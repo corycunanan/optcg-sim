@@ -6,9 +6,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-50 text-gray-900">
       {/* Admin nav */}
-      <nav className="border-b border-gray-200 bg-white">
+      <nav className="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
           <Link href="/" className="text-lg font-bold text-red-600">
             OPTCG
@@ -32,7 +32,9 @@ export default function AdminLayout({
       </nav>
 
       {/* Content */}
-      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
+        {children}
+      </main>
     </div>
   );
 }
