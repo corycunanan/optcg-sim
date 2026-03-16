@@ -24,6 +24,11 @@ Each phase doc covers scope, implementation plan, roadmap, architecture specific
 | M4 | Effect Engine | [docs/M4-EFFECT-ENGINE.md](./M4-EFFECT-ENGINE.md) |
 | M5 | Polish & Scale | [docs/M5-POLISH-AND-SCALE.md](./M5-POLISH-AND-SCALE.md) |
 
+## Project Management
+
+- [Planning & Risk Assessment](./PLANNING.md) — unknowns, timeline estimates, prioritization
+- [Workflows & Tooling Guide](./WORKFLOWS.md) — GSD best practices, multi-agent usage, tool selection, documentation practices
+
 ## Reference
 
 - [PRD](../PRD%20-%20OPTCG%20Simulator.md) — product requirements document (source of truth)
