@@ -9,6 +9,7 @@
 
 - [Architecture Overview](./ARCHITECTURE.md) — system diagram, service boundaries, data flow, deployment topology
 - [Tech Stack](./TECH-STACK.md) — all technologies, versions, and rationale for each choice
+- [Game Engine Requirements](./GAME-ENGINE-REQUIREMENTS.md) — complete rules-to-engine mapping from Comprehensive Rules v1.2.0, including corrections to phase docs
 
 ## Phase Documentation
 
