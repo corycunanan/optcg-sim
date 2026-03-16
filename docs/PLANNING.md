@@ -51,19 +51,24 @@ Specific timing complexities:
 
 **Mitigation:** Build a comprehensive test suite of known card interactions before implementing. OPTCG community rulings and FAQs document edge cases — those become test cases.
 
-### 3. Card Data Sourcing — ✅ LARGELY RESOLVED
+### 3. Card Data Sourcing — ✅ FULLY RESOLVED
 
-**Risk: Low (was Medium). Impact: High (blocks everything).**
+**Risk: Resolved (was Medium). Impact: High (blocks everything).**
 
-**Resolution:** Identified two community tools:
-- **vegapull** (https://github.com/coko7/vegapull) — Rust CLI that scrapes the official OPTCG site. If it works against the current site, gives us full coverage (all sets including OP-14).
-- **punk-records** (https://github.com/buhbbl/punk-records) — prefetched JSON dataset from vegapull. 4,007 cards across 50 packs as of March 8, 2026. Coverage through OP-09 only.
+**Resolution (2026-03-16):** vegapull v1.2.0 confirmed working against the live official site. Full dataset pulled:
+- **51 packs**, 4,346 card entries, 2,496 unique base cards
+- Coverage through OP-15, EB-04, all Starter Decks through ST-29, Premium Boosters PRB-01/02
+- `block_number` field auto-populated for all cards (eliminates manual block rotation maintenance)
+- Art variant convention (`_p` = parallel art, `_r` = reprint) allows automated classification
+- 575 cards confirmed as cross-set reprints requiring many-to-many Card ↔ Set relationship
+- Card images downloadable via `--with-images` flag (600×838 PNG, SAMPLE watermarked)
 
-**Pipeline strategy:** Try vegapull directly first (Mode A) for full coverage. Fall back to punk-records (Mode B) if vegapull hits issues. Import pipeline includes an art variant grouping step to deduplicate cards that appear across multiple packs.
+**Remaining minor issues:**
+- Pack 569115 (OP15-EB04) crashes on card OP15-096 (vegapull bug — empty block_number)
+- Card images have SAMPLE watermarks (fine for dev, need alternative source for production)
+- HTML entities in some card names (transform step handles this)
 
-**Remaining gaps:** ban status, block rotation, errata (maintained manually). Art variants handled via dedup/grouping in the import pipeline.
-
-See [DATA-PIPELINE.md](./DATA-PIPELINE.md) for full evaluation, field mapping, and pipeline design.
+See [DATA-PIPELINE.md](./DATA-PIPELINE.md) for full test results, field mapping, and pipeline design.
 
 ### 4. Game Server Architecture and Hosting
 
@@ -98,10 +103,10 @@ M3 ships with manual effect tracking. M4 automates them. The transition is awkwa
 
 Before writing code:
 
-1. ~~**Card data source**~~ — ✅ Resolved. Using punk-records community JSON dataset.
+1. ~~**Card data source**~~ — ✅ Fully resolved. vegapull confirmed working; full dataset pulled 2026-03-16.
 2. **Effect schema stress test** — pick 20 of the most complex cards across 2 sets and try to author their effectSchema by hand. See where the vocabulary breaks.
 3. **Community rulings** — find OPTCG judge rulings or FAQ documents that cover edge cases not in the comprehensive rules. These become the test suite.
 
 ---
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-16_

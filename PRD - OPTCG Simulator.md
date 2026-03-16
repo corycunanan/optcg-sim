@@ -11,7 +11,7 @@
 | Date | Author | Change |
 |---|---|---|
 | 2026-03-15 | Cory Cunanan | Initial PRD draft created — auth, deck builder, social, simulator, data pipeline, effect schema, architecture, milestones |
-| 2026-03-15 | Cory Cunanan | Card data model: renamed `subtype` → `traits`; added `set` field to `ArtVariant`; added example to `name` field |
+| 2026-03-16 | Cory Cunanan | vegapull confirmed working; full dataset (51 packs, 4,346 entries, 2,496 unique cards) pulled successfully. Updated data model: Card ↔ Set many-to-many via CardSet join table, `originSet` + `blockNumber` fields, `_p`/`_r` variant classification. Admin UI added to M0 scope. Python pipeline replaced with TypeScript. Reprint filter feature added. |
 
 ---
 
@@ -71,9 +71,9 @@ A full-featured web application for playing the One Piece Trading Card Game (OPT
 
 ```
 Card {
-  id:             string        // e.g. "OP01-001"
-  set:            string        // e.g. "OP01"
-  name:           string.       // e.g. "Monkey.D.Luffy"
+  id:             string        // e.g. "OP01-001" (base ID, no suffix)
+  originSet:      string        // e.g. "OP-01" — derived from card ID prefix (first printing)
+  name:           string        // e.g. "Monkey.D.Luffy"
   color:          string[]      // Red, Blue, Green, Purple, Black, Yellow
   type:           enum          // Leader, Character, Event, Stage
   cost:           int | null
@@ -82,20 +82,29 @@ Card {
   attribute:      string[]      // Strike, Slash, Ranged, Special, Wisdom
   life:           int | null    // Leader only
   traits:         string[]      // e.g. ["Straw Hat Crew"]
+  rarity:         string        // Common, Uncommon, Rare, SuperRare, SecretRare, etc.
   effectText:     string        // Raw printed text
   triggerText:    string | null
   effectSchema:   EffectSchema  // Parsed JSON (see section 6)
+  blockNumber:    int           // Block rotation (1, 2, 3, 4) — auto-populated from vegapull
   artVariants:    ArtVariant[]
   errata:         Errata[]
+  cardSets:       CardSet[]     // All sets/packs this card appears in
   banStatus:      enum          // Legal, Banned, Restricted
-  blockRotation:  string[]      // Which block formats this card is legal in
   imageUrl:       string
-  altImageUrls:   string[]
+}
+
+CardSet {
+  packId:       string          // vegapull pack ID (e.g. "569101")
+  setLabel:     string          // Human-readable (e.g. "OP-01")
+  setName:      string          // Full name (e.g. "ROMANCE DAWN")
+  isOrigin:     boolean         // True if this is the card's first printing
 }
 
 ArtVariant {
-  variantId:    string
-  label:        string          // e.g. "Parallel", "SEC"
+  variantId:    string          // Full vegapull ID (e.g. "OP01-001_p1")
+  label:        string          // e.g. "Parallel", "SEC", "Treasure", "Promo"
+  rarity:       string          // Rarity of this specific variant
   imageUrl:     string
   set:          string
 }
@@ -109,28 +118,34 @@ Errata {
 
 #### 2b. Data Pipeline
 
-**Primary approach — HTML scraping from official OPTCG site:**
-- Write a scraper (e.g. Python + BeautifulSoup or Playwright for JS-rendered pages) that targets the official card list pages organized by set
-- Parse card attributes from each card's detail page
-- Store raw HTML snapshots alongside parsed data to support re-parsing on schema changes
-- Schedule scraper runs on new set release dates (manually triggered or cron)
+**Primary approach — vegapull (Rust CLI) + TypeScript import pipeline:**
+- **vegapull** (https://github.com/coko7/vegapull) — Rust CLI that scrapes the official OPTCG site. Confirmed working 2026-03-16. Produces structured JSON with card metadata, images, and block rotation data.
+- Run `vega pull -o <dir> cards <pack_id>` per pack (non-interactive mode)
+- TypeScript import pipeline transforms vegapull JSON → Prisma schema and upserts to PostgreSQL
+- Image download via `--with-images` flag; uploaded to R2/CDN
+- Full pull: ~4.5 minutes for 51 packs, 4,346 card entries
 
-**Alternative / supplementary sources to evaluate:**
-- `optcg-data` community repositories on GitHub — may have structured JSON already
-- Bandai's official API (if one exists or becomes available)
-- Fanmade databases (e.g. One Piece Card Game DB sites) — check licensing before use
+**Key data pipeline capabilities:**
+- Art variant classification: `_p` suffixes → ArtVariant records (different art), `_r` suffixes → CardSet entries (reprints, same art)
+- Cross-set merging: 575 cards appear in 2+ packs; Card ↔ Set many-to-many via CardSet join table
+- Reprint filtering: `originSet` derived from card ID prefix (e.g. OP01-001 → OP-01); option to show cards only in origin set
+- Block rotation: `block_number` field auto-populated from vegapull (no manual maintenance)
+
+**Fallback / supplementary sources:**
+- **punk-records** (https://github.com/buhbbl/punk-records) — prefetched JSON dataset; coverage through OP-09
+- Manual entry via database admin UI for cards vegapull misses
 
 **Pipeline steps:**
-1. **Fetch** — download HTML/JSON from source per set
-2. **Parse** — extract structured card data
-3. **Normalize** — standardize field names, resolve edge cases (dual-color, errata'd cards)
-4. **Diff** — compare against existing DB records; flag changed cards for manual review
-5. **Effect parsing** — run effect text through the translation layer (see section 6) to generate `effectSchema`
-6. **Publish** — write to production card database; invalidate CDN cache for card images
+1. **Pull** — Run vegapull per pack with retry logic
+2. **Transform** — Map fields, decode HTML entities, classify variants
+3. **Merge** — Build Card ↔ Set membership, group art variants, detect reprints
+4. **Write** — Upsert cards + variants + set membership to PostgreSQL via Prisma
+5. **Download images** — Fetch card images → local/R2
+6. **Verify** — Count cards, spot-check known cards
 
 **Storage:**
-- Card records: PostgreSQL or Supabase table (structured queries for deck builder filters)
-- Card images: object storage (S3/R2), served via CDN
+- Card records: PostgreSQL (Supabase) with Card, CardSet, ArtVariant tables
+- Card images: local storage (dev) → Cloudflare R2 + CDN (production)
 
 ---
 
@@ -316,7 +331,8 @@ This is one of the highest-complexity components. Card effect text must be parse
 | Database | PostgreSQL via Supabase or Neon |
 | ORM | Prisma |
 | Card images | Cloudflare R2 + CDN |
-| Data pipeline | Python (Playwright + BeautifulSoup), scheduled via GitHub Actions or a cron job |
+| Data sourcing | vegapull v1.2.0 (Rust CLI) — scrapes official OPTCG site |
+| Data pipeline | TypeScript (tsx) — JSON transform, Prisma import, image download |
 | LLM integration | Claude API (for effect text parsing in Phase 2) |
 | Hosting | Vercel (frontend + API) or Railway/Fly.io for long-running server |
 
@@ -368,8 +384,11 @@ This is one of the highest-complexity components. Card effect text must be parse
 ### M0 — Foundation
 - [ ] Repo setup, CI/CD, hosting
 - [ ] Google auth flow
-- [ ] PostgreSQL schema for cards, users, decks
-- [ ] Basic card database populated for 1-2 sets (manual or scraped)
+- [ ] PostgreSQL schema for cards (with CardSet join table, art variants), users, decks
+- [ ] Full card database populated via vegapull (all 51 packs, 2,496 unique cards)
+- [ ] Card images downloaded and stored (local/R2)
+- [ ] Database admin UI: browse, search, filter, edit, add cards, reprint filter toggle
+- [ ] Art variant gallery and cross-set membership visualization
 
 ### M1 — Deck Builder
 - [ ] Card search + filter API

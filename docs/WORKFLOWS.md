@@ -79,7 +79,7 @@ Independent tasks with zero shared state:
 
 | Parallel Pair | Why It Works |
 |---------------|-------------|
-| M0: Data pipeline (Python) + Frontend scaffold (Next.js) | Completely independent codebases |
+| M0: Data pipeline (TypeScript) + Frontend scaffold (Next.js) | Completely independent codebases |
 | M1: Card search API + Deck editor UI | API built to spec, UI built against mock data |
 | M2: Friend system API + Messaging API | Independent feature domains |
 
@@ -151,7 +151,7 @@ Weaknesses:
 |----------|------|-----|
 | Planning, discussion, docs | GSD or Claude Code | Interactive, iterative |
 | M0–M2 implementation | GSD auto-mode | Structured serial tasks with verification |
-| Data pipeline (Python scraper) | GSD subagent (parallel) | Independent from frontend work |
+| Data pipeline (TypeScript import) | GSD subagent (parallel) | Independent from frontend work |
 | Game engine core (M3) | GSD, single-agent, frequent human review | High-stakes rules accuracy |
 | Effect schema bulk authoring (M4) | Gemini for generation → GSD for integration/testing | Gemini's context window for analyzing 120+ cards at once |
 | Card data source evaluation | Claude Code or GSD | Quick research task |

@@ -327,13 +327,192 @@ For new set releases: run `vega pull cards {pack_id}` for the new pack, pipe thr
 
 ---
 
-## Open Questions
+## vegapull Confirmed Working (2026-03-16)
 
-- [ ] **Does vegapull work today?** Need to test `vega pull all` against the current site. Cookie protections may have changed since the tool's last update (Jan 2026).
-- [ ] **Image hosting rights:** Can we download and re-host card images on our CDN? Need to understand the copyright implications. The images are copyrighted by Bandai Namco. Other fan projects (sim tools, deck builders) generally do this — but it's worth noting.
-- [ ] **Errata tracking source:** Where do we get errata data? The official site may update card text in-place without history. We may need to diff against our stored data on each re-import to detect changes.
-- [ ] **Block rotation data source:** Is there an official list of which cards are legal in which block formats? This may need to be maintained from official tournament announcements.
+### Test Results
+
+vegapull v1.2.0 successfully scraped the live official site. **Mode A is confirmed viable.**
+
+| Metric | Value |
+|--------|-------|
+| Packs discovered | 51 |
+| Packs pulled successfully | 50 (1 partial failure) |
+| Total card entries | 4,346 |
+| Unique base card IDs | 2,496 |
+| Base entries | 2,858 |
+| Art variant entries (\_p suffix) | 1,488 |
+| Reprint entries (\_r suffix) | 362 |
+| Full pull time (non-interactive) | ~4.5 minutes |
+| Image size per card | ~180KB PNG (600×838) |
+| Estimated total image size | ~780MB |
+
+### CLI Usage Notes
+
+The `vega pull all` command requires TTY (interactive mode) and fails in scripts. Use pack-by-pack loop instead:
+
+```bash
+# Pull pack list first
+vega pull -o <dir> packs
+
+# Then pull each pack individually
+for pack_id in $(cat <dir>/json/packs.json | python3 -c "..."); do
+  vega pull -o <dir> cards "$pack_id"
+  sleep 0.5  # rate limit
+done
+
+# With images (much slower):
+vega pull -o <dir> cards <pack_id> --with-images
+```
+
+### Known Issues
+
+1. **Pack 569115 (OP15-EB04) crashes on card OP15-096** — `block_number` is empty for this card, causing a vegapull error. The rest of the pack's data was captured via an earlier single-pack pull before the crash point. This is a vegapull bug; workaround: use existing data from a successful partial pull or manually add OP15-096.
+2. **Transient network errors** — pack 569018 (ST-18) failed on first attempt but succeeded on retry. The pull script should include retry logic.
+3. **Card images have "SAMPLE" watermarks** — these are from the official site and are baked into the images. The images are usable for development/testing but may need to be sourced elsewhere for production.
+4. **HTML entities in card names** — e.g. `"Smoker &amp; Tashigi"` needs decoding.
+
+### New Field: `block_number`
+
+vegapull now includes `block_number` (integer) for all cards. This was added in January 2026 and directly maps to block rotation legality:
+
+| Block | Entry Count | Sets |
+|-------|-------------|------|
+| 1 | 1,329 | ST-01–ST-10, OP-01–OP-04, EB-01 |
+| 2 | 1,194 | ST-11–ST-17, OP-05–OP-08, EB-02 |
+| 3 | 1,138 | ST-18–ST-24, OP-09–OP-12, EB-03 |
+| 4 | 685 | ST-25+, OP-13+, EB-04 |
+
+This eliminates the need to manually maintain block rotation data — it can be auto-populated from vegapull.
+
+### Variant ID Convention
+
+vegapull uses ID suffixes to distinguish card printings:
+
+| Suffix | Meaning | Count | Source |
+|--------|---------|-------|--------|
+| (none) | Base card (original printing) | 2,858 | Original set |
+| `_p1`–`_p8` | Parallel / promo art (different artwork) | 1,488 | Boosters, promos, extra boosters |
+| `_r1`–`_r2` | Reprint (same art, different product) | 362 | Premium Boosters, Starter Decks |
+
+**Key distinction:** `_p` = different art (→ ArtVariant record), `_r` = same art reprint (→ set membership only, no new ArtVariant image).
+
+### Cross-Set Card Analysis
+
+**575 unique cards appear in 2+ different packs:**
+- 418 cards in 2 packs
+- 117 cards in 3 packs  
+- 35 cards in 4 packs
+- 5 cards in 5 packs
+
+**Example:** EB01-015 has 7 entries across ST-24, EB-01, PRB-02, and Promotion card packs with various art variants.
+
+**Impact on schema:** The `Card.set` single string field is insufficient. We need:
+1. An `originSet` field derived from card ID prefix (e.g. `OP01-001` → `OP-01`)
+2. A full set membership list showing ALL packs/sets a card appears in
+3. A reprint filter option: when enabled, cards only appear under their origin set; when disabled, they appear in every set they're printed in
+
+### Image Pipeline
+
+Images download successfully via `--with-images` flag:
+- Format: PNG, 600×838 pixels, ~180KB each
+- Naming: matches card ID (e.g. `ST01-001.png`)
+- Storage: local `images/` directory within the output folder
+- Production plan: download locally, then upload to Cloudflare R2 for CDN serving
 
 ---
 
-_Last updated: 2026-03-15_
+## Updated Pipeline Design
+
+### Revised Architecture
+
+```
+                    ┌──────────────────┐
+                    │   vegapull CLI    │
+                    │   v1.2.0 (Rust)  │
+                    └────────┬─────────┘
+                             │ JSON + PNG files
+                    ┌────────▼─────────┐
+                    │  Raw card data    │
+                    │  per-pack JSON    │
+                    │  + card images    │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────▼──────────────┐
+              │   Import Pipeline (TypeScript) │
+              │                                │
+              │  1. Load JSON + packs.json     │
+              │  2. Decode HTML entities        │
+              │  3. Map fields to our schema    │
+              │  4. Sanitize effect text        │
+              │  5. Group art variants (_p)     │
+              │  6. Map reprints (_r) to sets   │
+              │  7. Build card ↔ set membership │
+              │  8. Derive originSet from ID    │
+              │  9. Populate block_number       │
+              │  10. Upsert to PostgreSQL       │
+              │  11. Copy images → R2           │
+              └──────────────┬──────────────────┘
+                             │
+              ┌──────────────▼──────────────┐
+              │   PostgreSQL (Supabase)       │
+              │   cards + art_variants +      │
+              │   card_sets (join table)       │
+              └──────────────────────────────┘
+```
+
+### Updated Field Mapping
+
+| Source Field | Our Prisma Field | Transform |
+|---|---|---|
+| `id` | `Card.id` | Strip `_p1`/`_r1` suffix → base ID |
+| `id` suffix | `ArtVariant.variantId` or `CardSet` entry | `_p` → art variant; `_r` → set membership |
+| `pack_id` | `CardSet.packId` | Many-to-many relation |
+| Card ID prefix | `Card.originSet` | Parse: `OP01-001` → `OP-01` |
+| `name` | `Card.name` | Decode HTML entities |
+| `category` | `Card.type` (enum) | Map: Leader/Character/Event/Stage |
+| `colors` | `Card.color` (string[]) | Direct |
+| `cost` | `Card.cost` (int?) | Direct |
+| `power` | `Card.power` (int?) | Direct |
+| `counter` | `Card.counter` (int?) | Direct |
+| `attributes` | `Card.attribute` (string[]) | Direct |
+| `types` | `Card.traits` (string[]) | Direct |
+| `effect` | `Card.effectText` | Strip `<br>` → newlines; decode HTML entities |
+| `trigger` | `Card.triggerText` (string?) | Direct |
+| `rarity` | `Card.rarity` / `ArtVariant.rarity` | Direct; base card uses origin rarity |
+| `block_number` | `Card.blockNumber` (int) | Direct — auto-populated! |
+| `img_full_url` | `Card.imageUrl` / `ArtVariant.imageUrl` | Download → R2 → CDN URL |
+
+---
+
+## Database Admin UI
+
+A database visualization and editing UI is planned as part of M0 to support ongoing maintenance:
+
+### Features
+1. **Browse & Search** — paginated card grid with images, filter by set/type/color/rarity/block, full-text search by name
+2. **Card Detail View** — all fields displayed, art variants gallery, set membership list
+3. **Manual Edit** — edit any card field (ban status, block rotation, traits, errata, effect text) with change tracking
+4. **Add Card** — manually add cards that vegapull misses (e.g. OP15-096)
+5. **Import/Re-import** — trigger vegapull re-pull and merge for specific packs
+6. **Reprint Filter Toggle** — switch between "show card in origin set only" and "show card in all sets"
+7. **Errata Management** — add/edit errata entries with before/after text comparison
+
+### Purpose
+- M0 verification: confirm pipeline imported correctly
+- Ongoing maintenance: ban lists, errata, manual corrections
+- Data quality: spot-check and fix issues vegapull can't handle
+
+---
+
+## Open Questions
+
+- [x] ~~**Does vegapull work today?**~~ ✅ Yes — confirmed 2026-03-16. Full dataset pulled successfully.
+- [ ] **Image hosting rights:** Card images have "SAMPLE" watermarks from the official site. Other fan projects host images — but copyright implications remain. May need to source from community image repositories.
+- [ ] **Errata tracking source:** Need to diff against stored data on each re-import to detect changes. The `effectText` comparison between runs is the detection mechanism.
+- [x] ~~**Block rotation data source:**~~ ✅ Resolved — `block_number` field from vegapull provides this automatically.
+- [ ] **Production image source:** ALL known sources (official EN/JP sites, Limitless TCG, OPTCG API, onepiece.gg) serve SAMPLE-watermarked images from Bandai. No clean digital source exists — clean images only exist as physical card scans. Options: (1) accept watermarks like other fan tools, (2) source community scans with coverage gaps, (3) accept long-term. This is an open item for production readiness.
+- [ ] **OP15-096 vegapull bug:** Card crashes vegapull due to empty `block_number`. Flagged for manual add via admin UI — will serve as a test case for manual card entry workflow.
+
+---
+
+_Last updated: 2026-03-16_

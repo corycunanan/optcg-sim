@@ -15,9 +15,10 @@
 | Auth | Supabase Auth (Google OAuth 2.0) | Authentication, session management |
 | Database | PostgreSQL (via Supabase or Neon) | Primary data store |
 | ORM | Prisma | Type-safe DB access, migrations |
-| Object Storage | Cloudflare R2 | Card images, raw HTML snapshots |
+| Object Storage | Cloudflare R2 | Card images, raw data snapshots |
 | CDN | Cloudflare CDN | Image delivery, static asset caching |
-| Data Pipeline | Python + Playwright + BeautifulSoup | Card data scraping and parsing |
+| Data Sourcing | vegapull v1.2.0 (Rust CLI) | Card data scraping from official OPTCG site |
+| Data Pipeline | TypeScript (tsx) | JSON transform, Prisma import, image download |
 | LLM Integration | Claude API | Effect text → schema translation (M4+) |
 | CI/CD | GitHub Actions | Pipeline automation, deploy triggers |
 | Hosting (Frontend) | Vercel | Next.js hosting, preview deploys |
@@ -111,19 +112,27 @@
 
 ## Data Pipeline
 
-### Python + Playwright + BeautifulSoup
+### vegapull (Rust CLI) + TypeScript Import Pipeline
 
-- **Why Python:** Best-in-class scraping ecosystem; Playwright handles JS-rendered pages, BeautifulSoup handles static HTML parsing
-- **Why not Node:** Python's scraping libraries are more mature; pipeline runs independently from the app anyway
+**Data sourcing: vegapull v1.2.0**
+- **Language:** Rust (compiled binary, no runtime dependencies)
+- **Install:** `cargo install vegapull`
+- **Confirmed working:** 2026-03-16 against the live official site
+- **Capabilities:** 51 packs, 4,346 card entries, card images, block_number field, 7 languages
+- **Usage:** Per-pack CLI invocations (`vega pull -o <dir> cards <pack_id>`)
+
+**Import pipeline: TypeScript**
+- **Why TypeScript (not Python):** Same language as the app; no scraping needed since vegapull produces JSON. Eliminates Python runtime dependency.
 - **Pipeline stages:**
-  1. **Fetch** — Playwright navigates official OPTCG card list, downloads page HTML per set
-  2. **Parse** — BeautifulSoup extracts card attributes from HTML
-  3. **Normalize** — Standardize field names, handle edge cases (dual-color cards, errata)
-  4. **Diff** — Compare parsed data against existing DB records; flag changes
-  5. **Effect translate** — Generate `effectSchema` JSON (manual in early phases, LLM-assisted later)
-  6. **Publish** — Write to PostgreSQL, upload images to R2, invalidate CDN cache
+  1. **Load** — Read vegapull JSON output (packs.json + per-pack card files)
+  2. **Transform** — Map fields to Prisma schema; decode HTML entities
+  3. **Sanitize** — Strip `<br>` → newlines; normalize whitespace
+  4. **Classify** — `_p` suffixes → ArtVariant records; `_r` suffixes → CardSet entries
+  5. **Build set membership** — Card ↔ Set many-to-many from cross-pack appearances
+  6. **Write** — Upsert to PostgreSQL via Prisma
+  7. **Download images** — Fetch card images from official URLs → local/R2
 - **Scheduling:** GitHub Actions cron (on set release dates) or manual trigger
-- **Dependencies:** `playwright`, `beautifulsoup4`, `httpx`, `psycopg2` / `asyncpg`, `pydantic` (data validation)
+- **Dependencies:** `tsx` (TypeScript runner), Prisma client, `node-html-parser` (HTML entity decode)
 
 ### Claude API (M4+)
 
@@ -170,10 +179,9 @@
 | TypeScript | 5.x | Strict mode enabled |
 | Tailwind CSS | 3.4+ | |
 | Prisma | 5.x+ | |
-| Python | 3.11+ | Data pipeline |
-| Playwright (Python) | Latest | Scraping |
+| vegapull | 1.2.0 | Rust CLI for card data sourcing; installed via `cargo install vegapull` |
 | PostgreSQL | 15+ | Via Supabase/Neon |
 
 ---
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-16_

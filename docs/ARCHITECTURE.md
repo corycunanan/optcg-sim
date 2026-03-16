@@ -59,16 +59,20 @@
 ┌─────────────┴───────────────────────────────────────────────┐
 │                    Data Pipeline                             │
 │                                                              │
-│  ┌──────┐   ┌───────┐   ┌───────────┐   ┌──────┐   ┌─────┐│
-│  │Fetch │──▶│ Parse │──▶│ Normalize │──▶│ Diff │──▶│Write││
-│  │(HTML)│   │       │   │           │   │      │   │(DB) ││
-│  └──────┘   └───────┘   └───────────┘   └──────┘   └─────┘│
-│                                │                            │
-│                    ┌───────────▼──────────┐                 │
-│                    │  Effect Translator   │                 │
-│                    │  (Manual → LLM)      │                 │
-│                    └─────────────────────┘                  │
+│  ┌──────────┐  ┌───────────┐  ┌───────────┐  ┌────────┐   │
+│  │ vegapull │─▶│ Transform │─▶│ Classify  │─▶│ Write  │   │
+│  │ (Rust   │  │ + Sanitize│  │ variants  │  │ (DB +  │   │
+│  │  CLI)   │  │           │  │ + sets    │  │ images)│   │
+│  └──────┬──┘  └───────────┘  └───────────┘  └────────┘   │
+│         │                          │                        │
+│  ┌──────▼──┐            ┌──────────▼──────────┐            │
+│  │  JSON + │            │  Art Variant Grouping│            │
+│  │  Images │            │  + Cross-Set Merge   │            │
+│  └─────────┘            │  + Reprint Detection │            │
+│                         └─────────────────────┘            │
 │                                                              │
+│  Mode A: vegapull direct (confirmed working 2026-03-16)      │
+│  Mode B: punk-records fallback (through OP-09)               │
 │  Triggered: manually or via GitHub Actions cron              │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -117,13 +121,14 @@ A dedicated long-running process that manages active game sessions:
 
 ### Data Pipeline
 
-A separate process (Python) that populates and updates the card database:
+A separate process (TypeScript) that populates and updates the card database:
 
 - Runs on demand or on a cron schedule (GitHub Actions)
-- Fetches from the official OPTCG site (HTML scraping) or community data sources
+- Invokes vegapull CLI to scrape the official OPTCG site (JSON output)
+- Transforms JSON → Prisma schema, classifies art variants and reprints
 - Writes structured card data to PostgreSQL
-- Uploads card images to object storage
-- Generates `effectSchema` JSON (manual in M0–M3, LLM-assisted in M4+)
+- Downloads card images to local storage / object storage
+- Handles cross-set card membership (many-to-many Card ↔ Set)
 
 ---
 
@@ -229,9 +234,14 @@ If offline → message stored; delivered on next connect
 | Prisma as ORM | Type-safe database access, migration management, good Next.js ecosystem fit |
 | WebSocket over SSE for games | Bidirectional communication needed — both players send actions and receive state |
 | CDN for card images | Cards are static assets; serving via CDN reduces load and latency |
-| Python for data pipeline | Better scraping ecosystem (Playwright, BeautifulSoup); runs independently from the app |
+| vegapull for data sourcing | Rust CLI that solved the cookie/auth problem; confirmed working 2026-03-16; replaces custom scraper and Python pipeline |
+| TypeScript for data pipeline | Same language as the app; no Python dependency needed since we're transforming JSON not scraping HTML |
+| Card ↔ Set as many-to-many | 575 cards appear in multiple packs; single `set` field insufficient for cross-set queryability and reprint filtering |
+| `originSet` derived from card ID prefix | Card ID prefix (e.g. OP01 from OP01-001) reliably indicates first printing; more reliable than pack metadata |
+| `blockNumber` from vegapull | Auto-populated integer eliminates manual block rotation maintenance |
+| Admin UI in M0 (not just verification page) | Database needs ongoing maintenance (ban lists, errata, manual corrections); visual tool pays for itself across all milestones |
 | Effect schema as JSON | Machine-readable format lets the game engine resolve effects programmatically without parsing natural language at runtime |
 
 ---
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-16_
