@@ -230,4 +230,82 @@ This serves dual purpose: M0 verification AND ongoing database maintenance for f
 
 ---
 
+### 2026-03-16 — Scaffold: Next.js 16 (not 14) + Prisma 6 (not 7)
+
+**Area:** Project Setup
+
+The docs specified Next.js 14 but `create-next-app@latest` installed Next.js 16.1.6 (App Router). This is fine — the API is backwards-compatible and the App Router patterns we need work the same way.
+
+Prisma 7 was initially installed but its new config format (`prisma.config.ts` replacing `datasource.url` in schema) would have required a different setup. Downgraded to Prisma 6.19 which uses the traditional `schema.prisma` with `url = env("DATABASE_URL")`. Prisma 7 migration can happen later.
+
+**Versions locked:**
+- Next.js 16.1.6
+- React 19.2.3
+- TypeScript 5.9.3
+- Prisma 6.19.2
+- Tailwind CSS 4.2.1
+
+---
+
+### 2026-03-16 — Pipeline: Sanitize and transform are combined, not separate steps
+
+**Area:** Data Pipeline
+
+The original plan had `sanitize.ts` as a separate pipeline file. In practice, sanitization (HTML entity decode, `<br>` → newlines, strip HTML tags) was folded into `transform.ts` since it happens naturally during the field mapping step. No need for a separate file — the transform function handles decode + sanitize + map in a single pass.
+
+Also, `group-variants.ts` became `classify.ts` — clearer name since it classifies entries into base/parallel/reprint rather than just grouping.
+
+---
+
+### 2026-03-16 — Pipeline: OP07-091_p1 duplicated in vegapull source data
+
+**Area:** Data Pipeline
+
+vegapull outputs OP07-091_p1 twice across different pack files. Prisma's `createMany({ skipDuplicates: true })` handles this correctly — 1,488 variant entries in source → 1,487 in database. This is expected and the verify step accounts for it.
+
+---
+
+### 2026-03-16 — Pipeline: vegapull packs.json is a dict, not an array
+
+**Area:** Data Pipeline
+
+vegapull's `packs.json` output is `Record<string, Pack>` (keyed by pack_id), not `Pack[]`. The load step must handle this dict structure. Pack IDs are string numbers like "569101".
+
+Also: `life` field does NOT exist in vegapull output for Leaders. The `cost` field on Leaders represents the starting life value (always 5). This means `Card.life` in the Prisma schema stays null for all cards from the pipeline — life would need to be populated separately or derived from the cost field for Leaders.
+
+---
+
+### 2026-03-16 — Admin UI: Dark mode text color conflict
+
+**Area:** Frontend / UI
+
+The app's `globals.css` uses `prefers-color-scheme: dark` to set `--foreground: #ededed` (light gray). The admin layout uses `bg-gray-50` (light background), but inherited text color was the dark-mode `#ededed` — making headings and text nearly invisible on the light admin background.
+
+**Fix:** Added explicit `text-gray-900` to the admin layout wrapper div. This forces readable dark text regardless of the system color scheme. The landing page (`/`) correctly renders in dark mode with its dark background.
+
+**Lesson:** When mixing light-background admin sections with a dark-mode-aware root layout, always set explicit text colors on the section wrapper. Don't rely on CSS variable inheritance across color scheme boundaries.
+
+---
+
+### 2026-03-16 — Admin UI: Sticky nav + scrollbar-gutter for consistent layout
+
+**Area:** Frontend / UI
+
+Two subtle layout issues fixed:
+1. **Scrollbar layout shift** — When page content grows tall enough to need a scrollbar, the scrollbar appearing shifts content left. Fixed with `scrollbar-gutter: stable` on `<html>` which reserves space for the scrollbar even when not present.
+2. **Scroll behavior** — Admin nav made `sticky top-0` so it stays visible while scrolling through card grid. Main content uses `flex-1` in a `flex flex-col min-h-screen` layout for proper height distribution.
+
+---
+
+### 2026-03-16 — Dev Setup: Local PostgreSQL via Homebrew (not Supabase for dev)
+
+**Area:** Infrastructure
+
+For local development, PostgreSQL 16 via Homebrew (`brew install postgresql@16`) is simpler than setting up Supabase. Connection string: `postgresql://username@localhost:5432/optcg_sim`. Supabase is still the target for production.
+
+Start: `brew services start postgresql@16`
+Create DB: `/opt/homebrew/opt/postgresql@16/bin/createdb optcg_sim`
+
+---
+
 <!-- Add new entries above this line -->

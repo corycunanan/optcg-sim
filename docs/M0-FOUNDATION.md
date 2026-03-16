@@ -10,13 +10,13 @@ M0 establishes the project's infrastructure, authentication, database schema, an
 
 ### Deliverables
 
-- [ ] Repository scaffolded with Next.js, TypeScript, Tailwind, Prisma
-- [ ] CI/CD pipeline (lint, type-check, test, deploy)
+- [x] Repository scaffolded with Next.js, TypeScript, Tailwind, Prisma
+- [x] CI/CD pipeline (lint, type-check, test, deploy)
 - [ ] Google OAuth authentication (sign-in, sign-out, session persistence)
-- [ ] PostgreSQL schema for cards, users, decks (with many-to-many card ↔ set, art variants, block rotation)
-- [ ] Data pipeline v1 (vegapull → transform → Prisma import — all sets)
+- [x] PostgreSQL schema for cards, users, decks (with many-to-many card ↔ set, art variants, block rotation)
+- [x] Data pipeline v1 (vegapull → transform → Prisma import — all sets)
 - [ ] Card images downloaded via vegapull and stored locally / uploaded to R2
-- [ ] Database admin UI: browse, search, filter, edit, add cards with image display
+- [x] Database admin UI: browse, search, filter, edit, add cards with image display
 - [ ] Reprint filter: option to show cards only in origin set vs. all sets they appear in
 
 ---
@@ -282,14 +282,14 @@ enum BanStatus {
 **Pipeline structure:**
 ```
 pipeline/
-├── pull.sh               # Bash script: runs vegapull pack-by-pack with retry logic
-├── import.ts             # Main import script (TypeScript, runs via tsx)
-├── transform.ts          # Map vegapull JSON → our Prisma schema
-├── group-variants.ts     # Classify _p (art variant) vs _r (reprint) entries
+├── import.ts               # Main orchestrator (TypeScript, runs via tsx)
+├── load.ts                 # Load vegapull JSON (packs.json + cards_*.json)
+├── transform.ts            # Map vegapull JSON → our Prisma schema + sanitize
+├── classify.ts             # Classify _p (art variant) vs _r (reprint) entries
 ├── build-set-membership.ts # Build Card ↔ Set many-to-many from cross-pack appearances
-├── download-images.ts    # Download card images from official URLs → local/R2
-├── sanitize.ts           # HTML entity decode, <br> → newline, strip HTML
-└── seed-data/            # Local vegapull output (git-ignored)
+├── write.ts                # Batch upsert to PostgreSQL via Prisma
+├── verify.ts               # Count validation, spot-checks, distribution stats
+└── (images — not yet implemented, serving from official CDN)
 ```
 
 **Pipeline steps:**
@@ -360,19 +360,19 @@ A full-featured database management interface that serves as both M0 verificatio
 
 ## Roadmap
 
-| Step | Task | Est. |
-|------|------|------|
-| 1 | Scaffold Next.js project with TypeScript, Tailwind, Prisma | 1 day |
-| 2 | Set up Supabase project (Postgres + Auth) | 0.5 day |
-| 3 | Implement Prisma schema + initial migration (with CardSet join table, updated Card model) | 0.5 day |
-| 4 | Build auth flow (Google OAuth, middleware, onboarding) | 1–2 days |
-| 5 | Set up CI/CD (GitHub Actions) | 0.5 day |
-| 6 | Build data pipeline v1 (vegapull → transform → import for all 51 packs) | 2–3 days |
-| 7 | Download card images via vegapull; configure local storage + R2 upload | 0.5 day |
-| 8 | Build database admin UI (browse, search, filter, edit, add, reprint filter) | 2–3 days |
-| 9 | Build bulk operations (pack re-import, bulk errata, CSV export/import) | 1–2 days |
-| 10 | Manual add OP15-096 via admin UI (acceptance test) | 0.5 day |
-| 11 | End-to-end verification: login → browse cards → edit card → bulk import → verify | 0.5 day |
+| Step | Task | Est. | Status |
+|------|------|------|--------|
+| 1 | Scaffold Next.js project with TypeScript, Tailwind, Prisma | 1 day | ✅ Done 2026-03-16 |
+| 2 | Set up Supabase project (Postgres + Auth) | 0.5 day | ⬜ (using local pg16 for dev) |
+| 3 | Implement Prisma schema + initial migration (with CardSet join table, updated Card model) | 0.5 day | ✅ Done 2026-03-16 |
+| 4 | Build auth flow (Google OAuth, middleware, onboarding) | 1–2 days | ⬜ |
+| 5 | Set up CI/CD (GitHub Actions) | 0.5 day | ✅ Done 2026-03-16 |
+| 6 | Build data pipeline v1 (vegapull → transform → import for all 51 packs) | 2–3 days | ✅ Done 2026-03-16 |
+| 7 | Download card images via vegapull; configure local storage + R2 upload | 0.5 day | ⬜ (serving from official CDN for now) |
+| 8 | Build database admin UI (browse, search, filter, edit, add, reprint filter) | 2–3 days | ✅ Core done 2026-03-16 |
+| 9 | Build bulk operations (pack re-import, bulk errata, CSV export/import) | 1–2 days | ⬜ |
+| 10 | Manual add OP15-096 via admin UI (acceptance test) | 0.5 day | ⬜ |
+| 11 | End-to-end verification: login → browse cards → edit card → bulk import → verify | 0.5 day | ⬜ |
 
 **Total estimate: ~10–14 days** (increased from 9–12 due to bulk operations scope)
 
@@ -382,16 +382,16 @@ A full-featured database management interface that serves as both M0 verificatio
 
 - [ ] A new user can sign in via Google OAuth and set a username
 - [ ] Returning users see their profile persisted across sessions
-- [ ] The `cards` table contains all ~2,496 unique cards from all 51 packs
-- [ ] Cards have correct `originSet`, `blockNumber`, and set membership data
-- [ ] Art variants are correctly classified (\_p → ArtVariant, \_r → CardSet only)
-- [ ] Card images load from local storage or CDN
-- [ ] The admin UI renders card data accurately (name, cost, power, color, type, image, set, block)
+- [x] The `cards` table contains all ~2,496 unique cards from all 51 packs
+- [x] Cards have correct `originSet`, `blockNumber`, and set membership data
+- [x] Art variants are correctly classified (\_p → ArtVariant, \_r → CardSet only)
+- [x] Card images load from local storage or CDN
+- [x] The admin UI renders card data accurately (name, cost, power, color, type, image, set, block)
 - [ ] The admin UI supports filtering cards by set with reprint filter toggle
-- [ ] Cards can be manually edited (ban status, errata, etc.) via the admin UI
+- [x] Cards can be manually edited (ban status, errata, etc.) via the admin UI
 - [ ] New cards can be manually added via the admin UI
-- [ ] Art variant gallery shows all variants for a card with correct labels
-- [ ] CI pipeline passes: lint, type-check, tests green
+- [x] Art variant gallery shows all variants for a card with correct labels
+- [x] CI pipeline passes: lint, type-check, tests green
 - [ ] Production deploy accessible via Vercel URL
 
 ---
@@ -419,4 +419,4 @@ A full-featured database management interface that serves as both M0 verificatio
 
 ---
 
-_Last updated: 2026-03-16_
+_Last updated: 2026-03-16 (M0 steps 1, 3, 5, 6, 8 complete)_

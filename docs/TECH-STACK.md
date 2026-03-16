@@ -171,16 +171,17 @@
 
 ## Version Targets
 
-| Technology | Target Version | Notes |
-|-----------|---------------|-------|
-| Node.js | 20 LTS | Runtime for Next.js and game server |
-| Next.js | 14.x+ | App Router |
-| React | 18.x+ | Concurrent features |
-| TypeScript | 5.x | Strict mode enabled |
-| Tailwind CSS | 3.4+ | |
-| Prisma | 5.x+ | |
-| vegapull | 1.2.0 | Rust CLI for card data sourcing; installed via `cargo install vegapull` |
-| PostgreSQL | 15+ | Via Supabase/Neon |
+| Technology | Target Version | Actual Version | Notes |
+|-----------|---------------|----------------|-------|
+| Node.js | 20 LTS | 22.22.1 | Runtime for Next.js and game server |
+| Next.js | 14.x+ | 16.1.6 | App Router (latest via create-next-app) |
+| React | 18.x+ | 19.2.3 | Concurrent features |
+| TypeScript | 5.x | 5.9.3 | Strict mode enabled |
+| Tailwind CSS | 3.4+ | 4.2.1 | v4 with @tailwindcss/postcss |
+| Prisma | 5.x+ | 6.19.2 | Prisma 7 deferred (new config format) |
+| vegapull | 1.2.0 | 1.2.0 | Rust CLI for card data sourcing; installed via `cargo install vegapull` |
+| PostgreSQL | 15+ | 16.13 | Local via Homebrew; Supabase for production |
+| pnpm | 10+ | 10.32.1 | Package manager |
 
 ---
 
