@@ -123,7 +123,7 @@ function mapCategory(
 
 export function transformCards(
   rawCards: RawVegapullCard[],
-  _packs: PackMap
+  _packs: PackMap // reserved for future pack-level transforms
 ): TransformedCard[] {
   const transformed: TransformedCard[] = [];
   const skipped: string[] = [];

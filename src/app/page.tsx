@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
@@ -7,18 +9,18 @@ export default function Home() {
           One Piece Trading Card Game — Deck Builder & Simulator
         </p>
         <div className="flex gap-4">
-          <a
+          <Link
             href="/admin/cards"
             className="rounded-lg bg-red-600 px-6 py-3 text-white transition hover:bg-red-700"
           >
             Card Database
-          </a>
-          <a
+          </Link>
+          <Link
             href="/login"
             className="rounded-lg border border-gray-300 px-6 py-3 transition hover:bg-gray-50"
           >
             Sign In
-          </a>
+          </Link>
         </div>
       </div>
     </main>

@@ -9,7 +9,7 @@
  * See docs/DATA-PIPELINE.md for full pipeline design.
  */
 
-import { PrismaClient, type CardType, type Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { loadVegapullData } from "./load";
 import { transformCards } from "./transform";
 import { classifyEntries } from "./classify";
