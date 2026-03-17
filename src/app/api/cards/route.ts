@@ -16,10 +16,14 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type");
   const costMin = searchParams.get("costMin");
   const costMax = searchParams.get("costMax");
+  const powerMin = searchParams.get("powerMin");
+  const powerMax = searchParams.get("powerMax");
   const set = searchParams.get("set");
   const block = searchParams.get("block");
   const rarity = searchParams.get("rarity");
   const ban = searchParams.get("ban");
+  const traits = searchParams.get("traits");
+  const attribute = searchParams.get("attribute");
   const page = parseInt(searchParams.get("page") || "1");
   const limit = Math.min(parseInt(searchParams.get("limit") || "40"), 100);
   const sort = searchParams.get("sort") || "id";
@@ -46,6 +50,12 @@ export async function GET(request: NextRequest) {
     if (costMax) where.cost.lte = parseInt(costMax);
   }
 
+  if (powerMin || powerMax) {
+    where.power = {};
+    if (powerMin) where.power.gte = parseInt(powerMin);
+    if (powerMax) where.power.lte = parseInt(powerMax);
+  }
+
   if (set) {
     where.cardSets = { some: { setLabel: set } };
   }
@@ -62,6 +72,14 @@ export async function GET(request: NextRequest) {
     where.banStatus = {
       in: ban.split(",") as Prisma.EnumBanStatusFilter["in"],
     };
+  }
+
+  if (traits) {
+    where.traits = { hasSome: traits.split(",") };
+  }
+
+  if (attribute) {
+    where.attribute = { hasSome: attribute.split(",") };
   }
 
   // Build orderBy

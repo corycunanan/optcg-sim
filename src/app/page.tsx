@@ -25,27 +25,26 @@ export default async function Home() {
         </p>
         <div className="flex justify-center gap-4">
           <Link
-            href="/admin/cards"
+            href={session ? "/decks" : "/login"}
             className="rounded-lg px-7 py-3 text-sm font-semibold transition-colors"
             style={{
               background: "var(--accent)",
               color: "var(--surface-0)",
             }}
           >
+            Deck Builder
+          </Link>
+          <Link
+            href="/admin/cards"
+            className="rounded-lg px-7 py-3 text-sm font-medium transition-colors"
+            style={{
+              border: "1px solid var(--border)",
+              color: "var(--text-secondary)",
+            }}
+          >
             Card Database
           </Link>
-          {session ? (
-            <Link
-              href="/admin"
-              className="rounded-lg px-7 py-3 text-sm font-medium transition-colors"
-              style={{
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              Dashboard
-            </Link>
-          ) : (
+          {!session && (
             <Link
               href="/login"
               className="rounded-lg px-7 py-3 text-sm font-medium transition-colors"

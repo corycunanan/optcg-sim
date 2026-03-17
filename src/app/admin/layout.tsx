@@ -37,6 +37,7 @@ export default async function AdminLayout({
             <NavLink href="/admin" label="Dashboard" />
             <NavLink href="/admin/cards" label="Cards" />
             <NavLink href="/admin/sets" label="Sets" />
+            <NavLink href="/decks" label="My Decks" />
           </div>
           <div className="ml-auto flex items-center gap-3">
             <Link
