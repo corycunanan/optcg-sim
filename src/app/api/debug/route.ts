@@ -23,7 +23,7 @@ export async function GET() {
       },
     });
     
-    const response = await handlers.GET(req);
+    const response = await handlers.GET(req as unknown as import("next/server").NextRequest);
     results.authSignin = { 
       status: response.status, 
       location: response.headers.get("location")?.substring(0, 100),
