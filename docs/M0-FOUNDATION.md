@@ -395,7 +395,7 @@ A full-featured database management interface that serves as both M0 verificatio
 - [x] New cards can be manually added via the admin UI
 - [x] Art variant gallery shows all variants for a card with correct labels
 - [x] CI pipeline passes: lint, type-check, tests green
-- [ ] Production deploy accessible via Vercel URL _(deferred — TD-003)_
+- [x] Production deploy accessible via Vercel URL — https://optcg-sim.vercel.app
 
 ---
 
@@ -432,7 +432,7 @@ A full-featured database management interface that serves as both M0 verificatio
 |----|------|----------|-------|
 | TD-001 | Bulk operations UI (pack re-import, bulk errata, CSV export/import) | Low | Admin productivity tools. Data is correct; these speed up manual maintenance. Build when needed. |
 | TD-002 | Card image download + R2 hosting | Medium | Currently serving SAMPLE-watermarked images from official CDN. Fine for dev. For production, download via vegapull `--with-images` (~780MB) and host on Cloudflare R2. |
-| TD-003 | Production deploy to Vercel | Medium | Needs production PostgreSQL (Supabase or Neon), env vars on Vercel, and domain setup. Straightforward once a production DB is provisioned. |
+| TD-003 | ~~Production deploy to Vercel~~ | ✅ Done | Deployed to https://optcg-sim.vercel.app with Neon PostgreSQL |
 | TD-004 | E2E verification walkthrough | Low | Sign in with Google → browse → edit → verify. Informal manual test, not blocking. |
 
 ### Current state summary
@@ -452,7 +452,7 @@ A full-featured database management interface that serves as both M0 verificatio
 | Auth | ✅ Complete | NextAuth.js v5, Google OAuth, Prisma adapter, proxy route protection, onboarding |
 | Bulk operations | 🔄 Tech debt | TD-001 |
 | Image hosting | 🔄 Tech debt | TD-002 |
-| Production deploy | 🔄 Tech debt | TD-003 |
+| Production deploy | ✅ Complete | https://optcg-sim.vercel.app, Neon PostgreSQL |
 
 ### Tech context for the next agent
 
