@@ -52,3 +52,4 @@ next-env.d.ts
 
 # bg-shell state
 .bg-shell/
+.env.vercel-token
