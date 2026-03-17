@@ -78,6 +78,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
     const cards: DeckCardEntry[] = preview.cards.map((c) => ({
       cardId: c.cardId,
       quantity: c.quantity,
+      selectedArtUrl: null,
       card: c.card,
     }));
 

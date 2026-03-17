@@ -5,6 +5,7 @@
 export interface DeckCardEntry {
   cardId: string;
   quantity: number;
+  selectedArtUrl: string | null; // Custom art variant URL (null = use base)
   card: {
     id: string;
     name: string;
@@ -60,6 +61,7 @@ export type DeckBuilderAction =
   | { type: "SET_QUANTITY"; cardId: string; quantity: number }
   | { type: "INCREMENT_CARD"; cardId: string }
   | { type: "DECREMENT_CARD"; cardId: string }
+  | { type: "SET_ART_VARIANT"; cardId: string; artUrl: string | null }
   | { type: "CLEAR_DECK" }
   | { type: "LOAD_DECK"; state: Omit<DeckBuilderState, "isDirty" | "isSaving"> }
   | { type: "IMPORT_CARDS"; leader: DeckLeaderEntry | null; cards: DeckCardEntry[] }
@@ -113,6 +115,7 @@ export function deckBuilderReducer(
         newCards.set(action.card.id, {
           cardId: action.card.id,
           quantity: 1,
+          selectedArtUrl: null,
           card: action.card,
         });
       }
@@ -166,6 +169,18 @@ export function deckBuilderReducer(
       return { ...state, cards: newCards, isDirty: true };
     }
 
+    case "SET_ART_VARIANT": {
+      const newCards = new Map(state.cards);
+      const entry = newCards.get(action.cardId);
+      if (entry) {
+        newCards.set(action.cardId, {
+          ...entry,
+          selectedArtUrl: action.artUrl,
+        });
+      }
+      return { ...state, cards: newCards, isDirty: true };
+    }
+
     case "CLEAR_DECK":
       return {
         ...state,
@@ -195,7 +210,10 @@ export function deckBuilderReducer(
             quantity: Math.min(existing.quantity + entry.quantity, 4),
           });
         } else {
-          newCards.set(entry.cardId, entry);
+          newCards.set(entry.cardId, {
+            ...entry,
+            selectedArtUrl: entry.selectedArtUrl ?? null,
+          });
         }
       }
       return {

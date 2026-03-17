@@ -46,6 +46,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           cardsMap.set(dc.cardId, {
             cardId: dc.cardId,
             quantity: dc.quantity,
+            selectedArtUrl: null,
             card: dc.card,
           });
         }
@@ -153,6 +154,16 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     [],
   );
 
+  // Remove card handler (decrement by 1)
+  const removeCard = useCallback((cardId: string) => {
+    dispatch({ type: "DECREMENT_CARD", cardId });
+  }, []);
+
+  // Set art variant handler
+  const setArtVariant = useCallback((cardId: string, artUrl: string | null) => {
+    dispatch({ type: "SET_ART_VARIANT", cardId, artUrl });
+  }, []);
+
   // Import handler
   const handleImport = useCallback(
     (leader: DeckLeaderEntry | null, cards: DeckCardEntry[]) => {
@@ -175,7 +186,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
   return (
     <div
-      className="flex min-h-screen flex-col"
+      className="flex h-screen flex-col"
       style={{ background: "var(--surface-0)", color: "var(--text-primary)" }}
     >
       {/* Header bar */}
@@ -193,22 +204,24 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
         onClear={() => dispatch({ type: "CLEAR_DECK" })}
       />
 
-      {/* Main split layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Card search */}
+      {/* Main split layout — both panels scroll independently */}
+      <div className="flex min-h-0 flex-1">
+        {/* Left: Card search — independent scroll */}
         <div
           className="flex w-[420px] shrink-0 flex-col overflow-hidden border-r"
           style={{ borderColor: "var(--border-subtle)" }}
         >
           <DeckBuilderSearch
             onAddCard={addCard}
+            onRemoveCard={removeCard}
+            onSetArtVariant={setArtVariant}
             deckCards={state.cards}
             leaderColors={state.leader?.color ?? []}
           />
         </div>
 
-        {/* Right: Deck editor */}
-        <div className="flex flex-1 flex-col overflow-y-auto">
+        {/* Right: Deck editor — independent scroll */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="flex flex-1 flex-col gap-5 p-5">
             {/* Deck Stats */}
             <DeckBuilderStats
@@ -229,6 +242,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
               onSetQuantity={(id, qty) =>
                 dispatch({ type: "SET_QUANTITY", cardId: id, quantity: qty })
               }
+              onSetArtVariant={setArtVariant}
+              onAddCard={addCard}
             />
           </div>
         </div>

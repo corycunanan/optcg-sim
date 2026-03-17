@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder-state";
+import { CardInspectModal } from "./card-inspect-modal";
 
 const COLOR_DOT: Record<string, string> = {
   Red: "var(--card-red)",
@@ -17,6 +19,8 @@ interface DeckBuilderListProps {
   onDecrement: (cardId: string) => void;
   onRemove: (cardId: string) => void;
   onSetQuantity: (cardId: string, quantity: number) => void;
+  onSetArtVariant: (cardId: string, artUrl: string | null) => void;
+  onAddCard: (card: DeckCardEntry["card"]) => void;
 }
 
 export function DeckBuilderList({
@@ -24,7 +28,11 @@ export function DeckBuilderList({
   onIncrement,
   onDecrement,
   onRemove,
+  onSetArtVariant,
+  onAddCard,
 }: DeckBuilderListProps) {
+  const [inspectEntry, setInspectEntry] = useState<DeckCardEntry | null>(null);
+
   // Sort by type (Character > Event > Stage), then cost, then name
   const typeOrder: Record<string, number> = {
     Character: 0,
@@ -60,16 +68,10 @@ export function DeckBuilderList({
           border: "1px solid var(--border-subtle)",
         }}
       >
-        <p
-          className="text-sm font-medium"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <p className="text-sm font-medium" style={{ color: "var(--text-tertiary)" }}>
           No cards in deck yet
         </p>
-        <p
-          className="mt-1 text-xs"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
           Click cards from the search panel to add them
         </p>
       </div>
@@ -77,129 +79,167 @@ export function DeckBuilderList({
   }
 
   return (
-    <div className="space-y-4">
-      {Array.from(groups.entries()).map(([type, entries]) => {
-        const groupTotal = entries.reduce((sum, e) => sum + e.quantity, 0);
-        return (
-          <div key={type}>
-            <div
-              className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              <span>{type}s</span>
-              <span
-                className="rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
-                style={{
-                  background: "var(--surface-3)",
-                  color: "var(--text-secondary)",
-                }}
+    <>
+      <div className="space-y-4">
+        {Array.from(groups.entries()).map(([type, entries]) => {
+          const groupTotal = entries.reduce((sum, e) => sum + e.quantity, 0);
+          return (
+            <div key={type}>
+              <div
+                className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
+                style={{ color: "var(--text-tertiary)" }}
               >
-                {groupTotal}
-              </span>
-            </div>
-
-            <div className="space-y-0.5">
-              {entries.map((entry) => (
-                <div
-                  key={entry.cardId}
-                  className="group flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.03]"
-                  style={{ borderLeft: "3px solid transparent" }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget;
-                    const color = entry.card.color[0];
-                    el.style.borderLeftColor = COLOR_DOT[color] || "var(--border)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderLeftColor = "transparent";
+                <span>{type}s</span>
+                <span
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                  style={{
+                    background: "var(--surface-3)",
+                    color: "var(--text-secondary)",
                   }}
                 >
-                  {/* Thumbnail */}
-                  <div className="h-10 w-7 shrink-0 overflow-hidden rounded">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={entry.card.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
+                  {groupTotal}
+                </span>
+              </div>
 
-                  {/* Card info */}
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="truncate text-sm font-medium leading-tight"
-                      style={{ color: "var(--text-primary)" }}
+              <div className="space-y-1">
+                {entries.map((entry) => {
+                  const displayUrl = entry.selectedArtUrl || entry.card.imageUrl;
+                  return (
+                    <div
+                      key={entry.cardId}
+                      className="group flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-white/[0.03]"
+                      style={{ borderLeft: "3px solid transparent" }}
+                      onMouseEnter={(e) => {
+                        const color = entry.card.color[0];
+                        e.currentTarget.style.borderLeftColor =
+                          COLOR_DOT[color] || "var(--border)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderLeftColor = "transparent";
+                      }}
                     >
-                      {entry.card.name}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      {entry.card.cost !== null && (
-                        <span
-                          className="text-[10px] font-bold tabular-nums"
-                          style={{ color: "var(--text-tertiary)" }}
-                        >
-                          {entry.card.cost}⬡
-                        </span>
-                      )}
-                      <span
-                        className="text-[10px]"
-                        style={{ color: "var(--text-tertiary)" }}
+                      {/* Thumbnail — clickable to inspect */}
+                      <button
+                        onClick={() => setInspectEntry(entry)}
+                        className="h-16 w-[46px] shrink-0 overflow-hidden rounded-lg transition-transform hover:scale-105"
+                        style={{ border: "1px solid var(--border-subtle)" }}
                       >
-                        {entry.cardId}
-                      </span>
-                      {/* Color dots */}
-                      <div className="flex gap-0.5">
-                        {entry.card.color.map((c) => (
-                          <span
-                            key={c}
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ background: COLOR_DOT[c] }}
-                          />
-                        ))}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={displayUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+
+                      {/* Card info — clickable to inspect */}
+                      <button
+                        onClick={() => setInspectEntry(entry)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p
+                          className="truncate text-sm font-semibold leading-tight"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {entry.card.name}
+                        </p>
+                        <div className="mt-0.5 flex items-center gap-1.5">
+                          {entry.card.cost !== null && (
+                            <span
+                              className="text-[11px] font-bold tabular-nums"
+                              style={{ color: "var(--text-tertiary)" }}
+                            >
+                              {entry.card.cost}⬡
+                            </span>
+                          )}
+                          {entry.card.power !== null && (
+                            <span
+                              className="text-[11px] tabular-nums"
+                              style={{ color: "var(--text-tertiary)" }}
+                            >
+                              {entry.card.power.toLocaleString()} PWR
+                            </span>
+                          )}
+                          <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                            {entry.cardId}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1">
+                          {entry.card.color.map((c) => (
+                            <span
+                              key={c}
+                              className="inline-block h-2 w-2 rounded-full"
+                              style={{ background: COLOR_DOT[c] }}
+                            />
+                          ))}
+                          {entry.selectedArtUrl && (
+                            <span
+                              className="ml-1 text-[9px] font-medium"
+                              style={{ color: "var(--teal-muted)" }}
+                            >
+                              Alt Art
+                            </span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => onDecrement(entry.cardId)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold transition-colors hover:bg-white/10"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          −
+                        </button>
+                        <span
+                          className="w-6 text-center text-base font-bold tabular-nums"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {entry.quantity}
+                        </span>
+                        <button
+                          onClick={() => onIncrement(entry.cardId)}
+                          disabled={entry.quantity >= 4}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold transition-colors hover:bg-white/10 disabled:opacity-30"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          +
+                        </button>
                       </div>
+
+                      {/* Remove button */}
+                      <button
+                        onClick={() => onRemove(entry.cardId)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-xs opacity-0 transition-all group-hover:opacity-100 hover:bg-white/10"
+                        style={{ color: "var(--error)" }}
+                        title="Remove"
+                      >
+                        ✕
+                      </button>
                     </div>
-                  </div>
-
-                  {/* Quantity controls */}
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      onClick={() => onDecrement(entry.cardId)}
-                      className="flex h-6 w-6 items-center justify-center rounded text-xs font-bold transition-colors hover:bg-white/10"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      −
-                    </button>
-                    <span
-                      className="w-5 text-center text-sm font-bold tabular-nums"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {entry.quantity}
-                    </span>
-                    <button
-                      onClick={() => onIncrement(entry.cardId)}
-                      disabled={entry.quantity >= 4}
-                      className="flex h-6 w-6 items-center justify-center rounded text-xs font-bold transition-colors hover:bg-white/10 disabled:opacity-30"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  {/* Remove button */}
-                  <button
-                    onClick={() => onRemove(entry.cardId)}
-                    className="flex h-6 w-6 items-center justify-center rounded text-xs opacity-0 transition-all group-hover:opacity-100 hover:bg-white/10"
-                    style={{ color: "var(--error)" }}
-                    title="Remove"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+
+      {/* Inspect modal for deck cards */}
+      {inspectEntry && (
+        <CardInspectModal
+          cardId={inspectEntry.cardId}
+          preloadedCard={inspectEntry.card}
+          quantityInDeck={inspectEntry.quantity}
+          selectedArtUrl={inspectEntry.selectedArtUrl}
+          onAddCard={() => onAddCard(inspectEntry.card)}
+          onRemoveCard={() => onDecrement(inspectEntry.cardId)}
+          onSetArtVariant={(artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl)}
+          onClose={() => setInspectEntry(null)}
+        />
+      )}
+    </>
   );
 }

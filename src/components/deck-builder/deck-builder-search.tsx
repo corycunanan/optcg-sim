@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder-state";
+import { CardInspectModal } from "./card-inspect-modal";
 
 interface CardSearchResult {
   id: string;
@@ -25,6 +26,8 @@ interface CardSearchResult {
 
 interface DeckBuilderSearchProps {
   onAddCard: (card: DeckCardEntry["card"]) => void;
+  onRemoveCard: (cardId: string) => void;
+  onSetArtVariant: (cardId: string, artUrl: string | null) => void;
   deckCards: Map<string, DeckCardEntry>;
   leaderColors: string[];
 }
@@ -43,6 +46,8 @@ const COLOR_STYLE: Record<string, { bg: string; text: string }> = {
 
 export function DeckBuilderSearch({
   onAddCard,
+  onRemoveCard,
+  onSetArtVariant,
   deckCards,
   leaderColors,
 }: DeckBuilderSearchProps) {
@@ -55,6 +60,7 @@ export function DeckBuilderSearch({
   const [activeType, setActiveType] = useState<string>("");
   const [costMin, setCostMin] = useState("");
   const [costMax, setCostMax] = useState("");
+  const [inspectCard, setInspectCard] = useState<CardSearchResult | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -121,249 +127,227 @@ export function DeckBuilderSearch({
   const totalPages = Math.ceil(total / 40);
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Search input */}
-      <div className="p-3 pb-0">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search cards…"
-          className="w-full rounded-lg px-3 py-2 text-sm transition-colors focus:outline-none"
-          style={{
-            background: "var(--surface-2)",
-            border: "1px solid var(--border)",
-            color: "var(--text-primary)",
-          }}
-        />
-      </div>
-
-      {/* Filters */}
-      <div className="space-y-2 px-3 pt-2 pb-2">
-        {/* Color filters */}
-        <div className="flex flex-wrap gap-1">
-          {COLORS.map((c) => {
-            const active = activeColors.includes(c);
-            const cs = COLOR_STYLE[c];
-            return (
-              <button
-                key={c}
-                onClick={() => toggleColor(c)}
-                className="rounded px-2 py-0.5 text-[11px] font-medium transition-all"
-                style={
-                  active
-                    ? { background: cs.bg, color: cs.text }
-                    : {
-                        background: "var(--surface-2)",
-                        color: "var(--text-tertiary)",
-                        border: "1px solid var(--border)",
-                      }
-                }
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Type + Cost filters */}
-        <div className="flex items-center gap-2">
-          <select
-            value={activeType}
-            onChange={(e) => setActiveType(e.target.value)}
-            className="rounded px-2 py-1 text-xs focus:outline-none"
+    <>
+      <div className="flex h-full flex-col">
+        {/* Search input */}
+        <div className="p-3 pb-0">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search cards…"
+            className="w-full rounded-lg px-3 py-2 text-sm transition-colors focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
-              color: "var(--text-secondary)",
+              color: "var(--text-primary)",
             }}
-          >
-            <option value="">All Types</option>
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="0"
-              max="10"
-              placeholder="Min"
-              value={costMin}
-              onChange={(e) => setCostMin(e.target.value)}
-              className="w-14 rounded px-2 py-1 text-xs focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            />
-            <span
-              className="text-[10px]"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              –
-            </span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              placeholder="Max"
-              value={costMax}
-              onChange={(e) => setCostMax(e.target.value)}
-              className="w-14 rounded px-2 py-1 text-xs focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            />
-            <span
-              className="text-[10px]"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              Cost
-            </span>
-          </div>
+          />
         </div>
-      </div>
 
-      {/* Results count */}
-      <div
-        className="px-3 pb-1 text-[11px]"
-        style={{ color: "var(--text-tertiary)" }}
-      >
-        {isLoading ? "Searching…" : `${total.toLocaleString()} cards`}
-      </div>
+        {/* Filters */}
+        <div className="space-y-2 px-3 pt-2 pb-2">
+          {/* Color filters */}
+          <div className="flex flex-wrap gap-1">
+            {COLORS.map((c) => {
+              const active = activeColors.includes(c);
+              const cs = COLOR_STYLE[c];
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggleColor(c)}
+                  className="rounded px-2 py-0.5 text-[11px] font-medium transition-all"
+                  style={
+                    active
+                      ? { background: cs.bg, color: cs.text }
+                      : {
+                          background: "var(--surface-2)",
+                          color: "var(--text-tertiary)",
+                          border: "1px solid var(--border)",
+                        }
+                  }
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Results grid */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-3 pb-3"
-      >
-        <div className="grid grid-cols-3 gap-1.5">
-          {results.map((card) => {
-            const inDeck = deckCards.get(card.id);
-            const qtyInDeck = inDeck?.quantity || 0;
-            const isLeaderColor =
-              leaderColors.length === 0 ||
-              card.color.some((c) => leaderColors.includes(c)) ||
-              card.type === "Leader";
+          {/* Type + Cost filters */}
+          <div className="flex items-center gap-2">
+            <select
+              value={activeType}
+              onChange={(e) => setActiveType(e.target.value)}
+              className="rounded px-2 py-1 text-xs focus:outline-none"
+              style={{
+                background: "var(--surface-2)",
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <option value="">All Types</option>
+              {TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
 
-            return (
-              <button
-                key={card.id}
-                onClick={() => onAddCard(card)}
-                className="group relative overflow-hidden rounded-lg text-left transition-all duration-150 hover:-translate-y-0.5"
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min="0"
+                max="10"
+                placeholder="Min"
+                value={costMin}
+                onChange={(e) => setCostMin(e.target.value)}
+                className="w-14 rounded px-2 py-1 text-xs focus:outline-none"
                 style={{
-                  background: "var(--surface-1)",
-                  border: `1px solid ${qtyInDeck > 0 ? "var(--accent)" : "var(--border-subtle)"}`,
-                  opacity: isLeaderColor ? 1 : 0.5,
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
                 }}
-              >
-                <div className="relative aspect-[600/838] w-full overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={card.imageUrl}
-                    alt={card.name}
-                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.05]"
-                    loading="lazy"
-                  />
-                  {/* Quantity badge */}
-                  {qtyInDeck > 0 && (
-                    <div
-                      className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
-                      style={{
-                        background: "var(--accent)",
-                        color: "var(--surface-0)",
-                      }}
-                    >
-                      {qtyInDeck}
-                    </div>
-                  )}
-                  {/* Hover overlay */}
-                  <div
-                    className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ background: "oklch(0% 0 0 / 0.5)" }}
-                  >
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                      style={{
-                        background: "var(--accent)",
-                        color: "var(--surface-0)",
-                      }}
-                    >
-                      {card.type === "Leader" ? "Set Leader" : "+ Add"}
-                    </span>
-                  </div>
-                </div>
-                {/* Mini info */}
-                <div className="px-1.5 py-1">
-                  <p
-                    className="truncate text-[10px] font-medium leading-tight"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {card.name}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    {card.cost !== null && (
-                      <span
-                        className="text-[9px] font-bold tabular-nums"
-                        style={{ color: "var(--text-tertiary)" }}
-                      >
-                        {card.cost}⬡
-                      </span>
-                    )}
-                    <span
-                      className="text-[9px]"
-                      style={{ color: "var(--text-tertiary)" }}
-                    >
-                      {card.id}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+              />
+              <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>–</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                placeholder="Max"
+                value={costMax}
+                onChange={(e) => setCostMax(e.target.value)}
+                className="w-14 rounded px-2 py-1 text-xs focus:outline-none"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                }}
+              />
+              <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Cost</span>
+            </div>
+          </div>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-3 flex items-center justify-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-30"
-              style={{
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              ←
-            </button>
-            <span
-              className="px-2 text-xs tabular-nums"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-30"
-              style={{
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              →
-            </button>
+        {/* Results count */}
+        <div className="px-3 pb-1 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+          {isLoading ? "Searching…" : `${total.toLocaleString()} cards`}
+        </div>
+
+        {/* Results grid */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 pb-3">
+          <div className="grid grid-cols-3 gap-1.5">
+            {results.map((card) => {
+              const inDeck = deckCards.get(card.id);
+              const qtyInDeck = inDeck?.quantity || 0;
+              const isLeaderColor =
+                leaderColors.length === 0 ||
+                card.color.some((c) => leaderColors.includes(c)) ||
+                card.type === "Leader";
+
+              return (
+                <button
+                  key={card.id}
+                  onClick={() => setInspectCard(card)}
+                  className="group relative overflow-hidden rounded-lg text-left transition-all duration-150 hover:-translate-y-0.5"
+                  style={{
+                    background: "var(--surface-1)",
+                    border: `1px solid ${qtyInDeck > 0 ? "var(--accent)" : "var(--border-subtle)"}`,
+                    opacity: isLeaderColor ? 1 : 0.5,
+                  }}
+                >
+                  <div className="relative aspect-[600/838] w-full overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={card.imageUrl}
+                      alt={card.name}
+                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.05]"
+                      loading="lazy"
+                    />
+                    {/* Quantity badge */}
+                    {qtyInDeck > 0 && (
+                      <div
+                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
+                        style={{
+                          background: "var(--accent)",
+                          color: "var(--surface-0)",
+                        }}
+                      >
+                        {qtyInDeck}
+                      </div>
+                    )}
+                  </div>
+                  {/* Mini info */}
+                  <div className="px-1.5 py-1">
+                    <p
+                      className="truncate text-[10px] font-medium leading-tight"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {card.name}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      {card.cost !== null && (
+                        <span
+                          className="text-[9px] font-bold tabular-nums"
+                          style={{ color: "var(--text-tertiary)" }}
+                        >
+                          {card.cost}⬡
+                        </span>
+                      )}
+                      <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>
+                        {card.id}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-30"
+                style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              >
+                ←
+              </button>
+              <span className="px-2 text-xs tabular-nums" style={{ color: "var(--text-tertiary)" }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-30"
+                style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              >
+                →
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Card inspect modal */}
+      {inspectCard && (
+        <CardInspectModal
+          cardId={inspectCard.id}
+          preloadedCard={inspectCard}
+          quantityInDeck={
+            inspectCard.type === "Leader"
+              ? 0 // Leaders don't have a quantity
+              : deckCards.get(inspectCard.id)?.quantity || 0
+          }
+          selectedArtUrl={deckCards.get(inspectCard.id)?.selectedArtUrl ?? null}
+          isLeader={inspectCard.type === "Leader"}
+          onAddCard={() => onAddCard(inspectCard)}
+          onRemoveCard={() => onRemoveCard(inspectCard.id)}
+          onSetArtVariant={(artUrl) => onSetArtVariant(inspectCard.id, artUrl)}
+          onClose={() => setInspectCard(null)}
+        />
+      )}
+    </>
   );
 }
