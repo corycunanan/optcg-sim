@@ -1,40 +1,42 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const checks = {
-    AUTH_SECRET: !!process.env.AUTH_SECRET,
-    AUTH_SECRET_length: process.env.AUTH_SECRET?.length,
-    AUTH_GOOGLE_ID: !!process.env.AUTH_GOOGLE_ID,
-    AUTH_GOOGLE_ID_value: process.env.AUTH_GOOGLE_ID?.substring(0, 20) + "...",
-    AUTH_GOOGLE_SECRET: !!process.env.AUTH_GOOGLE_SECRET,
-    AUTH_GOOGLE_SECRET_length: process.env.AUTH_GOOGLE_SECRET?.length,
-    AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    DATABASE_URL: process.env.DATABASE_URL ? "set (length: " + process.env.DATABASE_URL.length + ")" : "NOT SET",
-    DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL ? "set (length: " + process.env.DIRECT_DATABASE_URL.length + ")" : "NOT SET",
-    NODE_ENV: process.env.NODE_ENV,
-  };
+  const results: Record<string, unknown> = {};
 
-  // Test DB connection
-  let dbStatus = "untested";
+  // Test 1: Can we reach Google's OIDC discovery endpoint?
   try {
-    const { prisma } = await import("@/lib/db");
-    const count = await prisma.card.count();
-    dbStatus = `connected (${count} cards)`;
+    const res = await fetch("https://accounts.google.com/.well-known/openid-configuration");
+    results.googleOIDC = { status: res.status, ok: res.ok };
   } catch (e: unknown) {
-    dbStatus = `error: ${e instanceof Error ? e.message : String(e)}`;
+    results.googleOIDC = { error: e instanceof Error ? e.message : String(e) };
   }
 
-  // Test auth config by trying to get session
-  let authStatus = "untested";
+  // Test 2: Try to initiate the auth flow manually  
   try {
-    const { auth } = await import("@/auth");
-    const session = await auth();
-    authStatus = session ? `ok (user: ${session.user?.email})` : "ok (no session)";
+    const { handlers } = await import("@/auth");
+    
+    // Create a fake request to /api/auth/signin/google
+    const req = new Request("https://optcg-sim.vercel.app/api/auth/signin/google", {
+      method: "GET",
+      headers: {
+        host: "optcg-sim.vercel.app",
+      },
+    });
+    
+    const response = await handlers.GET(req);
+    results.authSignin = { 
+      status: response.status, 
+      location: response.headers.get("location")?.substring(0, 100),
+      headers: Object.fromEntries(response.headers.entries()),
+    };
   } catch (e: unknown) {
     const err = e instanceof Error ? e : new Error(String(e));
-    authStatus = `error: ${err.message}\nstack: ${err.stack?.split("\n").slice(0, 3).join(" | ")}`;
+    results.authSignin = { 
+      error: err.message, 
+      name: (e as {name?: string}).name,
+      stack: err.stack?.split("\n").slice(0, 5).join(" | "),
+    };
   }
 
-  return NextResponse.json({ checks, dbStatus, authStatus }, { status: 200 });
+  return NextResponse.json(results, { status: 200 });
 }
