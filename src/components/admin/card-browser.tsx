@@ -18,6 +18,7 @@ interface CardBrowserProps {
     type: string;
     set: string;
     block: string;
+    originOnly: string;
   };
 }
 
@@ -74,7 +75,7 @@ export function CardBrowser({
 
       router.push(`/admin/cards?${params.toString()}`);
     },
-    [router, searchParams]
+    [router, searchParams],
   );
 
   const handleSearch = useCallback(
@@ -82,8 +83,16 @@ export function CardBrowser({
       e.preventDefault();
       updateFilters({ q: search });
     },
-    [search, updateFilters]
+    [search, updateFilters],
   );
+
+  const hasFilters =
+    currentFilters.q ||
+    currentFilters.color ||
+    currentFilters.type ||
+    currentFilters.set ||
+    currentFilters.block ||
+    currentFilters.originOnly;
 
   return (
     <div>
@@ -95,26 +104,35 @@ export function CardBrowser({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search cards by name..."
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+            className="flex-1 rounded-lg px-4 py-2.5 text-sm transition-colors focus:outline-none"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+            }}
           />
           <button
             type="submit"
-            className="rounded-lg bg-red-600 px-6 py-2 text-sm font-medium text-white hover:bg-red-700"
+            className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors"
+            style={{
+              background: "var(--accent)",
+              color: "var(--surface-0)",
+            }}
           >
             Search
           </button>
-          {(currentFilters.q ||
-            currentFilters.color ||
-            currentFilters.type ||
-            currentFilters.set ||
-            currentFilters.block) && (
+          {hasFilters && (
             <button
               type="button"
               onClick={() => {
                 setSearch("");
                 router.push("/admin/cards");
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              className="rounded-lg px-4 py-2.5 text-sm transition-colors"
+              style={{
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+              }}
             >
               Clear
             </button>
@@ -129,13 +147,31 @@ export function CardBrowser({
         onFilterChange={updateFilters}
       />
 
-      {/* Results */}
-      <div className="mt-4 mb-4 text-sm text-gray-500">
+      {/* Results count */}
+      <div
+        className="mt-4 mb-4 text-sm"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         Showing {initialCards.length} of {total.toLocaleString()} cards
         {currentFilters.q && (
           <span>
             {" "}
-            matching &ldquo;<strong>{currentFilters.q}</strong>&rdquo;
+            matching &ldquo;
+            <strong style={{ color: "var(--text-secondary)" }}>
+              {currentFilters.q}
+            </strong>
+            &rdquo;
+          </span>
+        )}
+        {currentFilters.originOnly === "true" && (
+          <span
+            className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{
+              background: "var(--sage-muted)",
+              color: "var(--sage)",
+            }}
+          >
+            Origin sets only
           </span>
         )}
       </div>

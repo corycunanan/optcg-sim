@@ -11,7 +11,6 @@ export function Pagination({
   totalPages,
   onPageChange,
 }: PaginationProps) {
-  // Build page numbers to show
   const pages: (number | "...")[] = [];
 
   if (totalPages <= 7) {
@@ -29,39 +28,58 @@ export function Pagination({
   }
 
   return (
-    <div className="mt-6 flex items-center justify-center gap-1">
+    <div className="mt-8 flex items-center justify-center gap-1">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="rounded-md px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+        style={{
+          border: "1px solid var(--border)",
+          color: "var(--text-secondary)",
+        }}
       >
         Prev
       </button>
 
       {pages.map((p, i) =>
         p === "..." ? (
-          <span key={`dots-${i}`} className="px-2 text-sm text-gray-400">
+          <span
+            key={`dots-${i}`}
+            className="px-2 text-sm"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             …
           </span>
         ) : (
           <button
             key={p}
             onClick={() => onPageChange(p)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            className="rounded-md px-3 py-1.5 text-sm font-medium tabular-nums transition-colors"
+            style={
               p === page
-                ? "bg-red-600 text-white"
-                : "border border-gray-300 text-gray-600 hover:bg-gray-50"
-            }`}
+                ? {
+                    background: "var(--accent)",
+                    color: "var(--surface-0)",
+                  }
+                : {
+                    border: "1px solid var(--border)",
+                    color: "var(--text-secondary)",
+                  }
+            }
           >
             {p}
           </button>
-        )
+        ),
       )}
 
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="rounded-md px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+        style={{
+          border: "1px solid var(--border)",
+          color: "var(--text-secondary)",
+        }}
       >
         Next
       </button>

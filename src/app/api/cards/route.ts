@@ -1,25 +1,12 @@
 /**
  * GET /api/cards — Search and filter cards
- *
- * Query params:
- *   q        — full-text search on name
- *   color    — filter by color (comma-separated)
- *   type     — filter by card type (comma-separated)
- *   costMin  — minimum cost
- *   costMax  — maximum cost
- *   set      — filter by set label
- *   block    — filter by block number
- *   rarity   — filter by rarity (comma-separated)
- *   ban      — filter by ban status
- *   page     — page number (default 1)
- *   limit    — items per page (default 40)
- *   sort     — sort field (default "id")
- *   order    — sort order (default "asc")
+ * POST /api/cards — Create a new card (admin)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { type Prisma } from "@prisma/client";
+import { cardIdToOriginSet } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -118,7 +105,72 @@ export async function GET(request: NextRequest) {
     console.error("Card search error:", error);
     return NextResponse.json(
       { error: "Failed to search cards" },
-      { status: 500 }
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    // Validate required fields
+    const { id, name, type, color, blockNumber } = body;
+    if (!id || !name || !type || !color?.length || blockNumber == null) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing required fields: id, name, type, color, blockNumber",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Check for duplicate
+    const existing = await prisma.card.findUnique({ where: { id } });
+    if (existing) {
+      return NextResponse.json(
+        { error: `Card with ID "${id}" already exists` },
+        { status: 409 },
+      );
+    }
+
+    // Derive origin set from card ID
+    const originSet = cardIdToOriginSet(id);
+
+    const card = await prisma.card.create({
+      data: {
+        id,
+        name,
+        originSet,
+        type,
+        color,
+        cost: body.cost ?? null,
+        power: body.power ?? null,
+        counter: body.counter ?? null,
+        life: body.life ?? null,
+        attribute: body.attribute || [],
+        traits: body.traits || [],
+        rarity: body.rarity || "Unknown",
+        effectText: body.effectText || "",
+        triggerText: body.triggerText || null,
+        imageUrl: body.imageUrl || "",
+        blockNumber,
+        banStatus: body.banStatus || "LEGAL",
+        isReprint: false,
+      },
+      include: {
+        artVariants: true,
+        cardSets: true,
+      },
+    });
+
+    return NextResponse.json(card, { status: 201 });
+  } catch (error) {
+    console.error("Card create error:", error);
+    return NextResponse.json(
+      { error: "Failed to create card" },
+      { status: 500 },
     );
   }
 }

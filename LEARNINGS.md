@@ -308,4 +308,77 @@ Create DB: `/opt/homebrew/opt/postgresql@16/bin/createdb optcg_sim`
 
 ---
 
+### 2026-03-16 — UI: Dark theme with OKLCH-based palette
+
+**Area:** Frontend / UI
+
+Migrated the entire admin UI from light mode (gray-50/white) to a dark, teal-tinted theme. Palette derived from a Coolors palette of Coral Red / Charcoal / Sage / Dusty Teal / Teal / Deep Teal, mapped into OKLCH color space for perceptual uniformity.
+
+Key decisions:
+- **Surface hierarchy**: `--surface-0` (14% L) → `--surface-1` (17%) → `--surface-2` (21%) → `--surface-3` (26%), all tinted toward hue 210 (teal)
+- **No pure gray anywhere** — all neutrals carry a 0.01 chroma tint toward the teal hue for subconscious cohesion
+- **TCG card colors as CSS variables**: `--card-red`, `--card-blue`, etc. — functional colors that appear in filter pills and card badges, kept distinct from the UI palette
+- **Coral red accent** (`oklch(62% 0.18 25)`) used sparingly — nav "Add Card" button, pagination active page, CTA buttons only. Avoids overuse per 60-30-10 rule.
+- Using CSS custom properties (not Tailwind theme colors) for the palette — allows `style={}` props for inline theming without generating thousands of utility classes
+
+**Lesson:** OKLCH's perceptual uniformity is a real improvement over HSL for dark mode. Setting a consistent chroma (0.01) and hue (210) across 10 surface/border/text levels produces a coherent palette without manual per-shade tuning.
+
+---
+
+### 2026-03-16 — Admin UI: Selectable artwork gallery on card detail page
+
+**Area:** Frontend / UI
+
+The card detail page now has a `CardImageGallery` client component that:
+1. Shows **all artworks** — the original/base card image is included as the first thumbnail labeled "Original", followed by all art variants
+2. Clicking any thumbnail swaps the main display image
+3. Selected artwork gets a coral accent border + highlighted label; unselected thumbnails are slightly dimmed (70% opacity) and brighten on hover
+
+This required extracting the image section from the server component (`page.tsx`) into a `"use client"` component (`card-image-gallery.tsx`) since `useState` is needed for the selected image. The server component passes `baseImageUrl` and `artVariants` as props.
+
+**Note:** After creating this component, the Next.js dev server showed `useInsertionEffect` errors. These were hot-reload artifacts — a server restart (`pnpm dev`) resolved them cleanly. If you see similar errors after adding client components to server pages, restart the dev server first before debugging.
+
+---
+
+### 2026-03-16 — UI: Reprint filter implementation
+
+**Area:** Frontend / Data Filtering
+
+Implemented reprint filter as a toggle button ("Origin only") in the card filters panel. When active:
+- **With a set filter**: uses `originSet = set` to match only cards whose ID prefix corresponds to the set label (e.g. `OP01-xxx` for `OP-01`). This is more precise than checking `isReprint` because it leverages the card ID prefix as the canonical origin.
+- **Without a set filter**: uses `isReprint = false` to exclude reprint entries.
+
+Test case: PRB-01 (Premium Booster) shows 111 cards with reprints → 1 card with "Origin only" enabled. This confirms the filter works correctly since Premium Boosters are almost entirely reprints.
+
+---
+
+### 2026-03-16 — Auth: NextAuth.js v5 chosen over Supabase Auth
+
+**Area:** Authentication / Infrastructure
+
+The M0 plan originally specified Supabase Auth, but since we're running local PostgreSQL (not Supabase), NextAuth.js v5 (Auth.js) was chosen instead. Key reasons:
+
+- Works directly with existing Prisma + local PostgreSQL — no external auth service needed
+- `@auth/prisma-adapter` stores all auth data (accounts, sessions, users) in our own DB
+- Most mature Next.js auth solution with wide community support
+- No vendor lock-in — switching providers (add Discord, GitHub, etc.) is a config change
+
+**Setup decisions:**
+- Database session strategy (not JWT) — sessions stored in PostgreSQL, not browser cookies
+- Next.js 16 `proxy.ts` (not `middleware.ts`) for route protection — `middleware.ts` is deprecated in Next.js 16
+- User model merged Auth.js required fields (`email`, `emailVerified`, `image`, `name`) with our custom fields (`username`)
+- `username` is nullable — set during `/onboarding` flow after first Google login
+- `authId` field removed (was Supabase-specific); Auth.js uses `Account` join table instead
+
+**Files added:**
+- `src/auth.ts` — NextAuth config with Prisma adapter + Google provider
+- `src/proxy.ts` — Route protection (redirects unauthenticated users from `/admin/*` to `/login`)
+- `src/app/login/page.tsx` — Login page with "Continue with Google" button
+- `src/app/onboarding/page.tsx` — Username setup for new users
+- `src/app/api/auth/[...nextauth]/route.ts` — Auth.js API route handler
+- `src/app/api/user/username/route.ts` — Username set/update endpoint
+- `src/components/auth/sign-out-button.tsx` — Client-side sign out button
+
+---
+
 <!-- Add new entries above this line -->

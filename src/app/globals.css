@@ -1,35 +1,90 @@
 @import "tailwindcss";
 
+/* ─── Color Palette ──────────────────────────────────────────
+   Derived from the OPTCG brand palette:
+   Coral (#E85D4A) · Charcoal (#3E4346) · Sage (#A0A882) 
+   Dusty Teal (#9FBAB4) · Teal (#55A0A8) · Deep Teal (#2D6E80)
+   ───────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand Accent */
+  --accent: oklch(62% 0.18 25);
+  --accent-hover: oklch(55% 0.20 25);
+  --accent-soft: oklch(62% 0.18 25 / 0.12);
+
+  /* Teal Range */
+  --teal: oklch(62% 0.08 200);
+  --teal-deep: oklch(42% 0.06 210);
+  --teal-muted: oklch(72% 0.04 195);
+
+  /* Sage */
+  --sage: oklch(70% 0.06 120);
+  --sage-muted: oklch(70% 0.06 120 / 0.15);
+
+  /* Dark surfaces — tinted toward teal, not pure gray */
+  --surface-0: oklch(14% 0.01 210);
+  --surface-1: oklch(17% 0.01 210);
+  --surface-2: oklch(21% 0.015 210);
+  --surface-3: oklch(26% 0.015 210);
+
+  /* Borders */
+  --border: oklch(28% 0.01 210);
+  --border-subtle: oklch(24% 0.01 210);
+  --border-hover: oklch(35% 0.02 210);
+
+  /* Text */
+  --text-primary: oklch(92% 0.01 210);
+  --text-secondary: oklch(68% 0.01 210);
+  --text-tertiary: oklch(50% 0.01 210);
+
+  /* Semantic */
+  --success: oklch(72% 0.14 155);
+  --warning: oklch(78% 0.14 80);
+  --error: oklch(60% 0.18 25);
+
+  /* TCG Card Colors — functional, for filter pills and card badges */
+  --card-red: oklch(60% 0.20 25);
+  --card-blue: oklch(55% 0.15 250);
+  --card-green: oklch(60% 0.16 150);
+  --card-purple: oklch(50% 0.16 300);
+  --card-black: oklch(35% 0.01 210);
+  --card-yellow: oklch(80% 0.16 90);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--surface-0);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: none;
 }
 
-html,
 body {
   overflow-x: hidden;
 }
 
-html {
-  scrollbar-gutter: stable;
+body {
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom scrollbar for dark UI */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface-0);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
 }

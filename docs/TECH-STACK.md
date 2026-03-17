@@ -12,7 +12,7 @@
 | Styling | Tailwind CSS | Utility-first CSS, rapid UI development |
 | Backend API | Next.js API Routes (primary) / Fastify (fallback) | REST endpoints for CRUD operations |
 | Realtime | WebSocket (Socket.io or native `ws`) | Game state sync, messaging, lobby updates |
-| Auth | Supabase Auth (Google OAuth 2.0) | Authentication, session management |
+| Auth | NextAuth.js v5 (Auth.js) via Google OAuth 2.0 | Authentication, session management |
 | Database | PostgreSQL (via Supabase or Neon) | Primary data store |
 | ORM | Prisma | Type-safe DB access, migrations |
 | Object Storage | Cloudflare R2 | Card images, raw data snapshots |
@@ -68,15 +68,17 @@
 - **Why separate:** Game sessions hold in-memory state for the duration of a match (5–30 minutes). Serverless functions time out. WebSocket connections require persistent TCP.
 - **Scaling consideration:** Each game server instance can handle many concurrent games (game state is lightweight). Horizontal scaling via sticky sessions if needed.
 
-### Auth — Supabase Auth
+### Auth — NextAuth.js v5 (Auth.js)
 
 - **Provider:** Google OAuth 2.0
-- **Why Supabase Auth over Firebase Auth:**
-  - Supabase bundles auth + PostgreSQL — one platform for auth and data
-  - Row-level security policies tie directly to auth user IDs
-  - Open-source, self-hostable if needed later
-- **Session management:** JWT-based; auto-refresh via Supabase client SDK
-- **Profile enrichment:** On first login, user sets a username; avatar pulled from Google profile (or uploadable later)
+- **Why NextAuth.js over Supabase Auth:**
+  - Works directly with existing local PostgreSQL + Prisma — no external auth service required
+  - Most popular Next.js auth solution with mature ecosystem
+  - Database adapter (Prisma) stores sessions, accounts, and users in our own DB
+  - No vendor lock-in — all auth data in our PostgreSQL
+- **Session management:** Database sessions via Prisma adapter; `auth()` helper for server components
+- **Profile enrichment:** On first login, user redirected to `/onboarding` to set a unique username
+- **Route protection:** Next.js 16 proxy (`proxy.ts`) protects `/admin/*` routes, redirects to `/login`
 
 ---
 

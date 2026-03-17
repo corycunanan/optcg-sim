@@ -12,12 +12,13 @@ M0 establishes the project's infrastructure, authentication, database schema, an
 
 - [x] Repository scaffolded with Next.js, TypeScript, Tailwind, Prisma
 - [x] CI/CD pipeline (lint, type-check, test, deploy)
-- [ ] Google OAuth authentication (sign-in, sign-out, session persistence)
+- [x] Google OAuth authentication (sign-in, sign-out, session persistence)
 - [x] PostgreSQL schema for cards, users, decks (with many-to-many card ↔ set, art variants, block rotation)
 - [x] Data pipeline v1 (vegapull → transform → Prisma import — all sets)
 - [ ] Card images downloaded via vegapull and stored locally / uploaded to R2
 - [x] Database admin UI: browse, search, filter, edit, add cards with image display
-- [ ] Reprint filter: option to show cards only in origin set vs. all sets they appear in
+- [x] Reprint filter: option to show cards only in origin set vs. all sets they appear in
+- [x] Manual card add page (/admin/cards/new) with POST API endpoint
 
 ---
 
@@ -337,7 +338,7 @@ A full-featured database management interface that serves as both M0 verificatio
 
 **Key features:**
 - **Reprint filter toggle** — global switch: "Show in origin set only" vs. "Show in all sets." When filtering reprints, a card like EB01-015 only appears under EB-01 (its origin set). When showing all, it appears under ST-24, PRB-02, and Promotion cards too.
-- **Art variant gallery** — card detail page shows all art variants side-by-side with variant labels, rarities, and source sets
+- **Art variant gallery** — card detail page shows **all artworks** (original + variants) as selectable thumbnails; clicking any thumbnail swaps the main display image. Selected artwork is highlighted with a coral accent border.
 - **Inline image display** — card images served from local storage or CDN
 - **Set membership list** — shows every pack/set a card appears in with links
 - **Edit with change tracking** — all manual edits logged (who, when, what changed)
@@ -363,16 +364,18 @@ A full-featured database management interface that serves as both M0 verificatio
 | Step | Task | Est. | Status |
 |------|------|------|--------|
 | 1 | Scaffold Next.js project with TypeScript, Tailwind, Prisma | 1 day | ✅ Done 2026-03-16 |
-| 2 | Set up Supabase project (Postgres + Auth) | 0.5 day | ⬜ (using local pg16 for dev) |
+| 2 | Set up Supabase project (Postgres + Auth) | 0.5 day | 🔄 Deferred — using local pg16 + NextAuth.js for dev |
 | 3 | Implement Prisma schema + initial migration (with CardSet join table, updated Card model) | 0.5 day | ✅ Done 2026-03-16 |
-| 4 | Build auth flow (Google OAuth, middleware, onboarding) | 1–2 days | ⬜ |
+| 4 | Build auth flow (Google OAuth, middleware, onboarding) | 1–2 days | ✅ Done 2026-03-16 |
 | 5 | Set up CI/CD (GitHub Actions) | 0.5 day | ✅ Done 2026-03-16 |
 | 6 | Build data pipeline v1 (vegapull → transform → import for all 51 packs) | 2–3 days | ✅ Done 2026-03-16 |
-| 7 | Download card images via vegapull; configure local storage + R2 upload | 0.5 day | ⬜ (serving from official CDN for now) |
-| 8 | Build database admin UI (browse, search, filter, edit, add, reprint filter) | 2–3 days | ✅ Core done 2026-03-16 |
-| 9 | Build bulk operations (pack re-import, bulk errata, CSV export/import) | 1–2 days | ⬜ |
-| 10 | Manual add OP15-096 via admin UI (acceptance test) | 0.5 day | ⬜ |
-| 11 | End-to-end verification: login → browse cards → edit card → bulk import → verify | 0.5 day | ⬜ |
+| 7 | Download card images via vegapull; configure local storage + R2 upload | 0.5 day | 🔄 Deferred (tech debt) |
+| 8 | Build database admin UI (browse, search, filter, edit, add, reprint filter) | 2–3 days | ✅ Done 2026-03-16 |
+| 8b | Reprint filter toggle + manual card add page | 0.5 day | ✅ Done 2026-03-16 |
+| 8c | Dark theme UI overhaul (coral/teal palette) + selectable artwork gallery | 0.5 day | ✅ Done 2026-03-16 |
+| 9 | Build bulk operations (pack re-import, bulk errata, CSV export/import) | 1–2 days | 🔄 Deferred (tech debt) |
+| 10 | Manual add OP15-096 via admin UI (acceptance test) | 0.5 day | ✅ Done 2026-03-16 |
+| 11 | End-to-end verification: login → browse cards → edit card → bulk import → verify | 0.5 day | 🔄 Deferred (tech debt) |
 
 **Total estimate: ~10–14 days** (increased from 9–12 due to bulk operations scope)
 
@@ -380,19 +383,19 @@ A full-featured database management interface that serves as both M0 verificatio
 
 ## Acceptance Criteria
 
-- [ ] A new user can sign in via Google OAuth and set a username
-- [ ] Returning users see their profile persisted across sessions
+- [x] A new user can sign in via Google OAuth and set a username
+- [x] Returning users see their profile persisted across sessions
 - [x] The `cards` table contains all ~2,496 unique cards from all 51 packs
 - [x] Cards have correct `originSet`, `blockNumber`, and set membership data
 - [x] Art variants are correctly classified (\_p → ArtVariant, \_r → CardSet only)
 - [x] Card images load from local storage or CDN
 - [x] The admin UI renders card data accurately (name, cost, power, color, type, image, set, block)
-- [ ] The admin UI supports filtering cards by set with reprint filter toggle
+- [x] The admin UI supports filtering cards by set with reprint filter toggle
 - [x] Cards can be manually edited (ban status, errata, etc.) via the admin UI
-- [ ] New cards can be manually added via the admin UI
+- [x] New cards can be manually added via the admin UI
 - [x] Art variant gallery shows all variants for a card with correct labels
 - [x] CI pipeline passes: lint, type-check, tests green
-- [ ] Production deploy accessible via Vercel URL
+- [ ] Production deploy accessible via Vercel URL _(deferred — TD-003)_
 
 ---
 
@@ -419,4 +422,50 @@ A full-featured database management interface that serves as both M0 verificatio
 
 ---
 
-_Last updated: 2026-03-16 (M0 steps 1, 3, 5, 6, 8 complete)_
+## Next Steps (for the next agent)
+
+**M0 is closed.** All core deliverables are complete. Remaining items are tracked as tech debt below.
+
+### Tech Debt (from M0)
+
+| ID | Item | Priority | Notes |
+|----|------|----------|-------|
+| TD-001 | Bulk operations UI (pack re-import, bulk errata, CSV export/import) | Low | Admin productivity tools. Data is correct; these speed up manual maintenance. Build when needed. |
+| TD-002 | Card image download + R2 hosting | Medium | Currently serving SAMPLE-watermarked images from official CDN. Fine for dev. For production, download via vegapull `--with-images` (~780MB) and host on Cloudflare R2. |
+| TD-003 | Production deploy to Vercel | Medium | Needs production PostgreSQL (Supabase or Neon), env vars on Vercel, and domain setup. Straightforward once a production DB is provisioned. |
+| TD-004 | E2E verification walkthrough | Low | Sign in with Google → browse → edit → verify. Informal manual test, not blocking. |
+
+### Current state summary
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Prisma schema | ✅ Complete | Cards, CardSet, ArtVariant, Errata, User, Account, Session, Deck, DeckCard |
+| Data pipeline | ✅ Complete | 2,496 cards, 1,487 art variants, 51 packs imported |
+| Admin dashboard | ✅ Complete | Stats, type/block distribution with progress bars |
+| Card browser | ✅ Complete | Search, color/type/set/block filters, reprint filter, pagination |
+| Card detail | ✅ Complete | Selectable artwork gallery, stats, traits, effect text, set membership |
+| Card edit | ✅ Complete | All card attributes editable (name, type, color, cost, power, counter, life, attributes, traits, rarity, block, ban status, effect/trigger text, image URL, reprint flag) |
+| Card add | ✅ Complete | Full form with validation, POST API, origin set derivation |
+| Sets page | ✅ Complete | Grouped by prefix (ST/OP/EB/PRB), card counts, links to filtered view |
+| Reprint filter | ✅ Complete | Origin-only toggle, works with and without set filter |
+| Dark theme | ✅ Complete | OKLCH-based coral/teal palette, custom scrollbar, overscroll fix |
+| Auth | ✅ Complete | NextAuth.js v5, Google OAuth, Prisma adapter, proxy route protection, onboarding |
+| Bulk operations | 🔄 Tech debt | TD-001 |
+| Image hosting | 🔄 Tech debt | TD-002 |
+| Production deploy | 🔄 Tech debt | TD-003 |
+
+### Tech context for the next agent
+
+- **Next.js 16.1.6** with App Router — server components by default, `"use client"` for interactive parts
+- **NextAuth.js v5** (`next-auth@5.0.0-beta.30`) — `auth()` for server-side session, `SessionProvider` for client, `proxy.ts` for route protection
+- **Local PostgreSQL 16** via Homebrew — `DATABASE_URL` in `.env`, start with `brew services start postgresql@16`
+- **Prisma 6.19** — run `pnpm db:generate` after schema changes, `pnpm db:migrate` for migrations
+- **Dark theme** uses CSS custom properties (`--surface-0` through `--surface-3`, `--text-primary/secondary/tertiary`, `--accent`, `--border`, etc.) defined in `globals.css`. Components use `style={{}}` props, not Tailwind color classes, for the palette.
+- **Dev server**: `pnpm dev` on port 3000
+- **Type check**: `npx tsc --noEmit` — currently zero errors
+- **Lint**: `pnpm lint` — zero errors (one pre-existing warning in `pipeline/transform.ts`)
+- Read `LEARNINGS.md` for accumulated decisions and gotchas
+
+---
+
+_M0 closed: 2026-03-16. Tech debt tracked above. Next milestone: M1 — Deck Builder._

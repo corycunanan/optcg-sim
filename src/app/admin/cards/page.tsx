@@ -14,6 +14,7 @@ export default async function AdminCardsPage({
   const type = (params.type as string) || "";
   const set = (params.set as string) || "";
   const block = (params.block as string) || "";
+  const originOnly = (params.originOnly as string) || "";
   const page = parseInt((params.page as string) || "1");
   const limit = 40;
 
@@ -27,10 +28,23 @@ export default async function AdminCardsPage({
     where.color = { hasSome: color.split(",") };
   }
   if (type) {
-    where.type = { in: type.split(",") as ("Leader" | "Character" | "Event" | "Stage")[] };
+    where.type = {
+      in: type.split(",") as ("Leader" | "Character" | "Event" | "Stage")[],
+    };
   }
   if (set) {
-    where.cardSets = { some: { setLabel: set } };
+    if (originOnly === "true") {
+      // When origin-only is active AND a set is selected, 
+      // only show cards whose originSet matches this set label
+      where.originSet = set;
+    } else {
+      where.cardSets = { some: { setLabel: set } };
+    }
+  }
+  if (originOnly === "true" && !set) {
+    // When origin-only is active but no set filter,
+    // filter out reprints
+    where.isReprint = false;
   }
   if (block) {
     where.blockNumber = { in: block.split(",").map(Number) };
@@ -62,8 +76,16 @@ export default async function AdminCardsPage({
   return (
     <div>
       <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold">Card Database</h1>
-        <span className="text-sm text-gray-500">
+        <h1
+          className="text-3xl font-bold tracking-tight"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Card Database
+        </h1>
+        <span
+          className="text-sm tabular-nums"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           {total.toLocaleString()} cards
         </span>
       </div>
@@ -74,7 +96,7 @@ export default async function AdminCardsPage({
         page={page}
         totalPages={totalPages}
         sets={sets}
-        currentFilters={{ q, color, type, set, block }}
+        currentFilters={{ q, color, type, set, block, originOnly }}
       />
     </div>
   );

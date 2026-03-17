@@ -4,13 +4,13 @@ const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const TYPES = ["Leader", "Character", "Event", "Stage"];
 const BLOCKS = [1, 2, 3, 4];
 
-const COLOR_STYLES: Record<string, string> = {
-  Red: "bg-red-100 text-red-800 border-red-300",
-  Blue: "bg-blue-100 text-blue-800 border-blue-300",
-  Green: "bg-green-100 text-green-800 border-green-300",
-  Purple: "bg-purple-100 text-purple-800 border-purple-300",
-  Black: "bg-gray-200 text-gray-800 border-gray-400",
-  Yellow: "bg-yellow-100 text-yellow-800 border-yellow-300",
+const COLOR_ACTIVE: Record<string, { bg: string; text: string; border: string }> = {
+  Red:    { bg: "var(--card-red)",    text: "#fff", border: "var(--card-red)" },
+  Blue:   { bg: "var(--card-blue)",   text: "#fff", border: "var(--card-blue)" },
+  Green:  { bg: "var(--card-green)",  text: "#fff", border: "var(--card-green)" },
+  Purple: { bg: "var(--card-purple)", text: "#fff", border: "var(--card-purple)" },
+  Black:  { bg: "var(--card-black)",  text: "#ddd", border: "var(--card-black)" },
+  Yellow: { bg: "var(--card-yellow)", text: "#222", border: "var(--card-yellow)" },
 };
 
 interface CardFiltersProps {
@@ -21,6 +21,7 @@ interface CardFiltersProps {
     type: string;
     set: string;
     block: string;
+    originOnly: string;
   };
   onFilterChange: (updates: Record<string, string>) => void;
 }
@@ -39,11 +40,12 @@ export function CardFilters({
   const activeBlocks = currentFilters.block
     ? currentFilters.block.split(",").map(Number)
     : [];
+  const originOnly = currentFilters.originOnly === "true";
 
   function toggleFilter(
     filterKey: string,
     value: string,
-    activeValues: string[]
+    activeValues: string[],
   ) {
     const newValues = activeValues.includes(value)
       ? activeValues.filter((v) => v !== value)
@@ -52,62 +54,107 @@ export function CardFilters({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+    <div
+      className="space-y-4 rounded-xl p-4"
+      style={{
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-subtle)",
+      }}
+    >
       {/* Colors */}
       <div>
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <label
+          className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           Color
         </label>
         <div className="flex flex-wrap gap-1.5">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => toggleFilter("color", c, activeColors)}
-              className={`rounded-md border px-3 py-1 text-xs font-medium transition ${
-                activeColors.includes(c)
-                  ? COLOR_STYLES[c]
-                  : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
+          {COLORS.map((c) => {
+            const active = activeColors.includes(c);
+            const colorStyle = COLOR_ACTIVE[c];
+            return (
+              <button
+                key={c}
+                onClick={() => toggleFilter("color", c, activeColors)}
+                className="rounded-md px-3 py-1 text-xs font-medium transition-all"
+                style={
+                  active
+                    ? {
+                        background: colorStyle.bg,
+                        color: colorStyle.text,
+                        border: `1px solid ${colorStyle.border}`,
+                      }
+                    : {
+                        background: "var(--surface-2)",
+                        color: "var(--text-tertiary)",
+                        border: "1px solid var(--border)",
+                      }
+                }
+              >
+                {c}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Types */}
       <div>
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <label
+          className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           Type
         </label>
         <div className="flex flex-wrap gap-1.5">
-          {TYPES.map((t) => (
-            <button
-              key={t}
-              onClick={() => toggleFilter("type", t, activeTypes)}
-              className={`rounded-md border px-3 py-1 text-xs font-medium transition ${
-                activeTypes.includes(t)
-                  ? "border-indigo-300 bg-indigo-100 text-indigo-800"
-                  : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+          {TYPES.map((t) => {
+            const active = activeTypes.includes(t);
+            return (
+              <button
+                key={t}
+                onClick={() => toggleFilter("type", t, activeTypes)}
+                className="rounded-md px-3 py-1 text-xs font-medium transition-all"
+                style={
+                  active
+                    ? {
+                        background: "var(--teal)",
+                        color: "var(--surface-0)",
+                        border: "1px solid var(--teal)",
+                      }
+                    : {
+                        background: "var(--surface-2)",
+                        color: "var(--text-tertiary)",
+                        border: "1px solid var(--border)",
+                      }
+                }
+              >
+                {t}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Set + Block row */}
-      <div className="flex flex-wrap gap-4">
+      {/* Set + Block + Reprint filter row */}
+      <div className="flex flex-wrap items-end gap-4">
         {/* Set dropdown */}
         <div className="min-w-[200px] flex-1">
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <label
+            className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             Set
           </label>
           <select
             value={currentFilters.set}
             onChange={(e) => onFilterChange({ set: e.target.value })}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-red-500 focus:outline-none"
+            className="w-full rounded-md px-3 py-1.5 text-sm focus:outline-none"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+            }}
           >
             <option value="">All Sets</option>
             {sets.map((s) => (
@@ -120,26 +167,81 @@ export function CardFilters({
 
         {/* Block */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <label
+            className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             Block
           </label>
           <div className="flex gap-1.5">
-            {BLOCKS.map((b) => (
-              <button
-                key={b}
-                onClick={() =>
-                  toggleFilter("block", String(b), activeBlocks.map(String))
-                }
-                className={`rounded-md border px-3 py-1 text-xs font-medium transition ${
-                  activeBlocks.includes(b)
-                    ? "border-amber-300 bg-amber-100 text-amber-800"
-                    : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                {b}
-              </button>
-            ))}
+            {BLOCKS.map((b) => {
+              const active = activeBlocks.includes(b);
+              return (
+                <button
+                  key={b}
+                  onClick={() =>
+                    toggleFilter("block", String(b), activeBlocks.map(String))
+                  }
+                  className="rounded-md px-3 py-1 text-xs font-medium transition-all"
+                  style={
+                    active
+                      ? {
+                          background: "var(--sage)",
+                          color: "var(--surface-0)",
+                          border: "1px solid var(--sage)",
+                        }
+                      : {
+                          background: "var(--surface-2)",
+                          color: "var(--text-tertiary)",
+                          border: "1px solid var(--border)",
+                        }
+                  }
+                >
+                  {b}
+                </button>
+              );
+            })}
           </div>
+        </div>
+
+        {/* Reprint filter toggle */}
+        <div>
+          <label
+            className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            Reprints
+          </label>
+          <button
+            onClick={() =>
+              onFilterChange({ originOnly: originOnly ? "" : "true" })
+            }
+            className="flex items-center gap-2 rounded-md px-3 py-1 text-xs font-medium transition-all"
+            style={
+              originOnly
+                ? {
+                    background: "var(--accent-soft)",
+                    color: "var(--accent)",
+                    border: "1px solid var(--accent)",
+                  }
+                : {
+                    background: "var(--surface-2)",
+                    color: "var(--text-tertiary)",
+                    border: "1px solid var(--border)",
+                  }
+            }
+          >
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-sm transition-colors"
+              style={{
+                background: originOnly ? "var(--accent)" : "transparent",
+                border: originOnly
+                  ? "1.5px solid var(--accent)"
+                  : "1.5px solid var(--text-tertiary)",
+              }}
+            />
+            Origin only
+          </button>
         </div>
       </div>
     </div>

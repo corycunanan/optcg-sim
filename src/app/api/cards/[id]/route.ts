@@ -47,15 +47,24 @@ export async function PATCH(
   try {
     const body = await request.json();
 
-    // Only allow updating specific fields
+    // Allow updating all card fields (except id and originSet which are derived)
     const allowedFields = [
       "name",
-      "banStatus",
-      "effectText",
-      "triggerText",
+      "type",
+      "color",
+      "cost",
+      "power",
+      "counter",
+      "life",
+      "attribute",
       "traits",
       "rarity",
+      "effectText",
+      "triggerText",
+      "imageUrl",
       "blockNumber",
+      "banStatus",
+      "isReprint",
     ];
 
     const updateData: Record<string, unknown> = {};

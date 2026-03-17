@@ -1,25 +1,17 @@
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { CardImageGallery } from "@/components/admin/card-image-gallery";
 
 export const dynamic = "force-dynamic";
 
-const COLOR_BG: Record<string, string> = {
-  Red: "bg-red-50 border-red-200",
-  Blue: "bg-blue-50 border-blue-200",
-  Green: "bg-green-50 border-green-200",
-  Purple: "bg-purple-50 border-purple-200",
-  Black: "bg-gray-100 border-gray-300",
-  Yellow: "bg-yellow-50 border-yellow-200",
-};
-
-const COLOR_TEXT: Record<string, string> = {
-  Red: "text-red-700",
-  Blue: "text-blue-700",
-  Green: "text-green-700",
-  Purple: "text-purple-700",
-  Black: "text-gray-700",
-  Yellow: "text-yellow-700",
+const COLOR_ACCENT: Record<string, string> = {
+  Red: "var(--card-red)",
+  Blue: "var(--card-blue)",
+  Green: "var(--card-green)",
+  Purple: "var(--card-purple)",
+  Black: "var(--card-black)",
+  Yellow: "var(--card-yellow)",
 };
 
 export default async function CardDetailPage({
@@ -41,78 +33,61 @@ export default async function CardDetailPage({
   if (!card) notFound();
 
   const primaryColor = card.color[0] || "Black";
+  const accentColor = COLOR_ACCENT[primaryColor] || "var(--teal)";
 
   return (
     <div>
       {/* Breadcrumb */}
-      <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
-        <Link href="/admin/cards" className="hover:text-gray-700">
+      <div className="mb-6 flex items-center gap-2 text-sm">
+        <Link
+          href="/admin/cards"
+          className="transition-colors hover:underline"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           Cards
         </Link>
-        <span>›</span>
-        <span className="text-gray-900">{card.id}</span>
+        <span style={{ color: "var(--text-tertiary)" }}>›</span>
+        <span style={{ color: "var(--text-primary)" }}>{card.id}</span>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Left: Card image */}
-        <div>
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={card.imageUrl}
-              alt={card.name}
-              className="w-full"
-            />
-          </div>
-
-          {/* Art variants */}
-          {card.artVariants.length > 0 && (
-            <div className="mt-4">
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">
-                Art Variants ({card.artVariants.length})
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                {card.artVariants.map((v) => (
-                  <div
-                    key={v.id}
-                    className="overflow-hidden rounded-lg border border-gray-200"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={v.imageUrl}
-                      alt={`${card.name} — ${v.label}`}
-                      className="w-full"
-                      loading="lazy"
-                    />
-                    <div className="p-1 text-center text-[10px] text-gray-500">
-                      {v.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
+        {/* Left: Card image gallery */}
+        <CardImageGallery
+          cardName={card.name}
+          baseImageUrl={card.imageUrl}
+          artVariants={card.artVariants}
+        />
 
         {/* Right: Card details */}
         <div className="space-y-4">
           {/* Header */}
           <div
-            className={`rounded-xl border p-5 ${COLOR_BG[primaryColor] || "bg-gray-50 border-gray-200"}`}
+            className="rounded-xl p-6"
+            style={{
+              background: "var(--surface-1)",
+              borderLeft: `3px solid ${accentColor}`,
+            }}
           >
             <div className="flex items-start justify-between">
               <div>
                 <h1
-                  className={`text-2xl font-bold ${COLOR_TEXT[primaryColor] || "text-gray-900"}`}
+                  className="text-2xl font-bold tracking-tight"
+                  style={{ color: "var(--text-primary)" }}
                 >
                   {card.name}
                 </h1>
-                <p className="mt-1 text-sm text-gray-500">
+                <p
+                  className="mt-1 text-sm"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
                   {card.id} · {card.type} · {card.rarity}
                 </p>
               </div>
               {card.banStatus !== "LEGAL" && (
-                <span className="rounded-md bg-red-600 px-2 py-1 text-xs font-bold text-white">
+                <span
+                  className="rounded-md px-2.5 py-1 text-xs font-bold"
+                  style={{ background: "var(--error)", color: "#fff" }}
+                >
                   {card.banStatus}
                 </span>
               )}
@@ -123,7 +98,11 @@ export default async function CardDetailPage({
               {card.color.map((c) => (
                 <span
                   key={c}
-                  className={`rounded-full border px-3 py-0.5 text-xs font-medium ${COLOR_BG[c]} ${COLOR_TEXT[c]}`}
+                  className="rounded-full px-3 py-0.5 text-xs font-semibold"
+                  style={{
+                    background: COLOR_ACCENT[c] || "var(--surface-3)",
+                    color: c === "Yellow" ? "#222" : "#fff",
+                  }}
                 >
                   {c}
                 </span>
@@ -132,7 +111,7 @@ export default async function CardDetailPage({
           </div>
 
           {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {card.cost !== null && (
               <StatCard label="Cost" value={String(card.cost)} />
             )}
@@ -180,7 +159,10 @@ export default async function CardDetailPage({
           {/* Effect text */}
           {card.effectText && (
             <Section title="Effect">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+              <p
+                className="whitespace-pre-wrap text-sm leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {card.effectText}
               </p>
             </Section>
@@ -189,23 +171,42 @@ export default async function CardDetailPage({
           {/* Trigger text */}
           {card.triggerText && (
             <Section title="Trigger">
-              <p className="text-sm text-gray-800">{card.triggerText}</p>
+              <p
+                className="text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {card.triggerText}
+              </p>
             </Section>
           )}
 
           {/* Set membership */}
           {card.cardSets.length > 0 && (
             <Section title="Appears In">
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {card.cardSets.map((cs) => (
-                  <div key={cs.id} className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-gray-600">
+                  <div
+                    key={cs.id}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <span
+                      className="font-mono font-medium"
+                      style={{ color: "var(--teal)" }}
+                    >
                       {cs.setLabel}
                     </span>
-                    <span className="text-gray-400">—</span>
-                    <span className="text-gray-700">{cs.setName}</span>
+                    <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      {cs.setName}
+                    </span>
                     {cs.isOrigin && (
-                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          background: "var(--sage-muted)",
+                          color: "var(--sage)",
+                        }}
+                      >
                         Origin
                       </span>
                     )}
@@ -216,12 +217,26 @@ export default async function CardDetailPage({
           )}
 
           {/* Edit link */}
-          <div className="pt-2">
+          <div className="flex gap-3 pt-2">
             <Link
               href={`/admin/cards/${card.id}/edit`}
-              className="inline-block rounded-lg bg-gray-800 px-5 py-2 text-sm font-medium text-white hover:bg-gray-900"
+              className="rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors"
+              style={{
+                background: "var(--accent)",
+                color: "var(--surface-0)",
+              }}
             >
               Edit Card
+            </Link>
+            <Link
+              href="/admin/cards"
+              className="rounded-lg px-5 py-2.5 text-sm transition-colors"
+              style={{
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              Back to Cards
             </Link>
           </div>
         </div>
@@ -232,11 +247,25 @@ export default async function CardDetailPage({
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+    <div
+      className="rounded-lg p-3 text-center"
+      style={{
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-subtle)",
+      }}
+    >
+      <div
+        className="text-[10px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         {label}
       </div>
-      <div className="mt-0.5 text-lg font-bold text-gray-900">{value}</div>
+      <div
+        className="mt-0.5 text-lg font-bold tabular-nums"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -249,8 +278,17 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+    <div
+      className="rounded-xl p-4"
+      style={{
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-subtle)",
+      }}
+    >
+      <h3
+        className="mb-2.5 text-[11px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         {title}
       </h3>
       {children}
@@ -260,7 +298,13 @@ function Section({
 
 function Tag({ text }: { text: string }) {
   return (
-    <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+    <span
+      className="rounded-md px-2.5 py-1 text-xs font-medium"
+      style={{
+        background: "var(--surface-3)",
+        color: "var(--text-secondary)",
+      }}
+    >
       {text}
     </span>
   );

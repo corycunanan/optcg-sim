@@ -1,0 +1,33 @@
+# OPTCG Simulator — CLAUDE.md
+
+## Project
+
+One Piece Trading Card Game simulator — deck builder, card database, and game engine. Built with Next.js 16, React 19, Tailwind CSS v4, Prisma 6, TypeScript.
+
+## Design Context
+
+### Users
+One Piece Trading Card Game players — competitive and casual — who want to build decks, browse cards, and play games online. They're typically engaged fans who spend long sessions deckbuilding and testing. The context is focused, functional play: search a card, build a deck, jump into a game. They expect the tool to feel like a premium game client, not a spreadsheet.
+
+### Brand Personality
+**Bold. Confident. Alive.**
+
+The OPTCG Simulator channels the energy of the One Piece universe — vibrant, action-packed, high-contrast. It should feel like a competitive gaming platform, not a dev tool. The card art is spectacular and deserves to be the hero. Every surface should feel intentional and premium without being overwrought.
+
+Emotional goals: excitement when browsing cards, confidence when building decks, immersion during gameplay.
+
+### Aesthetic Direction
+- **Visual tone:** Dark, premium, high-energy. Inspired by MTG Arena and PTCG Live — polished game clients with rich card presentation, immersive dark surfaces, and purposeful motion.
+- **Theme:** Dark mode primary, with light mode as secondary option. Dark backgrounds let card art pop and reduce fatigue during long deckbuilding sessions.
+- **Color system:** The TCG itself defines six card colors (Red, Blue, Green, Purple, Black, Yellow) — these are functional, not decorative. The UI palette should complement them without competing. Use warm neutrals tinted toward the brand rather than pure gray. Red is the current primary accent — lean into it as the brand hue (echoing One Piece's energy).
+- **Typography:** Geist Sans is already loaded — it's a strong choice. Use it with clear hierarchy: bold display weights for headings, regular for body. Consider a display or condensed face for card names and stats where density matters.
+- **Card presentation:** Cards are the core content. Show them large, with high-quality art. Hover states should feel tactile — subtle lift, shadow, maybe a slight perspective shift. Card grids should breathe, not feel like a spreadsheet.
+- **Anti-references:** Should NOT look like a generic dashboard or SaaS app. No flat pastel cards-on-cards layouts. No generic AI aesthetics (cyan-on-dark, purple gradients, neon glow). Avoid looking like Moxfield's utilitarian approach — this should feel more immersive.
+
+### Design Principles
+
+1. **Card art is the hero** — Every layout decision should amplify the artwork. Backgrounds recede, chrome minimizes, cards command attention.
+2. **Dark canvas, vibrant content** — The UI is a dark, quiet stage. Color comes from the cards and intentional interactive accents, not decorative gradients.
+3. **Competitive clarity** — Information density matters (stats, filters, deck counts), but it must be scannable. Strong typographic hierarchy, not visual noise.
+4. **Tactile and alive** — Interactions should feel physical: cards that lift on hover, smooth transitions, responsive feedback. Not flashy animation for its own sake, but motion that communicates state.
+5. **Earned complexity** — Start simple, reveal depth through interaction. Progressive disclosure over information overload. A new player and a competitive grinder should both feel at home.

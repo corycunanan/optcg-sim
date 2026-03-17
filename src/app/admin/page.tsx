@@ -26,63 +26,122 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Admin Dashboard</h1>
+      <h1
+        className="mb-8 text-3xl font-bold tracking-tight"
+        style={{ color: "var(--text-primary)" }}
+      >
+        Dashboard
+      </h1>
 
       {/* Stats */}
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatBox label="Cards" value={cardCount} href="/admin/cards" />
         <StatBox label="Art Variants" value={variantCount} />
         <StatBox label="Sets" value={setCount.length} href="/admin/sets" />
-        <StatBox
-          label="Blocks"
-          value={blockDistribution.length}
-        />
+        <StatBox label="Blocks" value={blockDistribution.length} />
       </div>
 
-      {/* Type distribution */}
-      <div className="mb-8 grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
+      {/* Distribution */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div
+          className="rounded-xl p-5"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          <h2
+            className="mb-4 text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             By Type
           </h2>
-          <div className="space-y-2">
-            {typeDistribution.map((t) => (
-              <div key={t.type} className="flex items-center justify-between">
-                <Link
-                  href={`/admin/cards?type=${t.type}`}
-                  className="text-sm text-gray-700 hover:text-red-600"
-                >
-                  {t.type}
-                </Link>
-                <span className="text-sm font-medium text-gray-900">
-                  {t._count.toLocaleString()}
-                </span>
-              </div>
-            ))}
+          <div className="space-y-2.5">
+            {typeDistribution.map((t) => {
+              const pct = Math.round((t._count / cardCount) * 100);
+              return (
+                <div key={t.type}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <Link
+                      href={`/admin/cards?type=${t.type}`}
+                      className="text-sm font-medium transition-colors hover:underline"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {t.type}
+                    </Link>
+                    <span
+                      className="text-sm tabular-nums font-semibold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {t._count.toLocaleString()}
+                    </span>
+                  </div>
+                  <div
+                    className="h-1 overflow-hidden rounded-full"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${pct}%`,
+                        background: "var(--teal)",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
+        <div
+          className="rounded-xl p-5"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          <h2
+            className="mb-4 text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             By Block
           </h2>
-          <div className="space-y-2">
-            {blockDistribution.map((b) => (
-              <div
-                key={b.blockNumber}
-                className="flex items-center justify-between"
-              >
-                <Link
-                  href={`/admin/cards?block=${b.blockNumber}`}
-                  className="text-sm text-gray-700 hover:text-red-600"
-                >
-                  Block {b.blockNumber}
-                </Link>
-                <span className="text-sm font-medium text-gray-900">
-                  {b._count.toLocaleString()}
-                </span>
-              </div>
-            ))}
+          <div className="space-y-2.5">
+            {blockDistribution.map((b) => {
+              const pct = Math.round((b._count / cardCount) * 100);
+              return (
+                <div key={b.blockNumber}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <Link
+                      href={`/admin/cards?block=${b.blockNumber}`}
+                      className="text-sm font-medium transition-colors hover:underline"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Block {b.blockNumber}
+                    </Link>
+                    <span
+                      className="text-sm tabular-nums font-semibold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {b._count.toLocaleString()}
+                    </span>
+                  </div>
+                  <div
+                    className="h-1 overflow-hidden rounded-full"
+                    style={{ background: "var(--surface-3)" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${pct}%`,
+                        background: "var(--sage)",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -101,12 +160,22 @@ function StatBox({
 }) {
   const content = (
     <div
-      className={`rounded-lg border border-gray-200 bg-white p-5 ${href ? "transition hover:border-red-300 hover:shadow-sm" : ""}`}
+      className={`rounded-xl p-5 transition-colors ${href ? "cursor-pointer" : ""}`}
+      style={{
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-subtle)",
+      }}
     >
-      <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <div
+        className="text-[11px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         {label}
       </div>
-      <div className="mt-1 text-3xl font-bold text-gray-900">
+      <div
+        className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight"
+        style={{ color: "var(--text-primary)" }}
+      >
         {value.toLocaleString()}
       </div>
     </div>

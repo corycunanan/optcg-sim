@@ -21,24 +21,34 @@ export default async function CardEditPage({
   return (
     <div>
       {/* Breadcrumb */}
-      <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
-        <Link href="/admin/cards" className="hover:text-gray-700">
+      <div className="mb-6 flex items-center gap-2 text-sm">
+        <Link
+          href="/admin/cards"
+          className="transition-colors hover:underline"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           Cards
         </Link>
-        <span>›</span>
+        <span style={{ color: "var(--text-tertiary)" }}>›</span>
         <Link
           href={`/admin/cards/${card.id}`}
-          className="hover:text-gray-700"
+          className="transition-colors hover:underline"
+          style={{ color: "var(--text-tertiary)" }}
         >
           {card.id}
         </Link>
-        <span>›</span>
-        <span className="text-gray-900">Edit</span>
+        <span style={{ color: "var(--text-tertiary)" }}>›</span>
+        <span style={{ color: "var(--text-primary)" }}>Edit</span>
       </div>
 
-      <h1 className="mb-6 text-2xl font-bold">
-        Edit: {card.name}{" "}
-        <span className="text-lg font-normal text-gray-400">({card.id})</span>
+      <h1 className="mb-8 text-3xl font-bold tracking-tight">
+        <span style={{ color: "var(--text-primary)" }}>Edit: {card.name}</span>
+        <span
+          className="ml-2 text-lg font-normal"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          ({card.id})
+        </span>
       </h1>
 
       <CardEditForm card={card} />
