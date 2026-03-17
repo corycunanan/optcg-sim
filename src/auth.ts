@@ -14,6 +14,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
   },
+  debug: process.env.NODE_ENV === "development",
+  trustHost: true,
   callbacks: {
     async session({ session, user }) {
       // Expose username and user id to the client session
