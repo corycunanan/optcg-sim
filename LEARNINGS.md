@@ -374,10 +374,59 @@ The M0 plan originally specified Supabase Auth, but since we're running local Po
 - `src/auth.ts` — NextAuth config with Prisma adapter + Google provider
 - `src/proxy.ts` — Route protection (redirects unauthenticated users from `/admin/*` to `/login`)
 - `src/app/login/page.tsx` — Login page with "Continue with Google" button
+- `src/app/login/google-sign-in-button.tsx` — Client component using direct form POST (workaround)
 - `src/app/onboarding/page.tsx` — Username setup for new users
 - `src/app/api/auth/[...nextauth]/route.ts` — Auth.js API route handler
 - `src/app/api/user/username/route.ts` — Username set/update endpoint
 - `src/components/auth/sign-out-button.tsx` — Client-side sign out button
+
+---
+
+### 2026-03-16 — NextAuth v5 `signIn()` server action broken on Next.js 16
+
+**Problem:** The `signIn()` server action exported from NextAuth v5 (beta.30) throws a `Configuration` error on Next.js 16. The error is: `Cannot destructure property 'href' of 'e.nextUrl' as it is undefined.`
+
+**Root cause:** NextAuth's `signIn` server action in `next-auth/lib/actions.js` calls `createActionURL()` which reads `headers.get("x-forwarded-proto")`. In Next.js 16's server action context, this header is absent, causing the constructed URL to be invalid. The error is then masked as a generic `Configuration` error by `@auth/core`.
+
+**Solution:** Replace the `signIn()` server action with a **client component that POSTs directly** to `/api/auth/signin/google` with a CSRF token fetched from `/api/auth/csrf`. This is the same pattern NextAuth's built-in signin page uses.
+
+**Reference:** https://github.com/nextauthjs/next-auth/issues/13388
+
+**Key files:**
+- `src/app/login/google-sign-in-button.tsx` — Client component with direct form POST
+- `src/app/login/page.tsx` — Server component that checks session, renders the client button
+
+---
+
+### 2026-03-16 — Vercel env vars: beware of trailing newlines
+
+**Problem:** When piping env var values to `vercel env add` using `echo`, trailing newlines are included in the stored value. This caused `AUTH_GOOGLE_ID` to have `%0A` appended in the OAuth redirect URL, and `AUTH_TRUST_HOST` / `NEXTAUTH_URL` to have `\n` suffixes.
+
+**Solution:** Always use `printf '%s' "$VALUE"` instead of `echo "$VALUE"` when piping to `vercel env add`. The `printf '%s'` avoids adding a trailing newline.
+
+```bash
+# WRONG — adds trailing newline
+echo "$VALUE" | vercel env add KEY production --force
+
+# CORRECT — no trailing newline
+printf '%s' "$VALUE" | vercel env add KEY production --force
+```
+
+---
+
+### 2026-03-16 — Neon PostgreSQL + Prisma: use directUrl for non-pooled connections
+
+**Problem:** Neon's pooled connection (pgbouncer) doesn't support Prisma's prepared statements, causing adapter failures.
+
+**Solution:** In `prisma/schema.prisma`, use `directUrl` alongside `url`:
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")        // Pooled URL with ?pgbouncer=true
+  directUrl = env("DIRECT_DATABASE_URL") // Direct URL (non-pooled)
+}
+```
+The pooled URL (with `-pooler` in hostname) gets `?pgbouncer=true` appended. The direct URL removes `-pooler` from the hostname.
 
 ---
 
