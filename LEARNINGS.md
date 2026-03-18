@@ -430,4 +430,71 @@ The pooled URL (with `-pooler` in hostname) gets `?pgbouncer=true` appended. The
 
 ---
 
+### 2026-03-17 — Design System: M2.5 normalization complete
+
+**Area:** Frontend / Design System
+
+Full design system normalization pass completed across all pages and deck builder components:
+
+- Removed all broken CSS variable references (`--surface-0`, `--accent`, `--border-subtle`) that were removed in M2.5 token redesign but still referenced in page files
+- Applied `font-display` (Barlow Condensed) to page titles, deck name in header, and card name in inspect modal — the font was loaded but never applied
+- Fixed touch targets throughout deck builder (h-7 → h-9 minimum, 36px)
+- Removed colored `border-l` from deck builder list rows (was JS-driven inline style)
+- Removed strokes from all card images
+- Consistent `rounded` (4px) for deck builder cards, `rounded-lg` (12px) for card database cards
+
+---
+
+### 2026-03-17 — Deck Builder: Tabs + larger leader card
+
+**Area:** Frontend / Deck Builder
+
+Deck builder right panel refactored to use Radix UI tabs:
+- **Cards tab** (default): large `w-48` leader card (clickable → inspect modal with art variant support), compact inline validation tags (X/50 + rule pills, no heading), card list
+- **Stats tab**: cost curve (taller, 120px) + color breakdown
+
+Leader art variant selection stored in local `leaderSelectedArtUrl` state — not yet persisted to DB. This is a known gap for a future session.
+
+---
+
+### 2026-03-17 — Images: Hotlinking from onepiece-cardgame.com causes failures
+
+**Area:** Infrastructure / Images
+
+Card images were hotlinked directly from `en.onepiece-cardgame.com`. This caused intermittent `ERR_BLOCKED_BY_RESPONSE.NotSameSite` failures in production due to the site's CORS/CORP headers. Fix: self-host on Cloudflare R2.
+
+**Migration:** `pipeline/migrate-images.ts` — downloads all card/variant images from DB source URLs, uploads to R2, updates DB with CDN URLs. Resumable (skips already-migrated). Run after each new set import.
+
+**Key gotcha:** `NEXT_PUBLIC_*` env vars are baked into the Next.js bundle at build time — changing them in Vercel requires a fresh build (push a commit), not just a redeploy.
+
+**Key gotcha:** The migration script connects to whatever `DATABASE_URL` is in `.env`. Make sure local `.env` points to the same database as production (Neon), otherwise the migration updates the wrong DB.
+
+---
+
+### 2026-03-18 — Images: Cloudflare R2 public URL has CORP: same-origin by default
+
+**Area:** Infrastructure / Images
+
+Cloudflare R2's public development URL (`pub-*.r2.dev`) serves objects with `Cross-Origin-Resource-Policy: same-origin`. This blocks cross-origin image loads (browser throws `ERR_BLOCKED_BY_RESPONSE.NotSameSite`).
+
+**Fix:** A Cloudflare Worker (`workers/images/`) that proxies R2 and sets:
+- `Cross-Origin-Resource-Policy: cross-origin`
+- `Access-Control-Allow-Origin: *`
+- `Cache-Control: public, max-age=31536000, immutable`
+
+Worker URL: `https://optcg-images.corymcunanan.workers.dev`
+Deploy: `pnpm worker:deploy` (from project root)
+
+**Note:** S3 `Metadata` fields are returned as `x-amz-meta-*` headers — they do NOT map to actual HTTP response headers like CORP. The only way to set CORP on R2 objects is via a Worker or Transform Rule on a custom domain.
+
+---
+
+### 2026-03-18 — Build: Exclude workers/ from root tsconfig
+
+**Area:** Build / TypeScript
+
+The `workers/images/src/index.ts` file uses Cloudflare Worker types (`R2Bucket`) which aren't available in the Next.js build. Next.js's `tsc` picks up all `**/*.ts` files by default, causing a build failure.
+
+**Fix:** Add `"workers"` to the `exclude` array in `tsconfig.json`. The worker has its own `tsconfig.json` with `@cloudflare/workers-types`.
+
 <!-- Add new entries above this line -->
