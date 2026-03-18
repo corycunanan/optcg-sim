@@ -17,7 +17,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "pipeline:import": "tsx pipeline/import.ts",
-    "pipeline:migrate-images": "tsx pipeline/migrate-images.ts"
+    "pipeline:migrate-images": "tsx pipeline/migrate-images.ts",
+    "worker:deploy": "cd workers/images && pnpm install && pnpm deploy"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
