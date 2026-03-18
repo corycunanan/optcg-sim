@@ -62,7 +62,7 @@ export default async function CardDetailPage({
         <div className="space-y-4">
           {/* Header */}
           <div
-            className="rounded-xl p-6"
+            className="rounded p-6"
             style={{
               background: "var(--surface-1)",
               borderLeft: `3px solid ${accentColor}`,
@@ -85,7 +85,7 @@ export default async function CardDetailPage({
               </div>
               {card.banStatus !== "LEGAL" && (
                 <span
-                  className="rounded-md px-2.5 py-1 text-xs font-bold"
+                  className="rounded px-2.5 py-1 text-xs font-bold"
                   style={{ background: "var(--error)", color: "#fff" }}
                 >
                   {card.banStatus}
@@ -220,7 +220,7 @@ export default async function CardDetailPage({
           <div className="flex gap-3 pt-2">
             <Link
               href={`/admin/cards/${card.id}/edit`}
-              className="rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors"
+              className="rounded px-5 py-2.5 text-sm font-semibold transition-colors"
               style={{
                 background: "var(--accent)",
                 color: "var(--surface-0)",
@@ -230,7 +230,7 @@ export default async function CardDetailPage({
             </Link>
             <Link
               href="/admin/cards"
-              className="rounded-lg px-5 py-2.5 text-sm transition-colors"
+              className="rounded px-5 py-2.5 text-sm transition-colors"
               style={{
                 border: "1px solid var(--border)",
                 color: "var(--text-secondary)",
@@ -248,7 +248,7 @@ export default async function CardDetailPage({
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div
-      className="rounded-lg p-3 text-center"
+      className="rounded p-3 text-center"
       style={{
         background: "var(--surface-1)",
         border: "1px solid var(--border-subtle)",
@@ -279,7 +279,7 @@ function Section({
 }) {
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded p-4"
       style={{
         background: "var(--surface-1)",
         border: "1px solid var(--border-subtle)",
@@ -299,7 +299,7 @@ function Section({
 function Tag({ text }: { text: string }) {
   return (
     <span
-      className="rounded-md px-2.5 py-1 text-xs font-medium"
+      className="rounded px-2.5 py-1 text-xs font-medium"
       style={{
         background: "var(--surface-3)",
         color: "var(--text-secondary)",

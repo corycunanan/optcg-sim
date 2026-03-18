@@ -32,7 +32,7 @@ export function Pagination({
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="rounded-md px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+        className="rounded px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
         style={{
           border: "1px solid var(--border)",
           color: "var(--text-secondary)",
@@ -54,7 +54,7 @@ export function Pagination({
           <button
             key={p}
             onClick={() => onPageChange(p)}
-            className="rounded-md px-3 py-1.5 text-sm font-medium tabular-nums transition-colors"
+            className="rounded px-3 py-1.5 text-sm font-medium tabular-nums transition-colors"
             style={
               p === page
                 ? {
@@ -75,7 +75,7 @@ export function Pagination({
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="rounded-md px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+        className="rounded px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
         style={{
           border: "1px solid var(--border)",
           color: "var(--text-secondary)",

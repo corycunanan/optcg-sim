@@ -47,7 +47,7 @@ export default async function SetsPage() {
               <Link
                 key={s.packId}
                 href={`/admin/cards?set=${encodeURIComponent(s.setLabel)}`}
-                className="flex items-center justify-between rounded-xl p-4 transition-all hover:-translate-y-px hover:shadow-md hover:shadow-black/20"
+                className="flex items-center justify-between rounded p-4 transition-all hover:-translate-y-px hover:shadow-md hover:shadow-black/20"
                 style={{
                   background: "var(--surface-1)",
                   border: "1px solid var(--border-subtle)",

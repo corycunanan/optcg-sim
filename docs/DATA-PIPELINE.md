@@ -508,6 +508,7 @@ A database visualization and editing UI is planned as part of M0 to support ongo
 
 - [x] ~~**Does vegapull work today?**~~ ✅ Yes — confirmed 2026-03-16. Full dataset pulled successfully.
 - [ ] **Image hosting rights:** Card images have "SAMPLE" watermarks from the official site. Other fan projects host images — but copyright implications remain. May need to source from community image repositories.
+- [x] ~~**Image hosting infrastructure:**~~ ✅ Resolved 2026-03-17 — Cloudflare R2 selected (10GB free tier, ~657MB needed). Migration script at `pipeline/migrate-images.ts`. See `docs/M1-DECK-BUILDER.md` for setup steps.
 - [ ] **Errata tracking source:** Need to diff against stored data on each re-import to detect changes. The `effectText` comparison between runs is the detection mechanism.
 - [x] ~~**Block rotation data source:**~~ ✅ Resolved — `block_number` field from vegapull provides this automatically.
 - [ ] **Production image source:** ALL known sources (official EN/JP sites, Limitless TCG, OPTCG API, onepiece.gg) serve SAMPLE-watermarked images from Bandai. No clean digital source exists — clean images only exist as physical card scans. Options: (1) accept watermarks like other fan tools, (2) source community scans with coverage gaps, (3) accept long-term. This is an open item for production readiness.

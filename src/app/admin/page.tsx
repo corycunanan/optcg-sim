@@ -44,7 +44,7 @@ export default async function AdminPage() {
       {/* Distribution */}
       <div className="grid gap-4 md:grid-cols-2">
         <div
-          className="rounded-xl p-5"
+          className="rounded p-5"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-subtle)",
@@ -95,7 +95,7 @@ export default async function AdminPage() {
         </div>
 
         <div
-          className="rounded-xl p-5"
+          className="rounded p-5"
           style={{
             background: "var(--surface-1)",
             border: "1px solid var(--border-subtle)",
@@ -160,7 +160,7 @@ function StatBox({
 }) {
   const content = (
     <div
-      className={`rounded-xl p-5 transition-colors ${href ? "cursor-pointer" : ""}`}
+      className={`rounded p-5 transition-colors ${href ? "cursor-pointer" : ""}`}
       style={{
         background: "var(--surface-1)",
         border: "1px solid var(--border-subtle)",

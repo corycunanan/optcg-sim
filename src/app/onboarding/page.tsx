@@ -59,45 +59,23 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-center p-8"
-      style={{ background: "var(--surface-0)" }}
-    >
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1
-            className="text-3xl font-bold tracking-tight"
-            style={{ color: "var(--text-primary)" }}
-          >
+          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-content-primary">
             Welcome aboard!
           </h1>
-          <p
-            className="mt-2 text-sm"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <p className="mt-2 text-sm text-content-tertiary">
             Choose a username to get started
           </p>
         </div>
 
         {/* Form card */}
-        <div
-          className="rounded-xl p-6"
-          style={{
-            background: "var(--surface-1)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
+        <div className="rounded border border-border bg-surface-1 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div
-                className="rounded-lg p-3 text-sm font-medium"
-                style={{
-                  background: "oklch(60% 0.18 25 / 0.1)",
-                  color: "var(--error)",
-                  border: "1px solid oklch(60% 0.18 25 / 0.2)",
-                }}
-              >
+              <div className="rounded border border-error/20 bg-error-soft p-3 text-sm font-medium text-error">
                 {error}
               </div>
             )}
@@ -105,8 +83,7 @@ export default function OnboardingPage() {
             <div>
               <label
                 htmlFor="username"
-                className="mb-1.5 block text-sm font-medium"
-                style={{ color: "var(--text-secondary)" }}
+                className="mb-2 block text-sm font-medium text-content-secondary"
               >
                 Username
               </label>
@@ -117,17 +94,9 @@ export default function OnboardingPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="pirate_king"
                 autoFocus
-                className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                style={{
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                }}
+                className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-navy-900/10"
               />
-              <p
-                className="mt-1.5 text-xs"
-                style={{ color: "var(--text-tertiary)" }}
-              >
+              <p className="mt-2 text-xs text-content-tertiary">
                 3–20 characters. Letters, numbers, hyphens, underscores.
               </p>
             </div>
@@ -135,11 +104,7 @@ export default function OnboardingPage() {
             <button
               type="submit"
               disabled={saving || !username.trim()}
-              className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
-              style={{
-                background: "var(--accent)",
-                color: "var(--surface-0)",
-              }}
+              className="w-full rounded bg-navy-900 px-4 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 active:scale-[0.98] disabled:opacity-50"
             >
               {saving ? "Setting up…" : "Set Username"}
             </button>

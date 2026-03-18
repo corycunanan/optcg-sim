@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/components/ui/cn";
 
 interface ArtVariant {
   id: string;
@@ -42,13 +49,9 @@ interface CardInspectData {
 
 interface CardInspectModalProps {
   cardId: string;
-  /** Pre-loaded card data (from search results) — variants fetched async */
   preloadedCard?: CardInspectData;
-  /** Quantity already in deck (0 if not added) */
   quantityInDeck: number;
-  /** Currently selected art URL for this card in the deck */
   selectedArtUrl: string | null;
-  /** Whether this card is a leader vs regular card */
   isLeader?: boolean;
   onAddCard: () => void;
   onRemoveCard: () => void;
@@ -56,7 +59,7 @@ interface CardInspectModalProps {
   onClose: () => void;
 }
 
-const COLOR_ACCENT: Record<string, string> = {
+const COLOR_BG: Record<string, string> = {
   Red: "var(--card-red)",
   Blue: "var(--card-blue)",
   Green: "var(--card-green)",
@@ -82,7 +85,6 @@ export function CardInspectModal({
   );
   const [isLoading, setIsLoading] = useState(!preloadedCard?.artVariants);
 
-  // Fetch full card data with variants if not preloaded
   useEffect(() => {
     if (preloadedCard?.artVariants) {
       setCard(preloadedCard);
@@ -96,9 +98,7 @@ export function CardInspectModal({
         if (!res.ok) return;
         const data = await res.json();
         setCard(data);
-        if (!displayImage) {
-          setDisplayImage(selectedArtUrl || data.imageUrl);
-        }
+        if (!displayImage) setDisplayImage(selectedArtUrl || data.imageUrl);
       } catch {
         // noop
       } finally {
@@ -109,17 +109,13 @@ export function CardInspectModal({
     fetchCard();
   }, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update display image when card loads
   useEffect(() => {
-    if (card && !displayImage) {
-      setDisplayImage(selectedArtUrl || card.imageUrl);
-    }
+    if (card && !displayImage) setDisplayImage(selectedArtUrl || card.imageUrl);
   }, [card, selectedArtUrl, displayImage]);
 
   const primaryColor = card?.color[0] || "Black";
-  const accentColor = COLOR_ACCENT[primaryColor] || "var(--teal)";
+  const accentColor = COLOR_BG[primaryColor] || "var(--navy-700)";
 
-  // All artworks: base + variants
   const allArtworks = card
     ? [
         { id: "__origin", label: "Original", imageUrl: card.imageUrl },
@@ -133,52 +129,30 @@ export function CardInspectModal({
 
   const handleArtSelect = (artUrl: string) => {
     setDisplayImage(artUrl);
-    // If it's the base image, set null (meaning "use base")
     onSetArtVariant(artUrl === card?.imageUrl ? null : artUrl);
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "oklch(0% 0 0 / 0.75)" }}
-      onClick={onClose}
-    >
-      <div
-        className="relative flex max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl"
-        style={{
-          background: "var(--surface-1)",
-          border: "1px solid var(--border)",
-        }}
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        size="xl"
+        className="max-h-[90vh] overflow-hidden p-0"
       >
         {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <DialogClose aria-label="Close" className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary active:scale-95">
           ✕
-        </button>
+        </DialogClose>
 
         {isLoading || !card ? (
-          <div
-            className="flex w-full items-center justify-center py-20"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <div className="flex w-full items-center justify-center py-20 text-content-tertiary">
             Loading…
           </div>
         ) : (
-          <>
+          <div className="flex max-h-[90vh]">
             {/* Left: Card image + art variants */}
-            <div
-              className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r p-4"
-              style={{ borderColor: "var(--border-subtle)" }}
-            >
+            <div className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border p-4">
               {/* Main image */}
-              <div
-                className="overflow-hidden rounded-xl"
-                style={{ border: `2px solid ${accentColor}` }}
-              >
+              <div className="overflow-hidden rounded">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={displayImage}
@@ -191,43 +165,42 @@ export function CardInspectModal({
               {/* Art variant selector */}
               {allArtworks.length > 1 && (
                 <div className="mt-4">
-                  <h4
-                    className="mb-2 text-[11px] font-semibold uppercase tracking-widest"
-                    style={{ color: "var(--text-tertiary)" }}
-                  >
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                     Artworks ({allArtworks.length})
                   </h4>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-2">
                     {allArtworks.map((art) => {
                       const isSelected = displayImage === art.imageUrl;
                       return (
                         <button
                           key={art.id}
+                          aria-label={`Select ${art.label} artwork`}
+                          aria-pressed={isSelected}
                           onClick={() => handleArtSelect(art.imageUrl)}
-                          className="group overflow-hidden rounded-lg transition-all hover:-translate-y-0.5"
-                          style={{
-                            border: isSelected
-                              ? "2px solid var(--accent)"
-                              : "1px solid var(--border-subtle)",
-                          }}
+                          className={cn(
+                            "group overflow-hidden rounded border transition-all",
+                            isSelected
+                              ? "border-navy-900"
+                              : "border-border hover:border-border-strong"
+                          )}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={art.imageUrl}
                             alt={art.label}
-                            className={`w-full transition-opacity ${isSelected ? "opacity-100" : "opacity-60 group-hover:opacity-100"}`}
+                            className={cn(
+                              "w-full transition-opacity",
+                              isSelected ? "opacity-100" : "opacity-60 group-hover:opacity-100"
+                            )}
                             loading="lazy"
                           />
                           <div
-                            className="p-1 text-center text-[9px] font-medium"
-                            style={{
-                              background: isSelected
-                                ? "var(--accent-soft)"
-                                : "var(--surface-2)",
-                              color: isSelected
-                                ? "var(--accent)"
-                                : "var(--text-tertiary)",
-                            }}
+                            className={cn(
+                              "p-1 text-center text-xs font-medium",
+                              isSelected
+                                ? "bg-navy-100 text-navy-900"
+                                : "bg-surface-2 text-content-tertiary"
+                            )}
                           >
                             {art.label}
                           </div>
@@ -245,39 +218,30 @@ export function CardInspectModal({
               <div className="mb-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2
-                      className="text-xl font-bold tracking-tight"
-                      style={{ color: "var(--text-primary)" }}
-                    >
+                    <h2 className="font-display text-2xl font-bold leading-tight tracking-tight text-content-primary">
                       {card.name}
                     </h2>
-                    <p
-                      className="mt-0.5 text-sm"
-                      style={{ color: "var(--text-tertiary)" }}
-                    >
+                    <p className="mt-1 text-sm text-content-tertiary">
                       {card.id} · {card.type} · {card.rarity}
                     </p>
                   </div>
                   {card.banStatus !== "LEGAL" && (
-                    <span
-                      className="shrink-0 rounded-md px-2 py-0.5 text-xs font-bold"
-                      style={{ background: "var(--error)", color: "#fff" }}
-                    >
+                    <span className="shrink-0 rounded bg-error px-2 py-0.5 text-xs font-bold text-content-inverse">
                       {card.banStatus}
                     </span>
                   )}
                 </div>
 
                 {/* Color badges */}
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {card.color.map((c) => (
                     <span
                       key={c}
-                      className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                      style={{
-                        background: COLOR_ACCENT[c] || "var(--surface-3)",
-                        color: c === "Yellow" ? "#222" : "#fff",
-                      }}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-semibold",
+                        c === "Yellow" ? "text-content-primary" : "text-content-inverse"
+                      )}
+                      style={{ background: COLOR_BG[c] || "var(--surface-3)" }}
                     >
                       {c}
                     </span>
@@ -302,11 +266,9 @@ export function CardInspectModal({
               {/* Attributes */}
               {card.attribute.length > 0 && (
                 <div className="mb-3">
-                  <Label text="Attributes" />
+                  <SectionLabel text="Attributes" />
                   <div className="flex flex-wrap gap-1">
-                    {card.attribute.map((a) => (
-                      <Tag key={a} text={a} />
-                    ))}
+                    {card.attribute.map((a) => <Tag key={a} text={a} />)}
                   </div>
                 </div>
               )}
@@ -314,11 +276,9 @@ export function CardInspectModal({
               {/* Traits */}
               {card.traits.length > 0 && (
                 <div className="mb-3">
-                  <Label text="Traits" />
+                  <SectionLabel text="Traits" />
                   <div className="flex flex-wrap gap-1">
-                    {card.traits.map((t) => (
-                      <Tag key={t} text={t} />
-                    ))}
+                    {card.traits.map((t) => <Tag key={t} text={t} />)}
                   </div>
                 </div>
               )}
@@ -326,11 +286,8 @@ export function CardInspectModal({
               {/* Effect text */}
               {card.effectText && (
                 <div className="mb-3">
-                  <Label text="Effect" />
-                  <p
-                    className="whitespace-pre-wrap text-sm leading-relaxed"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <SectionLabel text="Effect" />
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
                     {card.effectText}
                   </p>
                 </div>
@@ -339,38 +296,23 @@ export function CardInspectModal({
               {/* Trigger text */}
               {card.triggerText && (
                 <div className="mb-3">
-                  <Label text="Trigger" />
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    {card.triggerText}
-                  </p>
+                  <SectionLabel text="Trigger" />
+                  <p className="text-sm text-content-secondary">{card.triggerText}</p>
                 </div>
               )}
 
               {/* Set membership */}
               {card.cardSets && card.cardSets.length > 0 && (
                 <div className="mb-4">
-                  <Label text="Appears In" />
+                  <SectionLabel text="Appears In" />
                   <div className="space-y-1">
                     {card.cardSets.map((cs) => (
                       <div key={cs.id} className="flex items-center gap-2 text-xs">
-                        <span
-                          className="font-mono font-medium"
-                          style={{ color: "var(--teal)" }}
-                        >
-                          {cs.setLabel}
-                        </span>
-                        <span style={{ color: "var(--text-tertiary)" }}>—</span>
-                        <span style={{ color: "var(--text-secondary)" }}>
-                          {cs.setName}
-                        </span>
+                        <span className="font-mono font-medium text-navy-900">{cs.setLabel}</span>
+                        <span className="text-content-tertiary">—</span>
+                        <span className="text-content-secondary">{cs.setName}</span>
                         {cs.isOrigin && (
-                          <span
-                            className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-                            style={{
-                              background: "var(--sage-muted)",
-                              color: "var(--sage)",
-                            }}
-                          >
+                          <span className="rounded-full bg-gold-100 px-1.5 py-0.5 text-xs font-semibold text-gold-500">
                             Origin
                           </span>
                         )}
@@ -380,103 +322,68 @@ export function CardInspectModal({
                 </div>
               )}
 
-              {/* Spacer */}
               <div className="flex-1" />
 
               {/* Add/remove actions — pinned to bottom */}
-              <div
-                className="flex items-center gap-3 border-t pt-4"
-                style={{ borderColor: "var(--border-subtle)" }}
-              >
+              <div className="flex items-center gap-3 border-t border-border pt-4">
                 {quantityInDeck > 0 ? (
                   <>
                     <div className="flex items-center gap-1">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        aria-label="Remove one"
                         onClick={onRemoveCard}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold transition-colors hover:bg-white/10"
-                        style={{
-                          border: "1px solid var(--border)",
-                          color: "var(--text-secondary)",
-                        }}
+                        className="h-9 w-9 p-0 active:scale-95"
                       >
                         −
-                      </button>
-                      <span
-                        className="w-8 text-center text-lg font-bold tabular-nums"
-                        style={{ color: "var(--text-primary)" }}
-                      >
+                      </Button>
+                      <span className="w-8 text-center text-lg font-bold tabular-nums text-content-primary">
                         {quantityInDeck}
                       </span>
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        aria-label="Add one"
                         onClick={onAddCard}
                         disabled={quantityInDeck >= 4}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold transition-colors hover:bg-white/10 disabled:opacity-30"
-                        style={{
-                          border: "1px solid var(--border)",
-                          color: "var(--text-secondary)",
-                        }}
+                        className="h-9 w-9 p-0 active:scale-95"
                       >
                         +
-                      </button>
+                      </Button>
                     </div>
-                    <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    <span className="text-xs text-content-tertiary">
                       {isLeader ? "Set as leader" : `${quantityInDeck}/4 in deck`}
                     </span>
                   </>
                 ) : (
-                  <button
-                    onClick={onAddCard}
-                    className="rounded-lg px-5 py-2 text-sm font-semibold transition-colors"
-                    style={{
-                      background: "var(--accent)",
-                      color: "var(--surface-0)",
-                    }}
-                  >
-                    {isLeader || card.type === "Leader"
-                      ? "Set as Leader"
-                      : "+ Add to Deck"}
-                  </button>
+                  <Button onClick={onAddCard}>
+                    {isLeader || card.type === "Leader" ? "Set as Leader" : "+ Add to Deck"}
+                  </Button>
                 )}
               </div>
             </div>
-          </>
+          </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className="rounded-lg px-2.5 py-1.5 text-center"
-      style={{
-        background: "var(--surface-2)",
-        border: "1px solid var(--border-subtle)",
-      }}
-    >
-      <div
-        className="text-[9px] font-semibold uppercase tracking-widest"
-        style={{ color: "var(--text-tertiary)" }}
-      >
+    <div className="rounded border border-border bg-surface-2 px-3 py-2 text-center">
+      <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {label}
       </div>
-      <div
-        className="text-sm font-bold tabular-nums"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {value}
-      </div>
+      <div className="text-sm font-bold tabular-nums text-content-primary">{value}</div>
     </div>
   );
 }
 
-function Label({ text }: { text: string }) {
+function SectionLabel({ text }: { text: string }) {
   return (
-    <h4
-      className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest"
-      style={{ color: "var(--text-tertiary)" }}
-    >
+    <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
       {text}
     </h4>
   );
@@ -484,13 +391,7 @@ function Label({ text }: { text: string }) {
 
 function Tag({ text }: { text: string }) {
   return (
-    <span
-      className="rounded-md px-2 py-0.5 text-[11px] font-medium"
-      style={{
-        background: "var(--surface-3)",
-        color: "var(--text-secondary)",
-      }}
-    >
+    <span className="rounded bg-surface-3 px-2 py-0.5 text-xs font-medium text-content-secondary">
       {text}
     </span>
   );

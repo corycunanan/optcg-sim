@@ -42,7 +42,7 @@ export default async function AdminLayout({
           <div className="ml-auto flex items-center gap-3">
             <Link
               href="/admin/cards/new"
-              className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+              className="rounded px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
                 background: "var(--accent)",
                 color: "var(--surface-0)",
@@ -103,7 +103,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/5"
+      className="rounded px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/5"
       style={{ color: "var(--text-secondary)" }}
     >
       {label}

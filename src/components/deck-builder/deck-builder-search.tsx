@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder-state";
 import { CardInspectModal } from "./card-inspect-modal";
+import { cn } from "@/components/ui/cn";
 
 interface CardSearchResult {
   id: string;
@@ -35,13 +36,14 @@ interface DeckBuilderSearchProps {
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const TYPES = ["Leader", "Character", "Event", "Stage"];
 
-const COLOR_STYLE: Record<string, { bg: string; text: string }> = {
-  Red: { bg: "var(--card-red)", text: "#fff" },
-  Blue: { bg: "var(--card-blue)", text: "#fff" },
-  Green: { bg: "var(--card-green)", text: "#fff" },
-  Purple: { bg: "var(--card-purple)", text: "#fff" },
-  Black: { bg: "var(--card-black)", text: "#ddd" },
-  Yellow: { bg: "var(--card-yellow)", text: "#222" },
+// Card color backgrounds (dynamic — CSS variables only, no hardcoded hex)
+const COLOR_BG: Record<string, string> = {
+  Red: "var(--card-red)",
+  Blue: "var(--card-blue)",
+  Green: "var(--card-green)",
+  Purple: "var(--card-purple)",
+  Black: "var(--card-black)",
+  Yellow: "var(--card-yellow)",
 };
 
 export function DeckBuilderSearch({
@@ -100,7 +102,6 @@ export function DeckBuilderSearch({
     [],
   );
 
-  // Debounced search
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -110,7 +111,6 @@ export function DeckBuilderSearch({
     return () => clearTimeout(debounceRef.current);
   }, [query, activeColors, activeType, costMin, costMax, fetchCards]);
 
-  // Page change
   useEffect(() => {
     if (page > 1) {
       fetchCards(query, page, activeColors, activeType, costMin, costMax);
@@ -130,42 +130,33 @@ export function DeckBuilderSearch({
     <>
       <div className="flex h-full flex-col">
         {/* Search input */}
-        <div className="p-3 pb-0">
+        <div className="px-3 pt-3">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search cards…"
-            className="w-full rounded-lg px-3 py-2 text-sm transition-colors focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-1 px-3 py-2 text-sm text-content-primary placeholder:text-content-tertiary transition-colors hover:border-border-strong focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-navy-900/10"
           />
         </div>
 
         {/* Filters */}
-        <div className="space-y-2 px-3 pt-2 pb-2">
+        <div className="space-y-2 px-3 py-2">
           {/* Color filters */}
           <div className="flex flex-wrap gap-1">
             {COLORS.map((c) => {
               const active = activeColors.includes(c);
-              const cs = COLOR_STYLE[c];
               return (
                 <button
                   key={c}
                   onClick={() => toggleColor(c)}
-                  className="rounded px-2 py-0.5 text-[11px] font-medium transition-all"
-                  style={
+                  className={cn(
+                    "rounded px-2 py-0.5 text-xs font-medium transition-all",
                     active
-                      ? { background: cs.bg, color: cs.text }
-                      : {
-                          background: "var(--surface-2)",
-                          color: "var(--text-tertiary)",
-                          border: "1px solid var(--border)",
-                        }
-                  }
+                      ? c === "Yellow" ? "text-content-primary" : "text-content-inverse"
+                      : "border border-border bg-surface-2 text-content-tertiary hover:border-border-strong"
+                  )}
+                  style={active ? { background: COLOR_BG[c] } : undefined}
                 >
                   {c}
                 </button>
@@ -178,18 +169,11 @@ export function DeckBuilderSearch({
             <select
               value={activeType}
               onChange={(e) => setActiveType(e.target.value)}
-              className="rounded px-2 py-1 text-xs focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
+              className="rounded border border-border bg-surface-1 px-2 py-1 text-xs text-content-secondary focus:outline-none focus:border-border-focus"
             >
               <option value="">All Types</option>
               {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+                <option key={t} value={t}>{t}</option>
               ))}
             </select>
 
@@ -201,14 +185,9 @@ export function DeckBuilderSearch({
                 placeholder="Min"
                 value={costMin}
                 onChange={(e) => setCostMin(e.target.value)}
-                className="w-14 rounded px-2 py-1 text-xs focus:outline-none"
-                style={{
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                }}
+                className="w-14 rounded border border-border bg-surface-1 px-2 py-1 text-xs text-content-secondary focus:outline-none focus:border-border-focus"
               />
-              <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>–</span>
+              <span className="text-xs text-content-tertiary">–</span>
               <input
                 type="number"
                 min="0"
@@ -216,26 +195,21 @@ export function DeckBuilderSearch({
                 placeholder="Max"
                 value={costMax}
                 onChange={(e) => setCostMax(e.target.value)}
-                className="w-14 rounded px-2 py-1 text-xs focus:outline-none"
-                style={{
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                }}
+                className="w-14 rounded border border-border bg-surface-1 px-2 py-1 text-xs text-content-secondary focus:outline-none focus:border-border-focus"
               />
-              <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Cost</span>
+              <span className="text-xs text-content-tertiary">Cost</span>
             </div>
           </div>
         </div>
 
         {/* Results count */}
-        <div className="px-3 pb-1 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+        <div className="px-3 pb-1 text-xs text-content-tertiary">
           {isLoading ? "Searching…" : `${total.toLocaleString()} cards`}
         </div>
 
         {/* Results grid */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 pb-3">
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {results.map((card) => {
               const inDeck = deckCards.get(card.id);
               const qtyInDeck = inDeck?.quantity || 0;
@@ -247,55 +221,40 @@ export function DeckBuilderSearch({
               return (
                 <button
                   key={card.id}
+                  aria-label={`Inspect ${card.name}`}
                   onClick={() => setInspectCard(card)}
-                  className="group relative overflow-hidden rounded-lg text-left transition-all duration-150 hover:-translate-y-0.5"
-                  style={{
-                    background: "var(--surface-1)",
-                    border: `1px solid ${qtyInDeck > 0 ? "var(--accent)" : "var(--border-subtle)"}`,
-                    opacity: isLeaderColor ? 1 : 0.5,
-                  }}
+                  className={cn(
+                    "group relative overflow-hidden rounded border-0 bg-surface-1 text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                    qtyInDeck > 0 ? "border-navy-900" : "border-border",
+                    !isLeaderColor && "opacity-40"
+                  )}
                 >
                   <div className="relative aspect-[600/838] w-full overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={card.imageUrl}
                       alt={card.name}
-                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.05]"
+                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.04]"
                       loading="lazy"
                     />
-                    {/* Quantity badge */}
                     {qtyInDeck > 0 && (
-                      <div
-                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
-                        style={{
-                          background: "var(--accent)",
-                          color: "var(--surface-0)",
-                        }}
-                      >
+                      <div className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-content-inverse">
                         {qtyInDeck}
                       </div>
                     )}
                   </div>
                   {/* Mini info */}
                   <div className="px-1.5 py-1">
-                    <p
-                      className="truncate text-[10px] font-medium leading-tight"
-                      style={{ color: "var(--text-primary)" }}
-                    >
+                    <p className="truncate text-xs font-medium leading-tight text-content-primary">
                       {card.name}
                     </p>
                     <div className="flex items-center gap-1">
                       {card.cost !== null && (
-                        <span
-                          className="text-[9px] font-bold tabular-nums"
-                          style={{ color: "var(--text-tertiary)" }}
-                        >
+                        <span className="text-xs font-bold tabular-nums text-content-tertiary">
                           {card.cost}⬡
                         </span>
                       )}
-                      <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>
-                        {card.id}
-                      </span>
+                      <span className="text-xs text-content-tertiary">{card.id}</span>
                     </div>
                   </div>
                 </button>
@@ -307,21 +266,21 @@ export function DeckBuilderSearch({
           {totalPages > 1 && (
             <div className="mt-3 flex items-center justify-center gap-1">
               <button
+                aria-label="Previous page"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-30"
-                style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                className="flex h-9 w-9 items-center justify-center rounded border border-border text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:opacity-30"
               >
                 ←
               </button>
-              <span className="px-2 text-xs tabular-nums" style={{ color: "var(--text-tertiary)" }}>
+              <span className="px-2 text-xs tabular-nums text-content-tertiary">
                 {page} / {totalPages}
               </span>
               <button
+                aria-label="Next page"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-30"
-                style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                className="flex h-9 w-9 items-center justify-center rounded border border-border text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:opacity-30"
               >
                 →
               </button>
@@ -330,14 +289,13 @@ export function DeckBuilderSearch({
         </div>
       </div>
 
-      {/* Card inspect modal */}
       {inspectCard && (
         <CardInspectModal
           cardId={inspectCard.id}
           preloadedCard={inspectCard}
           quantityInDeck={
             inspectCard.type === "Leader"
-              ? 0 // Leaders don't have a quantity
+              ? 0
               : deckCards.get(inspectCard.id)?.quantity || 0
           }
           selectedArtUrl={deckCards.get(inspectCard.id)?.selectedArtUrl ?? null}

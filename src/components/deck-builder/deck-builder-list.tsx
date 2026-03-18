@@ -33,7 +33,6 @@ export function DeckBuilderList({
 }: DeckBuilderListProps) {
   const [inspectEntry, setInspectEntry] = useState<DeckCardEntry | null>(null);
 
-  // Sort by type (Character > Event > Stage), then cost, then name
   const typeOrder: Record<string, number> = {
     Character: 0,
     Event: 1,
@@ -51,7 +50,6 @@ export function DeckBuilderList({
     return a.card.name.localeCompare(b.card.name);
   });
 
-  // Group by type
   const groups = new Map<string, DeckCardEntry[]>();
   for (const entry of sorted) {
     const key = entry.card.type;
@@ -61,17 +59,9 @@ export function DeckBuilderList({
 
   if (cards.length === 0) {
     return (
-      <div
-        className="rounded-xl p-8 text-center"
-        style={{
-          background: "var(--surface-1)",
-          border: "1px solid var(--border-subtle)",
-        }}
-      >
-        <p className="text-sm font-medium" style={{ color: "var(--text-tertiary)" }}>
-          No cards in deck yet
-        </p>
-        <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>
+      <div className="rounded border border-border bg-surface-1 p-8 text-center">
+        <p className="text-sm font-medium text-content-tertiary">No cards in deck yet</p>
+        <p className="mt-1 text-xs text-content-tertiary">
           Click cards from the search panel to add them
         </p>
       </div>
@@ -85,18 +75,9 @@ export function DeckBuilderList({
           const groupTotal = entries.reduce((sum, e) => sum + e.quantity, 0);
           return (
             <div key={type}>
-              <div
-                className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "var(--text-tertiary)" }}
-              >
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                 <span>{type}s</span>
-                <span
-                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
-                  style={{
-                    background: "var(--surface-3)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
+                <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-bold tabular-nums text-content-secondary">
                   {groupTotal}
                 </span>
               </div>
@@ -104,25 +85,17 @@ export function DeckBuilderList({
               <div className="space-y-1">
                 {entries.map((entry) => {
                   const displayUrl = entry.selectedArtUrl || entry.card.imageUrl;
+                  const rowColor = COLOR_DOT[entry.card.color[0]] || "var(--border)";
                   return (
                     <div
                       key={entry.cardId}
-                      className="group flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-white/[0.03]"
-                      style={{ borderLeft: "3px solid transparent" }}
-                      onMouseEnter={(e) => {
-                        const color = entry.card.color[0];
-                        e.currentTarget.style.borderLeftColor =
-                          COLOR_DOT[color] || "var(--border)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderLeftColor = "transparent";
-                      }}
+                      className="group flex items-center gap-3 rounded px-3 py-2 transition-colors hover:bg-surface-2"
                     >
-                      {/* Thumbnail — clickable to inspect */}
+                      {/* Thumbnail */}
                       <button
+                        aria-label={`Inspect ${entry.card.name}`}
                         onClick={() => setInspectEntry(entry)}
-                        className="h-16 w-[46px] shrink-0 overflow-hidden rounded-lg transition-transform hover:scale-105"
-                        style={{ border: "1px solid var(--border-subtle)" }}
+                        className="h-16 w-[46px] shrink-0 overflow-hidden rounded transition-transform hover:scale-105"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -133,37 +106,23 @@ export function DeckBuilderList({
                         />
                       </button>
 
-                      {/* Card info — clickable to inspect */}
-                      <button
-                        onClick={() => setInspectEntry(entry)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <p
-                          className="truncate text-sm font-semibold leading-tight"
-                          style={{ color: "var(--text-primary)" }}
-                        >
+                      {/* Card info */}
+                      <button aria-label={`Inspect ${entry.card.name}`} onClick={() => setInspectEntry(entry)} className="min-w-0 flex-1 text-left">
+                        <p className="truncate text-sm font-semibold leading-tight text-content-primary">
                           {entry.card.name}
                         </p>
-                        <div className="mt-0.5 flex items-center gap-1.5">
+                        <div className="mt-0.5 flex items-center gap-2">
                           {entry.card.cost !== null && (
-                            <span
-                              className="text-[11px] font-bold tabular-nums"
-                              style={{ color: "var(--text-tertiary)" }}
-                            >
+                            <span className="text-xs font-bold tabular-nums text-content-tertiary">
                               {entry.card.cost}⬡
                             </span>
                           )}
                           {entry.card.power !== null && (
-                            <span
-                              className="text-[11px] tabular-nums"
-                              style={{ color: "var(--text-tertiary)" }}
-                            >
+                            <span className="text-xs tabular-nums text-content-tertiary">
                               {entry.card.power.toLocaleString()} PWR
                             </span>
                           )}
-                          <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
-                            {entry.cardId}
-                          </span>
+                          <span className="text-xs text-content-tertiary">{entry.cardId}</span>
                         </div>
                         <div className="mt-0.5 flex items-center gap-1">
                           {entry.card.color.map((c) => (
@@ -174,36 +133,28 @@ export function DeckBuilderList({
                             />
                           ))}
                           {entry.selectedArtUrl && (
-                            <span
-                              className="ml-1 text-[9px] font-medium"
-                              style={{ color: "var(--teal-muted)" }}
-                            >
-                              Alt Art
-                            </span>
+                            <span className="ml-1 text-xs font-medium text-navy-500">Alt Art</span>
                           )}
                         </div>
                       </button>
 
                       {/* Quantity controls */}
-                      <div className="flex items-center gap-0.5">
+                      <div className="flex items-center gap-1">
                         <button
+                          aria-label="Remove one"
                           onClick={() => onDecrement(entry.cardId)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold transition-colors hover:bg-white/10"
-                          style={{ color: "var(--text-secondary)" }}
+                          className="flex h-9 w-9 items-center justify-center rounded text-sm font-bold text-content-secondary transition-colors hover:bg-surface-3 active:scale-95"
                         >
                           −
                         </button>
-                        <span
-                          className="w-6 text-center text-base font-bold tabular-nums"
-                          style={{ color: "var(--text-primary)" }}
-                        >
+                        <span className="w-6 text-center text-base font-bold tabular-nums text-content-primary">
                           {entry.quantity}
                         </span>
                         <button
+                          aria-label="Add one"
                           onClick={() => onIncrement(entry.cardId)}
                           disabled={entry.quantity >= 4}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold transition-colors hover:bg-white/10 disabled:opacity-30"
-                          style={{ color: "var(--text-secondary)" }}
+                          className="flex h-9 w-9 items-center justify-center rounded text-sm font-bold text-content-secondary transition-colors hover:bg-surface-3 active:scale-95 disabled:opacity-30"
                         >
                           +
                         </button>
@@ -211,10 +162,9 @@ export function DeckBuilderList({
 
                       {/* Remove button */}
                       <button
+                        aria-label={`Remove ${entry.card.name}`}
                         onClick={() => onRemove(entry.cardId)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-xs opacity-0 transition-all group-hover:opacity-100 hover:bg-white/10"
-                        style={{ color: "var(--error)" }}
-                        title="Remove"
+                        className="flex h-9 w-9 items-center justify-center rounded text-xs text-error opacity-0 transition-all hover:bg-error-soft active:scale-95 group-hover:opacity-100"
                       >
                         ✕
                       </button>
@@ -227,7 +177,6 @@ export function DeckBuilderList({
         })}
       </div>
 
-      {/* Inspect modal for deck cards */}
       {inspectEntry && (
         <CardInspectModal
           cardId={inspectEntry.cardId}

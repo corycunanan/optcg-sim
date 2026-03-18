@@ -277,8 +277,60 @@ M1 delivers a fully functional deck builder — the first real user-facing featu
 ## Dependencies
 
 - M0 complete (auth working, card database populated, DB schema deployed)
-- Card images accessible via CDN
+- Card images accessible via CDN — **resolved: Cloudflare R2** (see below)
 
 ---
 
-_Last updated: 2026-03-15_
+## Image Hosting — Cloudflare R2
+
+### Decision (2026-03-17)
+
+Card images were hotlinked from `en.onepiece-cardgame.com`, which caused intermittent loading failures due to rate limiting and request blocking. The fix is to self-host images on **Cloudflare R2**.
+
+**Why R2:**
+
+| Option | Free Tier | Our Usage (~657MB) | Verdict |
+|--------|-----------|---------------------|---------|
+| Cloudflare R2 | 10 GB storage | ~6.5% | ✅ Comfortable |
+| Vercel Blob | 500 MB storage | ~131% | ✗ Over limit |
+
+**Image inventory:**
+- Cards: ~2,497 base images
+- Art variants: ~1,487 variant images
+- Total: ~3,984 images × ~165KB avg = **~657MB**
+
+### Migration Script
+
+`pipeline/migrate-images.ts` — downloads all images from their current `imageUrl` in the DB, uploads to R2, and updates the DB with CDN URLs.
+
+**Setup:**
+1. Create an R2 bucket at [dash.cloudflare.com](https://dash.cloudflare.com) → R2 → Create bucket
+2. Create an API token with `Object Read & Write` on your bucket
+3. Enable public access on the bucket (or use a custom domain)
+4. Fill in `.env` from `.env.example`:
+   ```
+   R2_ACCOUNT_ID=your-account-id
+   R2_ACCESS_KEY_ID=your-key-id
+   R2_SECRET_ACCESS_KEY=your-secret
+   R2_BUCKET_NAME=optcg-images
+   NEXT_PUBLIC_CDN_URL=https://pub-<bucket-id>.r2.dev
+   ```
+5. Run a dry run to verify config: `pnpm pipeline:migrate-images --dry-run`
+6. Run migration: `pnpm pipeline:migrate-images`
+
+**Script features:**
+- **Resumable** — images already on R2 or CDN are skipped
+- **Concurrent** — 5 parallel uploads by default (`--concurrency <n>`)
+- **Retry logic** — 3 attempts with backoff on transient failures
+- **Dry run** — `--dry-run` shows what would happen without writing anything
+- **Partial run** — `--limit <n>` for batched migration
+
+**Key behaviors:**
+- Cards stored at `cards/<id>.webp`, variants at `variants/<id>.webp`
+- `Cache-Control: public, max-age=31536000, immutable` — images are permanently cached
+- Updates `Card.imageUrl` and `ArtVariant.imageUrl` in DB after successful upload
+- For new set imports, run `pipeline:import` (which populates hotlinked URLs), then run `pipeline:migrate-images` to move new images to R2
+
+---
+
+_Last updated: 2026-03-17_

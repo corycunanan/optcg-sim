@@ -55,7 +55,7 @@ export function CardFilters({
 
   return (
     <div
-      className="space-y-4 rounded-xl p-4"
+      className="space-y-4 rounded p-4"
       style={{
         background: "var(--surface-1)",
         border: "1px solid var(--border-subtle)",
@@ -77,7 +77,7 @@ export function CardFilters({
               <button
                 key={c}
                 onClick={() => toggleFilter("color", c, activeColors)}
-                className="rounded-md px-3 py-1 text-xs font-medium transition-all"
+                className="rounded px-3 py-1 text-xs font-medium transition-all"
                 style={
                   active
                     ? {
@@ -114,7 +114,7 @@ export function CardFilters({
               <button
                 key={t}
                 onClick={() => toggleFilter("type", t, activeTypes)}
-                className="rounded-md px-3 py-1 text-xs font-medium transition-all"
+                className="rounded px-3 py-1 text-xs font-medium transition-all"
                 style={
                   active
                     ? {
@@ -149,7 +149,7 @@ export function CardFilters({
           <select
             value={currentFilters.set}
             onChange={(e) => onFilterChange({ set: e.target.value })}
-            className="w-full rounded-md px-3 py-1.5 text-sm focus:outline-none"
+            className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -182,7 +182,7 @@ export function CardFilters({
                   onClick={() =>
                     toggleFilter("block", String(b), activeBlocks.map(String))
                   }
-                  className="rounded-md px-3 py-1 text-xs font-medium transition-all"
+                  className="rounded px-3 py-1 text-xs font-medium transition-all"
                   style={
                     active
                       ? {
@@ -216,7 +216,7 @@ export function CardFilters({
             onClick={() =>
               onFilterChange({ originOnly: originOnly ? "" : "true" })
             }
-            className="flex items-center gap-2 rounded-md px-3 py-1 text-xs font-medium transition-all"
+            className="flex items-center gap-2 rounded px-3 py-1 text-xs font-medium transition-all"
             style={
               originOnly
                 ? {

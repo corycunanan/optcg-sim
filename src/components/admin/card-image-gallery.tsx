@@ -38,7 +38,7 @@ export function CardImageGallery({
     <div>
       {/* Main image */}
       <div
-        className="overflow-hidden rounded-xl"
+        className="overflow-hidden rounded"
         style={{ border: "1px solid var(--border-subtle)" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -67,7 +67,7 @@ export function CardImageGallery({
                   key={art.id}
                   type="button"
                   onClick={() => setSelectedImage(art.imageUrl)}
-                  className="group cursor-pointer overflow-hidden rounded-lg text-left transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
+                  className="group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-lg hover:shadow-black/20"
                   style={{
                     border: isSelected
                       ? "2px solid var(--accent)"

@@ -1,112 +1,67 @@
 "use client";
 
 import type { ValidationResult } from "@/lib/deck-validation";
+import { cn } from "@/components/ui/cn";
 
 interface DeckBuilderValidationProps {
   results: ValidationResult[];
+  totalCards: number;
 }
 
-export function DeckBuilderValidation({ results }: DeckBuilderValidationProps) {
-  const errors = results.filter((r) => !r.passed && r.severity === "error");
-  const warnings = results.filter((r) => !r.passed && r.severity === "warning");
-  const passed = results.filter((r) => r.passed);
+export function DeckBuilderValidation({ results, totalCards }: DeckBuilderValidationProps) {
+  // Exclude leader (shown as card) and deck-size (shown as X/50 tag)
+  const rules = results.filter((r) => r.id !== "leader" && r.id !== "deck-size");
+  const errors = rules.filter((r) => !r.passed && r.severity === "error");
+  const warnings = rules.filter((r) => !r.passed && r.severity === "warning");
+  const passed = rules.filter((r) => r.passed);
 
-  if (errors.length === 0 && warnings.length === 0) {
-    return (
-      <div
-        className="flex items-center gap-2 rounded-xl px-4 py-2.5"
-        style={{
-          background: "oklch(72% 0.14 155 / 0.08)",
-          border: "1px solid oklch(72% 0.14 155 / 0.2)",
-        }}
-      >
-        <span className="text-sm">✅</span>
-        <span className="text-xs font-medium" style={{ color: "var(--success)" }}>
-          All deck rules satisfied
-        </span>
-      </div>
-    );
-  }
+  const deckFull = totalCards === 50;
 
   return (
-    <div
-      className="space-y-1 rounded-xl p-3"
-      style={{
-        background: "var(--surface-1)",
-        border: "1px solid var(--border-subtle)",
-      }}
-    >
-      <h3
-        className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest"
-        style={{ color: "var(--text-tertiary)" }}
+    <div className="flex flex-col gap-2">
+      {/* X/50 deck size tag */}
+      <span
+        className={cn(
+          "self-start rounded px-3 py-1 text-sm font-bold tabular-nums",
+          deckFull
+            ? "bg-success text-content-inverse"
+            : "bg-surface-3 text-content-secondary"
+        )}
       >
-        Validation
-      </h3>
+        {totalCards}/50
+      </span>
 
+      {/* Error tags */}
       {errors.map((r) => (
-        <div
+        <span
           key={r.id}
-          className="flex items-start gap-2 rounded-lg px-2.5 py-1.5"
-          style={{ background: "oklch(60% 0.18 25 / 0.06)" }}
+          className="self-start rounded bg-error-soft px-2 py-1 text-xs font-semibold text-error"
+          title={r.message}
         >
-          <span className="mt-0.5 text-xs">❌</span>
-          <div>
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "var(--error)" }}
-            >
-              {r.rule}
-            </span>
-            <p
-              className="text-[11px] leading-tight"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {r.message}
-            </p>
-          </div>
-        </div>
+          ✕ {r.rule}
+        </span>
       ))}
 
+      {/* Warning tags */}
       {warnings.map((r) => (
-        <div
+        <span
           key={r.id}
-          className="flex items-start gap-2 rounded-lg px-2.5 py-1.5"
-          style={{ background: "oklch(78% 0.14 80 / 0.06)" }}
+          className="self-start rounded bg-warning-soft px-2 py-1 text-xs font-semibold text-warning"
+          title={r.message}
         >
-          <span className="mt-0.5 text-xs">⚠️</span>
-          <div>
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "var(--warning)" }}
-            >
-              {r.rule}
-            </span>
-            <p
-              className="text-[11px] leading-tight"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {r.message}
-            </p>
-          </div>
-        </div>
+          ⚠ {r.rule}
+        </span>
       ))}
 
-      {passed.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1.5 pt-1">
-          {passed.map((r) => (
-            <span
-              key={r.id}
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{
-                background: "oklch(72% 0.14 155 / 0.08)",
-                color: "var(--success)",
-              }}
-            >
-              ✓ {r.rule}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Passed tags */}
+      {passed.map((r) => (
+        <span
+          key={r.id}
+          className="self-start rounded bg-success-soft px-2 py-1 text-xs font-medium text-success"
+        >
+          ✓ {r.rule}
+        </span>
+      ))}
     </div>
   );
 }

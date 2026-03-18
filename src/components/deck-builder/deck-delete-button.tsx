@@ -34,24 +34,21 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
         className="flex items-center gap-2"
         onClick={(e) => e.preventDefault()}
       >
-        <span className="text-[10px]" style={{ color: "var(--error)" }}>
+        <span className="text-xs text-error">
           Delete &ldquo;{deckName}&rdquo;?
         </span>
         <button
+          aria-label="Confirm delete"
           onClick={handleDelete}
           disabled={deleting}
-          className="rounded px-2 py-0.5 text-[10px] font-bold"
-          style={{ background: "var(--error)", color: "#fff" }}
+          className="rounded bg-error px-2 py-1 text-xs font-bold text-content-inverse transition-colors hover:bg-red-600 active:scale-95 disabled:opacity-50"
         >
           {deleting ? "…" : "Yes"}
         </button>
         <button
+          aria-label="Cancel delete"
           onClick={() => setConfirming(false)}
-          className="rounded px-2 py-0.5 text-[10px]"
-          style={{
-            border: "1px solid var(--border)",
-            color: "var(--text-secondary)",
-          }}
+          className="rounded border border-border px-2 py-1 text-xs text-content-secondary transition-colors hover:bg-surface-2"
         >
           No
         </button>
@@ -61,12 +58,12 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
 
   return (
     <button
+      aria-label={`Delete deck ${deckName}`}
       onClick={(e) => {
         e.preventDefault();
         setConfirming(true);
       }}
-      className="rounded px-2 py-0.5 text-[10px] opacity-0 transition-opacity group-hover:opacity-100"
-      style={{ color: "var(--error)" }}
+      className="rounded px-2 py-1 text-xs text-error opacity-0 transition-all hover:bg-error-soft group-hover:opacity-100"
     >
       Delete
     </button>

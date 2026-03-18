@@ -140,7 +140,7 @@ export function CardEditForm({ card }: { card: Card }) {
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
       {error && (
         <div
-          className="rounded-lg p-3 text-sm font-medium"
+          className="rounded p-3 text-sm font-medium"
           style={{
             background: "oklch(60% 0.18 25 / 0.1)",
             color: "var(--error)",
@@ -152,7 +152,7 @@ export function CardEditForm({ card }: { card: Card }) {
       )}
       {success && (
         <div
-          className="rounded-lg p-3 text-sm font-medium"
+          className="rounded p-3 text-sm font-medium"
           style={{
             background: "oklch(72% 0.14 155 / 0.1)",
             color: "var(--success)",
@@ -167,7 +167,7 @@ export function CardEditForm({ card }: { card: Card }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Card ID" hint="Read-only">
           <div
-            className="w-full rounded-lg px-3 py-2.5 font-mono text-sm"
+            className="w-full rounded px-3 py-2.5 font-mono text-sm"
             style={{
               background: "var(--surface-1)",
               border: "1px solid var(--border)",
@@ -179,7 +179,7 @@ export function CardEditForm({ card }: { card: Card }) {
         </Field>
         <Field label="Origin Set" hint="Derived from ID">
           <div
-            className="w-full rounded-lg px-3 py-2.5 text-sm"
+            className="w-full rounded px-3 py-2.5 text-sm"
             style={{
               background: "var(--surface-1)",
               border: "1px solid var(--border)",
@@ -197,7 +197,7 @@ export function CardEditForm({ card }: { card: Card }) {
           type="text"
           value={form.name}
           onChange={(e) => update("name", e.target.value)}
-          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+          className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
           style={{
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
@@ -214,7 +214,7 @@ export function CardEditForm({ card }: { card: Card }) {
               key={t}
               type="button"
               onClick={() => update("type", t)}
-              className="rounded-md px-4 py-1.5 text-xs font-medium transition-all"
+              className="rounded px-4 py-1.5 text-xs font-medium transition-all"
               style={
                 form.type === t
                   ? {
@@ -245,7 +245,7 @@ export function CardEditForm({ card }: { card: Card }) {
                 key={c}
                 type="button"
                 onClick={() => toggleColor(c)}
-                className="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                className="rounded px-3 py-1.5 text-xs font-medium transition-all"
                 style={
                   active
                     ? {
@@ -275,7 +275,7 @@ export function CardEditForm({ card }: { card: Card }) {
             value={form.cost}
             onChange={(e) => update("cost", e.target.value)}
             min={0}
-            className="w-full rounded-lg px-3 py-2.5 text-sm tabular-nums focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -290,7 +290,7 @@ export function CardEditForm({ card }: { card: Card }) {
             onChange={(e) => update("power", e.target.value)}
             min={0}
             step={1000}
-            className="w-full rounded-lg px-3 py-2.5 text-sm tabular-nums focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -305,7 +305,7 @@ export function CardEditForm({ card }: { card: Card }) {
             onChange={(e) => update("counter", e.target.value)}
             min={0}
             step={1000}
-            className="w-full rounded-lg px-3 py-2.5 text-sm tabular-nums focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -319,7 +319,7 @@ export function CardEditForm({ card }: { card: Card }) {
             value={form.life}
             onChange={(e) => update("life", e.target.value)}
             min={0}
-            className="w-full rounded-lg px-3 py-2.5 text-sm tabular-nums focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -337,7 +337,7 @@ export function CardEditForm({ card }: { card: Card }) {
             value={form.rarity}
             onChange={(e) => update("rarity", e.target.value)}
             placeholder="Rare, SuperRare…"
-            className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -352,7 +352,7 @@ export function CardEditForm({ card }: { card: Card }) {
             onChange={(e) => update("blockNumber", e.target.value)}
             min={1}
             max={10}
-            className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -364,7 +364,7 @@ export function CardEditForm({ card }: { card: Card }) {
           <select
             value={form.banStatus}
             onChange={(e) => update("banStatus", e.target.value)}
-            className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -387,7 +387,7 @@ export function CardEditForm({ card }: { card: Card }) {
           value={form.attribute}
           onChange={(e) => update("attribute", e.target.value)}
           placeholder="Strike, Slash, Ranged"
-          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+          className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
           style={{
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
@@ -402,7 +402,7 @@ export function CardEditForm({ card }: { card: Card }) {
           value={form.traits}
           onChange={(e) => update("traits", e.target.value)}
           placeholder="Straw Hat Crew, Supernovas"
-          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+          className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
           style={{
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
@@ -417,7 +417,7 @@ export function CardEditForm({ card }: { card: Card }) {
           value={form.effectText}
           onChange={(e) => update("effectText", e.target.value)}
           rows={5}
-          className="w-full rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none"
+          className="w-full rounded px-3 py-2.5 font-mono text-sm focus:outline-none"
           style={{
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
@@ -432,7 +432,7 @@ export function CardEditForm({ card }: { card: Card }) {
           value={form.triggerText}
           onChange={(e) => update("triggerText", e.target.value)}
           rows={2}
-          className="w-full rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none"
+          className="w-full rounded px-3 py-2.5 font-mono text-sm focus:outline-none"
           style={{
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
@@ -448,7 +448,7 @@ export function CardEditForm({ card }: { card: Card }) {
           value={form.imageUrl}
           onChange={(e) => update("imageUrl", e.target.value)}
           placeholder="https://..."
-          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+          className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
           style={{
             background: "var(--surface-2)",
             border: "1px solid var(--border)",
@@ -460,7 +460,7 @@ export function CardEditForm({ card }: { card: Card }) {
       {/* Image Preview */}
       {form.imageUrl && (
         <div
-          className="w-48 overflow-hidden rounded-lg"
+          className="w-48 overflow-hidden rounded"
           style={{ border: "1px solid var(--border-subtle)" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -494,7 +494,7 @@ export function CardEditForm({ card }: { card: Card }) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+          className="rounded px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
           style={{
             background: "var(--accent)",
             color: "var(--surface-0)",
@@ -505,7 +505,7 @@ export function CardEditForm({ card }: { card: Card }) {
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-lg px-6 py-2.5 text-sm transition-colors"
+          className="rounded px-6 py-2.5 text-sm transition-colors"
           style={{
             border: "1px solid var(--border)",
             color: "var(--text-secondary)",

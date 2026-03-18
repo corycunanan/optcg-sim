@@ -104,7 +104,7 @@ export function CardBrowser({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search cards by name..."
-            className="flex-1 rounded-lg px-4 py-2.5 text-sm transition-colors focus:outline-none"
+            className="flex-1 rounded px-4 py-2.5 text-sm transition-colors focus:outline-none"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -113,7 +113,7 @@ export function CardBrowser({
           />
           <button
             type="submit"
-            className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors"
+            className="rounded px-6 py-2.5 text-sm font-semibold transition-colors"
             style={{
               background: "var(--accent)",
               color: "var(--surface-0)",
@@ -128,7 +128,7 @@ export function CardBrowser({
                 setSearch("");
                 router.push("/admin/cards");
               }}
-              className="rounded-lg px-4 py-2.5 text-sm transition-colors"
+              className="rounded px-4 py-2.5 text-sm transition-colors"
               style={{
                 border: "1px solid var(--border)",
                 color: "var(--text-secondary)",

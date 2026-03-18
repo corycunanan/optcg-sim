@@ -21,6 +21,7 @@ Each phase doc covers scope, implementation plan, roadmap, architecture specific
 | M0 | Foundation | [docs/M0-FOUNDATION.md](./M0-FOUNDATION.md) |
 | M1 | Deck Builder | [docs/M1-DECK-BUILDER.md](./M1-DECK-BUILDER.md) |
 | M2 | Social | [docs/M2-SOCIAL.md](./M2-SOCIAL.md) |
+| M2.5 | Design System | [docs/M2.5-DESIGN-SYSTEM.md](./M2.5-DESIGN-SYSTEM.md) |
 | M3 | Simulator (Core) | [docs/M3-SIMULATOR-CORE.md](./M3-SIMULATOR-CORE.md) |
 | M4 | Effect Engine | [docs/M4-EFFECT-ENGINE.md](./M4-EFFECT-ENGINE.md) |
 | M5 | Polish & Scale | [docs/M5-POLISH-AND-SCALE.md](./M5-POLISH-AND-SCALE.md) |

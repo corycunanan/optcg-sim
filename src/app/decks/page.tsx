@@ -43,37 +43,23 @@ export default async function DecksPage() {
   const leaderMap = new Map(leaders.map((l) => [l.id, l]));
 
   return (
-    <div
-      className="flex min-h-screen flex-col"
-      style={{ background: "var(--surface-0)", color: "var(--text-primary)" }}
-    >
+    <div className="flex min-h-screen flex-col bg-background text-content-primary">
       {/* Header */}
-      <header
-        className="sticky top-0 z-10"
-        style={{
-          background: "var(--surface-1)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
+      <header className="sticky top-0 z-10 border-b border-border bg-surface-1">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-6">
           <Link
             href="/"
-            className="text-lg font-bold tracking-tight"
-            style={{ color: "var(--accent)" }}
+            className="text-lg font-bold tracking-tight text-navy-900"
           >
             OPTCG
           </Link>
-          <h1
-            className="text-sm font-semibold"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <h1 className="text-sm font-semibold text-content-secondary">
             My Decks
           </h1>
           <div className="ml-auto">
             <Link
               href="/decks/new"
-              className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-              style={{ background: "var(--accent)", color: "var(--surface-0)" }}
+              className="rounded bg-navy-900 px-4 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
             >
               + New Deck
             </Link>
@@ -84,25 +70,15 @@ export default async function DecksPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         {decks.length === 0 ? (
           <div className="py-20 text-center">
-            <p
-              className="text-lg font-semibold"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p className="text-lg font-semibold text-content-secondary">
               No decks yet
             </p>
-            <p
-              className="mt-1 text-sm"
-              style={{ color: "var(--text-tertiary)" }}
-            >
+            <p className="mt-1 text-sm text-content-tertiary">
               Create your first deck to get started
             </p>
             <Link
               href="/decks/new"
-              className="mt-6 inline-block rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors"
-              style={{
-                background: "var(--accent)",
-                color: "var(--surface-0)",
-              }}
+              className="mt-6 inline-block rounded bg-navy-900 px-6 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
             >
               + New Deck
             </Link>
@@ -125,11 +101,7 @@ export default async function DecksPage() {
                 <Link
                   key={deck.id}
                   href={`/decks/${deck.id}`}
-                  className="group relative overflow-hidden rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30"
-                  style={{
-                    background: "var(--surface-1)",
-                    border: "1px solid var(--border-subtle)",
-                  }}
+                  className="group relative overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md"
                 >
                   {/* Leader image as background */}
                   {leader && (
@@ -140,33 +112,20 @@ export default async function DecksPage() {
                         alt=""
                         className="h-full w-full object-cover object-top opacity-60 transition-transform duration-300 group-hover:scale-[1.05]"
                       />
-                      <div
-                        className="absolute inset-0"
-                        style={{
-                          background:
-                            "linear-gradient(to top, var(--surface-1) 0%, transparent 60%)",
-                        }}
-                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface-1 to-transparent" />
                     </div>
                   )}
 
                   <div className="relative p-4">
-                    <h3
-                      className="text-base font-bold"
-                      style={{ color: "var(--text-primary)" }}
-                    >
+                    <h3 className="text-base font-bold text-content-primary">
                       {deck.name}
                     </h3>
-                    <p
-                      className="mt-0.5 text-xs"
-                      style={{ color: "var(--text-tertiary)" }}
-                    >
-                      {leader?.name || "No leader"} ·{" "}
-                      {totalCards}/50 cards
+                    <p className="mt-1 text-xs text-content-tertiary">
+                      {leader?.name || "No leader"} · {totalCards}/50 cards
                     </p>
 
                     {/* Color dots + delete */}
-                    <div className="mt-2 flex items-center gap-1.5">
+                    <div className="mt-2 flex items-center gap-2">
                       {Array.from(colors).map((c) => (
                         <span
                           key={c}
@@ -182,10 +141,7 @@ export default async function DecksPage() {
                           deckId={deck.id}
                           deckName={deck.name}
                         />
-                        <span
-                          className="text-[10px]"
-                          style={{ color: "var(--text-tertiary)" }}
-                        >
+                        <span className="text-xs text-content-tertiary">
                           {deck.updatedAt.toLocaleDateString()}
                         </span>
                       </div>

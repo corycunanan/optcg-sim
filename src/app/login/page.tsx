@@ -17,45 +17,27 @@ export default async function LoginPage({
   }
 
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-center p-8"
-      style={{ background: "var(--surface-0)" }}
-    >
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-10 text-center">
           <Link href="/">
-            <h1
-              className="text-4xl font-bold tracking-tight"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <h1 className="font-display text-5xl font-bold leading-none tracking-tight text-content-primary">
               OPTCG{" "}
-              <span style={{ color: "var(--accent)" }}>Simulator</span>
+              <span className="text-navy-900">Simulator</span>
             </h1>
           </Link>
-          <p
-            className="mt-2 text-sm"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <p className="mt-2 text-sm text-content-tertiary">
             Sign in to manage decks, play games, and more
           </p>
         </div>
 
         {/* Sign in card */}
-        <div
-          className="rounded-xl p-6"
-          style={{
-            background: "var(--surface-1)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
+        <div className="rounded border border-border bg-surface-1 p-6">
           <GoogleSignInButton callbackUrl={callbackUrl || "/admin"} />
 
           <div className="mt-4 text-center">
-            <p
-              className="text-xs"
-              style={{ color: "var(--text-tertiary)" }}
-            >
+            <p className="text-xs text-content-tertiary">
               By signing in, you agree to our terms of use
             </p>
           </div>
@@ -65,8 +47,7 @@ export default async function LoginPage({
         <div className="mt-6 text-center">
           <Link
             href="/"
-            className="text-sm transition-colors hover:underline"
-            style={{ color: "var(--text-tertiary)" }}
+            className="text-sm text-content-tertiary transition-colors hover:text-content-secondary hover:underline"
           >
             ← Back to home
           </Link>

@@ -12,10 +12,12 @@ import { validateDeck, type DeckCard, type DeckLeader } from "@/lib/deck-validat
 import { DeckBuilderSearch } from "./deck-builder-search";
 import { DeckBuilderList } from "./deck-builder-list";
 import { DeckBuilderHeader } from "./deck-builder-header";
-import { DeckBuilderStats } from "./deck-builder-stats";
+import { DeckBuilderStatsCharts } from "./deck-builder-stats";
 import { DeckBuilderValidation } from "./deck-builder-validation";
+import { CardInspectModal } from "./card-inspect-modal";
 import { ImportModal } from "./import-modal";
 import { ExportModal } from "./export-modal";
+import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface DeckBuilderShellProps {
   deckId: string | null;
@@ -27,6 +29,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [isLoading, setIsLoading] = useState(!!deckId);
+  const [inspectingLeader, setInspectingLeader] = useState(false);
+  const [leaderSelectedArtUrl, setLeaderSelectedArtUrl] = useState<string | null>(null);
 
   // Load existing deck
   useEffect(() => {
@@ -119,7 +123,6 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       const data = await res.json();
       dispatch({ type: "SAVE_SUCCESS", id: data.id });
 
-      // Update URL for new decks
       if (!state.id) {
         router.replace(`/decks/${data.id}`);
       }
@@ -154,17 +157,14 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     [],
   );
 
-  // Remove card handler (decrement by 1)
   const removeCard = useCallback((cardId: string) => {
     dispatch({ type: "DECREMENT_CARD", cardId });
   }, []);
 
-  // Set art variant handler
   const setArtVariant = useCallback((cardId: string, artUrl: string | null) => {
     dispatch({ type: "SET_ART_VARIANT", cardId, artUrl });
   }, []);
 
-  // Import handler
   const handleImport = useCallback(
     (leader: DeckLeaderEntry | null, cards: DeckCardEntry[]) => {
       dispatch({ type: "IMPORT_CARDS", leader, cards });
@@ -175,20 +175,16 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
   if (isLoading) {
     return (
-      <div
-        className="flex min-h-screen items-center justify-center"
-        style={{ background: "var(--surface-0)" }}
-      >
-        <div style={{ color: "var(--text-tertiary)" }}>Loading deck…</div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-content-tertiary">Loading deck…</div>
       </div>
     );
   }
 
+  const leaderDisplayUrl = leaderSelectedArtUrl || state.leader?.imageUrl;
+
   return (
-    <div
-      className="flex h-screen flex-col"
-      style={{ background: "var(--surface-0)", color: "var(--text-primary)" }}
-    >
+    <div className="flex h-screen flex-col bg-background text-content-primary">
       {/* Header bar */}
       <DeckBuilderHeader
         name={state.name}
@@ -204,13 +200,10 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
         onClear={() => dispatch({ type: "CLEAR_DECK" })}
       />
 
-      {/* Main split layout — both panels scroll independently */}
+      {/* Main split layout */}
       <div className="flex min-h-0 flex-1">
-        {/* Left: Card search — independent scroll */}
-        <div
-          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-r"
-          style={{ borderColor: "var(--border-subtle)" }}
-        >
+        {/* Left: Card search */}
+        <div className="flex w-[420px] shrink-0 flex-col overflow-hidden border-r border-border">
           <DeckBuilderSearch
             onAddCard={addCard}
             onRemoveCard={removeCard}
@@ -220,34 +213,102 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           />
         </div>
 
-        {/* Right: Deck editor — independent scroll */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          <div className="flex flex-1 flex-col gap-5 p-5">
-            {/* Deck Stats */}
-            <DeckBuilderStats
-              leader={state.leader}
-              stats={validation.stats}
-              onRemoveLeader={() => dispatch({ type: "REMOVE_LEADER" })}
-            />
+        {/* Right: Deck editor with tabs */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <TabsRoot defaultValue="cards" className="flex min-h-0 flex-1 flex-col">
+            {/* Tab bar */}
+            <div className="border-b border-border px-5 pt-4">
+              <TabsList>
+                <TabsTrigger value="cards">Cards</TabsTrigger>
+                <TabsTrigger value="stats">Stats</TabsTrigger>
+              </TabsList>
+            </div>
 
-            {/* Validation */}
-            <DeckBuilderValidation results={validation.results} />
+            {/* Cards tab */}
+            <TabsContent value="cards" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {/* Leader + validation row */}
+              <div className="flex gap-4 p-5 pb-4">
+                {/* Leader card — large, clickable */}
+                <div className="w-48 shrink-0">
+                  {state.leader ? (
+                    <div className="group relative">
+                      <button
+                        aria-label={`Inspect leader: ${state.leader.name}`}
+                        onClick={() => setInspectingLeader(true)}
+                        className="w-full overflow-hidden rounded"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={leaderDisplayUrl}
+                          alt={state.leader.name}
+                          className="w-full transition-transform duration-200 group-hover:scale-[1.02]"
+                        />
+                      </button>
+                      {/* Remove button */}
+                      <button
+                        aria-label="Remove leader"
+                        onClick={() => {
+                          dispatch({ type: "REMOVE_LEADER" });
+                          setLeaderSelectedArtUrl(null);
+                        }}
+                        className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-overlay text-xs text-error opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex aspect-[600/838] w-full items-center justify-center rounded border-2 border-dashed border-border p-3 text-center">
+                      <p className="text-xs font-medium text-content-tertiary">
+                        Search &amp; click a Leader to select
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-            {/* Card list */}
-            <DeckBuilderList
-              cards={Array.from(state.cards.values())}
-              onIncrement={(id) => dispatch({ type: "INCREMENT_CARD", cardId: id })}
-              onDecrement={(id) => dispatch({ type: "DECREMENT_CARD", cardId: id })}
-              onRemove={(id) => dispatch({ type: "REMOVE_CARD", cardId: id })}
-              onSetQuantity={(id, qty) =>
-                dispatch({ type: "SET_QUANTITY", cardId: id, quantity: qty })
-              }
-              onSetArtVariant={setArtVariant}
-              onAddCard={addCard}
-            />
-          </div>
+                {/* Compact validation tags */}
+                <DeckBuilderValidation
+                  results={validation.results}
+                  totalCards={validation.stats.totalCards}
+                />
+              </div>
+
+              {/* Card list */}
+              <div className="px-5 pb-5">
+                <DeckBuilderList
+                  cards={Array.from(state.cards.values())}
+                  onIncrement={(id) => dispatch({ type: "INCREMENT_CARD", cardId: id })}
+                  onDecrement={(id) => dispatch({ type: "DECREMENT_CARD", cardId: id })}
+                  onRemove={(id) => dispatch({ type: "REMOVE_CARD", cardId: id })}
+                  onSetQuantity={(id, qty) =>
+                    dispatch({ type: "SET_QUANTITY", cardId: id, quantity: qty })
+                  }
+                  onSetArtVariant={setArtVariant}
+                  onAddCard={addCard}
+                />
+              </div>
+            </TabsContent>
+
+            {/* Stats tab */}
+            <TabsContent value="stats" className="overflow-y-auto p-5">
+              <DeckBuilderStatsCharts stats={validation.stats} />
+            </TabsContent>
+          </TabsRoot>
         </div>
       </div>
+
+      {/* Leader inspect modal */}
+      {inspectingLeader && state.leader && (
+        <CardInspectModal
+          cardId={state.leader.id}
+          quantityInDeck={0}
+          selectedArtUrl={leaderSelectedArtUrl}
+          isLeader
+          onAddCard={() => {}}
+          onRemoveCard={() => {}}
+          onSetArtVariant={(artUrl) => setLeaderSelectedArtUrl(artUrl)}
+          onClose={() => setInspectingLeader(false)}
+        />
+      )}
 
       {/* Modals */}
       {showImport && (

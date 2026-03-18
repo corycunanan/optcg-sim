@@ -1,62 +1,161 @@
 @import "tailwindcss";
 
-/* ─── Color Palette ──────────────────────────────────────────
-   Derived from the OPTCG brand palette:
-   Coral (#E85D4A) · Charcoal (#3E4346) · Sage (#A0A882) 
-   Dusty Teal (#9FBAB4) · Teal (#55A0A8) · Deep Teal (#2D6E80)
-   ───────────────────────────────────────────────────────── */
+/* ─── OPTCG Simulator Design Tokens ─────────────────────────────
+   Palette: warm white surfaces · deep navy structure & accent
+            warm gold secondary · One Piece red for emphasis
+   References: en.onepiece-cardgame.com · magic.wizards.com/en/mtgarena
+   ─────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Brand Accent */
-  --accent: oklch(62% 0.18 25);
-  --accent-hover: oklch(55% 0.20 25);
-  --accent-soft: oklch(62% 0.18 25 / 0.12);
+  /* ── Surfaces (warm white, light mode) ── */
+  --surface-base: oklch(98%  0.005 75);   /* page background */
+  --surface-1:    oklch(96%  0.007 75);   /* cards, panels */
+  --surface-2:    oklch(93%  0.008 75);   /* elevated panels */
+  --surface-3:    oklch(88%  0.010 75);   /* tags, dividers, inset areas */
 
-  /* Teal Range */
-  --teal: oklch(62% 0.08 200);
-  --teal-deep: oklch(42% 0.06 210);
-  --teal-muted: oklch(72% 0.04 195);
+  /* ── Navy (primary accent + structure) ── */
+  --navy-900:     oklch(22%  0.04 245);   /* buttons, nav bg, active states */
+  --navy-800:     oklch(30%  0.04 245);   /* headings, hover on navy */
+  --navy-700:     oklch(38%  0.03 245);   /* borders on dark surfaces */
+  --navy-500:     oklch(50%  0.04 245);   /* subdued elements */
+  --navy-200:     oklch(88%  0.02 245);   /* light navy tint */
+  --navy-100:     oklch(94%  0.015 245);  /* very light navy bg */
 
-  /* Sage */
-  --sage: oklch(70% 0.06 120);
-  --sage-muted: oklch(70% 0.06 120 / 0.15);
+  /* ── Gold (secondary accent — treasure, premium moments) ── */
+  --gold-500:     oklch(72%  0.14 75);    /* secondary CTAs, highlights */
+  --gold-400:     oklch(78%  0.12 75);    /* hover on gold */
+  --gold-100:     oklch(95%  0.04 75);    /* soft gold background */
 
-  /* Dark surfaces — tinted toward teal, not pure gray */
-  --surface-0: oklch(14% 0.01 210);
-  --surface-1: oklch(17% 0.01 210);
-  --surface-2: oklch(21% 0.015 210);
-  --surface-3: oklch(26% 0.015 210);
+  /* ── Red (energy, emphasis, destructive actions) ── */
+  --red-600:      oklch(55%  0.20 25);    /* emphasis, destructive */
+  --red-500:      oklch(62%  0.18 25);    /* hover on red */
+  --red-100:      oklch(96%  0.04 25);    /* soft red background */
 
-  /* Borders */
-  --border: oklch(28% 0.01 210);
-  --border-subtle: oklch(24% 0.01 210);
-  --border-hover: oklch(35% 0.02 210);
+  /* ── Text ── */
+  --text-primary:   oklch(18%  0.02 245); /* navy-tinted, near-black */
+  --text-secondary: oklch(45%  0.01 245); /* secondary labels */
+  --text-tertiary:  oklch(62%  0.01 245); /* placeholder, disabled */
+  --text-disabled:  oklch(74%  0.01 245);
+  --text-inverse:   oklch(98%  0.005 75); /* white text on dark surfaces */
 
-  /* Text */
-  --text-primary: oklch(92% 0.01 210);
-  --text-secondary: oklch(68% 0.01 210);
-  --text-tertiary: oklch(50% 0.01 210);
+  /* ── Borders ── */
+  --border:        oklch(86%  0.01 245);
+  --border-strong: oklch(76%  0.01 245);
+  --border-focus:  var(--navy-900);
 
-  /* Semantic */
-  --success: oklch(72% 0.14 155);
-  --warning: oklch(78% 0.14 80);
-  --error: oklch(60% 0.18 25);
+  /* ── Semantic ── */
+  --success:       oklch(52%  0.16 155);
+  --success-soft:  oklch(96%  0.04 155);
+  --warning:       oklch(68%  0.14 80);
+  --warning-soft:  oklch(96%  0.05 80);
+  --error:         oklch(55%  0.20 25);
+  --error-soft:    oklch(96%  0.04 25);
 
-  /* TCG Card Colors — functional, for filter pills and card badges */
-  --card-red: oklch(60% 0.20 25);
-  --card-blue: oklch(55% 0.15 250);
-  --card-green: oklch(60% 0.16 150);
-  --card-purple: oklch(50% 0.16 300);
-  --card-black: oklch(35% 0.01 210);
-  --card-yellow: oklch(80% 0.16 90);
+  /* ── Overlays ── */
+  --overlay:       oklch(18%  0.03 245 / 0.60);
+  --overlay-light: oklch(18%  0.03 245 / 0.30);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px oklch(18% 0.03 245 / 0.06),
+               0 1px 3px oklch(18% 0.03 245 / 0.10);
+  --shadow-md: 0 4px 6px  oklch(18% 0.03 245 / 0.07),
+               0 2px 4px  oklch(18% 0.03 245 / 0.06);
+  --shadow-lg: 0 10px 15px oklch(18% 0.03 245 / 0.10),
+               0 4px 6px   oklch(18% 0.03 245 / 0.05);
+
+  /* ── TCG Card Colors (functional — filter pills, card badges) ── */
+  --card-red:    oklch(55% 0.20 25);
+  --card-blue:   oklch(50% 0.18 250);
+  --card-green:  oklch(52% 0.18 150);
+  --card-purple: oklch(48% 0.18 300);
+  --card-black:  oklch(28% 0.01 245);
+  --card-yellow: oklch(78% 0.18 90);
 }
+
+/* ─── Tailwind v4 Theme ──────────────────────────────────────────
+   Exposes CSS tokens as Tailwind utilities.
+   Use these instead of inline style={{}} for all design properties.
+   ─────────────────────────────────────────────────────────────── */
 
 @theme inline {
-  --color-background: var(--surface-0);
+  /* Fonts */
+  --font-sans:    var(--font-geist-sans);
+  --font-mono:    var(--font-geist-mono);
+  --font-display: var(--font-barlow-condensed);
+
+  /* Background / foreground defaults */
+  --color-background: var(--surface-base);
   --color-foreground: var(--text-primary);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Surfaces */
+  --color-surface-base: var(--surface-base);
+  --color-surface-1:    var(--surface-1);
+  --color-surface-2:    var(--surface-2);
+  --color-surface-3:    var(--surface-3);
+
+  /* Navy */
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-navy-500: var(--navy-500);
+  --color-navy-200: var(--navy-200);
+  --color-navy-100: var(--navy-100);
+
+  /* Gold */
+  --color-gold-500: var(--gold-500);
+  --color-gold-400: var(--gold-400);
+  --color-gold-100: var(--gold-100);
+
+  /* Red */
+  --color-red-600: var(--red-600);
+  --color-red-500: var(--red-500);
+  --color-red-100: var(--red-100);
+
+  /* Text — use as text-content-primary etc to avoid conflicts */
+  --color-content-primary:   var(--text-primary);
+  --color-content-secondary: var(--text-secondary);
+  --color-content-tertiary:  var(--text-tertiary);
+  --color-content-disabled:  var(--text-disabled);
+  --color-content-inverse:   var(--text-inverse);
+
+  /* Borders */
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-focus:  var(--border-focus);
+
+  /* Semantic */
+  --color-success:      var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning:      var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-error:        var(--error);
+  --color-error-soft:   var(--error-soft);
+
+  /* Overlays */
+  --color-overlay:       var(--overlay);
+  --color-overlay-light: var(--overlay-light);
+
+  /* TCG Card Colors */
+  --color-card-red:    var(--card-red);
+  --color-card-blue:   var(--card-blue);
+  --color-card-green:  var(--card-green);
+  --color-card-purple: var(--card-purple);
+  --color-card-black:  var(--card-black);
+  --color-card-yellow: var(--card-yellow);
+
+  /* Shadows */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  /* Border Radius — 4 values only, override Tailwind defaults */
+  --radius:    0.25rem;  /* 4px  — rounded      — badges, tags */
+  --radius-md: 0.5rem;   /* 8px  — rounded-md   — inputs, buttons */
+  --radius-lg: 0.75rem;  /* 12px — rounded-lg   — panels, modals */
+  /* rounded-full stays at 9999px — pills, avatars */
 }
+
+/* ─── Base Styles ────────────────────────────────────────────── */
 
 html {
   scrollbar-gutter: stable;
@@ -65,26 +164,31 @@ html {
 
 body {
   overflow-x: hidden;
-}
-
-body {
-  background: var(--surface-0);
+  background: var(--surface-base);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* Custom scrollbar for dark UI */
+/* ─── Scrollbar ──────────────────────────────────────────────── */
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--surface-0);
+  background: var(--surface-2);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: var(--navy-500);
+}
+
+/* ─── Focus Visible ──────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
