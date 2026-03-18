@@ -497,4 +497,151 @@ The `workers/images/src/index.ts` file uses Cloudflare Worker types (`R2Bucket`)
 
 **Fix:** Add `"workers"` to the `exclude` array in `tsconfig.json`. The worker has its own `tsconfig.json` with `@cloudflare/workers-types`.
 
+### 2026-03-18 — Research: Rive evaluated for game board UI, deferred to M5
+
+**Area:** Game Simulator / Frontend
+
+Investigated Rive (rive.app) as an alternative to React + Framer Motion for the M3 game board. Full findings in `docs/Research/RIVE-INVESTIGATION.md`.
+
+**Key takeaways:**
+- Rive's animation ceiling is genuinely higher for specific game elements (card flip, attack VFX, damage bursts) — bone rigs, mesh deforms, blend states that Framer Motion can't match
+- But it's the wrong tool for the DOM-based game board layer: no dynamic layout, no native drag-and-drop, canvas-only text, and no production web TCG examples to validate the approach
+- Bundle cost: ~648 KB (webgl2) vs. ~100 KB for Framer Motion
+- Multiple cards on a board require `useOffscreenRenderer: true` to avoid browser WebGL context limits
+- Authoring workflow (Rive editor → export → deploy) breaks fast iteration critical for M3/M4
+- The right hybrid is: React/HTML for board layout + UI chrome, Rive canvases as absolutely-positioned overlays for specific animations
+
+**Decision:** Proceed with Framer Motion for M3 and M4. Revisit Rive at M5 (Polish & Scale) for high-impact animated moments.
+
+### 2026-03-18 — M2 Social Layer: DB + REST API + basic UI complete
+
+**Area:** M2 Social / Backend + Frontend
+
+M2 social layer foundation built (no WebSocket yet — REST-only MVP):
+
+**Schema (prisma/schema.prisma):**
+- `FriendRequest` (PENDING/ACCEPTED/DECLINED)
+- `Friendship` (stored with userA < userB lexicographically to prevent duplicates)
+- `Message` (1:1, with `read` flag and index on `(fromUserId, toUserId, createdAt)`)
+- `Lobby` + `LobbyGuest` + `LobbyInvite` (with WAITING/READY/IN_GAME/CLOSED lifecycle)
+- All enums: `FriendRequestStatus`, `LobbyVisibility`, `LobbyStatus`, `LobbyInviteStatus`
+
+**API routes built:**
+- `GET/POST /api/friends/requests` — list + send friend requests
+- `PUT /api/friends/requests/[id]` — accept/decline
+- `GET /api/friends` — list friends
+- `DELETE /api/friends/[userId]` — remove friend
+- `GET /api/users/search?q=` — search users by username
+- `GET/POST /api/messages/conversations` — list conversations
+- `GET/POST /api/messages/[userId]` — message history + send message
+- `PUT /api/messages/[messageId]/read` — mark as read
+- `GET/POST /api/lobbies` — list public + create
+- `GET/DELETE /api/lobbies/[id]` — get + close
+- `POST /api/lobbies/[id]/join` — join with deck selection
+- `POST /api/lobbies/[id]/invite` — invite friend
+- `PUT /api/lobbies/[id]/invite/[inviteId]` — accept/decline invite
+- `POST /api/lobbies/[id]/start` — start game (M3 stub)
+
+**UI pages (`/social/`):**
+- `/social/friends` — friend search, request inbox, friend list, remove
+- `/social/messages` — conversation list; `/social/messages/[userId]` — chat window
+- `/social/lobbies` — browse public lobbies, create lobby, join with deck selection
+
+**Deferred to M2 follow-up:** WebSocket infrastructure (Socket.io) for real-time message delivery, presence system (online/in-game status), lobby browser auto-refresh. Current implementation is REST-only (polling or manual refresh).
+
+---
+
+### 2026-03-18 — Deck Builder: Leader art URL persisted to DB
+
+**Area:** Deck Builder / Data Model
+
+Added `leaderArtUrl String?` to the `Deck` Prisma model. When a user selects an art variant for their leader card, the URL is now saved on every deck save and restored when loading. Previously it was local state only (`leaderSelectedArtUrl` in deck-builder-shell.tsx), lost on page refresh.
+
+**Changes:** `prisma/schema.prisma` (new field), `api/decks/route.ts` (POST accepts `leaderArtUrl`), `api/decks/[id]/route.ts` (GET returns it, PUT accepts it), `deck-builder-shell.tsx` (save includes it, load restores it).
+
+---
+
+### 2026-03-18 — Admin UI: Design system normalization complete
+
+**Area:** Frontend / Admin UI
+
+Full normalization pass across all admin components and pages:
+
+- Replaced all `var(--surface-0)`, `var(--teal)`, `var(--sage)`, `var(--sage-muted)`, `var(--accent)`, `var(--accent-soft)`, `var(--border-subtle)` references — these were from the old dark theme and no longer exist in the token system.
+- Token mapping: `--accent` → `bg-navy-900`/`text-navy-900`, `--teal` → navy, `--sage` → `text-navy-700`, `--border-subtle` → `border-border`, `--surface-0` → `bg-background`
+- Removed all inline `style={{}}` for design properties — replaced with Tailwind utilities
+- Replaced `text-[11px]`/`text-[10px]` with `text-xs` (12px minimum)
+- Fixed off-scale spacing: `py-1.5` → `py-1`/`py-2`, `px-2.5` → `px-3`, `gap-1.5` → `gap-2`, etc.
+- Replaced hardcoded `#fff`/`#222` in color filter buttons with `var(--text-inverse)`/`var(--text-primary)`
+- Admin nav updated to navy-900 background with white text, gold "Add Card" button — matches design direction
+- Hardcoded oklch values in error/success banners replaced with `bg-error-soft`/`bg-success-soft` tokens
+- `cn()` utility added to all admin components that need conditional classes
+
+**Note on TCG color buttons:** Color filter/toggle buttons still use `style={{}}` with CSS variable tokens (e.g. `var(--card-red)`) for the active state background — this is intentional and allowed per CLAUDE.md since these are dynamic values that can't be expressed as static Tailwind classes.
+
+### 2026-03-18 — Auth: Credentials provider requires JWT session strategy
+
+**Area:** Authentication
+
+Adding email/password login alongside Google OAuth requires switching NextAuth's session strategy from `"database"` to `"jwt"`. The Credentials provider doesn't create OAuth account records, so the database session adapter path doesn't apply.
+
+**Key changes:**
+- `session: { strategy: "jwt" }` added to NextAuth config
+- `jwt` callback now carries `username` on the token (set once on first sign-in from user record)
+- `session` callback reads `token.sub` (auto-set by NextAuth to `user.id`) instead of `user.id`
+- `PrismaAdapter` stays in place — still used for OAuth account/user creation; `sessions` table is unused with JWT but that's fine
+- `declare module "next-auth/jwt"` augmentation throws a TS error on this version — extend JWT type inline instead
+
+**Registration flow:** `POST /api/auth/register` creates the user record with `bcrypt.hash(password, 12)`. After success, the client calls `signIn("credentials", { redirect: false })` and manually redirects on `result.url`. Doing `redirect: true` in client components swallows errors.
+
+**Important:** `signIn("credentials")` from `next-auth/react` (client-side) works fine in this version. Only the **server action** form of `signIn()` is broken on Next.js 16 (see earlier entry on the CSRF/URL issue).
+
+---
+
+### 2026-03-18 — Next.js: Sibling dynamic route segments must use the same name
+
+**Area:** Next.js / Routing
+
+The social messages API had two routes at the same level with different param names:
+- `src/app/api/messages/[userId]/route.ts`
+- `src/app/api/messages/[messageId]/read/route.ts`
+
+Next.js throws `You cannot use different slug names for the same dynamic path ('messageId' !== 'userId')` at startup and refuses to build.
+
+**Fix:** Move the conflicting route to a non-dynamic path. Refactored to `GET/PUT /api/messages/read?messageId=...` (query param instead of path segment). Literal path segments (e.g. `read`) always take precedence over dynamic ones, so there's no conflict.
+
+**Rule:** All dynamic segments at the same directory level must use the same name across the entire subtree. Different names = build error.
+
+---
+
+### 2026-03-18 — Social: Persistent sidebar + floating chat widget architecture
+
+**Area:** Frontend / Social Layer
+
+All social management consolidated into a persistent right-side panel rather than dedicated pages. The architecture:
+
+**`SocialShell` (client component in root layout):**
+- Owns `collapsed: boolean` and `chatUser: SidebarUser | null` state
+- Renders `SocialSidebar` + `ChatWidget` as siblings
+- Lifting state here means the chat widget always knows the correct `right` offset when the sidebar collapses
+
+**`SocialSidebar` (`w-64`, `bg-navy-900`, sticky):**
+- Two modes: Friends (people icon) and Play (swords icon), toggled in header
+- Friends mode: inline add-friend search, pending requests, friend list
+- Play mode: lobby invites, active lobby status, create lobby form, open lobbies list
+- Friend rows are `<button onClick={() => onOpenChat(user)}>` — no navigation
+- Collapses to `w-10` icon strip; badge count persists in collapsed state
+
+**`ChatWidget` (fixed, `bottom-0`, `w-80`):**
+- Positioned `right-64` or `right-10` depending on sidebar state — always flush against the sidebar's left edge
+- Minimizes to header bar only on click; close button removes from DOM entirely
+- Fetches message history from `GET /api/messages/[userId]` on mount; sends via `POST`
+- `border-b-0` on the container prevents a double border at the bottom viewport edge
+
+**Why no Context/Zustand:** State only needs to flow between sidebar and widget, both rendered in the same parent component. Lifting to `SocialShell` is sufficient and avoids the overhead of a context provider for two consumers.
+
+**`GET /api/lobbies/status`:** Single combined endpoint returning `{ invites, myLobby, openLobbies }` — avoids three separate fetches from the sidebar on every poll interval.
+
+---
+
 <!-- Add new entries above this line -->

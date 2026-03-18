@@ -91,9 +91,10 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, leaderId, format, cards } = body as {
+    const { name, leaderId, leaderArtUrl, format, cards } = body as {
       name?: string;
       leaderId?: string;
+      leaderArtUrl?: string | null;
       format?: string;
       cards?: { cardId: string; quantity: number }[];
     };
@@ -110,6 +111,7 @@ export async function PUT(
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
     if (leaderId !== undefined) updateData.leaderId = leaderId;
+    if (leaderArtUrl !== undefined) updateData.leaderArtUrl = leaderArtUrl;
     if (format !== undefined) updateData.format = format;
 
     // If cards are provided, replace all deck cards

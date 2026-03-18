@@ -104,20 +104,11 @@ export function CardBrowser({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search cards by name..."
-            className="flex-1 rounded px-4 py-2.5 text-sm transition-colors focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="flex-1 rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
           />
           <button
             type="submit"
-            className="rounded px-6 py-2.5 text-sm font-semibold transition-colors"
-            style={{
-              background: "var(--accent)",
-              color: "var(--surface-0)",
-            }}
+            className="rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
           >
             Search
           </button>
@@ -128,11 +119,7 @@ export function CardBrowser({
                 setSearch("");
                 router.push("/admin/cards");
               }}
-              className="rounded px-4 py-2.5 text-sm transition-colors"
-              style={{
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
+              className="rounded border border-border px-4 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
             >
               Clear
             </button>
@@ -148,29 +135,20 @@ export function CardBrowser({
       />
 
       {/* Results count */}
-      <div
-        className="mt-4 mb-4 text-sm"
-        style={{ color: "var(--text-tertiary)" }}
-      >
+      <div className="mb-4 mt-4 text-sm text-content-tertiary">
         Showing {initialCards.length} of {total.toLocaleString()} cards
         {currentFilters.q && (
           <span>
             {" "}
             matching &ldquo;
-            <strong style={{ color: "var(--text-secondary)" }}>
+            <strong className="text-content-secondary">
               {currentFilters.q}
             </strong>
             &rdquo;
           </span>
         )}
         {currentFilters.originOnly === "true" && (
-          <span
-            className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium"
-            style={{
-              background: "var(--sage-muted)",
-              color: "var(--sage)",
-            }}
-          >
+          <span className="ml-2 rounded-full bg-gold-100 px-2 py-1 text-xs font-medium text-gold-500">
             Origin sets only
           </span>
         )}

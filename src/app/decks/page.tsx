@@ -56,7 +56,7 @@ export default async function DecksPage() {
           <h1 className="text-sm font-semibold text-content-secondary">
             My Decks
           </h1>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
             <Link
               href="/decks/new"
               className="rounded bg-navy-900 px-4 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"

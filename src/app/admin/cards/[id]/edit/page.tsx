@@ -24,29 +24,24 @@ export default async function CardEditPage({
       <div className="mb-6 flex items-center gap-2 text-sm">
         <Link
           href="/admin/cards"
-          className="transition-colors hover:underline"
-          style={{ color: "var(--text-tertiary)" }}
+          className="text-content-tertiary transition-colors hover:underline"
         >
           Cards
         </Link>
-        <span style={{ color: "var(--text-tertiary)" }}>›</span>
+        <span className="text-content-tertiary">›</span>
         <Link
           href={`/admin/cards/${card.id}`}
-          className="transition-colors hover:underline"
-          style={{ color: "var(--text-tertiary)" }}
+          className="text-content-tertiary transition-colors hover:underline"
         >
           {card.id}
         </Link>
-        <span style={{ color: "var(--text-tertiary)" }}>›</span>
-        <span style={{ color: "var(--text-primary)" }}>Edit</span>
+        <span className="text-content-tertiary">›</span>
+        <span className="text-content-primary">Edit</span>
       </div>
 
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">
-        <span style={{ color: "var(--text-primary)" }}>Edit: {card.name}</span>
-        <span
-          className="ml-2 text-lg font-normal"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
+        Edit: {card.name}
+        <span className="ml-2 text-lg font-normal text-content-tertiary">
           ({card.id})
         </span>
       </h1>

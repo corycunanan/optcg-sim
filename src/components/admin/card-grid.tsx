@@ -79,7 +79,7 @@ export function CardGrid({ cards }: CardGridProps) {
                   <span
                     key={c}
                     className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ background: COLOR_DOT[c] || "var(--border)" }}
+                    style={{ background: COLOR_DOT[c] || "var(--border-strong)" }}
                     title={c}
                   />
                 ))}

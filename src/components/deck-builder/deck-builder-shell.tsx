@@ -66,6 +66,10 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             lastSavedAt: new Date(data.updatedAt),
           },
         });
+
+        if (data.leaderArtUrl) {
+          setLeaderSelectedArtUrl(data.leaderArtUrl);
+        }
       } catch {
         router.push("/decks");
       } finally {
@@ -95,6 +99,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     const payload = {
       name: state.name,
       leaderId: state.leader.id,
+      leaderArtUrl: leaderSelectedArtUrl ?? null,
       format: state.format,
       cards: Array.from(state.cards.values()).map((c) => ({
         cardId: c.cardId,

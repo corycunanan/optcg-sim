@@ -35,12 +35,24 @@ model User {
   emailVerified DateTime? @map("email_verified")
   image         String?
   username      String?   @unique // Game profile username (set during onboarding)
+  password      String?   // Bcrypt hash; null for OAuth-only accounts
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   accounts Account[]
   sessions Session[]
   decks    Deck[]
+
+  // Social
+  sentRequests      FriendRequest[] @relation("SentRequests")
+  receivedRequests  FriendRequest[] @relation("ReceivedRequests")
+  friendshipsA      Friendship[]    @relation("FriendshipsA")
+  friendshipsB      Friendship[]    @relation("FriendshipsB")
+  sentMessages      Message[]       @relation("SentMessages")
+  receivedMessages  Message[]       @relation("ReceivedMessages")
+  hostedLobbies     Lobby[]         @relation("HostedLobbies")
+  lobbyGuests       LobbyGuest[]
+  lobbyInvites      LobbyInvite[]
 
   @@map("users")
 }
@@ -176,16 +188,21 @@ model Errata {
 // ─── Deck ───────────────────────────────────────────────────
 
 model Deck {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  leaderId  String
-  format    String   @default("Standard")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  leaderId     String
+  leaderArtUrl String?  // Selected art variant URL for leader (null = base art)
+  format       String   @default("Standard")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards DeckCard[]
+
+  // Social — decks used in lobbies
+  hostedLobbies Lobby[]      @relation("LobbyHostDeck")
+  lobbyGuests   LobbyGuest[]
 
   @@index([userId])
   @@map("decks")
@@ -205,4 +222,124 @@ model DeckCard {
   @@unique([deckId, cardId])
   @@index([deckId])
   @@map("deck_cards")
+}
+
+// ─── M2: Social Layer ────────────────────────────────────────
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum LobbyVisibility {
+  PUBLIC
+  INVITE_ONLY
+}
+
+enum LobbyStatus {
+  WAITING
+  READY
+  IN_GAME
+  CLOSED
+}
+
+enum LobbyInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model FriendRequest {
+  id         String              @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  fromUser User @relation("SentRequests", fields: [fromUserId], references: [id])
+  toUser   User @relation("ReceivedRequests", fields: [toUserId], references: [id])
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId, status])
+  @@map("friend_requests")
+}
+
+model Friendship {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime @default(now())
+
+  userA User @relation("FriendshipsA", fields: [userAId], references: [id])
+  userB User @relation("FriendshipsB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@map("friendships")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  body       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  fromUser User @relation("SentMessages", fields: [fromUserId], references: [id])
+  toUser   User @relation("ReceivedMessages", fields: [toUserId], references: [id])
+
+  @@index([fromUserId, toUserId, createdAt])
+  @@index([toUserId, read])
+  @@map("messages")
+}
+
+model Lobby {
+  id         String          @id @default(uuid())
+  hostUserId String
+  hostDeckId String
+  format     String          @default("Standard")
+  visibility LobbyVisibility @default(PUBLIC)
+  status     LobbyStatus     @default(WAITING)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  host     User          @relation("HostedLobbies", fields: [hostUserId], references: [id])
+  hostDeck Deck          @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
+  invites  LobbyInvite[]
+  guest    LobbyGuest?
+
+  @@index([status, visibility])
+  @@map("lobbies")
+}
+
+model LobbyGuest {
+  id      String @id @default(uuid())
+  lobbyId String @unique
+  userId  String
+  deckId  String
+
+  lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+  deck  Deck  @relation(fields: [deckId], references: [id])
+
+  @@map("lobby_guests")
+}
+
+model LobbyInvite {
+  id        String            @id @default(uuid())
+  lobbyId   String
+  userId    String
+  status    LobbyInviteStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+
+  lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([lobbyId, userId])
+  @@index([userId, status])
+  @@map("lobby_invites")
 }

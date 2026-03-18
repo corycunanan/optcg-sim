@@ -58,9 +58,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, leaderId, format, cards } = body as {
+    const { name, leaderId, leaderArtUrl, format, cards } = body as {
       name: string;
       leaderId: string;
+      leaderArtUrl?: string | null;
       format?: string;
       cards?: { cardId: string; quantity: number }[];
     };
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         leaderId,
+        leaderArtUrl: leaderArtUrl ?? null,
         format: format || "Standard",
         userId: session.user.id,
         cards: cards?.length

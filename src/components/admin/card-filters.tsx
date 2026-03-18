@@ -1,16 +1,19 @@
 "use client";
 
+import { cn } from "@/components/ui/cn";
+
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const TYPES = ["Leader", "Character", "Event", "Stage"];
 const BLOCKS = [1, 2, 3, 4];
 
+// CSS variable tokens for tcg colors — dynamic and can't be expressed with static Tailwind
 const COLOR_ACTIVE: Record<string, { bg: string; text: string; border: string }> = {
-  Red:    { bg: "var(--card-red)",    text: "#fff", border: "var(--card-red)" },
-  Blue:   { bg: "var(--card-blue)",   text: "#fff", border: "var(--card-blue)" },
-  Green:  { bg: "var(--card-green)",  text: "#fff", border: "var(--card-green)" },
-  Purple: { bg: "var(--card-purple)", text: "#fff", border: "var(--card-purple)" },
-  Black:  { bg: "var(--card-black)",  text: "#ddd", border: "var(--card-black)" },
-  Yellow: { bg: "var(--card-yellow)", text: "#222", border: "var(--card-yellow)" },
+  Red:    { bg: "var(--card-red)",    text: "var(--text-inverse)", border: "var(--card-red)" },
+  Blue:   { bg: "var(--card-blue)",   text: "var(--text-inverse)", border: "var(--card-blue)" },
+  Green:  { bg: "var(--card-green)",  text: "var(--text-inverse)", border: "var(--card-green)" },
+  Purple: { bg: "var(--card-purple)", text: "var(--text-inverse)", border: "var(--card-purple)" },
+  Black:  { bg: "var(--card-black)",  text: "var(--text-inverse)", border: "var(--card-black)" },
+  Yellow: { bg: "var(--card-yellow)", text: "var(--text-primary)", border: "var(--card-yellow)" },
 };
 
 interface CardFiltersProps {
@@ -54,22 +57,13 @@ export function CardFilters({
   }
 
   return (
-    <div
-      className="space-y-4 rounded p-4"
-      style={{
-        background: "var(--surface-1)",
-        border: "1px solid var(--border-subtle)",
-      }}
-    >
+    <div className="space-y-4 rounded-lg border border-border bg-surface-1 p-4">
       {/* Colors */}
       <div>
-        <label
-          className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
           Color
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {COLORS.map((c) => {
             const active = activeColors.includes(c);
             const colorStyle = COLOR_ACTIVE[c];
@@ -77,19 +71,18 @@ export function CardFilters({
               <button
                 key={c}
                 onClick={() => toggleFilter("color", c, activeColors)}
-                className="rounded px-3 py-1 text-xs font-medium transition-all"
+                className={cn(
+                  "rounded border px-3 py-1 text-xs font-medium transition-all",
+                  !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                )}
                 style={
                   active
                     ? {
                         background: colorStyle.bg,
                         color: colorStyle.text,
-                        border: `1px solid ${colorStyle.border}`,
+                        borderColor: colorStyle.border,
                       }
-                    : {
-                        background: "var(--surface-2)",
-                        color: "var(--text-tertiary)",
-                        border: "1px solid var(--border)",
-                      }
+                    : undefined
                 }
               >
                 {c}
@@ -101,33 +94,22 @@ export function CardFilters({
 
       {/* Types */}
       <div>
-        <label
-          className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
           Type
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {TYPES.map((t) => {
             const active = activeTypes.includes(t);
             return (
               <button
                 key={t}
                 onClick={() => toggleFilter("type", t, activeTypes)}
-                className="rounded px-3 py-1 text-xs font-medium transition-all"
-                style={
+                className={cn(
+                  "rounded border px-3 py-1 text-xs font-medium transition-all",
                   active
-                    ? {
-                        background: "var(--teal)",
-                        color: "var(--surface-0)",
-                        border: "1px solid var(--teal)",
-                      }
-                    : {
-                        background: "var(--surface-2)",
-                        color: "var(--text-tertiary)",
-                        border: "1px solid var(--border)",
-                      }
-                }
+                    ? "border-navy-900 bg-navy-900 text-content-inverse"
+                    : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                )}
               >
                 {t}
               </button>
@@ -140,21 +122,13 @@ export function CardFilters({
       <div className="flex flex-wrap items-end gap-4">
         {/* Set dropdown */}
         <div className="min-w-[200px] flex-1">
-          <label
-            className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Set
           </label>
           <select
             value={currentFilters.set}
             onChange={(e) => onFilterChange({ set: e.target.value })}
-            className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           >
             <option value="">All Sets</option>
             {sets.map((s) => (
@@ -167,13 +141,10 @@ export function CardFilters({
 
         {/* Block */}
         <div>
-          <label
-            className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Block
           </label>
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             {BLOCKS.map((b) => {
               const active = activeBlocks.includes(b);
               return (
@@ -182,20 +153,12 @@ export function CardFilters({
                   onClick={() =>
                     toggleFilter("block", String(b), activeBlocks.map(String))
                   }
-                  className="rounded px-3 py-1 text-xs font-medium transition-all"
-                  style={
+                  className={cn(
+                    "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
-                      ? {
-                          background: "var(--sage)",
-                          color: "var(--surface-0)",
-                          border: "1px solid var(--sage)",
-                        }
-                      : {
-                          background: "var(--surface-2)",
-                          color: "var(--text-tertiary)",
-                          border: "1px solid var(--border)",
-                        }
-                  }
+                      ? "border-navy-900 bg-navy-900 text-content-inverse"
+                      : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                  )}
                 >
                   {b}
                 </button>
@@ -206,39 +169,27 @@ export function CardFilters({
 
         {/* Reprint filter toggle */}
         <div>
-          <label
-            className="mb-2 block text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Reprints
           </label>
           <button
             onClick={() =>
               onFilterChange({ originOnly: originOnly ? "" : "true" })
             }
-            className="flex items-center gap-2 rounded px-3 py-1 text-xs font-medium transition-all"
-            style={
+            className={cn(
+              "flex items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-all",
               originOnly
-                ? {
-                    background: "var(--accent-soft)",
-                    color: "var(--accent)",
-                    border: "1px solid var(--accent)",
-                  }
-                : {
-                    background: "var(--surface-2)",
-                    color: "var(--text-tertiary)",
-                    border: "1px solid var(--border)",
-                  }
-            }
+                ? "border-navy-900 bg-navy-100 text-navy-900"
+                : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+            )}
           >
             <span
-              className="inline-block h-2.5 w-2.5 rounded-sm transition-colors"
-              style={{
-                background: originOnly ? "var(--accent)" : "transparent",
-                border: originOnly
-                  ? "1.5px solid var(--accent)"
-                  : "1.5px solid var(--text-tertiary)",
-              }}
+              className={cn(
+                "inline-block h-3 w-3 rounded-sm border transition-colors",
+                originOnly
+                  ? "border-navy-900 bg-navy-900"
+                  : "border-content-tertiary bg-transparent",
+              )}
             />
             Origin only
           </button>

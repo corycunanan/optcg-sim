@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/components/ui/cn";
+
 interface PaginationProps {
   page: number;
   totalPages: number;
@@ -32,11 +34,7 @@ export function Pagination({
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="rounded px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
-        style={{
-          border: "1px solid var(--border)",
-          color: "var(--text-secondary)",
-        }}
+        className="rounded border border-border px-3 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-30"
       >
         Prev
       </button>
@@ -45,8 +43,7 @@ export function Pagination({
         p === "..." ? (
           <span
             key={`dots-${i}`}
-            className="px-2 text-sm"
-            style={{ color: "var(--text-tertiary)" }}
+            className="px-2 text-sm text-content-tertiary"
           >
             …
           </span>
@@ -54,18 +51,12 @@ export function Pagination({
           <button
             key={p}
             onClick={() => onPageChange(p)}
-            className="rounded px-3 py-1.5 text-sm font-medium tabular-nums transition-colors"
-            style={
+            className={cn(
+              "rounded px-3 py-2 text-sm font-medium tabular-nums transition-colors",
               p === page
-                ? {
-                    background: "var(--accent)",
-                    color: "var(--surface-0)",
-                  }
-                : {
-                    border: "1px solid var(--border)",
-                    color: "var(--text-secondary)",
-                  }
-            }
+                ? "bg-navy-900 text-content-inverse"
+                : "border border-border text-content-secondary hover:bg-surface-2",
+            )}
           >
             {p}
           </button>
@@ -75,11 +66,7 @@ export function Pagination({
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="rounded px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30"
-        style={{
-          border: "1px solid var(--border)",
-          color: "var(--text-secondary)",
-        }}
+        className="rounded border border-border px-3 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-30"
       >
         Next
       </button>

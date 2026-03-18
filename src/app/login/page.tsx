@@ -1,19 +1,19 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { CredentialsForm } from "./credentials-form";
 import { GoogleSignInButton } from "./google-sign-in-button";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; mode?: string }>;
 }) {
   const session = await auth();
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, mode } = await searchParams;
 
-  // Already logged in — redirect to callback or admin
   if (session) {
-    redirect(callbackUrl || "/admin");
+    redirect(callbackUrl || "/decks");
   }
 
   return (
@@ -34,13 +34,23 @@ export default async function LoginPage({
 
         {/* Sign in card */}
         <div className="rounded border border-border bg-surface-1 p-6">
-          <GoogleSignInButton callbackUrl={callbackUrl || "/admin"} />
+          <CredentialsForm
+            callbackUrl={callbackUrl || "/decks"}
+            initialMode={(mode === "signup" ? "signup" : "signin") as "signin" | "signup"}
+          />
 
-          <div className="mt-4 text-center">
-            <p className="text-xs text-content-tertiary">
-              By signing in, you agree to our terms of use
-            </p>
+          {/* Divider */}
+          <div className="my-5 flex items-center gap-3">
+            <div className="flex-1 border-t border-border" />
+            <span className="text-xs text-content-tertiary">or</span>
+            <div className="flex-1 border-t border-border" />
           </div>
+
+          <GoogleSignInButton callbackUrl={callbackUrl || "/decks"} />
+
+          <p className="mt-4 text-center text-xs text-content-tertiary">
+            By signing in, you agree to our terms of use
+          </p>
         </div>
 
         {/* Back to home */}

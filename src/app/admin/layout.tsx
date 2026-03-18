@@ -10,26 +10,13 @@ export default async function AdminLayout({
   const session = await auth();
 
   return (
-    <div
-      className="flex min-h-screen flex-col"
-      style={{
-        background: "var(--surface-0)",
-        color: "var(--text-primary)",
-      }}
-    >
+    <div className="flex min-h-screen flex-col bg-background text-content-primary">
       {/* Admin nav */}
-      <nav
-        className="sticky top-0 z-10"
-        style={{
-          background: "var(--surface-1)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
+      <nav className="sticky top-0 z-10 border-b border-navy-700 bg-navy-900">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-8 px-6">
           <Link
             href="/"
-            className="text-lg font-bold tracking-tight"
-            style={{ color: "var(--accent)" }}
+            className="font-display text-lg font-bold tracking-tight text-content-inverse"
           >
             OPTCG
           </Link>
@@ -42,34 +29,23 @@ export default async function AdminLayout({
           <div className="ml-auto flex items-center gap-3">
             <Link
               href="/admin/cards/new"
-              className="rounded px-3 py-1.5 text-xs font-medium transition-colors"
-              style={{
-                background: "var(--accent)",
-                color: "var(--surface-0)",
-              }}
+              className="rounded-md bg-gold-500 px-3 py-2 text-xs font-medium text-navy-900 transition-colors hover:bg-gold-400"
             >
               + Add Card
             </Link>
 
             {session?.user && (
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 {/* Avatar */}
                 {session.user.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={session.user.image}
                     alt=""
-                    className="h-7 w-7 rounded-full"
-                    style={{ border: "1px solid var(--border)" }}
+                    className="h-7 w-7 rounded-full border border-navy-700"
                   />
                 ) : (
-                  <div
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
-                    style={{
-                      background: "var(--accent)",
-                      color: "var(--surface-0)",
-                    }}
-                  >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gold-500 text-xs font-bold text-navy-900">
                     {(session.user.username || session.user.name || "?")
                       .charAt(0)
                       .toUpperCase()}
@@ -77,10 +53,7 @@ export default async function AdminLayout({
                 )}
 
                 {/* Username / name */}
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: "var(--text-secondary)" }}
-                >
+                <span className="text-xs font-medium text-content-inverse/70">
                   {session.user.username || session.user.name || session.user.email}
                 </span>
 
@@ -103,8 +76,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="rounded px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/5"
-      style={{ color: "var(--text-secondary)" }}
+      className="rounded px-3 py-2 text-sm font-medium text-content-inverse/70 transition-colors hover:bg-navy-800 hover:text-content-inverse"
     >
       {label}
     </Link>

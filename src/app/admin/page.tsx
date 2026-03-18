@@ -26,10 +26,7 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <h1
-        className="mb-8 text-3xl font-bold tracking-tight"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
         Dashboard
       </h1>
 
@@ -43,20 +40,11 @@ export default async function AdminPage() {
 
       {/* Distribution */}
       <div className="grid gap-4 md:grid-cols-2">
-        <div
-          className="rounded p-5"
-          style={{
-            background: "var(--surface-1)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          <h2
-            className="mb-4 text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+        <div className="rounded-lg border border-border bg-surface-1 p-5">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             By Type
           </h2>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {typeDistribution.map((t) => {
               const pct = Math.round((t._count / cardCount) * 100);
               return (
@@ -64,28 +52,18 @@ export default async function AdminPage() {
                   <div className="mb-1 flex items-center justify-between">
                     <Link
                       href={`/admin/cards?type=${t.type}`}
-                      className="text-sm font-medium transition-colors hover:underline"
-                      style={{ color: "var(--text-secondary)" }}
+                      className="text-sm font-medium text-content-secondary transition-colors hover:underline"
                     >
                       {t.type}
                     </Link>
-                    <span
-                      className="text-sm tabular-nums font-semibold"
-                      style={{ color: "var(--text-primary)" }}
-                    >
+                    <span className="text-sm font-semibold tabular-nums text-content-primary">
                       {t._count.toLocaleString()}
                     </span>
                   </div>
-                  <div
-                    className="h-1 overflow-hidden rounded-full"
-                    style={{ background: "var(--surface-3)" }}
-                  >
+                  <div className="h-1 overflow-hidden rounded-full bg-surface-3">
                     <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${pct}%`,
-                        background: "var(--teal)",
-                      }}
+                      className="h-full rounded-full bg-navy-900 transition-all"
+                      style={{ width: `${pct}%` }}
                     />
                   </div>
                 </div>
@@ -94,20 +72,11 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        <div
-          className="rounded p-5"
-          style={{
-            background: "var(--surface-1)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          <h2
-            className="mb-4 text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+        <div className="rounded-lg border border-border bg-surface-1 p-5">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             By Block
           </h2>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {blockDistribution.map((b) => {
               const pct = Math.round((b._count / cardCount) * 100);
               return (
@@ -115,28 +84,18 @@ export default async function AdminPage() {
                   <div className="mb-1 flex items-center justify-between">
                     <Link
                       href={`/admin/cards?block=${b.blockNumber}`}
-                      className="text-sm font-medium transition-colors hover:underline"
-                      style={{ color: "var(--text-secondary)" }}
+                      className="text-sm font-medium text-content-secondary transition-colors hover:underline"
                     >
                       Block {b.blockNumber}
                     </Link>
-                    <span
-                      className="text-sm tabular-nums font-semibold"
-                      style={{ color: "var(--text-primary)" }}
-                    >
+                    <span className="text-sm font-semibold tabular-nums text-content-primary">
                       {b._count.toLocaleString()}
                     </span>
                   </div>
-                  <div
-                    className="h-1 overflow-hidden rounded-full"
-                    style={{ background: "var(--surface-3)" }}
-                  >
+                  <div className="h-1 overflow-hidden rounded-full bg-surface-3">
                     <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${pct}%`,
-                        background: "var(--sage)",
-                      }}
+                      className="h-full rounded-full bg-gold-500 transition-all"
+                      style={{ width: `${pct}%` }}
                     />
                   </div>
                 </div>
@@ -160,22 +119,12 @@ function StatBox({
 }) {
   const content = (
     <div
-      className={`rounded p-5 transition-colors ${href ? "cursor-pointer" : ""}`}
-      style={{
-        background: "var(--surface-1)",
-        border: "1px solid var(--border-subtle)",
-      }}
+      className={`rounded-lg border border-border bg-surface-1 p-5 transition-colors ${href ? "cursor-pointer hover:bg-surface-2" : ""}`}
     >
-      <div
-        className="text-[11px] font-semibold uppercase tracking-widest"
-        style={{ color: "var(--text-tertiary)" }}
-      >
+      <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {label}
       </div>
-      <div
-        className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <div className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-content-primary">
         {value.toLocaleString()}
       </div>
     </div>

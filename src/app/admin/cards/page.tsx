@@ -34,7 +34,7 @@ export default async function AdminCardsPage({
   }
   if (set) {
     if (originOnly === "true") {
-      // When origin-only is active AND a set is selected, 
+      // When origin-only is active AND a set is selected,
       // only show cards whose originSet matches this set label
       where.originSet = set;
     } else {
@@ -76,16 +76,10 @@ export default async function AdminCardsPage({
   return (
     <div>
       <div className="mb-6 flex items-baseline justify-between">
-        <h1
-          className="text-3xl font-bold tracking-tight"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <h1 className="font-display text-3xl font-bold tracking-tight text-content-primary">
           Card Database
         </h1>
-        <span
-          className="text-sm tabular-nums"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <span className="text-sm tabular-nums text-content-tertiary">
           {total.toLocaleString()} cards
         </span>
       </div>

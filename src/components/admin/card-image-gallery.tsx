@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/components/ui/cn";
 
 interface ArtVariant {
   id: string;
@@ -37,10 +38,7 @@ export function CardImageGallery({
   return (
     <div>
       {/* Main image */}
-      <div
-        className="overflow-hidden rounded"
-        style={{ border: "1px solid var(--border-subtle)" }}
-      >
+      <div className="overflow-hidden rounded-lg border border-border">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={selectedImage}
@@ -53,10 +51,7 @@ export function CardImageGallery({
       {/* Artwork selector — only show if there are variants */}
       {artVariants.length > 0 && (
         <div className="mt-5">
-          <h3
-            className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Artworks ({allArtworks.length})
           </h3>
           <div className="grid grid-cols-3 gap-2">
@@ -67,32 +62,30 @@ export function CardImageGallery({
                   key={art.id}
                   type="button"
                   onClick={() => setSelectedImage(art.imageUrl)}
-                  className="group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-lg hover:shadow-black/20"
-                  style={{
-                    border: isSelected
-                      ? "2px solid var(--accent)"
-                      : "1px solid var(--border-subtle)",
-                  }}
+                  className={cn(
+                    "group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-md",
+                    isSelected
+                      ? "ring-2 ring-navy-900"
+                      : "border border-border",
+                  )}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={art.imageUrl}
                     alt={`${cardName} — ${art.label}`}
-                    className={`w-full transition-opacity ${
-                      isSelected ? "opacity-100" : "opacity-70 group-hover:opacity-100"
-                    }`}
+                    className={cn(
+                      "w-full transition-opacity",
+                      isSelected ? "opacity-100" : "opacity-70 group-hover:opacity-100",
+                    )}
                     loading="lazy"
                   />
                   <div
-                    className="p-1.5 text-center text-[10px] font-medium"
-                    style={{
-                      background: isSelected
-                        ? "var(--accent-soft)"
-                        : "var(--surface-1)",
-                      color: isSelected
-                        ? "var(--accent)"
-                        : "var(--text-tertiary)",
-                    }}
+                    className={cn(
+                      "p-1 text-center text-xs font-medium",
+                      isSelected
+                        ? "bg-navy-100 text-navy-900"
+                        : "bg-surface-1 text-content-tertiary",
+                    )}
                   >
                     {art.label}
                   </div>

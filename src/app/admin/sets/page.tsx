@@ -27,19 +27,13 @@ export default async function SetsPage() {
 
   return (
     <div>
-      <h1
-        className="mb-8 text-3xl font-bold tracking-tight"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
         Sets
       </h1>
 
       {Object.entries(grouped).map(([prefix, groupSets]) => (
         <div key={prefix} className="mb-10">
-          <h2
-            className="mb-4 text-[11px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             {prefixLabels[prefix] || prefix}
           </h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -47,33 +41,17 @@ export default async function SetsPage() {
               <Link
                 key={s.packId}
                 href={`/admin/cards?set=${encodeURIComponent(s.setLabel)}`}
-                className="flex items-center justify-between rounded p-4 transition-all hover:-translate-y-px hover:shadow-md hover:shadow-black/20"
-                style={{
-                  background: "var(--surface-1)",
-                  border: "1px solid var(--border-subtle)",
-                }}
+                className="flex items-center justify-between rounded-lg border border-border bg-surface-1 p-4 transition-all hover:-translate-y-px hover:shadow-md"
               >
                 <div>
-                  <span
-                    className="font-mono text-sm font-bold"
-                    style={{ color: "var(--teal)" }}
-                  >
+                  <span className="font-mono text-sm font-bold text-navy-900">
                     {s.setLabel}
                   </span>
-                  <p
-                    className="mt-0.5 text-xs"
-                    style={{ color: "var(--text-tertiary)" }}
-                  >
+                  <p className="mt-1 text-xs text-content-tertiary">
                     {s.setName}
                   </p>
                 </div>
-                <span
-                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums"
-                  style={{
-                    background: "var(--surface-3)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
+                <span className="rounded-full bg-surface-3 px-3 py-1 text-xs font-semibold tabular-nums text-content-secondary">
                   {s._count.cardId}
                 </span>
               </Link>

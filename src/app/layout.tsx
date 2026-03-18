@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Barlow_Condensed } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import { SocialShell } from "@/components/social/social-shell";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,7 +36,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased`}
       >
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <div className="flex min-h-screen">
+            <main className="min-w-0 flex-1">{children}</main>
+            <SocialShell />
+          </div>
+        </SessionProvider>
       </body>
     </html>
   );

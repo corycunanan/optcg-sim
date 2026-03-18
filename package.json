@@ -29,6 +29,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toast": "^1.2.15",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "next": "16.1.6",
     "next-auth": "5.0.0-beta.30",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1011.0",
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

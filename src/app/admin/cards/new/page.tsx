@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/components/ui/cn";
 
 const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
@@ -49,7 +50,6 @@ export default function NewCardPage() {
     setSaving(true);
     setError("");
 
-    // Validate required fields
     if (!form.id || !form.name || !form.type || form.color.length === 0) {
       setError("Card ID, name, type, and at least one color are required.");
       setSaving(false);
@@ -76,16 +76,10 @@ export default function NewCardPage() {
           counter: form.counter ? parseInt(form.counter) : null,
           life: form.life ? parseInt(form.life) : null,
           attribute: form.attribute
-            ? form.attribute
-                .split(",")
-                .map((a) => a.trim())
-                .filter(Boolean)
+            ? form.attribute.split(",").map((a) => a.trim()).filter(Boolean)
             : [],
           traits: form.traits
-            ? form.traits
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean)
+            ? form.traits.split(",").map((t) => t.trim()).filter(Boolean)
             : [],
           rarity: form.rarity || "Unknown",
           effectText: form.effectText || "",
@@ -112,23 +106,13 @@ export default function NewCardPage() {
 
   return (
     <div>
-      <h1
-        className="mb-8 text-3xl font-bold tracking-tight"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
         Add Card
       </h1>
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
         {error && (
-          <div
-            className="rounded p-3 text-sm font-medium"
-            style={{
-              background: "oklch(60% 0.18 25 / 0.1)",
-              color: "var(--error)",
-              border: "1px solid oklch(60% 0.18 25 / 0.2)",
-            }}
-          >
+          <div className="rounded bg-error-soft p-3 text-sm font-medium text-error">
             {error}
           </div>
         )}
@@ -141,12 +125,7 @@ export default function NewCardPage() {
               value={form.id}
               onChange={(e) => update("id", e.target.value)}
               placeholder="OP15-096"
-              className="w-full rounded px-3 py-2.5 font-mono text-sm focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Name" required>
@@ -155,38 +134,25 @@ export default function NewCardPage() {
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
               placeholder="Monkey D. Luffy"
-              className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
             />
           </Field>
         </div>
 
         {/* Type */}
         <Field label="Type" required>
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             {CARD_TYPES.map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => update("type", t)}
-                className="rounded px-4 py-1.5 text-xs font-medium transition-all"
-                style={
+                className={cn(
+                  "rounded border px-4 py-1 text-xs font-medium transition-all",
                   form.type === t
-                    ? {
-                        background: "var(--teal)",
-                        color: "var(--surface-0)",
-                        border: "1px solid var(--teal)",
-                      }
-                    : {
-                        background: "var(--surface-2)",
-                        color: "var(--text-tertiary)",
-                        border: "1px solid var(--border)",
-                      }
-                }
+                    ? "border-navy-900 bg-navy-900 text-content-inverse"
+                    : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                )}
               >
                 {t}
               </button>
@@ -196,7 +162,7 @@ export default function NewCardPage() {
 
         {/* Color */}
         <Field label="Color" required>
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {COLORS.map((c) => {
               const active = form.color.includes(c);
               return (
@@ -204,19 +170,18 @@ export default function NewCardPage() {
                   key={c}
                   type="button"
                   onClick={() => toggleColor(c)}
-                  className="rounded px-3 py-1.5 text-xs font-medium transition-all"
+                  className={cn(
+                    "rounded border px-3 py-1 text-xs font-medium transition-all",
+                    !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                  )}
                   style={
                     active
                       ? {
                           background: `var(--card-${c.toLowerCase()})`,
-                          color: c === "Yellow" ? "#222" : "#fff",
-                          border: `1px solid var(--card-${c.toLowerCase()})`,
+                          color: c === "Yellow" ? "var(--text-primary)" : "var(--text-inverse)",
+                          borderColor: `var(--card-${c.toLowerCase()})`,
                         }
-                      : {
-                          background: "var(--surface-2)",
-                          color: "var(--text-tertiary)",
-                          border: "1px solid var(--border)",
-                        }
+                      : undefined
                   }
                 >
                   {c}
@@ -234,12 +199,7 @@ export default function NewCardPage() {
               value={form.cost}
               onChange={(e) => update("cost", e.target.value)}
               min={0}
-              className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Power">
@@ -249,12 +209,7 @@ export default function NewCardPage() {
               onChange={(e) => update("power", e.target.value)}
               min={0}
               step={1000}
-              className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Counter">
@@ -264,12 +219,7 @@ export default function NewCardPage() {
               onChange={(e) => update("counter", e.target.value)}
               min={0}
               step={1000}
-              className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Life" hint="Leaders only">
@@ -278,12 +228,7 @@ export default function NewCardPage() {
               value={form.life}
               onChange={(e) => update("life", e.target.value)}
               min={0}
-              className="w-full rounded px-3 py-2.5 text-sm tabular-nums focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
             />
           </Field>
         </div>
@@ -296,12 +241,7 @@ export default function NewCardPage() {
               value={form.rarity}
               onChange={(e) => update("rarity", e.target.value)}
               placeholder="Rare, SuperRare…"
-              className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Block Number" required>
@@ -311,24 +251,14 @@ export default function NewCardPage() {
               onChange={(e) => update("blockNumber", e.target.value)}
               min={1}
               max={10}
-              className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Ban Status">
             <select
               value={form.banStatus}
               onChange={(e) => update("banStatus", e.target.value)}
-              className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
             >
               {BAN_STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -346,12 +276,7 @@ export default function NewCardPage() {
             value={form.attribute}
             onChange={(e) => update("attribute", e.target.value)}
             placeholder="Strike, Slash, Ranged"
-            className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
@@ -361,12 +286,7 @@ export default function NewCardPage() {
             value={form.traits}
             onChange={(e) => update("traits", e.target.value)}
             placeholder="Straw Hat Crew, Supernovas"
-            className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
@@ -376,12 +296,7 @@ export default function NewCardPage() {
             value={form.effectText}
             onChange={(e) => update("effectText", e.target.value)}
             rows={5}
-            className="w-full rounded px-3 py-2.5 font-mono text-sm focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
@@ -391,12 +306,7 @@ export default function NewCardPage() {
             value={form.triggerText}
             onChange={(e) => update("triggerText", e.target.value)}
             rows={2}
-            className="w-full rounded px-3 py-2.5 font-mono text-sm focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
@@ -407,21 +317,13 @@ export default function NewCardPage() {
             value={form.imageUrl}
             onChange={(e) => update("imageUrl", e.target.value)}
             placeholder="https://..."
-            className="w-full rounded px-3 py-2.5 text-sm focus:outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
-        {/* Preview + Actions */}
+        {/* Preview */}
         {form.imageUrl && (
-          <div
-            className="w-48 overflow-hidden rounded"
-            style={{ border: "1px solid var(--border-subtle)" }}
-          >
+          <div className="w-48 overflow-hidden rounded border border-border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={form.imageUrl} alt="Preview" className="w-full" />
           </div>
@@ -431,22 +333,14 @@ export default function NewCardPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
-            style={{
-              background: "var(--accent)",
-              color: "var(--surface-0)",
-            }}
+            className="rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50"
           >
             {saving ? "Creating…" : "Create Card"}
           </button>
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded px-6 py-2.5 text-sm transition-colors"
-            style={{
-              border: "1px solid var(--border)",
-              color: "var(--text-secondary)",
-            }}
+            className="rounded-md border border-border px-6 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
           >
             Cancel
           </button>
@@ -469,21 +363,13 @@ function Field({
 }) {
   return (
     <div>
-      <label
-        className="mb-1.5 block text-sm font-medium"
-        style={{ color: "var(--text-secondary)" }}
-      >
+      <label className="mb-2 block text-sm font-medium text-content-secondary">
         {label}
         {required && (
-          <span className="ml-0.5" style={{ color: "var(--accent)" }}>
-            *
-          </span>
+          <span className="ml-1 text-red-600">*</span>
         )}
         {hint && (
-          <span
-            className="ml-1 font-normal"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <span className="ml-1 font-normal text-content-tertiary">
             ({hint})
           </span>
         )}
