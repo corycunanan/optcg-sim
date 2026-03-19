@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as RadixToast from "@radix-ui/react-toast";
-import { cn } from "./cn";
+import { cn } from "@/lib/utils";
 
 export const ToastProvider = RadixToast.Provider;
 export const ToastRoot = RadixToast.Root;

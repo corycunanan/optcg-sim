@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DeckCardEntry } from "@/lib/deck-builder-state";
+import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import { CardInspectModal } from "./card-inspect-modal";
 
 const COLOR_DOT: Record<string, string> = {

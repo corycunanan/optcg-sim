@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DeckCardEntry, DeckLeaderEntry } from "@/lib/deck-builder-state";
+import type { DeckCardEntry, DeckLeaderEntry } from "@/lib/deck-builder/state";
 import {
   Dialog,
   DialogContent,

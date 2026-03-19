@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];

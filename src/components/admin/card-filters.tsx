@@ -1,6 +1,7 @@
 "use client";
 
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
+import { SetFilter } from "./set-filter";
 
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const TYPES = ["Leader", "Character", "Event", "Stage"];
@@ -120,23 +121,16 @@ export function CardFilters({
 
       {/* Set + Block + Reprint filter row */}
       <div className="flex flex-wrap items-end gap-4">
-        {/* Set dropdown */}
-        <div className="min-w-[200px] flex-1">
+        {/* Set multi-select */}
+        <div className="min-w-[240px] flex-1">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Set
           </label>
-          <select
-            value={currentFilters.set}
-            onChange={(e) => onFilterChange({ set: e.target.value })}
-            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
-          >
-            <option value="">All Sets</option>
-            {sets.map((s) => (
-              <option key={s.packId} value={s.setLabel}>
-                {s.setLabel} — {s.setName}
-              </option>
-            ))}
-          </select>
+          <SetFilter
+            sets={sets}
+            selectedSets={currentFilters.set ? currentFilters.set.split(",") : []}
+            onChange={(labels) => onFilterChange({ set: labels.join(",") })}
+          />
         </div>
 
         {/* Block */}

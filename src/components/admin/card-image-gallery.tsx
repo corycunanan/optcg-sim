@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 interface ArtVariant {
   id: string;

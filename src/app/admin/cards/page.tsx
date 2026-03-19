@@ -33,12 +33,13 @@ export default async function AdminCardsPage({
     };
   }
   if (set) {
-    if (originOnly === "true") {
-      // When origin-only is active AND a set is selected,
-      // only show cards whose originSet matches this set label
-      where.originSet = set;
-    } else {
-      where.cardSets = { some: { setLabel: set } };
+    const setLabels = set.split(",").filter(Boolean);
+    if (setLabels.length > 0) {
+      if (originOnly === "true") {
+        where.originSet = setLabels.length === 1 ? setLabels[0] : { in: setLabels };
+      } else {
+        where.cardSets = { some: { setLabel: setLabels.length === 1 ? setLabels[0] : { in: setLabels } } };
+      }
     }
   }
   if (originOnly === "true" && !set) {
@@ -57,7 +58,7 @@ export default async function AdminCardsPage({
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        artVariants: { take: 1 },
+        _count: { select: { artVariants: true } },
         cardSets: { where: { isOrigin: true }, take: 1 },
       },
     }),

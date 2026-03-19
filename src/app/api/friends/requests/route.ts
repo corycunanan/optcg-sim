@@ -33,7 +33,9 @@ export async function GET() {
       }),
     ]);
 
-    return NextResponse.json({ incoming, outgoing });
+    return NextResponse.json({ incoming, outgoing }, {
+      headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" },
+    });
   } catch (error) {
     console.error("Friend requests list error:", error);
     return NextResponse.json({ error: "Failed to list requests" }, { status: 500 });

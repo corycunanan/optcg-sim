@@ -7,8 +7,8 @@ import {
   createInitialState,
   type DeckCardEntry,
   type DeckLeaderEntry,
-} from "@/lib/deck-builder-state";
-import { validateDeck, type DeckCard, type DeckLeader } from "@/lib/deck-validation";
+} from "@/lib/deck-builder/state";
+import { validateDeck, type DeckCard, type DeckLeader } from "@/lib/deck-builder/validation";
 import { DeckBuilderSearch } from "./deck-builder-search";
 import { DeckBuilderList } from "./deck-builder-list";
 import { DeckBuilderHeader } from "./deck-builder-header";
@@ -180,7 +180,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-1 items-center justify-center">
         <div className="text-content-tertiary">Loading deck…</div>
       </div>
     );
@@ -189,7 +189,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   const leaderDisplayUrl = leaderSelectedArtUrl || state.leader?.imageUrl;
 
   return (
-    <div className="flex h-screen flex-col bg-background text-content-primary">
+    <div className="flex flex-1 flex-col min-h-0 bg-background text-content-primary overflow-hidden">
       {/* Header bar */}
       <DeckBuilderHeader
         name={state.name}

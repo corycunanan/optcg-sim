@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as RadixTabs from "@radix-ui/react-tabs";
-import { cn } from "./cn";
+import { cn } from "@/lib/utils";
 
 export const TabsRoot = RadixTabs.Root;
 

@@ -4,6 +4,78 @@
 
 One Piece Trading Card Game simulator — deck builder, card database, and game engine. Built with Next.js 16, React 19, Tailwind CSS v4, Prisma 6, TypeScript.
 
+## Codebase Map
+
+### Directory Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| `src/app/` | Next.js App Router — pages and API routes |
+| `src/app/(auth)/` | Auth pages: `/login`, `/onboarding` |
+| `src/app/admin/` | Admin UI — card browser, editor, set management |
+| `src/app/api/` | REST API routes — 25 endpoints across 8 domains |
+| `src/app/decks/` | Deck builder pages |
+| `src/components/ui/` | Base UI primitives (Button, Input, Dialog, Badge, Tabs, Toast, Tooltip) |
+| `src/components/admin/` | Admin-specific components (card browser, filters, grid, edit form) |
+| `src/components/deck-builder/` | Deck builder components (search, list, header, stats, validation) |
+| `src/components/social/` | Social components (sidebar, chat widget, user avatar) |
+| `src/components/nav/` | Navigation (Navbar) |
+| `src/hooks/` | Custom React hooks — to be populated in M3+ |
+| `src/lib/` | Shared utilities and business logic |
+| `src/lib/deck-builder/` | Deck builder state machine and validation engine |
+| `src/types/` | Global TypeScript types (supplements Prisma-generated types) |
+| `pipeline/` | Card data ETL: vegapull JSON → transform → PostgreSQL + R2 |
+| `workers/images/` | Cloudflare Worker — CDN image serving with CORS |
+| `prisma/` | Database schema (`schema.prisma`) and migrations |
+| `docs/` | Project documentation — architecture, milestone plans, research |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/auth.ts` | NextAuth v5 config — Google OAuth + email/password, JWT/session callbacks |
+| `src/lib/db.ts` | Prisma client singleton — import `{ prisma }` from here |
+| `src/lib/utils.ts` | `cn()` class merger + card ID helpers (`cardIdToOriginSet`, `stripVariantSuffix`) |
+| `src/lib/proxy.ts` | Route protection middleware logic (auth guard for `/admin`, `/onboarding`) |
+| `src/lib/deck-builder/state.ts` | Deck builder state types, `deckBuilderReducer`, `createInitialState` |
+| `src/lib/deck-builder/validation.ts` | OPTCG deck validation rules engine (`validateDeck`) |
+| `src/types/index.ts` | Shared types: `CardColor`, `CardRarity`, `CardSearchParams`, pipeline types |
+| `src/app/globals.css` | Design tokens (CSS custom properties) and global styles — source of truth for all tokens |
+| `prisma/schema.prisma` | Full database schema — source of truth for all data shapes |
+
+### Where Things Go
+
+**New API endpoint** → `src/app/api/<domain>/route.ts`
+Auth: `const session = await auth()` from `@/auth`. DB: `prisma` from `@/lib/db`. Follow existing route files as pattern.
+
+**New page** → `src/app/<route>/page.tsx`
+Server component by default. Use `"use client"` only when interactivity is required at the page level — prefer interactive child components inside a server shell.
+
+**New component** — group by feature domain:
+- Generic/reusable UI → `src/components/ui/`
+- Admin UI → `src/components/admin/`
+- Deck builder UI → `src/components/deck-builder/`
+- Social/friends/lobby UI → `src/components/social/`
+- Navigation → `src/components/nav/`
+
+**New shared utility** → `src/lib/utils.ts` (pure functions) or `src/lib/<feature>/` (feature-scoped logic)
+
+**New type** → `src/types/index.ts` if app-wide; co-locate with the feature if narrowly scoped
+
+**New custom hook** → `src/hooks/`
+
+### Import Conventions
+
+```ts
+import { cn } from "@/lib/utils";           // class merging utility
+import { prisma } from "@/lib/db";          // database client
+import { auth } from "@/auth";              // session/auth
+import { Button } from "@/components/ui";  // UI primitives (barrel export)
+// Feature types:
+import type { CardColor } from "@/types";
+import type { DeckBuilderState } from "@/lib/deck-builder/state";
+```
+
 ## Design Context
 
 ### Users

@@ -7,7 +7,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 interface ArtVariant {
   id: string;
@@ -232,25 +232,51 @@ export function CardInspectModal({
                   )}
                 </div>
 
-                {/* Color badges */}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {card.color.map((c) => (
-                    <span
-                      key={c}
-                      className={cn(
-                        "rounded-full px-3 py-1 text-xs font-semibold",
-                        c === "Yellow" ? "text-content-primary" : "text-content-inverse"
-                      )}
-                      style={{ background: COLOR_BG[c] || "var(--surface-3)" }}
-                    >
-                      {c}
-                    </span>
-                  ))}
+              </div>
+
+              {/* Color / Attributes / Traits — three columns */}
+              <div className="mb-4 grid grid-cols-3 gap-4">
+                <div>
+                  <SectionLabel text="Color" />
+                  <div className="flex flex-wrap gap-1">
+                    {card.color.map((c) => (
+                      <span
+                        key={c}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-semibold",
+                          c === "Yellow" ? "text-content-primary" : "text-content-inverse"
+                        )}
+                        style={{ background: COLOR_BG[c] || "var(--surface-3)" }}
+                      >
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <SectionLabel text="Attributes" />
+                  {card.attribute.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {card.attribute.map((a) => <Tag key={a} text={a} />)}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-content-tertiary">—</span>
+                  )}
+                </div>
+                <div>
+                  <SectionLabel text="Traits" />
+                  {card.traits.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {card.traits.map((t) => <Tag key={t} text={t} />)}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-content-tertiary">—</span>
+                  )}
                 </div>
               </div>
 
-              {/* Stats row */}
-              <div className="mb-4 flex flex-wrap gap-2">
+              {/* Stats — six columns */}
+              <div className="mb-4 grid grid-cols-6 gap-2">
                 {card.cost !== null && <StatPill label="Cost" value={String(card.cost)} />}
                 {card.power !== null && (
                   <StatPill label="Power" value={card.power.toLocaleString()} />
@@ -262,26 +288,6 @@ export function CardInspectModal({
                 <StatPill label="Block" value={String(card.blockNumber)} />
                 <StatPill label="Set" value={card.originSet} />
               </div>
-
-              {/* Attributes */}
-              {card.attribute.length > 0 && (
-                <div className="mb-3">
-                  <SectionLabel text="Attributes" />
-                  <div className="flex flex-wrap gap-1">
-                    {card.attribute.map((a) => <Tag key={a} text={a} />)}
-                  </div>
-                </div>
-              )}
-
-              {/* Traits */}
-              {card.traits.length > 0 && (
-                <div className="mb-3">
-                  <SectionLabel text="Traits" />
-                  <div className="flex flex-wrap gap-1">
-                    {card.traits.map((t) => <Tag key={t} text={t} />)}
-                  </div>
-                </div>
-              )}
 
               {/* Effect text */}
               {card.effectText && (

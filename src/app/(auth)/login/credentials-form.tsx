@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 type Mode = "signin" | "signup";
 

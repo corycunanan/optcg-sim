@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { CardGrid } from "./card-grid";
 import { CardFilters } from "./card-filters";
 import { Pagination } from "./pagination";
+import { CardDetailModal } from "./card-detail-modal";
 
 interface CardBrowserProps {
   initialCards: CardWithRelations[];
@@ -40,7 +41,7 @@ export interface CardWithRelations {
   blockNumber: number;
   banStatus: string;
   isReprint: boolean;
-  artVariants: { id: string }[];
+  _count: { artVariants: number };
   cardSets: { setLabel: string }[];
 }
 
@@ -55,6 +56,26 @@ export function CardBrowser({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(currentFilters.q);
+  const [modalCardId, setModalCardId] = useState<string | null>(null);
+  const pendingEdgeRef = useRef<"first" | "last" | null>(null);
+
+  const cardIds = initialCards.map((c) => c.id);
+  const cardIdsKey = cardIds.join(",");
+  const prevCardIdsKeyRef = useRef(cardIdsKey);
+
+  // When a page load is triggered by cross-page navigation, auto-navigate to edge card
+  useEffect(() => {
+    if (pendingEdgeRef.current && cardIdsKey !== prevCardIdsKeyRef.current) {
+      prevCardIdsKeyRef.current = cardIdsKey;
+      const edge = pendingEdgeRef.current;
+      pendingEdgeRef.current = null;
+      if (edge === "first" && cardIds.length > 0) {
+        setModalCardId(cardIds[0]);
+      } else if (edge === "last" && cardIds.length > 0) {
+        setModalCardId(cardIds[cardIds.length - 1]);
+      }
+    }
+  }, [cardIdsKey, cardIds]);
 
   const updateFilters = useCallback(
     (updates: Record<string, string>) => {
@@ -141,9 +162,7 @@ export function CardBrowser({
           <span>
             {" "}
             matching &ldquo;
-            <strong className="text-content-secondary">
-              {currentFilters.q}
-            </strong>
+            <strong className="text-content-secondary">{currentFilters.q}</strong>
             &rdquo;
           </span>
         )}
@@ -154,16 +173,34 @@ export function CardBrowser({
         )}
       </div>
 
-      <CardGrid cards={initialCards} />
+      <CardGrid cards={initialCards} onCardClick={setModalCardId} />
 
       {/* Pagination */}
       {totalPages > 1 && (
         <Pagination
           page={page}
           totalPages={totalPages}
-          onPageChange={(newPage) =>
-            updateFilters({ page: String(newPage) })
-          }
+          onPageChange={(newPage) => updateFilters({ page: String(newPage) })}
+        />
+      )}
+
+      {/* Card detail modal */}
+      {modalCardId && (
+        <CardDetailModal
+          cardId={modalCardId}
+          cardIds={cardIds}
+          isFirstPage={page === 1}
+          isLastPage={page === totalPages}
+          onNavigate={setModalCardId}
+          onPrevPage={() => {
+            pendingEdgeRef.current = "last";
+            updateFilters({ page: String(page - 1) });
+          }}
+          onNextPage={() => {
+            pendingEdgeRef.current = "first";
+            updateFilters({ page: String(page + 1) });
+          }}
+          onClose={() => setModalCardId(null)}
         />
       )}
     </div>

@@ -62,7 +62,9 @@ export async function GET() {
       }),
     ]);
 
-    return NextResponse.json({ invites, myLobby, openLobbies });
+    return NextResponse.json({ invites, myLobby, openLobbies }, {
+      headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" },
+    });
   } catch (error) {
     console.error("Lobby status error:", error);
     return NextResponse.json({ error: "Failed to fetch lobby status" }, { status: 500 });

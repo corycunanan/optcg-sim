@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 interface PaginationProps {
   page: number;

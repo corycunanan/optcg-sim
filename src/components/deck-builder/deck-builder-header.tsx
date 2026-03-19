@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 interface DeckBuilderHeaderProps {
   name: string;
@@ -52,7 +52,7 @@ export function DeckBuilderHeader({
   };
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-border bg-surface-1 px-4 py-3">
+    <header className="flex items-center gap-4 border-b border-border bg-surface-1 px-4 py-3">
       {/* Back */}
       <Link
         href="/decks"

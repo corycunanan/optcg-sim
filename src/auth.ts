@@ -1,3 +1,11 @@
+/**
+ * NextAuth v5 configuration.
+ * Exports: { handlers, auth, signIn, signOut }
+ * - handlers → used in src/app/api/auth/[...nextauth]/route.ts
+ * - auth     → used in server components and API routes for session access
+ * - signIn/signOut → used in client components
+ * Extends Session type to include user.id and user.username.
+ */
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";

@@ -8,10 +8,13 @@
 
 :root {
   /* ── Surfaces (warm white, light mode) ── */
-  --surface-base: oklch(98%  0.005 75);   /* page background */
-  --surface-1:    oklch(96%  0.007 75);   /* cards, panels */
+  --surface-base: oklch(97%  0.006 75);   /* page background */
+  --surface-1:    oklch(95%  0.007 75);   /* cards, panels */
   --surface-2:    oklch(93%  0.008 75);   /* elevated panels */
   --surface-3:    oklch(88%  0.010 75);   /* tags, dividers, inset areas */
+
+  /* ── Nav background (dark charcoal, distinct from navy) ── */
+  --surface-nav:  oklch(20%  0.010 245);  /* global navbar */
 
   /* ── Navy (primary accent + structure) ── */
   --navy-900:     oklch(22%  0.04 245);   /* buttons, nav bg, active states */
@@ -88,6 +91,7 @@
   --color-foreground: var(--text-primary);
 
   /* Surfaces */
+  --color-surface-nav:  var(--surface-nav);
   --color-surface-base: var(--surface-base);
   --color-surface-1:    var(--surface-1);
   --color-surface-2:    var(--surface-2);

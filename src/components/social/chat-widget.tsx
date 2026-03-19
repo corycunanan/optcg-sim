@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 import { UserAvatar } from "./user-avatar";
 
 interface User {
@@ -30,14 +30,49 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(false);
+  const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<Message[]>([]);
 
+  // Keep ref in sync so the poll interval can read latest messages without stale closure
   useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Initial load
+  useEffect(() => {
+    setLoading(true);
     fetch(`/api/messages/${user.id}`)
       .then((r) => r.json())
-      .then((data) => setMessages(data.data || []));
+      .then((data) => {
+        setMessages(data.data || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [user.id]);
+
+  // Poll for new messages every 5 seconds when widget is open
+  useEffect(() => {
+    if (loading) return;
+    const interval = setInterval(async () => {
+      if (minimized) return;
+      const current = messagesRef.current;
+      const lastMsg = current[current.length - 1];
+      const after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
+      try {
+        const res = await fetch(`/api/messages/${user.id}?after=${encodeURIComponent(after)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.data?.length > 0) {
+          setMessages((prev) => [...prev, ...data.data]);
+        }
+      } catch {
+        // ignore poll errors silently
+      }
+    }, 5_000);
+    return () => clearInterval(interval);
+  }, [user.id, loading, minimized]);
 
   useEffect(() => {
     if (!minimized) {
@@ -108,7 +143,12 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
         <>
           {/* Messages */}
           <div className="h-80 overflow-y-auto bg-surface-1 px-3 py-3 space-y-2">
-            {messages.length === 0 && (
+            {loading && (
+              <p className="py-6 text-center text-xs text-content-tertiary">
+                Loading…
+              </p>
+            )}
+            {!loading && messages.length === 0 && (
               <p className="py-6 text-center text-xs text-content-tertiary">
                 No messages yet. Say something!
               </p>

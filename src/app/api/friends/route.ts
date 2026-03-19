@@ -31,7 +31,9 @@ export async function GET() {
       return { friendshipId: f.id, user: friend, since: f.createdAt };
     });
 
-    return NextResponse.json({ data: friends });
+    return NextResponse.json({ data: friends }, {
+      headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" },
+    });
   } catch (error) {
     console.error("Friends list error:", error);
     return NextResponse.json({ error: "Failed to list friends" }, { status: 500 });

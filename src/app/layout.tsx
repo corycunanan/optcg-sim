@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Barlow_Condensed } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import { Navbar } from "@/components/nav/navbar";
 import { SocialShell } from "@/components/social/social-shell";
 import "./globals.css";
 
@@ -37,9 +38,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased`}
       >
         <SessionProvider>
-          <div className="flex min-h-screen">
-            <main className="min-w-0 flex-1">{children}</main>
-            <SocialShell />
+          <div className="flex min-h-screen flex-col">
+            <Navbar />
+            <div className="flex flex-1 min-h-0">
+              <main className="flex flex-1 flex-col min-w-0 min-h-0">{children}</main>
+              <SocialShell />
+            </div>
           </div>
         </SessionProvider>
       </body>

@@ -87,7 +87,7 @@ The frontend is a single Next.js application with distinct feature modules:
 
 | Module | Responsibility | Key Dependencies |
 |--------|---------------|-----------------|
-| Auth | Login/logout, session display, profile setup | Firebase/Supabase Auth SDK |
+| Auth | Login/logout, session display, profile setup | NextAuth v5 (Google OAuth + email/password) |
 | Deck Builder | Card search, deck editing, validation, import/export | REST API, local state management |
 | Social | Friends list, messaging, lobby browser | REST API + WebSocket |
 | Game Board | Game rendering, player actions, effect resolution UI | WebSocket (real-time sync) |
@@ -244,4 +244,4 @@ If offline → message stored; delivered on next connect
 
 ---
 
-_Last updated: 2026-03-16_
+_Last updated: 2026-03-18_

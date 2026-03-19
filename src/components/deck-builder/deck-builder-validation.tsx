@@ -1,7 +1,7 @@
 "use client";
 
-import type { ValidationResult } from "@/lib/deck-validation";
-import { cn } from "@/components/ui/cn";
+import type { ValidationResult } from "@/lib/deck-builder/validation";
+import { cn } from "@/lib/utils";
 
 interface DeckBuilderValidationProps {
   results: ValidationResult[];

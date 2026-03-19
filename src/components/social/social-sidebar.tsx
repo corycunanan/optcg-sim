@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 import { UserAvatar } from "./user-avatar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -97,14 +97,6 @@ function IconChevronLeft({ className }: { className?: string }) {
   );
 }
 
-function IconChat({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={cn("h-3 w-3", className)}>
-      <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 0 1-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" clipRule="evenodd" />
-    </svg>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-widest text-content-inverse/40">
@@ -131,6 +123,13 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SidebarUser[]>([]);
   const [pendingSent, setPendingSent] = useState<Set<string>>(new Set());
+
+  // Context menu (right-click on friend)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    userId: string;
+  } | null>(null);
 
   // Lobby state
   const [lobbyInvites, setLobbyInvites] = useState<LobbyInvite[]>([]);
@@ -195,6 +194,14 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
     return () => clearInterval(interval);
   }, [fetchFriendsData, fetchLobbyData, fetchDecks]);
 
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    function dismiss() { setContextMenu(null); }
+    document.addEventListener("mousedown", dismiss);
+    return () => document.removeEventListener("mousedown", dismiss);
+  }, [contextMenu]);
+
   // ── Friend actions ──────────────────────────────────────────────────────────
 
   const search = useCallback(async (q: string) => {
@@ -203,6 +210,12 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
     const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
     setSearchResults(data.data || []);
+  }, []);
+
+  const removeFriend = useCallback(async (userId: string) => {
+    setContextMenu(null);
+    await fetch(`/api/friends/${userId}`, { method: "DELETE" });
+    setFriends((prev) => prev.filter((f) => f.user.id !== userId));
   }, []);
 
   const sendRequest = useCallback(async (toUserId: string) => {
@@ -287,7 +300,7 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
 
   if (collapsed) {
     return (
-      <aside className="sticky top-0 z-30 flex h-screen w-10 shrink-0 flex-col items-center border-l border-navy-700 bg-navy-900 py-3 gap-3">
+      <aside className="sticky top-16 z-20 flex h-[calc(100vh-4rem)] w-10 shrink-0 flex-col items-center border-l border-navy-700 bg-navy-900 py-3 gap-3">
         <button
           onClick={() => onCollapse(false)}
           title="Expand social panel"
@@ -307,7 +320,7 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
   // ── Full sidebar ─────────────────────────────────────────────────────────────
 
   return (
-    <aside className="sticky top-0 z-30 flex h-screen w-64 shrink-0 flex-col border-l border-navy-700 bg-navy-900 overflow-hidden">
+    <aside className="sticky top-16 z-20 flex h-[calc(100vh-4rem)] w-64 shrink-0 flex-col border-l border-navy-700 bg-navy-900 overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center gap-1 border-b border-navy-700 px-3 py-3">
@@ -459,23 +472,40 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
                   <button
                     key={friendshipId}
                     onClick={() => onOpenChat(user)}
-                    className="group flex w-full items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-navy-800"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setContextMenu({ x: e.clientX, y: e.clientY, userId: user.id });
+                    }}
+                    className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-navy-800"
                   >
                     <div className="relative shrink-0">
                       <UserAvatar user={user} size="sm" variant="dark" />
                       <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-navy-900 bg-navy-500" />
                     </div>
-                    <span className="flex-1 truncate text-xs font-medium text-content-inverse">
+                    <span className="truncate text-xs font-medium text-content-inverse">
                       {user.username || user.name}
-                    </span>
-                    <span className="hidden text-content-inverse/40 group-hover:block">
-                      <IconChat />
                     </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── CONTEXT MENU (right-click on friend) ─────────────────── */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-36 rounded-lg border border-border bg-background py-1 shadow-lg"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => removeFriend(contextMenu.userId)}
+            className="block w-full px-4 py-2 text-left text-sm text-error transition-colors hover:bg-error-soft"
+          >
+            Unfriend
+          </button>
         </div>
       )}
 

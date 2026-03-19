@@ -19,9 +19,36 @@ export async function GET(
   const myId = session.user.id;
   const { userId: otherId } = await params;
   const cursor = request.nextUrl.searchParams.get("cursor");
+  const after = request.nextUrl.searchParams.get("after");
   const limit = 50;
 
   try {
+    // Polling mode: only fetch messages newer than `after` timestamp
+    if (after) {
+      const newMessages = await prisma.message.findMany({
+        where: {
+          OR: [
+            { fromUserId: myId, toUserId: otherId },
+            { fromUserId: otherId, toUserId: myId },
+          ],
+          createdAt: { gt: new Date(after) },
+        },
+        orderBy: { createdAt: "asc" },
+        include: {
+          fromUser: { select: { id: true, username: true, name: true, image: true } },
+        },
+      });
+
+      if (newMessages.length > 0) {
+        await prisma.message.updateMany({
+          where: { fromUserId: otherId, toUserId: myId, read: false },
+          data: { read: true },
+        });
+      }
+
+      return NextResponse.json({ data: newMessages });
+    }
+
     const messages = await prisma.message.findMany({
       where: {
         OR: [

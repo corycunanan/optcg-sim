@@ -1,4 +1,4 @@
-export { cn } from "./cn";
+export { cn } from "@/lib/utils";
 export { Button } from "./button";
 export { Badge } from "./badge";
 export { Input } from "./input";

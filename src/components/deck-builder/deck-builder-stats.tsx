@@ -1,6 +1,6 @@
 "use client";
 
-import type { DeckStats } from "@/lib/deck-validation";
+import type { DeckStats } from "@/lib/deck-builder/validation";
 
 const COLOR_VAR: Record<string, string> = {
   Red: "var(--card-red)",

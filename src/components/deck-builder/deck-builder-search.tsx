@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import type { DeckCardEntry } from "@/lib/deck-builder-state";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import { CardInspectModal } from "./card-inspect-modal";
-import { cn } from "@/components/ui/cn";
+import { cn } from "@/lib/utils";
 
 interface CardSearchResult {
   id: string;
@@ -59,7 +59,7 @@ export function DeckBuilderSearch({
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [activeColors, setActiveColors] = useState<string[]>([]);
-  const [activeType, setActiveType] = useState<string>("");
+  const [activeType, setActiveType] = useState<string>("Leader");
   const [costMin, setCostMin] = useState("");
   const [costMax, setCostMax] = useState("");
   const [inspectCard, setInspectCard] = useState<CardSearchResult | null>(null);
@@ -117,6 +117,17 @@ export function DeckBuilderSearch({
       scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When a leader is selected/changed, auto-filter to their compatible colors
+  const leaderColorsKey = useMemo(() => leaderColors.join(","), [leaderColors]);
+  const prevLeaderColorsKeyRef = useRef("");
+  useEffect(() => {
+    if (leaderColorsKey !== "" && leaderColorsKey !== prevLeaderColorsKeyRef.current) {
+      prevLeaderColorsKeyRef.current = leaderColorsKey;
+      setActiveColors(leaderColors);
+      setActiveType(""); // switch from Leader type filter to all types
+    }
+  }, [leaderColorsKey, leaderColors]);
 
   const toggleColor = (c: string) => {
     setActiveColors((prev) =>

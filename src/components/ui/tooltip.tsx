@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as RadixTooltip from "@radix-ui/react-tooltip";
-import { cn } from "./cn";
+import { cn } from "@/lib/utils";
 
 export const TooltipProvider = RadixTooltip.Provider;
 export const TooltipRoot = RadixTooltip.Root;
