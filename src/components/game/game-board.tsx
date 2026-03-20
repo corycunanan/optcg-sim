@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useGameWs,
   type CardInstance,
@@ -21,12 +21,22 @@ interface GameBoardProps {
 export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
+  const [jwt, setJwt] = useState<string>("");
+
+  // Fetch the raw signed JWT once — passed to WebSocket as the auth token
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/game/token")
+      .then((r) => r.json())
+      .then((data: { token?: string }) => { if (data.token) setJwt(data.token); })
+      .catch(() => {});
+  }, [session]);
 
   // Determine this player's index from game state (set after first message)
   const [playerIndex, setPlayerIndex] = useState<0 | 1 | null>(null);
 
   const { gameState, connectionStatus, lastError, activePrompt, gameOver, sendAction } =
-    useGameWs(gameId, workerUrl, userId, playerIndex);
+    useGameWs(gameId, workerUrl, jwt, playerIndex);
 
   // Derive player index from game state
   if (gameState && playerIndex === null) {
@@ -37,12 +47,14 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
   const myIndex = playerIndex ?? 0;
   const oppIndex: 0 | 1 = myIndex === 0 ? 1 : 0;
 
-  if (connectionStatus === "connecting" && !gameState) {
+  if (!jwt || (connectionStatus === "connecting" && !gameState)) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[--surface-nav]">
         <div className="text-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[--navy-700] border-t-[--gold-500] mx-auto" />
-          <p className="text-sm text-[--text-inverse]">Connecting to game server...</p>
+          <p className="text-sm text-[--text-inverse]">
+            {!jwt ? "Authenticating..." : "Connecting to game server..."}
+          </p>
         </div>
       </div>
     );
