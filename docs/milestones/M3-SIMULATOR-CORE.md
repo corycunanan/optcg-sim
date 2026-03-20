@@ -1,33 +1,48 @@
 # M3 — Simulator (Core)
 
-> Game state machine, turn phases, attack/counter/blocker resolution, manual card play, and real-time WebSocket sync.
+> Game state machine, turn phases, battle system, keyword automation, and real-time WebSocket sync. Built automation-ready: the 7-step action pipeline and event bus are established here so M4's effect engine plugs in without structural changes.
 
 ---
 
 ## Scope
 
-M3 delivers a playable OPTCG simulator where two players can play a full game with rules-enforced turn structure, attack phases, and win/lose conditions. Card effects are **not** auto-resolved in M3 — players manually track and announce effects. The engine enforces the structural rules (phases, timing, combat math) while effect automation comes in M4.
+M3 delivers a playable OPTCG simulator where two players can play a full game with rules-enforced turn structure, combat, and win/lose conditions. **Keyword effects** (Rush, Double Attack, Banish, Blocker, Trigger, Unblockable) are automated in M3. Full card effect automation comes in M4.
+
+The engine is built from the start with automation in mind: all game mutations flow through a single 7-step action pipeline, every completed action emits a typed event on an event bus, and state is tracked as immutable snapshots. M4's effect engine plugs directly into these hooks.
 
 ### Deliverables
 
-- [ ] Game state machine with full turn phase enforcement
-- [ ] Board rendering (leader, characters, life, hand, trash, DON!! area, stages)
-- [ ] Card play from hand (cost validation via DON!! spending)
-- [ ] Attack declaration, counter window, blocker window, damage resolution
-- [ ] DON!! phase (attach from DON!! deck to active pool)
-- [ ] Win/lose condition detection
+- [ ] Game state machine with full turn phase enforcement (corrected phase sequence, see §5.1)
+- [ ] Battle system as a Main Phase sub-state (corrected sequence: Attack → Block → Counter → Damage → End)
+- [ ] Game setup (shuffle, life placement, opening hands, mulligan)
+- [ ] All Main Phase actions: play card, activate effect (manual), give DON!!, battle, end phase
+- [ ] DON!! phase (1 on turn 1 for first player, up to 2 otherwise)
+- [ ] Keyword automation: Rush, Rush:Character, Double Attack, Banish, Blocker, Trigger, Unblockable
+- [ ] Win/lose condition detection (life-out, deck-out, concession)
+- [ ] 7-step action pipeline (validate → prohibitions → replacements → execute → fire triggers → recalculate → rule processing)
+- [ ] Event bus (typed events emitted on every action — M4 subscribes to these)
+- [ ] Modifier layer system (DON!! power bonus + stub for M4 effect modifiers)
+- [ ] Immutable state snapshots (every mutation produces a new GameState)
 - [ ] WebSocket sync between two clients (real-time game state)
 - [ ] Reconnection handling (server holds state, client re-syncs)
 - [ ] Game log (action history visible to both players)
 - [ ] Forfeit/concede option
+- [ ] `MANUAL_EFFECT` escape hatch for card effects not yet automated
 
 ---
 
 ## Architecture (M3-Specific)
 
+The game server runs as a **Cloudflare Durable Object** — one DO instance per active game session. Clients connect via WebSocket directly to the DO; the Next.js app handles session setup and lobby handoff only. No game traffic flows through Next.js.
+
+**Deployment split:**
+- Next.js app → Vercel (`https://optcg-sim.vercel.app`)
+- Game server Worker → Cloudflare (`workers/game/`), separate from the existing image CDN worker (`workers/images/`)
+- The only cross-platform call is `POST /game/:gameId/init` from Vercel → Cloudflare at lobby start
+
 ```
 ┌────────────────────────────────┐   ┌────────────────────────────────┐
-│   Player 1 Client              │   │   Player 2 Client              │
+│   Player 1 Client (Browser)    │   │   Player 2 Client (Browser)    │
 │                                │   │                                │
 │  ┌──────────────────────────┐ │   │ ┌──────────────────────────┐  │
 │  │      Game Board UI       │ │   │ │      Game Board UI       │  │
@@ -45,33 +60,45 @@ M3 delivers a playable OPTCG simulator where two players can play a full game wi
 │               │ WebSocket     │   │               │ WebSocket     │
 └───────────────┼───────────────┘   └───────────────┼───────────────┘
                 │                                   │
+                │  (direct to Cloudflare edge)      │
 ┌───────────────▼───────────────────────────────────▼───────────────┐
-│                       Game Server                                  │
+│   Cloudflare Worker — Game Server                                  │
+│   workers/game/                                                    │
 │                                                                    │
 │  ┌─────────────────────────────────────────────────────────────┐  │
-│  │  Game Session Manager                                        │  │
-│  │  • Creates GameState on lobby start                          │  │
-│  │  • Routes WebSocket messages to correct game                 │  │
-│  │  • Handles reconnection                                      │  │
+│  │  GameSession Durable Object (one instance per game)          │  │
+│  │                                                              │  │
+│  │  • Accepts WebSocket connections from both players           │  │
+│  │  • Holds GameState in memory for the duration of the game   │  │
+│  │  • Serializes all incoming actions (no race conditions)      │  │
+│  │  • Hibernates when no messages; wakes on reconnect           │  │
+│  │                                                              │  │
+│  │  ┌───────────────────────────────────────────────────────┐  │  │
+│  │  │  Rules Engine                                          │  │  │
+│  │  │  • 7-step action pipeline                             │  │  │
+│  │  │  • Phase FSM (Refresh → Draw → DON → Main → End)      │  │  │
+│  │  │  • Action validator                                   │  │  │
+│  │  │  • Battle resolver (Attack → Block → Counter → Damage) │  │  │
+│  │  │  • Modifier layer system                              │  │  │
+│  │  │  • Keyword executor                                   │  │  │
+│  │  │  • Defeat checker                                     │  │  │
+│  │  └───────────────────────────────────────────────────────┘  │  │
+│  │                                                              │  │
+│  │  ┌───────────────────────────────────────────────────────┐  │  │
+│  │  │  Event Bus                                             │  │  │
+│  │  │  • Typed events emitted after every action            │  │  │
+│  │  │  • M4 trigger system subscribes here                  │  │  │
+│  │  └───────────────────────────────────────────────────────┘  │  │
 │  └─────────────────────────────────────────────────────────────┘  │
 │                                                                    │
 │  ┌─────────────────────────────────────────────────────────────┐  │
-│  │  Rules Engine                                                │  │
-│  │  • Phase state machine (Refresh → Draw → DON!! → Main →     │  │
-│  │    Attack → End)                                             │  │
-│  │  • Action validation (is this move legal right now?)         │  │
-│  │  • Combat resolution (power comparison, damage assignment)    │  │
-│  │  • Win/lose condition checks                                 │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │  Action Log                                                  │  │
-│  │  • Every action persisted for game replay (stretch) and      │  │
-│  │    in-game log display                                       │  │
+│  │  Worker Router (fetch handler)                               │  │
+│  │  • GET  /game/:gameId/ws → upgrade to WebSocket, route to DO │  │
+│  │  • POST /game/:gameId/init → called by Next.js on lobby start│  │
 │  └─────────────────────────────────────────────────────────────┘  │
 │                                                                    │
 └──────────────────────────────┬─────────────────────────────────────┘
-                               │
+                               │ (on game end: write result)
 ┌──────────────────────────────▼─────────────────────────────────────┐
 │   PostgreSQL                                                        │
 │   • game_sessions table (metadata, result)                         │
@@ -79,81 +106,151 @@ M3 delivers a playable OPTCG simulator where two players can play a full game wi
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+### How a game starts
+
+```
+1. Both players ready in lobby (M2)
+2. Host clicks "Start Game"
+3. Next.js POST /api/lobbies/:id/start
+   → Creates game_session row in PostgreSQL (status: IN_PROGRESS)
+   → Calls POST workers/game/:gameId/init with both player IDs + deck data
+   → Returns { gameId, workerUrl } to both clients
+4. Both clients open WebSocket to wss://<worker-url>/game/:gameId/ws?token=<jwt>
+5. Durable Object validates JWT, sends initial GameState to both clients
+6. Game begins
+```
+
+### Cloudflare Worker structure
+
+```
+workers/game/
+├── wrangler.toml
+├── src/
+│   ├── index.ts         — Worker fetch handler + DO routing
+│   ├── GameSession.ts   — Durable Object class
+│   ├── engine/          — Rules engine (pure TypeScript, no CF dependencies)
+│   │   ├── pipeline.ts
+│   │   ├── phases.ts
+│   │   ├── battle.ts
+│   │   ├── modifiers.ts
+│   │   ├── keywords.ts
+│   │   └── defeat.ts
+│   └── types.ts         — Shared GameState, GameAction, GameEvent types
+```
+
+The engine code in `workers/game/src/engine/` has no Cloudflare dependencies — it's pure TypeScript operating on `GameState` objects. This makes it testable in isolation and portable to M4.
+
 ---
 
 ## Core Data Structures
 
 ### GameState
 
+Every field is read-only after creation. Mutations produce a new snapshot.
+
 ```typescript
 interface GameState {
   id: string;
+  turn: TurnState;
   players: [PlayerState, PlayerState];
-  activePlayerIndex: 0 | 1;
-  phase: Phase;
-  turn: number;
-  subPhase: SubPhase | null;       // e.g. COUNTER_WINDOW, BLOCKER_WINDOW
-  pendingActions: PendingAction[];  // What the game is waiting for
-  log: LogEntry[];
+  battle: BattleContext | null;
+  activeEffects: ActiveEffect[];           // M3: always empty — M4 populates
+  prohibitions: ActiveProhibition[];       // M3: always empty — M4 populates
+  scheduledActions: ScheduledActionEntry[]; // M3: always empty — M4 populates
+  oneTimeModifiers: ActiveOneTimeModifier[]; // M3: always empty — M4 populates
+  triggerRegistry: RegisteredTrigger[];    // M3: keywords registered here; M4 adds card effects
+  eventLog: GameEvent[];
   status: 'IN_PROGRESS' | 'FINISHED';
   winner: 0 | 1 | null;
   winReason: string | null;
 }
 
-type Phase =
-  | 'REFRESH'
-  | 'DRAW'
-  | 'DON'
-  | 'MAIN'
-  | 'ATTACK'
-  | 'END';
-
-type SubPhase =
-  | 'ATTACK_DECLARATION'
-  | 'COUNTER_WINDOW'
-  | 'BLOCKER_WINDOW'
-  | 'DAMAGE_RESOLUTION';
-
-interface PlayerState {
-  userId: string;
-  leader: BoardCard;
-  characters: BoardCard[];       // In-play characters
-  hand: CardInstance[];
-  deck: CardInstance[];          // Face-down, order matters
-  life: CardInstance[];          // Face-down
-  trash: CardInstance[];
-  stage: BoardCard | null;
-  donDeck: number;               // DON!! cards remaining in DON!! deck
-  donActive: number;             // DON!! cards in active play (unattached)
-  donAttached: DonAttachment[];  // DON!! attached to specific cards
-  connected: boolean;            // WebSocket connection status
+interface TurnState {
+  number: number;
+  activePlayerIndex: 0 | 1;
+  phase: Phase;
+  battleSubPhase: BattleSubPhase | null;
+  oncePerTurnUsed: Map<string, Set<string>>; // effectId → Set of instanceIds used this turn
+  actionsPerformedThisTurn: PerformedAction[];
+  extraTurnsPending: number;               // M4: extra turns from effects; M3: always 0
 }
 
-interface BoardCard {
-  instanceId: string;            // Unique per game instance
-  cardId: string;                // References Card.id in DB
-  isRested: boolean;
-  attachedDon: number;
-  powerModifier: number;         // Temporary power changes (M4: from effects)
-  keywords: string[];            // Temporary keyword grants (M4)
+// Phases: no separate ATTACK phase — battles happen within MAIN (see §5.1)
+type Phase = 'REFRESH' | 'DRAW' | 'DON' | 'MAIN' | 'END';
+
+type BattleSubPhase =
+  | 'ATTACK_STEP'
+  | 'BLOCK_STEP'    // Block comes BEFORE Counter (per rules §7-1)
+  | 'COUNTER_STEP'
+  | 'DAMAGE_STEP'
+  | 'END_OF_BATTLE';
+```
+
+### PlayerState
+
+```typescript
+interface PlayerState {
+  playerId: string;
+  leader: CardInstance;
+  characters: CardInstance[];   // max 5
+  stage: CardInstance | null;   // max 1
+  donCostArea: DonInstance[];
+  hand: CardInstance[];
+  deck: CardInstance[];         // ordered, index 0 = top
+  trash: CardInstance[];        // ordered, index 0 = top (most recent)
+  donDeck: DonInstance[];
+  life: LifeCard[];             // ordered, index 0 = top (first to be removed on damage)
+  removedFromGame: CardInstance[]; // Banish destination — empty in M3 until Banish is triggered
+  connected: boolean;
 }
 
 interface CardInstance {
+  instanceId: string;           // unique per game life, reset on zone change (per rules §3-1-6)
+  cardId: string;               // references Card.id in DB
+  zone: Zone;
+  state: 'ACTIVE' | 'RESTED';
+  attachedDon: DonInstance[];
+  turnPlayed: number | null;    // for Rush check: can attack if turnPlayed === turn.number
+  controller: 0 | 1;
+  owner: 0 | 1;
+}
+
+interface LifeCard {
   instanceId: string;
   cardId: string;
+  face: 'UP' | 'DOWN';
 }
 
-interface DonAttachment {
-  targetInstanceId: string;      // Which card has DON!! attached
-  count: number;
+interface DonInstance {
+  instanceId: string;
+  state: 'ACTIVE' | 'RESTED';
+  attachedTo: string | null;    // CardInstance.instanceId or null if in cost area
 }
 
-interface LogEntry {
-  turn: number;
-  phase: Phase;
-  playerIndex: 0 | 1;
-  action: string;                // Human-readable description
-  timestamp: number;
+type Zone =
+  | 'LEADER'
+  | 'CHARACTER'
+  | 'STAGE'
+  | 'COST_AREA'
+  | 'HAND'
+  | 'DECK'
+  | 'TRASH'
+  | 'LIFE'
+  | 'DON_DECK'
+  | 'REMOVED_FROM_GAME';
+```
+
+### BattleContext
+
+```typescript
+interface BattleContext {
+  battleId: string;
+  attackerInstanceId: string;
+  targetInstanceId: string;
+  attackerPower: number;         // calculated at time of attack declaration
+  defenderPower: number;         // recalculated after counters
+  counterPowerAdded: number;     // total counter power applied this battle
+  blockerActivated: boolean;
 }
 ```
 
@@ -161,148 +258,256 @@ interface LogEntry {
 
 ```typescript
 type GameAction =
+  // Phase control
   | { type: 'ADVANCE_PHASE' }
+  // Main Phase actions
   | { type: 'PLAY_CARD'; cardInstanceId: string; position?: number }
   | { type: 'ATTACH_DON'; targetInstanceId: string; count: number }
+  | { type: 'ACTIVATE_EFFECT'; cardInstanceId: string; effectId: string }
+  // Battle actions
   | { type: 'DECLARE_ATTACK'; attackerInstanceId: string; targetInstanceId: string }
-  | { type: 'PLAY_COUNTER'; cardInstanceId: string }
   | { type: 'DECLARE_BLOCKER'; blockerInstanceId: string }
-  | { type: 'PASS' }            // Pass priority in counter/blocker windows
+  | { type: 'USE_COUNTER'; cardInstanceId: string; counterTargetInstanceId: string }
+  | { type: 'USE_COUNTER_EVENT'; cardInstanceId: string; counterTargetInstanceId: string }
+  | { type: 'REVEAL_TRIGGER'; reveal: boolean }  // choose to reveal life card [Trigger] or add to hand
+  | { type: 'PASS' }             // pass priority in block/counter windows
+  // Other
   | { type: 'CONCEDE' }
-  | { type: 'MANUAL_EFFECT'; description: string }  // M3: players announce effects manually
+  | { type: 'MANUAL_EFFECT'; description: string }  // escape hatch for unimplemented effects
 ```
+
+---
+
+## Action Pipeline
+
+Every game mutation flows through this 7-step pipeline — no exceptions. Player actions, rule processing, and keyword effects all enter at step 1.
+
+```
+1. VALIDATE       — Is this action legal in the current phase and game state?
+2. CHECK_PROHIBITIONS — Scan prohibition registry for vetoes (M3: always passes; M4 populates)
+3. CHECK_REPLACEMENTS — Scan for replacement effects (M3: always passes; M4 populates)
+4. EXECUTE        — Produce new GameState snapshot
+5. FIRE_TRIGGERS  — Emit typed GameEvent on bus; scan triggerRegistry for matches
+6. RECALCULATE    — Recompute modifier layers for affected cards
+7. RULE_PROCESSING — Check defeat conditions, zero-power KOs, state-based actions
+```
+
+Steps 2 and 3 are no-ops in M3 (the registries are empty) but must exist as pipeline steps so M4 doesn't require restructuring.
+
+---
+
+## Modifier Layer System
+
+Power and cost are computed fresh from an ordered layer stack. Never stored as mutated values.
+
+```
+Layer 0: Base printed value (from card DB)
+Layer 1: Base-setting effects (M4 — always empty in M3)
+Layer 2: Additive/subtractive modifiers (M4 — empty in M3 outside of counters)
+DON!! bonus: +1000 × attachedDon count, ONLY during the owner's turn
+= Effective value
+```
+
+**DON!! bonus is turn-conditional:** `+1000 × attachedDon` only when `currentTurnPlayer === cardOwner`. On the opponent's turn, DON!! remain attached but grant no power (per rules §6-5-5-2).
+
+**Power can be negative.** No floor on power. Cost is clamped to 0 for payment purposes only.
+
+**Counter power:** Applied as a battle-scoped additive modifier in Layer 2, expires at End of Battle.
 
 ---
 
 ## Turn Phase Implementation
 
-### Phase State Machine
+### Phase Sequence
 
 ```
-Game Start
-  → Setup (shuffle decks, set life, draw opening hands, mulligan)
-  → Player 1 Turn 1
-
-Each Turn:
-  REFRESH → DRAW → DON → MAIN → ATTACK → END → (opponent's turn)
+REFRESH_PHASE → DRAW_PHASE → DON_PHASE → MAIN_PHASE → END_PHASE
 ```
 
-### Phase Details
+**There is no separate Attack Phase.** Battles happen within Main Phase as one of the four available actions (per rules §6-5-2). The phase enum has no `ATTACK` value.
 
-#### Setup Phase (Game Start)
+### Refresh Phase
 
-1. Both players shuffle their 50-card decks
-2. Both players place their Leader card in the Leader zone (active)
-3. Both players set their life cards face-down (count = Leader's life value)
-4. Both players draw 5 cards
-5. Mulligan: each player may shuffle hand into deck and draw 5 new cards (once)
-6. DON!! deck: 10 DON!! cards per player (set aside)
-7. Determine first player (host goes first, or coin flip)
-8. **First player restriction:** Player going first cannot attack on their first turn
+Executed as 4 discrete steps (effect triggers checked between each):
 
-#### Refresh Phase
+1. Effects lasting "until the start of your next turn" expire
+2. "At the start of your/your opponent's turn" auto effects activate
+3. Return all DON!! attached to Leader/Characters to cost area — placed **rested**
+4. Set all rested cards (Leader, Characters, Stage, cost area DON!!) to **active**
 
-- All rested cards (Leader + Characters) become active
-- **Skip on Turn 1** for the starting player
+**No turn-1 exception.** Refresh Phase always runs. On turn 1, step 3 is a no-op (no DON!! attached yet).
 
-#### Draw Phase
+### Draw Phase
 
-- Active player draws 1 card from deck
-- **If deck is empty → defeat condition triggered** (rule processing checks this)
-- **Skip on Turn 1** for the starting player
+- Active player draws 1 card
+- **First player, turn 1: does NOT draw** (phase still runs — matters for future phase-transition effects)
+- Deck-empty check happens here: if deck has 0 cards when draw is required → defeat condition
 
-#### DON!! Phase
+### DON!! Phase
 
-- Active player adds up to 2 DON!! cards from their DON!! deck to their active DON!! area
-- If fewer than 2 remain in DON!! deck, add as many as available
+- Place 2 DON!! cards from DON!! deck to cost area (placed active)
+- **First player, turn 1: places only 1**
+- If fewer than 2 remain, place however many are available
 
-#### Main Phase
+### Main Phase
 
-Available actions (repeatable, in any order):
-- **Play a Character:** Pay cost (rest DON!! equal to card cost), place on board in active state
-- **Play an Event:** Pay cost, resolve effect (manual in M3), send to trash
-- **Play a Stage:** Pay cost, replace existing stage (if any), place on board
-- **Attach DON!!:** Move DON!! from active pool to a Character or Leader (increases power by +1000 per DON!!)
-- **Activate "Activate: Main" effects:** (Manual in M3 — player announces effect)
-- **End Main Phase:** Advance to Attack Phase
+Available actions (any order, any number of times):
 
-**Cost validation:**
-- Player must have enough unattached active DON!! to pay the card's cost
-- DON!! used for cost payment are rested (not returned to DON!! deck)
+1. **Play a Character:** rest DON!! equal to cost, place on board in active state. Character cannot attack this turn unless it has [Rush]
+2. **Play an Event [Main]:** rest DON!! equal to cost, trash the Event, resolve its effect (manual in M3 via `MANUAL_EFFECT`)
+3. **Play a Stage:** rest DON!! equal to cost, trash existing Stage if any, place on board active
+4. **Give DON!!:** take 1 active DON!! from cost area, attach it to a Leader or Character
+5. **Activate [Activate: Main] effect:** manual in M3 via `MANUAL_EFFECT`. **Cannot be used during battle sub-state.**
+6. **Battle:** see Battle System below
+7. **End Main Phase:** advance to End Phase
 
-#### Attack Phase
+**5-card overflow:** If a player plays a 6th Character, they must trash one existing Character first. This is rule processing — it bypasses the effect system, does not trigger [On K.O.].
 
-The attack phase consists of multiple attack sub-steps. The active player may declare multiple attacks (one at a time).
+### Battle System (Main Phase Sub-State)
 
-**Attack sub-steps:**
+Battle is declared as a Main Phase action. Once declared, the state machine enters the battle sub-state until End of Battle.
 
 ```
-1. ATTACK_DECLARATION
-   Active player selects an active (non-rested) attacker (Leader or Character)
-   Active player selects a target (opponent's Leader or a rested Character)
-   Attacker becomes rested
-   → Determine attack power: attacker's base power + attached DON!! × 1000 + modifiers
-
-2. COUNTER_WINDOW
-   Defending player may:
-   - Play Counter events from hand (pay cost)
-   - Use Counter abilities on characters (per card text)
-   - Pass
-   → Each counter may add to defending card's power for this battle
-
-3. BLOCKER_WINDOW
-   Defending player may:
-   - Declare a Blocker (active Character with Blocker keyword)
-   - Blocker becomes rested, replaces the original target
-   - Pass
-
-4. DAMAGE_RESOLUTION
-   Compare attacker power vs defender power
-   If attacker power ≥ defender power:
-     - If target is Leader: Leader takes 1 damage
-       → If life > 0: move top life card to hand (trigger effect check in M4)
-       → If life = 0: defeat condition met
-     - If target is Character: Character is KO'd → sent to trash
-   If attacker power < defender power:
-     - Attack fails, no damage
-   
-   Reset temporary power modifiers from counters
+ATTACK_STEP → BLOCK_STEP → COUNTER_STEP → DAMAGE_STEP → END_OF_BATTLE
 ```
 
-**After each attack resolves:** Active player may declare another attack or end the Attack Phase.
+**Note the order: BLOCK comes before COUNTER** (per rules §7-1-2, §7-1-3). The original M3 spec had these reversed.
 
-#### End Phase
+#### Attack Step
 
-- Return all DON!! attached to Characters/Leader back to the active DON!! pool (per standard rules)
-  - **Note:** Verify this against comprehensive rules — some rulesets keep DON!! attached
-- Discard to hand limit if applicable (standard rules: no hand limit, but check)
-- Turn passes to opponent
+1. Turn player selects an **active** Leader or Character as attacker — it becomes **rested**
+2. Turn player selects attack target: opponent's Leader OR one of opponent's **rested** Characters
+3. Auto effects: [When Attacking], [On Your Opponent's Attack] activate
+4. **Bail-out:** if attacker or target has moved to another area → skip to End of Battle
+
+**Turn 1 restriction:** First player cannot declare a battle on their first turn at all.
+
+#### Block Step
+
+1. Defending player may activate [Blocker] on one of their active Characters **(once per battle)**
+   - Rest the Blocker → it replaces the current attack target
+2. [On Block] effects activate if a Blocker was declared
+3. **Bail-out:** if attacker or target has moved → skip to End of Battle
+
+**[Unblockable]:** If the attacking card has [Unblockable], the opponent cannot activate [Blocker] during this step.
+
+#### Counter Step
+
+1. "When attacked" auto effects activate for the defending player
+2. Defending player may perform any number of times (any order):
+   - **Symbol Counter:** trash a Character from hand that has a Counter value → apply that value as +power to their Leader or one of their Characters **during this battle**
+   - **Counter Event:** pay cost of a [Counter] Event from hand, trash it, resolve its effect
+3. **Bail-out:** if attacker or target has moved → skip to End of Battle
+
+#### Damage Step
+
+Compare attacker power (base + DON!! bonus + counters) vs defender power (base + DON!! bonus + counters):
+
+**If attacker power ≥ defender power:**
+- **Target is Leader:** deal damage
+  - Check defeat: if defending player has 0 Life **at the point damage is determined** → that player loses
+  - Otherwise: move top Life card to hand
+  - If Life card has [Trigger]: defending player may reveal it and activate [Trigger] instead (card goes to no-area while resolving, then trash); or they may add it to hand without revealing
+  - **[Double Attack]:** if attacker has Double Attack, deal 2 damage (process each life card removal sequentially, each with its own [Trigger] check)
+  - **[Banish]:** if attacker has Banish, the life card goes to trash instead of hand; [Trigger] cannot be activated
+- **Target is Character:** K.O. that Character (trash it). Triggers [On K.O.] two-phase resolution (see below)
+
+**If attacker power < defender power:** nothing happens.
+
+**[On K.O.] Two-Phase Resolution:**
+1. While Character is still on field: check [On K.O.] conditions, pay activation costs
+2. Move Character to trash
+3. While Character is in trash: resolve [On K.O.] effect actions
+
+#### End of Battle
+
+1. "At the end of this battle" effects activate
+2. Battle-scoped counter power modifiers expire (Layer 2 modifiers with `THIS_BATTLE` duration cleared)
+3. Return to Main Phase idle state
+
+### End Phase
+
+Executed in order:
+
+1. Turn player's [End of Your Turn] auto effects activate and resolve (each once only)
+2. Non-turn player's [End of Your Opponent's Turn] auto effects activate and resolve (each once only)
+3. Turn player's "until end of turn" / "until end of End Phase" continuous effects expire
+4. Non-turn player's same expire
+5. Turn player's "during this turn" continuous effects expire
+6. Non-turn player's same expire
+7. Turn passes to opponent
+
+**DON!! does NOT return during End Phase.** DON!! attached to cards stays until the owner's next Refresh Phase step 3.
 
 ### Win/Lose Conditions
 
-Checked via rule processing after each action:
-1. **Life out + Leader damaged:** Player's life is 0 and their Leader takes damage → that player loses
-2. **Deck out:** Player has 0 cards in deck → that player loses
+Checked via rule processing (step 7) after every action:
+
+1. **Life-out:** Player has 0 Life cards AND their Leader takes damage → that player loses
+2. **Deck-out:** Player has 0 cards in deck → that player loses
 3. **Concession:** Immediate loss
+4. **Simultaneous defeat:** Both players meet a defeat condition in the same action → draw
+
+---
+
+## Keyword Implementation
+
+| Keyword | Where Automated | Behavior |
+|---------|----------------|---------|
+| **[Rush]** | Card play | Character can attack on the turn it was played. `turnPlayed === turn.number` check in attack validator |
+| **[Rush: Character]** | Card play | Like Rush but can only attack opponent's Characters (not Leader) on turn played |
+| **[Double Attack]** | Damage Step | 2 life cards removed instead of 1; process sequentially, each triggers [Trigger] check |
+| **[Banish]** | Damage Step | Life card goes to trash instead of hand; suppresses [Trigger] entirely |
+| **[Blocker]** | Block Step | Active Character may be rested to redirect attack to itself; only once per battle |
+| **[Trigger]** | Damage Step | When life card is revealed by damage, player may activate its effect; card in no-area during resolution, then trash |
+| **[Unblockable]** | Block Step | Defending player cannot activate [Blocker] against this attacker |
+
+---
+
+## Event Bus
+
+Every action that completes pipeline step 4 emits a typed `GameEvent`. M4's trigger system subscribes to these. In M3 the bus exists but only keyword handlers subscribe.
+
+Key events emitted in M3:
+
+| Event | Emitted When |
+|-------|-------------|
+| `PHASE_CHANGED` | Phase transitions |
+| `TURN_STARTED` / `TURN_ENDED` | Turn boundaries |
+| `CARD_PLAYED` | Card enters field from hand |
+| `CARD_KO` | Character KO'd (battle or effect) |
+| `CARD_DRAWN` | Card drawn from deck |
+| `ATTACK_DECLARED` | Attack step begins |
+| `BLOCK_DECLARED` | Blocker activated |
+| `COUNTER_USED` | Symbol counter or Counter Event used |
+| `BATTLE_RESOLVED` | Damage step completes |
+| `DAMAGE_DEALT` | Leader takes damage |
+| `CARD_ADDED_TO_HAND_FROM_LIFE` | Life card moved to hand |
+| `TRIGGER_ACTIVATED` | Life card [Trigger] activated |
+| `DON_GIVEN_TO_CARD` | DON!! attached to card |
+| `DON_DETACHED` | DON!! detached (Refresh Phase, or card leaving field) |
+| `GAME_OVER` | Win/lose/draw detected |
 
 ---
 
 ## WebSocket Communication Protocol
 
+The Durable Object handles WebSocket connections natively via the [WebSocket Hibernation API](https://developers.cloudflare.com/durable-objects/api/websockets/). This lets the DO sleep between messages and wake instantly on new input — no idle resource cost.
+
 ### Connection
 
 ```
-Client connects to /game namespace with:
-  - JWT (auth)
-  - gameId (from lobby start)
+Client opens: wss://<worker-url>/game/:gameId/ws?token=<jwt>
 
-Server validates:
-  - JWT is valid
-  - User is a player in this game
-  - Game is IN_PROGRESS
+Durable Object validates:
+  - JWT signature and expiry
+  - User is player1 or player2 in this game (checked against game_session row)
+  - Game status is IN_PROGRESS
 
-On success: server sends full GameState to client
-On failure: error event + disconnect
+On success: DO sends full GameState to connecting client
+On failure: DO closes WebSocket with an error code
+
+Both players connect independently — the DO tracks which WS belongs to which player.
 ```
 
 ### Event Flow
@@ -327,17 +532,18 @@ On failure: error event + disconnect
 
 ```
 Player disconnects (tab close, network drop)
-  → Server keeps GameState in memory
-  → Server starts 5-minute reconnection timer
+  → DO hibernates (no active WS) but GameState persists in DO storage
+  → DO starts 5-minute reconnection timer (alarm API)
   → Opponent sees "Waiting for opponent to reconnect..."
 
 Player reconnects:
-  → Server sends full GameState
+  → Opens new WebSocket to same wss://<worker-url>/game/:gameId/ws?token=<jwt>
+  → DO wakes, validates token, sends full GameState
   → Game resumes from where it left off
 
-Timer expires:
+Timer expires (DO alarm fires):
   → Disconnected player forfeits
-  → Opponent wins
+  → DO writes result to PostgreSQL and shuts down
 ```
 
 ---
@@ -356,7 +562,7 @@ Timer expires:
 │  DON!!: 8/10 active  │  Life: ■■■■■ (5)  │  Deck: 42  │ Trash │
 ├────────────────────────────────────────────────────────────────┤
 │  ┌───────────────────────────────────────────────────────────┐│
-│  │ Game Log / Action Feed                                     ││
+│  │ Game Log                                                   ││
 │  │ Turn 3: Player 1 plays OP01-004 (cost 3)                 ││
 │  │ Turn 3: Player 1 attaches DON!! to OP01-004               ││
 │  │ Turn 3: Player 1 attacks with OP01-004 → Opponent Leader  ││
@@ -382,13 +588,14 @@ Timer expires:
 | `GameBoard` | Top-level layout, routes game events to zones |
 | `PlayerZone` | Leader + Characters + Stage + DON!! + Life + Deck/Trash counts |
 | `CardSlot` | Renders a single card on the board (active/rested state, DON!! count) |
-| `HandZone` | Fan of cards in hand, click to play |
+| `HandZone` | Hand of cards, click to play |
 | `GameLog` | Scrollable action feed |
 | `PhaseIndicator` | Shows current phase, highlights active player |
 | `ActionBar` | Context-sensitive buttons (End Phase, Pass, Concede) |
-| `CounterModal` | Appears during counter window — select counter cards to play |
-| `BlockerModal` | Appears during blocker window — select blocker character |
-| `TargetSelector` | Overlay for selecting attack targets or effect targets |
+| `BlockerModal` | Appears during Block Step — select Blocker character |
+| `CounterModal` | Appears during Counter Step — select counter cards to use |
+| `TriggerModal` | Appears when a Life card with [Trigger] is revealed — reveal or add to hand |
+| `TargetSelector` | Overlay for selecting attack targets |
 
 ### Card Rendering States
 
@@ -397,11 +604,11 @@ Timer expires:
 | Active | Card upright, full opacity |
 | Rested | Card rotated 90° clockwise |
 | Face-down (life) | Card back shown |
-| In hand (yours) | Face up, fan layout |
+| In hand (yours) | Face up |
 | In hand (opponent) | Card backs, count shown |
-| DON!! attached | Small DON!! icon with count badge |
-| Valid target | Highlighted border (green glow) |
-| Invalid action | Grayed out / not interactive |
+| DON!! attached | Count badge on card |
+| Valid target | Highlighted border |
+| Invalid / unselectable | Grayed out |
 
 ---
 
@@ -455,37 +662,51 @@ enum GameStatus {
 
 | Step | Task | Est. |
 |------|------|------|
-| 1 | Define TypeScript types for GameState, GameAction, all interfaces | 1 day |
-| 2 | Implement phase state machine (Refresh → Draw → DON → Main → Attack → End) | 2–3 days |
-| 3 | Implement game setup (shuffle, life, opening hand, mulligan) | 1 day |
-| 4 | Implement Main Phase actions (play card, attach DON!!, cost validation) | 2 days |
-| 5 | Implement Attack Phase (declaration, counter window, blocker window, damage) | 3–4 days |
-| 6 | Implement win/lose condition detection | 0.5 day |
-| 7 | Set up dedicated game server (separate from API) | 1 day |
-| 8 | Implement WebSocket protocol (connect, action, state sync, reconnect) | 2 days |
-| 9 | Build game board UI (layout, card slots, zones) | 3–4 days |
-| 10 | Build interaction UI (card play, attack targeting, counter/blocker modals) | 2–3 days |
-| 11 | Build game log component | 0.5 day |
-| 12 | Connect lobby → game transition (M2 lobby starts M3 game) | 1 day |
-| 13 | Add game_sessions + game_actions tables, persist results | 1 day |
-| 14 | Integration testing (full game playthrough, 2 clients) | 2–3 days |
+| 1 | Define TypeScript types: GameState, GameAction, all interfaces | 1 day |
+| 2 | Implement immutable state store + snapshot model | 1 day |
+| 3 | Implement 7-step action pipeline skeleton (stubs for steps 2, 3 initially) | 1 day |
+| 4 | Implement event bus | 0.5 day |
+| 5 | Implement modifier layer system (DON!! bonus + battle counter layer) | 1 day |
+| 6 | Implement game setup (shuffle, life placement, opening hands, mulligan) | 1 day |
+| 7 | Implement phase FSM (Refresh → Draw → DON → Main → End) with correct per-phase logic | 2 days |
+| 8 | Implement Main Phase actions (play card, attach DON!!, cost validation, stage overflow) | 2 days |
+| 9 | Implement battle sub-state machine (Attack → Block → Counter → Damage → End) | 3 days |
+| 10 | Implement keyword automation (Rush, Double Attack, Banish, Blocker, Trigger, Unblockable) | 2 days |
+| 11 | Implement win/lose condition detection | 0.5 day |
+| 12 | Set up dedicated game server | 1 day |
+| 13 | Implement WebSocket protocol (connect, action, state sync, reconnect) | 2 days |
+| 14 | Build game board UI (layout, zones, card slots) | 3 days |
+| 15 | Build interaction UI (targeting, counter/blocker/trigger modals) | 2–3 days |
+| 16 | Build game log component | 0.5 day |
+| 17 | Connect lobby → game transition | 1 day |
+| 18 | Add game_sessions + game_actions tables, persist results | 1 day |
+| 19 | Integration testing (full game playthrough, 2 clients) | 2–3 days |
 
-**Total estimate: ~20–26 days**
+**Total estimate: ~27–32 days**
 
 ---
 
 ## Acceptance Criteria
 
 - [ ] Two players can play a full OPTCG game from start to finish
-- [ ] Turn phases enforce correct ordering (Refresh → Draw → DON → Main → Attack → End)
-- [ ] Starting player skips Refresh, Draw, and Attack on Turn 1
-- [ ] Playing a card validates and spends the correct DON!! cost
-- [ ] Attack declaration rests the attacker and prompts target selection
-- [ ] Counter window gives the defender time to play counter cards
-- [ ] Blocker window allows the defender to redirect attacks
-- [ ] Damage is correctly applied (life removal or character KO)
-- [ ] Game ends when a player's life is 0 and leader takes damage, or when a player decks out
+- [ ] Phase sequence is Refresh → Draw → DON → Main → End (no separate Attack phase)
+- [ ] Battles are declared as Main Phase actions, not a separate phase
+- [ ] Battle sequence is Attack Step → Block Step → Counter Step → Damage Step → End of Battle
+- [ ] First player: Refresh Phase runs (no-op), no draw on turn 1, only 1 DON!! placed, cannot battle on turn 1
+- [ ] DON!! returns during Refresh Phase (not End Phase)
+- [ ] DON!! power bonus (+1000/DON!!) applies only during the owner's turn
+- [ ] Playing a card correctly validates and rests DON!! equal to card cost
+- [ ] Characters cannot attack the turn they are played (unless [Rush])
+- [ ] [Rush] characters can attack immediately; [Rush: Character] only vs opponent's Characters
+- [ ] [Blocker] correctly rests a character to intercept an attack during Block Step
+- [ ] [Double Attack] removes 2 life cards, each with its own [Trigger] check
+- [ ] [Banish] sends life card to trash, no [Trigger] activation
+- [ ] [Trigger] correctly prompts the defending player: reveal and activate, or add to hand
+- [ ] [Unblockable] prevents the opponent from activating [Blocker]
+- [ ] [On K.O.] two-phase: activates on field, resolves in trash
+- [ ] Defeat check: life-out + damage, deck-out, simultaneous draw
 - [ ] Concede immediately ends the game
+- [ ] 5-card Character area overflow: rule-processing trash (no [On K.O.])
 - [ ] Game state syncs correctly between both clients in real time
 - [ ] Disconnected player can reconnect and resume the game
 - [ ] Game log accurately records all actions
@@ -497,11 +718,11 @@ enum GameStatus {
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
-| Rules edge cases not covered by state machine | Illegal game states or softlocks | Cross-reference every phase transition against the comprehensive rules document; add "manual override" action as escape hatch |
-| Game server memory management (many concurrent games) | Server OOM | Each GameState is ~50KB; 1000 concurrent games = ~50MB — manageable. Add game timeout (auto-abandon after 1hr inactivity) |
-| WebSocket message ordering | Desynced clients | Server is authoritative; clients always render server state. Sequence numbers on updates to detect gaps |
-| Complex attack phase timing | Counter/blocker UX confusion | Clear phase indicator, explicit "Pass" button, countdown timer for response windows |
-| Manual effect tracking (M3) is tedious | Poor gameplay UX | Provide "Announce Effect" button for structured manual tracking; M4 automates this |
+| Battle bail-out conditions missed | Illegal states | Implement bail-out check as explicit step after every battle sub-step |
+| DON!! turn-conditional power easy to forget | Combat math wrong | Modifier layer system handles this; never compute power without going through the layer stack |
+| [On K.O.] two-phase is easy to break | Effects don't fire | Explicit `ON_KO_PENDING` state on pipeline; never deregister trigger between activation and resolution |
+| WebSocket message ordering | Desynced clients | Server is authoritative; clients always render server state. Sequence numbers on updates |
+| MANUAL_EFFECT abuse | Players skip effects or lie | Log every MANUAL_EFFECT call; M4 will replace these with automated resolution |
 
 ---
 
@@ -515,13 +736,10 @@ enum GameStatus {
 
 ## References
 
-- [OPTCG Comprehensive Rules v1.2.0](../rules/rule_comprehensive.md) — authoritative source for all phase, combat, and effect rules
-- Sections most relevant to M3:
-  - §5 Game Setup
-  - §6 Game Progression (turn structure)
-  - §7 Card Attacks and Battles
-  - §9 Rule Processing
+- [OPTCG Comprehensive Rules v1.2.0](../rules/rule_comprehensive.md) — authoritative source
+- [Game Engine Requirements](../game-engine/GAME-ENGINE-REQUIREMENTS.md) — complete rules-to-engine mapping, including §13 corrections to the prior M3 doc
+- [Engine Architecture](../game-engine/08-ENGINE-ARCHITECTURE.md) — component design and full GameState model
 
 ---
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-20_

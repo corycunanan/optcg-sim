@@ -1,0 +1,20 @@
+name = "optcg-game"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Local dev only — use `wrangler secret put` for production values
+NEXTJS_URL = "https://optcg-sim.vercel.app"
+# GAME_WORKER_SECRET and JWT_SECRET are secrets — set via:
+#   wrangler secret put GAME_WORKER_SECRET
+#   wrangler secret put JWT_SECRET
+# For local dev, create a .dev.vars file in workers/game/ with these values.
+
+[[durable_objects.bindings]]
+name = "GAME_SESSION"
+class_name = "GameSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameSession"]

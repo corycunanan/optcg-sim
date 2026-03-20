@@ -7,6 +7,7 @@
 ## Architecture & Infrastructure
 
 - [Architecture Overview](./architecture/ARCHITECTURE.md) — system diagram, service boundaries, data flow, deployment topology
+- [Deployment](./architecture/DEPLOYMENT.md) — service map, Vercel + Cloudflare split, lobby→game handoff
 - [Tech Stack](./architecture/TECH-STACK.md) — all technologies, versions, and rationale for each choice
 - [Data Pipeline](./architecture/DATA-PIPELINE.md) — vegapull/punk-records evaluation, field mapping, art variant grouping, pipeline design
 
