@@ -26,9 +26,12 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ## Game Engine
 
-- [Game Engine Requirements](./game-engine/GAME-ENGINE-REQUIREMENTS.md) — complete rules-to-engine mapping from Comprehensive Rules v1.2.0
-- [Card Analysis Findings](./game-engine/CARD-ANALYSIS-FINDINGS.md) — ~200 distinct card effect patterns identified across all 51 sets
-- [Card Effect Examples](./game-engine/CARD-EFFECT-EXAMPLES.md) — complex card examples for schema validation
+- [Game Engine Index](./game-engine/README.md) — full index for the effect schema spec (11 spec files, ~12,000 lines)
+- [Effect Schema Spec](./game-engine/01-SCHEMA-OVERVIEW.md) — start here: EffectBlock structure, categories, costs, chains, durations
+- [Engine Architecture](./game-engine/08-ENGINE-ARCHITECTURE.md) — action pipeline, modifier layers, trigger system, event bus
+- [Encoding Guide](./game-engine/11-ENCODING-GUIDE.md) — condensed pattern-matching reference for card encoding
+- [Game Engine Requirements](./game-engine/GAME-ENGINE-REQUIREMENTS.md) — rules-to-engine mapping from Comprehensive Rules v1.2.0
+- [Card Analysis Findings](./game-engine/CARD-ANALYSIS-FINDINGS.md) — ~200 distinct card effect patterns across all 51 sets
 
 ## Design
 
