@@ -27,7 +27,15 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `pipeline/` | Card data ETL: vegapull JSON → transform → PostgreSQL + R2 |
 | `workers/images/` | Cloudflare Worker — CDN image serving with CORS |
 | `prisma/` | Database schema (`schema.prisma`) and migrations |
-| `docs/` | Project documentation — architecture, milestone plans, research |
+| `docs/` | Project documentation (see `docs/README.md` for full index) |
+| `docs/architecture/` | System design — architecture, tech stack, data pipeline |
+| `docs/milestones/` | Phase docs M0–M5 — scope, plans, acceptance criteria |
+| `docs/game-engine/` | Game engine design — requirements, card analysis, effect examples |
+| `docs/design/` | UI/UX design audits and critiques |
+| `docs/project/` | Project management — PRD, planning, workflows, learnings |
+| `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.0 |
+| `docs/cards/` | Card effect text for all 51 sets |
+| `docs/research/` | Technical investigations and evaluations |
 
 ### Key Files
 

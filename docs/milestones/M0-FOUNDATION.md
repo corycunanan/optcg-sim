@@ -265,7 +265,7 @@ enum BanStatus {
 
 **Scope for M0:** Import the full card database with art variant grouping, cross-set membership, and card images.
 
-**Data source:** vegapull v1.2.0 (confirmed working 2026-03-16). See [DATA-PIPELINE.md](./DATA-PIPELINE.md) for full evaluation and test results.
+**Data source:** vegapull v1.2.0 (confirmed working 2026-03-16). See [DATA-PIPELINE.md](../architecture/DATA-PIPELINE.md) for full evaluation and test results.
 
 | Mode | Source | Coverage | When to Use |
 |------|--------|----------|-------------|

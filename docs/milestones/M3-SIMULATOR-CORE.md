@@ -515,7 +515,7 @@ enum GameStatus {
 
 ## References
 
-- [OPTCG Comprehensive Rules v1.2.0](../Rules/rule_comprehensive.md) — authoritative source for all phase, combat, and effect rules
+- [OPTCG Comprehensive Rules v1.2.0](../rules/rule_comprehensive.md) — authoritative source for all phase, combat, and effect rules
 - Sections most relevant to M3:
   - §5 Game Setup
   - §6 Game Progression (turn structure)

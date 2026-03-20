@@ -68,7 +68,7 @@ Specific timing complexities:
 - Card images have SAMPLE watermarks (fine for dev, need alternative source for production)
 - HTML entities in some card names (transform step handles this)
 
-See [DATA-PIPELINE.md](./DATA-PIPELINE.md) for full test results, field mapping, and pipeline design.
+See [DATA-PIPELINE.md](../architecture/DATA-PIPELINE.md) for full test results, field mapping, and pipeline design.
 
 ### 4. Game Server Architecture and Hosting
 

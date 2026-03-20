@@ -513,8 +513,8 @@ interface PlayerState {
 
 ## References
 
-- [OPTCG Comprehensive Rules v1.2.0](../Rules/rule_comprehensive.md) — §8 Activating and Resolving Effects, §10 Keyword Effects
-- [Effect Schema Vocabulary (PRD §6)](../PRD%20-%20OPTCG%20Simulator.md) — initial schema draft
+- [OPTCG Comprehensive Rules v1.2.0](../rules/rule_comprehensive.md) — §8 Activating and Resolving Effects, §10 Keyword Effects
+- [Effect Schema Vocabulary (PRD §6)](../project/PRD.md) — initial schema draft
 
 ---
 

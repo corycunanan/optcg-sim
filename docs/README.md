@@ -1,42 +1,56 @@
 # OPTCG Simulator — Documentation Index
 
 > Living documentation for the One Piece Trading Card Game Simulator project.
-> These docs are derived from the [PRD](../PRD%20-%20OPTCG%20Simulator.md) and will be updated as plans evolve and context is added.
 
 ---
 
-## Architecture & Tech Stack
+## Architecture & Infrastructure
 
-- [Architecture Overview](./ARCHITECTURE.md) — system diagram, service boundaries, data flow, deployment topology
-- [Tech Stack](./TECH-STACK.md) — all technologies, versions, and rationale for each choice
-- [Game Engine Requirements](./GAME-ENGINE-REQUIREMENTS.md) — complete rules-to-engine mapping from Comprehensive Rules v1.2.0, including corrections to phase docs
-- [Data Pipeline](./DATA-PIPELINE.md) — vegapull/punk-records evaluation, field mapping, art variant grouping, pipeline design
+- [Architecture Overview](./architecture/ARCHITECTURE.md) — system diagram, service boundaries, data flow, deployment topology
+- [Tech Stack](./architecture/TECH-STACK.md) — all technologies, versions, and rationale for each choice
+- [Data Pipeline](./architecture/DATA-PIPELINE.md) — vegapull/punk-records evaluation, field mapping, art variant grouping, pipeline design
 
-## Phase Documentation
+## Milestones
 
-Each phase doc covers scope, implementation plan, roadmap, architecture specifics, and acceptance criteria.
+Each milestone doc covers scope, implementation plan, roadmap, architecture specifics, and acceptance criteria.
 
 | Phase | Title | Doc |
 |-------|-------|-----|
-| M0 | Foundation | [docs/M0-FOUNDATION.md](./M0-FOUNDATION.md) |
-| M1 | Deck Builder | [docs/M1-DECK-BUILDER.md](./M1-DECK-BUILDER.md) |
-| M2 | Social | [docs/M2-SOCIAL.md](./M2-SOCIAL.md) |
-| M2.5 | Design System | [docs/M2.5-DESIGN-SYSTEM.md](./M2.5-DESIGN-SYSTEM.md) |
-| M3 | Simulator (Core) | [docs/M3-SIMULATOR-CORE.md](./M3-SIMULATOR-CORE.md) |
-| M4 | Effect Engine | [docs/M4-EFFECT-ENGINE.md](./M4-EFFECT-ENGINE.md) |
-| M5 | Polish & Scale | [docs/M5-POLISH-AND-SCALE.md](./M5-POLISH-AND-SCALE.md) |
+| M0 | Foundation | [M0-FOUNDATION.md](./milestones/M0-FOUNDATION.md) |
+| M1 | Deck Builder | [M1-DECK-BUILDER.md](./milestones/M1-DECK-BUILDER.md) |
+| M2 | Social | [M2-SOCIAL.md](./milestones/M2-SOCIAL.md) |
+| M2.5 | Design System | [M2.5-DESIGN-SYSTEM.md](./milestones/M2.5-DESIGN-SYSTEM.md) |
+| M3 | Simulator (Core) | [M3-SIMULATOR-CORE.md](./milestones/M3-SIMULATOR-CORE.md) |
+| M4 | Effect Engine | [M4-EFFECT-ENGINE.md](./milestones/M4-EFFECT-ENGINE.md) |
+| M5 | Polish & Scale | [M5-POLISH-AND-SCALE.md](./milestones/M5-POLISH-AND-SCALE.md) |
+
+## Game Engine
+
+- [Game Engine Requirements](./game-engine/GAME-ENGINE-REQUIREMENTS.md) — complete rules-to-engine mapping from Comprehensive Rules v1.2.0
+- [Card Analysis Findings](./game-engine/CARD-ANALYSIS-FINDINGS.md) — ~200 distinct card effect patterns identified across all 51 sets
+- [Card Effect Examples](./game-engine/CARD-EFFECT-EXAMPLES.md) — complex card examples for schema validation
+
+## Design
+
+- [Design Audit](./design/DESIGN-AUDIT.md) — interface quality audit across accessibility, performance, and theming
+- [Design Critique](./design/DESIGN-CRITIQUE.md) — UX evaluation with actionable feedback
 
 ## Project Management
 
-- [Planning & Risk Assessment](./PLANNING.md) — unknowns, timeline estimates, prioritization
-- [Workflows & Tooling Guide](./WORKFLOWS.md) — GSD best practices, multi-agent usage, tool selection, documentation practices
+- [Planning & Risk Assessment](./project/PLANNING.md) — unknowns, timeline estimates, prioritization
+- [Workflows & Tooling Guide](./project/WORKFLOWS.md) — GSD best practices, multi-agent usage, tool selection, documentation practices
+- [Learnings](./project/LEARNINGS.md) — running log of decisions and discoveries
 
 ## Reference
 
-- [PRD](../PRD%20-%20OPTCG%20Simulator.md) — product requirements document (source of truth)
-- [Comprehensive Rules](../Rules/rule_comprehensive.md) — official OPTCG rules v1.2.0
-- [Learnings](../LEARNINGS.md) — running log of decisions and discoveries
+- [PRD](./project/PRD.md) — product requirements document (source of truth)
+- [Comprehensive Rules](./rules/rule_comprehensive.md) — official OPTCG rules v1.2.0
+- [Card Set Data](./cards/) — effect text for all 51 card sets (OP-01 through ST-29)
+
+## Research
+
+- [Rive Investigation](./research/RIVE-INVESTIGATION.md) — Rive vs React + Framer Motion evaluation for game board UI
 
 ---
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-19_

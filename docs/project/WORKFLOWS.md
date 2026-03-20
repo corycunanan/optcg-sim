@@ -47,9 +47,9 @@ Tasks with **clear input → deterministic output → verifiable result**:
 Each session starts with a blank context window. Context persists through artifacts:
 
 **Automatic (committed to repo):**
-- All `docs/*.md` files — architecture, phase docs, game engine requirements
-- `LEARNINGS.md` — decisions log
-- PRD — source of truth
+- All `docs/**/*.md` files — architecture, milestones, game engine, design, project management
+- `docs/project/LEARNINGS.md` — decisions log
+- `docs/project/PRD.md` — source of truth
 
 **GSD-managed (when using structured `/gsd` workflow):**
 - `STATE.md` — quick-glance status (current milestone, slice, what's done, what's next)
@@ -174,13 +174,13 @@ Every major decision, architecture choice, and rules interpretation should be wr
 
 | Document | Type | Update Trigger |
 |----------|------|---------------|
-| `PRD` | Source of truth | When product scope changes |
-| `docs/ARCHITECTURE.md` | Living | When service boundaries or deployment changes |
-| `docs/TECH-STACK.md` | Living | When technology choices change |
-| `docs/M0–M5-*.md` | Living | When phase plans change or more context is added |
-| `docs/GAME-ENGINE-REQUIREMENTS.md` | Living | When rules interpretations are corrected or edge cases discovered |
-| `docs/PLANNING.md` | Living | When risk assessment or timeline changes |
-| `LEARNINGS.md` | Append-only | When a decision is made or a lesson is learned |
+| `docs/project/PRD.md` | Source of truth | When product scope changes |
+| `docs/architecture/ARCHITECTURE.md` | Living | When service boundaries or deployment changes |
+| `docs/architecture/TECH-STACK.md` | Living | When technology choices change |
+| `docs/milestones/M0–M5-*.md` | Living | When phase plans change or more context is added |
+| `docs/game-engine/GAME-ENGINE-REQUIREMENTS.md` | Living | When rules interpretations are corrected or edge cases discovered |
+| `docs/project/PLANNING.md` | Living | When risk assessment or timeline changes |
+| `docs/project/LEARNINGS.md` | Append-only | When a decision is made or a lesson is learned |
 | `DECISIONS.md` (GSD) | Append-only | When an architectural choice is made during implementation |
 | `STATE.md` (GSD) | Current state | After every slice/task completion |
 

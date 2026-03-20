@@ -501,7 +501,7 @@ The `workers/images/src/index.ts` file uses Cloudflare Worker types (`R2Bucket`)
 
 **Area:** Game Simulator / Frontend
 
-Investigated Rive (rive.app) as an alternative to React + Framer Motion for the M3 game board. Full findings in `docs/Research/RIVE-INVESTIGATION.md`.
+Investigated Rive (rive.app) as an alternative to React + Framer Motion for the M3 game board. Full findings in `docs/research/RIVE-INVESTIGATION.md`.
 
 **Key takeaways:**
 - Rive's animation ceiling is genuinely higher for specific game elements (card flip, attack VFX, damage bursts) — bone rigs, mesh deforms, blend states that Framer Motion can't match

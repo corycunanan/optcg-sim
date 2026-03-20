@@ -6,7 +6,7 @@
  *
  * Usage: pnpm pipeline:import [--data-dir <path>] [--dry-run]
  *
- * See docs/DATA-PIPELINE.md for full pipeline design.
+ * See docs/architecture/DATA-PIPELINE.md for full pipeline design.
  */
 
 import { PrismaClient } from "@prisma/client";
