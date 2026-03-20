@@ -3,19 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
 interface DeckBuilderHeaderProps {
   name: string;
   isDirty: boolean;
   isSaving: boolean;
   lastSavedAt: Date | null;
-  isValid: boolean;
-  totalCards: number;
   onNameChange: (name: string) => void;
   onSave: () => void;
-  onImport: () => void;
-  onExport: () => void;
   onClear: () => void;
 }
 
@@ -24,12 +18,8 @@ export function DeckBuilderHeader({
   isDirty,
   isSaving,
   lastSavedAt,
-  isValid,
-  totalCards,
   onNameChange,
   onSave,
-  onImport,
-  onExport,
   onClear,
 }: DeckBuilderHeaderProps) {
   const [editing, setEditing] = useState(false);
@@ -117,25 +107,6 @@ export function DeckBuilderHeader({
         )}
       </div>
 
-      {/* Card count + validity badge */}
-      <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            "rounded-full px-3 py-1 text-xs font-semibold tabular-nums",
-            totalCards === 50
-              ? "bg-success text-content-inverse"
-              : "bg-surface-3 text-content-secondary"
-          )}
-        >
-          {totalCards}/50
-        </span>
-        {isValid && totalCards === 50 && (
-          <span className="rounded-full bg-success px-3 py-1 text-xs font-bold uppercase tracking-wider text-content-inverse">
-            Valid
-          </span>
-        )}
-      </div>
-
       {/* Save status */}
       <div className="ml-auto flex items-center gap-2">
         {lastSavedAt && !isDirty && (
@@ -150,8 +121,6 @@ export function DeckBuilderHeader({
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        <Button variant="secondary" size="sm" onClick={onImport}>Import</Button>
-        <Button variant="secondary" size="sm" onClick={onExport}>Export</Button>
         <Button variant="ghost" size="sm" onClick={onClear}>Clear</Button>
         <Button onClick={onSave} disabled={isSaving} size="sm">
           {isSaving ? "Saving…" : "Save"}

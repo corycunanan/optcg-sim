@@ -38,7 +38,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased`}
       >
         <SessionProvider>
-          <div className="flex min-h-screen flex-col">
+          <div className="flex h-screen flex-col overflow-hidden">
             <Navbar />
             <div className="flex flex-1 min-h-0">
               <main className="flex flex-1 flex-col min-w-0 min-h-0">{children}</main>

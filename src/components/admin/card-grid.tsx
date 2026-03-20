@@ -1,14 +1,5 @@
 import type { CardWithRelations } from "./card-browser";
 
-const COLOR_DOT: Record<string, string> = {
-  Red: "var(--card-red)",
-  Blue: "var(--card-blue)",
-  Green: "var(--card-green)",
-  Purple: "var(--card-purple)",
-  Black: "var(--card-black)",
-  Yellow: "var(--card-yellow)",
-};
-
 interface CardGridProps {
   cards: CardWithRelations[];
   onCardClick: (cardId: string) => void;
@@ -24,7 +15,7 @@ export function CardGrid({ cards, onCardClick }: CardGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
       {cards.map((card) => (
         <button
           key={card.id}
@@ -61,39 +52,6 @@ export function CardGrid({ cards, onCardClick }: CardGridProps) {
             )}
           </div>
 
-          {/* Card info */}
-          <div className="p-3">
-            <div className="flex items-start justify-between gap-1">
-              <p className="line-clamp-2 text-sm font-semibold leading-tight text-content-primary">
-                {card.name}
-              </p>
-              {card.cost !== null && (
-                <span className="shrink-0 rounded bg-surface-3 px-2 py-1 text-xs font-bold tabular-nums text-content-secondary">
-                  {card.cost}
-                </span>
-              )}
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <div className="flex gap-1">
-                {card.color.map((c) => (
-                  <span
-                    key={c}
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ background: COLOR_DOT[c] || "var(--border-strong)" }}
-                    title={c}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-content-tertiary">{card.type}</span>
-              <span className="ml-auto font-mono text-xs text-content-tertiary">{card.id}</span>
-            </div>
-            {card.power !== null && (
-              <div className="mt-1 text-xs tabular-nums text-content-tertiary">
-                {card.power.toLocaleString()} PWR
-                {card.counter !== null && ` · ${card.counter.toLocaleString()} CTR`}
-              </div>
-            )}
-          </div>
         </button>
       ))}
     </div>

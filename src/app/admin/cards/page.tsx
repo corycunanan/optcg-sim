@@ -76,15 +76,6 @@ export default async function AdminCardsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-content-primary">
-          Card Database
-        </h1>
-        <span className="text-sm tabular-nums text-content-tertiary">
-          {total.toLocaleString()} cards
-        </span>
-      </div>
-
       <CardBrowser
         initialCards={cards}
         total={total}

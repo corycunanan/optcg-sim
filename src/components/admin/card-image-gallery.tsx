@@ -16,14 +16,28 @@ interface CardImageGalleryProps {
   cardName: string;
   baseImageUrl: string;
   artVariants: ArtVariant[];
+  // Controlled mode — when provided, selected image is managed externally
+  controlledImage?: string;
+  onImageSelect?: (imageUrl: string, isBase: boolean) => void;
 }
 
 export function CardImageGallery({
   cardName,
   baseImageUrl,
   artVariants,
+  controlledImage,
+  onImageSelect,
 }: CardImageGalleryProps) {
-  const [selectedImage, setSelectedImage] = useState(baseImageUrl);
+  const [internalImage, setInternalImage] = useState(baseImageUrl);
+  const selectedImage = controlledImage ?? internalImage;
+
+  function handleSelect(imageUrl: string) {
+    if (onImageSelect) {
+      onImageSelect(imageUrl, imageUrl === baseImageUrl);
+    } else {
+      setInternalImage(imageUrl);
+    }
+  }
 
   // Build the full list: origin artwork first, then variants
   const allArtworks = [
@@ -51,17 +65,14 @@ export function CardImageGallery({
       {/* Artwork selector — only show if there are variants */}
       {artVariants.length > 0 && (
         <div className="mt-5">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-            Artworks ({allArtworks.length})
-          </h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {allArtworks.map((art) => {
               const isSelected = selectedImage === art.imageUrl;
               return (
                 <button
                   key={art.id}
                   type="button"
-                  onClick={() => setSelectedImage(art.imageUrl)}
+                  onClick={() => handleSelect(art.imageUrl)}
                   className={cn(
                     "group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-md",
                     isSelected

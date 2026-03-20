@@ -58,82 +58,63 @@ export function CardFilters({
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-surface-1 p-4">
-      {/* Colors */}
-      <div>
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-          Color
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {COLORS.map((c) => {
-            const active = activeColors.includes(c);
-            const colorStyle = COLOR_ACTIVE[c];
-            return (
-              <button
-                key={c}
-                onClick={() => toggleFilter("color", c, activeColors)}
-                className={cn(
-                  "rounded border px-3 py-1 text-xs font-medium transition-all",
-                  !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
-                )}
-                style={
-                  active
-                    ? {
-                        background: colorStyle.bg,
-                        color: colorStyle.text,
-                        borderColor: colorStyle.border,
-                      }
-                    : undefined
-                }
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Types */}
-      <div>
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-          Type
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {TYPES.map((t) => {
-            const active = activeTypes.includes(t);
-            return (
-              <button
-                key={t}
-                onClick={() => toggleFilter("type", t, activeTypes)}
-                className={cn(
-                  "rounded border px-3 py-1 text-xs font-medium transition-all",
-                  active
-                    ? "border-navy-900 bg-navy-900 text-content-inverse"
-                    : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
-                )}
-              >
-                {t}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Set + Block + Reprint filter row */}
-      <div className="flex flex-wrap items-end gap-4">
-        {/* Set multi-select */}
-        <div className="min-w-[240px] flex-1">
+    <div className="space-y-4">
+      {/* Row 1: Color, Type, Block, Reprints */}
+      <div className="flex flex-wrap items-end gap-6">
+        <div>
           <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-            Set
+            Color
           </label>
-          <SetFilter
-            sets={sets}
-            selectedSets={currentFilters.set ? currentFilters.set.split(",") : []}
-            onChange={(labels) => onFilterChange({ set: labels.join(",") })}
-          />
+          <div className="flex flex-wrap gap-2">
+            {COLORS.map((c) => {
+              const active = activeColors.includes(c);
+              const colorStyle = COLOR_ACTIVE[c];
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggleFilter("color", c, activeColors)}
+                  className={cn(
+                    "rounded border px-3 py-1 text-xs font-medium transition-all",
+                    !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                  )}
+                  style={
+                    active
+                      ? { background: colorStyle.bg, color: colorStyle.text, borderColor: colorStyle.border }
+                      : undefined
+                  }
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Block */}
+        <div>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+            Type
+          </label>
+          <div className="flex gap-2">
+            {TYPES.map((t) => {
+              const active = activeTypes.includes(t);
+              return (
+                <button
+                  key={t}
+                  onClick={() => toggleFilter("type", t, activeTypes)}
+                  className={cn(
+                    "rounded border px-3 py-1 text-xs font-medium transition-all",
+                    active
+                      ? "border-navy-900 bg-navy-900 text-content-inverse"
+                      : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                  )}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div>
           <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Block
@@ -144,9 +125,7 @@ export function CardFilters({
               return (
                 <button
                   key={b}
-                  onClick={() =>
-                    toggleFilter("block", String(b), activeBlocks.map(String))
-                  }
+                  onClick={() => toggleFilter("block", String(b), activeBlocks.map(String))}
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
@@ -161,15 +140,12 @@ export function CardFilters({
           </div>
         </div>
 
-        {/* Reprint filter toggle */}
         <div>
           <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Reprints
           </label>
           <button
-            onClick={() =>
-              onFilterChange({ originOnly: originOnly ? "" : "true" })
-            }
+            onClick={() => onFilterChange({ originOnly: originOnly ? "" : "true" })}
             className={cn(
               "flex items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-all",
               originOnly
@@ -180,14 +156,24 @@ export function CardFilters({
             <span
               className={cn(
                 "inline-block h-3 w-3 rounded-sm border transition-colors",
-                originOnly
-                  ? "border-navy-900 bg-navy-900"
-                  : "border-content-tertiary bg-transparent",
+                originOnly ? "border-navy-900 bg-navy-900" : "border-content-tertiary bg-transparent",
               )}
             />
             Origin only
           </button>
         </div>
+      </div>
+
+      {/* Row 2: Set */}
+      <div>
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          Set
+        </label>
+        <SetFilter
+          sets={sets}
+          selectedSets={currentFilters.set ? currentFilters.set.split(",") : []}
+          onChange={(labels) => onFilterChange({ set: labels.join(",") })}
+        />
       </div>
     </div>
   );

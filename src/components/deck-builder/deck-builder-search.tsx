@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
-import { CardInspectModal } from "./card-inspect-modal";
+import { CardDetailModal } from "@/components/admin/card-detail-modal";
 import { cn } from "@/lib/utils";
 
 interface CardSearchResult {
@@ -63,6 +63,7 @@ export function DeckBuilderSearch({
   const [costMin, setCostMin] = useState("");
   const [costMax, setCostMax] = useState("");
   const [inspectCard, setInspectCard] = useState<CardSearchResult | null>(null);
+  const [pendingArtVariants, setPendingArtVariants] = useState<Map<string, string | null>>(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -260,11 +261,6 @@ export function DeckBuilderSearch({
                       {card.name}
                     </p>
                     <div className="flex items-center gap-1">
-                      {card.cost !== null && (
-                        <span className="text-xs font-bold tabular-nums text-content-tertiary">
-                          {card.cost}⬡
-                        </span>
-                      )}
                       <span className="text-xs text-content-tertiary">{card.id}</span>
                     </div>
                   </div>
@@ -301,20 +297,24 @@ export function DeckBuilderSearch({
       </div>
 
       {inspectCard && (
-        <CardInspectModal
+        <CardDetailModal
           cardId={inspectCard.id}
-          preloadedCard={inspectCard}
-          quantityInDeck={
-            inspectCard.type === "Leader"
-              ? 0
-              : deckCards.get(inspectCard.id)?.quantity || 0
-          }
-          selectedArtUrl={deckCards.get(inspectCard.id)?.selectedArtUrl ?? null}
-          isLeader={inspectCard.type === "Leader"}
-          onAddCard={() => onAddCard(inspectCard)}
-          onRemoveCard={() => onRemoveCard(inspectCard.id)}
-          onSetArtVariant={(artUrl) => onSetArtVariant(inspectCard.id, artUrl)}
           onClose={() => setInspectCard(null)}
+          deckActions={{
+            quantityInDeck: inspectCard.type === "Leader" ? 0 : deckCards.get(inspectCard.id)?.quantity || 0,
+            selectedArtUrl: deckCards.get(inspectCard.id)?.selectedArtUrl ?? pendingArtVariants.get(inspectCard.id) ?? null,
+            isLeader: inspectCard.type === "Leader",
+            onAdd: () => {
+              onAddCard(inspectCard);
+              const pendingArt = pendingArtVariants.get(inspectCard.id);
+              if (pendingArt) onSetArtVariant(inspectCard.id, pendingArt);
+            },
+            onRemove: () => onRemoveCard(inspectCard.id),
+            onSetArtVariant: (artUrl) => {
+              setPendingArtVariants((prev) => new Map(prev).set(inspectCard.id, artUrl));
+              if (deckCards.has(inspectCard.id)) onSetArtVariant(inspectCard.id, artUrl);
+            },
+          }}
         />
       )}
     </>

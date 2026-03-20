@@ -2,23 +2,12 @@
 
 import { useState } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
-import { CardInspectModal } from "./card-inspect-modal";
-
-const COLOR_DOT: Record<string, string> = {
-  Red: "var(--card-red)",
-  Blue: "var(--card-blue)",
-  Green: "var(--card-green)",
-  Purple: "var(--card-purple)",
-  Black: "var(--card-black)",
-  Yellow: "var(--card-yellow)",
-};
+import { CardDetailModal } from "@/components/admin/card-detail-modal";
 
 interface DeckBuilderListProps {
   cards: DeckCardEntry[];
   onIncrement: (cardId: string) => void;
   onDecrement: (cardId: string) => void;
-  onRemove: (cardId: string) => void;
-  onSetQuantity: (cardId: string, quantity: number) => void;
   onSetArtVariant: (cardId: string, artUrl: string | null) => void;
   onAddCard: (card: DeckCardEntry["card"]) => void;
 }
@@ -27,11 +16,11 @@ export function DeckBuilderList({
   cards,
   onIncrement,
   onDecrement,
-  onRemove,
   onSetArtVariant,
   onAddCard,
 }: DeckBuilderListProps) {
-  const [inspectEntry, setInspectEntry] = useState<DeckCardEntry | null>(null);
+  const [inspectCardId, setInspectCardId] = useState<string | null>(null);
+  const inspectEntry = inspectCardId ? cards.find((e) => e.cardId === inspectCardId) ?? null : null;
 
   const typeOrder: Record<string, number> = {
     Character: 0,
@@ -82,20 +71,19 @@ export function DeckBuilderList({
                 </span>
               </div>
 
-              <div className="space-y-1">
+              <div className="divide-y divide-border">
                 {entries.map((entry) => {
                   const displayUrl = entry.selectedArtUrl || entry.card.imageUrl;
-                  const rowColor = COLOR_DOT[entry.card.color[0]] || "var(--border)";
                   return (
                     <div
                       key={entry.cardId}
-                      className="group flex items-center gap-3 rounded px-3 py-2 transition-colors hover:bg-surface-2"
+                      className="flex items-center gap-3 py-1"
                     >
                       {/* Thumbnail */}
                       <button
                         aria-label={`Inspect ${entry.card.name}`}
-                        onClick={() => setInspectEntry(entry)}
-                        className="h-16 w-[46px] shrink-0 overflow-hidden rounded transition-transform hover:scale-105"
+                        onClick={() => setInspectCardId(entry.cardId)}
+                        className="h-12 w-[34px] shrink-0 overflow-hidden rounded transition-transform hover:scale-105"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -107,35 +95,15 @@ export function DeckBuilderList({
                       </button>
 
                       {/* Card info */}
-                      <button aria-label={`Inspect ${entry.card.name}`} onClick={() => setInspectEntry(entry)} className="min-w-0 flex-1 text-left">
-                        <p className="truncate text-sm font-semibold leading-tight text-content-primary">
+                      <button aria-label={`Inspect ${entry.card.name}`} onClick={() => setInspectCardId(entry.cardId)} className="min-w-0 flex-1 text-left">
+                        <p className="truncate text-sm font-medium leading-tight text-content-primary">
                           {entry.card.name}
                         </p>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          {entry.card.cost !== null && (
-                            <span className="text-xs font-bold tabular-nums text-content-tertiary">
-                              {entry.card.cost}⬡
-                            </span>
-                          )}
-                          {entry.card.power !== null && (
-                            <span className="text-xs tabular-nums text-content-tertiary">
-                              {entry.card.power.toLocaleString()} PWR
-                            </span>
-                          )}
-                          <span className="text-xs text-content-tertiary">{entry.cardId}</span>
-                        </div>
-                        <div className="mt-0.5 flex items-center gap-1">
-                          {entry.card.color.map((c) => (
-                            <span
-                              key={c}
-                              className="inline-block h-2 w-2 rounded-full"
-                              style={{ background: COLOR_DOT[c] }}
-                            />
-                          ))}
-                          {entry.selectedArtUrl && (
-                            <span className="ml-1 text-xs font-medium text-navy-500">Alt Art</span>
-                          )}
-                        </div>
+                        {entry.card.power !== null && (
+                          <p className="text-xs tabular-nums text-content-tertiary">
+                            {entry.card.power.toLocaleString()} PWR
+                          </p>
+                        )}
                       </button>
 
                       {/* Quantity controls */}
@@ -143,31 +111,22 @@ export function DeckBuilderList({
                         <button
                           aria-label="Remove one"
                           onClick={() => onDecrement(entry.cardId)}
-                          className="flex h-9 w-9 items-center justify-center rounded text-sm font-bold text-content-secondary transition-colors hover:bg-surface-3 active:scale-95"
+                          className="flex h-6 w-6 items-center justify-center rounded text-sm font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary active:scale-95"
                         >
                           −
                         </button>
-                        <span className="w-6 text-center text-base font-bold tabular-nums text-content-primary">
+                        <span className="w-4 text-center text-sm font-bold tabular-nums text-content-primary">
                           {entry.quantity}
                         </span>
                         <button
                           aria-label="Add one"
                           onClick={() => onIncrement(entry.cardId)}
                           disabled={entry.quantity >= 4}
-                          className="flex h-9 w-9 items-center justify-center rounded text-sm font-bold text-content-secondary transition-colors hover:bg-surface-3 active:scale-95 disabled:opacity-30"
+                          className="flex h-6 w-6 items-center justify-center rounded text-sm font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary active:scale-95 disabled:opacity-30"
                         >
                           +
                         </button>
                       </div>
-
-                      {/* Remove button */}
-                      <button
-                        aria-label={`Remove ${entry.card.name}`}
-                        onClick={() => onRemove(entry.cardId)}
-                        className="flex h-9 w-9 items-center justify-center rounded text-xs text-error opacity-0 transition-all hover:bg-error-soft active:scale-95 group-hover:opacity-100"
-                      >
-                        ✕
-                      </button>
                     </div>
                   );
                 })}
@@ -178,15 +137,16 @@ export function DeckBuilderList({
       </div>
 
       {inspectEntry && (
-        <CardInspectModal
+        <CardDetailModal
           cardId={inspectEntry.cardId}
-          preloadedCard={inspectEntry.card}
-          quantityInDeck={inspectEntry.quantity}
-          selectedArtUrl={inspectEntry.selectedArtUrl}
-          onAddCard={() => onAddCard(inspectEntry.card)}
-          onRemoveCard={() => onDecrement(inspectEntry.cardId)}
-          onSetArtVariant={(artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl)}
-          onClose={() => setInspectEntry(null)}
+          onClose={() => setInspectCardId(null)}
+          deckActions={{
+            quantityInDeck: inspectEntry.quantity,
+            selectedArtUrl: inspectEntry.selectedArtUrl,
+            onAdd: () => onAddCard(inspectEntry.card),
+            onRemove: () => onDecrement(inspectEntry.cardId),
+            onSetArtVariant: (artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl),
+          }}
         />
       )}
     </>

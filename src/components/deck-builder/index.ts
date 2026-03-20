@@ -1,4 +1,3 @@
-export { CardInspectModal } from "./card-inspect-modal";
 export { DeckBuilderHeader } from "./deck-builder-header";
 export { DeckBuilderList } from "./deck-builder-list";
 export { DeckBuilderSearch } from "./deck-builder-search";
