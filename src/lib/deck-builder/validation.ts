@@ -92,7 +92,7 @@ function computeStats(cards: DeckCard[]): DeckStats {
       (typeBreakdown[dc.card.type] || 0) + dc.quantity;
 
     // Trait breakdown
-    for (const trait of dc.card.traits) {
+    for (const trait of dc.card.traits ?? []) {
       traitBreakdown[trait] = (traitBreakdown[trait] || 0) + dc.quantity;
     }
   }

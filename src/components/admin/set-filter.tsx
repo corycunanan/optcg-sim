@@ -130,11 +130,13 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
   return (
     <div ref={containerRef} className="relative">
       {/* Trigger */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => e.key === "Enter" || e.key === " " ? setOpen((v) => !v) : undefined}
         className={cn(
-          "flex min-h-9 w-full flex-wrap items-center gap-1 rounded border bg-surface-2 px-3 py-1 text-left text-sm transition-colors",
+          "flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded border bg-surface-2 px-3 py-1 text-left text-sm transition-colors",
           open
             ? "border-border-focus ring-2 ring-navy-900/10"
             : "border-border hover:border-border-strong",
@@ -170,7 +172,7 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
           )}
           <ChevronDown className={cn("text-content-tertiary transition-transform", open && "rotate-180")} />
         </span>
-      </button>
+      </div>
 
       {/* Dropdown */}
       {open && (

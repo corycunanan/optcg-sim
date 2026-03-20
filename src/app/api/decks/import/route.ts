@@ -27,6 +27,25 @@ function parseDeckList(text: string): ParsedLine[] {
     // Skip empty lines and comments
     if (!raw || raw.startsWith("//") || raw.startsWith("#")) continue;
 
+    // Skip section headers: "Leader", "Character (40)", "Event (10)", etc.
+    // These are lines with no card ID — either a bare word/phrase or word with (count)
+    if (/^[A-Za-z][A-Za-z\s!!]*(?:\s*\(\d+\))?$/.test(raw)) continue;
+
+    // Format: "N Card Name (CARD-ID)" — e.g. "4 Izo (ST22-002)"
+    const namedMatch = raw.match(
+      /^(\d+)\s+.+\(([A-Z]{2,}\d+-\d+)\)\s*$/i,
+    );
+    if (namedMatch) {
+      const quantity = parseInt(namedMatch[1]);
+      const cardId = namedMatch[2].toUpperCase();
+      if (quantity < 1 || quantity > 4) {
+        results.push({ line: i + 1, raw, cardId, quantity, error: `Invalid quantity: ${quantity} (must be 1-4)` });
+      } else {
+        results.push({ line: i + 1, raw, cardId, quantity, error: null });
+      }
+      continue;
+    }
+
     // Try to parse: "Nx CARDID", "NxCARDID", "N CARDID", or just "CARDID"
     const match = raw.match(
       /^(?:(\d+)\s*[xX×]\s*)?([A-Z]{2,}\d+-\d+)(?:\s.*)?$/i,
@@ -110,6 +129,7 @@ export async function POST(request: NextRequest) {
         cost: true,
         power: true,
         imageUrl: true,
+        traits: true,
       },
     });
 
