@@ -54,6 +54,10 @@ model User {
   lobbyGuests       LobbyGuest[]
   lobbyInvites      LobbyInvite[]
 
+  // Game
+  gamesAsPlayer1    GameSession[]   @relation("GamesAsPlayer1")
+  gamesAsPlayer2    GameSession[]   @relation("GamesAsPlayer2")
+
   @@map("users")
 }
 
@@ -342,4 +346,52 @@ model LobbyInvite {
   @@unique([lobbyId, userId])
   @@index([userId, status])
   @@map("lobby_invites")
+}
+
+// ─── M3: Game Engine ─────────────────────────────────────────
+
+enum GameStatus {
+  IN_PROGRESS
+  FINISHED
+  ABANDONED
+}
+
+model GameSession {
+  id            String          @id @default(uuid())
+  lobbyId       String          @unique
+  player1Id     String
+  player2Id     String
+  player1DeckId String
+  player2DeckId String
+  format        String
+  status        GameStatus      @default(IN_PROGRESS)
+  winnerId      String?
+  winReason     String?
+  startedAt     DateTime        @default(now())
+  endedAt       DateTime?
+
+  player1       User            @relation("GamesAsPlayer1", fields: [player1Id], references: [id])
+  player2       User            @relation("GamesAsPlayer2", fields: [player2Id], references: [id])
+  actions       GameActionLog[]
+
+  @@index([player1Id])
+  @@index([player2Id])
+  @@index([status])
+  @@map("game_sessions")
+}
+
+model GameActionLog {
+  id            String      @id @default(uuid())
+  gameSessionId String
+  turn          Int
+  phase         String
+  playerIndex   Int         // 0 or 1
+  actionType    String
+  actionData    Json
+  timestamp     DateTime    @default(now())
+
+  gameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+
+  @@index([gameSessionId, timestamp])
+  @@map("game_action_logs")
 }
