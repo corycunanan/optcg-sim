@@ -196,6 +196,7 @@ interface TargetFilter {
   // --- Trait (type) filters ---
   traits?: string[];
   traits_any_of?: string[];
+  traits_exclude?: string[];
 
   // --- Name filters ---
   name?: string;
@@ -290,9 +291,11 @@ type CardColor = "RED" | "BLUE" | "GREEN" | "PURPLE" | "BLACK" | "YELLOW";
 |---|---|---|---|
 | `traits` | `string[]` | "a {Straw Hat Crew} type Character" | EB02-010 |
 | `traits_any_of` | `string[]` | "a {Straw Hat Crew}, {Kid Pirates}, or {Heart Pirates} type card" | OP05-076 |
+| `traits_exclude` | `string[]` | "that do not have a type including Roger Pirates" | OP13-064 |
 
 - `traits` — conjunction. The card must have ALL listed traits.
 - `traits_any_of` — disjunction. The card must have at least one of the listed traits.
+- `traits_exclude` — exclusion. The card must NOT have any of the listed traits.
 
 #### Name Filters
 

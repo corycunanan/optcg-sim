@@ -198,7 +198,7 @@ Your Leader and all of your Characters that do not have a type including "Roger 
 ```
 
 #### Annotations
-- **Negative trait filtering (spec gap):** The card text restricts negation to cards "that do not have a type including Roger Pirates." TargetFilter currently lacks a negative-trait filter (a `traits_exclude` counterpart to the existing `traits` field, analogous to how `lacks_effect_type` exists as the negative counterpart to keyword filters). The engine must implement per-card trait checking to exclude Roger Pirates cards from the negation target. Cards with the Roger Pirates trait retain their effects. A future `traits_exclude` filter field would handle this natively.
+- **Negative trait filtering:** The card text restricts negation to cards "that do not have a type including Roger Pirates." The `traits_exclude` filter field on [TargetFilter](./05-TARGETING.md) handles this — cards matching any trait in `traits_exclude` are excluded from the target set. Cards with the Roger Pirates trait retain their effects.
 - **Permanent negation as modifier:** The NEGATE_EFFECTS modifier on a permanent block continuously blanks effects on the target population. This is an aura — it applies to all qualifying cards on the field and automatically includes/excludes cards as they enter/leave.
 - **DON_MINUS cost:** "DON!! -3" is a cost, not a condition. The player must return 3 DON!! from field to DON!! deck before the actions resolve. If fewer than 3 DON!! are available, the effect cannot be activated.
 - **YOUR_LEADER target:** "Your Leader gains +2000 power" targets the controller's Leader specifically, not a selected character. No count or filter needed.
@@ -453,7 +453,7 @@ When your deck is reduced to 0, you win the game instead of losing, according to
 #### Annotations
 - **rule_modification vs replacement:** "according to the rules" in the card text signals this is a rule modification, not a replacement effect. The `LOSS_CONDITION_MOD` with `modification: "WIN_INSTEAD"` overrides the standard deck-out loss rule at the engine level. This could alternatively be encoded as a `replacement` block with `replaces.event: "WOULD_LOSE_GAME"` (see [06](./06-PROHIBITIONS-AND-REPLACEMENTS.md) for that pattern). The rule_modification approach is preferred here because the card explicitly says "according to the rules."
 - **Synergy between effects:** The rule modification (deck-out = win) and the auto effect (mill your own deck) form a combo. The player mills their own deck to reach 0 cards and win instead of losing.
-- **DON!! x1 on CustomTrigger (spec gap):** The `[DON!! x1]` prefix requires 1 DON!! attached to this Leader. The `don_requirement` field is defined on `KeywordTrigger` but not on `CustomTrigger`. This is a spec gap — the DON!! x1 precondition should logically extend to CustomTrigger. The engine should check attached DON!! count before allowing this effect to activate.
+- **DON!! x1 on CustomTrigger:** The `[DON!! x1]` prefix requires 1 DON!! attached to this Leader. The `don_requirement` field is defined on both `KeywordTrigger` and `CustomTrigger` (see [02-TRIGGERS.md](./02-TRIGGERS.md)).
 - **LEADER_ATTACK_DEALS_DAMAGE:** A custom trigger that fires when this Leader's attack successfully deals damage to the opponent's Life (i.e., the attack resolves, is not blocked, and removes a Life card).
 - **MILL vs TRASH_CARD:** "trash 1 card from the top of your deck" is a mill operation (deck to trash, top card). MILL is the correct primitive — TRASH_CARD requires a target selection, while MILL always takes from the top.
 

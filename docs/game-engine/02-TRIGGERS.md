@@ -31,6 +31,7 @@ interface CustomTrigger {
   filter?: EventFilter;
   turn_restriction?: TurnRestriction;
   once_per_turn?: boolean;
+  don_requirement?: number;
   quantity_threshold?: number;
 }
 
@@ -101,7 +102,7 @@ interface KeywordTrigger {
 }
 ```
 
-The `don_requirement` field handles the `[DON!! x2]` prefix pattern. When present, the trigger fires normally but the effect only resolves if the source card has at least N DON!! cards attached.
+The `don_requirement` field handles the `[DON!! xN]` prefix pattern. When present, the trigger fires normally but the effect only resolves if the source card has at least N DON!! cards attached. This field is available on both `KeywordTrigger` and `CustomTrigger`.
 
 Example — ST01-012 Monkey.D.Luffy: `[DON!! x2] [When Attacking] Your opponent cannot activate [Blocker] during this battle.`
 

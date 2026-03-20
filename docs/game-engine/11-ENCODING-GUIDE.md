@@ -241,6 +241,7 @@
 | "K.O. all Characters other than this Character" | `{ "type": "CHARACTER", "controller": "EITHER", "count": { "all": true }, "filter": { "exclude_self": true } }` |
 | "with a cost of 3 to 5" | `filter: { "cost_range": { "min": 3, "max": 5 } }` |
 | "with a cost of 0 or cost of 8 or more" | `filter: { "any_of": [{ "cost_exact": 0 }, { "cost_min": 8 }] }` |
+| "that do not have a type including {Trait}" | `filter: { "traits_exclude": ["Trait"] }` |
 | "with different card names" (multi-select) | add `"uniqueness_constraint": { "field": "name" }` to target |
 | "a total power of N or less" (multi-select) | add `"aggregate_constraint": { "property": "power", "operator": "<=", "value": N }` |
 | "with a DON!! card given" | `filter: { "don_given_count": { "operator": ">=", "value": 1 } }` |
