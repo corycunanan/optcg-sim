@@ -1,7 +1,7 @@
 import type { CardData, PlayerState } from "@shared/game-types";
 import { CardRow, CardNameWithTooltip } from "./card-slot";
 import { SectionLabel, Stat, Tag } from "./game-ui";
-import { s } from "./game-styles";
+import { cn } from "@/lib/utils";
 
 type CardDb = Record<string, CardData>;
 
@@ -14,22 +14,30 @@ export function PlayerZone({
   isMe: boolean;
   cardDb: CardDb;
 }) {
-  if (!player) return <div style={{ color: "#555", padding: 16 }}>—</div>;
+  if (!player) return <div className="text-gb-text-muted p-4">&mdash;</div>;
 
   const activeDon = player.donCostArea.filter((d) => d.state === "ACTIVE").length;
   const restedDon = player.donCostArea.filter((d) => d.state === "RESTED").length;
 
   return (
-    <div style={{ ...s.panel, border: isActive ? "1px solid #22c55e44" : "1px solid #222" }}>
+    <div className={cn(
+      "bg-gb-surface rounded p-2.5 border",
+      isActive ? "border-gb-accent-green/25" : "border-gb-border-strong",
+    )}>
 
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <span style={{ fontWeight: "bold", fontSize: 12, color: isActive ? "#22c55e" : "#999" }}>{label}</span>
-        {!player.connected && <Tag color="#ef4444">DISCONNECTED</Tag>}
+      <div className="flex justify-between items-center mb-2">
+        <span className={cn(
+          "font-bold text-xs",
+          isActive ? "text-gb-accent-green" : "text-gb-text-subtle",
+        )}>
+          {label}
+        </span>
+        {!player.connected && <Tag color="var(--gb-accent-red)">DISCONNECTED</Tag>}
       </div>
 
       {/* Stat row */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10, fontSize: 11 }}>
+      <div className="flex gap-3 flex-wrap mb-2.5 text-xs">
         <Stat label="Life" value={player.life.length} />
         <Stat label="Hand" value={player.hand.length} />
         <Stat label="Deck" value={player.deck.length} />
@@ -57,14 +65,16 @@ export function PlayerZone({
         <>
           <SectionLabel>HAND ({player.hand.length})</SectionLabel>
           {player.hand.length === 0
-            ? <div style={s.empty}>Empty</div>
+            ? <div className="text-gb-text-dim text-xs italic py-0.5">Empty</div>
             : player.hand.map((c) => <CardRow key={c.instanceId} card={c} cardDb={cardDb} />)
           }
         </>
       ) : (
         <>
           <SectionLabel>HAND</SectionLabel>
-          <div style={s.empty}>{player.hand.length} card{player.hand.length !== 1 ? "s" : ""} (hidden)</div>
+          <div className="text-gb-text-dim text-xs italic py-0.5">
+            {player.hand.length} card{player.hand.length !== 1 ? "s" : ""} (hidden)
+          </div>
         </>
       )}
 
@@ -73,11 +83,11 @@ export function PlayerZone({
         <>
           <SectionLabel>LIFE CARDS</SectionLabel>
           {player.life.map((l, i) => (
-            <div key={l.instanceId} style={{ fontSize: 11, color: "#666", padding: "1px 0" }}>
+            <div key={l.instanceId} className="text-xs text-gb-text-subtle py-px">
               [{i + 1}]{" "}
               {l.face === "UP"
                 ? <CardNameWithTooltip cardId={l.cardId} cardDb={cardDb} />
-                : <span style={{ color: "#444" }}>face-down</span>
+                : <span className="text-gb-text-dim">face-down</span>
               }
             </div>
           ))}

@@ -1,5 +1,4 @@
 import type { CardData } from "@shared/game-types";
-import { s } from "./game-styles";
 
 type CardDb = Record<string, CardData>;
 
@@ -20,54 +19,47 @@ export interface ModalState {
 
 export function TargetModal({ modal, onClose, cardDb }: { modal: ModalState; onClose: () => void; cardDb: CardDb }) {
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 100,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <div style={{
-        background: "#111", border: "1px solid #333", borderRadius: 6,
-        padding: 20, minWidth: 320, maxWidth: 480, width: "90%",
-        fontFamily: "'SF Mono', 'Fira Code', monospace",
-      }}>
-        <div style={{ fontWeight: "bold", color: "#fff", fontSize: 13, marginBottom: 12 }}>
+    <div className="fixed inset-0 bg-black/75 z-100 flex items-center justify-center">
+      <div className="bg-gb-surface border border-gb-border-strong rounded-md p-5 min-w-80 max-w-[480px] w-[90%] font-mono">
+        <div className="font-bold text-gb-text-bright text-[13px] mb-3">
           {modal.title}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto" }}>
+        <div className="flex flex-col gap-1 max-h-[360px] overflow-y-auto">
           {modal.targets.map((t) => {
             const data = cardDb[t.cardId];
             return (
               <button
                 key={t.instanceId}
                 onClick={() => modal.onSelect(t.instanceId)}
-                style={{
-                  background: "#1a1a1a", border: "1px solid #333", borderRadius: 4,
-                  padding: "8px 12px", textAlign: "left", cursor: "pointer", color: "#ccc",
-                  fontFamily: "inherit", fontSize: 12, transition: "background 0.1s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#222")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#1a1a1a")}
+                className="bg-gb-surface-raised border border-gb-border-strong rounded px-3 py-2 text-left cursor-pointer text-gb-text font-[inherit] text-xs transition-colors duration-100 hover:bg-gb-border-strong/50"
               >
-                <div style={{ fontWeight: "bold", color: "#93c5fd" }}>{t.label}</div>
-                {t.sublabel && <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>{t.sublabel}</div>}
+                <div className="font-bold text-gb-accent-blue">{t.label}</div>
+                {t.sublabel && <div className="text-[10px] text-gb-text-muted mt-0.5">{t.sublabel}</div>}
                 {data && (
-                  <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: 10 }}>
-                    {data.cost !== null && <span style={{ color: "#f59e0b" }}>Cost {data.cost}</span>}
-                    {data.power !== null && <span style={{ color: "#22c55e" }}>Pwr {data.power.toLocaleString()}</span>}
-                    {data.counter !== null && <span style={{ color: "#a78bfa" }}>Ctr +{data.counter}</span>}
-                    <span style={{ color: "#555" }}>{data.type}</span>
+                  <div className="flex gap-2.5 mt-1 text-[10px]">
+                    {data.cost !== null && <span className="text-gb-accent-amber">Cost {data.cost}</span>}
+                    {data.power !== null && <span className="text-gb-accent-green">Pwr {data.power.toLocaleString()}</span>}
+                    {data.counter !== null && <span className="text-gb-accent-purple">Ctr +{data.counter}</span>}
+                    <span className="text-gb-text-muted">{data.type}</span>
                   </div>
                 )}
               </button>
             );
           })}
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <div className="flex gap-2 mt-3">
           {modal.optional && modal.onSkip && (
-            <button onClick={modal.onSkip} style={{ ...s.smallBtn, flex: 1 }}>
+            <button
+              onClick={modal.onSkip}
+              className="flex-1 px-2 py-1 bg-gb-surface-raised border border-gb-border-strong text-gb-text-subtle cursor-pointer rounded text-xs font-mono hover:border-gb-text-muted"
+            >
               Skip
             </button>
           )}
-          <button onClick={onClose} style={{ ...s.smallBtn, flex: 1 }}>
+          <button
+            onClick={onClose}
+            className="flex-1 px-2 py-1 bg-gb-surface-raised border border-gb-border-strong text-gb-text-subtle cursor-pointer rounded text-xs font-mono hover:border-gb-text-muted"
+          >
             Cancel
           </button>
         </div>

@@ -3,12 +3,12 @@
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameWs } from "@/hooks/use-game-ws";
+import { cn } from "@/lib/utils";
 import type { CardData, GameAction } from "@shared/game-types";
 import { PlayerZone } from "./player-zone";
 import { ActionPanel } from "./action-panel";
 import { TargetModal, type ModalState, type ModalTarget } from "./target-modal";
 import { Tag, formatCountdown } from "./game-ui";
-import { s } from "./game-styles";
 
 type CardDb = Record<string, CardData>;
 
@@ -52,7 +52,6 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
   const { gameState, connectionStatus, lastError, activePrompt, gameOver, sendAction, leaveGame } =
     useGameWs(gameId, workerUrl, getToken);
 
-  // Card database — fetched once from worker
   const [cardDb, setCardDb] = useState<CardDb>({});
   const cardDbFetched = useRef(false);
   useEffect(() => {
@@ -67,7 +66,6 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
       .catch(() => {});
   }, [gameId, workerUrl, getToken]);
 
-  // Target modal
   const [modal, setModal] = useState<ModalState | null>(null);
   const closeModal = () => setModal(null);
 
@@ -335,9 +333,9 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
   // ─── Derived values ─────────────────────────────────────────────────────────
 
   const statusColor =
-    connectionStatus === "connected" ? "#22c55e"
-    : connectionStatus === "connecting" ? "#f59e0b"
-    : "#ef4444";
+    connectionStatus === "connected" ? "var(--gb-accent-green)"
+    : connectionStatus === "connecting" ? "var(--gb-accent-amber)"
+    : "var(--gb-accent-red)";
 
   const endTitle = gameOver
     ? gameOver.winner === null ? "DRAW"
@@ -346,31 +344,32 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
       : remoteGameStatus?.winnerPerspective === "NONE" ? "MATCH ENDED"
       : "DEFEAT";
 
-  const endColor = gameOver
-    ? gameOver.winner === myIndex ? "#22c55e"
-      : gameOver.winner === null ? "#f59e0b" : "#ef4444"
-    : remoteGameStatus?.winnerPerspective === "SELF" ? "#22c55e"
-      : remoteGameStatus?.winnerPerspective === "NONE" ? "#f59e0b"
-      : "#ef4444";
+  const endColorClass =
+    (gameOver
+      ? gameOver.winner === myIndex ? "text-gb-accent-green"
+        : gameOver.winner === null ? "text-gb-accent-amber" : "text-gb-accent-red"
+      : remoteGameStatus?.winnerPerspective === "SELF" ? "text-gb-accent-green"
+        : remoteGameStatus?.winnerPerspective === "NONE" ? "text-gb-accent-amber"
+        : "text-gb-accent-red");
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={s.root}>
+    <div className="font-mono text-xs bg-gb-bg text-gb-text min-h-screen">
 
-      {/* ── Match ended overlay ── */}
+      {/* Match ended overlay */}
       {matchClosed && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div style={{ maxWidth: 440, width: "100%", background: "#141414", border: "1px solid #333", borderRadius: 12, padding: 28, textAlign: "center" }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "#888", letterSpacing: "0.08em", marginBottom: 8 }}>MATCH COMPLETE</p>
-            <p style={{ fontSize: 28, fontWeight: 800, color: endColor, marginBottom: 12 }}>{endTitle}</p>
-            <p style={{ fontSize: 14, color: "#aaa", lineHeight: 1.5, marginBottom: 24 }}>
+        <div className="fixed inset-0 z-100 bg-black/82 flex items-center justify-center p-6">
+          <div className="max-w-[440px] w-full bg-gb-surface border border-gb-border-strong rounded-lg p-6 text-center">
+            <p className="text-xs font-semibold text-gb-text-subtle tracking-widest mb-2">MATCH COMPLETE</p>
+            <p className={cn("text-[28px] font-extrabold mb-3", endColorClass)}>{endTitle}</p>
+            <p className="text-sm text-gb-text leading-relaxed mb-6">
               {gameOver?.reason ?? remoteGameStatus?.winReason ?? "The game has ended."}
             </p>
             <button
               type="button"
               onClick={handleBackToPlay}
-              style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "none", background: "#1e3a5f", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
+              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-[15px] font-bold cursor-pointer hover:bg-navy-700"
             >
               Back to Play
             </button>
@@ -378,35 +377,49 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
         </div>
       )}
 
-      {/* ── Header ── */}
-      <div style={s.header}>
-        <span style={{ fontWeight: "bold", color: "#fff", fontSize: 13 }}>OPTCG TEST</span>
-        <span style={s.dim}>game:{gameId.slice(0, 10)}</span>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-gb-border-subtle bg-gb-surface sticky top-0 z-20">
+        <span className="font-bold text-gb-text-bright text-[13px]">OPTCG TEST</span>
+        <span className="text-gb-text-dim">game:{gameId.slice(0, 10)}</span>
         <Tag color={statusColor}>{connectionStatus.toUpperCase()}</Tag>
-        {myIndex !== null && <span style={s.dim}>you=P{myIndex + 1}</span>}
-        {lastError && <span style={{ color: "#ef4444", fontSize: 11 }}>⚠ {lastError}</span>}
-        {leaveError && <span style={{ color: "#ef4444", fontSize: 11 }}>⚠ {leaveError}</span>}
-        <div style={{ flex: 1 }} />
+        {myIndex !== null && <span className="text-gb-text-dim">you=P{myIndex + 1}</span>}
+        {lastError && <span className="text-gb-accent-red text-xs">&9888; {lastError}</span>}
+        {leaveError && <span className="text-gb-accent-red text-xs">&9888; {leaveError}</span>}
+        <div className="flex-1" />
         {!matchClosed && (
-          <button onClick={handleLeaveGame} style={s.smallBtn}>
-            {leavingGame ? "Leaving…" : "Leave Game"}
+          <button
+            onClick={handleLeaveGame}
+            className="px-2 py-1 bg-gb-surface-raised border border-gb-border-strong text-gb-text-subtle cursor-pointer rounded text-xs font-mono hover:border-gb-text-muted"
+          >
+            {leavingGame ? "Leaving\u2026" : "Leave Game"}
           </button>
         )}
-        <button onClick={handleBackToPlay} style={s.smallBtn}>← Lobbies</button>
+        <button
+          onClick={handleBackToPlay}
+          className="px-2 py-1 bg-gb-surface-raised border border-gb-border-strong text-gb-text-subtle cursor-pointer rounded text-xs font-mono hover:border-gb-text-muted"
+        >
+          &larr; Lobbies
+        </button>
       </div>
 
       {!matchClosed && opponentAway && (
-        <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 16px", background: gamePausedForOpponent ? "#1a1400" : "#111827", borderBottom: "1px solid #333", flexWrap: "wrap" }}>
-          <span style={{ fontWeight: "bold", fontSize: 14, color: gamePausedForOpponent ? "#f59e0b" : "#93c5fd" }}>
+        <div className={cn(
+          "flex gap-3 items-center px-4 py-2 border-b border-gb-border-strong flex-wrap",
+          gamePausedForOpponent ? "bg-gb-prompt-bg" : "bg-gb-surface",
+        )}>
+          <span className={cn(
+            "font-bold text-sm",
+            gamePausedForOpponent ? "text-gb-accent-amber" : "text-gb-accent-blue",
+          )}>
             {gamePausedForOpponent ? "GAME PAUSED" : "OPPONENT AWAY"}
           </span>
-          <span style={s.dim}>
+          <span className="text-gb-text-dim">
             {opponentAwayText} {gamePausedForOpponent
               ? "The game will resume once they reconnect."
               : "You can keep making moves until their input is required."}
           </span>
           {opponentDeadlineRemaining !== null && (
-            <span style={{ color: "#f59e0b", fontSize: 11 }}>
+            <span className="text-gb-accent-amber text-xs">
               Rejoin window: {formatCountdown(opponentDeadlineRemaining)}
             </span>
           )}
@@ -414,35 +427,35 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
       )}
 
       {!gameState ? (
-        <div style={{ padding: 48, textAlign: "center", color: "#555" }}>
-          <div>{connectionStatus === "connecting" ? "Connecting…" : "Waiting for game state…"}</div>
+        <div className="p-12 text-center text-gb-text-muted">
+          <div>{connectionStatus === "connecting" ? "Connecting\u2026" : "Waiting for game state\u2026"}</div>
           {fallbackConcedeAvailable && (
-            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
-              <div style={{ color: "#888", fontSize: 12, maxWidth: 420 }}>
+            <div className="mt-4 flex flex-col gap-2.5 items-center">
+              <div className="text-gb-text-subtle text-xs max-w-[420px]">
                 Reconnect failed. You can still concede this match without restoring the websocket session.
               </div>
-              {fallbackError && <div style={{ color: "#ef4444", fontSize: 11 }}>{fallbackError}</div>}
+              {fallbackError && <div className="text-gb-accent-red text-xs">{fallbackError}</div>}
               <button
                 onClick={handleFallbackConcede}
                 disabled={fallbackSubmitting}
-                style={{ ...s.smallBtn, color: "#ef4444", borderColor: "#6b1d1d" }}
+                className="px-2 py-1 bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red cursor-pointer rounded text-xs font-mono hover:border-gb-accent-red/50"
               >
-                {fallbackSubmitting ? "Conceding…" : "Concede Match"}
+                {fallbackSubmitting ? "Conceding\u2026" : "Concede Match"}
               </button>
             </div>
           )}
         </div>
       ) : (
-        <div style={s.grid}>
+        <div className="grid grid-cols-[1fr_1fr_300px] gap-2.5 p-2.5 items-start">
           <PlayerZone
-            label={`YOU — P${(myIndex ?? 0) + 1}`}
+            label={`YOU \u2014 P${(myIndex ?? 0) + 1}`}
             player={me}
             isActive={isMyTurn}
             isMe
             cardDb={cardDb}
           />
           <PlayerZone
-            label={`OPPONENT — P${(oppIndex ?? 1) + 1}`}
+            label={`OPPONENT \u2014 P${(oppIndex ?? 1) + 1}`}
             player={opp}
             isActive={!isMyTurn}
             isMe={false}

@@ -1,24 +1,24 @@
 import type React from "react";
-import { s } from "./game-styles";
+import { cn } from "@/lib/utils";
 
 export function ActionBtn({
-  children, onClick, accent, style,
+  children, onClick, accent, className,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   accent?: boolean;
-  style?: React.CSSProperties;
+  className?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        ...s.actionBtn,
-        ...(accent ? { background: "#14532d", color: "#86efac", borderColor: "#166534" } : {}),
-        ...style,
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#555")}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = accent ? "#166534" : "#2a2a2a")}
+      className={cn(
+        "block w-full px-2 py-1 mb-0.5 text-left text-xs font-mono rounded cursor-pointer transition-[border-color] duration-100",
+        "bg-gb-surface-raised border border-gb-border-strong text-gb-text",
+        "hover:border-gb-text-muted",
+        accent && "bg-gb-accent-green/15 text-gb-accent-green border-gb-accent-green/30 hover:border-gb-accent-green/50",
+        className,
+      )}
     >
       {children}
     </button>
@@ -27,7 +27,7 @@ export function ActionBtn({
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={s.panel}>
+    <div className="bg-gb-surface border border-gb-border rounded p-2.5">
       <SectionLabel>{title}</SectionLabel>
       {children}
     </div>
@@ -36,10 +36,7 @@ export function Section({ title, children }: { title: string; children: React.Re
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      fontSize: 9, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.1em",
-      color: "#444", borderBottom: "1px solid #1a1a1a", paddingBottom: 3, marginBottom: 5,
-    }}>
+    <div className="text-[9px] font-bold uppercase tracking-widest text-gb-text-dim border-b border-gb-border-subtle pb-0.5 mb-1">
       {children}
     </div>
   );
@@ -47,19 +44,23 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function Stat({ label, value }: { label: string; value: unknown }) {
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ color: "#ccc", fontWeight: "bold" }}>{String(value)}</div>
-      <div style={{ color: "#444", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+    <div className="text-center">
+      <div className="text-gb-text font-bold">{String(value)}</div>
+      <div className="text-[9px] text-gb-text-dim uppercase tracking-wide">{label}</div>
     </div>
   );
 }
 
 export function Tag({ color, children }: { color: string; children: React.ReactNode }) {
   return (
-    <span style={{
-      fontSize: 9, fontWeight: "bold", padding: "2px 6px", borderRadius: 3,
-      background: color + "22", color, border: `1px solid ${color}44`,
-    }}>
+    <span
+      className="text-[9px] font-bold px-1 py-0.5 rounded border"
+      style={{
+        color,
+        backgroundColor: `color-mix(in srgb, ${color} 13%, transparent)`,
+        borderColor: `color-mix(in srgb, ${color} 27%, transparent)`,
+      }}
+    >
       {children}
     </span>
   );

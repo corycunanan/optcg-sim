@@ -1,6 +1,6 @@
 import type { CardData, GameAction, GameState, PlayerState, PromptOptions, PromptType } from "@shared/game-types";
 import { ActionBtn, Section, SectionLabel } from "./game-ui";
-import { s } from "./game-styles";
+import { cn } from "@/lib/utils";
 
 type CardDb = Record<string, CardData>;
 
@@ -46,37 +46,37 @@ export function ActionPanel({
   const isBlockStep = !matchClosed && battlePhase === "BLOCK_STEP";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="flex flex-col gap-2">
 
-      {/* ── Turn info ── */}
-      <div style={{ ...s.panel, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 11 }}>
-          <span style={s.dim}>Turn </span>
-          <span style={{ color: "#fff", fontWeight: "bold" }}>{turn.number}</span>
-          <span style={s.dim}> · </span>
-          <span style={{ color: isMyTurn ? "#22c55e" : "#f59e0b" }}>
+      {/* Turn info */}
+      <div className="bg-gb-surface border border-gb-border rounded p-2.5 flex gap-4 items-center flex-wrap">
+        <div className="text-xs">
+          <span className="text-gb-text-dim">Turn </span>
+          <span className="text-gb-text-bright font-bold">{turn.number}</span>
+          <span className="text-gb-text-dim"> &middot; </span>
+          <span className={isMyTurn ? "text-gb-accent-green" : "text-gb-accent-amber"}>
             {isMyTurn ? "YOUR TURN" : "OPP TURN"}
           </span>
-          <span style={s.dim}> · </span>
-          <span style={{ color: "#93c5fd" }}>{phase}</span>
+          <span className="text-gb-text-dim"> &middot; </span>
+          <span className="text-gb-accent-blue">{phase}</span>
           {battlePhase && (
             <>
-              <span style={s.dim}> › </span>
-              <span style={{ color: "#c4b5fd" }}>{battlePhase}</span>
+              <span className="text-gb-text-dim"> &rsaquo; </span>
+              <span className="text-gb-accent-purple">{battlePhase}</span>
             </>
           )}
         </div>
       </div>
 
-      {/* ── Active prompt banner ── */}
+      {/* Active prompt banner */}
       {activePrompt && (
-        <div style={{ ...s.panel, border: "1px solid #f59e0b44", background: "#1a1400" }}>
-          <div style={{ color: "#f59e0b", fontWeight: "bold", fontSize: 11, marginBottom: 6 }}>
-            ⚡ ACTION NEEDED: {activePrompt.promptType.replace(/_/g, " ")}
+        <div className="bg-gb-prompt-bg border border-gb-accent-amber/25 rounded p-2.5">
+          <div className="text-gb-accent-amber font-bold text-xs mb-1">
+            &#x26A1; ACTION NEEDED: {activePrompt.promptType.replace(/_/g, " ")}
           </div>
 
           {activePrompt.promptType === "REVEAL_TRIGGER" && (
-            <div style={{ display: "flex", gap: 4 }}>
+            <div className="flex gap-1">
               <ActionBtn onClick={() => sendAction({ type: "REVEAL_TRIGGER", reveal: true })}>
                 Reveal &amp; Activate
               </ActionBtn>
@@ -92,7 +92,7 @@ export function ActionPanel({
                 accent
                 onClick={() => onDeclareBlocker(activePrompt.options.validTargets ?? [])}
               >
-                Choose Blocker…
+                Choose Blocker&hellip;
               </ActionBtn>
               <ActionBtn onClick={() => sendAction({ type: "PASS" })}>No Blocker</ActionBtn>
             </>
@@ -104,65 +104,65 @@ export function ActionPanel({
         </div>
       )}
 
-      {/* ── Phase actions ── */}
+      {/* Phase actions */}
       <Section title="PHASE">
         {canEndPhase && (
           <ActionBtn accent onClick={() => sendAction({ type: "ADVANCE_PHASE" })}>
-            End {phase} →
+            End {phase} &rarr;
           </ActionBtn>
         )}
         {canPass && (
           <ActionBtn onClick={() => sendAction({ type: "PASS" })}>Pass</ActionBtn>
         )}
         {matchClosed && (
-          <div style={s.empty}>Match already resolved. Actions are disabled.</div>
+          <div className="text-gb-text-dim text-xs italic py-0.5">Match already resolved. Actions are disabled.</div>
         )}
         {!isMyTurn && !inBattle && (
-          <div style={s.empty}>Waiting for opponent…</div>
+          <div className="text-gb-text-dim text-xs italic py-0.5">Waiting for opponent&hellip;</div>
         )}
         {!matchClosed && (
           <ActionBtn
             onClick={() => sendAction({ type: "CONCEDE" })}
-            style={{ color: "#ef4444", marginTop: 4 }}
+            className="text-gb-accent-red mt-1"
           >
             Concede
           </ActionBtn>
         )}
       </Section>
 
-      {/* ── Attack actions ── */}
+      {/* Attack actions */}
       {canAttack && me && (
         <Section title="ATTACK">
           {me.leader.state === "ACTIVE" && (
             <ActionBtn onClick={() => onAttackWith(me.leader.instanceId)}>
-              ⚔ Leader: <span style={{ color: "#93c5fd" }}>{cardDb[me.leader.cardId]?.name ?? me.leader.cardId}</span>
+              &#x2694; Leader: <span className="text-gb-accent-blue">{cardDb[me.leader.cardId]?.name ?? me.leader.cardId}</span>
             </ActionBtn>
           )}
           {me.characters
             .filter((c) => c.state === "ACTIVE" && (c.turnPlayed === null || c.turnPlayed < turn.number))
             .map((c) => (
               <ActionBtn key={c.instanceId} onClick={() => onAttackWith(c.instanceId)}>
-                ⚔ {cardDb[c.cardId]?.name ?? c.cardId}
-                <span style={s.dim}> · {(cardDb[c.cardId]?.power ?? 0).toLocaleString()} pwr</span>
+                &#x2694; {cardDb[c.cardId]?.name ?? c.cardId}
+                <span className="text-gb-text-dim"> &middot; {(cardDb[c.cardId]?.power ?? 0).toLocaleString()} pwr</span>
               </ActionBtn>
             ))
           }
           {me.leader.state === "RESTED" && me.characters.filter((c) => c.state === "ACTIVE").length === 0 && (
-            <div style={s.empty}>No active cards to attack with</div>
+            <div className="text-gb-text-dim text-xs italic py-0.5">No active cards to attack with</div>
           )}
         </Section>
       )}
 
-      {/* ── Counter ── */}
+      {/* Counter */}
       {isCounterStep && !isMyTurn && hasCounterCards && (
         <Section title="COUNTER">
-          <ActionBtn accent onClick={onUseCounter}>Use Counter Card…</ActionBtn>
+          <ActionBtn accent onClick={onUseCounter}>Use Counter Card&hellip;</ActionBtn>
           <ActionBtn onClick={() => sendAction({ type: "PASS" })}>No Counter</ActionBtn>
         </Section>
       )}
       {isCounterStep && !isMyTurn && !hasCounterCards && (
         <Section title="COUNTER">
-          <div style={s.empty}>No counter cards in hand</div>
+          <div className="text-gb-text-dim text-xs italic py-0.5">No counter cards in hand</div>
           <ActionBtn onClick={() => sendAction({ type: "PASS" })}>Pass (No Counter)</ActionBtn>
         </Section>
       )}
@@ -171,55 +171,55 @@ export function ActionPanel({
           <ActionBtn accent onClick={() => onDeclareBlocker(
             me?.characters.filter((c) => c.state === "ACTIVE").map((c) => c.instanceId) ?? []
           )}>
-            Declare Blocker…
+            Declare Blocker&hellip;
           </ActionBtn>
           <ActionBtn onClick={() => sendAction({ type: "PASS" })}>No Blocker</ActionBtn>
         </Section>
       )}
 
-      {/* ── Play card from hand ── */}
+      {/* Play card from hand */}
       {canPlayCard && me && me.hand.length > 0 && (
         <Section title="PLAY CARD">
           {me.hand.map((c) => {
             const data = cardDb[c.cardId];
             return (
               <ActionBtn key={c.instanceId} onClick={() => sendAction({ type: "PLAY_CARD", cardInstanceId: c.instanceId })}>
-                ▶ {data?.name ?? c.cardId}
-                {data && <span style={s.dim}> · cost {data.cost ?? "?"}</span>}
+                &#x25B6; {data?.name ?? c.cardId}
+                {data && <span className="text-gb-text-dim"> &middot; cost {data.cost ?? "?"}</span>}
               </ActionBtn>
             );
           })}
         </Section>
       )}
 
-      {/* ── DON!! attach ── */}
+      {/* DON!! attach */}
       {canAttachDon && (
         <Section title={`ATTACH DON!! (${activeDon} available)`}>
-          <ActionBtn onClick={onAttachDon}>Choose Target…</ActionBtn>
+          <ActionBtn onClick={onAttachDon}>Choose Target&hellip;</ActionBtn>
         </Section>
       )}
 
-      {/* ── Event log ── */}
+      {/* Event log */}
       <Section title={`EVENT LOG (${gameState.eventLog.length})`}>
-        <div style={{ maxHeight: 160, overflowY: "auto" }}>
+        <div className="max-h-40 overflow-y-auto">
           {gameState.eventLog.slice().reverse().map((ev, i) => (
-            <div key={i} style={{ fontSize: 10, color: "#444", borderBottom: "1px solid #151515", padding: "1px 0" }}>
-              <span style={{ color: "#666" }}>{ev.type}</span>
+            <div key={i} className="text-[10px] text-gb-text-dim border-b border-gb-border-subtle py-px">
+              <span className="text-gb-text-subtle">{ev.type}</span>
               {ev.payload && Object.entries(ev.payload).map(([k, v]) => (
-                <span key={k} style={{ color: "#383838" }}> {k}={JSON.stringify(v)}</span>
+                <span key={k} className="text-gb-text-dim/70"> {k}={JSON.stringify(v)}</span>
               ))}
             </div>
           ))}
-          {gameState.eventLog.length === 0 && <div style={{ color: "#333", fontSize: 10 }}>No events</div>}
+          {gameState.eventLog.length === 0 && <div className="text-gb-text-dim text-[10px]">No events</div>}
         </div>
       </Section>
 
-      {/* ── Raw JSON ── */}
-      <button onClick={onToggleRaw} style={{ ...s.actionBtn, color: "#555" }}>
-        {showRaw ? "▲ Hide" : "▼ Show"} Raw State JSON
-      </button>
+      {/* Raw JSON */}
+      <ActionBtn onClick={onToggleRaw} className="text-gb-text-muted">
+        {showRaw ? "\u25B2 Hide" : "\u25BC Show"} Raw State JSON
+      </ActionBtn>
       {showRaw && (
-        <pre style={{ fontSize: 9, background: "#080808", border: "1px solid #1a1a1a", padding: 8, overflow: "auto", maxHeight: 400, borderRadius: 3, color: "#444" }}>
+        <pre className="text-[9px] bg-gb-surface-inset border border-gb-border-subtle p-2 overflow-auto max-h-[400px] rounded text-gb-text-dim">
           {JSON.stringify(rawState, null, 2)}
         </pre>
       )}

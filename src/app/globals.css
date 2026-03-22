@@ -73,6 +73,27 @@
   --card-purple: oklch(48% 0.18 300);
   --card-black:  oklch(28% 0.01 245);
   --card-yellow: oklch(78% 0.18 90);
+
+  /* ── Game Board (dark testing environment) ── */
+  --gb-bg:              oklch(5%   0.005 245);  /* page background */
+  --gb-surface:         oklch(9%   0.005 245);  /* panels, header */
+  --gb-surface-raised:  oklch(11%  0.005 245);  /* buttons, interactive */
+  --gb-surface-inset:   oklch(4%   0.003 245);  /* code blocks, sunken */
+  --gb-border:          oklch(13%  0.005 245);  /* default borders */
+  --gb-border-strong:   oklch(20%  0.005 245);  /* prominent borders */
+  --gb-border-subtle:   oklch(9%   0.003 245);  /* row separators */
+  --gb-text:            oklch(80%  0.005 245);  /* body text */
+  --gb-text-bright:     oklch(100% 0     0);    /* headings */
+  --gb-text-dim:        oklch(28%  0.005 245);  /* muted labels */
+  --gb-text-muted:      oklch(35%  0.005 245);  /* placeholder */
+  --gb-text-subtle:     oklch(42%  0.005 245);  /* secondary info */
+  --gb-accent-blue:     oklch(72%  0.12  240);  /* card names, info */
+  --gb-accent-green:    oklch(64%  0.18  150);  /* active state */
+  --gb-accent-amber:    oklch(72%  0.16  80);   /* DON, warnings */
+  --gb-accent-red:      oklch(60%  0.22  25);   /* errors, concede */
+  --gb-accent-purple:   oklch(62%  0.16  290);  /* counter, battle phase */
+  --gb-accent-rose:     oklch(58%  0.18  15);   /* life stat */
+  --gb-prompt-bg:       oklch(10%  0.01  80);   /* prompt/warning panel bg */
 }
 
 /* ─── Tailwind v4 Theme ──────────────────────────────────────────
@@ -151,6 +172,27 @@
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+
+  /* Game Board */
+  --color-gb-bg:             var(--gb-bg);
+  --color-gb-surface:        var(--gb-surface);
+  --color-gb-surface-raised: var(--gb-surface-raised);
+  --color-gb-surface-inset:  var(--gb-surface-inset);
+  --color-gb-border:         var(--gb-border);
+  --color-gb-border-strong:  var(--gb-border-strong);
+  --color-gb-border-subtle:  var(--gb-border-subtle);
+  --color-gb-text:           var(--gb-text);
+  --color-gb-text-bright:    var(--gb-text-bright);
+  --color-gb-text-dim:       var(--gb-text-dim);
+  --color-gb-text-muted:     var(--gb-text-muted);
+  --color-gb-text-subtle:    var(--gb-text-subtle);
+  --color-gb-accent-blue:    var(--gb-accent-blue);
+  --color-gb-accent-green:   var(--gb-accent-green);
+  --color-gb-accent-amber:   var(--gb-accent-amber);
+  --color-gb-accent-red:     var(--gb-accent-red);
+  --color-gb-accent-purple:  var(--gb-accent-purple);
+  --color-gb-accent-rose:    var(--gb-accent-rose);
+  --color-gb-prompt-bg:      var(--gb-prompt-bg);
 
   /* Border Radius — 4 values only, override Tailwind defaults */
   --radius:    0.25rem;  /* 4px  — rounded      — badges, tags */
