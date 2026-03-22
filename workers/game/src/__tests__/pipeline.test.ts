@@ -250,6 +250,57 @@ describe("battle", () => {
     expect(result.state.turn.battleSubPhase).toBe("COUNTER_STEP");
   });
 
+  it("rejects second blocker declaration in the same battle (§7-1-2-1)", () => {
+    const cardDb = createTestCardDb();
+    let state = createBattleReadyState(cardDb);
+
+    const attacker = state.players[0].characters[0];
+    const originalTarget = state.players[1].leader;
+
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: originalTarget.instanceId,
+    }, cardDb, 0);
+    expect(result.valid).toBe(true);
+    expect(result.state.turn.battleSubPhase).toBe("BLOCK_STEP");
+
+    // Declare first blocker
+    const blocker1 = result.state.players[1].characters.find(
+      (c) => c.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
+    )!;
+    result = runPipeline(result.state, { type: "DECLARE_BLOCKER", blockerInstanceId: blocker1.instanceId }, cardDb, 0);
+    expect(result.valid).toBe(true);
+    expect(result.state.turn.battle!.blockerActivated).toBe(true);
+
+    // Simulate being back in BLOCK_STEP with blockerActivated still true
+    // (defensive check — natural flow moves to COUNTER_STEP, but the guard must hold)
+    const forcedState: GameState = {
+      ...result.state,
+      turn: { ...result.state.turn, battleSubPhase: "BLOCK_STEP" },
+    };
+
+    // Add a second blocker candidate
+    const blocker2: CardInstance = {
+      instanceId: "blocker-2nd",
+      cardId: CARDS.BLOCKER.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 1,
+      owner: 1,
+    };
+    const newPlayers = [...forcedState.players] as [PlayerState, PlayerState];
+    newPlayers[1] = { ...newPlayers[1], characters: [...newPlayers[1].characters, blocker2] };
+    const stateWith2ndBlocker: GameState = { ...forcedState, players: newPlayers };
+
+    // Second blocker should be rejected
+    const result2 = runPipeline(stateWith2ndBlocker, { type: "DECLARE_BLOCKER", blockerInstanceId: blocker2.instanceId }, cardDb, 0);
+    expect(result2.valid).toBe(false);
+    expect(result2.error).toContain("§7-1-2-1");
+  });
+
   it("symbol counter increases defender power", () => {
     const cardDb = createTestCardDb();
     let state = createBattleReadyState(cardDb);

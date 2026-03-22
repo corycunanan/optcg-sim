@@ -310,7 +310,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **7-1-2-1.** Defender can activate [Blocker] once per battle | **IMPL** | `executeDeclareBlocker()` + `validation.ts → validateDeclareBlocker()` | Rests blocker, replaces target in `BattleContext`. `blockerActivated` flag exists but **not enforced in validation** — a second DECLARE_BLOCKER could theoretically succeed |
+| **7-1-2-1.** Defender can activate [Blocker] once per battle | **IMPL** | `executeDeclareBlocker()` + `validation.ts → validateDeclareBlocker()` | Rests blocker, replaces target in `BattleContext`. `blockerActivated` enforced: `validateDeclareBlocker()` rejects when `battle.blockerActivated === true` |
 | **7-1-2-2.** [On Block] effects activate | **STUB** | `battle.ts:104` comment | "fires in M4" |
 | **7-1-2-3.** Card moved areas during Block Step → skip to End of Battle | **GAP** | — | Same as 7-1-1-4 — no early-exit check |
 
@@ -533,7 +533,7 @@ The following new functions or systems are required, derived directly from the g
 15. **Mid-Battle Zone Check** — After Attack Step, Block Step, and Counter Step, check if attacker or target left the battlefield. If so, skip to End of Battle.
     - Rules: 7-1-1-4, 7-1-2-3, 7-1-3-3
 
-16. **Blocker Once-Per-Battle Enforcement** — Validate that `BattleContext.blockerActivated` is `false` before allowing a second `DECLARE_BLOCKER`.
+16. ~~**Blocker Once-Per-Battle Enforcement**~~ — **DONE (M3.5).** `validateDeclareBlocker()` rejects when `battle.blockerActivated === true`.
     - Rules: 7-1-2-1
 
 17. **End-of-Battle Effects** — Hook for "at the end of battle" auto effects.
