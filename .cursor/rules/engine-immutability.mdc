@@ -1,0 +1,42 @@
+---
+description: Enforce immutable state patterns in the game engine
+alwaysApply: true
+---
+
+## E — Engine Immutability
+
+### E-1. Pure Functions
+
+**E-1-1.** All game engine functions are pure: `(state, action) → newState`. They must not produce side effects or mutate their inputs.
+
+**E-1-2.** The only place `GameState` is persisted is in the Durable Object's storage. Engine functions never write to storage, network, or global variables.
+
+### E-2. Prohibited Mutations
+
+**E-2-1.** Never mutate `GameState`, `PlayerState`, `CardInstance`, `DonInstance`, `TurnState`, `BattleContext`, or any nested object in place.
+
+**E-2-2.** Never use `Array.push()`, `Array.splice()`, `Array.sort()` (in-place), or `delete obj.prop` on state objects. Use spread syntax, `Array.filter()`, `Array.map()`, or destructuring to produce new arrays and objects.
+
+**E-2-3.** Never assign directly to a property on a state object (e.g., `player.hand = [...]`). Always create a new parent object via spread: `{ ...player, hand: [...] }`.
+
+### E-3. Correct Patterns
+
+**E-3-1.** Adding to an array: `[...array, newItem]` or `[newItem, ...array]`.
+
+**E-3-2.** Removing from an array: `array.filter(item => item.id !== targetId)`.
+
+**E-3-3.** Updating an item in an array: `array.map(item => item.id === targetId ? { ...item, ...changes } : item)`.
+
+**E-3-4.** Updating nested state: spread at every level up to the root.
+
+```typescript
+const newPlayers = [...state.players] as [PlayerState, PlayerState];
+newPlayers[pi] = { ...newPlayers[pi], characters: newCharacters };
+return { ...state, players: newPlayers };
+```
+
+### E-4. Zone Transitions
+
+**E-4-1.** All card movement between zones must go through `moveCard()` in `state.ts`. Do not manually add/remove cards from zone arrays — `moveCard()` enforces §3-1-6 (new instanceId, strip attached DON!!, reset state).
+
+**E-4-2.** The only exception is life card handling, which uses `removeTopLifeCard()` and `addToLife()` because `LifeCard` is a different type than `CardInstance`.

@@ -51,10 +51,12 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 - [PRD](./project/PRD.md) — product requirements document (source of truth)
 - [Comprehensive Rules](./rules/rule_comprehensive.md) — official OPTCG rules v1.2.0
+- [Rule Index](./rules/RULE-INDEX.md) — concept-to-rule lookup table (start here, then read specific rules)
 - [Card Set Data](./cards/) — effect text for all 51 card sets (OP-01 through ST-29)
 
 ## Research
 
+- [Git Practices](./research/GIT-PRACTICES.md) — git conventions for AI-assisted development at this project's scale
 - [Rive Investigation](./research/RIVE-INVESTIGATION.md) — Rive vs React + Framer Motion evaluation for game board UI
 
 ---

@@ -1,0 +1,38 @@
+---
+description: Require tests alongside game engine changes
+alwaysApply: true
+---
+
+## T — Test Requirements
+
+### T-1. Engine Test Coverage
+
+**T-1-1.** When adding or modifying any function in `workers/game/src/engine/`, add or update the corresponding test in `workers/game/src/__tests__/`.
+
+**T-1-2.** A task is not complete until its tests exist and pass.
+
+**T-1-3.** Run the full test suite (`npm test` in `workers/game/`) before committing (per G-1-2) to verify no regressions.
+
+### T-2. Test Scope
+
+**T-2-1.** Bug fixes require at least one regression test that reproduces the bug scenario and verifies the fix.
+
+**T-2-2.** New utility functions require unit tests covering normal operation, edge cases, and error/null returns.
+
+**T-2-3.** New pipeline integration paths (e.g., a new action type flowing through `runPipeline()`) require a pipeline test in `pipeline.test.ts`.
+
+### T-3. Test Organization
+
+**T-3-1.** Pipeline integration tests (action → pipeline → state) go in `pipeline.test.ts`.
+
+**T-3-2.** Unit tests for individual functions go in `unit.test.ts`.
+
+**T-3-3.** Shared test utilities (card catalog, state builders) go in `helpers.ts`.
+
+### T-4. Test Quality
+
+**T-4-1.** Tests must assert specific outcomes, not just "no error thrown."
+
+**T-4-2.** Use the test helpers (`setupGame()`, `createBattleReadyState()`, `advanceToPhase()`) to set up state rather than hand-building `GameState` objects from scratch.
+
+**T-4-3.** Reference the rule number (e.g., `§7-1-4-1-1-1`) in the test name when testing rules-compliance behavior.

@@ -1,0 +1,51 @@
+---
+description: Enforce atomic git commits — one commit per logical task
+alwaysApply: true
+---
+
+## G — Git Practices
+
+### G-1. Atomic Commits
+
+**G-1-1.** Each commit must represent one logical unit of work. Do not accumulate changes across multiple tasks into a single commit.
+
+**G-1-2.** Commit immediately after completing each discrete task. Do not wait until the end of a multi-task session.
+
+**G-1-3.** A "unit of work" is one of the following:
+
+**G-1-3-1.** A single bug fix, including its regression test(s).
+
+**G-1-3-2.** A single new function or utility, including its unit test(s).
+
+**G-1-3-3.** A refactor of one file or one closely related group of files.
+
+**G-1-3-4.** A documentation update about work committed in the same commit.
+
+**G-1-3-5.** A dependency change (`package.json` + lockfile).
+
+**G-1-4.** If a task includes both implementation and test, they belong in the same commit.
+
+**G-1-5.** If a task includes both code and documentation about that code, they belong in the same commit.
+
+### G-2. Commit Messages
+
+**G-2-1.** Follow the format: `<phase>: <concise description>`. Examples:
+- `M3.5: Fix blocker once-per-battle validation (§7-1-2-1)`
+- `M3.5: Add returnDonToDeck() and drawCards() utilities`
+- `M4: Effect parser — keyword auto-effects`
+
+**G-2-2.** For larger changes, use a summary line + blank line + body.
+
+**G-2-3.** Reference the relevant rule number (e.g., `§7-1-4-1-1-1`) in the commit message when fixing a rules-compliance bug.
+
+### G-3. Push Policy
+
+**G-3-1.** Do NOT push to remote unless the user explicitly asks.
+
+**G-3-2.** Committing without pushing is always safe. Default to commit-only.
+
+### G-4. Excluded Files
+
+**G-4-1.** Do NOT commit files matched by `.gitignore`, build artifacts, or `.wrangler/` state.
+
+**G-4-2.** Before staging, verify no unexpected files are included with `git status`.
