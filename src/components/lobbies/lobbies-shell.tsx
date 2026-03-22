@@ -402,13 +402,13 @@ export function LobbiesShell() {
                 <>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-content-secondary">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Deck
                       </label>
                       <select
                         value={createDeckId}
                         onChange={(e) => setCreateDeckId(e.target.value)}
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-navy-900"
+                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
                       >
                         {userDecks.map((d) => (
                           <option key={d.id} value={d.id}>
@@ -418,13 +418,13 @@ export function LobbiesShell() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-content-secondary">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Format
                       </label>
                       <select
                         value={createFormat}
                         onChange={(e) => setCreateFormat(e.target.value)}
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-navy-900"
+                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
                       >
                         <option>Standard</option>
                         <option>Block</option>
@@ -464,7 +464,7 @@ export function LobbiesShell() {
                 <>
                   <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-content-secondary">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Code
                       </label>
                       <input
@@ -474,17 +474,17 @@ export function LobbiesShell() {
                         }
                         placeholder="ABCD12"
                         maxLength={6}
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm uppercase tracking-[0.2em] text-content-primary focus:outline-none focus:ring-2 focus:ring-navy-900"
+                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm uppercase tracking-[0.2em] text-content-primary transition-colors focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-content-secondary">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Deck
                       </label>
                       <select
                         value={joinDeckId}
                         onChange={(e) => setJoinDeckId(e.target.value)}
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-navy-900"
+                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
                       >
                         {userDecks.map((d) => (
                           <option key={d.id} value={d.id}>

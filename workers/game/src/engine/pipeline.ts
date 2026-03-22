@@ -14,9 +14,9 @@
  * 7. Rule Processing     (defeat checks)
  */
 
-import type { CardData, GameAction, GameState } from "../types.js";
+import type { CardData, GameAction, GameState, ExecuteResult } from "../types.js";
 import { validate } from "./validation.js";
-import { execute, ExecuteResult } from "./execute.js";
+import { execute } from "./execute.js";
 import { emitEvent } from "./events.js";
 import { checkDefeat } from "./defeat.js";
 

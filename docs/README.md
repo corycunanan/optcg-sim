@@ -22,12 +22,14 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 | M2 | Social | [M2-SOCIAL.md](./milestones/M2-SOCIAL.md) |
 | M2.5 | Design System | [M2.5-DESIGN-SYSTEM.md](./milestones/M2.5-DESIGN-SYSTEM.md) |
 | M3 | Simulator (Core) | [M3-SIMULATOR-CORE.md](./milestones/M3-SIMULATOR-CORE.md) |
+| M3.5 | Simulator Tech Debt | [M3.5-SIMULATOR-TECH-DEBT.md](./milestones/M3.5-SIMULATOR-TECH-DEBT.md) |
 | M4 | Effect Engine | [M4-EFFECT-ENGINE.md](./milestones/M4-EFFECT-ENGINE.md) |
 | M5 | Polish & Scale | [M5-POLISH-AND-SCALE.md](./milestones/M5-POLISH-AND-SCALE.md) |
 
 ## Game Engine
 
 - [Game Engine Index](./game-engine/README.md) — full index for the effect schema spec (11 spec files, ~12,000 lines)
+- [Rules → Engine Map](./game-engine/RULES-TO-ENGINE-MAP.md) — every rule from Comprehensive Rules v1.2.0 mapped to engine functions, with gap analysis
 - [Effect Schema Spec](./game-engine/01-SCHEMA-OVERVIEW.md) — start here: EffectBlock structure, categories, costs, chains, durations
 - [Engine Architecture](./game-engine/08-ENGINE-ARCHITECTURE.md) — action pipeline, modifier layers, trigger system, event bus
 - [Encoding Guide](./game-engine/11-ENCODING-GUIDE.md) — condensed pattern-matching reference for card encoding
@@ -57,4 +59,4 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ---
 
-_Last updated: 2026-03-19_
+_Last updated: 2026-03-22_

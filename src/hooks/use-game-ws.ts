@@ -1,115 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
-// Mirror the minimal types we need from the worker (avoid importing the worker package)
-export type Zone =
-  | "LEADER" | "CHARACTER" | "STAGE" | "COST_AREA" | "HAND"
-  | "DECK" | "TRASH" | "LIFE" | "DON_DECK" | "REMOVED_FROM_GAME";
-
-export type Phase = "REFRESH" | "DRAW" | "DON" | "MAIN" | "END";
-export type BattleSubPhase =
-  | "ATTACK_STEP" | "BLOCK_STEP" | "COUNTER_STEP" | "DAMAGE_STEP" | "END_OF_BATTLE";
-
-export interface CardInstance {
-  instanceId: string;
-  cardId: string;
-  zone: Zone;
-  state: "ACTIVE" | "RESTED";
-  attachedDon: DonInstance[];
-  turnPlayed: number | null;
-  controller: 0 | 1;
-  owner: 0 | 1;
-}
-
-export interface LifeCard {
-  instanceId: string;
-  cardId: string;
-  face: "UP" | "DOWN";
-}
-
-export interface DonInstance {
-  instanceId: string;
-  state: "ACTIVE" | "RESTED";
-  attachedTo: string | null;
-}
-
-export interface PlayerState {
-  playerId: string;
-  leader: CardInstance;
-  hand: CardInstance[];
-  deck: CardInstance[];
-  life: LifeCard[];
-  characters: CardInstance[];
-  stage: CardInstance | null;
-  donDeck: DonInstance[];
-  donCostArea: DonInstance[];
-  trash: CardInstance[];
-  removedFromGame: CardInstance[];
-  connected: boolean;
-  awayReason: "LEFT" | "DISCONNECTED" | null;
-  rejoinDeadlineAt: number | null;
-}
-
-export interface TurnState {
-  number: number;
-  activePlayerIndex: 0 | 1;
-  phase: Phase;
-  battleSubPhase: BattleSubPhase | null;
-  battle: unknown | null;
-  oncePerTurnUsed: Record<string, string[]>;
-  actionsPerformedThisTurn: { actionType: string; timestamp: number }[];
-}
-
-export interface GameState {
-  id: string;
-  players: [PlayerState, PlayerState];
-  turn: TurnState;
-  activeEffects: unknown[];
-  prohibitions: unknown[];
-  scheduledActions: unknown[];
-  oneTimeModifiers: unknown[];
-  triggerRegistry: unknown[];
-  eventLog: unknown[];
-  status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
-  winner: 0 | 1 | null;
-  winReason: string | null;
-}
-
-export type GameAction =
-  | { type: "ADVANCE_PHASE" }
-  | { type: "PLAY_CARD"; cardInstanceId: string; position?: number }
-  | { type: "ATTACH_DON"; targetInstanceId: string; count: number }
-  | { type: "DECLARE_ATTACK"; attackerInstanceId: string; targetInstanceId: string }
-  | { type: "DECLARE_BLOCKER"; blockerInstanceId: string }
-  | { type: "USE_COUNTER"; cardInstanceId: string; counterTargetInstanceId: string }
-  | { type: "USE_COUNTER_EVENT"; cardInstanceId: string; counterTargetInstanceId: string }
-  | { type: "REVEAL_TRIGGER"; reveal: boolean }
-  | { type: "PASS" }
-  | { type: "CONCEDE" }
-  | { type: "MANUAL_EFFECT"; description: string };
-
-export type PromptType =
-  | "SELECT_BLOCKER"
-  | "SELECT_COUNTER_TARGET"
-  | "SELECT_ATTACK_TARGET"
-  | "REVEAL_TRIGGER"
-  | "SELECT_CARD_TO_TRASH";
-
-export interface PromptOptions {
-  validTargets?: string[];
-  optional?: boolean;
-  timeoutMs?: number;
-}
-
-type ServerMessage =
-  | { type: "game:state"; state: GameState }
-  | { type: "game:update"; action: GameAction; state: GameState }
-  | { type: "game:prompt"; promptType: PromptType; options: PromptOptions }
-  | { type: "game:error"; message: string }
-  | { type: "game:over"; winner: 0 | 1 | null; reason: string }
-  | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
-  | { type: "game:player_reconnected"; playerIndex: 0 | 1 };
+import type {
+  GameState,
+  GameAction,
+  PromptType,
+  PromptOptions,
+  ServerMessage,
+} from "@shared/game-types";
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 

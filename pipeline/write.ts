@@ -44,6 +44,7 @@ export async function writeToDatabase(
             type: card.type,
             color: card.color,
             cost: card.cost,
+            life: card.life,
             power: card.power,
             counter: card.counter,
             attribute: card.attribute,
@@ -60,6 +61,7 @@ export async function writeToDatabase(
             type: card.type,
             color: card.color,
             cost: card.cost,
+            life: card.life,
             power: card.power,
             counter: card.counter,
             attribute: card.attribute,
@@ -67,7 +69,7 @@ export async function writeToDatabase(
             rarity: card.rarity,
             effectText: card.effectText,
             triggerText: card.triggerText,
-            imageUrl: card.imageUrl,
+            // imageUrl intentionally excluded — preserve CDN URLs set by migrate-images
             blockNumber: card.blockNumber,
           },
         })
@@ -84,28 +86,38 @@ export async function writeToDatabase(
 
   // ─── Clear existing art variants and card sets, then re-create ─
 
-  // Delete existing variants and card sets for a clean import
-  console.log(`  Clearing existing art variants and card sets...`);
-  await prisma.artVariant.deleteMany({});
+  // Delete existing card sets for a clean import (variants use upsert to preserve CDN imageUrls)
+  console.log(`  Clearing existing card sets...`);
   await prisma.cardSet.deleteMany({});
 
-  // ─── Create art variants in batches ───────────────────────
+  // ─── Upsert art variants in batches ───────────────────────
 
-  console.log(`  Creating ${artVariants.length} art variants...`);
+  console.log(`  Upserting ${artVariants.length} art variants...`);
   for (let i = 0; i < artVariants.length; i += BATCH_SIZE) {
     const batch = artVariants.slice(i, i + BATCH_SIZE);
 
-    await prisma.artVariant.createMany({
-      data: batch.map((v) => ({
-        cardId: v.cardId,
-        variantId: v.variantId,
-        label: v.label,
-        rarity: v.rarity,
-        imageUrl: v.imageUrl,
-        set: v.set,
-      })),
-      skipDuplicates: true,
-    });
+    await Promise.all(
+      batch.map((v) =>
+        prisma.artVariant.upsert({
+          where: { variantId: v.variantId },
+          create: {
+            cardId: v.cardId,
+            variantId: v.variantId,
+            label: v.label,
+            rarity: v.rarity,
+            imageUrl: v.imageUrl,
+            set: v.set,
+          },
+          update: {
+            cardId: v.cardId,
+            label: v.label,
+            rarity: v.rarity,
+            // imageUrl intentionally excluded — preserve CDN URLs set by migrate-images
+            set: v.set,
+          },
+        })
+      )
+    );
 
     variantsCreated += batch.length;
     if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= artVariants.length) {

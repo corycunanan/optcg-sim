@@ -18,6 +18,7 @@ export interface BaseCard {
   type: "Leader" | "Character" | "Event" | "Stage";
   color: string[];
   cost: number | null;
+  life: number | null;
   power: number | null;
   counter: number | null;
   attribute: string[];
@@ -101,6 +102,7 @@ export function classifyEntries(transformedCards: TransformedCard[]): {
         type: first.type,
         color: first.color,
         cost: first.cost,
+        life: first.life,
         power: first.power,
         counter: first.counter,
         attribute: first.attribute,
@@ -122,6 +124,7 @@ export function classifyEntries(transformedCards: TransformedCard[]): {
         type: baseEntry.type,
         color: baseEntry.color,
         cost: baseEntry.cost,
+        life: baseEntry.life,
         power: baseEntry.power,
         counter: baseEntry.counter,
         attribute: baseEntry.attribute,

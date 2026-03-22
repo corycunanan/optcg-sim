@@ -5,15 +5,7 @@
  * included in the GameInitPayload sent to the Durable Object.
  */
 
-interface KeywordSet {
-  rush: boolean;
-  rushCharacter: boolean;
-  doubleAttack: boolean;
-  banish: boolean;
-  blocker: boolean;
-  trigger: boolean;
-  unblockable: boolean;
-}
+import type { KeywordSet } from "@shared/game-types";
 
 export function extractKeywords(
   effectText: string,

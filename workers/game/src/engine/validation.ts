@@ -133,9 +133,9 @@ function validateDeclareAttack(
   if (state.turn.phase !== "MAIN") return "Battles can only happen during the Main Phase";
   if (state.turn.battleSubPhase !== null) return "Already in a battle";
 
-  // Turn 1 restriction: first player cannot battle on turn 1
-  if (state.turn.number === 1 && state.turn.activePlayerIndex === 0) {
-    return "First player cannot attack on turn 1";
+  // §6-5-6-1: Neither player can battle on their first turn
+  if (state.turn.number === 1) {
+    return "Neither player can attack on their first turn";
   }
 
   const attackerFound = findCardInState(state, attackerInstanceId);

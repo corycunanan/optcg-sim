@@ -29,6 +29,8 @@ export interface TransformedCard {
   color: string[];
   /** Mana cost (null for Leaders) */
   cost: number | null;
+  /** Life value (Leaders only — sourced from vegapull `cost` field) */
+  life: number | null;
   /** Power value */
   power: number | null;
   /** Counter value */
@@ -140,6 +142,8 @@ export function transformCards(
     const variantType = detectVariantType(raw.id);
     const originSet = cardIdToOriginSet(baseId);
 
+    const isLeader = type === "Leader";
+
     transformed.push({
       vegapullId: raw.id,
       baseId,
@@ -149,7 +153,8 @@ export function transformCards(
       name: decodeHtmlEntities(raw.name),
       type,
       color: raw.colors,
-      cost: raw.cost,
+      cost: isLeader ? null : raw.cost,
+      life: isLeader ? raw.cost : null,
       power: raw.power,
       counter: raw.counter,
       attribute: raw.attributes,

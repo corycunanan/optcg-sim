@@ -1,0 +1,426 @@
+/**
+ * Battle system
+ *
+ * Attack → Block → Counter → Damage → End of Battle.
+ * All battle-related execution logic, extracted from execute.ts.
+ */
+
+import type { CardData, GameState, LifeCard, PendingEvent, ExecuteResult } from "../types.js";
+import {
+  getActivePlayerIndex,
+  getInactivePlayerIndex,
+  findCardInState,
+  moveCard,
+  removeTopLifeCard,
+  restDonForCost,
+} from "./state.js";
+import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
+import { hasDoubleAttack, hasBanish, hasTrigger } from "./keywords.js";
+import { nanoid } from "../util/nanoid.js";
+
+// ─── Declare Attack ───────────────────────────────────────────────────────────
+
+export function executeDeclareAttack(
+  state: GameState,
+  attackerInstanceId: string,
+  targetInstanceId: string,
+  cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const pi = getActivePlayerIndex(state);
+
+  // Rest the attacker
+  let nextState = setCardState(state, pi, attackerInstanceId, "RESTED");
+
+  const attackerFound = findCardInState(nextState, attackerInstanceId)!;
+  const attackerData = cardDb.get(attackerFound.card.cardId)!;
+  const attackerPower = getEffectivePower(attackerFound.card, attackerData, nextState);
+
+  const defenderFound = findCardInState(nextState, targetInstanceId)!;
+  const defenderData = cardDb.get(defenderFound.card.cardId)!;
+  const defenderPower = getEffectivePower(defenderFound.card, defenderData, nextState);
+
+  const battle = {
+    battleId: nanoid(),
+    attackerInstanceId,
+    targetInstanceId,
+    attackerPower,
+    defenderPower,
+    counterPowerAdded: 0,
+    blockerActivated: false,
+  };
+
+  nextState = {
+    ...nextState,
+    turn: { ...nextState.turn, battle, battleSubPhase: "ATTACK_STEP" },
+  };
+
+  events.push({
+    type: "ATTACK_DECLARED",
+    playerIndex: pi,
+    payload: { attackerInstanceId, targetInstanceId, attackerPower },
+  });
+
+  // [When Attacking] and [On Your Opponent's Attack] fire here in M4
+
+  // Advance to BLOCK_STEP
+  nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "BLOCK_STEP" } };
+  events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "ATTACK_STEP", to: "BLOCK_STEP" } });
+
+  return { state: nextState, events };
+}
+
+// ─── Declare Blocker ──────────────────────────────────────────────────────────
+
+export function executeDeclareBlocker(
+  state: GameState,
+  blockerInstanceId: string,
+  cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const inactiveIdx = getInactivePlayerIndex(state);
+
+  // Rest the blocker
+  let nextState = setCardState(state, inactiveIdx, blockerInstanceId, "RESTED");
+
+  // Replace the target in BattleContext
+  const battle = nextState.turn.battle!;
+  const updatedBattle = { ...battle, targetInstanceId: blockerInstanceId, blockerActivated: true };
+
+  // Recalculate defender power with new target
+  const blockerFound = findCardInState(nextState, blockerInstanceId)!;
+  const blockerData = cardDb.get(blockerFound.card.cardId)!;
+  const blockerPower = getEffectivePower(blockerFound.card, blockerData, nextState);
+
+  nextState = {
+    ...nextState,
+    turn: {
+      ...nextState.turn,
+      battle: { ...updatedBattle, defenderPower: blockerPower },
+    },
+  };
+
+  events.push({ type: "BLOCK_DECLARED", playerIndex: inactiveIdx, payload: { blockerInstanceId } });
+  // [On Block] fires in M4
+
+  // Advance to COUNTER_STEP
+  nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" } };
+  events.push({ type: "PHASE_CHANGED", playerIndex: inactiveIdx, payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" } });
+
+  return { state: nextState, events };
+}
+
+// ─── Pass (battle sub-phase transitions) ──────────────────────────────────────
+
+export function executePass(state: GameState, cardDb: Map<string, CardData>): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const pi = getActivePlayerIndex(state);
+  let nextState = state;
+
+  if (state.turn.battleSubPhase === "BLOCK_STEP") {
+    // Defender passes blocker window → advance to COUNTER_STEP
+    nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" } };
+    events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" } });
+  } else if (state.turn.battleSubPhase === "COUNTER_STEP") {
+    // Defender passes counter window → advance to DAMAGE_STEP
+    nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "DAMAGE_STEP" } };
+    events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "COUNTER_STEP", to: "DAMAGE_STEP" } });
+    // Run damage resolution immediately
+    const dmgResult = executeDamageStep(nextState, cardDb);
+    nextState = dmgResult.state;
+    events.push(...dmgResult.events);
+    return { state: nextState, events, damagedPlayerIndex: dmgResult.damagedPlayerIndex };
+  }
+
+  return { state: nextState, events };
+}
+
+// ─── Symbol Counter ───────────────────────────────────────────────────────────
+
+export function executeUseCounter(
+  state: GameState,
+  cardInstanceId: string,
+  counterTargetInstanceId: string,
+  cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const inactiveIdx = getInactivePlayerIndex(state);
+
+  const found = findCardInState(state, cardInstanceId)!;
+  const cardData = cardDb.get(found.card.cardId)!;
+  const counterValue = cardData.counter!;
+
+  // Trash the counter card from hand
+  let nextState = moveCard(state, cardInstanceId, "TRASH");
+
+  // Add counter power to battle context
+  const battle = nextState.turn.battle!;
+  const targetFound = findCardInState(nextState, battle.targetInstanceId);
+  if (targetFound) {
+    const targetData = cardDb.get(targetFound.card.cardId);
+    const newCounterPower = battle.counterPowerAdded + counterValue;
+    const newDefenderPower = targetData
+      ? getBattleDefenderPower(targetFound.card, targetData, newCounterPower, nextState)
+      : battle.defenderPower + counterValue;
+
+    nextState = {
+      ...nextState,
+      turn: {
+        ...nextState.turn,
+        battle: { ...battle, counterPowerAdded: newCounterPower, defenderPower: newDefenderPower },
+      },
+    };
+  }
+
+  events.push({
+    type: "COUNTER_USED",
+    playerIndex: inactiveIdx,
+    payload: { cardId: cardData.id, counterValue, counterTargetInstanceId },
+  });
+
+  return { state: nextState, events };
+}
+
+// ─── Counter Event ────────────────────────────────────────────────────────────
+
+export function executeUseCounterEvent(
+  state: GameState,
+  cardInstanceId: string,
+  cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const inactiveIdx = getInactivePlayerIndex(state);
+
+  const found = findCardInState(state, cardInstanceId)!;
+  const cardData = cardDb.get(found.card.cardId)!;
+  const cost = getEffectiveCost(cardData);
+
+  // Pay cost
+  let nextState = restDonForCost(state, inactiveIdx, cost)!;
+  // Trash the event
+  nextState = moveCard(nextState, cardInstanceId, "TRASH");
+
+  events.push({
+    type: "COUNTER_USED",
+    playerIndex: inactiveIdx,
+    payload: { cardId: cardData.id, type: "event" },
+  });
+
+  // Counter event effect is manual in M3 (MANUAL_EFFECT to follow if needed)
+  return { state: nextState, events };
+}
+
+// ─── Reveal Trigger ───────────────────────────────────────────────────────────
+
+export function executeRevealTrigger(
+  state: GameState,
+  reveal: boolean,
+  _cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const inactiveIdx = getInactivePlayerIndex(state);
+  let nextState = state;
+
+  const battle = state.turn.battle as typeof state.turn.battle & { pendingTriggerLifeCard?: LifeCard };
+  if (!battle?.pendingTriggerLifeCard) return { state, events };
+
+  const lifeCard = battle.pendingTriggerLifeCard;
+
+  if (reveal) {
+    // Activate trigger — card goes to trash after (rules §10-1-5-3)
+    // In M3 the trigger effect text is manual; card goes to trash
+    const trashCard = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "TRASH" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: inactiveIdx,
+      owner: inactiveIdx,
+    };
+    const newPlayers = [...nextState.players] as typeof nextState.players;
+    newPlayers[inactiveIdx] = {
+      ...newPlayers[inactiveIdx],
+      trash: [trashCard, ...newPlayers[inactiveIdx].trash],
+    };
+    nextState = { ...nextState, players: newPlayers };
+    events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, activated: true } });
+  } else {
+    // Decline trigger — add to hand
+    const handCard = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "HAND" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: inactiveIdx,
+      owner: inactiveIdx,
+    };
+    const newPlayers = [...nextState.players] as typeof nextState.players;
+    newPlayers[inactiveIdx] = {
+      ...newPlayers[inactiveIdx],
+      hand: [...newPlayers[inactiveIdx].hand, handCard],
+    };
+    nextState = { ...nextState, players: newPlayers };
+    events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId } });
+  }
+
+  // Clear pending trigger and end battle
+  const cleanedBattle = { ...battle };
+  delete (cleanedBattle as Partial<typeof cleanedBattle & { pendingTriggerLifeCard?: LifeCard }>).pendingTriggerLifeCard;
+  nextState = { ...nextState, turn: { ...nextState.turn, battle: cleanedBattle } };
+  nextState = endBattle(nextState, events);
+
+  return { state: nextState, events };
+}
+
+// ─── Damage Step (internal) ──────────────────────────────────────────────────
+
+function executeDamageStep(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
+  const events: PendingEvent[] = [];
+  const pi = getActivePlayerIndex(state);
+  const inactiveIdx = getInactivePlayerIndex(state);
+  const battle = state.turn.battle!;
+  let nextState = state;
+  let damagedPlayerIndex: 0 | 1 | undefined;
+
+  const { attackerPower, defenderPower, targetInstanceId } = battle;
+
+  if (attackerPower >= defenderPower) {
+    const targetFound = findCardInState(state, targetInstanceId);
+    if (targetFound) {
+      if (targetFound.card.zone === "LEADER") {
+        // Leader takes damage
+        const attackerFound = findCardInState(state, battle.attackerInstanceId);
+        const attackerData = attackerFound ? cardDb.get(attackerFound.card.cardId) : undefined;
+        const damageCount = attackerData && hasDoubleAttack(attackerData) ? 2 : 1;
+        const isBanish = attackerData ? hasBanish(attackerData) : false;
+
+        // Process each damage point (rules §7-1-4-1-1-3)
+        for (let i = 0; i < damageCount; i++) {
+          // §7-1-4-1-1-1: If 0 life at the point damage would be dealt → defeat
+          if (nextState.players[inactiveIdx].life.length === 0) {
+            damagedPlayerIndex = inactiveIdx;
+            events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { target: "leader", amount: 1, lethal: true } });
+            break;
+          }
+
+          // §7-1-4-1-1-2: Has life → remove top life card
+          const result = removeTopLifeCard(nextState, inactiveIdx);
+          if (!result) break;
+
+          const { lifeCard, state: stateAfterRemoval } = result;
+          nextState = stateAfterRemoval;
+
+          events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { amount: 1 } });
+
+          if (isBanish) {
+            // Banish: life card goes to trash, no Trigger (rules §10-1-3-1)
+            const trashCard = {
+              instanceId: lifeCard.instanceId,
+              cardId: lifeCard.cardId,
+              zone: "TRASH" as const,
+              state: "ACTIVE" as const,
+              attachedDon: [],
+              turnPlayed: null,
+              controller: inactiveIdx,
+              owner: inactiveIdx,
+            };
+            const newPlayers = [...nextState.players] as typeof nextState.players;
+            newPlayers[inactiveIdx] = {
+              ...newPlayers[inactiveIdx],
+              trash: [trashCard, ...newPlayers[inactiveIdx].trash],
+            };
+            nextState = { ...nextState, players: newPlayers };
+          } else if (hasTrigger(cardDb.get(lifeCard.cardId) ?? { keywords: { trigger: false } } as CardData)) {
+            // Has [Trigger] — pause for defending player's choice (rules §10-1-5-1)
+            const updatedBattle = {
+              ...nextState.turn.battle!,
+              pendingTriggerLifeCard: lifeCard,
+            };
+            nextState = {
+              ...nextState,
+              turn: { ...nextState.turn, battle: updatedBattle as typeof battle },
+            };
+            events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId } });
+            return { state: nextState, events, damagedPlayerIndex };
+          } else {
+            // Normal: add life card to hand
+            const handCard = {
+              instanceId: lifeCard.instanceId,
+              cardId: lifeCard.cardId,
+              zone: "HAND" as const,
+              state: "ACTIVE" as const,
+              attachedDon: [],
+              turnPlayed: null,
+              controller: inactiveIdx,
+              owner: inactiveIdx,
+            };
+            const newPlayers = [...nextState.players] as typeof nextState.players;
+            newPlayers[inactiveIdx] = {
+              ...newPlayers[inactiveIdx],
+              hand: [...newPlayers[inactiveIdx].hand, handCard],
+            };
+            nextState = { ...nextState, players: newPlayers };
+            events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId } });
+          }
+        }
+      } else if (targetFound.card.zone === "CHARACTER") {
+        // KO the character
+        nextState = moveCard(nextState, targetInstanceId, "TRASH");
+        events.push({ type: "CARD_KO", playerIndex: pi, payload: { instanceId: targetInstanceId, cause: "battle" } });
+        // [On K.O.] fires in M4
+      }
+    }
+  }
+  // Attacker power < defender power: nothing happens
+
+  // End of Battle
+  nextState = endBattle(nextState, events);
+
+  return { state: nextState, events, damagedPlayerIndex };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function setCardState(
+  state: GameState,
+  playerIndex: 0 | 1,
+  instanceId: string,
+  cardState: "ACTIVE" | "RESTED",
+): GameState {
+  const player = state.players[playerIndex];
+  const update = (card: { instanceId: string; state: string }) =>
+    card.instanceId === instanceId ? { ...card, state: cardState } : card;
+
+  const newPlayers = [...state.players] as typeof state.players;
+  newPlayers[playerIndex] = {
+    ...player,
+    leader: update(player.leader) as typeof player.leader,
+    characters: player.characters.map((c) => update(c) as typeof c),
+  };
+  return { ...state, players: newPlayers };
+}
+
+function endBattle(state: GameState, events: PendingEvent[]): GameState {
+  events.push({ type: "BATTLE_RESOLVED", playerIndex: state.turn.activePlayerIndex });
+  events.push({
+    type: "PHASE_CHANGED",
+    playerIndex: state.turn.activePlayerIndex,
+    payload: { from: "DAMAGE_STEP", to: "MAIN" },
+  });
+
+  return {
+    ...state,
+    turn: {
+      ...state.turn,
+      battle: null,
+      battleSubPhase: null,
+    },
+  };
+}

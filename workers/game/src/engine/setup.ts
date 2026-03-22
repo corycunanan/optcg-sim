@@ -43,8 +43,11 @@ export function buildInitialState(payload: GameInitPayload): {
   const [hand1, remainingDeck1] = drawN(shuffled1, 5);
 
   // Place life cards (from top of deck, placed bottom-up per rules §5-2-1-7)
-  const leaderLife0 = cardDb.get(payload.player1.leader.cardId)?.life ?? 5;
-  const leaderLife1 = cardDb.get(payload.player2.leader.cardId)?.life ?? 5;
+  // Fallback chain: life → cost (vegapull stores leader life in cost) → 5
+  const leader0Data = cardDb.get(payload.player1.leader.cardId);
+  const leader1Data = cardDb.get(payload.player2.leader.cardId);
+  const leaderLife0 = leader0Data?.life ?? leader0Data?.cost ?? 5;
+  const leaderLife1 = leader1Data?.life ?? leader1Data?.cost ?? 5;
 
   const [lifeCards0, deckAfterLife0] = drawN(remainingDeck0, leaderLife0);
   const [lifeCards1, deckAfterLife1] = drawN(remainingDeck1, leaderLife1);

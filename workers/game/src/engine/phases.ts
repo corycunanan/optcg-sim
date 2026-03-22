@@ -1,0 +1,123 @@
+/**
+ * Phase transition logic
+ *
+ * Handles REFRESH → DRAW → DON → MAIN → END phase sequence
+ * and turn handoff. Extracted from execute.ts for clarity.
+ */
+
+import type { CardData, GameState, PendingEvent, ExecuteResult } from "../types.js";
+import {
+  getActivePlayerIndex,
+  returnAttachedDonToCostArea,
+  activateAllRested,
+  moveCard,
+  placeDonFromDeck,
+} from "./state.js";
+
+export function executeAdvancePhase(state: GameState, _cardDb: Map<string, CardData>): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const pi = getActivePlayerIndex(state);
+  const { phase, number: turnNumber } = state.turn;
+
+  let nextState = state;
+
+  switch (phase) {
+    case "REFRESH": {
+      // Step 1: "until start of your next turn" effects expire (M4)
+      // Step 2: "at start of your/opponent's turn" auto effects (M4)
+      // Step 3: Return attached DON!! to cost area (rested)
+      nextState = returnAttachedDonToCostArea(nextState, pi);
+      events.push({ type: "DON_DETACHED", playerIndex: pi });
+      // Step 4: Activate all rested cards
+      nextState = activateAllRested(nextState, pi);
+      // Advance to DRAW
+      nextState = { ...nextState, turn: { ...nextState.turn, phase: "DRAW" } };
+      events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "REFRESH", to: "DRAW" } });
+      break;
+    }
+
+    case "DRAW": {
+      // Draw 1 card (except first player turn 1)
+      const isFirstPlayerTurnOne = turnNumber === 1 && pi === 0;
+      if (!isFirstPlayerTurnOne) {
+        const drawn = nextState.players[pi].deck[0];
+        if (drawn) {
+          nextState = moveCard(nextState, drawn.instanceId, "HAND");
+          events.push({ type: "CARD_DRAWN", playerIndex: pi, payload: { cardId: drawn.cardId } });
+        }
+        // Deck-out is checked in step 7 (defeat.ts)
+      }
+      nextState = { ...nextState, turn: { ...nextState.turn, phase: "DON" } };
+      events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "DRAW", to: "DON" } });
+      break;
+    }
+
+    case "DON": {
+      // Place DON!! cards: 2 normally, 1 on first player's first turn
+      const donCount = (turnNumber === 1 && pi === 0) ? 1 : 2;
+      nextState = placeDonFromDeck(nextState, pi, donCount);
+      events.push({
+        type: "DON_PLACED_ON_FIELD",
+        playerIndex: pi,
+        payload: { count: Math.min(donCount, state.players[pi].donDeck.length) },
+      });
+      nextState = { ...nextState, turn: { ...nextState.turn, phase: "MAIN" } };
+      events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "DON", to: "MAIN" } });
+      break;
+    }
+
+    case "MAIN": {
+      // Advance to END
+      nextState = { ...nextState, turn: { ...nextState.turn, phase: "END" } };
+      events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "MAIN", to: "END" } });
+      // Run end-phase sequence automatically
+      const endResult = runEndPhase(nextState, pi);
+      nextState = endResult.state;
+      events.push(...endResult.events);
+      break;
+    }
+
+    case "END": {
+      // Should not be reached via ADVANCE_PHASE (end phase runs automatically)
+      break;
+    }
+  }
+
+  return { state: nextState, events };
+}
+
+function runEndPhase(state: GameState, pi: 0 | 1): ExecuteResult {
+  const events: PendingEvent[] = [];
+
+  // Steps 1 & 2: [End of Your Turn] / [End of Your Opponent's Turn] effects (M4)
+
+  // Steps 3-6: Expiry waves (M4 — no active effects in M3)
+
+  // Turn passes to opponent
+  const nextPlayerIndex: 0 | 1 = pi === 0 ? 1 : 0;
+  const nextTurnNumber = nextPlayerIndex === 0 ? state.turn.number + 1 : state.turn.number;
+
+  events.push({ type: "TURN_ENDED", playerIndex: pi });
+
+  const nextState: GameState = {
+    ...state,
+    turn: {
+      number: nextTurnNumber,
+      activePlayerIndex: nextPlayerIndex,
+      phase: "REFRESH",
+      battleSubPhase: null,
+      battle: null,
+      oncePerTurnUsed: {},
+      actionsPerformedThisTurn: [],
+    },
+  };
+
+  events.push({ type: "TURN_STARTED", playerIndex: nextPlayerIndex });
+  events.push({
+    type: "PHASE_CHANGED",
+    playerIndex: nextPlayerIndex,
+    payload: { from: "END", to: "REFRESH" },
+  });
+
+  return { state: nextState, events };
+}
