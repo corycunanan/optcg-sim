@@ -90,8 +90,8 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **2-2-2.** Five card categories | **IMPL** | `CardData.type: "Leader" \| "Character" \| "Event" \| "Stage"` | DON!! cards are `DonInstance` — a separate type, not a `CardData` |
 | **2-2-4-1/2.** "Character" vs "Character card" distinction | **GAP** | — | The rules distinguish between a Character (in Character area) and a "Character card" (outside Character area). Engine has no location-sensitive type inference for effect targeting |
 | **2-3-4/5.** Multi-color cards | **IMPL** | `CardData.color: string[]` | Array structure supports multi-color |
-| **2-4-2.** Multiple types (slash-separated) | **GAP** | `CardData` has no `types` field | Card type/tribe data not modeled. Effects referencing `{type}` brackets cannot be evaluated |
-| **2-5.** Attributes (Slash, Strike, etc.) | **GAP** | `CardData` has no `attribute` field | Card attributes not modeled. Effects referencing `<attribute>` brackets cannot be evaluated |
+| **2-4-2.** Multiple types (slash-separated) | **IMPL** | `CardData.types: string[]` | Populated from DB `traits` column. M4 effect targeting can match `{type}` brackets |
+| **2-5.** Attributes (Slash, Strike, etc.) | **IMPL** | `CardData.attribute: string[]` | Populated from DB `attribute` column. M4 effect targeting can match `<attribute>` brackets |
 
 ### 2-6 to 2-9. Power, Cost, Card Text, Life
 
@@ -550,7 +550,7 @@ The following new functions or systems are required, derived directly from the g
 20. **Character Overflow Player Choice** — Prompt the player to choose which Character to trash (instead of auto-trashing oldest).
     - Rules: 3-7-6-1
 
-21. **Card Data Expansion** — Add `attribute` and `types` (tribe) fields to `CardData`.
+21. ~~**Card Data Expansion**~~ — **DONE (M3.5).** `CardData.attribute: string[]` and `CardData.types: string[]` added. Populated from DB `attribute` and `traits` columns via `toCardData()`.
     - Rules: 2-4-1 to 2-4-4, 2-5-1 to 2-5-7
 
 22. **Infinite Loop Detection** — Track repeated game states; if detected, prompt players for loop count or declare draw.

@@ -202,6 +202,8 @@ export interface CardData {
   power: number | null;
   counter: number | null;
   life: number | null;
+  attribute: string[];   // Strike, Slash, Ranged, Special, Wisdom (§2-4)
+  types: string[];       // Tribes, e.g. ["Straw Hat Crew"] (§2-5)
   effectText: string;
   triggerText: string | null;
   keywords: KeywordSet;

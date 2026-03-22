@@ -23,6 +23,8 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
     power: 4000,
     counter: null,
     life: null,
+    attribute: [],
+    types: [],
     effectText: "",
     triggerText: null,
     keywords: noKeywords(),

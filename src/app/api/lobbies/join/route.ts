@@ -109,6 +109,8 @@ export async function POST(request: NextRequest) {
       power: card.power,
       counter: card.counter,
       life: card.life,
+      attribute: card.attribute,
+      types: card.traits,
       effectText: card.effectText,
       triggerText: card.triggerText ?? null,
       keywords: extractKeywords(card.effectText, card.triggerText ?? null),
