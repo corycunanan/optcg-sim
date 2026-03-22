@@ -91,6 +91,8 @@ export interface PlayerState {
   life: LifeCard[];              // ordered; index 0 = top (first removed on damage)
   removedFromGame: CardInstance[];
   connected: boolean;
+  awayReason: "LEFT" | "DISCONNECTED" | null;
+  rejoinDeadlineAt: number | null;
 }
 
 // ─── Effect / Modifier stubs (populated in M4) ────────────────────────────────
@@ -175,7 +177,7 @@ export interface GameState {
   triggerRegistry: RegisteredTrigger[];
   // Log
   eventLog: GameEvent[];
-  status: "IN_PROGRESS" | "FINISHED";
+  status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
   winner: 0 | 1 | null;
   winReason: string | null;
 }
@@ -233,11 +235,14 @@ export type ServerMessage =
   | { type: "game:update"; action: GameAction; state: GameState }
   | { type: "game:prompt"; promptType: PromptType; options: PromptOptions }
   | { type: "game:error"; message: string }
-  | { type: "game:over"; winner: 0 | 1 | null; reason: string };
+  | { type: "game:over"; winner: 0 | 1 | null; reason: string }
+  | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
+  | { type: "game:player_reconnected"; playerIndex: 0 | 1 };
 
 // Client → Server
 export type ClientMessage =
-  | { type: "game:action"; action: GameAction };
+  | { type: "game:action"; action: GameAction }
+  | { type: "game:leave" };
 
 export type PromptType =
   | "SELECT_BLOCKER"

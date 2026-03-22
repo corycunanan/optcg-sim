@@ -47,6 +47,8 @@ export interface PlayerState {
   trash: CardInstance[];
   removedFromGame: CardInstance[];
   connected: boolean;
+  awayReason: "LEFT" | "DISCONNECTED" | null;
+  rejoinDeadlineAt: number | null;
 }
 
 export interface TurnState {
@@ -105,7 +107,9 @@ type ServerMessage =
   | { type: "game:update"; action: GameAction; state: GameState }
   | { type: "game:prompt"; promptType: PromptType; options: PromptOptions }
   | { type: "game:error"; message: string }
-  | { type: "game:over"; winner: 0 | 1 | null; reason: string };
+  | { type: "game:over"; winner: 0 | 1 | null; reason: string }
+  | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
+  | { type: "game:player_reconnected"; playerIndex: 0 | 1 };
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -115,15 +119,22 @@ export interface UseGameWsReturn {
   lastError: string | null;
   activePrompt: { promptType: PromptType; options: PromptOptions } | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
-  playerIndex: 0 | 1 | null;
   sendAction: (action: GameAction) => void;
+  leaveGame: () => Promise<void>;
 }
 
+/**
+ * useGameWs — manages the WebSocket connection to the Cloudflare game DO.
+ *
+ * Accepts a `getToken` async function instead of a static token string.
+ * This is critical: the HS256 token expires after 5 minutes, and every
+ * reconnect attempt fetches a fresh one, preventing the stale-token
+ * reconnect loop that caused "cannot rejoin" failures.
+ */
 export function useGameWs(
   gameId: string,
   workerUrl: string,
-  token: string,  // userId (stub) or JWT in production
-  playerIndex: 0 | 1 | null,
+  getToken: () => Promise<string>,
 ): UseGameWsReturn {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
@@ -134,12 +145,32 @@ export function useGameWs(
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const unmountedRef = useRef(false);
+  const manualCloseRef = useRef(false);
 
-  const connect = useCallback(() => {
-    if (!token || !gameId || !workerUrl) return;
+  const connect = useCallback(async function connectImpl() {
+    if (!gameId || !workerUrl) return;
+    if (unmountedRef.current) return;
+    manualCloseRef.current = false;
+
+    // Always fetch a fresh token on every connect attempt.
+    // The token expires in 5 min; reusing a stale token on reconnect causes 401 loops.
+    let token: string;
+    try {
+      token = await getToken();
+    } catch {
+      if (unmountedRef.current) return;
+      setConnectionStatus("error");
+      setLastError("Failed to get auth token");
+      const delay = Math.min(5000 * Math.pow(2, reconnectAttemptsRef.current), 60000);
+      reconnectAttemptsRef.current += 1;
+      reconnectTimerRef.current = setTimeout(() => { void connectImpl(); }, delay);
+      return;
+    }
+
+    if (unmountedRef.current) return;
 
     const url = `${workerUrl}/game/${gameId}/ws?token=${encodeURIComponent(token)}`;
-    // Use wss:// for production, ws:// for localhost
     const wsUrl = url.replace(/^http/, "ws");
 
     const ws = new WebSocket(wsUrl);
@@ -147,6 +178,7 @@ export function useGameWs(
     setConnectionStatus("connecting");
 
     ws.onopen = () => {
+      if (unmountedRef.current) { ws.close(); return; }
       setConnectionStatus("connected");
       reconnectAttemptsRef.current = 0;
     };
@@ -162,10 +194,22 @@ export function useGameWs(
       switch (msg.type) {
         case "game:state":
           setGameState(msg.state);
+          if (msg.state.status !== "IN_PROGRESS") {
+            setGameOver({
+              winner: msg.state.winner,
+              reason: msg.state.winReason ?? "Game over",
+            });
+          }
           break;
         case "game:update":
           setGameState(msg.state);
           setActivePrompt(null);
+          if (msg.state.status !== "IN_PROGRESS") {
+            setGameOver({
+              winner: msg.state.winner,
+              reason: msg.state.winReason ?? "Game over",
+            });
+          }
           break;
         case "game:prompt":
           setActivePrompt({ promptType: msg.promptType, options: msg.options });
@@ -176,30 +220,37 @@ export function useGameWs(
         case "game:over":
           setGameOver({ winner: msg.winner, reason: msg.reason });
           break;
+        case "game:player_disconnected":
+        case "game:player_reconnected":
+          // Game state update (connected flag) will arrive via next broadcast
+          break;
       }
     };
 
     ws.onerror = () => {
-      setConnectionStatus("error");
+      if (!unmountedRef.current) setConnectionStatus("error");
     };
 
     ws.onclose = () => {
+      if (unmountedRef.current || manualCloseRef.current) return;
       setConnectionStatus("disconnected");
       wsRef.current = null;
 
-      // Exponential backoff reconnect (max 30s)
+      // Exponential backoff; fresh token fetched on each attempt via connect()
       const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
       reconnectAttemptsRef.current += 1;
-      reconnectTimerRef.current = setTimeout(connect, delay);
+      reconnectTimerRef.current = setTimeout(() => { void connectImpl(); }, delay);
     };
-  }, [gameId, workerUrl, token]);
+  }, [gameId, workerUrl, getToken]);
 
   useEffect(() => {
+    unmountedRef.current = false;
     connect();
     return () => {
+      unmountedRef.current = true;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (wsRef.current) {
-        wsRef.current.onclose = null; // prevent reconnect on unmount
+        wsRef.current.onclose = null; // suppress reconnect on intentional unmount
         wsRef.current.close();
       }
     };
@@ -215,13 +266,24 @@ export function useGameWs(
     setLastError(null);
   }, []);
 
-  return {
-    gameState,
-    connectionStatus,
-    lastError,
-    activePrompt,
-    gameOver,
-    playerIndex,
-    sendAction,
-  };
+  const leaveGame = useCallback(async () => {
+    manualCloseRef.current = true;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.onclose = null;
+      ws.send(JSON.stringify({ type: "game:leave" }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      ws.close();
+    } else if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
+
+    wsRef.current = null;
+    setConnectionStatus("disconnected");
+  }, []);
+
+  return { gameState, connectionStatus, lastError, activePrompt, gameOver, sendAction, leaveGame };
 }

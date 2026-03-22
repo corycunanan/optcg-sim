@@ -12,7 +12,6 @@ interface Env {
   GAME_SESSION: DurableObjectNamespace;
   NEXTJS_URL: string;
   GAME_WORKER_SECRET: string;
-  JWT_SECRET: string;
 }
 
 export default {
@@ -30,16 +29,16 @@ export default {
       });
     }
 
-    // Route: /game/:gameId/init or /game/:gameId/ws
-    const match = url.pathname.match(/^\/game\/([^/]+)\/(init|ws)$/);
+    // Route: /game/:gameId/init | ws | cards | notify-end
+    const match = url.pathname.match(/^\/game\/([^/]+)\/(init|ws|cards|notify-end)$/);
     if (!match) {
       return new Response("Not found", { status: 404 });
     }
 
     const [, gameId, route] = match;
 
-    // Auth check for /init (must come from Next.js with the shared secret)
-    if (route === "init") {
+    // Auth check for /init and /notify-end (must come from Next.js with the shared secret)
+    if (route === "init" || route === "notify-end") {
       if (request.method !== "POST") {
         return new Response("Method not allowed", { status: 405 });
       }

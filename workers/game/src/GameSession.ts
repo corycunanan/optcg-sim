@@ -18,12 +18,13 @@ import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
 import { setPlayerConnected } from "./engine/state.js";
 
+const REJOIN_WINDOW_MS = 5 * 60 * 1000;
+
 // Stored in DO persistent storage
 interface StoredSession {
   state: GameState;
   cardDb: Record<string, CardData>; // serialized as plain object
   mulliganDone: [boolean, boolean];
-  reconnectTimer: boolean; // whether alarm is set for a disconnected player
 }
 
 export class GameSession implements DurableObject {
@@ -48,9 +49,19 @@ export class GameSession implements DurableObject {
       return this.handleInit(request);
     }
 
+    // POST /notify-end — DB already updated (e.g. API fallback concede); sync DO + notify clients
+    if (request.method === "POST" && url.pathname.endsWith("/notify-end")) {
+      return this.handleNotifyEnd(request);
+    }
+
     // GET /ws — WebSocket upgrade
     if (request.headers.get("Upgrade") === "websocket") {
       return this.handleWebSocket(request);
+    }
+
+    // GET /cards — return card DB (auth via game token)
+    if (request.method === "GET" && url.pathname.endsWith("/cards")) {
+      return this.handleGetCards(request);
     }
 
     return new Response("Not found", { status: 404 });
@@ -74,9 +85,85 @@ export class GameSession implements DurableObject {
     });
   }
 
+  /** Called from Next.js after a game is finished in Postgres (e.g. disconnected concede). */
+  private async handleNotifyEnd(request: Request): Promise<Response> {
+    const auth = request.headers.get("Authorization");
+    if (auth !== `Bearer ${this.env.GAME_WORKER_SECRET}`) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    let body: { winnerIndex?: unknown; reason?: unknown };
+    try {
+      body = await request.json() as { winnerIndex?: unknown; reason?: unknown };
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    const winnerIndex = body.winnerIndex;
+    const reason = typeof body.reason === "string" ? body.reason : "";
+    if (winnerIndex !== 0 && winnerIndex !== 1 || !reason) {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    if (!this.gameState) {
+      const loaded = await this.loadFromStorage();
+      if (!loaded) return new Response("Game not initialized", { status: 404 });
+    }
+
+    if (this.gameState!.status !== "IN_PROGRESS") {
+      return new Response(JSON.stringify({ ok: true, skipped: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    this.gameState = {
+      ...this.gameState!,
+      status: "FINISHED",
+      winner: winnerIndex as 0 | 1,
+      winReason: reason,
+    };
+    await this.persist();
+
+    this.broadcast({ type: "game:over", winner: winnerIndex as 0 | 1, reason });
+    this.broadcast({ type: "game:state", state: this.gameState });
+    await this.writeResultToDb();
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ─── Card DB ────────────────────────────────────────────────────────────────
+
+  private async handleGetCards(request: Request): Promise<Response> {
+    if (!this.cardDb || !this.gameState) {
+      const loaded = await this.loadFromStorage();
+      if (!loaded) return new Response("Game not initialized", { status: 404 });
+    }
+
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token");
+
+    if (!token) return new Response("Missing token", { status: 401 });
+    const playerIndex = await this.validateToken(token);
+    if (playerIndex === null) return new Response("Unauthorized", { status: 401 });
+
+    return new Response(JSON.stringify(Object.fromEntries(this.cardDb!)), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": this.env.NEXTJS_URL,
+      },
+    });
+  }
+
   // ─── WebSocket ─────────────────────────────────────────────────────────────
 
   private async handleWebSocket(request: Request): Promise<Response> {
+    if (!this.gameState) {
+      const loaded = await this.loadFromStorage();
+      if (!loaded) return new Response("Game not initialized", { status: 404 });
+    }
+
     const url = new URL(request.url);
     const token = url.searchParams.get("token");
 
@@ -90,24 +177,24 @@ export class GameSession implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    // Ensure game state is loaded
-    if (!this.gameState) {
-      const loaded = await this.loadFromStorage();
-      if (!loaded) return new Response("Game not initialized", { status: 404 });
-    }
-
     const { 0: client, 1: server } = new WebSocketPair();
     this.state.acceptWebSocket(server, [`player-${playerIndex}`]);
 
     // Mark player as connected
-    this.gameState = setPlayerConnected(this.gameState!, playerIndex as 0 | 1, true);
+    this.gameState = this.setPlayerPresence(this.gameState!, playerIndex as 0 | 1, {
+      connected: true,
+      awayReason: null,
+      rejoinDeadlineAt: null,
+    });
     await this.persist();
+    await this.syncAlarm();
 
-    // Send full game state to connecting client
-    this.send(server, { type: "game:state", state: this.gameState! });
-
-    // Cancel reconnect timer if it was running for this player
-    // (alarm fires if player doesn't reconnect in time)
+    // Broadcast updated game state to ALL connected players (including the new socket).
+    // This is the only reliable way to keep the `connected` flags in sync on both clients.
+    // If we only send game:state to the connecting player, the opponent's client will never
+    // learn that this player's connected flag changed to true.
+    this.broadcast({ type: "game:state", state: this.gameState! });
+    this.broadcast({ type: "game:player_reconnected", playerIndex });
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -132,49 +219,79 @@ export class GameSession implements DurableObject {
       return;
     }
 
-    if (clientMsg.type !== "game:action") return;
+    if (clientMsg.type === "game:leave") {
+      await this.handlePlayerAway(playerIndex, "LEFT", ws);
+      try { ws.close(1000, "left"); } catch { /* ignore */ }
+      return;
+    }
 
-    await this.handleAction(ws, playerIndex, clientMsg.action);
+    if (clientMsg.type === "game:action") {
+      await this.handleAction(ws, playerIndex, clientMsg.action);
+    }
   }
 
-  async webSocketClose(ws: WebSocket, _code: number, _reason: string): Promise<void> {
+  async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    void code;
+    void reason;
+
+    if (!this.gameState) {
+      await this.loadFromStorage();
+    }
+
     const tags = this.state.getTags(ws);
     const playerTag = tags.find((t) => t.startsWith("player-"));
     if (!playerTag || !this.gameState) return;
 
     const playerIndex = parseInt(playerTag.replace("player-", "")) as 0 | 1;
-    this.gameState = setPlayerConnected(this.gameState, playerIndex, false);
-    await this.persist();
-
-    // Notify opponent
-    this.broadcastExcept(ws, {
-      type: "game:prompt",
-      promptType: "SELECT_BLOCKER", // reusing prompt channel for system messages — TODO: add system:message type
-      options: { timeoutMs: 300_000 },
-    });
-
-    // Set a 5-minute alarm for forfeit
-    await this.state.storage.setAlarm(Date.now() + 5 * 60 * 1000);
+    if (!this.gameState.players[playerIndex].connected) return;
+    await this.handlePlayerAway(playerIndex, "DISCONNECTED", ws);
   }
 
   async alarm(): Promise<void> {
-    // 5-minute reconnect timer expired — forfeit the disconnected player
     if (!this.gameState) await this.loadFromStorage();
-    if (!this.gameState || this.gameState.status === "FINISHED") return;
+    if (!this.gameState || this.gameState.status !== "IN_PROGRESS") return;
 
-    const disconnectedIdx = this.gameState.players[0].connected ? 1 : 0;
-    const winner: 0 | 1 = disconnectedIdx === 0 ? 1 : 0;
+    const now = Date.now();
+    const expiredPlayers = ([0, 1] as const).filter((playerIndex) => {
+      const player = this.gameState!.players[playerIndex];
+      return !player.connected && player.rejoinDeadlineAt !== null && player.rejoinDeadlineAt <= now;
+    });
+
+    if (expiredPlayers.length === 0) {
+      await this.syncAlarm();
+      return;
+    }
+
+    let winner: 0 | 1 | null = null;
+    let status: "FINISHED" | "ABANDONED" = "FINISHED";
+    let reason = "";
+
+    if (expiredPlayers.length === 2) {
+      status = "ABANDONED";
+      reason = "Both players failed to rejoin in time";
+    } else {
+      const awayPlayer = expiredPlayers[0];
+      const otherPlayer = awayPlayer === 0 ? 1 : 0;
+      if (this.gameState.players[otherPlayer].connected) {
+        winner = otherPlayer;
+        reason = `Player ${awayPlayer + 1} failed to rejoin in time`;
+      } else {
+        status = "ABANDONED";
+        reason = "Rejoin window expired while both players were away";
+      }
+    }
 
     this.gameState = {
       ...this.gameState,
-      status: "FINISHED",
+      status,
       winner,
-      winReason: `Player ${disconnectedIdx + 1} disconnected`,
+      winReason: reason,
     };
 
-    this.broadcast({ type: "game:over", winner, reason: "disconnect forfeit" });
     await this.persist();
     await this.writeResultToDb();
+    this.broadcast({ type: "game:over", winner, reason });
+    await this.syncAlarm();
   }
 
   // ─── Action handling ───────────────────────────────────────────────────────
@@ -186,26 +303,35 @@ export class GameSession implements DurableObject {
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
 
-    // Only the active player can act, except for: PASS, DECLARE_BLOCKER, USE_COUNTER,
-    // USE_COUNTER_EVENT, REVEAL_TRIGGER (which are the inactive/defending player's actions)
-    const inactiveActions = new Set([
-      "DECLARE_BLOCKER",
-      "USE_COUNTER",
-      "USE_COUNTER_EVENT",
-      "REVEAL_TRIGGER",
-      "PASS",
-    ]);
-
-    const expectedPlayer = inactiveActions.has(action.type)
-      ? (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0)
-      : this.gameState.turn.activePlayerIndex;
-
-    if (playerIndex !== expectedPlayer) {
-      this.send(ws, { type: "game:error", message: "Not your turn" });
+    const pauseReason = this.getPauseReason(playerIndex);
+    if (pauseReason && action.type !== "CONCEDE") {
+      this.send(ws, { type: "game:error", message: pauseReason });
       return;
     }
 
-    const result = runPipeline(this.gameState, action, this.cardDb);
+    // CONCEDE is allowed even while "paused" for opponent away — player may always resign.
+    if (action.type !== "CONCEDE") {
+      // Only the active player can act, except for: PASS, DECLARE_BLOCKER, USE_COUNTER,
+      // USE_COUNTER_EVENT, REVEAL_TRIGGER (which are the inactive/defending player's actions)
+      const inactiveActions = new Set([
+        "DECLARE_BLOCKER",
+        "USE_COUNTER",
+        "USE_COUNTER_EVENT",
+        "REVEAL_TRIGGER",
+        "PASS",
+      ]);
+
+      const expectedPlayer = inactiveActions.has(action.type)
+        ? (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0)
+        : this.gameState.turn.activePlayerIndex;
+
+      if (playerIndex !== expectedPlayer) {
+        this.send(ws, { type: "game:error", message: "Not your turn" });
+        return;
+      }
+    }
+
+    const result = runPipeline(this.gameState, action, this.cardDb, playerIndex);
 
     if (!result.valid) {
       this.send(ws, { type: "game:error", message: result.error ?? "Invalid action" });
@@ -215,18 +341,20 @@ export class GameSession implements DurableObject {
     this.gameState = result.state;
     await this.persist();
 
-    // Broadcast updated state to both players
-    this.broadcast({ type: "game:update", action, state: this.gameState });
-
+    // Persist result to Postgres before any broadcast that lets clients leave for /lobbies;
+    // otherwise GET /api/game/active can still see IN_PROGRESS and block new games.
     if (result.gameOver) {
+      await this.writeResultToDb();
+      this.broadcast({ type: "game:update", action, state: this.gameState });
       this.broadcast({
         type: "game:over",
         winner: result.gameOver.winner,
         reason: result.gameOver.reason,
       });
-      await this.writeResultToDb();
       return;
     }
+
+    this.broadcast({ type: "game:update", action, state: this.gameState });
 
     // Send prompts if a player input is required
     this.sendPendingPrompts();
@@ -264,13 +392,8 @@ export class GameSession implements DurableObject {
   // ─── Token validation ──────────────────────────────────────────────────────
 
   private async validateToken(token: string): Promise<0 | 1 | null> {
-    if (!this.gameState) {
-      const loaded = await this.loadFromStorage();
-      if (!loaded) return null;
-    }
-
-    const userId = await verifyNextAuthJwt(token, this.env.JWT_SECRET);
-    if (!userId) return null;
+    const userId = await verifyGameToken(token, this.env.GAME_WORKER_SECRET);
+    if (!userId || !this.gameState) return null;
 
     const players = this.gameState!.players;
     if (players[0].playerId === userId) return 0;
@@ -286,7 +409,6 @@ export class GameSession implements DurableObject {
       state: this.gameState,
       cardDb: Object.fromEntries(this.cardDb),
       mulliganDone: this.mulliganDone,
-      reconnectTimer: false,
     };
     await this.state.storage.put("session", stored);
   }
@@ -313,16 +435,23 @@ export class GameSession implements DurableObject {
       winReason: this.gameState.winReason,
     };
 
-    await fetch(`${this.env.NEXTJS_URL}/api/game/result`, {
+    const url = `${this.env.NEXTJS_URL}/api/game/result`;
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${this.env.GAME_WORKER_SECRET}`,
       },
       body: JSON.stringify(body),
-    }).catch(() => {
-      // Non-critical: game result logging. Don't crash the DO on failure.
+    }).catch((err: unknown) => {
+      console.error("[GameSession] writeResultToDb fetch failed:", url, err);
+      return null;
     });
+    if (!res) return;
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error("[GameSession] writeResultToDb HTTP", res.status, text.slice(0, 300));
+    }
   }
 
   // ─── Broadcast helpers ─────────────────────────────────────────────────────
@@ -353,13 +482,102 @@ export class GameSession implements DurableObject {
     const sockets = this.state.getWebSockets(`player-${playerIndex}`);
     return sockets[0] ?? null;
   }
+
+  private setPlayerPresence(
+    state: GameState,
+    playerIndex: 0 | 1,
+    updates: {
+      connected: boolean;
+      awayReason: "LEFT" | "DISCONNECTED" | null;
+      rejoinDeadlineAt: number | null;
+    },
+  ): GameState {
+    const nextState = setPlayerConnected(state, playerIndex, updates.connected);
+    const newPlayers: [GameState["players"][0], GameState["players"][1]] = [...nextState.players] as typeof nextState.players;
+    newPlayers[playerIndex] = {
+      ...newPlayers[playerIndex],
+      awayReason: updates.awayReason,
+      rejoinDeadlineAt: updates.rejoinDeadlineAt,
+    };
+    return { ...nextState, players: newPlayers };
+  }
+
+  private async handlePlayerAway(
+    playerIndex: 0 | 1,
+    reason: "LEFT" | "DISCONNECTED",
+    excludeWs?: WebSocket,
+  ): Promise<void> {
+    if (!this.gameState) return;
+
+    this.gameState = this.setPlayerPresence(this.gameState, playerIndex, {
+      connected: false,
+      awayReason: reason,
+      rejoinDeadlineAt: Date.now() + REJOIN_WINDOW_MS,
+    });
+    await this.persist();
+    await this.syncAlarm();
+
+    if (excludeWs) {
+      this.broadcastExcept(excludeWs, { type: "game:state", state: this.gameState });
+      this.broadcastExcept(excludeWs, { type: "game:player_disconnected", playerIndex });
+      return;
+    }
+
+    this.broadcast({ type: "game:state", state: this.gameState });
+    this.broadcast({ type: "game:player_disconnected", playerIndex });
+  }
+
+  private async syncAlarm(): Promise<void> {
+    if (!this.gameState) return;
+
+    const nextDeadline = this.gameState.players.reduce<number | null>((current, player) => {
+      if (player.connected || player.rejoinDeadlineAt === null) return current;
+      if (current === null) return player.rejoinDeadlineAt;
+      return Math.min(current, player.rejoinDeadlineAt);
+    }, null);
+
+    if (nextDeadline === null) {
+      await this.state.storage.deleteAlarm();
+      return;
+    }
+
+    await this.state.storage.setAlarm(nextDeadline);
+  }
+
+  private getPauseReason(playerIndex: 0 | 1): string | null {
+    if (!this.gameState) return null;
+
+    const awayPlayers = ([0, 1] as const).filter((index) => {
+      const player = this.gameState!.players[index];
+      return !player.connected && player.rejoinDeadlineAt !== null;
+    });
+
+    if (awayPlayers.length === 0) return null;
+    if (awayPlayers.length === 2) return "Both players are away. Rejoin to continue.";
+
+    const awayPlayer = awayPlayers[0];
+    if (awayPlayer === playerIndex) {
+      return "You left the game. Rejoin to continue.";
+    }
+    if (this.gameState.turn.activePlayerIndex === awayPlayer) {
+      return `Waiting for Player ${awayPlayer + 1} to rejoin for their turn.`;
+    }
+
+    const battleSubPhase = this.gameState.turn.battleSubPhase;
+    if (battleSubPhase === "BLOCK_STEP" || battleSubPhase === "COUNTER_STEP" || battleSubPhase === "DAMAGE_STEP") {
+      return `Waiting for Player ${awayPlayer + 1} to rejoin before battle can continue.`;
+    }
+
+    return null;
+  }
 }
 
-// ─── JWT verification (NextAuth v5 / @auth/core) ───────────────────────────
-// NextAuth signs tokens with HMAC-SHA512 using AUTH_SECRET as the raw key.
-// The `sub` claim contains the user's database ID.
+// ─── Game token verification ────────────────────────────────────────────────
+// Verifies the short-lived HS256 token minted by /api/game/token.
+// Signed with GAME_WORKER_SECRET (not NextAuth's JWE token, which uses
+// A256CBC-HS512 encryption and would be non-trivial to verify here).
 
-async function verifyNextAuthJwt(token: string, secret: string): Promise<string | null> {
+async function verifyGameToken(token: string, secret: string): Promise<string | null> {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -367,23 +585,19 @@ async function verifyNextAuthJwt(token: string, secret: string): Promise<string 
     const [headerB64, payloadB64, signatureB64] = parts;
     const signingInput = `${headerB64}.${payloadB64}`;
 
-    const keyMaterial = new TextEncoder().encode(secret);
     const key = await crypto.subtle.importKey(
       "raw",
-      keyMaterial,
-      { name: "HMAC", hash: "SHA-512" },
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
       false,
       ["verify"],
     );
 
     const signature = base64urlDecode(signatureB64);
-    const data = new TextEncoder().encode(signingInput);
-    const valid = await crypto.subtle.verify("HMAC", key, signature, data);
+    const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(signingInput));
     if (!valid) return null;
 
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64)));
-
-    // Reject expired tokens
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
 
     return (payload.sub as string) ?? null;
@@ -403,5 +617,4 @@ interface Env {
   GAME_SESSION: DurableObjectNamespace;
   NEXTJS_URL: string;
   GAME_WORKER_SECRET: string;
-  JWT_SECRET: string;
 }

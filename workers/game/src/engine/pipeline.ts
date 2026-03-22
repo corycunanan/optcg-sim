@@ -31,6 +31,7 @@ export function runPipeline(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
 ): PipelineResult {
   // Step 1: Validate
   const validationError = validate(state, action, cardDb);
@@ -45,7 +46,7 @@ export function runPipeline(
   // In M4: scan active replacement effects; substitute action if matched.
 
   // Step 4: Execute — produce new state snapshot
-  const execResult = execute(state, action, cardDb);
+  const execResult = execute(state, action, cardDb, actingPlayerIndex);
   let nextState = execResult.state;
 
   // Step 5: Fire Triggers — emit events, scan triggerRegistry
@@ -77,6 +78,18 @@ export function runPipeline(
       state: nextState,
       valid: true,
       gameOver: { winner: defeat.winner, reason: defeat.reason },
+    };
+  }
+
+  // CONCEDE (and any action that sets FINISHED without going through defeat checks)
+  if (nextState.status === "FINISHED" || nextState.status === "ABANDONED") {
+    return {
+      state: nextState,
+      valid: true,
+      gameOver: {
+        winner: nextState.winner,
+        reason: nextState.winReason ?? "Game over",
+      },
     };
   }
 

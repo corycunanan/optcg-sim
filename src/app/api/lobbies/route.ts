@@ -1,46 +1,12 @@
 /**
- * GET  /api/lobbies — List public WAITING lobbies
- * POST /api/lobbies — Create a lobby
+ * POST /api/lobbies — Create a lobby with a join code.
+ * Returns { lobbyId, joinCode } for the host to share.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-
-const LOBBY_INCLUDE = {
-  host: { select: { id: true, username: true, name: true, image: true } },
-  hostDeck: { select: { id: true, name: true, leaderId: true } },
-  guest: {
-    include: {
-      user: { select: { id: true, username: true, name: true, image: true } },
-      deck: { select: { id: true, name: true, leaderId: true } },
-    },
-  },
-  invites: {
-    where: { status: "PENDING" as const },
-    include: { user: { select: { id: true, username: true, name: true, image: true } } },
-  },
-} as const;
-
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const lobbies = await prisma.lobby.findMany({
-      where: { status: "WAITING", visibility: "PUBLIC" },
-      include: LOBBY_INCLUDE,
-      orderBy: { createdAt: "desc" },
-    });
-
-    return NextResponse.json({ data: lobbies });
-  } catch (error) {
-    console.error("Lobby list error:", error);
-    return NextResponse.json({ error: "Failed to list lobbies" }, { status: 500 });
-  }
-}
+import { generateLobbyCode } from "@/lib/lobbies";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -51,17 +17,15 @@ export async function POST(request: NextRequest) {
   const userId = session.user.id;
 
   try {
-    const { deckId, format, visibility } = await request.json() as {
+    const { deckId, format } = (await request.json()) as {
       deckId: string;
       format?: string;
-      visibility?: "PUBLIC" | "INVITE_ONLY";
     };
 
     if (!deckId) {
       return NextResponse.json({ error: "deckId is required" }, { status: 400 });
     }
 
-    // Verify deck belongs to user
     const deck = await prisma.deck.findFirst({
       where: { id: deckId, userId },
     });
@@ -75,17 +39,42 @@ export async function POST(request: NextRequest) {
       data: { status: "CLOSED" },
     });
 
-    const lobby = await prisma.lobby.create({
-      data: {
-        hostUserId: userId,
-        hostDeckId: deckId,
-        format: format || "Standard",
-        visibility: visibility || "PUBLIC",
-      },
-      include: LOBBY_INCLUDE,
-    });
+    let lobby = null;
+    let attempts = 0;
+    while (!lobby && attempts < 5) {
+      attempts += 1;
+      try {
+        lobby = await prisma.lobby.create({
+          data: {
+            hostUserId: userId,
+            hostDeckId: deckId,
+            format: format || "Standard",
+            joinCode: generateLobbyCode(),
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          "code" in error &&
+          (error as { code: string }).code === "P2002"
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
 
-    return NextResponse.json(lobby, { status: 201 });
+    if (!lobby) {
+      return NextResponse.json(
+        { error: "Failed to generate unique lobby code" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { lobbyId: lobby.id, joinCode: lobby.joinCode },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Lobby create error:", error);
     return NextResponse.json({ error: "Failed to create lobby" }, { status: 500 });

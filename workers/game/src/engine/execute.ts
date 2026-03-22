@@ -38,6 +38,7 @@ export function execute(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
 ): ExecuteResult {
   switch (action.type) {
     case "ADVANCE_PHASE":
@@ -59,7 +60,7 @@ export function execute(
     case "PASS":
       return executePass(state, cardDb);
     case "CONCEDE":
-      return executeConcede(state);
+      return executeConcede(state, actingPlayerIndex);
     case "MANUAL_EFFECT":
       return executeManualEffect(state, action.description);
     case "ACTIVATE_EFFECT":
@@ -634,18 +635,21 @@ function executeRevealTrigger(
 
 // ─── Concede ──────────────────────────────────────────────────────────────────
 
-function executeConcede(state: GameState): ExecuteResult {
-  const pi = getActivePlayerIndex(state);
-  const winner: 0 | 1 = pi === 0 ? 1 : 0;
+function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult {
+  const winner: 0 | 1 = concedingPlayer === 0 ? 1 : 0;
   const nextState: GameState = {
     ...state,
     status: "FINISHED",
     winner,
-    winReason: `Player ${pi + 1} conceded`,
+    winReason: `Player ${concedingPlayer + 1} conceded`,
   };
   return {
     state: nextState,
-    events: [{ type: "GAME_OVER", playerIndex: pi, payload: { winner, reason: "concede" } }],
+    events: [{
+      type: "GAME_OVER",
+      playerIndex: concedingPlayer,
+      payload: { winner, reason: "concede" },
+    }],
   };
 }
 

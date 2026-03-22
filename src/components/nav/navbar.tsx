@@ -64,6 +64,7 @@ export function Navbar() {
 
   const cardsActive = pathname.startsWith("/admin/cards") || pathname.startsWith("/admin/sets");
   const decksActive = pathname.startsWith("/decks");
+  const playActive = pathname.startsWith("/lobbies") || pathname.startsWith("/game");
 
   return (
     <nav
@@ -114,6 +115,19 @@ export function Navbar() {
             </DropdownMenu>
           )}
         </div>
+
+        {/* Play */}
+        <Link
+          href="/lobbies"
+          className={cn(
+            "rounded px-3 py-2 text-sm font-medium transition-colors",
+            playActive
+              ? "bg-white/10 text-content-inverse"
+              : "text-content-inverse/70 hover:bg-white/10 hover:text-content-inverse",
+          )}
+        >
+          Play
+        </Link>
 
         {/* Decks dropdown */}
         <div className="relative">

@@ -52,7 +52,6 @@ model User {
   receivedMessages  Message[]       @relation("ReceivedMessages")
   hostedLobbies     Lobby[]         @relation("HostedLobbies")
   lobbyGuests       LobbyGuest[]
-  lobbyInvites      LobbyInvite[]
 
   // Game
   gamesAsPlayer1    GameSession[]   @relation("GamesAsPlayer1")
@@ -236,22 +235,10 @@ enum FriendRequestStatus {
   DECLINED
 }
 
-enum LobbyVisibility {
-  PUBLIC
-  INVITE_ONLY
-}
-
 enum LobbyStatus {
   WAITING
-  READY
   IN_GAME
   CLOSED
-}
-
-enum LobbyInviteStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
 }
 
 model FriendRequest {
@@ -302,21 +289,21 @@ model Message {
 }
 
 model Lobby {
-  id         String          @id @default(uuid())
+  id         String      @id @default(uuid())
   hostUserId String
   hostDeckId String
-  format     String          @default("Standard")
-  visibility LobbyVisibility @default(PUBLIC)
-  status     LobbyStatus     @default(WAITING)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  joinCode   String      @unique @map("join_code")
+  format     String      @default("Standard")
+  status     LobbyStatus @default(WAITING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
-  host     User          @relation("HostedLobbies", fields: [hostUserId], references: [id])
-  hostDeck Deck          @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
-  invites  LobbyInvite[]
-  guest    LobbyGuest?
+  host        User         @relation("HostedLobbies", fields: [hostUserId], references: [id])
+  hostDeck    Deck         @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
+  guest       LobbyGuest?
+  gameSession GameSession?
 
-  @@index([status, visibility])
+  @@index([status])
   @@map("lobbies")
 }
 
@@ -331,21 +318,6 @@ model LobbyGuest {
   deck  Deck  @relation(fields: [deckId], references: [id])
 
   @@map("lobby_guests")
-}
-
-model LobbyInvite {
-  id        String            @id @default(uuid())
-  lobbyId   String
-  userId    String
-  status    LobbyInviteStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-
-  lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id])
-
-  @@unique([lobbyId, userId])
-  @@index([userId, status])
-  @@map("lobby_invites")
 }
 
 // ─── M3: Game Engine ─────────────────────────────────────────
@@ -372,6 +344,7 @@ model GameSession {
 
   player1       User            @relation("GamesAsPlayer1", fields: [player1Id], references: [id])
   player2       User            @relation("GamesAsPlayer2", fields: [player2Id], references: [id])
+  lobby         Lobby           @relation(fields: [lobbyId], references: [id])
   actions       GameActionLog[]
 
   @@index([player1Id])

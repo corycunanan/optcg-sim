@@ -134,8 +134,10 @@ type PartialPlayerState = Omit<import("../types.js").PlayerState, "hand" | "deck
 function buildPlayerDeck(
   playerData: PlayerInitData,
   playerIndex: 0 | 1,
-  _cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>,
 ): [PartialPlayerState, CardInstance[]] {
+  void cardDb;
+
   const leader: CardInstance = {
     instanceId: nanoid(),
     cardId: playerData.leader.cardId,
@@ -173,6 +175,8 @@ function buildPlayerDeck(
     trash: [],
     removedFromGame: [],
     connected: false,
+    awayReason: null,
+    rejoinDeadlineAt: null,
   };
 
   return [partialState, deckCards];
