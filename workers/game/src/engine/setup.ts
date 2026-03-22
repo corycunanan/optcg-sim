@@ -52,10 +52,11 @@ export function buildInitialState(payload: GameInitPayload): {
   const [lifeCards0, deckAfterLife0] = drawN(remainingDeck0, leaderLife0);
   const [lifeCards1, deckAfterLife1] = drawN(remainingDeck1, leaderLife1);
 
-  // Life area: cards placed from top of deck → bottom of life area
-  // So the first card drawn from life was the LAST card placed.
-  const lifeArea0: LifeCard[] = lifeCards0.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }));
-  const lifeArea1: LifeCard[] = lifeCards1.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }));
+  // §5-2-1-7: Top-of-deck card placed at bottom of Life area (removed last).
+  // drawN takes from deck[0] (top), so reverse so deck-top ends up at the end of the array.
+  // removeTopLifeCard() takes life[0], so life[0] = deepest card = last drawn = removed first.
+  const lifeArea0: LifeCard[] = lifeCards0.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const })).reverse();
+  const lifeArea1: LifeCard[] = lifeCards1.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const })).reverse();
 
   // Build 10 DON!! cards per player
   const donDeck0 = buildDonDeck(0 as const);

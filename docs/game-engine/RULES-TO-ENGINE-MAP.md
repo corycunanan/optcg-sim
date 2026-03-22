@@ -229,7 +229,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **5-2-1-5-2.** Shuffle after start-of-game effects | **GAP** | — | No post-effect shuffle |
 | **5-2-1-6.** Draw 5 cards as opening hand | **IMPL** | `setup.ts:42–43` | `drawN(shuffled, 5)` |
 | **5-2-1-6-1.** Mulligan: return all, reshuffle, redraw 5 | **IMPL** | `setup.ts → applyMulligan()` | Returns hand to deck, shuffles, draws 5. One mulligan per player |
-| **5-2-1-7.** Place life cards (top of deck → bottom of life area) | **IMPL** | `setup.ts:52–58` | Cards drawn from top of deck; first drawn is index 0 of life (top of life area). **Potential issue**: Rule says "card at top of deck is at bottom of life area" — current code maps first drawn to `life[0]` which is treated as top. Need to verify ordering matches rule intent. See `removeTopLifeCard()` which takes `life[0]`. If `life[0]` is "top" (first removed on damage), the current ordering may be inverted vs rules |
+| **5-2-1-7.** Place life cards (top of deck → bottom of life area) | **IMPL** | `setup.ts:55–58` | Life array is reversed after drawing so `life[0]` (removed first by `removeTopLifeCard()`) is the last card drawn. Top-of-deck card ends up at `life[last]` — removed last, matching rules |
 | **5-2-1-8.** First player begins | **IMPL** | `setup.ts:80–88` | `activePlayerIndex: 0`, `phase: "REFRESH"` |
 
 ---
@@ -562,7 +562,7 @@ The following new functions or systems are required, derived directly from the g
 24. **"Look at" Mechanic** — Effects that let a player view cards in a secret area (deck, life).
     - Rules: 11-3-1 to 11-3-3
 
-25. **Life Area Ordering** — Verify that `setup.ts` life card ordering matches rule §5-2-1-7 (top of deck → bottom of life). Current implementation may have inverted order — `life[0]` is treated as "top" (first removed) but should be the *last* card placed (originally on top of the deck).
+25. ~~**Life Area Ordering**~~ — **DONE (M3.5).** `setup.ts` reverses life cards so top-of-deck card is at `life[last]` (removed last by `removeTopLifeCard()`).
     - Rules: 2-9-2-1, 5-2-1-7
 
 ---

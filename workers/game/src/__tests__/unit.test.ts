@@ -151,6 +151,31 @@ describe("removeTopLifeCard", () => {
     expect(result!.lifeCard).toBeTruthy();
   });
 
+  it("life area ordering: top-of-deck card is last removed (§5-2-1-7, §2-9-2-1)", () => {
+    // After the §5-2-1-7 fix, buildInitialState reverses life cards so that
+    // the first card drawn from the deck (top of deck) ends up at life[last].
+    // removeTopLifeCard takes life[0], so the top-of-deck card is removed LAST.
+    const { state } = setupGame();
+    expect(state.players[0].life.length).toBe(5);
+
+    // All life cards should have unique instanceIds and be face-down
+    const lifeIds = state.players[0].life.map((lc) => lc.instanceId);
+    expect(new Set(lifeIds).size).toBe(5);
+    for (const lc of state.players[0].life) {
+      expect(lc.face).toBe("DOWN");
+    }
+
+    // Verify removeTopLifeCard drains from front (life[0] first, life[4] last)
+    let s = state;
+    for (let i = 0; i < 5; i++) {
+      const result = removeTopLifeCard(s, 0);
+      expect(result).not.toBeNull();
+      expect(result!.lifeCard.instanceId).toBe(lifeIds[i]);
+      s = result!.state;
+    }
+    expect(removeTopLifeCard(s, 0)).toBeNull();
+  });
+
   it("returns null when life is empty", () => {
     let { state } = setupGame();
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
