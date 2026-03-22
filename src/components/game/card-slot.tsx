@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { CardData, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 
@@ -25,41 +25,65 @@ export function CardRow({ card, cardDb }: { card: CardInstance; cardDb: CardDb }
   );
 }
 
-type TooltipPlacement = { vertical: "above" | "below"; horizontal: "left" | "right" };
-
 export function CardNameWithTooltip({ cardId, cardDb }: { cardId: string; cardDb: CardDb }) {
   const data = cardDb[cardId];
   const displayName = data?.name ?? cardId;
-  const ref = useRef<HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  const [placement, setPlacement] = useState<TooltipPlacement>({ vertical: "above", horizontal: "left" });
 
-  const handleMouseEnter = useCallback(() => {
-    if (!ref.current) { setVisible(true); return; }
-    const rect = ref.current.getBoundingClientRect();
-    const spaceAbove = rect.top;
-    const spaceRight = window.innerWidth - rect.left;
-    setPlacement({
-      vertical: spaceAbove < 200 ? "below" : "above",
-      horizontal: spaceRight < 360 ? "right" : "left",
-    });
-    setVisible(true);
-  }, []);
+  const handleMouseEnter = useCallback(() => setVisible(true), []);
+  const handleMouseLeave = useCallback(() => setVisible(false), []);
+
+  useLayoutEffect(() => {
+    if (!visible || !tooltipRef.current || !triggerRef.current) return;
+    const trigger = triggerRef.current.getBoundingClientRect();
+    const tt = tooltipRef.current;
+    const gap = 8;
+    const pad = 8;
+    const ttW = tt.offsetWidth;
+    const ttH = tt.offsetHeight;
+
+    let left: number;
+    const fitsRight = trigger.right + gap + ttW <= window.innerWidth - pad;
+    const fitsLeft = trigger.left - gap - ttW >= pad;
+
+    if (fitsRight) {
+      left = trigger.right + gap;
+    } else if (fitsLeft) {
+      left = trigger.left - gap - ttW;
+    } else {
+      left = Math.max(pad, window.innerWidth - ttW - pad);
+    }
+
+    const top = Math.max(pad, Math.min(trigger.top, window.innerHeight - ttH - pad));
+
+    tt.style.left = `${left}px`;
+    tt.style.top = `${top}px`;
+    tt.style.opacity = "1";
+  }, [visible]);
 
   return (
-    <span ref={ref} className="relative inline-block" onMouseEnter={handleMouseEnter} onMouseLeave={() => setVisible(false)}>
+    <span
+      ref={triggerRef}
+      className="relative inline-block"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <span className="text-gb-accent-blue cursor-default border-b border-dotted border-gb-accent-blue/50">
         {displayName}
       </span>
 
       {visible && data && (
-        <div className={cn(
-          "absolute z-50 pointer-events-none",
-          "bg-gb-surface border border-gb-border-strong rounded-md",
-          "p-2.5 min-w-[220px] max-w-[340px] shadow-lg",
-          placement.vertical === "above" ? "bottom-full mb-1" : "top-full mt-1",
-          placement.horizontal === "left" ? "left-0" : "right-0",
-        )}>
+        <div
+          ref={tooltipRef}
+          style={{ opacity: 0, top: 0, left: 0 }}
+          className={cn(
+            "fixed z-50 pointer-events-none",
+            "bg-gb-surface border border-gb-border-strong rounded-md",
+            "p-2.5 min-w-[220px] max-w-[340px] shadow-lg",
+          )}
+        >
           <div className="font-bold text-gb-text-bright text-sm mb-1">
             {data.name}
           </div>
