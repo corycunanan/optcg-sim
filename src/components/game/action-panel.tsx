@@ -203,14 +203,14 @@ export function ActionPanel({
       <Section title={`EVENT LOG (${gameState.eventLog.length})`}>
         <div className="max-h-40 overflow-y-auto">
           {gameState.eventLog.slice().reverse().map((ev, i) => (
-            <div key={i} className="text-[10px] text-gb-text-dim border-b border-gb-border-subtle py-px">
+            <div key={i} className="text-xs text-gb-text-dim border-b border-gb-border-subtle py-px">
               <span className="text-gb-text-subtle">{ev.type}</span>
               {ev.payload && Object.entries(ev.payload).map(([k, v]) => (
-                <span key={k} className="text-gb-text-dim/70"> {k}={JSON.stringify(v)}</span>
+                <span key={k} className="text-gb-text-dim"> {k}={JSON.stringify(v)}</span>
               ))}
             </div>
           ))}
-          {gameState.eventLog.length === 0 && <div className="text-gb-text-dim text-[10px]">No events</div>}
+          {gameState.eventLog.length === 0 && <div className="text-gb-text-dim text-xs">No events</div>}
         </div>
       </Section>
 
@@ -219,7 +219,7 @@ export function ActionPanel({
         {showRaw ? "\u25B2 Hide" : "\u25BC Show"} Raw State JSON
       </ActionBtn>
       {showRaw && (
-        <pre className="text-[9px] bg-gb-surface-inset border border-gb-border-subtle p-2 overflow-auto max-h-[400px] rounded text-gb-text-dim">
+        <pre className="text-xs bg-gb-surface-inset border border-gb-border-subtle p-2 overflow-auto max-h-[400px] rounded text-gb-text-dim">
           {JSON.stringify(rawState, null, 2)}
         </pre>
       )}

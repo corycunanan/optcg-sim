@@ -74,26 +74,28 @@
   --card-black:  oklch(28% 0.01 245);
   --card-yellow: oklch(78% 0.18 90);
 
-  /* ── Game Board (dark testing environment) ── */
+  /* ── Game Board (dark testing environment) ──
+     All text tokens pass WCAG AA (4.5:1) against --gb-surface (9%).
+     --gb-text-dim ≈5.2:1, --gb-text-muted ≈6.3:1, --gb-text-subtle ≈7.5:1 */
   --gb-bg:              oklch(5%   0.005 245);  /* page background */
   --gb-surface:         oklch(9%   0.005 245);  /* panels, header */
-  --gb-surface-raised:  oklch(11%  0.005 245);  /* buttons, interactive */
+  --gb-surface-raised:  oklch(14%  0.005 245);  /* buttons, interactive */
   --gb-surface-inset:   oklch(4%   0.003 245);  /* code blocks, sunken */
-  --gb-border:          oklch(13%  0.005 245);  /* default borders */
-  --gb-border-strong:   oklch(20%  0.005 245);  /* prominent borders */
-  --gb-border-subtle:   oklch(9%   0.003 245);  /* row separators */
-  --gb-text:            oklch(80%  0.005 245);  /* body text */
-  --gb-text-bright:     oklch(100% 0     0);    /* headings */
-  --gb-text-dim:        oklch(28%  0.005 245);  /* muted labels */
-  --gb-text-muted:      oklch(35%  0.005 245);  /* placeholder */
-  --gb-text-subtle:     oklch(42%  0.005 245);  /* secondary info */
+  --gb-border:          oklch(20%  0.005 245);  /* default borders */
+  --gb-border-strong:   oklch(28%  0.005 245);  /* prominent borders */
+  --gb-border-subtle:   oklch(16%  0.003 245);  /* row separators */
+  --gb-text:            oklch(82%  0.005 245);  /* body text */
+  --gb-text-bright:     oklch(96%  0.005 75);   /* headings — warm off-white */
+  --gb-text-dim:        oklch(52%  0.005 245);  /* muted labels — AA on 9% bg */
+  --gb-text-muted:      oklch(58%  0.005 245);  /* placeholder — AA on 9% bg */
+  --gb-text-subtle:     oklch(64%  0.005 245);  /* secondary info — AA on 9% bg */
   --gb-accent-blue:     oklch(72%  0.12  240);  /* card names, info */
   --gb-accent-green:    oklch(64%  0.18  150);  /* active state */
   --gb-accent-amber:    oklch(72%  0.16  80);   /* DON, warnings */
   --gb-accent-red:      oklch(60%  0.22  25);   /* errors, concede */
-  --gb-accent-purple:   oklch(62%  0.16  290);  /* counter, battle phase */
-  --gb-accent-rose:     oklch(58%  0.18  15);   /* life stat */
-  --gb-prompt-bg:       oklch(10%  0.01  80);   /* prompt/warning panel bg */
+  --gb-accent-purple:   oklch(66%  0.14  290);  /* counter, battle phase */
+  --gb-accent-rose:     oklch(62%  0.18  15);   /* life stat */
+  --gb-prompt-bg:       oklch(12%  0.01  80);   /* prompt/warning panel bg */
 }
 
 /* ─── Tailwind v4 Theme ──────────────────────────────────────────

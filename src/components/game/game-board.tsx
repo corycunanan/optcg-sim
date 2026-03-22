@@ -359,17 +359,17 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
 
       {/* Match ended overlay */}
       {matchClosed && (
-        <div className="fixed inset-0 z-100 bg-black/82 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-100 bg-black/82 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-labelledby="match-end-title">
           <div className="max-w-[440px] w-full bg-gb-surface border border-gb-border-strong rounded-lg p-6 text-center">
-            <p className="text-xs font-semibold text-gb-text-subtle tracking-widest mb-2">MATCH COMPLETE</p>
-            <p className={cn("text-[28px] font-extrabold mb-3", endColorClass)}>{endTitle}</p>
+            <p id="match-end-title" className="text-xs font-semibold text-gb-text-subtle tracking-widest mb-2">MATCH COMPLETE</p>
+            <p className={cn("text-3xl font-extrabold mb-3", endColorClass)}>{endTitle}</p>
             <p className="text-sm text-gb-text leading-relaxed mb-6">
               {gameOver?.reason ?? remoteGameStatus?.winReason ?? "The game has ended."}
             </p>
             <button
               type="button"
               onClick={handleBackToPlay}
-              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-[15px] font-bold cursor-pointer hover:bg-navy-700"
+              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-base font-bold cursor-pointer hover:bg-navy-700"
             >
               Back to Play
             </button>
@@ -379,7 +379,7 @@ export function GameBoard({ gameId, workerUrl }: GameBoardProps) {
 
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-gb-border-subtle bg-gb-surface sticky top-0 z-20">
-        <span className="font-bold text-gb-text-bright text-[13px]">OPTCG TEST</span>
+        <span className="font-bold text-gb-text-bright text-sm">OPTCG TEST</span>
         <span className="text-gb-text-dim">game:{gameId.slice(0, 10)}</span>
         <Tag color={statusColor}>{connectionStatus.toUpperCase()}</Tag>
         {myIndex !== null && <span className="text-gb-text-dim">you=P{myIndex + 1}</span>}

@@ -1,3 +1,6 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
 import type { CardData, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 
@@ -8,38 +11,56 @@ export function CardRow({ card, cardDb }: { card: CardInstance; cardDb: CardDb }
   return (
     <div className="flex items-center gap-1 py-0.5 border-b border-gb-border-subtle text-xs">
       <CardNameWithTooltip cardId={card.cardId} cardDb={cardDb} />
-      <span className="text-[10px] text-gb-text-dim">&middot;</span>
+      <span className="text-xs text-gb-text-dim">&middot;</span>
       <span className={cn(
-        "text-[10px]",
+        "text-xs",
         card.state === "ACTIVE" ? "text-gb-accent-green" : "text-gb-text-subtle",
       )}>
         {card.state}
       </span>
       {donCount > 0 && (
-        <span className="text-[10px] text-gb-accent-amber">+{donCount} DON</span>
+        <span className="text-xs text-gb-accent-amber">+{donCount} DON</span>
       )}
     </div>
   );
 }
 
+type TooltipPlacement = { vertical: "above" | "below"; horizontal: "left" | "right" };
+
 export function CardNameWithTooltip({ cardId, cardDb }: { cardId: string; cardDb: CardDb }) {
   const data = cardDb[cardId];
   const displayName = data?.name ?? cardId;
+  const ref = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [placement, setPlacement] = useState<TooltipPlacement>({ vertical: "above", horizontal: "left" });
+
+  const handleMouseEnter = useCallback(() => {
+    if (!ref.current) { setVisible(true); return; }
+    const rect = ref.current.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    const spaceRight = window.innerWidth - rect.left;
+    setPlacement({
+      vertical: spaceAbove < 200 ? "below" : "above",
+      horizontal: spaceRight < 360 ? "right" : "left",
+    });
+    setVisible(true);
+  }, []);
 
   return (
-    <span className="group relative inline-block">
+    <span ref={ref} className="relative inline-block" onMouseEnter={handleMouseEnter} onMouseLeave={() => setVisible(false)}>
       <span className="text-gb-accent-blue cursor-default border-b border-dotted border-gb-accent-blue/50">
         {displayName}
       </span>
 
-      {data && (
+      {visible && data && (
         <div className={cn(
-          "absolute bottom-full left-0 z-50 mb-1 pointer-events-none",
+          "absolute z-50 pointer-events-none",
           "bg-gb-surface border border-gb-border-strong rounded-md",
           "p-2.5 min-w-[220px] max-w-[340px] shadow-lg",
-          "hidden group-hover:block",
+          placement.vertical === "above" ? "bottom-full mb-1" : "top-full mt-1",
+          placement.horizontal === "left" ? "left-0" : "right-0",
         )}>
-          <div className="font-bold text-gb-text-bright text-[13px] mb-1">
+          <div className="font-bold text-gb-text-bright text-sm mb-1">
             {data.name}
           </div>
           <div className="text-xs text-gb-text-subtle mb-1">{data.type} &middot; {cardId}</div>
@@ -79,7 +100,7 @@ function TooltipStat({ label, value, color }: { label: string; value: unknown; c
   return (
     <div className="text-center">
       <div className="font-bold text-sm" style={{ color }}>{String(value)}</div>
-      <div className="text-[10px] text-gb-text-muted uppercase tracking-wide">{label}</div>
+      <div className="text-xs text-gb-text-muted uppercase tracking-wide">{label}</div>
     </div>
   );
 }
