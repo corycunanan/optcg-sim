@@ -122,9 +122,9 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **3-1-1.** Nine areas defined | **IMPL** | `Zone` type in `game-types.ts:10–20` | All 9 zones modeled: LEADER, CHARACTER, STAGE, COST_AREA, HAND, DECK, TRASH, LIFE, DON_DECK + REMOVED_FROM_GAME |
-| **3-1-2.** "The field" = Leader + Character + Stage + Cost areas | **GAP** | — | No `isOnField()` helper function. Would be useful for effect targeting |
+| **3-1-2.** "The field" = Leader + Character + Stage + Cost areas | **IMPL** | `state.ts → isOnField()` | Returns true for LEADER, CHARACTER, STAGE, COST_AREA |
 | **3-1-4.** Card counts are open info | **IMPL** | `PlayerState` has all zone arrays; client can count | |
-| **3-1-5.** Open vs secret areas | **GAP** | — | No formal `isOpenArea()` / `isSecretArea()` helper. Important for **8-4-5** (auto effects only activate when moving to open areas) and **11-2** (revealing cards moved between secret areas) |
+| **3-1-5.** Open vs secret areas | **IMPL** | `state.ts → isOpenArea()`, `isSecretArea()` | Open: LEADER, CHARACTER, STAGE, COST_AREA, DON_DECK, TRASH. Secret: HAND, DECK, LIFE |
 | **3-1-6.** Zone transition strips effects, new card identity | **IMPL** | `state.ts → moveCard()` | New `instanceId` via `nanoid()`, `attachedDon` cleared, state reset to ACTIVE |
 | **3-1-6-1.** DON!! zone transition strips effects | **IMPL** | `moveCard()` strips `attachedDon` | |
 | **3-1-7.** Owner decides order of simultaneous placements | **GAP** | — | No mechanism to let player choose ordering when multiple cards enter a zone simultaneously |
@@ -169,7 +169,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **4-5-1/2.** Draw = top of deck → hand, hidden | **IMPL** | `phases.ts:43–46` (Draw Phase), `moveCard()` | |
-| **4-5-3.** Draw X cards = repeat draw X times | **GAP** | — | No `drawCards(n)` function for effect-driven draws. `drawN()` in `setup.ts` is setup-only and doesn't emit events per card |
+| **4-5-3.** Draw X cards = repeat draw X times | **IMPL** | `state.ts → drawCards()` | Draws one at a time, emits `CARD_DRAWN` per card, stops early if deck empty (§4-5-3-1) |
 | **4-5-4.** Draw up to X cards | **GAP** | — | No "draw up to" mechanic — needs player choice loop |
 
 ### 4-6. Damage Processing
@@ -379,7 +379,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 |------|--------|----------------|-------|
 | **8-3-1.** Activation cost (before the colon) | **GAP** | — | No activation cost parser. `CardData` has `effectText` as raw string |
 | **8-3-1-5.** ① symbol = rest N active DON!! | **GAP** | — | DON!! rest-for-activation not implemented |
-| **8-3-1-6.** "DON!! −X" = return DON!! to DON!! deck | **GAP** | — | No function to return DON!! cards to DON!! deck. `returnAttachedDonToCostArea()` returns to cost area, not DON!! deck. **New function needed**: `returnDonToDeck(state, playerIndex, count)` |
+| **8-3-1-6.** "DON!! −X" = return DON!! to DON!! deck | **IMPL** | `state.ts → returnDonToDeck()` | Returns DON!! from cost area to DON!! deck, preferring rested. Handles count > available |
 | **8-3-2-3.** [DON!! xX] condition | **GAP** | — | `KeywordSet` doesn't include `donCondition`. No check for attached DON!! count meeting a threshold |
 | **8-3-2-4/5.** [Your Turn] / [Opponent's Turn] conditions | **GAP** | — | Easy to implement as `state.turn.activePlayerIndex` check, but no condition evaluation framework |
 
@@ -389,7 +389,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 |------|--------|----------------|-------|
 | **8-4-1 to 8-4-6.** Full activation sequence | **GAP** | — | No generic "activate effect" pipeline. M4 needs: check conditions → reveal card → pay cost → activate → resolve → post-resolution |
 | **8-4-4.** "Choose"/"select"/"up to" during resolution | **GAP** | — | No mid-resolution choice mechanism (needs prompt system integration) |
-| **8-4-5.** Auto effects only activate when moving to open area | **GAP** | — | No `isOpenArea()` check in trigger matching |
+| **8-4-5.** Auto effects only activate when moving to open area | **PARTIAL** | `state.ts → isOpenArea()` exists | Helper function ready; trigger matching in M4 needs to call `isOpenArea()` on destination zone |
 | **8-4-4-2.** Secret area cards: player can decline to choose | **GAP** | — | No handling of secret-area targeting constraints |
 
 ### 8-5. Card Activation vs Effect Activation
@@ -451,7 +451,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **[End of Your Turn]** | 10-2-7 | **STUB** | `phases.ts:92` comment | No-op in `runEndPhase()` |
 | **[End of Opponent's Turn]** | 10-2-8 | **STUB** | Same | |
 | **[DON!! xX]** | 10-2-9 | **GAP** | — | Not in `KeywordSet`. Needs: check attached DON!! count ≥ X as effect condition |
-| **DON!! −X** | 10-2-10 | **GAP** | — | No function to return DON!! to DON!! deck. See §8-3-1-6 |
+| **DON!! −X** | 10-2-10 | **IMPL** | `state.ts → returnDonToDeck()` | See §8-3-1-6 |
 | **[Your Turn]** / **[Opponent's Turn]** | 10-2-11/12 | **GAP** | — | Condition keywords; not modeled |
 | **[Once Per Turn]** | 10-2-13 | **PARTIAL** | `TurnState.oncePerTurnUsed: Record<string, string[]>` | Data structure exists but **nothing populates it**. M4 must record effect usage and check against it |
 | [Once Per Turn] — §10-2-13-4 | 10-2-13-4 | **GAP** | — | Card moved to new zone → treated as new card → can re-use [Once Per Turn]. `moveCard()` assigns new `instanceId`, which should satisfy this rule, but `oncePerTurnUsed` tracking doesn't exist yet |
@@ -519,7 +519,7 @@ The following new functions or systems are required, derived directly from the g
 11. **[DON!! xX] Condition Check** — Evaluate `card.attachedDon.length >= X` as an effect condition.
     - Rules: 8-3-2-3, 10-2-9
 
-12. **DON!! −X (Return to DON!! Deck)** — `returnDonToDeck(state, playerIndex, count)` — select DON!! from Leader/Character/Cost areas and return to DON!! deck.
+12. ~~**DON!! −X (Return to DON!! Deck)**~~ — **DONE (M3.5).** `returnDonToDeck(state, playerIndex, count)` in `state.ts`.
     - Rules: 8-3-1-6, 10-2-10
 
 13. **[Once Per Turn] Enforcement** — Populate `TurnState.oncePerTurnUsed`, check before activation, handle zone-reset rule (§10-2-13-4).

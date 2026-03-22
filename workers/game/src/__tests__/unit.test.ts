@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../types.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "../engine/modifiers.js";
 import { checkDefeat } from "../engine/defeat.js";
-import { moveCard, findCardInState, removeTopLifeCard } from "../engine/state.js";
+import {
+  moveCard, findCardInState, removeTopLifeCard,
+  returnDonToDeck, drawCards,
+  isOnField, isOpenArea, isSecretArea,
+} from "../engine/state.js";
 import { canAttackThisTurn, canAttackLeader } from "../engine/keywords.js";
 import { setupGame, createTestCardDb, CARDS } from "./helpers.js";
 
@@ -237,6 +241,175 @@ describe("checkDefeat", () => {
     const result = checkDefeat(state);
     expect(result).toBeTruthy();
     expect(result!.winner).toBeNull();
+  });
+});
+
+// ─── returnDonToDeck ──────────────────────────────────────────────────────────
+
+describe("returnDonToDeck", () => {
+  it("returns DON!! from cost area to DON!! deck (§8-3-1-6)", () => {
+    let { state } = setupGame();
+
+    // Give player 0 DON!! in cost area
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      donCostArea: [
+        { instanceId: "don-a", state: "ACTIVE", attachedTo: null },
+        { instanceId: "don-b", state: "ACTIVE", attachedTo: null },
+      ],
+      donDeck: [],
+    };
+    state = { ...state, players: newPlayers };
+
+    const result = returnDonToDeck(state, 0, 1);
+    expect(result.players[0].donCostArea.length).toBe(1);
+    expect(result.players[0].donDeck.length).toBe(1);
+  });
+
+  it("prefers rested DON!! over active", () => {
+    let { state } = setupGame();
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      donCostArea: [
+        { instanceId: "don-active", state: "ACTIVE", attachedTo: null },
+        { instanceId: "don-rested", state: "RESTED", attachedTo: null },
+      ],
+      donDeck: [],
+    };
+    state = { ...state, players: newPlayers };
+
+    const result = returnDonToDeck(state, 0, 1);
+    expect(result.players[0].donCostArea[0].instanceId).toBe("don-active");
+    expect(result.players[0].donDeck[0].instanceId).toBe("don-rested");
+  });
+
+  it("handles count > available gracefully", () => {
+    let { state } = setupGame();
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      donCostArea: [{ instanceId: "don-only", state: "ACTIVE", attachedTo: null }],
+      donDeck: [],
+    };
+    state = { ...state, players: newPlayers };
+
+    const result = returnDonToDeck(state, 0, 5);
+    expect(result.players[0].donCostArea.length).toBe(0);
+    expect(result.players[0].donDeck.length).toBe(1);
+  });
+
+  it("skips DON!! attached to cards", () => {
+    let { state } = setupGame();
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      donCostArea: [
+        { instanceId: "don-free", state: "ACTIVE", attachedTo: null },
+        { instanceId: "don-attached", state: "ACTIVE", attachedTo: "some-card" },
+      ],
+      donDeck: [],
+    };
+    state = { ...state, players: newPlayers };
+
+    const result = returnDonToDeck(state, 0, 2);
+    expect(result.players[0].donCostArea.length).toBe(1);
+    expect(result.players[0].donCostArea[0].instanceId).toBe("don-attached");
+    expect(result.players[0].donDeck.length).toBe(1);
+  });
+});
+
+// ─── drawCards ────────────────────────────────────────────────────────────────
+
+describe("drawCards", () => {
+  it("draws N cards from deck to hand with CARD_DRAWN events (§4-5-3)", () => {
+    const { state } = setupGame();
+    const deckBefore = state.players[0].deck.length;
+    const handBefore = state.players[0].hand.length;
+
+    const { state: after, events } = drawCards(state, 0, 2);
+    expect(after.players[0].deck.length).toBe(deckBefore - 2);
+    expect(after.players[0].hand.length).toBe(handBefore + 2);
+    expect(events.length).toBe(2);
+    expect(events[0].type).toBe("CARD_DRAWN");
+    expect(events[1].type).toBe("CARD_DRAWN");
+  });
+
+  it("stops early if deck runs out (§4-5-3-1)", () => {
+    let { state } = setupGame();
+
+    // Leave only 1 card in deck
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], deck: [newPlayers[0].deck[0]] };
+    state = { ...state, players: newPlayers };
+
+    const { state: after, events } = drawCards(state, 0, 3);
+    expect(after.players[0].deck.length).toBe(0);
+    expect(events.length).toBe(1);
+  });
+
+  it("returns unchanged state when deck is empty", () => {
+    let { state } = setupGame();
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], deck: [] };
+    state = { ...state, players: newPlayers };
+
+    const { state: after, events } = drawCards(state, 0, 1);
+    expect(after.players[0].hand.length).toBe(state.players[0].hand.length);
+    expect(events.length).toBe(0);
+  });
+});
+
+// ─── Zone classification helpers ──────────────────────────────────────────────
+
+describe("isOnField", () => {
+  it("returns true for field zones (§3-1-2)", () => {
+    expect(isOnField("LEADER")).toBe(true);
+    expect(isOnField("CHARACTER")).toBe(true);
+    expect(isOnField("STAGE")).toBe(true);
+    expect(isOnField("COST_AREA")).toBe(true);
+  });
+
+  it("returns false for non-field zones", () => {
+    expect(isOnField("HAND")).toBe(false);
+    expect(isOnField("DECK")).toBe(false);
+    expect(isOnField("TRASH")).toBe(false);
+    expect(isOnField("LIFE")).toBe(false);
+    expect(isOnField("DON_DECK")).toBe(false);
+    expect(isOnField("REMOVED_FROM_GAME")).toBe(false);
+  });
+});
+
+describe("isOpenArea / isSecretArea", () => {
+  it("open zones are visible to all players (§3-1-5)", () => {
+    expect(isOpenArea("LEADER")).toBe(true);
+    expect(isOpenArea("CHARACTER")).toBe(true);
+    expect(isOpenArea("STAGE")).toBe(true);
+    expect(isOpenArea("COST_AREA")).toBe(true);
+    expect(isOpenArea("DON_DECK")).toBe(true);
+    expect(isOpenArea("TRASH")).toBe(true);
+  });
+
+  it("secret zones are hidden from opponents (§8-4-5)", () => {
+    expect(isSecretArea("HAND")).toBe(true);
+    expect(isSecretArea("DECK")).toBe(true);
+    expect(isSecretArea("LIFE")).toBe(true);
+  });
+
+  it("open and secret are mutually exclusive for standard zones", () => {
+    const allZones: import("../types.js").Zone[] = [
+      "LEADER", "CHARACTER", "STAGE", "COST_AREA", "HAND",
+      "DECK", "TRASH", "LIFE", "DON_DECK", "REMOVED_FROM_GAME",
+    ];
+    for (const z of allZones) {
+      if (z === "REMOVED_FROM_GAME") continue; // special zone, neither open nor secret
+      expect(isOpenArea(z) !== isSecretArea(z)).toBe(true);
+    }
   });
 });
 

@@ -10,6 +10,7 @@ import type {
   DonInstance,
   GameState,
   LifeCard,
+  PendingEvent,
   PlayerState,
   Zone,
 } from "../types.js";
@@ -389,6 +390,108 @@ export function activateAllRested(
     donCostArea: player.donCostArea.map((d) => ({ ...d, state: "ACTIVE" as const })),
   };
   return { ...state, players: newPlayers };
+}
+
+// ─── M4 foundation utilities ──────────────────────────────────────────────────
+
+/**
+ * Return DON!! cards from cost area back to the DON!! deck (§8-3-1-6, §10-2-10).
+ * Prefers rested DON!! first. If count exceeds available, returns as many as possible.
+ */
+export function returnDonToDeck(
+  state: GameState,
+  playerIndex: 0 | 1,
+  count: number,
+): GameState {
+  const player = state.players[playerIndex];
+  const unattached = player.donCostArea.filter((d) => !d.attachedTo);
+  if (unattached.length === 0 || count <= 0) return state;
+
+  // Prefer rested DON!! first
+  const sorted = [...unattached].sort((a, b) => {
+    if (a.state === "RESTED" && b.state !== "RESTED") return -1;
+    if (a.state !== "RESTED" && b.state === "RESTED") return 1;
+    return 0;
+  });
+
+  const toReturn = sorted.slice(0, Math.min(count, sorted.length));
+  const toReturnIds = new Set(toReturn.map((d) => d.instanceId));
+
+  const remaining = player.donCostArea.filter((d) => !toReturnIds.has(d.instanceId));
+  const returned: DonInstance[] = toReturn.map((d) => ({
+    ...d,
+    state: "ACTIVE" as const,
+    attachedTo: null,
+  }));
+
+  const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
+  newPlayers[playerIndex] = {
+    ...player,
+    donCostArea: remaining,
+    donDeck: [...player.donDeck, ...returned],
+  };
+  return { ...state, players: newPlayers };
+}
+
+/**
+ * Draw N cards from deck to hand, producing CARD_DRAWN events (§4-5-3).
+ * Stops early if deck runs out — remaining draws are lost (§4-5-3-1).
+ */
+export function drawCards(
+  state: GameState,
+  playerIndex: 0 | 1,
+  count: number,
+): { state: GameState; events: PendingEvent[] } {
+  const events: PendingEvent[] = [];
+  let current = state;
+
+  for (let i = 0; i < count; i++) {
+    const player = current.players[playerIndex];
+    if (player.deck.length === 0) break;
+
+    const [drawn, ...remaining] = player.deck;
+    const handCard: CardInstance = { ...drawn, zone: "HAND" };
+
+    const newPlayers: [PlayerState, PlayerState] = [...current.players] as [PlayerState, PlayerState];
+    newPlayers[playerIndex] = {
+      ...player,
+      deck: remaining,
+      hand: [...player.hand, handCard],
+    };
+    current = { ...current, players: newPlayers };
+
+    events.push({
+      type: "CARD_DRAWN",
+      playerIndex,
+      payload: { cardInstanceId: handCard.instanceId },
+    });
+  }
+
+  return { state: current, events };
+}
+
+// ─── Zone classification helpers (§3-1-2, §3-1-5) ────────────────────────────
+
+/** True for zones that are "on the field" (§3-1-2). */
+export function isOnField(zone: Zone): boolean {
+  return zone === "LEADER" || zone === "CHARACTER" || zone === "STAGE" || zone === "COST_AREA";
+}
+
+/** True for zones visible to all players (§3-1-5). */
+export function isOpenArea(zone: Zone): boolean {
+  return (
+    zone === "LEADER" ||
+    zone === "CHARACTER" ||
+    zone === "STAGE" ||
+    zone === "COST_AREA" ||
+    zone === "DON_DECK" ||
+    zone === "TRASH"
+  );
+}
+
+/** True for zones hidden from opponents (§8-4-5). */
+export function isSecretArea(zone: Zone): boolean {
+  return zone === "HAND" || zone === "DECK" || zone === "LIFE";
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────
