@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { SocialSidebar, type SidebarUser } from "./social-sidebar";
 import { ChatWidget } from "./chat-widget";
 
 export function SocialShell() {
   const { data: session } = useSession();
-  const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+  const isGame = pathname.startsWith("/game/");
+  const [collapsed, setCollapsed] = useState(isGame);
   const [chatUser, setChatUser] = useState<SidebarUser | null>(null);
+
+  useEffect(() => {
+    if (isGame) setCollapsed(true);
+  }, [isGame]);
 
   if (!session?.user) return null;
 
@@ -18,6 +25,7 @@ export function SocialShell() {
         collapsed={collapsed}
         onCollapse={setCollapsed}
         onOpenChat={setChatUser}
+        hideNav={isGame}
       />
       {chatUser && (
         <ChatWidget

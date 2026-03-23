@@ -59,6 +59,7 @@ export function Navbar() {
   useEffect(() => { setOpen(null); }, [pathname]);
 
   if (!session?.user) return null;
+  if (pathname.startsWith("/game/")) return null;
 
   const toggle = (name: string) => setOpen((v) => (v === name ? null : name));
 

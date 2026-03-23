@@ -63,11 +63,12 @@ interface SocialSidebarProps {
   collapsed: boolean;
   onCollapse: (v: boolean) => void;
   onOpenChat: (user: SidebarUser) => void;
+  hideNav?: boolean;
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSidebarProps) {
+export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: SocialSidebarProps) {
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -146,7 +147,10 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
 
   if (collapsed) {
     return (
-      <aside className="sticky top-16 z-20 flex h-[calc(100vh-4rem)] w-10 shrink-0 flex-col items-center border-l border-navy-700 bg-navy-900 py-3 gap-3">
+      <aside className={cn(
+        "sticky z-20 flex w-10 shrink-0 flex-col items-center border-l border-navy-700 bg-navy-900 py-3 gap-3",
+        hideNav ? "top-0 h-screen" : "top-16 h-[calc(100vh-4rem)]",
+      )}>
         <button
           onClick={() => onCollapse(false)}
           title="Expand"
@@ -166,7 +170,10 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat }: SocialSideb
   // ── Full sidebar ───────────────────────────────────────────────────────────
 
   return (
-    <aside className="sticky top-16 z-20 flex h-[calc(100vh-4rem)] w-64 shrink-0 flex-col border-l border-navy-700 bg-navy-900 overflow-hidden">
+    <aside className={cn(
+      "sticky z-20 flex w-64 shrink-0 flex-col border-l border-navy-700 bg-navy-900 overflow-hidden",
+      hideNav ? "top-0 h-screen" : "top-16 h-[calc(100vh-4rem)]",
+    )}>
 
       {/* Header */}
       <div className="flex items-center gap-1 border-b border-navy-700 px-3 py-3">
