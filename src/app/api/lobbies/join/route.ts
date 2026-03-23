@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
       triggerText: card.triggerText ?? null,
       keywords: extractKeywords(card.effectText, card.triggerText ?? null),
       effectSchema: card.effectSchema ?? null,
+      imageUrl: card.imageUrl,
     });
 
     // Create LobbyGuest, GameSession, and mark lobby IN_GAME.

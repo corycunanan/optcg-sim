@@ -208,6 +208,7 @@ export interface CardData {
   triggerText: string | null;
   keywords: KeywordSet;
   effectSchema: unknown | null; // M4: parsed effect JSON
+  imageUrl: string | null;
 }
 
 export interface KeywordSet {

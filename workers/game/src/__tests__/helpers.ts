@@ -29,6 +29,7 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
     triggerText: null,
     keywords: noKeywords(),
     effectSchema: null,
+    imageUrl: null,
     ...overrides,
   };
 }
