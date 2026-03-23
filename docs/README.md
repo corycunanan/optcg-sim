@@ -40,6 +40,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 - [Design Audit](./design/DESIGN-AUDIT.md) — interface quality audit across accessibility, performance, and theming
 - [Design Critique](./design/DESIGN-CRITIQUE.md) — UX evaluation with actionable feedback
+- [Game Board Layout Reference](./design/GAME-BOARD-LAYOUT-REFERENCE.md) — wireframe proportions, zone geometry, and responsive scaling rules for the gameplay environment foundation
 
 ## Project Management
 
@@ -61,4 +62,4 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ---
 
-_Last updated: 2026-03-22_
+_Last updated: 2026-03-23_
