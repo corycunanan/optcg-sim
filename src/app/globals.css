@@ -96,6 +96,8 @@
   --gb-accent-purple:   oklch(66%  0.14  290);  /* counter, battle phase */
   --gb-accent-rose:     oklch(62%  0.18  15);   /* life stat */
   --gb-prompt-bg:       oklch(12%  0.01  80);   /* prompt/warning panel bg */
+  --gb-board:           oklch(18%  0.005 245);  /* game board felt background */
+  --gb-board-dark:      oklch(0%   0     0);    /* banner, mid-zone, hand strips */
 }
 
 /* ─── Tailwind v4 Theme ──────────────────────────────────────────
@@ -195,6 +197,8 @@
   --color-gb-accent-purple:  var(--gb-accent-purple);
   --color-gb-accent-rose:    var(--gb-accent-rose);
   --color-gb-prompt-bg:      var(--gb-prompt-bg);
+  --color-gb-board:          var(--gb-board);
+  --color-gb-board-dark:     var(--gb-board-dark);
 
   /* Border Radius — 4 values only, override Tailwind defaults */
   --radius:    0.25rem;  /* 4px  — rounded      — badges, tags */
