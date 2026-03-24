@@ -2,9 +2,16 @@
 
 import React from "react";
 import { useDraggable } from "@dnd-kit/core";
-import type { CardDb, CardInstance } from "@shared/game-types";
+import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { BoardCard } from "../board-card";
 import { FIELD_W, HAND_CARD_W, HAND_CARD_H, type HandCardDrag } from "./constants";
+
+function isCounterEligible(data: CardData | undefined): boolean {
+  if (!data) return false;
+  if (data.type === "Character" && data.counter != null && data.counter > 0) return true;
+  if (data.type === "Event" && data.effectText?.includes("[Counter]")) return true;
+  return false;
+}
 
 function DraggableHandCard({
   card,
@@ -12,6 +19,7 @@ function DraggableHandCard({
   width,
   height,
   disabled,
+  dimmed,
   style,
 }: {
   card: CardInstance;
@@ -19,6 +27,7 @@ function DraggableHandCard({
   width: number;
   height: number;
   disabled?: boolean;
+  dimmed?: boolean;
   style?: React.CSSProperties;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -34,7 +43,7 @@ function DraggableHandCard({
       {...listeners}
       style={{
         ...style,
-        opacity: isDragging ? 0.3 : 1,
+        opacity: isDragging ? 0.3 : dimmed ? 0.35 : 1,
         cursor: disabled ? "default" : "grab",
       }}
     >
@@ -48,11 +57,13 @@ export const HandLayer = React.memo(function HandLayer({
   faceDown,
   cardDb,
   enableDrag,
+  counterMode,
 }: {
   cards: CardInstance[];
   faceDown?: boolean;
   cardDb: CardDb;
   enableDrag?: boolean;
+  counterMode?: boolean;
 }) {
   const count = cards.length;
   if (count === 0) return null;
@@ -64,28 +75,38 @@ export const HandLayer = React.memo(function HandLayer({
 
   return (
     <div className="flex items-center pointer-events-auto">
-      {cards.map((card, i) =>
-        faceDown ? (
-          <BoardCard
-            key={card.instanceId}
-            cardDb={cardDb}
-            sleeve
-            width={HAND_CARD_W}
-            height={HAND_CARD_H}
-            style={i > 0 ? { marginLeft: gap } : undefined}
-          />
-        ) : (
+      {cards.map((card, i) => {
+        if (faceDown) {
+          return (
+            <BoardCard
+              key={card.instanceId}
+              cardDb={cardDb}
+              sleeve
+              width={HAND_CARD_W}
+              height={HAND_CARD_H}
+              style={i > 0 ? { marginLeft: gap } : undefined}
+            />
+          );
+        }
+
+        const eligible = counterMode
+          ? isCounterEligible(cardDb[card.cardId])
+          : true;
+        const disabled = !enableDrag || (counterMode && !eligible);
+
+        return (
           <DraggableHandCard
             key={card.instanceId}
             card={card}
             cardDb={cardDb}
-            disabled={!enableDrag}
+            disabled={disabled}
+            dimmed={counterMode && !eligible}
             width={HAND_CARD_W}
             height={HAND_CARD_H}
             style={i > 0 ? { marginLeft: gap } : undefined}
           />
-        ),
-      )}
+        );
+      })}
     </div>
   );
 });

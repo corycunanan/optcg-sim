@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   CardDb,
+  CardInstance,
   GameAction,
   PlayerState,
   PromptOptions,
@@ -46,7 +47,8 @@ import { HandLayer } from "./hand-layer";
 import { DonCard, DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, PlayerFieldCard, OpponentFieldCard } from "./field-card";
-import { MidZone } from "./mid-zone";
+import { MidZone, type BattleInfo } from "./mid-zone";
+import { DroppableTrashZone } from "./trash-zone";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -216,9 +218,39 @@ export function BoardLayout({
 
   const phase = turn?.phase ?? "";
   const inBattle = !!battlePhase;
-  // REFRESH, DRAW, and DON are auto-advanced by the server — only MAIN needs a button.
   const canEndPhase = !matchClosed && isMyTurn && !inBattle && phase === "MAIN";
-  const canPass = !matchClosed && inBattle;
+
+  /* ── Battle interaction state ─────────────────────────────────────── */
+
+  const isDefender = !isMyTurn && myIndex !== null && turn?.activePlayerIndex !== myIndex;
+  const canPass = !matchClosed && isDefender && battlePhase === "COUNTER_STEP";
+  const canDragCounter = !matchClosed && isDefender && battlePhase === "COUNTER_STEP";
+  const inBlockStep = !matchClosed && isDefender && battlePhase === "BLOCK_STEP";
+  const battle = turn?.battle ?? null;
+
+  const [selectedBlockerId, setSelectedBlockerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedBlockerId(null);
+  }, [battlePhase]);
+
+  const battleInfo: BattleInfo | null = useMemo(() => {
+    if (!battle || !me || !opp) return null;
+    const allCards: (CardInstance | null)[] = [
+      me.leader, opp.leader,
+      ...me.characters, ...opp.characters,
+    ];
+    const attackerCard = allCards.find((c) => c?.instanceId === battle.attackerInstanceId);
+    const defenderCard = allCards.find((c) => c?.instanceId === battle.targetInstanceId);
+    return {
+      attackerName: attackerCard ? cardDb[attackerCard.cardId]?.name ?? "?" : "?",
+      attackerPower: battle.attackerPower,
+      defenderName: defenderCard ? cardDb[defenderCard.cardId]?.name ?? "?" : "?",
+      defenderPower: battle.defenderPower,
+      counterPowerAdded: battle.counterPowerAdded,
+      battleSubPhase: battlePhase ?? "",
+    };
+  }, [battle, me, opp, cardDb, battlePhase]);
 
   /* ── Drag & drop ─────────────────────────────────────────────────── */
 
@@ -266,6 +298,25 @@ export function BoardLayout({
         attackerInstanceId: dragData.card.instanceId,
         targetInstanceId: dropData.targetInstanceId as string,
       });
+    } else if (
+      dragData.type === "hand-card" &&
+      dropData.type === "counter-trash" &&
+      battle
+    ) {
+      const cardData = cardDb[dragData.card.cardId];
+      if (cardData?.type === "Character" && cardData.counter != null && cardData.counter > 0) {
+        onAction({
+          type: "USE_COUNTER",
+          cardInstanceId: dragData.card.instanceId,
+          counterTargetInstanceId: battle.targetInstanceId,
+        });
+      } else if (cardData?.type === "Event" && cardData.effectText?.includes("[Counter]")) {
+        onAction({
+          type: "USE_COUNTER_EVENT",
+          cardInstanceId: dragData.card.instanceId,
+          counterTargetInstanceId: battle.targetInstanceId,
+        });
+      }
     }
   }
 
@@ -298,30 +349,29 @@ export function BoardLayout({
 
         {/* Center: turn info */}
         <div className="flex-1 flex items-center justify-center gap-2">
+          <span className="text-xs text-gb-text-bright font-bold">
+            Turn {turn?.number ?? "—"}
+          </span>
           <div
             className={cn(
               "w-2 h-2 rounded-full shrink-0",
               isMyTurn ? "bg-gb-accent-green" : "bg-gb-accent-amber",
             )}
           />
-          <span className="text-xs text-gb-text-bright font-bold">
-            Turn {turn?.number ?? "—"}
-          </span>
-          <span className="text-xs text-gb-accent-blue font-bold">
-            {phase}
-          </span>
-          {battlePhase && (
-            <span className="text-xs text-gb-accent-purple font-bold">
-              &rsaquo; {battlePhase.replace(/_/g, " ")}
-            </span>
-          )}
           <span
             className={cn(
               "text-xs font-bold",
               isMyTurn ? "text-gb-accent-green" : "text-gb-text-dim",
             )}
           >
-            {isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"}
+            {isMyTurn ? "Your Turn" : "Opponent\u2019s Turn"}
+          </span>
+          <span className="text-xs text-gb-accent-blue font-bold">
+            {battlePhase === "BLOCK_STEP"
+              ? "Opponent is blocking"
+              : battlePhase === "COUNTER_STEP"
+                ? "Opponent is countering"
+                : phase}
           </span>
         </div>
 
@@ -480,6 +530,16 @@ export function BoardLayout({
             canPass={canPass}
             inBattle={inBattle}
             activePrompt={activePrompt}
+            battleInfo={battleInfo}
+            blockerMode={inBlockStep ? {
+              selectedBlockerId,
+              onBlock: () => {
+                if (selectedBlockerId) {
+                  onAction({ type: "DECLARE_BLOCKER", blockerInstanceId: selectedBlockerId });
+                  setSelectedBlockerId(null);
+                }
+              },
+            } : undefined}
             onAction={onAction}
           />
 
@@ -495,22 +555,30 @@ export function BoardLayout({
           {/* Zone 2: Character row */}
           {charSlotCenters.map((pos, i) => {
             const char = me?.characters[i] ?? null;
-            return char ? (
+            if (!char) {
+              return (
+                <DroppableCharSlot
+                  key={`plr-c${i}`}
+                  slotIndex={i}
+                  label={`C${i + 1}`}
+                  cardDb={cardDb}
+                  activeDragType={activeDragType}
+                  style={{ position: "absolute", left: pos.left, top: playerCharTop }}
+                />
+              );
+            }
+            const charData = cardDb[char.cardId];
+            const isBlockerEligible = inBlockStep && char.state === "ACTIVE" && !!charData?.keywords?.blocker;
+            return (
               <PlayerFieldCard
                 key={`plr-c${i}`}
                 card={char}
                 cardDb={cardDb}
                 activeDragType={activeDragType}
                 canAttack={canInteract && char.state === "ACTIVE"}
-                style={{ position: "absolute", left: pos.left, top: playerCharTop }}
-              />
-            ) : (
-              <DroppableCharSlot
-                key={`plr-c${i}`}
-                slotIndex={i}
-                label={`C${i + 1}`}
-                cardDb={cardDb}
-                activeDragType={activeDragType}
+                blockerSelectable={isBlockerEligible}
+                selected={selectedBlockerId === char.instanceId}
+                onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />
             );
@@ -571,14 +639,11 @@ export function BoardLayout({
             height={BOARD_CARD_H}
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}
           />
-          <BoardCard
-            card={me && me.trash.length > 0 ? me.trash[0] : undefined}
+          <DroppableTrashZone
+            trash={me?.trash ?? []}
             cardDb={cardDb}
-            empty={!me || me.trash.length === 0}
-            label="TRASH"
-            count={me && me.trash.length > 1 ? me.trash.length : undefined}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
+            activeDrag={activeDrag}
+            battleSubPhase={turn?.battleSubPhase ?? null}
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
           />
         </div>
@@ -601,7 +666,8 @@ export function BoardLayout({
           <HandLayer
             cards={me?.hand ?? []}
             cardDb={cardDb}
-            enableDrag={canInteract}
+            enableDrag={canInteract || canDragCounter}
+            counterMode={canDragCounter}
           />
         </div>
       </div>

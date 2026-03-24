@@ -52,12 +52,18 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   cardDb,
   activeDragType,
   canAttack,
+  blockerSelectable,
+  selected,
+  onSelect,
   style,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
   canAttack: boolean;
+  blockerSelectable?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
   style: React.CSSProperties;
 }) {
   const {
@@ -90,15 +96,18 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       ref={mergedRef}
       {...attributes}
       {...listeners}
+      onClick={onSelect}
       style={{
         ...style,
         opacity: isDragging ? 0.3 : 1,
-        cursor: canAttack ? "grab" : "default",
+        cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
       }}
       className={cn(
-        "rounded-md",
+        "rounded-md transition-shadow",
         acceptsDon && "ring-2 ring-gb-accent-amber/30",
         isOver && acceptsDon && "ring-2 ring-gb-accent-amber",
+        selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
+        blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
       )}
     >
       <BoardCard
