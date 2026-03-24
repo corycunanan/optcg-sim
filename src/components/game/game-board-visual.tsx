@@ -2,7 +2,7 @@
 
 import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
-import { BoardLayout } from "./board-layout";
+import { BoardLayout } from "./board-layout/index";
 import { formatCountdown } from "./game-ui";
 
 interface GameBoardVisualProps {
