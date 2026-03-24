@@ -14,6 +14,18 @@ import {
   placeDonFromDeck,
 } from "./state.js";
 
+/**
+ * Returns true if the current phase should be auto-advanced without player input.
+ *
+ * REFRESH, DRAW, and DON require no player decisions in M3.
+ * Future (M4+): return false when a "start of turn" card effect needs a player choice,
+ * e.g. a trigger that lets you search your deck or rearrange life cards.
+ */
+export function isStartOfTurnAutoPhase(_state: GameState): boolean {
+  const { phase } = _state.turn;
+  return phase === "REFRESH" || phase === "DRAW" || phase === "DON";
+}
+
 export function executeAdvancePhase(state: GameState, _cardDb: Map<string, CardData>): ExecuteResult {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);

@@ -17,6 +17,7 @@ import type {
 import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
 import { setPlayerConnected } from "./engine/state.js";
+import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -331,11 +332,26 @@ export class GameSession implements DurableObject {
       }
     }
 
-    const result = runPipeline(this.gameState, action, this.cardDb, playerIndex);
+    let result = runPipeline(this.gameState, action, this.cardDb, playerIndex);
 
     if (!result.valid) {
       this.send(ws, { type: "game:error", message: result.error ?? "Invalid action" });
       return;
+    }
+
+    // Auto-advance through REFRESH → DRAW → DON phases without player input.
+    // These phases require no decisions in M3. When M4 adds "start of turn"
+    // effects that need a choice, isStartOfTurnAutoPhase() should return false
+    // for the affected phase so the player is prompted before continuing.
+    while (!result.gameOver && isStartOfTurnAutoPhase(result.state)) {
+      const next = runPipeline(
+        result.state,
+        { type: "ADVANCE_PHASE" },
+        this.cardDb!,
+        result.state.turn.activePlayerIndex,
+      );
+      if (!next.valid) break; // shouldn't happen, but prevents infinite loops
+      result = next;
     }
 
     this.gameState = result.state;
