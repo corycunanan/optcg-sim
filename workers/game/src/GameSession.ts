@@ -74,9 +74,12 @@ export class GameSession implements DurableObject {
     const payload = await request.json() as GameInitPayload;
     const { state, cardDb } = buildInitialState(payload);
 
-    this.gameState = state;
     this.cardDb = cardDb;
     this.mulliganDone = [false, false];
+
+    // Setup returns phase=REFRESH; auto-advance through the start-of-turn phases
+    // (REFRESH → DRAW → DON → MAIN) so the first player is immediately at MAIN.
+    this.gameState = this.runStartOfTurnAutoPhases(state);
 
     // Persist to DO storage so state survives hibernation
     await this.persist();
@@ -340,18 +343,10 @@ export class GameSession implements DurableObject {
     }
 
     // Auto-advance through REFRESH → DRAW → DON phases without player input.
-    // These phases require no decisions in M3. When M4 adds "start of turn"
-    // effects that need a choice, isStartOfTurnAutoPhase() should return false
-    // for the affected phase so the player is prompted before continuing.
-    while (!result.gameOver && isStartOfTurnAutoPhase(result.state)) {
-      const next = runPipeline(
-        result.state,
-        { type: "ADVANCE_PHASE" },
-        this.cardDb!,
-        result.state.turn.activePlayerIndex,
-      );
-      if (!next.valid) break; // shouldn't happen, but prevents infinite loops
-      result = next;
+    // When M4 adds "start of turn" effects that need a choice,
+    // isStartOfTurnAutoPhase() should return false to pause here.
+    if (!result.gameOver) {
+      result = { ...result, state: this.runStartOfTurnAutoPhases(result.state) };
     }
 
     this.gameState = result.state;
@@ -374,6 +369,27 @@ export class GameSession implements DurableObject {
 
     // Send prompts if a player input is required
     this.sendPendingPrompts();
+  }
+
+  /**
+   * Advance through REFRESH → DRAW → DON → MAIN automatically.
+   * Called after init and after each successful action.
+   * Returns the state once it reaches a phase that needs player input (MAIN or battle).
+   */
+  private runStartOfTurnAutoPhases(state: GameState): GameState {
+    if (!this.cardDb) return state;
+    let current = state;
+    while (current.status === "IN_PROGRESS" && isStartOfTurnAutoPhase(current)) {
+      const result = runPipeline(
+        current,
+        { type: "ADVANCE_PHASE" },
+        this.cardDb,
+        current.turn.activePlayerIndex,
+      );
+      if (!result.valid) break;
+      current = result.state;
+    }
+    return current;
   }
 
   private sendPendingPrompts(): void {
