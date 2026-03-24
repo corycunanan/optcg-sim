@@ -85,7 +85,7 @@ export function BoardCard({
     return (
       <div
         className={cn(
-          "rounded-md border border-dashed flex items-center justify-center",
+          "rounded border border-dashed flex items-center justify-center",
           "border-gb-border-strong/30 bg-gb-board/50",
           className,
         )}
@@ -104,7 +104,7 @@ export function BoardCard({
     return (
       <div
         className={cn(
-          "rounded-md border border-gb-border-strong relative overflow-hidden",
+          "rounded border border-gb-border-strong relative overflow-hidden",
           sleeve ? "bg-gb-board-dark" : "bg-gb-surface-inset",
           className,
         )}
@@ -147,85 +147,80 @@ export function BoardCard({
   return (
     <>
       <div
-        ref={cardRef}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onClick={onClick}
-        className={cn(
-          "rounded-md border relative overflow-hidden",
-          highlight
-            ? "border-gb-accent-green ring-1 ring-gb-accent-green/30"
-            : "border-gb-border-strong",
-          onClick && "cursor-pointer hover:border-gb-text-muted",
-          isRested && "opacity-60",
-          !imageUrl && "flex flex-col bg-gb-surface-raised",
-          className,
-        )}
+        className={cn("relative", isRested && "opacity-60", className)}
         style={{ width, height, ...style }}
       >
-        {imageUrl ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={data?.name ?? ""}
-              className="absolute inset-0 h-full w-full object-cover"
-              draggable={false}
-            />
-            {/* Bottom stat overlay */}
-            {(donCount > 0 || isRested) && (
-              <div className="absolute bottom-0 inset-x-0 flex items-center justify-between px-1 py-0.5 bg-gb-board-dark/75">
-                {donCount > 0 && (
-                  <span className="text-xs font-bold text-gb-accent-amber leading-none">
-                    +{donCount} DON
-                  </span>
-                )}
-                {isRested && (
-                  <span className="text-xs font-bold text-gb-accent-amber leading-none">
-                    REST
-                  </span>
-                )}
+        <div
+          ref={cardRef}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          onClick={onClick}
+          className={cn(
+            "rounded border relative overflow-hidden",
+            highlight
+              ? "border-gb-accent-green ring-1 ring-gb-accent-green/30"
+              : "border-gb-border-strong",
+            onClick && "cursor-pointer hover:border-gb-text-muted",
+            !imageUrl && "flex flex-col bg-gb-surface-raised",
+          )}
+          style={{
+            width,
+            height,
+            ...(isRested ? { transform: "rotate(90deg)" } : undefined),
+          }}
+        >
+          {imageUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt={data?.name ?? ""}
+                className="absolute inset-0 h-full w-full object-cover"
+                draggable={false}
+              />
+            </>
+          ) : (
+            <>
+              <div className="px-1 pt-1 text-xs leading-tight text-gb-text-bright font-bold line-clamp-2">
+                {data?.name ?? label ?? "?"}
               </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="px-1 pt-1 text-xs leading-tight text-gb-text-bright font-bold line-clamp-2">
-              {data?.name ?? label ?? "?"}
-            </div>
-            {data?.type && (
-              <div className="px-1">
-                <span className="text-xs text-gb-text-dim">{data.type}</span>
-              </div>
-            )}
-            <div className="flex-1" />
-            <div className="px-1 pb-1 flex items-end justify-between">
-              {data?.power != null && (
-                <span className="text-xs font-bold text-gb-accent-green leading-none">
-                  {data.power >= 1000
-                    ? `${(data.power / 1000).toFixed(0)}K`
-                    : data.power}
-                </span>
+              {data?.type && (
+                <div className="px-1">
+                  <span className="text-xs text-gb-text-dim">{data.type}</span>
+                </div>
               )}
-              <div className="flex flex-col items-end">
-                {donCount > 0 && (
-                  <span className="text-xs font-bold text-gb-accent-amber leading-none">
-                    +{donCount}
-                  </span>
-                )}
-                {isRested && (
-                  <span className="text-xs text-gb-accent-amber leading-none">
-                    REST
+              <div className="flex-1" />
+              <div className="px-1 pb-1 flex items-end justify-between">
+                {data?.power != null && (
+                  <span className="text-xs font-bold text-gb-accent-green leading-none">
+                    {data.power >= 1000
+                      ? `${(data.power / 1000).toFixed(0)}K`
+                      : data.power}
                   </span>
                 )}
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {count != null && count > 0 && (
-          <div className="absolute top-1 right-1 bg-gb-board-dark/80 text-gb-text-bright text-xs font-bold px-1 rounded text-center">
-            {count}
+          {count != null && count > 0 && (
+            <div className="absolute top-1 right-1 bg-gb-board-dark/80 text-gb-text-bright text-xs font-bold px-1 rounded text-center">
+              {count}
+            </div>
+          )}
+        </div>
+
+        {donCount > 0 && (
+          <div
+            className="absolute z-10 text-center bg-gb-board-dark/75 py-0.5"
+            style={{
+              bottom: isRested ? (height - width) / 2 : 0,
+              left: isRested ? -(height - width) / 2 : 0,
+              width: isRested ? height : width,
+            }}
+          >
+            <span className="text-xs font-extrabold text-white leading-none">
+              +{donCount} DON
+            </span>
           </div>
         )}
       </div>

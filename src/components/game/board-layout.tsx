@@ -1,9 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useState } from "react";
 import type {
   CardData,
   CardInstance,
+  DonInstance,
   GameAction,
   LifeCard,
   PlayerState,
@@ -11,10 +12,39 @@ import type {
   PromptType,
   TurnState,
 } from "@shared/game-types";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { BoardCard } from "./board-card";
 import { cn } from "@/lib/utils";
 
 type CardDb = Record<string, CardData>;
+
+/* ─── Drag & Drop payload types ───────────────────────────────────── */
+
+interface HandCardDrag {
+  type: "hand-card";
+  card: CardInstance;
+}
+
+interface ActiveDonDrag {
+  type: "active-don";
+  don: DonInstance;
+}
+
+interface AttackerDrag {
+  type: "attacker";
+  card: CardInstance;
+}
+
+type DragPayload = HandCardDrag | ActiveDonDrag | AttackerDrag;
 
 /* ─── Geometry constants (reference: GAME-BOARD-LAYOUT-REFERENCE.md) ── */
 
@@ -108,14 +138,53 @@ function MidZoneBtn({
 
 /* ─── Hand layer ──────────────────────────────────────────────────── */
 
+function DraggableHandCard({
+  card,
+  cardDb,
+  width,
+  height,
+  disabled,
+  style,
+}: {
+  card: CardInstance;
+  cardDb: CardDb;
+  width: number;
+  height: number;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `hand-${card.instanceId}`,
+    data: { type: "hand-card", card } satisfies HandCardDrag,
+    disabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{
+        ...style,
+        opacity: isDragging ? 0.3 : 1,
+        cursor: disabled ? "default" : "grab",
+      }}
+    >
+      <BoardCard card={card} cardDb={cardDb} width={width} height={height} />
+    </div>
+  );
+}
+
 function HandLayer({
   cards,
   faceDown,
   cardDb,
+  enableDrag,
 }: {
   cards: CardInstance[];
   faceDown?: boolean;
   cardDb: CardDb;
+  enableDrag?: boolean;
 }) {
   const count = cards.length;
   if (count === 0) return null;
@@ -127,17 +196,28 @@ function HandLayer({
 
   return (
     <div className="flex items-center pointer-events-auto">
-      {cards.map((card, i) => (
-        <BoardCard
-          key={card.instanceId}
-          card={faceDown ? undefined : card}
-          cardDb={cardDb}
-          faceDown={faceDown}
-          width={HAND_CARD_W}
-          height={HAND_CARD_H}
-          style={i > 0 ? { marginLeft: gap } : undefined}
-        />
-      ))}
+      {cards.map((card, i) =>
+        faceDown ? (
+          <BoardCard
+            key={card.instanceId}
+            cardDb={cardDb}
+            faceDown
+            width={HAND_CARD_W}
+            height={HAND_CARD_H}
+            style={i > 0 ? { marginLeft: gap } : undefined}
+          />
+        ) : (
+          <DraggableHandCard
+            key={card.instanceId}
+            card={card}
+            cardDb={cardDb}
+            disabled={!enableDrag}
+            width={HAND_CARD_W}
+            height={HAND_CARD_H}
+            style={i > 0 ? { marginLeft: gap } : undefined}
+          />
+        ),
+      )}
     </div>
   );
 }
@@ -193,16 +273,52 @@ function DonCard({ rested }: { rested?: boolean }) {
   return card;
 }
 
+/* ─── Draggable DON!! card ─────────────────────────────────────────── */
+
+function DraggableDonCard({
+  don,
+  index,
+  disabled,
+}: {
+  don: DonInstance;
+  index: number;
+  disabled?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `don-${don.instanceId}`,
+    data: { type: "active-don", don } satisfies ActiveDonDrag,
+    disabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{
+        marginLeft: index > 0 ? -DON_ACTIVE_OVERLAP : 0,
+        zIndex: index,
+        opacity: isDragging ? 0.3 : 1,
+        cursor: disabled ? "default" : "grab",
+      }}
+    >
+      <DonCard />
+    </div>
+  );
+}
+
 /* ─── DON!! zone display ──────────────────────────────────────────── */
 
 function DonZone({
   player,
   style,
   className,
+  enableDrag,
 }: {
   player: PlayerState | null;
   style: React.CSSProperties;
   className?: string;
+  enableDrag?: boolean;
 }) {
   const activeDon =
     player?.donCostArea.filter((d) => d.state === "ACTIVE") ?? [];
@@ -213,7 +329,7 @@ function DonZone({
   return (
     <div
       className={cn(
-        "absolute flex items-center rounded-md border border-gb-border-strong/30 bg-gb-board-dark/40",
+        "absolute flex items-center rounded-md border border-gb-border-strong/30",
         !hasAny && "justify-center",
         className,
       )}
@@ -225,24 +341,26 @@ function DonZone({
         </span>
       )}
 
-      {/* Active DON — upright (portrait), stacked from left */}
       {activeDon.length > 0 && (
         <div className="flex items-center">
-          {activeDon.map((don, i) => (
-            <div
-              key={don.instanceId}
-              style={{
-                marginLeft: i > 0 ? -DON_ACTIVE_OVERLAP : 0,
-                zIndex: i,
-              }}
-            >
-              <DonCard />
-            </div>
-          ))}
+          {activeDon.map((don, i) =>
+            enableDrag ? (
+              <DraggableDonCard key={don.instanceId} don={don} index={i} />
+            ) : (
+              <div
+                key={don.instanceId}
+                style={{
+                  marginLeft: i > 0 ? -DON_ACTIVE_OVERLAP : 0,
+                  zIndex: i,
+                }}
+              >
+                <DonCard />
+              </div>
+            ),
+          )}
         </div>
       )}
 
-      {/* Rested DON — rotated 90°, stacked after active group */}
       {restedDon.length > 0 && (
         <div
           className="flex items-center"
@@ -269,7 +387,7 @@ function DonZone({
 
 /* ─── Life zone — vertically stacked card sleeves ─────────────────── */
 
-const LIFE_STACK_OFFSET = 8;
+const LIFE_STACK_OFFSET = 20;
 
 function LifeZone({
   life,
@@ -313,6 +431,153 @@ function LifeZone({
           }}
         />
       ))}
+    </div>
+  );
+}
+
+/* ─── Droppable character slot (empty, accepts hand cards) ─────────── */
+
+function DroppableCharSlot({
+  slotIndex,
+  label,
+  cardDb,
+  activeDragType,
+  style,
+}: {
+  slotIndex: number;
+  label: string;
+  cardDb: CardDb;
+  activeDragType: string | null;
+  style: React.CSSProperties;
+}) {
+  const accepts = activeDragType === "hand-card";
+  const { setNodeRef, isOver } = useDroppable({
+    id: `char-slot-${slotIndex}`,
+    data: { type: "character-slot", slotIndex },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-md transition-shadow",
+        accepts && "ring-2 ring-gb-accent-blue/30",
+        isOver && accepts && "ring-2 ring-gb-accent-green",
+      )}
+    >
+      <BoardCard
+        cardDb={cardDb}
+        empty
+        label={label}
+        width={BOARD_CARD_W}
+        height={BOARD_CARD_H}
+      />
+    </div>
+  );
+}
+
+/* ─── Player field card (draggable for attack + droppable for DON) ── */
+
+function PlayerFieldCard({
+  card,
+  cardDb,
+  activeDragType,
+  canAttack,
+  style,
+}: {
+  card: CardInstance;
+  cardDb: CardDb;
+  activeDragType: string | null;
+  canAttack: boolean;
+  style: React.CSSProperties;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: `attacker-${card.instanceId}`,
+    data: { type: "attacker", card } satisfies AttackerDrag,
+    disabled: !canAttack,
+  });
+
+  const acceptsDon = activeDragType === "active-don";
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `don-target-${card.instanceId}`,
+    data: { type: "don-target", targetInstanceId: card.instanceId },
+  });
+
+  const mergedRef = useCallback(
+    (node: HTMLElement | null) => {
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
+
+  return (
+    <div
+      ref={mergedRef}
+      {...attributes}
+      {...listeners}
+      style={{
+        ...style,
+        opacity: isDragging ? 0.3 : 1,
+        cursor: canAttack ? "grab" : "default",
+      }}
+      className={cn(
+        "rounded-md",
+        acceptsDon && "ring-2 ring-gb-accent-amber/30",
+        isOver && acceptsDon && "ring-2 ring-gb-accent-amber",
+      )}
+    >
+      <BoardCard
+        card={card}
+        cardDb={cardDb}
+        width={BOARD_CARD_W}
+        height={BOARD_CARD_H}
+      />
+    </div>
+  );
+}
+
+/* ─── Opponent field card (droppable for attack targeting) ──────────── */
+
+function OpponentFieldCard({
+  card,
+  cardDb,
+  activeDragType,
+  style,
+}: {
+  card: CardInstance;
+  cardDb: CardDb;
+  activeDragType: string | null;
+  style: React.CSSProperties;
+}) {
+  const accepts = activeDragType === "attacker";
+  const { setNodeRef, isOver } = useDroppable({
+    id: `attack-target-${card.instanceId}`,
+    data: { type: "attack-target", targetInstanceId: card.instanceId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-md",
+        accepts && "ring-2 ring-gb-accent-red/30",
+        isOver && accepts && "ring-2 ring-gb-accent-red",
+      )}
+    >
+      <BoardCard
+        card={card}
+        cardDb={cardDb}
+        width={BOARD_CARD_W}
+        height={BOARD_CARD_H}
+      />
     </div>
   );
 }
@@ -399,6 +664,55 @@ export function BoardLayout({
   const canEndPhase = !matchClosed && isMyTurn && !inBattle;
   const canPass = !matchClosed && inBattle;
 
+  /* ── Drag & drop ─────────────────────────────────────────────────── */
+
+  const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
+  const activeDragType = activeDrag?.type ?? null;
+  const canInteract = isMyTurn && phase === "MAIN" && !inBattle && !matchClosed;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveDrag(event.active.data.current as DragPayload);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveDrag(null);
+    if (!over) return;
+
+    const dragData = active.data.current as DragPayload;
+    const dropData = over.data.current as Record<string, unknown>;
+
+    if (dragData.type === "hand-card" && dropData.type === "character-slot") {
+      onAction({
+        type: "PLAY_CARD",
+        cardInstanceId: dragData.card.instanceId,
+        position: dropData.slotIndex as number,
+      });
+    } else if (
+      dragData.type === "active-don" &&
+      dropData.type === "don-target"
+    ) {
+      onAction({
+        type: "ATTACH_DON",
+        targetInstanceId: dropData.targetInstanceId as string,
+        count: 1,
+      });
+    } else if (
+      dragData.type === "attacker" &&
+      dropData.type === "attack-target"
+    ) {
+      onAction({
+        type: "DECLARE_ATTACK",
+        attackerInstanceId: dragData.card.instanceId,
+        targetInstanceId: dropData.targetInstanceId as string,
+      });
+    }
+  }
+
   /* ── Status indicator ──────────────────────────────────────────── */
 
   const statusDot =
@@ -413,6 +727,11 @@ export function BoardLayout({
   const sideCardOffsetX = CARD_OFFSET_X;
 
   return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
       <nav
@@ -535,15 +854,31 @@ export function BoardLayout({
             />
           )}
 
-          <BoardCard
-            card={opp?.leader}
-            cardDb={cardDb}
-            empty={!opp}
-            label="LDR"
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
-          />
+          {opp?.leader ? (
+            <OpponentFieldCard
+              card={opp.leader}
+              cardDb={cardDb}
+              activeDragType={activeDragType}
+              style={{
+                position: "absolute",
+                left: leaderLeft,
+                top: oppLeaderTop,
+              }}
+            />
+          ) : (
+            <BoardCard
+              cardDb={cardDb}
+              empty
+              label="LDR"
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              style={{
+                position: "absolute",
+                left: leaderLeft,
+                top: oppLeaderTop,
+              }}
+            />
+          )}
 
           <DonZone
             player={opp}
@@ -559,12 +894,11 @@ export function BoardLayout({
           {charSlotCenters.map((pos, i) => {
             const char = opp?.characters[i] ?? null;
             return char ? (
-              <BoardCard
+              <OpponentFieldCard
                 key={`opp-c${i}`}
                 card={char}
                 cardDb={cardDb}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
+                activeDragType={activeDragType}
                 style={{
                   position: "absolute",
                   left: pos.left,
@@ -722,12 +1056,12 @@ export function BoardLayout({
           {charSlotCenters.map((pos, i) => {
             const char = me?.characters[i] ?? null;
             return char ? (
-              <BoardCard
+              <PlayerFieldCard
                 key={`plr-c${i}`}
                 card={char}
                 cardDb={cardDb}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
+                activeDragType={activeDragType}
+                canAttack={canInteract && char.state === "ACTIVE"}
                 style={{
                   position: "absolute",
                   left: pos.left,
@@ -735,13 +1069,12 @@ export function BoardLayout({
                 }}
               />
             ) : (
-              <BoardCard
+              <DroppableCharSlot
                 key={`plr-c${i}`}
-                cardDb={cardDb}
-                empty
+                slotIndex={i}
                 label={`C${i + 1}`}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
+                cardDb={cardDb}
+                activeDragType={activeDragType}
                 style={{
                   position: "absolute",
                   left: pos.left,
@@ -754,6 +1087,7 @@ export function BoardLayout({
           {/* Zone 2: Leader row — DON / LDR / STG */}
           <DonZone
             player={me}
+            enableDrag={canInteract}
             style={{
               left: zone2Left,
               top: playerLeaderTop,
@@ -762,19 +1096,32 @@ export function BoardLayout({
             }}
           />
 
-          <BoardCard
-            card={me?.leader}
-            cardDb={cardDb}
-            empty={!me}
-            label="LDR"
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{
-              position: "absolute",
-              left: leaderLeft,
-              top: playerLeaderTop,
-            }}
-          />
+          {me?.leader ? (
+            <PlayerFieldCard
+              card={me.leader}
+              cardDb={cardDb}
+              activeDragType={activeDragType}
+              canAttack={canInteract && me.leader.state === "ACTIVE"}
+              style={{
+                position: "absolute",
+                left: leaderLeft,
+                top: playerLeaderTop,
+              }}
+            />
+          ) : (
+            <BoardCard
+              cardDb={cardDb}
+              empty
+              label="LDR"
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              style={{
+                position: "absolute",
+                left: leaderLeft,
+                top: playerLeaderTop,
+              }}
+            />
+          )}
 
           {me?.stage ? (
             <BoardCard
@@ -850,9 +1197,43 @@ export function BoardLayout({
             transformOrigin: "top center",
           }}
         >
-          <HandLayer cards={me?.hand ?? []} cardDb={cardDb} />
+          <HandLayer
+            cards={me?.hand ?? []}
+            cardDb={cardDb}
+            enableDrag={canInteract}
+          />
         </div>
       </div>
     </div>
+
+    <DragOverlay dropAnimation={null}>
+      {activeDrag?.type === "hand-card" && (
+        <BoardCard
+          card={activeDrag.card}
+          cardDb={cardDb}
+          width={HAND_CARD_W * boardScale}
+          height={HAND_CARD_H * boardScale}
+        />
+      )}
+      {activeDrag?.type === "active-don" && (
+        <div
+          style={{
+            transform: `scale(${boardScale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          <DonCard />
+        </div>
+      )}
+      {activeDrag?.type === "attacker" && (
+        <BoardCard
+          card={activeDrag.card}
+          cardDb={cardDb}
+          width={BOARD_CARD_W * boardScale}
+          height={BOARD_CARD_H * boardScale}
+        />
+      )}
+    </DragOverlay>
+    </DndContext>
   );
 }
