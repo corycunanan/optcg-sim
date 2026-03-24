@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import type { GameAction, PromptOptions, PromptType } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { FIELD_W, MID_ZONE_H } from "./constants";
@@ -32,7 +33,7 @@ function MidZoneBtn({
   );
 }
 
-export function MidZone({
+export const MidZone = React.memo(function MidZone({
   top,
   isMyTurn,
   turnNumber,
@@ -161,4 +162,4 @@ export function MidZone({
       </div>
     </div>
   );
-}
+});

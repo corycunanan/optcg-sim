@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { CardDb, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { BoardCard } from "../board-card";
 import { BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
 
-export function DroppableCharSlot({
+export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   slotIndex,
   label,
   cardDb,
@@ -45,9 +45,9 @@ export function DroppableCharSlot({
       />
     </div>
   );
-}
+});
 
-export function PlayerFieldCard({
+export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   card,
   cardDb,
   activeDragType,
@@ -109,9 +109,9 @@ export function PlayerFieldCard({
       />
     </div>
   );
-}
+});
 
-export function OpponentFieldCard({
+export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card,
   cardDb,
   activeDragType,
@@ -146,4 +146,4 @@ export function OpponentFieldCard({
       />
     </div>
   );
-}
+});

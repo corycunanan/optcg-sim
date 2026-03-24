@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { CardDb, CardInstance } from "@shared/game-types";
 import { BoardCard } from "../board-card";
@@ -42,7 +43,7 @@ function DraggableHandCard({
   );
 }
 
-export function HandLayer({
+export const HandLayer = React.memo(function HandLayer({
   cards,
   faceDown,
   cardDb,
@@ -87,4 +88,4 @@ export function HandLayer({
       )}
     </div>
   );
-}
+});

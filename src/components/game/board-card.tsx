@@ -1,8 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CardDb, CardInstance } from "@shared/game-types";
+import type { CardData, CardDb, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { TooltipStat } from "./game-ui";
 
@@ -25,7 +25,7 @@ interface BoardCardProps {
   highlight?: boolean;
 }
 
-export function BoardCard({
+export const BoardCard = React.memo(function BoardCard({
   card,
   cardId: cardIdOverride,
   cardDb,
@@ -232,59 +232,73 @@ export function BoardCard({
             className="fixed z-[100] pointer-events-none bg-gb-surface border border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg"
             style={{ opacity: 0 }}
           >
-            <div className="font-bold text-gb-text-bright text-sm mb-1">
-              {data!.name}
-            </div>
-            <div className="text-xs text-gb-text-subtle mb-1">
-              {data!.type} &middot; {resolvedCardId}
-            </div>
-            <div className="flex gap-3 flex-wrap mb-1 text-xs">
-              {data!.type === "Leader"
-                ? (data!.life ?? data!.cost) != null && (
-                    <TooltipStat
-                      label="Life"
-                      value={(data!.life ?? data!.cost)!}
-                      color="var(--gb-accent-rose)"
-                    />
-                  )
-                : data!.cost != null && (
-                    <TooltipStat
-                      label="Cost"
-                      value={data!.cost}
-                      color="var(--gb-accent-amber)"
-                    />
-                  )}
-              {data!.power != null && (
-                <TooltipStat
-                  label="Power"
-                  value={data!.power.toLocaleString()}
-                  color="var(--gb-accent-green)"
-                />
-              )}
-              {data!.counter != null && (
-                <TooltipStat
-                  label="Counter"
-                  value={`+${data!.counter}`}
-                  color="var(--gb-accent-purple)"
-                />
-              )}
-              {data!.type !== "Leader" && data!.life != null && (
-                <TooltipStat
-                  label="Life"
-                  value={data!.life}
-                  color="var(--gb-accent-rose)"
-                />
-              )}
-            </div>
-            {data!.effectText && (
-              <div className="text-xs text-gb-text-subtle leading-relaxed border-t border-gb-border-strong pt-1 whitespace-pre-wrap">
-                {data!.effectText}
-              </div>
-            )}
+            <CardTooltipContent data={data!} cardId={resolvedCardId} />
           </div>,
           document.body,
         )}
     </>
   );
-}
+});
+
+const CardTooltipContent = React.memo(function CardTooltipContent({
+  data,
+  cardId,
+}: {
+  data: CardData;
+  cardId: string | undefined;
+}) {
+  return (
+    <>
+      <div className="font-bold text-gb-text-bright text-sm mb-1">
+        {data.name}
+      </div>
+      <div className="text-xs text-gb-text-subtle mb-1">
+        {data.type} &middot; {cardId}
+      </div>
+      <div className="flex gap-3 flex-wrap mb-1 text-xs">
+        {data.type === "Leader"
+          ? (data.life ?? data.cost) != null && (
+              <TooltipStat
+                label="Life"
+                value={(data.life ?? data.cost)!}
+                color="var(--gb-accent-rose)"
+              />
+            )
+          : data.cost != null && (
+              <TooltipStat
+                label="Cost"
+                value={data.cost}
+                color="var(--gb-accent-amber)"
+              />
+            )}
+        {data.power != null && (
+          <TooltipStat
+            label="Power"
+            value={data.power.toLocaleString()}
+            color="var(--gb-accent-green)"
+          />
+        )}
+        {data.counter != null && (
+          <TooltipStat
+            label="Counter"
+            value={`+${data.counter}`}
+            color="var(--gb-accent-purple)"
+          />
+        )}
+        {data.type !== "Leader" && data.life != null && (
+          <TooltipStat
+            label="Life"
+            value={data.life}
+            color="var(--gb-accent-rose)"
+          />
+        )}
+      </div>
+      {data.effectText && (
+        <div className="text-xs text-gb-text-subtle leading-relaxed border-t border-gb-border-strong pt-1 whitespace-pre-wrap">
+          {data.effectText}
+        </div>
+      )}
+    </>
+  );
+});
 

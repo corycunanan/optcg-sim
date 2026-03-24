@@ -3,6 +3,7 @@
 import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
 import { BoardLayout } from "./board-layout/index";
+import { GameErrorBoundary } from "./game-error-boundary";
 import { formatCountdown } from "./game-ui";
 
 interface GameBoardVisualProps {
@@ -61,7 +62,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   }
 
   return (
-    <>
+    <GameErrorBoundary>
       {/* Opponent away / disconnect banner */}
       {!session.matchClosed && session.opponentAway && (
         <div
@@ -148,6 +149,6 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
           </div>
         </div>
       )}
-    </>
+    </GameErrorBoundary>
   );
 }

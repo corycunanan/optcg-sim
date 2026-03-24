@@ -1,12 +1,13 @@
 "use client";
 
+import React from "react";
 import type { CardDb, LifeCard } from "@shared/game-types";
 import { BoardCard } from "../board-card";
 import { BOARD_CARD_W, BOARD_CARD_H } from "./constants";
 
 const LIFE_STACK_OFFSET = 20;
 
-export function LifeZone({
+export const LifeZone = React.memo(function LifeZone({
   life,
   cardDb,
   style,
@@ -50,4 +51,4 @@ export function LifeZone({
       ))}
     </div>
   );
-}
+});

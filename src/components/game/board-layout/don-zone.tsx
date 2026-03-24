@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { DonInstance, PlayerState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,7 @@ const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
 const DON_GROUP_GAP = -20;
 const DON_IMG = "/images/DON/zoro.jpg";
-export function DonCard({ rested }: { rested?: boolean }) {
+export const DonCard = React.memo(function DonCard({ rested }: { rested?: boolean }) {
   const card = (
     <div
       className="rounded shrink-0 overflow-hidden shadow-don"
@@ -47,7 +48,7 @@ export function DonCard({ rested }: { rested?: boolean }) {
   }
 
   return card;
-}
+});
 
 function DraggableDonCard({
   don,
@@ -81,7 +82,7 @@ function DraggableDonCard({
   );
 }
 
-export function DonZone({
+export const DonZone = React.memo(function DonZone({
   player,
   style,
   className,
@@ -155,4 +156,4 @@ export function DonZone({
       )}
     </div>
   );
-}
+});
