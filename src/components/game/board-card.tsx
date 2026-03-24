@@ -7,11 +7,14 @@ import { cn } from "@/lib/utils";
 
 type CardDb = Record<string, CardData>;
 
+const SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
+
 interface BoardCardProps {
   card?: CardInstance | null;
   cardId?: string;
   cardDb: CardDb;
   faceDown?: boolean;
+  sleeve?: boolean;
   empty?: boolean;
   label?: string;
   count?: number;
@@ -28,6 +31,7 @@ export function BoardCard({
   cardId: cardIdOverride,
   cardDb,
   faceDown,
+  sleeve,
   empty,
   label,
   count,
@@ -96,25 +100,36 @@ export function BoardCard({
     );
   }
 
-  if (faceDown) {
+  if (faceDown || sleeve) {
     return (
       <div
         className={cn(
-          "rounded-md border border-gb-border-strong bg-gb-surface-inset relative overflow-hidden",
+          "rounded-md border border-gb-border-strong relative overflow-hidden",
+          sleeve ? "bg-gb-board-dark" : "bg-gb-surface-inset",
           className,
         )}
         style={{ width, height, ...style }}
       >
-        <div
-          className="absolute inset-0 opacity-15"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, transparent, transparent 3px, currentColor 3px, currentColor 4px)",
-            color: "var(--gb-border-strong)",
-          }}
-        />
+        {sleeve ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={SLEEVE_IMG}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 opacity-15"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(45deg, transparent, transparent 3px, currentColor 3px, currentColor 4px)",
+              color: "var(--gb-border-strong)",
+            }}
+          />
+        )}
         {count != null && count > 0 && (
-          <div className="absolute bottom-1 right-1 bg-gb-board-dark/80 text-gb-text-bright text-xs font-bold px-1 rounded text-center">
+          <div className="absolute bottom-1 right-1 bg-gb-board-dark/80 text-gb-text-bright text-xs font-bold px-1 rounded text-center z-[1]">
             {count}
           </div>
         )}

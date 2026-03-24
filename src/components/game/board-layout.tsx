@@ -5,6 +5,7 @@ import type {
   CardData,
   CardInstance,
   GameAction,
+  LifeCard,
   PlayerState,
   PromptOptions,
   PromptType,
@@ -141,6 +142,57 @@ function HandLayer({
   );
 }
 
+/* ─── DON!! card constants (from Figma: Board Design / PlayerDONZone) ─ */
+
+const DON_CARD_W = 50;
+const DON_CARD_H = 70;
+const DON_ACTIVE_OVERLAP = 35;
+const DON_RESTED_OVERLAP = 60;
+const DON_GROUP_GAP = -20;
+const DON_IMG = "/images/DON/zoro.jpg";
+const DON_SHADOW = "3px 3px 0px 0px rgba(0, 0, 0, 0.25)";
+
+/* ─── Single DON!! card ────────────────────────────────────────────── */
+
+function DonCard({ rested }: { rested?: boolean }) {
+  const card = (
+    <div
+      className="rounded shrink-0 overflow-hidden"
+      style={{
+        width: DON_CARD_W,
+        height: DON_CARD_H,
+        boxShadow: DON_SHADOW,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={DON_IMG}
+        alt="DON!!"
+        className="h-full w-full object-cover"
+        draggable={false}
+      />
+    </div>
+  );
+
+  if (rested) {
+    return (
+      <div
+        className="relative shrink-0"
+        style={{ width: DON_CARD_H, height: DON_CARD_W }}
+      >
+        <div
+          className="absolute left-1/2 top-1/2"
+          style={{ transform: "translate(-50%, -50%) rotate(90deg)" }}
+        >
+          {card}
+        </div>
+      </div>
+    );
+  }
+
+  return card;
+}
+
 /* ─── DON!! zone display ──────────────────────────────────────────── */
 
 function DonZone({
@@ -152,37 +204,115 @@ function DonZone({
   style: React.CSSProperties;
   className?: string;
 }) {
-  const active =
-    player?.donCostArea.filter((d) => d.state === "ACTIVE").length ?? 0;
-  const rested =
-    player?.donCostArea.filter((d) => d.state === "RESTED").length ?? 0;
-  const deckCount = player?.donDeck.length ?? 0;
+  const activeDon =
+    player?.donCostArea.filter((d) => d.state === "ACTIVE") ?? [];
+  const restedDon =
+    player?.donCostArea.filter((d) => d.state === "RESTED") ?? [];
+  const hasAny = activeDon.length > 0 || restedDon.length > 0;
 
   return (
     <div
       className={cn(
-        "absolute flex flex-col items-center justify-center rounded-md border border-gb-border-strong/30 bg-gb-board-dark/40",
+        "absolute flex items-center rounded-md border border-gb-border-strong/30 bg-gb-board-dark/40",
+        !hasAny && "justify-center",
         className,
       )}
       style={style}
     >
-      <span className="text-xs font-bold text-gb-accent-amber leading-none">
-        DON!!
-      </span>
-      <span className="text-xs text-gb-text leading-tight mt-1">
-        {active}
-        <span className="text-gb-accent-green">A</span>
-        {rested > 0 && (
-          <>
-            {" "}
-            {rested}
-            <span className="text-gb-text-dim">R</span>
-          </>
-        )}
-      </span>
-      <span className="text-xs text-gb-text-dim leading-tight">
-        deck {deckCount}
-      </span>
+      {!hasAny && (
+        <span className="text-xs font-bold text-gb-accent-amber/40 leading-none select-none">
+          DON!!
+        </span>
+      )}
+
+      {/* Active DON — upright (portrait), stacked from left */}
+      {activeDon.length > 0 && (
+        <div className="flex items-center">
+          {activeDon.map((don, i) => (
+            <div
+              key={don.instanceId}
+              style={{
+                marginLeft: i > 0 ? -DON_ACTIVE_OVERLAP : 0,
+                zIndex: i,
+              }}
+            >
+              <DonCard />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Rested DON — rotated 90°, stacked after active group */}
+      {restedDon.length > 0 && (
+        <div
+          className="flex items-center"
+          style={{
+            marginLeft: activeDon.length > 0 ? DON_GROUP_GAP : 0,
+          }}
+        >
+          {restedDon.map((don, i) => (
+            <div
+              key={don.instanceId}
+              style={{
+                marginLeft: i > 0 ? -DON_RESTED_OVERLAP : 0,
+                zIndex: i,
+              }}
+            >
+              <DonCard rested />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Life zone — vertically stacked card sleeves ─────────────────── */
+
+const LIFE_STACK_OFFSET = 8;
+
+function LifeZone({
+  life,
+  cardDb,
+  style,
+}: {
+  life: LifeCard[];
+  cardDb: CardDb;
+  style: React.CSSProperties;
+}) {
+  const count = life.length;
+
+  if (count === 0) {
+    return (
+      <BoardCard
+        cardDb={cardDb}
+        empty
+        label="LIFE"
+        width={BOARD_CARD_W}
+        height={BOARD_CARD_H}
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <div style={style}>
+      {life.map((card, i) => (
+        <BoardCard
+          key={card.instanceId}
+          cardDb={cardDb}
+          sleeve
+          count={i === 0 ? count : undefined}
+          width={BOARD_CARD_W}
+          height={BOARD_CARD_H}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: i * LIFE_STACK_OFFSET,
+            zIndex: count - i,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -365,7 +495,7 @@ export function BoardLayout({
           />
           <BoardCard
             cardDb={cardDb}
-            faceDown
+            sleeve
             label="DECK"
             count={opp?.deck.length}
             width={BOARD_CARD_W}
@@ -459,13 +589,9 @@ export function BoardLayout({
           })}
 
           {/* Zone 1 (right): Life */}
-          <BoardCard
+          <LifeZone
+            life={opp?.life ?? []}
             cardDb={cardDb}
-            faceDown
-            label="LIFE"
-            count={opp?.life.length}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
             style={{
               position: "absolute",
               left: FIELD_W - SQUARE + sideCardOffsetX,
@@ -582,13 +708,9 @@ export function BoardLayout({
           {/* ═══════════════ PLAYER FIELD ═════════════════════════════ */}
 
           {/* Zone 1 (left): Life */}
-          <BoardCard
+          <LifeZone
+            life={me?.life ?? []}
             cardDb={cardDb}
-            faceDown
-            label="LIFE"
-            count={me?.life.length}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
             style={{
               position: "absolute",
               left: sideCardOffsetX,
@@ -686,7 +808,7 @@ export function BoardLayout({
           {/* Zone 3 (right): Deck + Trash */}
           <BoardCard
             cardDb={cardDb}
-            faceDown
+            sleeve
             label="DECK"
             count={me?.deck.length}
             width={BOARD_CARD_W}
