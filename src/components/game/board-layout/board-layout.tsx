@@ -214,12 +214,8 @@ export function BoardLayout({
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
       <nav
-        className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4"
-        style={{
-          height: NAVBAR_H,
-          backgroundColor: "oklch(16% 0.008 245 / 0.92)",
-          backdropFilter: "blur(8px)",
-        }}
+        className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 bg-gb-navbar backdrop-blur-sm"
+        style={{ height: NAVBAR_H }}
       >
         <span className="text-xs font-bold tracking-widest text-gb-text-bright">
           OPTCG SIM

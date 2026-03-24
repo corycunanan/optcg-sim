@@ -11,16 +11,13 @@ const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
 const DON_GROUP_GAP = -20;
 const DON_IMG = "/images/DON/zoro.jpg";
-const DON_SHADOW = "3px 3px 0px 0px rgba(0, 0, 0, 0.25)";
-
 export function DonCard({ rested }: { rested?: boolean }) {
   const card = (
     <div
-      className="rounded shrink-0 overflow-hidden"
+      className="rounded shrink-0 overflow-hidden shadow-don"
       style={{
         width: DON_CARD_W,
         height: DON_CARD_H,
-        boxShadow: DON_SHADOW,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -98,6 +98,8 @@
   --gb-prompt-bg:       oklch(12%  0.01  80);   /* prompt/warning panel bg */
   --gb-board:           oklch(18%  0.005 245);  /* game board felt background */
   --gb-board-dark:      oklch(0%   0     0);    /* banner, mid-zone, hand strips */
+  --gb-navbar:          oklch(16%  0.008 245 / 0.92); /* translucent game navbar */
+  --gb-shadow-don:      3px 3px 0px 0px rgba(0, 0, 0, 0.25); /* DON!! card drop shadow */
 }
 
 /* ─── Tailwind v4 Theme ──────────────────────────────────────────
@@ -199,6 +201,10 @@
   --color-gb-prompt-bg:      var(--gb-prompt-bg);
   --color-gb-board:          var(--gb-board);
   --color-gb-board-dark:     var(--gb-board-dark);
+  --color-gb-navbar:         var(--gb-navbar);
+
+  /* Shadows */
+  --shadow-don: var(--gb-shadow-don);
 
   /* Border Radius — 4 values only, override Tailwind defaults */
   --radius:    0.25rem;  /* 4px  — rounded      — badges, tags */

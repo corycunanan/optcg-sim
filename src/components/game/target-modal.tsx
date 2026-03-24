@@ -47,9 +47,9 @@ export function TargetModal({ modal, onClose, cardDb }: { modal: ModalState; onC
                 className="bg-gb-surface-raised border border-gb-border-strong rounded px-3 py-2 text-left cursor-pointer text-gb-text font-[inherit] text-xs transition-colors duration-100 hover:bg-gb-border-strong/50 focus-visible:ring-2 focus-visible:ring-gb-accent-blue focus-visible:ring-offset-1 focus-visible:ring-offset-gb-surface"
               >
                 <div className="font-bold text-gb-accent-blue">{t.label}</div>
-                {t.sublabel && <div className="text-xs text-gb-text-muted mt-0.5">{t.sublabel}</div>}
+                {t.sublabel && <div className="text-xs text-gb-text-muted mt-1">{t.sublabel}</div>}
                 {data && (
-                  <div className="flex gap-2.5 mt-1 text-xs">
+                  <div className="flex gap-3 mt-1 text-xs">
                     {data.cost !== null && <span className="text-gb-accent-amber">Cost {data.cost}</span>}
                     {data.power !== null && <span className="text-gb-accent-green">Pwr {data.power.toLocaleString()}</span>}
                     {data.counter !== null && <span className="text-gb-accent-purple">Ctr +{data.counter}</span>}

@@ -65,7 +65,7 @@ function HandStrip({
   return (
     <div
       className={cn(
-        "absolute inset-x-0 flex justify-center gap-2.5 z-10",
+        "absolute inset-x-0 flex justify-center gap-3 z-10",
         faceDown ? "items-end" : "items-start",
       )}
       style={style}

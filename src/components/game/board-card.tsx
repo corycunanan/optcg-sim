@@ -210,7 +210,7 @@ export function BoardCard({
 
         {donCount > 0 && (
           <div
-            className="absolute z-10 text-center bg-gb-board-dark/75 py-0.5"
+            className="absolute z-10 text-center bg-gb-board-dark/75 py-1"
             style={{
               bottom: isRested ? (height - width) / 2 : 0,
               left: isRested ? -(height - width) / 2 : 0,
