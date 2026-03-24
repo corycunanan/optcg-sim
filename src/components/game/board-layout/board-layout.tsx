@@ -24,6 +24,7 @@ import {
   SQUARE,
   HAND_CARD_W,
   HAND_CARD_H,
+  MID_ZONE_H,
   CHAR_ROW_GAP,
   ZONE_GAP,
   ROW_GAP,
