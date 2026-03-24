@@ -36,31 +36,25 @@ function MidZoneBtn({
 export const MidZone = React.memo(function MidZone({
   top,
   isMyTurn,
-  turnNumber,
   phase,
-  battlePhase,
   canEndPhase,
   canPass,
-  matchClosed,
+  inBattle,
   activePrompt,
   onAction,
 }: {
   top: number;
   isMyTurn: boolean;
-  turnNumber: number | undefined;
   phase: string;
-  battlePhase: string | null;
   canEndPhase: boolean;
   canPass: boolean;
-  matchClosed: boolean;
+  inBattle: boolean;
   activePrompt: { promptType: PromptType; options: PromptOptions } | null;
   onAction: (action: GameAction) => void;
 }) {
-  const inBattle = !!battlePhase;
-
   return (
     <div
-      className="absolute flex items-center justify-between px-4 bg-gb-board-dark"
+      className="absolute flex items-center justify-center px-4 gap-2"
       style={{
         left: 0,
         top,
@@ -68,36 +62,7 @@ export const MidZone = React.memo(function MidZone({
         height: MID_ZONE_H,
       }}
     >
-      {/* Left: turn info */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div
-          className={cn(
-            "w-2 h-2 rounded-full shrink-0",
-            isMyTurn ? "bg-gb-accent-green" : "bg-gb-accent-amber",
-          )}
-        />
-        <span className="text-xs text-gb-text-bright font-bold">
-          T{turnNumber ?? "—"}
-        </span>
-        <span className="text-xs text-gb-accent-blue font-bold">
-          {phase}
-        </span>
-        {battlePhase && (
-          <span className="text-xs text-gb-accent-purple font-bold">
-            &rsaquo; {battlePhase.replace(/_/g, " ")}
-          </span>
-        )}
-        <span
-          className={cn(
-            "text-xs font-bold",
-            isMyTurn ? "text-gb-accent-green" : "text-gb-text-dim",
-          )}
-        >
-          {isMyTurn ? "YOUR TURN" : "OPP TURN"}
-        </span>
-      </div>
-
-      {/* Center: active prompt */}
+      {/* Active prompt */}
       {activePrompt && (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-gb-accent-amber font-bold">
@@ -129,37 +94,25 @@ export const MidZone = React.memo(function MidZone({
         </div>
       )}
 
-      {!activePrompt && <div className="flex-1" />}
-
-      {/* Right: phase actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        {canEndPhase && (
-          <MidZoneBtn
-            accent
-            onClick={() => onAction({ type: "ADVANCE_PHASE" })}
-          >
-            End {phase} &rarr;
-          </MidZoneBtn>
-        )}
-        {canPass && (
-          <MidZoneBtn onClick={() => onAction({ type: "PASS" })}>
-            Pass
-          </MidZoneBtn>
-        )}
-        {!isMyTurn && !inBattle && (
-          <span className="text-xs text-gb-text-dim italic">
-            Waiting&hellip;
-          </span>
-        )}
-        {!matchClosed && (
-          <MidZoneBtn
-            danger
-            onClick={() => onAction({ type: "CONCEDE" })}
-          >
-            Concede
-          </MidZoneBtn>
-        )}
-      </div>
+      {/* Phase actions */}
+      {canEndPhase && (
+        <MidZoneBtn
+          accent
+          onClick={() => onAction({ type: "ADVANCE_PHASE" })}
+        >
+          End {phase} &rarr;
+        </MidZoneBtn>
+      )}
+      {canPass && (
+        <MidZoneBtn onClick={() => onAction({ type: "PASS" })}>
+          Pass
+        </MidZoneBtn>
+      )}
+      {!isMyTurn && !inBattle && (
+        <span className="text-xs text-gb-text-dim italic">
+          Waiting&hellip;
+        </span>
+      )}
     </div>
   );
 });

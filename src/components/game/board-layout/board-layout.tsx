@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   CardDb,
   GameAction,
@@ -64,6 +64,79 @@ export interface BoardLayoutProps {
   onAction: (action: GameAction) => void;
   onLeave: () => void;
   matchClosed: boolean;
+}
+
+function NavMenu({
+  onLeave,
+  onConcede,
+  matchClosed,
+}: {
+  onLeave: () => void;
+  onConcede: () => void;
+  matchClosed: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        close();
+      }
+    }
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
+  }, [open, close]);
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex items-center justify-center w-8 h-8 rounded-md transition-colors cursor-pointer",
+          open
+            ? "bg-gb-surface-raised text-gb-text-bright"
+            : "text-gb-text-subtle hover:text-gb-text-bright",
+        )}
+        aria-label="Game menu"
+        aria-expanded={open}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor" />
+          <rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor" />
+          <rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-48 rounded-md border border-gb-border-strong bg-gb-surface py-1 shadow-lg z-50">
+          <button
+            onClick={() => {
+              close();
+              onLeave();
+            }}
+            className="w-full text-left px-3 py-2 text-xs text-gb-text hover:bg-gb-surface-raised transition-colors cursor-pointer"
+          >
+            &larr; Back to Lobbies
+          </button>
+          {!matchClosed && (
+            <button
+              onClick={() => {
+                close();
+                onConcede();
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-gb-accent-red hover:bg-gb-surface-raised transition-colors cursor-pointer"
+            >
+              Concede
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function BoardLayout({
@@ -143,7 +216,8 @@ export function BoardLayout({
 
   const phase = turn?.phase ?? "";
   const inBattle = !!battlePhase;
-  const canEndPhase = !matchClosed && isMyTurn && !inBattle;
+  // REFRESH, DRAW, and DON are auto-advanced by the server — only MAIN needs a button.
+  const canEndPhase = !matchClosed && isMyTurn && !inBattle && phase === "MAIN";
   const canPass = !matchClosed && inBattle;
 
   /* ── Drag & drop ─────────────────────────────────────────────────── */
@@ -215,13 +289,43 @@ export function BoardLayout({
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
       <nav
-        className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 bg-gb-navbar backdrop-blur-sm"
+        className="absolute inset-x-0 top-0 z-30 flex items-center px-4 bg-gb-navbar"
         style={{ height: NAVBAR_H }}
       >
-        <span className="text-xs font-bold tracking-widest text-gb-text-bright">
+        <span className="text-xs font-bold tracking-widest text-gb-text-bright shrink-0">
           OPTCG SIM
         </span>
-        <div className="flex items-center gap-3">
+
+        {/* Center: turn info */}
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <div
+            className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              isMyTurn ? "bg-gb-accent-green" : "bg-gb-accent-amber",
+            )}
+          />
+          <span className="text-xs text-gb-text-bright font-bold">
+            Turn {turn?.number ?? "—"}
+          </span>
+          <span className="text-xs text-gb-accent-blue font-bold">
+            {phase}
+          </span>
+          {battlePhase && (
+            <span className="text-xs text-gb-accent-purple font-bold">
+              &rsaquo; {battlePhase.replace(/_/g, " ")}
+            </span>
+          )}
+          <span
+            className={cn(
+              "text-xs font-bold",
+              isMyTurn ? "text-gb-accent-green" : "text-gb-text-dim",
+            )}
+          >
+            {isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
           {myIndex !== null && (
             <span className="text-xs text-gb-text-dim">
               P{myIndex + 1}
@@ -233,12 +337,11 @@ export function BoardLayout({
               {connectionStatus}
             </span>
           </div>
-          <button
-            onClick={onLeave}
-            className="px-2 py-1 text-xs text-gb-text-subtle hover:text-gb-text-bright transition-colors"
-          >
-            &larr; Lobbies
-          </button>
+          <NavMenu
+            onLeave={onLeave}
+            onConcede={() => onAction({ type: "CONCEDE" })}
+            matchClosed={matchClosed}
+          />
         </div>
       </nav>
 
@@ -372,12 +475,10 @@ export function BoardLayout({
           <MidZone
             top={midTop}
             isMyTurn={isMyTurn}
-            turnNumber={turn?.number}
             phase={phase}
-            battlePhase={battlePhase}
             canEndPhase={canEndPhase}
             canPass={canPass}
-            matchClosed={matchClosed}
+            inBattle={inBattle}
             activePrompt={activePrompt}
             onAction={onAction}
           />

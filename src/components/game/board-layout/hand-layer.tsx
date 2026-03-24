@@ -69,7 +69,7 @@ export const HandLayer = React.memo(function HandLayer({
           <BoardCard
             key={card.instanceId}
             cardDb={cardDb}
-            faceDown
+            sleeve
             width={HAND_CARD_W}
             height={HAND_CARD_H}
             style={i > 0 ? { marginLeft: gap } : undefined}
