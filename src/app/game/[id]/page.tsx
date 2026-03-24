@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { GameBoard } from "@/components/game/game-board";
+import { GameBoardVisual } from "@/components/game/game-board-visual";
 
 export const metadata = {
   title: "Game — OPTCG Simulator",
 };
 
-const GAME_WORKER_URL = process.env.NEXT_PUBLIC_GAME_WORKER_URL ?? process.env.GAME_WORKER_URL ?? "";
+const GAME_WORKER_URL =
+  process.env.NEXT_PUBLIC_GAME_WORKER_URL ??
+  process.env.GAME_WORKER_URL ??
+  "";
 
 export default async function GamePage({
   params,
@@ -19,5 +22,5 @@ export default async function GamePage({
   }
 
   const { id } = await params;
-  return <GameBoard gameId={id} workerUrl={GAME_WORKER_URL} />;
+  return <GameBoardVisual gameId={id} workerUrl={GAME_WORKER_URL} />;
 }
