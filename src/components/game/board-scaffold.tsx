@@ -2,52 +2,25 @@
 
 import { useLayoutEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-
-/* ─── Dimensions (preserved from wireframe) ───────────────────────────── */
-
-const SCREEN_W = 1280;
-const SCREEN_H = 832;
-const NAVBAR_H = 48;
-const MID_ZONE_H = 64;
-const SQUARE = 112;
-const HAND_CARD_W = 84;
-const HAND_CARD_H = 118;
-
-/* ─── Derived layout values ───────────────────────────────────────────── */
-
-const CHAR_ROW_GAP = 10;
-const ZONE_GAP = 32;
-const ROW_GAP = 20;
-const LEADER_GAP = 10;
-const SIDE_ZONE_GAP = 12;
-
-const CHAR_ROW_W = 5 * SQUARE + 4 * CHAR_ROW_GAP;
-const FIELD_W = SQUARE + ZONE_GAP + CHAR_ROW_W + ZONE_GAP + SQUARE;
-const FIELD_H = SQUARE + ROW_GAP + SQUARE;
-const BOARD_CONTENT_H = FIELD_H + MID_ZONE_H + FIELD_H;
-
-const MIN_HAND_BOARD_GAP = 30;
-const PLAYER_HAND_VIEWPORT_MARGIN = 20;
-
-function getViewportSize() {
-  if (typeof window === "undefined") {
-    return { width: FIELD_W, height: BOARD_CONTENT_H + 2 * HAND_CARD_H };
-  }
-
-  const visualViewport = window.visualViewport;
-
-  if (visualViewport) {
-    return {
-      width: visualViewport.width,
-      height: visualViewport.height,
-    };
-  }
-
-  return {
-    width: document.documentElement.clientWidth,
-    height: document.documentElement.clientHeight,
-  };
-}
+import {
+  NAVBAR_H,
+  SQUARE,
+  HAND_CARD_W,
+  HAND_CARD_H,
+  MID_ZONE_H,
+  CHAR_ROW_GAP,
+  ZONE_GAP,
+  ROW_GAP,
+  LEADER_GAP,
+  SIDE_ZONE_GAP,
+  CHAR_ROW_W,
+  FIELD_W,
+  FIELD_H,
+  BOARD_CONTENT_H,
+  MIN_HAND_BOARD_GAP,
+  PLAYER_HAND_VIEWPORT_MARGIN,
+  getViewportSize,
+} from "./board-layout/constants";
 
 /* ─── Slot — placeholder for a single card position ───────────────────── */
 
@@ -196,7 +169,7 @@ export function BoardScaffold() {
         <div
           className="relative shrink-0"
           style={{
-            width: SCREEN_W,
+            width: FIELD_W,
             height: HAND_CARD_H,
             top: opponentHandTopPx,
             transform: `scale(${boardScale})`,
@@ -407,7 +380,7 @@ export function BoardScaffold() {
         <div
           className="relative shrink-0"
           style={{
-            width: SCREEN_W,
+            width: FIELD_W,
             height: HAND_CARD_H,
             transform: `scale(${boardScale})`,
             transformOrigin: "top center",
