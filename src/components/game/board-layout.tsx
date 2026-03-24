@@ -2,7 +2,7 @@
 
 import { useCallback, useLayoutEffect, useState } from "react";
 import type {
-  CardData,
+  CardDb,
   CardInstance,
   DonInstance,
   GameAction,
@@ -24,8 +24,6 @@ import {
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { BoardCard } from "./board-card";
 import { cn } from "@/lib/utils";
-
-type CardDb = Record<string, CardData>;
 
 /* ─── Drag & Drop payload types ───────────────────────────────────── */
 

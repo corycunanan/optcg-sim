@@ -193,6 +193,8 @@ export interface GameState {
 
 // Minimal card data the DO needs at runtime — fetched once from the Next.js API
 // on game init and stored in DO storage.
+export type CardDb = Record<string, CardData>;
+
 export interface CardData {
   id: string;
   name: string;

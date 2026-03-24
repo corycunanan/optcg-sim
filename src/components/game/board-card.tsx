@@ -2,10 +2,9 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CardData, CardInstance } from "@shared/game-types";
+import type { CardDb, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-
-type CardDb = Record<string, CardData>;
+import { TooltipStat } from "./game-ui";
 
 const SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
 
@@ -289,23 +288,3 @@ export function BoardCard({
   );
 }
 
-function TooltipStat({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: unknown;
-  color: string;
-}) {
-  return (
-    <div className="text-center">
-      <div className="font-bold text-sm" style={{ color }}>
-        {String(value)}
-      </div>
-      <div className="text-xs text-gb-text-muted uppercase tracking-wide">
-        {label}
-      </div>
-    </div>
-  );
-}

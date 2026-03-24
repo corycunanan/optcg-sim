@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameWs } from "@/hooks/use-game-ws";
 import type {
-  CardData,
+  CardDb,
   GameAction,
   GameState,
   PlayerState,
@@ -12,8 +12,6 @@ import type {
   PromptType,
   TurnState,
 } from "@shared/game-types";
-
-type CardDb = Record<string, CardData>;
 
 interface RemoteGameStatus {
   id: string;
