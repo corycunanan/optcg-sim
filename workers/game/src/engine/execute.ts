@@ -100,12 +100,12 @@ function executePlayCard(
       nextState = { ...nextState, players: newPlayers };
     }
 
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, zone: "CHARACTER" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId, zone: "CHARACTER" } });
 
   } else if (cardData.type === "Event") {
     // Trash the event, then the effect fires (MANUAL_EFFECT in M3)
     nextState = moveCard(nextState, cardInstanceId, "TRASH");
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, zone: "TRASH" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId, zone: "TRASH" } });
 
   } else if (cardData.type === "Stage") {
     // Trash existing stage first
@@ -115,7 +115,7 @@ function executePlayCard(
       events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: existingStage.cardId, reason: "stage_replaced" } });
     }
     nextState = moveCard(nextState, cardInstanceId, "STAGE");
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, zone: "STAGE" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId, zone: "STAGE" } });
   }
 
   return { state: nextState, events };

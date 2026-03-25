@@ -490,6 +490,7 @@ function executeEffectAction(
         if (filter.card_type) {
           if (data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
         }
+        if (filter.cost_min !== undefined && (data.cost ?? 0) < filter.cost_min) return false;
         if (filter.cost_max !== undefined && (data.cost ?? 0) > filter.cost_max) return false;
         return true;
       });

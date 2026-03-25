@@ -235,6 +235,9 @@ export type GameAction =
   | { type: "USE_COUNTER"; cardInstanceId: string; counterTargetInstanceId: string }
   | { type: "USE_COUNTER_EVENT"; cardInstanceId: string; counterTargetInstanceId: string }
   | { type: "REVEAL_TRIGGER"; reveal: boolean }  // true = reveal and activate, false = add to hand
+  | { type: "ARRANGE_TOP_CARDS"; keptCardInstanceId: string; orderedInstanceIds: string[]; destination: "top" | "bottom" }
+  | { type: "SELECT_TARGET"; selectedInstanceIds: string[] }
+  | { type: "PLAYER_CHOICE"; choiceId: string }
   | { type: "PASS" }
   | { type: "CONCEDE" }
   | { type: "MANUAL_EFFECT"; description: string };
@@ -261,10 +264,25 @@ export type PromptType =
   | "SELECT_COUNTER_TARGET"
   | "SELECT_ATTACK_TARGET"
   | "REVEAL_TRIGGER"
-  | "SELECT_CARD_TO_TRASH";  // e.g. 5-card overflow
+  | "SELECT_CARD_TO_TRASH"   // e.g. 5-card overflow
+  | "ARRANGE_TOP_CARDS"
+  | "SELECT_TARGET"
+  | "PLAYER_CHOICE"
+  | "OPTIONAL_EFFECT";
 
 export interface PromptOptions {
   validTargets?: string[];   // instanceIds
   optional?: boolean;
   timeoutMs?: number;
+  // ARRANGE_TOP_CARDS
+  canSendToBottom?: boolean;
+  // Shared: ARRANGE_TOP_CARDS + SELECT_TARGET
+  cards?: CardInstance[];
+  effectDescription?: string;
+  // SELECT_TARGET
+  countMin?: number;
+  countMax?: number;
+  ctaLabel?: string;
+  // PLAYER_CHOICE
+  choices?: { id: string; label: string }[];
 }
