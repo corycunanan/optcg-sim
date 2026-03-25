@@ -124,6 +124,8 @@ export const MidZone = React.memo(function MidZone({
   activePrompt,
   battleInfo,
   blockerMode,
+  isPromptHidden,
+  onShowPrompt,
   onAction,
 }: {
   top: number;
@@ -135,6 +137,8 @@ export const MidZone = React.memo(function MidZone({
   activePrompt: { promptType: PromptType; options: PromptOptions } | null;
   battleInfo: BattleInfo | null;
   blockerMode?: BlockerMode;
+  isPromptHidden?: boolean;
+  onShowPrompt?: () => void;
   onAction: (action: GameAction) => void;
 }) {
   return (
@@ -150,8 +154,20 @@ export const MidZone = React.memo(function MidZone({
       {/* Battle display */}
       {battleInfo && <BattleDisplay info={battleInfo} />}
 
-      {/* Active prompt (suppressed when blockerMode handles the UI) */}
-      {activePrompt && !blockerMode && (
+      {/* Hidden modal prompt indicator */}
+      {activePrompt && isPromptHidden && (
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-gb-accent-amber font-bold">
+            &#x26A1; ACTION REQUIRED
+          </span>
+          <MidZoneBtn accent onClick={onShowPrompt ?? (() => {})}>
+            Show Prompt
+          </MidZoneBtn>
+        </div>
+      )}
+
+      {/* Active prompt (suppressed when blockerMode or modal handles the UI) */}
+      {activePrompt && !blockerMode && !isPromptHidden && (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-gb-accent-amber font-bold">
             &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}

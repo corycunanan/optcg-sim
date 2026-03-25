@@ -232,7 +232,7 @@ export const BoardCard = React.memo(function BoardCard({
             className="fixed z-[100] pointer-events-none bg-gb-surface border border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg"
             style={{ opacity: 0 }}
           >
-            <CardTooltipContent data={data!} cardId={resolvedCardId} />
+            <CardTooltipContent data={data!} cardId={resolvedCardId} card={card} />
           </div>,
           document.body,
         )}
@@ -240,62 +240,82 @@ export const BoardCard = React.memo(function BoardCard({
   );
 });
 
-const CardTooltipContent = React.memo(function CardTooltipContent({
+export const CardTooltipContent = React.memo(function CardTooltipContent({
   data,
   cardId,
+  card,
 }: {
   data: CardData;
   cardId: string | undefined;
+  card?: CardInstance | null;
 }) {
+  const isFieldCard = data.type === "Leader" || data.type === "Character";
+  const donCount = card?.attachedDon.length ?? 0;
+  const basePower = data.power ?? 0;
+  const effectivePower = basePower + donCount * 1000;
+  const powerBoosted = donCount > 0;
+
   return (
     <>
-      <div className="font-bold text-gb-text-bright text-sm mb-1">
+      <div className="font-bold text-gb-text-bright text-sm">
         {data.name}
       </div>
-      <div className="text-xs text-gb-text-subtle mb-1">
+      <div className="text-xs text-gb-text-subtle mb-3">
         {data.type} &middot; {cardId}
       </div>
-      <div className="flex gap-3 flex-wrap mb-1 text-xs">
-        {data.type === "Leader"
-          ? (data.life ?? data.cost) != null && (
-              <TooltipStat
-                label="Life"
-                value={(data.life ?? data.cost)!}
-                color="var(--gb-accent-rose)"
-              />
-            )
-          : data.cost != null && (
-              <TooltipStat
-                label="Cost"
-                value={data.cost}
-                color="var(--gb-accent-amber)"
-              />
-            )}
-        {data.power != null && (
+
+      {isFieldCard ? (
+        <div className="flex gap-5 flex-wrap mb-3 text-xs">
+          {data.type === "Leader" ? (
+            <TooltipStat
+              label="Life"
+              value={data.life ?? data.cost ?? 0}
+              color="var(--gb-accent-rose)"
+            />
+          ) : (
+            <TooltipStat
+              label="Cost"
+              value={data.cost ?? 0}
+              color="var(--gb-accent-amber)"
+            />
+          )}
           <TooltipStat
             label="Power"
-            value={data.power.toLocaleString()}
+            value={effectivePower.toLocaleString()}
             color="var(--gb-accent-green)"
           />
-        )}
-        {data.counter != null && (
-          <TooltipStat
-            label="Counter"
-            value={`+${data.counter}`}
-            color="var(--gb-accent-purple)"
-          />
-        )}
-        {data.type !== "Leader" && data.life != null && (
-          <TooltipStat
-            label="Life"
-            value={data.life}
-            color="var(--gb-accent-rose)"
-          />
-        )}
-      </div>
+          {data.type !== "Leader" && (
+            <TooltipStat
+              label="Counter"
+              value={data.counter != null ? `+${data.counter}` : "—"}
+              color="var(--gb-accent-purple)"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-3 flex-wrap mb-3 text-xs">
+          {data.cost != null && (
+            <TooltipStat
+              label="Cost"
+              value={data.cost}
+              color="var(--gb-accent-amber)"
+            />
+          )}
+          {data.life != null && (
+            <TooltipStat
+              label="Life"
+              value={data.life}
+              color="var(--gb-accent-rose)"
+            />
+          )}
+        </div>
+      )}
+
       {data.effectText && (
-        <div className="text-xs text-gb-text-subtle leading-relaxed border-t border-gb-border-strong pt-1 whitespace-pre-wrap">
-          {data.effectText}
+        <div className="text-xs text-gb-text leading-relaxed border-t border-gb-border-strong pt-3 flex flex-col gap-2">
+          {data.effectText.split(/\n{2,}/).map((paragraph, i) => (
+            <p key={i} className="whitespace-pre-wrap">{paragraph}</p>
+          ))}
         </div>
       )}
     </>

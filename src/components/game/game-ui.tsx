@@ -76,7 +76,7 @@ export function TooltipStat({
   color: string;
 }) {
   return (
-    <div className="text-center">
+    <div className="text-center px-2">
       <div className="font-bold text-sm" style={{ color }}>
         {String(value)}
       </div>

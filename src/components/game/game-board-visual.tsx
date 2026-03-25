@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
 import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
+import type { PromptOptions, PromptType } from "@shared/game-types";
 
 interface GameBoardVisualProps {
   gameId: string;
@@ -14,6 +16,8 @@ interface GameBoardVisualProps {
 
 export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   const session = useGameSession(gameId, workerUrl);
+  const [devPrompt, setDevPrompt] = useState<{ promptType: PromptType; options: PromptOptions } | null>(null);
+  const activePrompt = devPrompt ?? session.activePrompt;
 
   if (!session.gameState) {
     return (
@@ -108,11 +112,90 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         isMyTurn={session.isMyTurn}
         battlePhase={session.battlePhase}
         connectionStatus={session.connectionStatus}
-        activePrompt={session.activePrompt}
-        onAction={session.sendAction}
+        activePrompt={activePrompt}
+        onAction={(action) => {
+          if (action.type === "ARRANGE_TOP_CARDS") setDevPrompt(null);
+          session.sendAction(action);
+        }}
         onLeave={session.handleBackToLobbies}
         matchClosed={session.matchClosed}
       />
+
+      {/* ── Dev: modal test panel ── only in development ──────────────── */}
+      {process.env.NODE_ENV === "development" && session.me && (
+        <div className="fixed bottom-4 right-4 z-[300] flex items-center gap-2">
+          {devPrompt && (
+            <button
+              onClick={() => setDevPrompt(null)}
+              className="px-2 py-1 text-xs font-mono bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red rounded cursor-pointer"
+            >
+              clear
+            </button>
+          )}
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              const val = e.target.value;
+              e.target.value = "";
+              if (!val || !session.me) return;
+              if (val === "ARRANGE_TOP_CARDS") {
+                const cards = session.me.deck.slice(0, 4);
+                if (cards.length === 0) return;
+                setDevPrompt({
+                  promptType: "ARRANGE_TOP_CARDS",
+                  options: {
+                    cards,
+                    effectDescription: "Look at the top 4 cards of your deck",
+                    canSendToBottom: true,
+                  },
+                });
+              } else if (val === "PLAYER_CHOICE") {
+                setDevPrompt({
+                  promptType: "PLAYER_CHOICE",
+                  options: {
+                    effectDescription: "Choose an effect",
+                    choices: [
+                      { id: "draw_2", label: "Draw 2 cards" },
+                      { id: "give_don", label: "Give 1 DON!! to your Leader" },
+                      { id: "return_char", label: "Return 1 opponent's Character to hand" },
+                    ],
+                  },
+                });
+              } else if (val === "SELECT_TARGET") {
+                const allCards = [
+                  ...session.me.characters.filter(Boolean),
+                  ...(session.opp?.characters.filter(Boolean) ?? []),
+                  ...session.me.hand.slice(0, 4),
+                ] as typeof session.me.characters;
+                if (allCards.length === 0) return;
+                // Mark roughly half as valid targets
+                const validTargets = allCards
+                  .filter((_, i) => i % 2 === 0)
+                  .map((c) => c.instanceId);
+                setDevPrompt({
+                  promptType: "SELECT_TARGET",
+                  options: {
+                    cards: allCards,
+                    validTargets,
+                    effectDescription: "Select up to 2 Characters with cost 3 or less",
+                    countMin: 1,
+                    countMax: 2,
+                    ctaLabel: "Confirm Selection",
+                  },
+                });
+              }
+            }}
+            className="px-2 py-1 text-xs font-mono bg-gb-surface-raised border border-gb-border-strong text-gb-text-dim rounded cursor-pointer"
+          >
+            <option value="" disabled>[dev] test modal…</option>
+            <option value="ARRANGE_TOP_CARDS">Arrange Top Cards</option>
+            <option value="SELECT_TARGET">Select Target</option>
+            <option value="PLAYER_CHOICE">Player Choice</option>
+            <option value="OPTIONAL_EFFECT" disabled>Optional Effect (not built)</option>
+            <option value="REVEAL_TRIGGER" disabled>Reveal Trigger (not built)</option>
+          </select>
+        </div>
+      )}
 
       {/* Event Log — bottom left */}
       <EventLog

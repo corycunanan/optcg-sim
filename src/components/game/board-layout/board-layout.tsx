@@ -48,6 +48,9 @@ import { DonCard, DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, PlayerFieldCard, OpponentFieldCard } from "./field-card";
 import { MidZone, type BattleInfo } from "./mid-zone";
+import { ArrangeTopCardsModal } from "../arrange-top-cards-modal";
+import { SelectTargetModal } from "../select-target-modal";
+import { PlayerChoiceModal } from "../player-choice-modal";
 import { DroppableTrashZone } from "./trash-zone";
 
 export interface BoardLayoutProps {
@@ -156,6 +159,12 @@ export function BoardLayout({
   matchClosed,
 }: BoardLayoutProps) {
   const [viewport, setViewport] = useState(getViewportSize);
+  const [isPromptHidden, setIsPromptHidden] = useState(false);
+
+  // Reset hidden state whenever a new prompt arrives
+  useEffect(() => {
+    setIsPromptHidden(false);
+  }, [activePrompt?.promptType]);
 
   useLayoutEffect(() => {
     function update() {
@@ -540,6 +549,8 @@ export function BoardLayout({
                 }
               },
             } : undefined}
+            isPromptHidden={isPromptHidden}
+            onShowPrompt={() => setIsPromptHidden(false)}
             onAction={onAction}
           />
 
@@ -673,6 +684,50 @@ export function BoardLayout({
           />
         </div>
       </div>
+
+      {/* ── Interruption Modals ─────────────────────────────────────── */}
+      {activePrompt?.promptType === "ARRANGE_TOP_CARDS" &&
+        activePrompt.options.cards &&
+        activePrompt.options.cards.length > 0 && (
+          <ArrangeTopCardsModal
+            cards={activePrompt.options.cards}
+            effectDescription={activePrompt.options.effectDescription ?? "Look at the top cards of your deck"}
+            canSendToBottom={activePrompt.options.canSendToBottom ?? true}
+            cardDb={cardDb}
+            isHidden={isPromptHidden}
+            onHide={() => setIsPromptHidden(true)}
+            onAction={onAction}
+          />
+        )}
+
+      {activePrompt?.promptType === "SELECT_TARGET" &&
+        activePrompt.options.cards &&
+        activePrompt.options.cards.length > 0 && (
+          <SelectTargetModal
+            cards={activePrompt.options.cards}
+            validTargets={activePrompt.options.validTargets ?? activePrompt.options.cards.map((c) => c.instanceId)}
+            effectDescription={activePrompt.options.effectDescription ?? "Select a target"}
+            countMin={activePrompt.options.countMin ?? 1}
+            countMax={activePrompt.options.countMax ?? 1}
+            ctaLabel={activePrompt.options.ctaLabel ?? "Confirm Selection"}
+            cardDb={cardDb}
+            isHidden={isPromptHidden}
+            onHide={() => setIsPromptHidden(true)}
+            onAction={onAction}
+          />
+        )}
+
+      {activePrompt?.promptType === "PLAYER_CHOICE" &&
+        activePrompt.options.choices &&
+        activePrompt.options.choices.length > 0 && (
+          <PlayerChoiceModal
+            effectDescription={activePrompt.options.effectDescription ?? "Choose an effect"}
+            choices={activePrompt.options.choices}
+            isHidden={isPromptHidden}
+            onHide={() => setIsPromptHidden(true)}
+            onAction={onAction}
+          />
+        )}
     </div>
 
     <DragOverlay dropAnimation={null}>
