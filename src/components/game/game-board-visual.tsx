@@ -4,6 +4,7 @@ import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
 import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
+import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
 
 interface GameBoardVisualProps {
@@ -111,6 +112,13 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         onAction={session.sendAction}
         onLeave={session.handleBackToLobbies}
         matchClosed={session.matchClosed}
+      />
+
+      {/* Event Log — bottom left */}
+      <EventLog
+        events={session.gameState.eventLog}
+        cardDb={session.cardDb}
+        myIndex={session.myIndex}
       />
 
       {/* Match ended overlay */}

@@ -1,0 +1,560 @@
+/**
+ * M4 Condition Evaluator
+ *
+ * Evaluates schema conditions against the current game state.
+ * Conditions are pure boolean checks — they never produce side effects.
+ *
+ * Used by:
+ * - Trigger matching (block-level conditions)
+ * - Effect resolver (inline action conditions)
+ * - Prohibition registry (conditional prohibitions)
+ * - Duration tracker (WHILE_CONDITION expiry)
+ */
+
+import type {
+  Condition,
+  SimpleCondition,
+  Controller,
+  NumericOperator,
+  TargetFilter,
+  NumericRange,
+  DynamicValue,
+} from "./effect-types.js";
+import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
+import { getEffectivePower } from "./modifiers.js";
+
+export interface ConditionContext {
+  /** The card instance the effect is on */
+  sourceCardInstanceId: string;
+  /** The controller of the source card */
+  controller: 0 | 1;
+  /** Card database for property lookups */
+  cardDb: Map<string, CardData>;
+}
+
+/**
+ * Evaluate a condition tree against the current game state.
+ */
+export function evaluateCondition(
+  state: GameState,
+  condition: Condition,
+  ctx: ConditionContext,
+): boolean {
+  // Compound wrappers
+  if ("all_of" in condition) {
+    return condition.all_of.every((c) => evaluateCondition(state, c, ctx));
+  }
+  if ("any_of" in condition) {
+    return condition.any_of.some((c) => evaluateCondition(state, c, ctx));
+  }
+  if ("not" in condition) {
+    return !evaluateCondition(state, condition.not, ctx);
+  }
+
+  // Simple condition — dispatch on type
+  return evaluateSimple(state, condition as SimpleCondition, ctx);
+}
+
+function evaluateSimple(
+  state: GameState,
+  cond: SimpleCondition,
+  ctx: ConditionContext,
+): boolean {
+  switch (cond.type) {
+    case "LIFE_COUNT":
+      return compareNum(
+        getPlayerByController(state, cond.controller, ctx.controller).life.length,
+        cond.operator,
+        cond.value,
+      );
+
+    case "HAND_COUNT":
+      return compareNum(
+        getPlayerByController(state, cond.controller, ctx.controller).hand.length,
+        cond.operator,
+        cond.value,
+      );
+
+    case "TRASH_COUNT":
+      return compareNum(
+        getPlayerByController(state, cond.controller, ctx.controller).trash.length,
+        cond.operator,
+        cond.value,
+      );
+
+    case "DECK_COUNT":
+      return compareNum(
+        getPlayerByController(state, cond.controller, ctx.controller).deck.length,
+        cond.operator,
+        cond.value,
+      );
+
+    case "DON_FIELD_COUNT": {
+      if (cond.controller === "EITHER") {
+        return (
+          compareNum(getDonFieldCount(state.players[0]), cond.operator, cond.value) ||
+          compareNum(getDonFieldCount(state.players[1]), cond.operator, cond.value)
+        );
+      }
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      return compareNum(getDonFieldCount(p), cond.operator, cond.value);
+    }
+
+    case "ACTIVE_DON_COUNT": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const activeCount = p.donCostArea.filter((d) => d.state === "ACTIVE").length;
+      return compareNum(activeCount, cond.operator, cond.value);
+    }
+
+    case "ALL_DON_STATE": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      if (p.donCostArea.length === 0) return true; // vacuously true
+      return p.donCostArea.every((d) => d.state === cond.required_state);
+    }
+
+    case "CARD_ON_FIELD": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const cards = getFieldCards(p);
+      const matching = cards.filter((c) => {
+        if (cond.exclude_self && c.instanceId === ctx.sourceCardInstanceId) return false;
+        return matchesFilter(c, cond.filter, ctx.cardDb, state);
+      });
+      if (cond.count) {
+        return compareNum(matching.length, cond.count.operator, cond.count.value);
+      }
+      return matching.length > 0;
+    }
+
+    case "MULTIPLE_NAMED_CARDS": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const cards = getFieldCards(p);
+      return cond.names.every((name) =>
+        cards.some((c) => {
+          const data = ctx.cardDb.get(c.cardId);
+          return data?.name === name;
+        }),
+      );
+    }
+
+    case "NAMED_CARD_WITH_PROPERTY": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const cards = getFieldCards(p);
+      return cards.some((c) => {
+        const data = ctx.cardDb.get(c.cardId);
+        if (!data || data.name !== cond.name) return false;
+        if (cond.property.power) {
+          const power = getEffectivePower(c, data, state);
+          if (!matchesNumericRange(power, cond.property.power)) return false;
+        }
+        if (cond.property.cost) {
+          if (!matchesNumericRange(data.cost ?? 0, cond.property.cost)) return false;
+        }
+        return true;
+      });
+    }
+
+    case "FIELD_PURITY": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      if (p.characters.length === 0) return true; // vacuously true
+      return p.characters.every((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
+    }
+
+    case "LEADER_PROPERTY": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const data = ctx.cardDb.get(p.leader.cardId);
+      if (!data) return false;
+      const prop = cond.property;
+      if ("power" in prop) {
+        const power = getEffectivePower(p.leader, data, state);
+        return matchesNumericRange(power, prop.power);
+      }
+      if ("color_includes" in prop) {
+        return data.color.some((c) => c.toUpperCase() === prop.color_includes);
+      }
+      if ("color" in prop) {
+        return data.color.length === 1 && data.color[0].toUpperCase() === prop.color;
+      }
+      if ("trait" in prop) {
+        return data.types?.includes(prop.trait) ?? false;
+      }
+      if ("attribute" in prop) {
+        return data.attribute?.includes(prop.attribute) ?? false;
+      }
+      if ("name" in prop) {
+        return data.name === prop.name;
+      }
+      return false;
+    }
+
+    case "SELF_POWER": {
+      const card = findInstanceById(state, ctx.sourceCardInstanceId);
+      if (!card) return false;
+      const data = ctx.cardDb.get(card.cardId);
+      if (!data) return false;
+      return compareNum(getEffectivePower(card, data, state), cond.operator, cond.value);
+    }
+
+    case "SELF_STATE": {
+      const card = findInstanceById(state, ctx.sourceCardInstanceId);
+      if (!card) return false;
+      return card.state === cond.required_state;
+    }
+
+    case "NO_BASE_EFFECT": {
+      const card = findInstanceById(state, ctx.sourceCardInstanceId);
+      if (!card) return false;
+      const data = ctx.cardDb.get(card.cardId);
+      if (!data) return false;
+      return !data.effectText || data.effectText.trim() === "";
+    }
+
+    case "HAS_EFFECT_TYPE":
+    case "LACKS_EFFECT_TYPE": {
+      // These are typically used as target filters, not standalone conditions
+      // For standalone use, check the source card
+      const card = findInstanceById(state, ctx.sourceCardInstanceId);
+      if (!card) return false;
+      const data = ctx.cardDb.get(card.cardId);
+      if (!data) return false;
+      const has = hasEffectKeyword(data, cond.effect_type);
+      return cond.type === "HAS_EFFECT_TYPE" ? has : !has;
+    }
+
+    case "COMPARATIVE": {
+      const selfPlayer = state.players[ctx.controller];
+      const oppPlayer = state.players[ctx.controller === 0 ? 1 : 0];
+      const selfVal = getMetricValue(selfPlayer, cond.metric);
+      const oppVal = getMetricValue(oppPlayer, cond.metric);
+      const margin = cond.margin ?? 0;
+      return compareNum(selfVal, cond.operator, oppVal + margin);
+    }
+
+    case "COMBINED_TOTAL": {
+      const p0Val = getMetricValue(state.players[0], cond.metric);
+      const p1Val = getMetricValue(state.players[1], cond.metric);
+      return compareNum(p0Val + p1Val, cond.operator, cond.value);
+    }
+
+    case "WAS_PLAYED_THIS_TURN": {
+      const card = findInstanceById(state, ctx.sourceCardInstanceId);
+      return card?.turnPlayed === state.turn.number;
+    }
+
+    case "ACTION_PERFORMED_THIS_TURN": {
+      // Check actionsPerformedThisTurn for matching action references
+      const _actionType = cond.action;
+      return state.turn.actionsPerformedThisTurn.some((a) => {
+        if (_actionType === "ACTIVATED_EVENT") return a.actionType === "USE_COUNTER_EVENT" || a.actionType === "PLAY_CARD";
+        if (_actionType === "PLAYED_CHARACTER") return a.actionType === "PLAY_CARD";
+        if (_actionType === "USED_BLOCKER") return a.actionType === "DECLARE_BLOCKER";
+        if (_actionType === "ATTACKED") return a.actionType === "DECLARE_ATTACK";
+        return false;
+      });
+    }
+
+    case "FACE_UP_LIFE": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const faceUpCount = p.life.filter((l) => l.face === "UP").length;
+      if (cond.operator && cond.value !== undefined) {
+        return compareNum(faceUpCount, cond.operator, cond.value);
+      }
+      return faceUpCount > 0;
+    }
+
+    case "CARD_TYPE_IN_ZONE": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const zone = cond.zone.toUpperCase();
+      let cards: Array<{ cardId: string }> = [];
+      if (zone === "TRASH") cards = p.trash;
+      else if (zone === "HAND") cards = p.hand;
+      else if (zone === "DECK") cards = p.deck;
+      else if (zone === "FIELD") cards = getFieldCards(p);
+      const count = cards.filter((c) => {
+        const data = ctx.cardDb.get(c.cardId);
+        return data?.type?.toUpperCase() === cond.card_type.toUpperCase();
+      }).length;
+      return compareNum(count, cond.operator, cond.value);
+    }
+
+    case "COMBINED_ZONE_COUNT": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      let total = 0;
+      for (const zone of cond.zones) {
+        const z = zone.toUpperCase();
+        if (z === "LIFE") total += p.life.length;
+        else if (z === "HAND") total += p.hand.length;
+        else if (z === "TRASH") total += p.trash.length;
+        else if (z === "DECK") total += p.deck.length;
+      }
+      return compareNum(total, cond.operator, cond.value);
+    }
+
+    case "BOARD_WIDE_EXISTENCE": {
+      const allChars = [...state.players[0].characters, ...state.players[1].characters];
+      const matching = allChars.filter((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
+      if (cond.count) {
+        return compareNum(matching.length, cond.count.operator, cond.count.value);
+      }
+      return matching.length > 0;
+    }
+
+    case "RESTED_CARD_COUNT": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      let count = 0;
+      if (p.leader.state === "RESTED") count++;
+      count += p.characters.filter((c) => c.state === "RESTED").length;
+      if (p.stage?.state === "RESTED") count++;
+      count += p.donCostArea.filter((d) => d.state === "RESTED").length;
+      return compareNum(count, cond.operator, cond.value);
+    }
+
+    case "DON_GIVEN": {
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      if (cond.mode === "ANY_CARD_HAS_DON") {
+        const allCards = [p.leader, ...p.characters];
+        return allCards.some((c) => c.attachedDon.length > 0);
+      }
+      // SPECIFIC_CARD mode — typically used as a target filter
+      return false;
+    }
+
+    case "TURN_COUNT": {
+      // Turn counting: each player's turn number = ceil(turn.number / 2) for alternating turns
+      // Simplified: use the global turn number for now
+      const turnNum = state.turn.number;
+      // For the controller, their "turn number" depends on order
+      // Player 0 has turns 1, 3, 5, ... → their Nth turn = 2N-1
+      // Player 1 has turns 2, 4, 6, ... → their Nth turn = 2N
+      const pi = resolveController(cond.controller, ctx.controller);
+      const playerTurnCount = Math.ceil(
+        pi === 0 ? (turnNum + 1) / 2 : turnNum / 2,
+      );
+      return compareNum(playerTurnCount, cond.operator, cond.value);
+    }
+
+    case "PLAY_METHOD":
+    case "SOURCE_PROPERTY":
+      // These require event context not available in static evaluation
+      return true;
+
+    default:
+      return true;
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function compareNum(a: number, op: NumericOperator, b: number): boolean {
+  switch (op) {
+    case "==": return a === b;
+    case "!=": return a !== b;
+    case "<": return a < b;
+    case "<=": return a <= b;
+    case ">": return a > b;
+    case ">=": return a >= b;
+    default: return false;
+  }
+}
+
+function resolveController(c: Controller, selfIndex: 0 | 1): 0 | 1 {
+  if (c === "SELF") return selfIndex;
+  if (c === "OPPONENT") return selfIndex === 0 ? 1 : 0;
+  return selfIndex; // EITHER/ANY → check both externally
+}
+
+function getPlayerByController(
+  state: GameState,
+  controller: Controller,
+  selfIndex: 0 | 1,
+): PlayerState {
+  return state.players[resolveController(controller, selfIndex)];
+}
+
+function getDonFieldCount(p: PlayerState): number {
+  let count = p.donCostArea.length;
+  count += p.leader.attachedDon.length;
+  for (const c of p.characters) count += c.attachedDon.length;
+  return count;
+}
+
+function getFieldCards(p: PlayerState): CardInstance[] {
+  const cards: CardInstance[] = [p.leader, ...p.characters];
+  if (p.stage) cards.push(p.stage);
+  return cards;
+}
+
+function findInstanceById(state: GameState, instanceId: string): CardInstance | null {
+  for (const player of state.players) {
+    if (player.leader.instanceId === instanceId) return player.leader;
+    const char = player.characters.find((c) => c.instanceId === instanceId);
+    if (char) return char;
+    if (player.stage?.instanceId === instanceId) return player.stage;
+    const hand = player.hand.find((c) => c.instanceId === instanceId);
+    if (hand) return hand;
+  }
+  return null;
+}
+
+function getMetricValue(p: PlayerState, metric: string): number {
+  switch (metric) {
+    case "LIFE_COUNT": return p.life.length;
+    case "DON_FIELD_COUNT": return getDonFieldCount(p);
+    case "CHARACTER_COUNT": return p.characters.length;
+    default: return 0;
+  }
+}
+
+function hasEffectKeyword(data: CardData, effectType: string): boolean {
+  const kw = data.keywords;
+  switch (effectType) {
+    case "ON_PLAY": return data.effectText.includes("[On Play]");
+    case "WHEN_ATTACKING": return data.effectText.includes("[When Attacking]");
+    case "ON_KO": return data.effectText.includes("[On K.O.]");
+    case "ON_BLOCK": return data.effectText.includes("[On Block]");
+    case "COUNTER": return data.effectText.includes("[Counter]");
+    case "TRIGGER": return kw.trigger;
+    case "ACTIVATE_MAIN": return data.effectText.includes("[Activate: Main]");
+    case "BLOCKER": return kw.blocker;
+    case "RUSH": return kw.rush || kw.rushCharacter;
+    case "DOUBLE_ATTACK": return kw.doubleAttack;
+    case "BANISH": return kw.banish;
+    default: return false;
+  }
+}
+
+/**
+ * Check if a card instance matches a TargetFilter.
+ * Used by condition evaluator and target resolver.
+ */
+export function matchesFilter(
+  card: CardInstance,
+  filter: TargetFilter,
+  cardDb: Map<string, CardData>,
+  state: GameState,
+): boolean {
+  const data = cardDb.get(card.cardId);
+  if (!data) return false;
+
+  // Disjunctive filter
+  if (filter.any_of) {
+    const baseFilter = { ...filter, any_of: undefined };
+    const baseOk = Object.keys(baseFilter).filter((k) => baseFilter[k as keyof TargetFilter] !== undefined).length === 0
+      || matchesFilter(card, baseFilter, cardDb, state);
+    if (!baseOk) return false;
+    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state));
+  }
+
+  // Cost filters
+  const cost = data.cost ?? 0;
+  if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact)) return false;
+  if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min)) return false;
+  if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max)) return false;
+  if (filter.cost_range && (cost < filter.cost_range.min || cost > filter.cost_range.max)) return false;
+  if (filter.base_cost_exact !== undefined && cost !== filter.base_cost_exact) return false;
+  if (filter.base_cost_min !== undefined && cost < filter.base_cost_min) return false;
+  if (filter.base_cost_max !== undefined && cost > filter.base_cost_max) return false;
+
+  // Power filters
+  const effectivePower = getEffectivePower(card, data, state);
+  const basePower = data.power ?? 0;
+  if (filter.power_exact !== undefined && !matchesDynamicNum(effectivePower, "==", filter.power_exact)) return false;
+  if (filter.power_min !== undefined && !matchesDynamicNum(effectivePower, ">=", filter.power_min)) return false;
+  if (filter.power_max !== undefined && !matchesDynamicNum(effectivePower, "<=", filter.power_max)) return false;
+  if (filter.power_range && (effectivePower < filter.power_range.min || effectivePower > filter.power_range.max)) return false;
+  if (filter.base_power_exact !== undefined && basePower !== filter.base_power_exact) return false;
+  if (filter.base_power_min !== undefined && basePower < filter.base_power_min) return false;
+  if (filter.base_power_max !== undefined && basePower > filter.base_power_max) return false;
+
+  // Color filters
+  const colors = data.color.map((c) => c.toUpperCase());
+  if (filter.color && !colors.includes(filter.color)) return false;
+  if (filter.color_includes && !filter.color_includes.some((c) => colors.includes(c))) return false;
+
+  // Trait filters
+  const traits = data.types ?? [];
+  if (filter.traits && !filter.traits.every((t) => traits.includes(t))) return false;
+  if (filter.traits_any_of && !filter.traits_any_of.some((t) => traits.includes(t))) return false;
+  if (filter.traits_exclude && filter.traits_exclude.some((t) => traits.includes(t))) return false;
+
+  // Name filters
+  if (filter.name && data.name !== filter.name) return false;
+  if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
+  if (filter.name_includes && !data.name.includes(filter.name_includes)) return false;
+  if (filter.exclude_name && data.name === filter.exclude_name) return false;
+
+  // Keyword / ability filters
+  if (filter.keywords) {
+    for (const kw of filter.keywords) {
+      if (kw === "BLOCKER" && !data.keywords.blocker) return false;
+      if (kw === "RUSH" && !data.keywords.rush && !data.keywords.rushCharacter) return false;
+      if (kw === "DOUBLE_ATTACK" && !data.keywords.doubleAttack) return false;
+      if (kw === "BANISH" && !data.keywords.banish) return false;
+      if (kw === "UNBLOCKABLE" && !data.keywords.unblockable) return false;
+    }
+  }
+  if (filter.has_trigger === true && !data.keywords.trigger) return false;
+  if (filter.has_trigger === false && data.keywords.trigger) return false;
+
+  if (filter.attribute && !(data.attribute ?? []).includes(filter.attribute)) return false;
+  if (filter.attribute_not && (data.attribute ?? []).includes(filter.attribute_not)) return false;
+
+  if (filter.no_base_effect === true) {
+    if (data.effectText && data.effectText.trim() !== "") return false;
+  }
+
+  if (filter.lacks_effect_type) {
+    if (hasEffectKeyword(data, filter.lacks_effect_type)) return false;
+  }
+
+  // Card type filter
+  if (filter.card_type) {
+    const cardType = data.type.toUpperCase();
+    if (Array.isArray(filter.card_type)) {
+      if (!filter.card_type.some((t) => t.toUpperCase() === cardType)) return false;
+    } else {
+      if (filter.card_type.toUpperCase() !== cardType) return false;
+    }
+  }
+
+  // State filters
+  if (filter.is_rested === true && card.state !== "RESTED") return false;
+  if (filter.is_active === true && card.state !== "ACTIVE") return false;
+  if (filter.state && card.state !== filter.state) return false;
+
+  // DON-given filters
+  if (filter.don_given_count) {
+    const donCount = card.attachedDon.length;
+    const val = typeof filter.don_given_count.value === "number"
+      ? filter.don_given_count.value
+      : 0; // DynamicValue resolved at runtime
+    if (!compareNum(donCount, filter.don_given_count.operator, val)) return false;
+  }
+
+  return true;
+}
+
+function matchesDynamicNum(actual: number, op: NumericOperator, expected: number | DynamicValue): boolean {
+  if (typeof expected === "number") {
+    return compareNum(actual, op, expected);
+  }
+  // DynamicValue — resolve at runtime; for now just check FIXED
+  if (expected.type === "FIXED") {
+    return compareNum(actual, op, expected.value);
+  }
+  // Other dynamic values need game state context — skip for now
+  return true;
+}
+
+function matchesNumericRange(value: number, range: NumericRange): boolean {
+  if ("any_of" in range) {
+    return range.any_of.some((r) => matchesNumericRange(value, r));
+  }
+  if ("min" in range && "max" in range) {
+    return value >= range.min && value <= range.max;
+  }
+  if ("operator" in range) {
+    const expected = typeof range.value === "number" ? range.value : 0;
+    return compareNum(value, range.operator, expected);
+  }
+  return true;
+}

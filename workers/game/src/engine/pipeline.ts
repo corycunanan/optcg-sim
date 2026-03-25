@@ -2,15 +2,13 @@
  * 7-Step Action Pipeline
  *
  * Every game mutation flows through here — no exceptions.
- * Steps 2 (prohibitions) and 3 (replacements) are no-ops in M3.
- * M4 fills them in without restructuring.
  *
  * 1. Validate
- * 2. Check Prohibitions  (M3: no-op)
- * 3. Check Replacements  (M3: no-op)
+ * 2. Check Prohibitions  (M4: scans active prohibitions)
+ * 3. Check Replacements  (M4: substitutes actions)
  * 4. Execute
- * 5. Fire Triggers       (M3: keyword handlers only)
- * 6. Recalculate Modifiers
+ * 5. Fire Triggers       (M4: event bus → trigger registry → effect resolver)
+ * 6. Recalculate Modifiers (M4: expire effects, recompute layers)
  * 7. Rule Processing     (defeat checks)
  */
 
@@ -19,6 +17,22 @@ import { validate } from "./validation.js";
 import { execute } from "./execute.js";
 import { emitEvent } from "./events.js";
 import { checkDefeat } from "./defeat.js";
+import { checkProhibitions } from "./prohibitions.js";
+import { checkReplacements } from "./replacements.js";
+import {
+  matchTriggersForEvent,
+  orderMatchedTriggers,
+  registerTriggersForCard,
+  deregisterTriggersForCard,
+} from "./triggers.js";
+import { resolveEffect } from "./effect-resolver.js";
+import {
+  expireEndOfTurnEffects,
+  expireBattleEffects,
+  expireSourceLeftZone,
+  expireProhibitions,
+  processScheduledActions,
+} from "./duration-tracker.js";
 
 export interface PipelineResult {
   state: GameState;
@@ -39,76 +53,270 @@ export function runPipeline(
     return { state, valid: false, error: validationError };
   }
 
-  // Step 2: Check Prohibitions (M3: no-op)
-  // In M4: scan state.prohibitions for any veto matching this action.
+  // Step 2: Check Prohibitions
+  const prohibitionVeto = checkProhibitions(state, action, cardDb, actingPlayerIndex);
+  if (prohibitionVeto) {
+    return { state, valid: false, error: prohibitionVeto };
+  }
 
-  // Step 3: Check Replacements (M3: no-op)
-  // In M4: scan active replacement effects; substitute action if matched.
+  // Step 3: Check Replacements
+  const replacementResult = checkReplacements(state, action, cardDb, actingPlayerIndex);
+  let nextState = replacementResult.state;
+  const actionToExecute = replacementResult.replaced && replacementResult.substituteAction
+    ? replacementResult.substituteAction
+    : action;
+
+  // Emit replacement events
+  for (const event of replacementResult.events) {
+    nextState = emitEvent(
+      nextState,
+      event.type,
+      event.playerIndex ?? actingPlayerIndex,
+      event.payload ?? {},
+    );
+  }
+
+  // If the action was fully replaced (no substitute), skip execution
+  if (replacementResult.replaced && !replacementResult.substituteAction) {
+    return finishPipeline(nextState, actingPlayerIndex, cardDb);
+  }
 
   // Step 4: Execute — produce new state snapshot
-  const execResult = execute(state, action, cardDb, actingPlayerIndex);
-  let nextState = execResult.state;
+  const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
+  nextState = execResult.state;
 
-  // Step 5: Fire Triggers — emit events, scan triggerRegistry
-  // In M3: emit the appropriate event(s) for what just happened.
-  nextState = fireEvents(nextState, execResult, action);
+  // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
+  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb);
 
-  // Step 6: Recalculate Modifiers
-  // In M3: no persistent modifiers to recalculate (DON!! bonuses are computed
-  // fresh on every read via getEffectivePower). No-op here until M4.
+  // Step 6: Recalculate Modifiers — expire effects whose duration ended
+  nextState = recalculateModifiers(nextState, actionToExecute, cardDb);
 
   // Step 7: Rule Processing — defeat conditions, zero-power KOs
-  const defeatCtx = execResult.damagedPlayerIndex !== undefined
+  return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
+}
+
+// ─── Step 5: Fire Events & Triggers ───────────────────────────────────────────
+
+function fireEventsAndTriggers(
+  state: GameState,
+  execResult: ExecuteResult,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const pi = state.turn.activePlayerIndex;
+
+  // Emit all events from execution
+  for (const event of execResult.events) {
+    state = emitEvent(state, event.type, event.playerIndex ?? pi, event.payload ?? {});
+  }
+
+  // Handle trigger registration for zone changes
+  state = handleZoneChangeTriggers(state, execResult, cardDb);
+
+  // Scan triggerRegistry for matches against emitted events
+  // Process only events emitted by this execution (not historical)
+  const eventsToProcess = execResult.events;
+
+  for (const pendingEvent of eventsToProcess) {
+    const gameEvent = {
+      type: pendingEvent.type,
+      playerIndex: pendingEvent.playerIndex ?? pi,
+      payload: pendingEvent.payload ?? {},
+      timestamp: Date.now(),
+    };
+
+    const matched = matchTriggersForEvent(state, gameEvent, cardDb);
+    if (matched.length === 0) continue;
+
+    const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
+
+    // Resolve each matched trigger's effect block
+    for (const match of ordered) {
+      const result = resolveEffect(
+        state,
+        match.effectBlock,
+        match.trigger.sourceCardInstanceId,
+        match.trigger.controller,
+        cardDb,
+      );
+      state = result.state;
+
+      // Emit events from effect resolution (which may trigger further effects)
+      for (const event of result.events) {
+        state = emitEvent(
+          state,
+          event.type,
+          event.playerIndex ?? match.trigger.controller,
+          event.payload ?? {},
+        );
+      }
+    }
+  }
+
+  // Record the action performed
+  state = {
+    ...state,
+    turn: {
+      ...state.turn,
+      actionsPerformedThisTurn: [
+        ...state.turn.actionsPerformedThisTurn,
+        { actionType: action.type, timestamp: Date.now() },
+      ],
+    },
+  };
+
+  return state;
+}
+
+/**
+ * Handle trigger registration/deregistration for zone changes.
+ * When a card enters the field, register its triggers.
+ * When a card leaves the field, deregister + expire source-bound effects.
+ */
+function handleZoneChangeTriggers(
+  state: GameState,
+  execResult: ExecuteResult,
+  cardDb: Map<string, CardData>,
+): GameState {
+  for (const event of execResult.events) {
+    if (event.type === "CARD_PLAYED") {
+      // Card entered the field — register triggers
+      const cardId = event.payload?.cardId as string | undefined;
+      if (!cardId) continue;
+
+      const cardData = cardDb.get(cardId);
+      if (!cardData) continue;
+
+      // Find the card instance
+      const instance = findNewlyPlayedCard(state, cardId);
+      if (instance) {
+        state = registerTriggersForCard(state, instance, cardData);
+      }
+    }
+
+    if (event.type === "CARD_KO" || event.type === "CARD_RETURNED_TO_HAND") {
+      // Card left the field — deregister triggers and expire source-bound effects
+      const instanceId = event.payload?.cardInstanceId as string | undefined;
+      if (!instanceId) continue;
+
+      state = deregisterTriggersForCard(state, instanceId);
+      state = expireSourceLeftZone(state, instanceId);
+    }
+
+    if (event.type === "CARD_TRASHED") {
+      // If trashed from field (stage replaced, overflow), deregister
+      const cardId = event.payload?.cardId as string | undefined;
+      if (cardId) {
+        // Find by cardId in trash (most recent)
+        for (const player of state.players) {
+          const trashed = player.trash.find((c) => c.cardId === cardId);
+          if (trashed) {
+            state = deregisterTriggersForCard(state, trashed.instanceId);
+            state = expireSourceLeftZone(state, trashed.instanceId);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return state;
+}
+
+// ─── Step 6: Recalculate Modifiers ────────────────────────────────────────────
+
+function recalculateModifiers(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+): GameState {
+  // Expire battle-scoped effects when battle ends
+  if (action.type === "PASS" && state.turn.battle) {
+    state = expireBattleEffects(state, state.turn.battle.battleId);
+  }
+
+  // Expire prohibitions at the same boundaries
+  if (state.turn.phase === "END") {
+    state = expireEndOfTurnEffects(state);
+    state = expireProhibitions(state, "END_OF_TURN", { turn: state.turn.number });
+
+    // Process end-of-turn scheduled actions
+    const scheduled = processScheduledActions(state, "END_OF_THIS_TURN");
+    state = scheduled.state;
+    for (const entry of scheduled.actionsToRun) {
+      // Resolve each scheduled action through the effect resolver
+      // (simplified — in full impl these would go through the pipeline)
+      const fakeBlock = {
+        id: "scheduled_" + entry.sourceEffectId,
+        category: "auto" as const,
+        actions: [entry.action],
+      };
+      const result = resolveEffect(state, fakeBlock, entry.sourceEffectId, entry.controller, cardDb);
+      state = result.state;
+    }
+  }
+
+  return state;
+}
+
+// ─── Step 7: Rule Processing ──────────────────────────────────────────────────
+
+function finishPipeline(
+  state: GameState,
+  actingPlayerIndex: 0 | 1,
+  _cardDb: Map<string, CardData>,
+  execResult?: ExecuteResult,
+): PipelineResult {
+  const defeatCtx = execResult?.damagedPlayerIndex !== undefined
     ? { damagedPlayerIndex: execResult.damagedPlayerIndex }
     : {};
-  const defeat = checkDefeat(nextState, defeatCtx);
+  const defeat = checkDefeat(state, defeatCtx);
 
   if (defeat) {
-    nextState = {
-      ...nextState,
+    state = {
+      ...state,
       status: "FINISHED",
       winner: defeat.winner,
       winReason: defeat.reason,
     };
-    nextState = emitEvent(nextState, "GAME_OVER", state.turn.activePlayerIndex, {
+    state = emitEvent(state, "GAME_OVER", actingPlayerIndex, {
       winner: defeat.winner,
       reason: defeat.reason,
     });
     return {
-      state: nextState,
+      state,
       valid: true,
       gameOver: { winner: defeat.winner, reason: defeat.reason },
     };
   }
 
   // CONCEDE (and any action that sets FINISHED without going through defeat checks)
-  if (nextState.status === "FINISHED" || nextState.status === "ABANDONED") {
+  if (state.status === "FINISHED" || state.status === "ABANDONED") {
     return {
-      state: nextState,
+      state,
       valid: true,
       gameOver: {
-        winner: nextState.winner,
-        reason: nextState.winReason ?? "Game over",
+        winner: state.winner,
+        reason: state.winReason ?? "Game over",
       },
     };
   }
 
-  return { state: nextState, valid: true };
+  return { state, valid: true };
 }
 
-function fireEvents(
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function findNewlyPlayedCard(
   state: GameState,
-  execResult: ExecuteResult,
-  action: GameAction,
-): GameState {
-  const pi = state.turn.activePlayerIndex;
-
-  for (const event of execResult.events) {
-    state = emitEvent(state, event.type, event.playerIndex ?? pi, event.payload ?? {});
+  cardId: string,
+): import("../types.js").CardInstance | null {
+  for (const player of state.players) {
+    // Check characters (most common for CARD_PLAYED)
+    const char = player.characters.find((c) => c.cardId === cardId);
+    if (char) return char;
+    // Check stage
+    if (player.stage?.cardId === cardId) return player.stage;
   }
-
-  // M4 hook: scan triggerRegistry for matches after events are emitted.
-  // For now, only keyword-driven handlers (in execute.ts) produce side effects.
-  void action; // will be used in M4 trigger matching
-  return state;
+  return null;
 }

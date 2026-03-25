@@ -368,9 +368,9 @@ export function BoardLayout({
           </span>
           <span className="text-xs text-gb-accent-blue font-bold">
             {battlePhase === "BLOCK_STEP"
-              ? "Opponent is blocking"
+              ? isDefender ? "You are blocking" : "Opponent is blocking"
               : battlePhase === "COUNTER_STEP"
-                ? "Opponent is countering"
+                ? isDefender ? "You are countering" : "Opponent is countering"
                 : phase}
           </span>
         </div>
@@ -579,6 +579,7 @@ export function BoardLayout({
                 blockerSelectable={isBlockerEligible}
                 selected={selectedBlockerId === char.instanceId}
                 onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
+                onAction={onAction}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />
             );
@@ -597,6 +598,7 @@ export function BoardLayout({
               cardDb={cardDb}
               activeDragType={activeDragType}
               canAttack={canInteract && me.leader.state === "ACTIVE"}
+              onAction={onAction}
               style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
             />
           ) : (

@@ -16,6 +16,7 @@ import type {
   TurnState,
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
+import { injectSchemasIntoCardDb } from "./schema-registry.js";
 
 export function buildInitialState(payload: GameInitPayload): {
   state: GameState;
@@ -30,6 +31,9 @@ export function buildInitialState(payload: GameInitPayload): {
       cardDb.set(entry.cardData.id, entry.cardData);
     }
   }
+
+  // Inject authored effect schemas into cardDb
+  injectSchemasIntoCardDb(cardDb);
 
   const [p0State, p0Deck] = buildPlayerDeck(payload.player1, 0 as const, cardDb);
   const [p1State, p1Deck] = buildPlayerDeck(payload.player2, 1 as const, cardDb);

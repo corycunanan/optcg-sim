@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import type { CardDb, CardInstance } from "@shared/game-types";
+import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { BoardCard } from "../board-card";
 import { BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
+import { CardActionMenu } from "../card-action-menu";
 
 export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   slotIndex,
@@ -55,6 +56,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   blockerSelectable,
   selected,
   onSelect,
+  onAction,
   style,
 }: {
   card: CardInstance;
@@ -64,8 +66,11 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   blockerSelectable?: boolean;
   selected?: boolean;
   onSelect?: () => void;
+  onAction?: (action: GameAction) => void;
   style: React.CSSProperties;
 }) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
   const {
     attributes,
     listeners,
@@ -91,32 +96,59 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     [setDragRef, setDropRef],
   );
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
+  const handleCloseMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
   return (
-    <div
-      ref={mergedRef}
-      {...attributes}
-      {...listeners}
-      onClick={onSelect}
-      style={{
-        ...style,
-        opacity: isDragging ? 0.3 : 1,
-        cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
-      }}
-      className={cn(
-        "rounded-md transition-shadow",
-        acceptsDon && "ring-2 ring-gb-accent-amber/30",
-        isOver && acceptsDon && "ring-2 ring-gb-accent-amber",
-        selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
-        blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
+    <>
+      <div
+        ref={mergedRef}
+        {...attributes}
+        {...listeners}
+        onClick={onSelect}
+        onContextMenu={handleContextMenu}
+        style={{
+          ...style,
+          opacity: isDragging ? 0.3 : 1,
+          cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
+        }}
+        className={cn(
+          "rounded-md transition-shadow",
+          acceptsDon && "ring-2 ring-gb-accent-amber/30",
+          isOver && acceptsDon && "ring-2 ring-gb-accent-amber",
+          selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
+          blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
+        )}
+      >
+        <BoardCard
+          card={card}
+          cardDb={cardDb}
+          width={BOARD_CARD_W}
+          height={BOARD_CARD_H}
+        />
+      </div>
+
+      {contextMenu && onAction && (
+        <CardActionMenu
+          card={card}
+          cardDb={cardDb}
+          anchorX={contextMenu.x}
+          anchorY={contextMenu.y}
+          onAction={onAction}
+          onClose={handleCloseMenu}
+        />
       )}
-    >
-      <BoardCard
-        card={card}
-        cardDb={cardDb}
-        width={BOARD_CARD_W}
-        height={BOARD_CARD_H}
-      />
-    </div>
+    </>
   );
 });
 

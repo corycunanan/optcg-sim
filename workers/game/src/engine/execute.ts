@@ -23,6 +23,8 @@ import {
   executeUseCounterEvent,
   executeRevealTrigger,
 } from "./battle.js";
+import { resolveEffect } from "./effect-resolver.js";
+import type { EffectSchema } from "./effect-types.js";
 
 export function execute(
   state: GameState,
@@ -54,7 +56,7 @@ export function execute(
     case "MANUAL_EFFECT":
       return executeManualEffect(state, action.description);
     case "ACTIVATE_EFFECT":
-      return { state, events: [] }; // M4
+      return executeActivateEffect(state, action.cardInstanceId, action.effectId, cardDb, actingPlayerIndex);
   }
 }
 
@@ -164,4 +166,48 @@ function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult
 
 function executeManualEffect(state: GameState, _description: string): ExecuteResult {
   return { state, events: [] };
+}
+
+// ─── Activate Effect (M4) ─────────────────────────────────────────────────────
+
+function executeActivateEffect(
+  state: GameState,
+  cardInstanceId: string,
+  effectId: string,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+
+  // Find the card
+  const found = findCardInState(state, cardInstanceId);
+  if (!found) return { state, events: [{ type: "CARD_STATE_CHANGED", payload: { error: "Card not found" } }] };
+
+  const cardData = cardDb.get(found.card.cardId);
+  if (!cardData) return { state, events };
+
+  // Get the effect schema
+  const schema = cardData.effectSchema as EffectSchema | null;
+  if (!schema) return { state, events };
+
+  // Find the specific effect block
+  const block = schema.effects.find((b) => b.id === effectId);
+  if (!block) return { state, events };
+
+  // Verify it's an activate effect
+  if (block.category !== "activate") return { state, events };
+
+  // Verify it has ACTIVATE_MAIN trigger
+  if (!block.trigger || !("keyword" in block.trigger) ||
+      (block.trigger.keyword !== "ACTIVATE_MAIN")) {
+    return { state, events };
+  }
+
+  // Resolve the effect through the effect resolver
+  const result = resolveEffect(state, block, cardInstanceId, actingPlayerIndex, cardDb);
+
+  return {
+    state: result.state,
+    events: [...events, ...result.events],
+  };
 }
