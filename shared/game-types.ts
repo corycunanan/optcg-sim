@@ -185,7 +185,8 @@ export type EffectStackPhase =
   | "AWAITING_TARGET_SELECTION"
   | "AWAITING_ARRANGE_CARDS"
   | "AWAITING_PLAYER_CHOICE"
-  | "INTERRUPTED_BY_TRIGGERS";
+  | "INTERRUPTED_BY_TRIGGERS"
+  | "AWAITING_TRIGGER_ORDER_SELECTION";
 
 export interface EffectStackFrame {
   id: string;
@@ -209,6 +210,9 @@ export interface EffectStackFrame {
 
   // Queued triggers waiting to resolve after this frame
   pendingTriggers: QueuedTrigger[];
+
+  // Simultaneous triggers awaiting player ordering choice
+  simultaneousTriggers?: QueuedTrigger[];
 
   // Events accumulated during partial execution
   accumulatedEvents: { type: GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[];

@@ -26,6 +26,7 @@ import { markOncePerTurnUsed, shuffleArray } from "./action-utils.js";
 import { payCostsWithSelection, applyCostSelection } from "./cost-handler.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "./resolver.js";
 import { nanoid } from "../../util/nanoid.js";
+import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../trigger-ordering.js";
 
 // ─── resumeEffectChain ───────────────────────────────────────────────────────
 
@@ -470,6 +471,157 @@ export function resumeFromStack(
       return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
     }
 
+    // ── Simultaneous trigger ordering — player picks which trigger next ──
+    case "AWAITING_TRIGGER_ORDER_SELECTION": {
+      const simultaneous = (topFrame.simultaneousTriggers ?? []) as QueuedTrigger[];
+      const savedPendingTriggers = topFrame.pendingTriggers as QueuedTrigger[];
+
+      // "Done" — player opted to skip remaining optional triggers
+      if (action.type === "PLAYER_CHOICE" && action.choiceId === "done") {
+        nextState = popFrame(nextState);
+        return processRemainingTriggers(nextState, savedPendingTriggers, cardDb, events);
+      }
+
+      if (action.type !== "PLAYER_CHOICE" || action.choiceId == null) {
+        return { state, events, resolved: false };
+      }
+
+      const chosenIndex = parseInt(action.choiceId, 10);
+      const chosenTrigger = simultaneous[chosenIndex];
+      if (!chosenTrigger) {
+        return { state, events, resolved: false };
+      }
+
+      // Remove chosen trigger from the remaining simultaneous set
+      const remaining = simultaneous.filter((_, i) => i !== chosenIndex);
+
+      // Pop the selection frame
+      nextState = popFrame(nextState);
+
+      // Resolve the chosen trigger
+      const result = resolveEffect(
+        nextState,
+        chosenTrigger.effectBlock as EffectBlock,
+        chosenTrigger.sourceCardInstanceId,
+        chosenTrigger.controller,
+        cardDb,
+      );
+      nextState = result.state;
+      events.push(...result.events);
+
+      // If chosen trigger needs player input, carry forward remaining triggers.
+      // Merge simultaneousTriggers into pendingTriggers so processRemainingTriggers
+      // will re-detect the 2+ same-player group and re-prompt for ordering.
+      if (result.pendingPrompt) {
+        const newTop = peekFrame(nextState) as EffectStackFrame | null;
+        if (newTop) {
+          nextState = updateTopFrame(nextState, {
+            pendingTriggers: [...remaining, ...savedPendingTriggers],
+          });
+        }
+        return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
+      }
+
+      // Emit events from the resolved trigger
+      for (const event of result.events) {
+        nextState = emitEvent(
+          nextState,
+          event.type,
+          event.playerIndex ?? chosenTrigger.controller,
+          event.payload ?? {},
+        );
+      }
+
+      // Scan for nested triggers (LIFO — resolve before returning to simultaneous set)
+      if (result.events.length > 0) {
+        const nestedTriggers = scanEventsForTriggers(
+          nextState, result.events, chosenTrigger.controller, cardDb,
+        );
+        if (nestedTriggers.length > 0) {
+          // Process nested triggers first, then come back to remaining simultaneous
+          const nestedResult = processRemainingTriggers(nextState, nestedTriggers, cardDb, events);
+          nextState = nestedResult.state;
+          // nestedResult.events already includes our prior events (passed as priorEvents)
+          if (nestedResult.pendingPrompt) {
+            const newTop = peekFrame(nextState) as EffectStackFrame | null;
+            if (newTop) {
+              nextState = updateTopFrame(nextState, {
+                pendingTriggers: [...remaining, ...savedPendingTriggers],
+              });
+            }
+            return { state: nextState, events: nestedResult.events, resolved: false, pendingPrompt: nestedResult.pendingPrompt };
+          }
+          // Push any new events from nested resolution
+          events.length = 0;
+          events.push(...nestedResult.events);
+        }
+      }
+
+      // Re-prompt for remaining simultaneous triggers
+      if (remaining.length > 1) {
+        const promptResult = buildTriggerSelectionPrompt(
+          nextState, remaining, savedPendingTriggers, cardDb,
+        );
+        return { state: promptResult.state, events, resolved: false, pendingPrompt: promptResult.pendingPrompt };
+      }
+
+      if (remaining.length === 1) {
+        // Auto-resolve the last one
+        const lastResult = resolveEffect(
+          nextState,
+          remaining[0].effectBlock as EffectBlock,
+          remaining[0].sourceCardInstanceId,
+          remaining[0].controller,
+          cardDb,
+        );
+        nextState = lastResult.state;
+        events.push(...lastResult.events);
+
+        if (lastResult.pendingPrompt) {
+          const newTop = peekFrame(nextState) as EffectStackFrame | null;
+          if (newTop) {
+            nextState = updateTopFrame(nextState, {
+              pendingTriggers: savedPendingTriggers,
+            });
+          }
+          return { state: nextState, events, resolved: false, pendingPrompt: lastResult.pendingPrompt };
+        }
+
+        // Emit events from the last trigger
+        for (const event of lastResult.events) {
+          nextState = emitEvent(
+            nextState,
+            event.type,
+            event.playerIndex ?? remaining[0].controller,
+            event.payload ?? {},
+          );
+        }
+
+        // Scan for nested triggers from last resolved trigger
+        if (lastResult.events.length > 0) {
+          const nestedTriggers = scanEventsForTriggers(
+            nextState, lastResult.events, remaining[0].controller, cardDb,
+          );
+          if (nestedTriggers.length > 0) {
+            const nestedResult = processRemainingTriggers(nextState, nestedTriggers, cardDb, events);
+            nextState = nestedResult.state;
+            if (nestedResult.pendingPrompt) {
+              const newTop = peekFrame(nextState) as EffectStackFrame | null;
+              if (newTop) {
+                nextState = updateTopFrame(nextState, { pendingTriggers: savedPendingTriggers });
+              }
+              return { state: nextState, events: nestedResult.events, resolved: false, pendingPrompt: nestedResult.pendingPrompt };
+            }
+            events.length = 0;
+            events.push(...nestedResult.events);
+          }
+        }
+      }
+
+      // All simultaneous triggers done — process remaining pending triggers
+      return processRemainingTriggers(nextState, savedPendingTriggers, cardDb, events);
+    }
+
     default:
       return { state, events, resolved: false };
   }
@@ -497,8 +649,26 @@ export function processRemainingTriggers(
   const events = [...priorEvents];
   let nextState = state;
 
-  for (let i = 0; i < pendingTriggers.length; i++) {
-    const trigger = pendingTriggers[i];
+  if (pendingTriggers.length === 0) {
+    return { state: nextState, events, resolved: true };
+  }
+
+  // Group by controller — turn player resolves first (§8-6),
+  // and within each group the player chooses order when 2+.
+  const activePI = nextState.turn.activePlayerIndex;
+  const turnPlayerTriggers = pendingTriggers.filter(t => t.controller === activePI);
+  const nonTurnPlayerTriggers = pendingTriggers.filter(t => t.controller !== activePI);
+
+  // Turn player has 2+ triggers — prompt for ordering
+  if (turnPlayerTriggers.length >= 2) {
+    const promptResult = buildTriggerSelectionPrompt(
+      nextState, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb,
+    );
+    return { state: promptResult.state, events, resolved: false, pendingPrompt: promptResult.pendingPrompt };
+  }
+
+  // Resolve turn player's 0–1 triggers first
+  for (const trigger of turnPlayerTriggers) {
     const result = resolveEffect(
       nextState,
       trigger.effectBlock as EffectBlock,
@@ -513,7 +683,48 @@ export function processRemainingTriggers(
       const topFrame = peekFrame(nextState) as EffectStackFrame;
       if (topFrame) {
         nextState = updateTopFrame(nextState, {
-          pendingTriggers: pendingTriggers.slice(i + 1),
+          pendingTriggers: nonTurnPlayerTriggers,
+        });
+      }
+      return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
+    }
+
+    // Emit events from this trigger's resolution
+    for (const event of result.events) {
+      nextState = emitEvent(
+        nextState,
+        event.type,
+        event.playerIndex ?? trigger.controller,
+        event.payload ?? {},
+      );
+    }
+  }
+
+  // Non-turn player has 2+ triggers — prompt for ordering
+  if (nonTurnPlayerTriggers.length >= 2) {
+    const promptResult = buildTriggerSelectionPrompt(
+      nextState, nonTurnPlayerTriggers, [], cardDb,
+    );
+    return { state: promptResult.state, events, resolved: false, pendingPrompt: promptResult.pendingPrompt };
+  }
+
+  // Resolve non-turn player's 0–1 triggers
+  for (const trigger of nonTurnPlayerTriggers) {
+    const result = resolveEffect(
+      nextState,
+      trigger.effectBlock as EffectBlock,
+      trigger.sourceCardInstanceId,
+      trigger.controller,
+      cardDb,
+    );
+    nextState = result.state;
+    events.push(...result.events);
+
+    if (result.pendingPrompt) {
+      const topFrame = peekFrame(nextState) as EffectStackFrame;
+      if (topFrame) {
+        nextState = updateTopFrame(nextState, {
+          pendingTriggers: [],
         });
       }
       return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };

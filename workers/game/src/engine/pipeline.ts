@@ -31,6 +31,7 @@ import { resolveEffect } from "./effect-resolver/index.js";
 import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
 import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
+import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
 import {
   expireEndOfTurnEffects,
   expireBattleEffects,
@@ -155,22 +156,23 @@ function fireEventsAndTriggers(
     }
   }
 
-  // Process trigger queue with LIFO insertion for nested triggers
+  // Group triggers by controller — turn player resolves first (§8-6),
+  // and within each group the player chooses the order.
   if (triggerQueue.length > 0) {
-    const result = processTriggerQueuePipeline(state, triggerQueue, cardDb);
+    const activePI = state.turn.activePlayerIndex;
+    const turnPlayerTriggers = triggerQueue.filter(t => t.controller === activePI);
+    const nonTurnPlayerTriggers = triggerQueue.filter(t => t.controller !== activePI);
+
+    const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
     state = result.state;
 
     if (result.pendingPrompt) {
-      // Recalculate battle powers before pausing — trigger effects may have
-      // applied modifiers (e.g., [On Your Opponent's Attack] → MODIFY_POWER)
       state = recalculateBattlePowers(state, cardDb);
       state = { ...state, pendingPrompt: result.pendingPrompt };
-      // Record action before returning (so it's tracked even when paused)
       state = recordAction(state, action);
       return state;
     }
 
-    // Recalculate battle powers after all triggers resolved
     state = recalculateBattlePowers(state, cardDb);
   }
 
@@ -234,39 +236,6 @@ function processTriggerQueuePipeline(
   }
 
   return { state: nextState };
-}
-
-function scanEventsForTriggers(
-  state: GameState,
-  events: { type: import("../types.js").GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[],
-  defaultController: 0 | 1,
-  cardDb: Map<string, CardData>,
-): QueuedTrigger[] {
-  const triggers: QueuedTrigger[] = [];
-
-  for (const event of events) {
-    const gameEvent = {
-      type: event.type,
-      playerIndex: event.playerIndex ?? defaultController,
-      payload: event.payload ?? {},
-      timestamp: Date.now(),
-    };
-
-    const matched = matchTriggersForEvent(state, gameEvent, cardDb);
-    if (matched.length === 0) continue;
-
-    const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
-    for (const match of ordered) {
-      triggers.push({
-        sourceCardInstanceId: match.trigger.sourceCardInstanceId,
-        controller: match.trigger.controller,
-        effectBlock: match.effectBlock,
-        triggeringEvent: event,
-      });
-    }
-  }
-
-  return triggers;
 }
 
 function recordAction(state: GameState, action: GameAction): GameState {
@@ -425,6 +394,47 @@ function finishPipeline(
   }
 
   return { state, valid: true };
+}
+
+// ─── Simultaneous Trigger Ordering ───────────────────────────────────────────
+
+/**
+ * Process a player's group of simultaneous triggers.
+ * If 0–1 triggers, resolve directly. If 2+, prompt the player to pick order.
+ * `afterTriggers` are the other player's triggers, stored as pendingTriggers.
+ */
+function processPlayerTriggerGroup(
+  state: GameState,
+  triggers: QueuedTrigger[],
+  afterTriggers: QueuedTrigger[],
+  cardDb: Map<string, CardData>,
+): { state: GameState; pendingPrompt?: PendingPromptState } {
+  if (triggers.length === 0) {
+    // No triggers for this player — process the other player's group
+    if (afterTriggers.length === 0) return { state };
+    return processPlayerTriggerGroup(state, afterTriggers, [], cardDb);
+  }
+
+  if (triggers.length === 1) {
+    // Single trigger — auto-resolve, no prompt needed
+    const result = processTriggerQueuePipeline(state, [...triggers], cardDb);
+    if (result.pendingPrompt) {
+      // Store afterTriggers on the stack frame so they resume later
+      const topFrame = peekStackFrame(result.state);
+      if (topFrame && afterTriggers.length > 0) {
+        result.state = updateStackTopFrame(result.state, {
+          pendingTriggers: [...(topFrame as any).pendingTriggers ?? [], ...afterTriggers],
+        });
+      }
+      return result;
+    }
+    // Single trigger done — process the other player's group
+    if (afterTriggers.length === 0) return { state: result.state };
+    return processPlayerTriggerGroup(result.state, afterTriggers, [], cardDb);
+  }
+
+  // 2+ triggers — prompt the player to choose the order
+  return buildTriggerSelectionPrompt(state, triggers, afterTriggers, cardDb);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

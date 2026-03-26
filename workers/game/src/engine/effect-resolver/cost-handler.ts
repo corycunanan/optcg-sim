@@ -245,6 +245,7 @@ export function payCostsWithSelection(
           costsPaid: false,
           oncePerTurnMarked: false,
           pendingTriggers: [],
+          simultaneousTriggers: [],
           accumulatedEvents: events,
         };
         nextState = pushFrame(nextState, frame);
@@ -288,6 +289,7 @@ export function payCostsWithSelection(
         costsPaid: false,
         oncePerTurnMarked: false,
         pendingTriggers: [],
+        simultaneousTriggers: [],
         accumulatedEvents: events,
       };
       nextState = pushFrame(nextState, frame);

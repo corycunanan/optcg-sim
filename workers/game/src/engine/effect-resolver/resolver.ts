@@ -165,6 +165,7 @@ export function resolveEffect(
       costsPaid: false,
       oncePerTurnMarked: false,
       pendingTriggers: [],
+      simultaneousTriggers: [],
       accumulatedEvents: [],
     };
     state = pushFrame(state, frame);
@@ -304,6 +305,7 @@ export function executeActionChain(
         costsPaid: true, // costs already paid before action chain
         oncePerTurnMarked: true,
         pendingTriggers: [],
+        simultaneousTriggers: [],
         accumulatedEvents: events,
       };
       const updatedState = pushFrame(result.state, frame);

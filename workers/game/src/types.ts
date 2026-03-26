@@ -69,6 +69,9 @@ export interface EffectStackFrame {
   // Queued triggers waiting to resolve after this frame
   pendingTriggers: QueuedTrigger[];
 
+  // Simultaneous triggers awaiting player ordering choice
+  simultaneousTriggers: QueuedTrigger[];
+
   // Events accumulated during partial execution
   accumulatedEvents: PendingEvent[];
 }
