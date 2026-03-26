@@ -220,7 +220,7 @@ export function executeTrashFromHand(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  _preselectedTargets?: string[],
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -237,8 +237,11 @@ export function executeTrashFromHand(
 
   if (candidates.length === 0) return { state, events, succeeded: false };
 
-  // If opponent choosing, prompt
-  if (action.target?.controller === "OPPONENT" || action.type === "TRASH_FROM_HAND") {
+  // Use preselected targets from resume flow (player already chose)
+  const selectedIds = preselectedTargets;
+
+  // If no preselection and player needs to choose, prompt
+  if (!selectedIds) {
     const validTargets = candidates.map((c) => c.instanceId);
     if (validTargets.length > amount) {
       const resumeCtx: import("../../../types.js").ResumeContext = {
@@ -266,8 +269,10 @@ export function executeTrashFromHand(
     }
   }
 
-  // Auto-select
-  const toTrash = candidates.slice(0, amount);
+  // Trash the selected (or auto-selected) cards
+  const toTrash = selectedIds
+    ? candidates.filter((c) => selectedIds.includes(c.instanceId))
+    : candidates.slice(0, amount);
   const toTrashIds = new Set(toTrash.map((c) => c.instanceId));
   const newHand = p.hand.filter((c) => !toTrashIds.has(c.instanceId));
   const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
@@ -275,12 +280,12 @@ export function executeTrashFromHand(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[targetController] = { ...p, hand: newHand, trash: newTrash };
 
-  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: amount, reason: "effect" } });
+  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: toTrash.length, reason: "effect" } });
 
   return {
     state: { ...state, players: newPlayers },
     events,
-    succeeded: true,
-    result: { targetInstanceIds: toTrash.map((c) => c.instanceId), count: amount },
+    succeeded: toTrash.length > 0,
+    result: { targetInstanceIds: toTrash.map((c) => c.instanceId), count: toTrash.length },
   };
 }

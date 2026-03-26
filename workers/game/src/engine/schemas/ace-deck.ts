@@ -119,7 +119,7 @@ export const ST22_002_IZO: EffectSchema = {
             look_at: 5,
             pick: { up_to: 1 },
             filter: {
-              traits: ["Whitebeard Pirates"],
+              traits_contains: ["Whitebeard Pirates"],
               exclude_name: "Izo",
             },
             rest_destination: "BOTTOM",
@@ -203,13 +203,13 @@ export const OP08_040_ATMOS: EffectSchema = {
         {
           type: "REVEAL_FROM_HAND",
           amount: 2,
-          filter: { traits: ["Whitebeard Pirates"] },
+          filter: { traits_contains: ["Whitebeard Pirates"] },
         },
       ],
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
-        property: { trait: "Whitebeard Pirates" },
+        property: { trait_contains: "Whitebeard Pirates" },
       },
       actions: [
         {
@@ -331,7 +331,7 @@ export const OP02_008_JOZU: EffectSchema = {
       conditions: {
         all_of: [
           { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 2 },
-          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Whitebeard Pirates" } },
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait_contains: "Whitebeard Pirates" } },
         ],
       },
       actions: [
@@ -462,7 +462,7 @@ export const OP13_046_VISTA: EffectSchema = {
       replacement_actions: [
         {
           type: "TRASH_FROM_HAND",
-          params: { amount: 1, filter: { traits: ["Whitebeard Pirates"] } },
+          params: { amount: 1, filter: { traits_contains: ["Whitebeard Pirates"] } },
         },
       ],
       flags: { once_per_turn: true, optional: true },
@@ -477,7 +477,7 @@ export const OP13_046_VISTA: EffectSchema = {
       replacement_actions: [
         {
           type: "TRASH_FROM_HAND",
-          params: { amount: 1, filter: { traits: ["Whitebeard Pirates"] } },
+          params: { amount: 1, filter: { traits_contains: ["Whitebeard Pirates"] } },
         },
       ],
       flags: { once_per_turn: true, optional: true },
@@ -649,7 +649,7 @@ export const ST22_015_WHITEBEARD: EffectSchema = {
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
-        property: { trait: "Whitebeard Pirates" },
+        property: { trait_contains: "Whitebeard Pirates" },
       },
       actions: [
         {

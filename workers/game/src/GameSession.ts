@@ -24,6 +24,7 @@ import { setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
+import { recalculateBattlePowers } from "./engine/battle.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -479,6 +480,12 @@ export class GameSession implements DurableObject {
       if (resumeResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
       }
+    }
+
+    // Recalculate battle powers after effect resolution — trigger effects
+    // (e.g., [On Your Opponent's Attack] → MODIFY_POWER) may have changed them
+    if (this.cardDb) {
+      this.gameState = recalculateBattlePowers(this.gameState, this.cardDb);
     }
 
     // Run start-of-turn auto phases in case this was end-of-turn

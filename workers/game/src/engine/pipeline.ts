@@ -15,6 +15,7 @@
 import type { CardData, GameAction, GameState, ExecuteResult, PendingPromptState } from "../types.js";
 import { validate } from "./validation.js";
 import { execute } from "./execute.js";
+import { recalculateBattlePowers } from "./battle.js";
 import { emitEvent } from "./events.js";
 import { checkDefeat } from "./defeat.js";
 import { checkProhibitions } from "./prohibitions.js";
@@ -160,11 +161,17 @@ function fireEventsAndTriggers(
     state = result.state;
 
     if (result.pendingPrompt) {
+      // Recalculate battle powers before pausing — trigger effects may have
+      // applied modifiers (e.g., [On Your Opponent's Attack] → MODIFY_POWER)
+      state = recalculateBattlePowers(state, cardDb);
       state = { ...state, pendingPrompt: result.pendingPrompt };
       // Record action before returning (so it's tracked even when paused)
       state = recordAction(state, action);
       return state;
     }
+
+    // Recalculate battle powers after all triggers resolved
+    state = recalculateBattlePowers(state, cardDb);
   }
 
   // Record the action performed

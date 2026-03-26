@@ -302,6 +302,7 @@ export type LeaderPropertyCheck =
   | { color_includes: CardColor }
   | { color: CardColor }
   | { trait: string }
+  | { trait_contains: string }
   | { attribute: Attribute }
   | { name: string }
   | { multicolored: boolean };
@@ -775,6 +776,7 @@ export interface TargetFilter {
   // Trait filters
   traits?: string[];
   traits_any_of?: string[];
+  traits_contains?: string[];
   traits_exclude?: string[];
 
   // Name filters

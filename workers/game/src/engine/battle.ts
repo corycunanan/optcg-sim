@@ -311,6 +311,46 @@ export function executeRevealTrigger(
   return { state: nextState, events };
 }
 
+// ─── Recalculate Battle Powers ───────────────────────────────────────────────
+
+/**
+ * Recalculate attacker/defender power in the battle context using current
+ * activeEffects. Called after trigger resolution and at damage step to ensure
+ * modifiers from [When Attacking] / [On Your Opponent's Attack] are reflected.
+ */
+export function recalculateBattlePowers(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const battle = state.turn.battle;
+  if (!battle) return state;
+
+  const attackerFound = findCardInState(state, battle.attackerInstanceId);
+  const defenderFound = findCardInState(state, battle.targetInstanceId);
+  if (!attackerFound || !defenderFound) return state;
+
+  const attackerData = cardDb.get(attackerFound.card.cardId);
+  const defenderData = cardDb.get(defenderFound.card.cardId);
+  if (!attackerData || !defenderData) return state;
+
+  const newAttackerPower = getEffectivePower(attackerFound.card, attackerData, state);
+  const newDefenderPower = getBattleDefenderPower(
+    defenderFound.card, defenderData, battle.counterPowerAdded, state,
+  );
+
+  if (newAttackerPower === battle.attackerPower && newDefenderPower === battle.defenderPower) {
+    return state;
+  }
+
+  return {
+    ...state,
+    turn: {
+      ...state.turn,
+      battle: { ...battle, attackerPower: newAttackerPower, defenderPower: newDefenderPower },
+    },
+  };
+}
+
 // ─── Damage Step (internal) ──────────────────────────────────────────────────
 
 function executeDamageStep(
@@ -320,8 +360,10 @@ function executeDamageStep(
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
   const inactiveIdx = getInactivePlayerIndex(state);
-  const battle = state.turn.battle!;
-  let nextState = state;
+
+  // Recalculate powers to reflect all modifiers (triggers, counters, effects)
+  let nextState = recalculateBattlePowers(state, cardDb);
+  const battle = nextState.turn.battle!;
   let damagedPlayerIndex: 0 | 1 | undefined;
 
   const { attackerPower, defenderPower, targetInstanceId } = battle;

@@ -122,7 +122,11 @@ export function payCosts(
             if (!data) return false;
             // Basic filter check for traits
             if (cost.filter?.traits) {
-              return cost.filter.traits.every((t) => (data.types ?? []).includes(t));
+              if (!cost.filter.traits.every((t) => (data.types ?? []).includes(t))) return false;
+            }
+            if (cost.filter?.traits_contains) {
+              const cardTraits = data.types ?? [];
+              if (!cost.filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
             }
             return true;
           });
@@ -267,10 +271,14 @@ export function computeCostTargets(
           const data = cardDb.get(c.cardId);
           if (!data) return false;
           if (cost.filter?.traits) {
-            return cost.filter.traits.every((t: string) => (data.types ?? []).includes(t));
+            if (!cost.filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
+          }
+          if (cost.filter?.traits_contains) {
+            const cardTraits = data.types ?? [];
+            if (!cost.filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
           }
           if (cost.filter?.color) {
-            return (data.color ?? []).some((clr: string) => cost.filter!.color!.includes(clr as never));
+            if (!(data.color ?? []).some((clr: string) => cost.filter!.color!.includes(clr as never))) return false;
           }
           return true;
         });
@@ -288,7 +296,11 @@ export function computeCostTargets(
           const data = cardDb.get(c.cardId);
           if (!data) return false;
           if (cost.filter?.traits) {
-            return cost.filter.traits.every((t: string) => (data.types ?? []).includes(t));
+            if (!cost.filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
+          }
+          if (cost.filter?.traits_contains) {
+            const cardTraits = data.types ?? [];
+            if (!cost.filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
           }
           if (cost.filter?.cost_max !== undefined) {
             return (data.cost ?? 0) <= (cost.filter.cost_max as number);

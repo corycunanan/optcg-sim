@@ -73,6 +73,10 @@ export function executeSearchDeck(
     if (filter.traits) {
       if (!filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
     }
+    if (filter.traits_contains) {
+      const cardTraits = data.types ?? [];
+      if (!filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
+    }
     if (filter.exclude_name && data.name === filter.exclude_name) return false;
     if (filter.card_type) {
       if (data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
@@ -164,6 +168,10 @@ export function executeFullDeckSearch(
     const data = cardDb.get(c.cardId);
     if (!data) return false;
     if (filter.traits && !filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
+    if (filter.traits_contains) {
+      const cardTraits = data.types ?? [];
+      if (!filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
+    }
     if (filter.exclude_name && data.name === filter.exclude_name) return false;
     if (filter.name && data.name !== filter.name) return false;
     if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;

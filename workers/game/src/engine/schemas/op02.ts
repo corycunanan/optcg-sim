@@ -180,7 +180,7 @@ export const OP02_008_JOZU: EffectSchema = {
               all_of: [
                 { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
                 { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 2 },
-                { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Whitebeard Pirates" } },
+                { type: "LEADER_PROPERTY", controller: "SELF", property: { trait_contains: "Whitebeard Pirates" } },
               ],
             },
           },
@@ -192,7 +192,7 @@ export const OP02_008_JOZU: EffectSchema = {
           all_of: [
             { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
             { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 2 },
-            { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Whitebeard Pirates" } },
+            { type: "LEADER_PROPERTY", controller: "SELF", property: { trait_contains: "Whitebeard Pirates" } },
           ],
         },
       },
@@ -217,7 +217,7 @@ export const OP02_009_SQUARD: EffectSchema = {
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
-        property: { trait: "Whitebeard Pirates" },
+        property: { trait_contains: "Whitebeard Pirates" },
       },
       actions: [
         {
@@ -353,7 +353,7 @@ export const OP02_013_PORTGAS_D_ACE: EffectSchema = {
           conditions: {
             type: "LEADER_PROPERTY",
             controller: "SELF",
-            property: { trait: "Whitebeard Pirates" },
+            property: { trait_contains: "Whitebeard Pirates" },
           },
         },
       ],
@@ -503,7 +503,7 @@ export const OP02_018_MARCO: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           amount: 1,
-          filter: { traits: ["Whitebeard Pirates"] },
+          filter: { traits_contains: ["Whitebeard Pirates"] },
         },
       ],
       conditions: {
@@ -552,7 +552,7 @@ export const OP02_019_RAKUYO: EffectSchema = {
             type: "CHARACTER",
             controller: "SELF",
             count: { all: true },
-            filter: { traits: ["Whitebeard Pirates"] },
+            filter: { traits_contains: ["Whitebeard Pirates"] },
           },
           params: { amount: 1000 },
         },
@@ -579,7 +579,7 @@ export const OP02_021_SEAQUAKE: EffectSchema = {
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
-        property: { trait: "Whitebeard Pirates" },
+        property: { trait_contains: "Whitebeard Pirates" },
       },
       actions: [
         {
@@ -636,7 +636,7 @@ export const OP02_022_WHITEBEARD_PIRATES: EffectSchema = {
             pick: { up_to: 1 },
             filter: {
               card_type: "CHARACTER",
-              traits: ["Whitebeard Pirates"],
+              traits_contains: ["Whitebeard Pirates"],
             },
             rest_destination: "BOTTOM",
           },
@@ -724,7 +724,7 @@ export const OP02_024_MOBY_DICK: EffectSchema = {
             filter: {
               any_of: [
                 { name: "Edward.Newgate" },
-                { traits: ["Whitebeard Pirates"] },
+                { traits_contains: ["Whitebeard Pirates"] },
               ],
             },
           },

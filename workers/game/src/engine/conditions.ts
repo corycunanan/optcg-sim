@@ -175,7 +175,12 @@ function evaluateSimple(
         return data.color.length === 1 && data.color[0].toUpperCase() === prop.color;
       }
       if ("trait" in prop) {
+        // {Type} notation — exact match in types array
         return data.types?.includes(prop.trait) ?? false;
+      }
+      if ("trait_contains" in prop) {
+        // "type including X" — substring match
+        return data.types?.some((t) => t.includes(prop.trait_contains as string)) ?? false;
       }
       if ("attribute" in prop) {
         return data.attribute?.includes(prop.attribute) ?? false;
@@ -474,6 +479,7 @@ export function matchesFilter(
   const traits = data.types ?? [];
   if (filter.traits && !filter.traits.every((t) => traits.includes(t))) return false;
   if (filter.traits_any_of && !filter.traits_any_of.some((t) => traits.includes(t))) return false;
+  if (filter.traits_contains && !filter.traits_contains.every((t) => traits.some((tr) => tr.includes(t)))) return false;
   if (filter.traits_exclude && filter.traits_exclude.some((t) => traits.includes(t))) return false;
 
   // Name filters
