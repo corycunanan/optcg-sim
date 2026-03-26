@@ -8,12 +8,35 @@
  * - A replacement effect can only apply once per original event (§6-6-3-5)
  * - If multiple replacements match, the affected player chooses which applies
  * - Replacement effects are consumed (removed) once they apply (if one-time)
+ *
+ * Replacement effects are registered as RuntimeActiveEffects with
+ * REPLACEMENT_EFFECT modifier type. They're created by
+ * registerReplacementsForCard() in triggers.ts when a card enters the field.
  */
 
 import type {
+  Action,
+  CauseFilter,
   RuntimeActiveEffect,
 } from "./effect-types.js";
-import type { CardData, GameAction, GameState, PendingEvent } from "../types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameAction,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+} from "../types.js";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type ReplacementEvent =
+  | "WOULD_BE_KO"
+  | "WOULD_BE_REMOVED_FROM_FIELD"
+  | "WOULD_LEAVE_FIELD"
+  | "WOULD_BE_RESTED"
+  | "WOULD_LOSE_GAME"
+  | "LIFE_ADDED_TO_HAND";
 
 export interface ReplacementResult {
   replaced: boolean;
@@ -24,202 +47,427 @@ export interface ReplacementResult {
   events: PendingEvent[];
 }
 
+export interface ReplacementCheckResult {
+  /** A matching replacement was found and applied (non-optional) */
+  replaced: boolean;
+  state: GameState;
+  events: PendingEvent[];
+  /** If the replacement is optional, a prompt to send to the player */
+  pendingPrompt?: PendingPromptState;
+}
+
+interface ReplacementParams {
+  trigger: string;
+  cause_filter: CauseFilter | null;
+  target_filter: Record<string, unknown> | null;
+  replacement_actions: Action[];
+  optional: boolean;
+  once_per_turn: boolean;
+}
+
+// ─── Pipeline Step 3: Action-Level Replacement ───────────────────────────────
+
 /**
- * Check for replacement effects that intercept an action.
+ * Check for replacement effects that intercept a player action.
+ * Called from the pipeline before action execution.
  *
- * Currently supports:
- * - KO → RETURN_TO_HAND (e.g., "When this Character would be KO'd, return it to hand instead")
- * - KO → BOTTOM_OF_DECK
- * - DAMAGE → PREVENT (e.g., "The next time this Leader would take damage, prevent it")
+ * Most OPTCG replacements operate at the consequence level (KO, removal)
+ * rather than the action level. This function handles action-level
+ * replacements if any exist.
  */
 export function checkReplacements(
   state: GameState,
-  action: GameAction,
-  cardDb: Map<string, CardData>,
-  actingPlayerIndex: 0 | 1,
+  _action: GameAction,
+  _cardDb: Map<string, CardData>,
+  _actingPlayerIndex: 0 | 1,
 ): ReplacementResult {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
-  const replacements = effects.filter((e) =>
-    e.modifiers?.some((m) => m.type === "REPLACEMENT_EFFECT"),
-  );
-
-  if (replacements.length === 0) {
-    return { replaced: false, state, events: [] };
-  }
-
-  // Check each replacement effect against the action
-  for (const replacement of replacements) {
-    const mod = replacement.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
-    if (!mod) continue;
-
-    const result = tryReplace(state, action, replacement, mod.params ?? {}, cardDb, actingPlayerIndex);
-    if (result) {
-      return result;
-    }
-  }
-
+  // Action-level replacements are uncommon in OPTCG.
+  // Most replacements intercept consequences (KO, removal) and are handled
+  // by checkReplacementForKO / checkReplacementForRemoval instead.
   return { replaced: false, state, events: [] };
 }
 
-function tryReplace(
-  _state: GameState,
-  _action: GameAction,
-  _effect: RuntimeActiveEffect,
-  params: Record<string, unknown>,
-  _cardDb: Map<string, CardData>,
-  _actingPlayerIndex: 0 | 1,
-): ReplacementResult | null {
-  const trigger = (params.trigger as string) ?? "";
+// ─── Consequence-Level Replacement Checks ────────────────────────────────────
 
-  // KO replacement
-  if (trigger === "KO" || trigger === "WOULD_BE_KO") {
-    // This intercepts at the engine level — KO events check
-    // active replacements before completing
-    // For action-level, we don't intercept DECLARE_ATTACK etc.
-    // KO replacements are checked in the effect resolver's koCharacter
-    return null;
-  }
-
-  // Damage replacement
-  if (trigger === "DAMAGE" || trigger === "WOULD_TAKE_DAMAGE") {
-    // Also checked at the battle damage step level
-    return null;
-  }
-
-  return null;
+/**
+ * Check if a KO would be replaced by an active replacement effect.
+ * Called from battle.ts (damage step) and effect-resolver.ts (KO action)
+ * before the KO is completed.
+ *
+ * @param cause - What's causing the KO: "battle" or "effect"
+ * @param causingController - The player whose action/effect caused the KO
+ */
+export function checkReplacementForKO(
+  state: GameState,
+  targetInstanceId: string,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
+  return checkReplacementForEvent(
+    state,
+    targetInstanceId,
+    "WOULD_BE_KO",
+    cause,
+    causingController,
+    cardDb,
+  );
 }
 
 /**
- * Check if a specific KO would be replaced.
- * Called by the effect resolver and battle system before completing a KO.
+ * Check if a removal from field (return to hand/deck by opponent effect)
+ * would be replaced.
+ * Called from effect-resolver.ts before RETURN_TO_HAND executes.
  */
-export function checkKOReplacement(
+export function checkReplacementForRemoval(
   state: GameState,
   targetInstanceId: string,
-  _cardDb: Map<string, CardData>,
-): { replaced: boolean; state: GameState; events: PendingEvent[] } {
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
+  // Check both specific WOULD_BE_REMOVED_FROM_FIELD and general WOULD_LEAVE_FIELD
+  const result = checkReplacementForEvent(
+    state,
+    targetInstanceId,
+    "WOULD_BE_REMOVED_FROM_FIELD",
+    "effect",
+    causingController,
+    cardDb,
+  );
+  if (result.replaced || result.pendingPrompt) return result;
+
+  return checkReplacementForEvent(
+    state,
+    targetInstanceId,
+    "WOULD_LEAVE_FIELD",
+    "effect",
+    causingController,
+    cardDb,
+  );
+}
+
+// ─── Core Matching Logic ─────────────────────────────────────────────────────
+
+function checkReplacementForEvent(
+  state: GameState,
+  targetInstanceId: string,
+  event: ReplacementEvent,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
   const effects = state.activeEffects as RuntimeActiveEffect[];
 
   for (const effect of effects) {
     const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
     if (!mod) continue;
 
-    const trigger = (mod.params?.trigger as string) ?? "";
-    if (trigger !== "KO" && trigger !== "WOULD_BE_KO") continue;
+    const params = mod.params as unknown as ReplacementParams;
+    if (!params) continue;
 
-    // Check if this replacement applies to the target
-    if (effect.appliesTo && effect.appliesTo.length > 0) {
-      if (!effect.appliesTo.includes(targetInstanceId)) continue;
+    // Match trigger event
+    if (params.trigger !== event) continue;
+
+    // Check if this replacement applies to the target card
+    if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) continue;
+
+    // Check cause filter
+    if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {
+      continue;
     }
 
-    const replacement = (mod.params?.replacement as string) ?? "";
-    const events: PendingEvent[] = [];
+    // Check once-per-turn
+    if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
 
-    if (replacement === "RETURN_TO_HAND") {
-      // Instead of KO, return to hand
-      let nextState = returnToHandInstead(state, targetInstanceId);
-      if (nextState) {
-        // Remove the one-time replacement effect
-        nextState = removeActiveEffect(nextState, effect.id);
-        events.push({
-          type: "CARD_RETURNED_TO_HAND",
-          payload: { cardInstanceId: targetInstanceId, replacedKO: true },
-        });
-        return { replaced: true, state: nextState, events };
-      }
+    // Check if replacement actions can be paid
+    if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) {
+      continue;
     }
 
-    if (replacement === "BOTTOM_OF_DECK") {
-      let nextState = returnToDeckInstead(state, targetInstanceId, "BOTTOM");
-      if (nextState) {
-        nextState = removeActiveEffect(nextState, effect.id);
-        return { replaced: true, state: nextState, events };
-      }
+    // Match found — if optional, prompt the player
+    if (params.optional) {
+      return buildReplacementPrompt(state, effect, targetInstanceId, event, cardDb);
     }
 
-    if (replacement === "PREVENT") {
-      // Simply prevent the KO
-      let nextState = removeActiveEffect(state, effect.id);
-      return { replaced: true, state: nextState, events };
-    }
+    // Non-optional: apply immediately
+    return applyReplacement(state, effect, params, targetInstanceId, cardDb);
   }
 
   return { replaced: false, state, events: [] };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function matchesCauseFilter(
+  filter: CauseFilter,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  replacementOwner: 0 | 1,
+): boolean {
+  switch (filter.by) {
+    case "OPPONENT_EFFECT":
+      return cause === "effect" && causingController !== replacementOwner;
+    case "ANY_EFFECT":
+      return cause === "effect";
+    case "ANY":
+      return true;
+    default:
+      return true;
+  }
+}
 
-function removeActiveEffect(state: GameState, effectId: string): GameState {
-  const effects = (state.activeEffects as RuntimeActiveEffect[]).filter(
-    (e) => e.id !== effectId,
-  );
+function hasUsedThisTurn(state: GameState, effect: RuntimeActiveEffect): boolean {
+  // Check if this effect has been marked as used this turn
+  // We track this via a convention: the effect's params will have usedOnTurn set
+  const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
+  const params = mod?.params as Record<string, unknown> | undefined;
+  return params?.usedOnTurn === state.turn.number;
+}
+
+// ─── Cost Validation ─────────────────────────────────────────────────────────
+
+function canPayReplacementCost(
+  state: GameState,
+  controller: 0 | 1,
+  actions: Action[],
+  cardDb: Map<string, CardData>,
+): boolean {
+  const player = state.players[controller];
+
+  for (const action of actions) {
+    if (action.type === "TRASH_FROM_HAND") {
+      const amount = (action.params?.amount as number) ?? 1;
+      const filter = action.params?.filter as Record<string, unknown> | undefined;
+
+      if (filter) {
+        // Count cards in hand matching the filter
+        const matching = player.hand.filter((c) => matchesCardFilter(c, filter, cardDb));
+        if (matching.length < amount) return false;
+      } else {
+        if (player.hand.length < amount) return false;
+      }
+    }
+    // Add more cost types as needed
+  }
+
+  return true;
+}
+
+function matchesCardFilter(
+  card: CardInstance,
+  filter: Record<string, unknown>,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const data = cardDb.get(card.cardId);
+  if (!data) return false;
+
+  if (filter.traits) {
+    const requiredTraits = filter.traits as string[];
+    const cardTraits = data.types ?? [];
+    if (!requiredTraits.every((t) => cardTraits.includes(t))) return false;
+  }
+
+  if (filter.color) {
+    const colors = Array.isArray(filter.color) ? filter.color : [filter.color];
+    if (!colors.includes(data.color)) return false;
+  }
+
+  if (filter.costMax !== undefined) {
+    if ((data.cost ?? 0) > (filter.costMax as number)) return false;
+  }
+
+  return true;
+}
+
+// ─── Apply Replacement ───────────────────────────────────────────────────────
+
+function applyReplacement(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+  params: ReplacementParams,
+  _targetInstanceId: string,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
+  const events: PendingEvent[] = [];
+  let nextState = state;
+
+  // Execute replacement actions (costs like trash from hand)
+  for (const action of params.replacement_actions) {
+    const result = executeReplacementAction(nextState, action, effect.controller, cardDb);
+    nextState = result.state;
+    events.push(...result.events);
+  }
+
+  // Mark once-per-turn if applicable
+  if (params.once_per_turn) {
+    nextState = markReplacementUsed(nextState, effect, nextState.turn.number);
+  }
+
+  return { replaced: true, state: nextState, events };
+}
+
+/**
+ * Execute a single replacement action (the "instead" behavior).
+ * These are simpler than full effect actions — typically just costs.
+ */
+function executeReplacementAction(
+  state: GameState,
+  action: Action,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): { state: GameState; events: PendingEvent[] } {
+  const events: PendingEvent[] = [];
+  const params = action.params ?? {};
+
+  switch (action.type) {
+    case "TRASH_FROM_HAND": {
+      const amount = (params.amount as number) ?? 1;
+      const filter = params.filter as Record<string, unknown> | undefined;
+      const player = state.players[controller];
+
+      let candidates = [...player.hand];
+      if (filter) {
+        candidates = candidates.filter((c) => matchesCardFilter(c, filter, cardDb));
+      }
+
+      // Auto-select: trash from end of hand (most recently drawn)
+      const toTrash = candidates.slice(-amount);
+      const trashIds = new Set(toTrash.map((c) => c.instanceId));
+
+      const newHand = player.hand.filter((c) => !trashIds.has(c.instanceId));
+      const newTrash = [
+        ...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })),
+        ...player.trash,
+      ];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...player, hand: newHand, trash: newTrash };
+
+      for (const card of toTrash) {
+        events.push({
+          type: "CARD_TRASHED",
+          playerIndex: controller,
+          payload: { cardId: card.cardId, from: "HAND" },
+        });
+      }
+
+      return { state: { ...state, players: newPlayers }, events };
+    }
+    default:
+      // Unhandled replacement action type — skip
+      return { state, events };
+  }
+}
+
+function markReplacementUsed(state: GameState, effect: RuntimeActiveEffect, turn: number): GameState {
+  const effects = (state.activeEffects as RuntimeActiveEffect[]).map((e) => {
+    if (e.id !== effect.id) return e;
+    return {
+      ...e,
+      modifiers: e.modifiers.map((m) => {
+        if (m.type !== "REPLACEMENT_EFFECT") return m;
+        return { ...m, params: { ...m.params, usedOnTurn: turn } };
+      }),
+    };
+  });
   return { ...state, activeEffects: effects as any };
 }
 
-function returnToHandInstead(state: GameState, instanceId: string): GameState | null {
-  for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
-    if (charIdx === -1) continue;
+// ─── Prompt for Optional Replacement ─────────────────────────────────────────
 
-    const char = player.characters[charIdx];
-    const newChars = player.characters.filter((_, i) => i !== charIdx);
+function buildReplacementPrompt(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+  targetInstanceId: string,
+  event: ReplacementEvent,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
+  const sourceCard = findCardInstance(state, effect.sourceCardInstanceId);
+  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const effectDescription = sourceData?.effectText ?? describeReplacementEvent(event);
 
-    const returnedDon = char.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
+  const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
 
-    const newHand = [
-      ...player.hand,
-      { ...char, zone: "HAND" as const, attachedDon: [], state: "ACTIVE" as const },
-    ];
+  const pendingPrompt: PendingPromptState = {
+    promptType: "OPTIONAL_EFFECT",
+    options: {
+      effectDescription,
+      cards,
+    },
+    respondingPlayer: effect.controller,
+    resumeContext: {
+      type: "REPLACEMENT",
+      effectId: effect.id,
+      targetInstanceId,
+      event,
+    },
+  };
 
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      characters: newChars,
-      hand: newHand,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
-
-    return { ...state, players: newPlayers };
-  }
-  return null;
+  return { replaced: false, state, events: [], pendingPrompt };
 }
 
-function returnToDeckInstead(
+function describeReplacementEvent(event: ReplacementEvent): string {
+  switch (event) {
+    case "WOULD_BE_KO":
+      return "This character would be KO'd. Activate replacement effect?";
+    case "WOULD_BE_REMOVED_FROM_FIELD":
+      return "This character would be removed from the field. Activate replacement effect?";
+    case "WOULD_LEAVE_FIELD":
+      return "This character would leave the field. Activate replacement effect?";
+    default:
+      return "Activate replacement effect?";
+  }
+}
+
+// ─── Resume from Optional Replacement Prompt ─────────────────────────────────
+
+export interface ReplacementResumeContext {
+  type: "REPLACEMENT";
+  effectId: string;
+  targetInstanceId: string;
+  event: ReplacementEvent;
+}
+
+/**
+ * Resume after the player has accepted or declined an optional replacement.
+ * Called from GameSession.resumeFromPrompt when the resume context is a
+ * replacement type.
+ *
+ * @returns replaced=true if the replacement was applied (original event should be skipped)
+ */
+export function resumeReplacement(
   state: GameState,
-  instanceId: string,
-  position: "TOP" | "BOTTOM",
-): GameState | null {
-  for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
-    if (charIdx === -1) continue;
+  ctx: ReplacementResumeContext,
+  accepted: boolean,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
+  if (!accepted) {
+    return { replaced: false, state, events: [] };
+  }
 
-    const char = player.characters[charIdx];
-    const newChars = player.characters.filter((_, i) => i !== charIdx);
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effect = effects.find((e) => e.id === ctx.effectId);
+  if (!effect) {
+    return { replaced: false, state, events: [] };
+  }
 
-    const returnedDon = char.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
+  const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
+  const params = mod?.params as unknown as ReplacementParams;
+  if (!params) {
+    return { replaced: false, state, events: [] };
+  }
 
-    const deckCard = { ...char, zone: "DECK" as const, attachedDon: [], state: "ACTIVE" as const };
-    const newDeck = position === "BOTTOM"
-      ? [...player.deck, deckCard]
-      : [deckCard, ...player.deck];
+  return applyReplacement(state, effect, params, ctx.targetInstanceId, cardDb);
+}
 
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      characters: newChars,
-      deck: newDeck,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    return { ...state, players: newPlayers };
+function findCardInstance(state: GameState, instanceId: string): CardInstance | null {
+  for (const player of state.players) {
+    if (player.leader.instanceId === instanceId) return player.leader;
+    const char = player.characters.find((c) => c.instanceId === instanceId);
+    if (char) return char;
+    if (player.stage?.instanceId === instanceId) return player.stage;
+    const hand = player.hand.find((c) => c.instanceId === instanceId);
+    if (hand) return hand;
   }
   return null;
 }

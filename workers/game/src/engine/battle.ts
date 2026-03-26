@@ -16,6 +16,9 @@ import {
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
 import { hasDoubleAttack, hasBanish, hasTrigger } from "./keywords.js";
+import { checkReplacementForKO } from "./replacements.js";
+import { resolveEffect } from "./effect-resolver.js";
+import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
 
 // ─── Declare Attack ───────────────────────────────────────────────────────────
@@ -129,7 +132,12 @@ export function executePass(state: GameState, cardDb: Map<string, CardData>): Ex
     const dmgResult = executeDamageStep(nextState, cardDb);
     nextState = dmgResult.state;
     events.push(...dmgResult.events);
-    return { state: nextState, events, damagedPlayerIndex: dmgResult.damagedPlayerIndex };
+    return {
+      state: nextState,
+      events,
+      damagedPlayerIndex: dmgResult.damagedPlayerIndex,
+      ...(dmgResult.pendingPrompt && { pendingPrompt: dmgResult.pendingPrompt }),
+    };
   }
 
   return { state: nextState, events };
@@ -215,7 +223,7 @@ export function executeUseCounterEvent(
 export function executeRevealTrigger(
   state: GameState,
   reveal: boolean,
-  _cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>,
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   const inactiveIdx = getInactivePlayerIndex(state);
@@ -227,8 +235,7 @@ export function executeRevealTrigger(
   const lifeCard = battle.pendingTriggerLifeCard;
 
   if (reveal) {
-    // Activate trigger — card goes to trash after (rules §10-1-5-3)
-    // In M3 the trigger effect text is manual; card goes to trash
+    // Activate trigger — card goes to trash (rules §10-1-5-3)
     const trashCard = {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
@@ -246,6 +253,34 @@ export function executeRevealTrigger(
     };
     nextState = { ...nextState, players: newPlayers };
     events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, activated: true } });
+
+    // If the trigger card has an effectSchema with a TRIGGER block, resolve it
+    const triggerCardData = cardDb.get(lifeCard.cardId);
+    const schema = triggerCardData?.effectSchema as EffectSchema | null;
+    if (schema?.effects) {
+      const triggerBlock = schema.effects.find(
+        (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
+      );
+      if (triggerBlock) {
+        const effectResult = resolveEffect(
+          nextState,
+          triggerBlock,
+          lifeCard.instanceId,
+          inactiveIdx,
+          cardDb,
+        );
+        nextState = effectResult.state;
+        events.push(...effectResult.events);
+        // If the trigger effect needs player input, surface the prompt
+        if (effectResult.pendingPrompt) {
+          // Clear pending trigger and pass through prompt
+          const cleanedBattle = { ...battle };
+          delete (cleanedBattle as any).pendingTriggerLifeCard;
+          nextState = { ...nextState, turn: { ...nextState.turn, battle: cleanedBattle } };
+          return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
+        }
+      }
+    }
   } else {
     // Decline trigger — add to hand
     const handCard = {
@@ -371,10 +406,20 @@ function executeDamageStep(
           }
         }
       } else if (targetFound.card.zone === "CHARACTER") {
-        // KO the character
-        nextState = moveCard(nextState, targetInstanceId, "TRASH");
-        events.push({ type: "CARD_KO", playerIndex: pi, payload: { cardInstanceId: targetInstanceId, cause: "battle" } });
-        // [On K.O.] fires in M4
+        // Check for replacement effects before KO
+        const replacement = checkReplacementForKO(nextState, targetInstanceId, "battle", pi as 0 | 1, cardDb);
+        if (replacement.pendingPrompt) {
+          events.push(...replacement.events);
+          return { state: replacement.state, events, damagedPlayerIndex, pendingPrompt: replacement.pendingPrompt };
+        }
+        if (replacement.replaced) {
+          nextState = replacement.state;
+          events.push(...replacement.events);
+        } else {
+          // KO the character
+          nextState = moveCard(nextState, targetInstanceId, "TRASH");
+          events.push({ type: "CARD_KO", playerIndex: pi, payload: { cardInstanceId: targetInstanceId, cause: "battle" } });
+        }
       }
     }
   }

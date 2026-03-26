@@ -9,6 +9,7 @@
 
 import type { RuntimeActiveEffect, ExpiryTiming } from "./effect-types.js";
 import type { GameState } from "../types.js";
+import { cleanupConsumedOneTimeModifiers, expireOneTimeModifiers } from "./modifiers.js";
 
 /**
  * Expire all effects whose duration has elapsed.
@@ -39,7 +40,11 @@ export function expireBattleEffects(state: GameState, battleId: string): GameSta
  * Order: turn player first, then non-turn player (§6-6-1-3).
  */
 export function expireEndOfTurnEffects(state: GameState): GameState {
-  return expireEffects(state, "END_OF_TURN", { turn: state.turn.number });
+  let nextState = expireEffects(state, "END_OF_TURN", { turn: state.turn.number });
+  // Clean up consumed and THIS_TURN one-time modifiers
+  nextState = cleanupConsumedOneTimeModifiers(nextState);
+  nextState = expireOneTimeModifiers(nextState);
+  return nextState;
 }
 
 /**

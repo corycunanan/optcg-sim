@@ -576,6 +576,8 @@ export type ActionType =
   | "TRASH_FROM_HAND"
   | "RETURN_HAND_TO_DECK"
   | "GRANT_COUNTER"
+  // One-time modifier
+  | "APPLY_ONE_TIME_MODIFIER"
   // Self-play
   | "PLAY_SELF";
 

@@ -10,7 +10,7 @@ import { evaluateCondition, matchesFilter, type ConditionContext } from "../engi
 import { registerTriggersForCard, matchTriggersForEvent, orderMatchedTriggers, deregisterTriggersForCard } from "../engine/triggers.js";
 import { resolveEffect } from "../engine/effect-resolver.js";
 import { checkProhibitions, isProhibitedForCard } from "../engine/prohibitions.js";
-import { checkKOReplacement } from "../engine/replacements.js";
+import { checkReplacementForKO } from "../engine/replacements.js";
 import { expireEndOfTurnEffects, expireBattleEffects, expireSourceLeftZone, processScheduledActions } from "../engine/duration-tracker.js";
 import { getEffectivePower, hasGrantedKeyword } from "../engine/modifiers.js";
 import type { GameState, CardData, CardInstance, GameEvent } from "../types.js";
@@ -780,7 +780,7 @@ describe("Trigger System", () => {
 // ─── Replacement Effect Tests ─────────────────────────────────────────────────
 
 describe("Replacement Effects", () => {
-  it("replaces KO with RETURN_TO_HAND", () => {
+  it("prevents KO via non-optional replacement (trash from hand)", () => {
     const state = createInitialGameState();
     const char: CardInstance = {
       instanceId: "char-1",
@@ -793,18 +793,36 @@ describe("Replacement Effects", () => {
       owner: 0,
     };
     state.players[0].characters = [char];
+    // Give player 0 a card in hand so they can pay the cost
+    state.players[0].hand = [{
+      instanceId: "hand-1",
+      cardId: NAMI_CARD.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 0,
+      owner: 0,
+    } as CardInstance];
 
     const effect: RuntimeActiveEffect = {
       id: "repl-1",
-      sourceCardInstanceId: "some-card",
+      sourceCardInstanceId: "char-1",
       sourceEffectBlockId: "block-1",
-      category: "auto",
+      category: "replacement",
       modifiers: [{
         type: "REPLACEMENT_EFFECT",
-        params: { trigger: "WOULD_BE_KO", replacement: "RETURN_TO_HAND" },
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: null,
+          target_filter: null,
+          replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }],
+          optional: false,
+          once_per_turn: false,
+        },
       }],
-      duration: { type: "THIS_TURN" },
-      expiresAt: { wave: "END_OF_TURN", turn: 1 },
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
       controller: 0,
       appliesTo: ["char-1"],
       timestamp: Date.now(),
@@ -812,13 +830,14 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(NAMI_CARD);
-    const result = checkKOReplacement(state, "char-1", cardDb);
+    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
 
     expect(result.replaced).toBe(true);
-    expect(result.state.players[0].characters.length).toBe(0);
-    expect(result.state.players[0].hand.some((c) => c.instanceId === "char-1")).toBe(true);
-    // The replacement effect should be consumed
-    expect(result.state.activeEffects.length).toBe(0);
+    // Character should still be on field (KO was prevented)
+    expect(result.state.players[0].characters.length).toBe(1);
+    // Hand card was trashed as cost
+    expect(result.state.players[0].hand.length).toBe(0);
+    expect(result.state.players[0].trash.length).toBe(1);
   });
 
   it("does not replace KO for non-matching card", () => {
@@ -837,15 +856,22 @@ describe("Replacement Effects", () => {
 
     const effect: RuntimeActiveEffect = {
       id: "repl-1",
-      sourceCardInstanceId: "some-card",
+      sourceCardInstanceId: "char-1",
       sourceEffectBlockId: "block-1",
-      category: "auto",
+      category: "replacement",
       modifiers: [{
         type: "REPLACEMENT_EFFECT",
-        params: { trigger: "WOULD_BE_KO", replacement: "RETURN_TO_HAND" },
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: null,
+          target_filter: null,
+          replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }],
+          optional: false,
+          once_per_turn: false,
+        },
       }],
-      duration: { type: "THIS_TURN" },
-      expiresAt: { wave: "END_OF_TURN", turn: 1 },
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
       controller: 0,
       appliesTo: ["char-1"], // different card
       timestamp: Date.now(),
@@ -853,9 +879,113 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(NAMI_CARD);
-    const result = checkKOReplacement(state, "char-2", cardDb);
+    const result = checkReplacementForKO(state, "char-2", "effect", 1, cardDb);
 
     expect(result.replaced).toBe(false);
+  });
+
+  it("returns prompt for optional replacement", () => {
+    const state = createInitialGameState();
+    const char: CardInstance = {
+      instanceId: "char-1",
+      cardId: NAMI_CARD.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    state.players[0].characters = [char];
+    state.players[0].hand = [{
+      instanceId: "hand-1",
+      cardId: NAMI_CARD.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 0,
+      owner: 0,
+    } as CardInstance];
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-1",
+      sourceCardInstanceId: "char-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: null,
+          target_filter: null,
+          replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: ["char-1"],
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+
+    const cardDb = makeCardDb(NAMI_CARD);
+    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
+
+    // Should not auto-replace — returns a prompt instead
+    expect(result.replaced).toBe(false);
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt!.respondingPlayer).toBe(0);
+  });
+
+  it("skips replacement when cost cannot be paid", () => {
+    const state = createInitialGameState();
+    const char: CardInstance = {
+      instanceId: "char-1",
+      cardId: NAMI_CARD.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    state.players[0].characters = [char];
+    state.players[0].hand = []; // Empty hand — cannot pay cost
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-1",
+      sourceCardInstanceId: "char-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: null,
+          target_filter: null,
+          replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }],
+          optional: false,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: ["char-1"],
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+
+    const cardDb = makeCardDb(NAMI_CARD);
+    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
+
+    expect(result.replaced).toBe(false);
+    expect(result.pendingPrompt).toBeUndefined();
   });
 });
 

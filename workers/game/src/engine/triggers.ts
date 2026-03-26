@@ -19,6 +19,7 @@ import type {
   EffectBlock,
   EffectSchema,
   EffectZone,
+  RuntimeActiveEffect,
   RuntimeRegisteredTrigger,
 } from "./effect-types.js";
 import type {
@@ -86,6 +87,62 @@ export function deregisterTriggersForCard(
   );
   if (filtered.length === state.triggerRegistry.length) return state;
   return { ...state, triggerRegistry: filtered };
+}
+
+// ─── Replacement Registration ─────────────────────────────────────────────────
+
+/**
+ * Register replacement effect blocks as RuntimeActiveEffects when a card
+ * enters the field. These are checked by the replacement interceptor when
+ * a KO, removal, or other replaceable event is about to happen.
+ */
+export function registerReplacementsForCard(
+  state: GameState,
+  cardInstance: CardInstance,
+  cardData: CardData,
+): GameState {
+  const schema = cardData.effectSchema as EffectSchema | null;
+  if (!schema?.effects) return state;
+
+  const newEffects: RuntimeActiveEffect[] = [];
+
+  for (const block of schema.effects) {
+    if (block.category !== "replacement") continue;
+    if (!block.replaces) continue;
+
+    const zone: EffectZone = block.zone ?? "FIELD";
+    if (!isCardInValidZone(cardInstance, zone)) continue;
+
+    newEffects.push({
+      id: nanoid(),
+      sourceCardInstanceId: cardInstance.instanceId,
+      sourceEffectBlockId: block.id,
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: block.replaces.event,
+          cause_filter: block.replaces.cause_filter ?? null,
+          target_filter: block.replaces.target_filter ?? null,
+          replacement_actions: block.replacement_actions ?? [],
+          optional: block.flags?.optional ?? false,
+          once_per_turn: block.flags?.once_per_turn ?? false,
+        },
+      }],
+      duration: { type: "PERMANENT" as const },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" as const },
+      controller: cardInstance.controller,
+      appliesTo: [cardInstance.instanceId],
+      timestamp: Date.now(),
+    });
+  }
+
+  if (newEffects.length === 0) return state;
+
+  return {
+    ...state,
+    activeEffects: [...state.activeEffects, ...newEffects as any],
+  };
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────────

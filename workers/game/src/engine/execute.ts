@@ -13,7 +13,7 @@ import {
   restDonForCost,
   attachDon,
 } from "./state.js";
-import { getEffectiveCost } from "./modifiers.js";
+import { getEffectiveCost, consumeOneTimeModifiers } from "./modifiers.js";
 import { executeAdvancePhase } from "./phases.js";
 import {
   executeDeclareAttack,
@@ -78,10 +78,13 @@ function executePlayCard(
 
   const found = findCardInState(state, cardInstanceId)!;
   const cardData = cardDb.get(found.card.cardId)!;
-  const cost = getEffectiveCost(cardData);
+  const cost = getEffectiveCost(cardData, state, cardInstanceId);
 
   // Pay cost: rest DON!!
   let nextState = restDonForCost(state, pi, cost)!;
+
+  // Consume any one-time cost modifiers that applied
+  nextState = consumeOneTimeModifiers(nextState, cardData, pi);
 
   if (cardData.type === "Character") {
     // Handle 5-card overflow: if character area already has 5, discard oldest.

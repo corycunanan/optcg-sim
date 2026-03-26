@@ -17,7 +17,7 @@ import type {
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
 import { injectSchemasIntoCardDb } from "./schema-registry.js";
-import { registerTriggersForCard } from "./triggers.js";
+import { registerTriggersForCard, registerReplacementsForCard } from "./triggers.js";
 
 export function buildInitialState(payload: GameInitPayload): {
   state: GameState;
@@ -117,6 +117,7 @@ export function buildInitialState(payload: GameInitPayload): {
     const leaderData = cardDb.get(player.leader.cardId);
     if (leaderData) {
       state = registerTriggersForCard(state, player.leader, leaderData);
+      state = registerReplacementsForCard(state, player.leader, leaderData);
     }
   }
 

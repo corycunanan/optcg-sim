@@ -10,7 +10,7 @@
  * from the schemas/ directory.
  */
 
-import type { EffectSchema } from "./effect-types.js";
+import type { EffectSchema, EffectBlock, Action } from "./effect-types.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { ACE_DECK_SCHEMAS } from "./schemas/ace-deck.js";
 import { NAMI_DECK_SCHEMAS } from "./schemas/nami-deck.js";
@@ -33,11 +33,16 @@ export function getEffectSchema(cardId: string): EffectSchema | null {
 /**
  * Merge authored schemas into a CardDb's effectSchema fields.
  * Called at game init to inject schemas into the runtime card database.
+ * Validates each schema and logs warnings for malformed entries.
  */
 export function injectSchemasIntoCardDb(
   cardDb: Map<string, import("../types.js").CardData>,
 ): void {
   for (const [cardId, schema] of Object.entries(AUTHORED_SCHEMAS)) {
+    const errors = validateEffectSchema(schema, cardId);
+    if (errors.length > 0) {
+      console.warn(`[schema] Validation errors for ${cardId}:\n  ${errors.join("\n  ")}`);
+    }
     const data = cardDb.get(cardId);
     if (data && !data.effectSchema) {
       cardDb.set(cardId, { ...data, effectSchema: schema });
@@ -50,4 +55,157 @@ export function injectSchemasIntoCardDb(
  */
 export function listAuthoredSchemas(): string[] {
   return Object.keys(AUTHORED_SCHEMAS);
+}
+
+// ─── Schema Validation ───────────────────────────────────────────────────────
+
+const VALID_CATEGORIES = new Set(["auto", "activate", "permanent", "replacement", "rule_modification"]);
+
+const VALID_ACTION_TYPES = new Set([
+  "DRAW", "SEARCH_DECK", "TRASH_CARD", "KO", "RETURN_TO_HAND", "RETURN_TO_DECK",
+  "PLAY_CARD", "ADD_TO_LIFE", "ADD_TO_LIFE_FROM_DECK", "ADD_TO_LIFE_FROM_HAND",
+  "ADD_TO_LIFE_FROM_FIELD", "PLAY_FROM_LIFE", "LIFE_TO_HAND", "TRASH_FROM_LIFE",
+  "DRAIN_LIFE_TO_THRESHOLD", "LIFE_CARD_TO_DECK", "TRASH_FACE_UP_LIFE",
+  "MODIFY_POWER", "SET_POWER", "MODIFY_COST", "SET_COST",
+  "GRANT_KEYWORD", "REMOVE_KEYWORD", "GRANT_COUNTER", "GRANT_ATTRIBUTE",
+  "GIVE_DON", "RETURN_DON_TO_DECK", "FORCE_OPPONENT_DON_RETURN", "ATTACH_DON_TO_TARGET",
+  "ADD_DON_FROM_DECK", "SET_DON_ACTIVE", "GIVE_OPPONENT_DON_TO_OPPONENT",
+  "DISTRIBUTE_DON", "RETURN_ATTACHED_DON_TO_COST",
+  "SET_ACTIVE", "SET_REST", "APPLY_PROHIBITION", "REMOVE_PROHIBITION",
+  "PLAYER_CHOICE", "OPPONENT_CHOICE", "CHOOSE_VALUE", "WIN_GAME",
+  "OPPONENT_ACTION", "EXTRA_TURN", "SCHEDULE_ACTION",
+  "REDIRECT_ATTACK", "DEAL_DAMAGE", "SELF_TAKE_DAMAGE",
+  "ACTIVATE_EVENT_FROM_HAND", "ACTIVATE_EVENT_FROM_TRASH", "REUSE_EFFECT",
+  "NEGATE_TRIGGER_TYPE", "TRASH_FROM_HAND", "RETURN_HAND_TO_DECK",
+  "MILL", "PLACE_HAND_TO_DECK", "APPLY_ONE_TIME_MODIFIER", "PLAY_SELF",
+  "TURN_LIFE_FACE_UP", "TURN_LIFE_FACE_DOWN", "TURN_ALL_LIFE_FACE_DOWN",
+  "LIFE_SCRY", "REORDER_ALL_LIFE",
+]);
+
+/**
+ * Validate an effect schema and return a list of error messages.
+ * Returns an empty array if the schema is valid.
+ */
+export function validateEffectSchema(schema: EffectSchema, cardId?: string): string[] {
+  const errors: string[] = [];
+  const prefix = cardId ? `[${cardId}]` : "";
+
+  if (!schema.effects || !Array.isArray(schema.effects)) {
+    errors.push(`${prefix} Missing or non-array 'effects' field`);
+    return errors;
+  }
+
+  const blockIds = new Set<string>();
+
+  for (let i = 0; i < schema.effects.length; i++) {
+    const block = schema.effects[i];
+    const blockPrefix = `${prefix} effects[${i}]`;
+
+    // Check id uniqueness
+    if (!block.id) {
+      errors.push(`${blockPrefix}: Missing 'id' field`);
+    } else if (blockIds.has(block.id)) {
+      errors.push(`${blockPrefix}: Duplicate block id '${block.id}'`);
+    } else {
+      blockIds.add(block.id);
+    }
+
+    // Check category
+    if (!block.category) {
+      errors.push(`${blockPrefix}: Missing 'category' field`);
+    } else if (!VALID_CATEGORIES.has(block.category)) {
+      errors.push(`${blockPrefix}: Invalid category '${block.category}'`);
+    }
+
+    // Category-specific checks
+    errors.push(...validateBlock(block, blockPrefix));
+  }
+
+  return errors;
+}
+
+function validateBlock(block: EffectBlock, prefix: string): string[] {
+  const errors: string[] = [];
+
+  switch (block.category) {
+    case "auto":
+    case "activate":
+      if (!block.trigger) {
+        errors.push(`${prefix}: '${block.category}' block missing 'trigger'`);
+      }
+      if (!block.actions || block.actions.length === 0) {
+        errors.push(`${prefix}: '${block.category}' block missing 'actions'`);
+      }
+      break;
+
+    case "permanent":
+      if (!block.modifiers && !block.prohibitions) {
+        errors.push(`${prefix}: 'permanent' block needs 'modifiers' or 'prohibitions'`);
+      }
+      break;
+
+    case "replacement":
+      if (!block.replaces) {
+        errors.push(`${prefix}: 'replacement' block missing 'replaces'`);
+      }
+      if (!block.replacement_actions || block.replacement_actions.length === 0) {
+        errors.push(`${prefix}: 'replacement' block missing 'replacement_actions'`);
+      }
+      break;
+  }
+
+  // Validate actions
+  if (block.actions) {
+    for (let i = 0; i < block.actions.length; i++) {
+      errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`));
+    }
+  }
+
+  if (block.replacement_actions) {
+    for (let i = 0; i < block.replacement_actions.length; i++) {
+      errors.push(...validateAction(block.replacement_actions[i], `${prefix}.replacement_actions[${i}]`));
+    }
+  }
+
+  return errors;
+}
+
+function validateAction(action: Action, prefix: string): string[] {
+  const errors: string[] = [];
+
+  if (!action.type) {
+    errors.push(`${prefix}: Missing 'type' field`);
+  } else if (!VALID_ACTION_TYPES.has(action.type)) {
+    errors.push(`${prefix}: Unknown action type '${action.type}'`);
+  }
+
+  // Validate nested actions in PLAYER_CHOICE/OPPONENT_CHOICE
+  if ((action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") && action.params?.options) {
+    const options = action.params.options as Action[][];
+    if (!Array.isArray(options)) {
+      errors.push(`${prefix}: 'options' must be an array of action arrays`);
+    } else {
+      for (let i = 0; i < options.length; i++) {
+        if (!Array.isArray(options[i])) {
+          errors.push(`${prefix}.options[${i}]: Must be an array of actions`);
+        } else {
+          for (let j = 0; j < options[i].length; j++) {
+            errors.push(...validateAction(options[i][j], `${prefix}.options[${i}][${j}]`));
+          }
+        }
+      }
+    }
+  }
+
+  // Validate nested action in OPPONENT_ACTION
+  if (action.type === "OPPONENT_ACTION" && action.params?.action) {
+    errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`));
+  }
+
+  // Validate nested action in SCHEDULE_ACTION
+  if (action.type === "SCHEDULE_ACTION" && action.params?.action) {
+    errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`));
+  }
+
+  return errors;
 }

@@ -11,7 +11,7 @@
  */
 
 import type { CardInstance, CardData, GameState } from "../types.js";
-import type { RuntimeActiveEffect } from "./effect-types.js";
+import type { RuntimeActiveEffect, RuntimeOneTimeModifier, TargetFilter } from "./effect-types.js";
 
 /**
  * Returns the effective power of a card in the current game state.
@@ -88,6 +88,18 @@ export function getEffectiveCost(
         }
       }
     }
+
+    // One-time modifiers (unconsumed, matching cost modification for this play action)
+    const oneTimeModifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
+    for (const otm of oneTimeModifiers) {
+      if (otm.consumed) continue;
+      if (otm.modification.type !== "MODIFY_COST") continue;
+      if (!matchesOneTimeFilter(otm, cardData, state)) continue;
+
+      if (otm.modification.params?.amount !== undefined) {
+        cost += otm.modification.params.amount as number;
+      }
+    }
   }
 
   return Math.max(0, cost);
@@ -138,4 +150,79 @@ export function getBattleDefenderPower(
   state: GameState,
 ): number {
   return getEffectivePower(defenderCard, defenderCardData, state) + counterPowerAdded;
+}
+
+// ─── One-Time Modifiers ──────────────────────────────────────────────────────
+
+/**
+ * Consume all matching one-time modifiers when a card is played.
+ * Returns a new GameState with consumed modifiers marked.
+ */
+export function consumeOneTimeModifiers(
+  state: GameState,
+  cardData: CardData,
+  controller: 0 | 1,
+): GameState {
+  const modifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
+  let changed = false;
+
+  const updated = modifiers.map((otm) => {
+    if (otm.consumed) return otm;
+    if (otm.controller !== controller) return otm;
+    if (otm.modification.type !== "MODIFY_COST") return otm;
+    if (!matchesOneTimeFilter(otm, cardData, state)) return otm;
+
+    changed = true;
+    return { ...otm, consumed: true };
+  });
+
+  if (!changed) return state;
+  return { ...state, oneTimeModifiers: updated as any };
+}
+
+/**
+ * Remove all consumed one-time modifiers from state.
+ */
+export function cleanupConsumedOneTimeModifiers(state: GameState): GameState {
+  const modifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
+  const remaining = modifiers.filter((m) => !m.consumed);
+  if (remaining.length === modifiers.length) return state;
+  return { ...state, oneTimeModifiers: remaining as any };
+}
+
+/**
+ * Remove expired one-time modifiers (by turn number for THIS_TURN duration).
+ */
+export function expireOneTimeModifiers(state: GameState): GameState {
+  const modifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
+  const remaining = modifiers.filter((m) => {
+    if (m.consumed) return false;
+    if (m.expires.type === "THIS_TURN") return false; // End of turn = expired
+    return true;
+  });
+  if (remaining.length === modifiers.length) return state;
+  return { ...state, oneTimeModifiers: remaining as any };
+}
+
+function matchesOneTimeFilter(
+  otm: RuntimeOneTimeModifier,
+  cardData: CardData,
+  _state: GameState,
+): boolean {
+  const filter = otm.appliesTo.filter;
+  if (!filter) return true;
+
+  if ((filter as TargetFilter & { costMax?: number }).costMax !== undefined) {
+    if ((cardData.cost ?? 0) > ((filter as any).costMax as number)) return false;
+  }
+  if ((filter as any).traits) {
+    const traits = (filter as any).traits as string[];
+    const cardTraits = cardData.types ?? [];
+    if (!traits.every((t: string) => cardTraits.includes(t))) return false;
+  }
+  if ((filter as any).color) {
+    const colors = Array.isArray((filter as any).color) ? (filter as any).color : [(filter as any).color];
+    if (!colors.includes(cardData.color)) return false;
+  }
+  return true;
 }

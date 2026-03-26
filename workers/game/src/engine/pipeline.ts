@@ -23,6 +23,7 @@ import {
   matchTriggersForEvent,
   orderMatchedTriggers,
   registerTriggersForCard,
+  registerReplacementsForCard,
   deregisterTriggersForCard,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver.js";
@@ -216,6 +217,7 @@ function handleZoneChangeTriggers(
       console.log(`[zone] instance found=${!!instance} zone=${instance?.zone} triggersBefore=${state.triggerRegistry.length}`);
       if (instance) {
         state = registerTriggersForCard(state, instance, cardData);
+        state = registerReplacementsForCard(state, instance, cardData);
         console.log(`[zone] triggersAfter=${state.triggerRegistry.length}`);
       }
     }

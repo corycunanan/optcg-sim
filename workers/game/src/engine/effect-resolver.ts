@@ -31,6 +31,7 @@ import type {
   ResumeContext,
 } from "../types.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
+import { checkReplacementForKO, checkReplacementForRemoval } from "./replacements.js";
 import { nanoid } from "../util/nanoid.js";
 
 export interface EffectResolverResult {
@@ -488,19 +489,34 @@ function executeEffectAction(
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       let nextState = state;
+      const koedIds: string[] = [];
       for (const id of targetIds) {
+        // Check for replacement effects before completing the KO
+        const replacement = checkReplacementForKO(nextState, id, "effect", controller, cardDb);
+        if (replacement.pendingPrompt) {
+          // Pause for optional replacement prompt
+          events.push(...replacement.events);
+          return { state: replacement.state, events, succeeded: false, pendingPrompt: replacement.pendingPrompt };
+        }
+        if (replacement.replaced) {
+          nextState = replacement.state;
+          events.push(...replacement.events);
+          continue; // KO was replaced — skip this target
+        }
+
         const result = koCharacter(nextState, id, controller);
         if (result) {
           nextState = result.state;
           events.push(...result.events);
+          koedIds.push(id);
         }
       }
 
       return {
         state: nextState,
         events,
-        succeeded: targetIds.length > 0,
-        result: { targetInstanceIds: targetIds, count: targetIds.length },
+        succeeded: koedIds.length > 0,
+        result: { targetInstanceIds: koedIds, count: koedIds.length },
       };
     }
 
@@ -513,19 +529,33 @@ function executeEffectAction(
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       let nextState = state;
+      const returnedIds: string[] = [];
       for (const id of targetIds) {
+        // Check for removal replacement effects (opponent removing from field)
+        const replacement = checkReplacementForRemoval(nextState, id, controller, cardDb);
+        if (replacement.pendingPrompt) {
+          events.push(...replacement.events);
+          return { state: replacement.state, events, succeeded: false, pendingPrompt: replacement.pendingPrompt };
+        }
+        if (replacement.replaced) {
+          nextState = replacement.state;
+          events.push(...replacement.events);
+          continue; // Removal was replaced
+        }
+
         const result = returnToHand(nextState, id);
         if (result) {
           nextState = result.state;
           events.push(...result.events);
+          returnedIds.push(id);
         }
       }
 
       return {
         state: nextState,
         events,
-        succeeded: targetIds.length > 0,
-        result: { targetInstanceIds: targetIds, count: targetIds.length },
+        succeeded: returnedIds.length > 0,
+        result: { targetInstanceIds: returnedIds, count: returnedIds.length },
       };
     }
 
@@ -740,20 +770,81 @@ function executeEffectAction(
       };
     }
 
+    case "APPLY_ONE_TIME_MODIFIER": {
+      const modification = params.modification as import("./effect-types.js").Modifier;
+      const appliesTo = params.applies_to as { action: string; filter?: import("./effect-types.js").TargetFilter };
+      const expires = action.duration ?? { type: "THIS_TURN" as const };
+
+      if (!modification || !appliesTo) return { state, events, succeeded: false };
+
+      const otm: import("./effect-types.js").RuntimeOneTimeModifier = {
+        id: nanoid(),
+        appliesTo: appliesTo as any,
+        modification,
+        expires,
+        consumed: false,
+        controller,
+      };
+
+      return {
+        state: { ...state, oneTimeModifiers: [...state.oneTimeModifiers, otm as any] },
+        events,
+        succeeded: true,
+      };
+    }
+
     case "PLAYER_CHOICE":
     case "OPPONENT_CHOICE": {
-      // For now, auto-select the first option
       const options = params.options as Action[][];
       if (!options || options.length === 0) return { state, events, succeeded: false };
 
-      const chosenBranch = options[0];
-      const result = executeActionChain(state, chosenBranch, sourceCardInstanceId, controller, cardDb);
+      // Determine who chooses: PLAYER_CHOICE = controller, OPPONENT_CHOICE = opponent
+      const chooser = action.type === "OPPONENT_CHOICE"
+        ? (controller === 0 ? 1 : 0) as 0 | 1
+        : controller;
 
-      return {
-        state: result.state,
-        events: [...events, ...result.events],
-        succeeded: true,
+      // If only one option, auto-select it (no prompt needed)
+      if (options.length === 1) {
+        const result = executeActionChain(state, options[0], sourceCardInstanceId, controller, cardDb);
+        return {
+          state: result.state,
+          events: [...events, ...result.events],
+          succeeded: true,
+        };
+      }
+
+      // Build choice labels from action types or explicit labels
+      const explicitLabels = params.labels as string[] | undefined;
+      const choices = options.map((branch, i) => ({
+        id: String(i),
+        label: explicitLabels?.[i] ?? describeActionBranch(branch),
+      }));
+
+      // Build prompt description from source card
+      const choiceSourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const choiceSourceData = choiceSourceCard ? cardDb.get(choiceSourceCard.cardId) : undefined;
+      const effectDescription = choiceSourceData?.effectText ?? "Choose one";
+
+      const resumeCtx: ResumeContext = {
+        effectSourceInstanceId: sourceCardInstanceId,
+        controller,
+        pausedAction: action,
+        remainingActions: [],
+        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        validTargets: [],
       };
+
+      const pendingPrompt: PendingPromptState = {
+        promptType: "PLAYER_CHOICE",
+        options: {
+          effectDescription,
+          choices,
+        },
+        respondingPlayer: chooser,
+        resumeContext: resumeCtx,
+      };
+
+      return { state, events, succeeded: false, pendingPrompt };
     }
 
     case "OPPONENT_ACTION": {
@@ -1347,6 +1438,36 @@ function findCardInstanceById(state: GameState, instanceId: string): CardInstanc
   return null;
 }
 
+// ─── Choice Label Generation ─────────────────────────────────────────────────
+
+const ACTION_LABELS: Record<string, string> = {
+  DRAW: "Draw cards",
+  SEARCH_DECK: "Search deck",
+  KO: "KO a character",
+  RETURN_TO_HAND: "Return to hand",
+  RETURN_TO_DECK: "Return to deck",
+  MODIFY_POWER: "Modify power",
+  MODIFY_COST: "Modify cost",
+  GRANT_KEYWORD: "Grant keyword",
+  TRASH_CARD: "Trash a card",
+  TRASH_FROM_HAND: "Trash from hand",
+  GIVE_DON: "Give DON!!",
+  SET_ACTIVE: "Set active",
+  SET_REST: "Set to rest",
+  OPPONENT_ACTION: "Opponent action",
+  ADD_DON_FROM_DECK: "Add DON!! from deck",
+  PLAY_CARD: "Play a card",
+  MILL: "Trash from deck",
+};
+
+function describeActionBranch(actions: Action[]): string {
+  if (actions.length === 0) return "Do nothing";
+  const labels = actions
+    .map((a) => ACTION_LABELS[a.type] ?? a.type.replace(/_/g, " ").toLowerCase())
+    .slice(0, 2);
+  return labels.join(", then ");
+}
+
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 function markOncePerTurnUsed(state: GameState, effectBlockId: string, instanceId: string): GameState {
@@ -1474,6 +1595,30 @@ export function resumeEffectChain(
     const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
     newPlayers[controller] = { ...p, deck: newDeck, hand: newHand };
     nextState = { ...nextState, players: newPlayers };
+  }
+
+  // Resume from PLAYER_CHOICE response
+  if (action.type === "PLAYER_CHOICE" && pausedAction !== null &&
+      (pausedAction.type === "PLAYER_CHOICE" || pausedAction.type === "OPPONENT_CHOICE")) {
+    const options = (pausedAction.params?.options as Action[][]) ?? [];
+    const chosenIndex = parseInt(action.choiceId, 10);
+    const chosenBranch = options[chosenIndex];
+    if (chosenBranch) {
+      const branchResult = executeActionChain(
+        nextState,
+        chosenBranch,
+        effectSourceInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+      );
+      nextState = branchResult.state;
+      events.push(...branchResult.events);
+
+      if (branchResult.pendingPrompt) {
+        return { state: nextState, events, resolved: false, pendingPrompt: branchResult.pendingPrompt };
+      }
+    }
   }
 
   // Resume from SELECT_TARGET response

@@ -18,6 +18,7 @@ import type {
 } from "./types.js";
 import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
+import { resumeReplacement, type ReplacementResumeContext } from "./engine/replacements.js";
 import { setPlayerConnected } from "./engine/state.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain } from "./engine/effect-resolver.js";
@@ -440,17 +441,34 @@ export class GameSession implements DurableObject {
     if (!this.gameState || !this.cardDb) return;
 
     const prompt = this.gameState.pendingPrompt!;
-    const resumeCtx = prompt.resumeContext as ResumeContext;
+    const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
 
     // Clear the pending prompt before resuming
     this.gameState = { ...this.gameState, pendingPrompt: null };
 
-    const resumeResult = resumeEffectChain(this.gameState, resumeCtx, action, this.cardDb);
-    this.gameState = resumeResult.state;
+    // Route to the appropriate resume handler based on context type
+    if (resumeCtx?.type === "REPLACEMENT") {
+      const accepted = action.type !== "PASS";
+      const replacementResult = resumeReplacement(
+        this.gameState,
+        resumeCtx as unknown as ReplacementResumeContext,
+        accepted,
+        this.cardDb,
+      );
+      this.gameState = replacementResult.state;
 
-    // If the resumed chain hit another prompt, store it
-    if (resumeResult.pendingPrompt) {
-      this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      if (replacementResult.pendingPrompt) {
+        this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
+      }
+    } else {
+      // Standard effect chain resume
+      const effectResumeCtx = resumeCtx as unknown as ResumeContext;
+      const resumeResult = resumeEffectChain(this.gameState, effectResumeCtx, action, this.cardDb);
+      this.gameState = resumeResult.state;
+
+      if (resumeResult.pendingPrompt) {
+        this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      }
     }
 
     // Run start-of-turn auto phases in case this was end-of-turn
@@ -506,10 +524,33 @@ export class GameSession implements DurableObject {
     } else if (battleSubPhase === "DAMAGE_STEP" && battle && "pendingTriggerLifeCard" in battle) {
       const inactiveWs = this.getWebSocketForPlayer(inactiveIdx);
       if (inactiveWs) {
+        const triggerLifeCard = (battle as any).pendingTriggerLifeCard;
+        const triggerCardData = triggerLifeCard && this.cardDb
+          ? this.cardDb.get(triggerLifeCard.cardId)
+          : undefined;
+        // Build a CardInstance-like object for the client to display
+        const triggerCards = triggerLifeCard ? [{
+          instanceId: triggerLifeCard.instanceId,
+          cardId: triggerLifeCard.cardId,
+          zone: "LIFE" as const,
+          state: "ACTIVE" as const,
+          attachedDon: [] as any[],
+          turnPlayed: null,
+          controller: inactiveIdx as 0 | 1,
+          owner: inactiveIdx as 0 | 1,
+        }] : [];
+        const effectDescription = triggerCardData?.triggerText
+          ?? triggerCardData?.effectText
+          ?? "You may reveal this Trigger card to activate its effect";
         this.send(inactiveWs, {
           type: "game:prompt",
           promptType: "REVEAL_TRIGGER",
-          options: { optional: false, timeoutMs: 30_000 },
+          options: {
+            cards: triggerCards,
+            effectDescription,
+            optional: false,
+            timeoutMs: 30_000,
+          },
         });
       }
     }
