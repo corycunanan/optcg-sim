@@ -57,6 +57,11 @@ export function execute(
       return executeManualEffect(state, action.description);
     case "ACTIVATE_EFFECT":
       return executeActivateEffect(state, action.cardInstanceId, action.effectId, cardDb, actingPlayerIndex);
+    // Prompt responses — handled by GameSession before reaching the pipeline
+    case "SELECT_TARGET":
+    case "PLAYER_CHOICE":
+    case "ARRANGE_TOP_CARDS":
+      return { state, events: [] };
   }
 }
 
@@ -88,6 +93,9 @@ function executePlayCard(
     }
 
     nextState = moveCard(nextState, cardInstanceId, "CHARACTER");
+    // moveCard assigns a new instanceId — capture it for trigger matching
+    const newCharInstance = nextState.players[pi].characters[nextState.players[pi].characters.length - 1];
+    const charNewInstanceId = newCharInstance.instanceId;
     // Record turn played for Rush/summoning sickness
     const charIdx = nextState.players[pi].characters.findIndex(
       (c) => c.cardId === found.card.cardId && c.turnPlayed === null,
@@ -100,12 +108,13 @@ function executePlayCard(
       nextState = { ...nextState, players: newPlayers };
     }
 
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId, zone: "CHARACTER" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER" } });
 
   } else if (cardData.type === "Event") {
     // Trash the event, then the effect fires (MANUAL_EFFECT in M3)
     nextState = moveCard(nextState, cardInstanceId, "TRASH");
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId, zone: "TRASH" } });
+    const newEventInstance = nextState.players[pi].trash[0]; // trash is LIFO, newest at [0]
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH" } });
 
   } else if (cardData.type === "Stage") {
     // Trash existing stage first
@@ -115,7 +124,8 @@ function executePlayCard(
       events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: existingStage.cardId, reason: "stage_replaced" } });
     }
     nextState = moveCard(nextState, cardInstanceId, "STAGE");
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId, zone: "STAGE" } });
+    const newStageInstance = nextState.players[pi].stage!;
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newStageInstance.instanceId, zone: "STAGE" } });
   }
 
   return { state: nextState, events };
@@ -209,5 +219,6 @@ function executeActivateEffect(
   return {
     state: result.state,
     events: [...events, ...result.events],
+    ...(result.pendingPrompt && { pendingPrompt: result.pendingPrompt }),
   };
 }

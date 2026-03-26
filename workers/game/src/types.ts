@@ -13,9 +13,10 @@ export type {
   GameAction,
   ServerMessage, ClientMessage,
   PromptType, PromptOptions,
+  PendingPromptState,
 } from "../../../shared/game-types.js";
 
-import type { CardData, GameEventType, GameState } from "../../../shared/game-types.js";
+import type { CardData, GameEventType, GameState, PendingPromptState } from "../../../shared/game-types.js";
 
 // ─── Engine-internal types ────────────────────────────────────────────────────
 
@@ -29,6 +30,16 @@ export interface ExecuteResult {
   state: GameState;
   events: PendingEvent[];
   damagedPlayerIndex?: 0 | 1; // set when a leader takes damage (for defeat check)
+  pendingPrompt?: PendingPromptState;
+}
+
+export interface ResumeContext {
+  effectSourceInstanceId: string;
+  controller: 0 | 1;
+  pausedAction: import("./engine/effect-types.js").Action | null;
+  remainingActions: import("./engine/effect-types.js").Action[];
+  resultRefs: [string, unknown][];
+  validTargets: string[];
 }
 
 // ─── Init payload (Next.js → DO on game start) ────────────────────────────────
@@ -44,6 +55,8 @@ export interface PlayerInitData {
   userId: string;
   deck: DeckCardData[];
   leader: DeckCardData;
+  /** Dev-only: move all cards with SEARCH_DECK effects to the top of the deck before dealing */
+  debug?: { searchersFirst?: boolean };
 }
 
 export interface DeckCardData {

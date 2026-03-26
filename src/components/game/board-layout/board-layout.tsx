@@ -51,6 +51,8 @@ import { MidZone, type BattleInfo } from "./mid-zone";
 import { ArrangeTopCardsModal } from "../arrange-top-cards-modal";
 import { SelectTargetModal } from "../select-target-modal";
 import { PlayerChoiceModal } from "../player-choice-modal";
+import { OptionalEffectModal } from "../optional-effect-modal";
+import { RevealTriggerModal } from "../reveal-trigger-modal";
 import { DroppableTrashZone } from "./trash-zone";
 
 export interface BoardLayoutProps {
@@ -693,6 +695,7 @@ export function BoardLayout({
             cards={activePrompt.options.cards}
             effectDescription={activePrompt.options.effectDescription ?? "Look at the top cards of your deck"}
             canSendToBottom={activePrompt.options.canSendToBottom ?? true}
+            validTargets={activePrompt.options.validTargets}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={() => setIsPromptHidden(true)}
@@ -723,6 +726,30 @@ export function BoardLayout({
           <PlayerChoiceModal
             effectDescription={activePrompt.options.effectDescription ?? "Choose an effect"}
             choices={activePrompt.options.choices}
+            isHidden={isPromptHidden}
+            onHide={() => setIsPromptHidden(true)}
+            onAction={onAction}
+          />
+        )}
+
+      {activePrompt?.promptType === "OPTIONAL_EFFECT" && (
+        <OptionalEffectModal
+          effectDescription={activePrompt.options.effectDescription ?? "You may activate this effect"}
+          card={activePrompt.options.cards?.[0]}
+          cardDb={cardDb}
+          isHidden={isPromptHidden}
+          onHide={() => setIsPromptHidden(true)}
+          onAction={onAction}
+        />
+      )}
+
+      {activePrompt?.promptType === "REVEAL_TRIGGER" &&
+        activePrompt.options.cards &&
+        activePrompt.options.cards.length > 0 && (
+          <RevealTriggerModal
+            cards={activePrompt.options.cards}
+            effectDescription={activePrompt.options.effectDescription ?? "You may reveal this Trigger card to activate its effect"}
+            cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={() => setIsPromptHidden(true)}
             onAction={onAction}

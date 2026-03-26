@@ -170,6 +170,15 @@ export interface GameEvent {
   timestamp: number;
 }
 
+// ─── Pending Prompt State ─────────────────────────────────────────────────────
+
+export interface PendingPromptState {
+  promptType: PromptType;
+  options: PromptOptions;
+  respondingPlayer: 0 | 1;
+  resumeContext: unknown; // cast to ResumeContext in worker
+}
+
 // ─── Game State ───────────────────────────────────────────────────────────────
 
 export interface GameState {
@@ -182,6 +191,7 @@ export interface GameState {
   scheduledActions: ScheduledActionEntry[];
   oneTimeModifiers: ActiveOneTimeModifier[];
   triggerRegistry: RegisteredTrigger[];
+  pendingPrompt: PendingPromptState | null;
   // Log
   eventLog: GameEvent[];
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";

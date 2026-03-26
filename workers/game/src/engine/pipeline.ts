@@ -12,7 +12,7 @@
  * 7. Rule Processing     (defeat checks)
  */
 
-import type { CardData, GameAction, GameState, ExecuteResult } from "../types.js";
+import type { CardData, GameAction, GameState, ExecuteResult, PendingPromptState } from "../types.js";
 import { validate } from "./validation.js";
 import { execute } from "./execute.js";
 import { emitEvent } from "./events.js";
@@ -39,6 +39,7 @@ export interface PipelineResult {
   valid: boolean;
   error?: string;
   gameOver?: { winner: 0 | 1 | null; reason: string };
+  pendingPrompt?: PendingPromptState;
 }
 
 export function runPipeline(
@@ -85,8 +86,18 @@ export function runPipeline(
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
   nextState = execResult.state;
 
+  if (execResult.pendingPrompt) {
+    nextState = { ...nextState, pendingPrompt: execResult.pendingPrompt };
+    return { state: nextState, valid: true, pendingPrompt: execResult.pendingPrompt };
+  }
+
   // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
   nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb);
+
+  // If triggers paused for player input, skip steps 6-7 and surface the prompt
+  if (nextState.pendingPrompt) {
+    return { state: nextState, valid: true, pendingPrompt: nextState.pendingPrompt };
+  }
 
   // Step 6: Recalculate Modifiers — expire effects whose duration ended
   nextState = recalculateModifiers(nextState, actionToExecute, cardDb);
@@ -126,12 +137,14 @@ function fireEventsAndTriggers(
     };
 
     const matched = matchTriggersForEvent(state, gameEvent, cardDb);
+    console.log(`[pipeline] event=${pendingEvent.type} registry=${state.triggerRegistry.length} matched=${matched.length}`);
     if (matched.length === 0) continue;
 
     const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
 
     // Resolve each matched trigger's effect block
     for (const match of ordered) {
+      console.log(`[pipeline] resolving trigger blockId=${match.effectBlock.id} card=${match.trigger.sourceCardInstanceId}`);
       const result = resolveEffect(
         state,
         match.effectBlock,
@@ -139,7 +152,14 @@ function fireEventsAndTriggers(
         match.trigger.controller,
         cardDb,
       );
+      console.log(`[pipeline] resolveEffect resolved=${result.resolved} hasPendingPrompt=${!!result.pendingPrompt}`);
       state = result.state;
+
+      if (result.pendingPrompt) {
+        // Store pause state and stop processing further triggers
+        state = { ...state, pendingPrompt: result.pendingPrompt };
+        return state;
+      }
 
       // Emit events from effect resolution (which may trigger further effects)
       for (const event of result.events) {
@@ -182,15 +202,21 @@ function handleZoneChangeTriggers(
     if (event.type === "CARD_PLAYED") {
       // Card entered the field — register triggers
       const cardId = event.payload?.cardId as string | undefined;
+      const cardInstanceId = event.payload?.cardInstanceId as string | undefined;
       if (!cardId) continue;
 
       const cardData = cardDb.get(cardId);
+      console.log(`[zone] CARD_PLAYED cardId=${cardId} hasSchema=${!!cardData?.effectSchema} instanceId=${cardInstanceId}`);
       if (!cardData) continue;
 
-      // Find the card instance
-      const instance = findNewlyPlayedCard(state, cardId);
+      // Use instanceId from event (now correctly set to the post-moveCard instanceId)
+      const instance = cardInstanceId
+        ? findCardInstanceAnywhere(state, cardInstanceId)
+        : findNewlyPlayedCard(state, cardId);
+      console.log(`[zone] instance found=${!!instance} zone=${instance?.zone} triggersBefore=${state.triggerRegistry.length}`);
       if (instance) {
         state = registerTriggersForCard(state, instance, cardData);
+        console.log(`[zone] triggersAfter=${state.triggerRegistry.length}`);
       }
     }
 
@@ -317,6 +343,24 @@ function findNewlyPlayedCard(
     if (char) return char;
     // Check stage
     if (player.stage?.cardId === cardId) return player.stage;
+  }
+  return null;
+}
+
+/** Find a card instance by instanceId in all zones (field, hand, trash, etc.) */
+function findCardInstanceAnywhere(
+  state: GameState,
+  instanceId: string,
+): import("../types.js").CardInstance | null {
+  for (const player of state.players) {
+    if (player.leader.instanceId === instanceId) return player.leader;
+    const char = player.characters.find((c) => c.instanceId === instanceId);
+    if (char) return char;
+    if (player.stage?.instanceId === instanceId) return player.stage;
+    const hand = player.hand.find((c) => c.instanceId === instanceId);
+    if (hand) return hand;
+    const trash = player.trash.find((c) => c.instanceId === instanceId);
+    if (trash) return trash;
   }
   return null;
 }

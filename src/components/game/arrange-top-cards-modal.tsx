@@ -116,6 +116,8 @@ interface ArrangeTopCardsModalProps {
   cards: CardInstance[];
   effectDescription: string;
   canSendToBottom: boolean;
+  /** If provided, only these instanceIds may be selected to add to hand */
+  validTargets?: string[];
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -126,6 +128,7 @@ export function ArrangeTopCardsModal({
   cards: initialCards,
   effectDescription,
   canSendToBottom,
+  validTargets,
   cardDb,
   isHidden,
   onHide,
@@ -139,6 +142,10 @@ export function ArrangeTopCardsModal({
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   if (isHidden) return null;
+
+  // If validTargets is provided, only those cards can be selected
+  const canSelectCard = (instanceId: string) =>
+    validTargets === undefined || validTargets.includes(instanceId);
 
   function handleDragStart(i: number) {
     setDragIndex(i);
@@ -173,11 +180,16 @@ export function ArrangeTopCardsModal({
     setStep(2);
   }
 
+  function handleSkip() {
+    // Keep no card — go straight to arrange step
+    setKeptCardInstanceId("");
+    setStep(2);
+  }
+
   function handleSend(destination: "top" | "bottom") {
-    if (!keptCardInstanceId) return;
     onAction({
       type: "ARRANGE_TOP_CARDS",
-      keptCardInstanceId,
+      keptCardInstanceId: keptCardInstanceId ?? "",
       orderedInstanceIds: orderedCards.map((c) => c.instanceId),
       destination,
     });
@@ -216,10 +228,10 @@ export function ArrangeTopCardsModal({
                 card={card}
                 cardDb={cardDb}
                 selected={step === 1 && selectedId === card.instanceId}
-                dimmed={dragIndex !== null && dragIndex === i}
+                dimmed={step === 1 && !canSelectCard(card.instanceId)}
                 isDragOver={dropIndex === i}
                 onSelect={() => {
-                  if (step === 1) {
+                  if (step === 1 && canSelectCard(card.instanceId)) {
                     setSelectedId((prev) =>
                       prev === card.instanceId ? null : card.instanceId,
                     );
@@ -243,21 +255,21 @@ export function ArrangeTopCardsModal({
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gb-border">
           {step === 1 && (
-            <ModalBtn accent disabled={!selectedId} onClick={handleAddToHand}>
-              Add Card to Hand
-            </ModalBtn>
-          )}
-          {step === 2 && (
             <>
-              {canSendToBottom && (
-                <ModalBtn onClick={() => handleSend("bottom")}>
-                  Send to Bottom
+              {validTargets !== undefined && (
+                <ModalBtn onClick={handleSkip}>
+                  Keep None
                 </ModalBtn>
               )}
-              <ModalBtn accent onClick={() => handleSend("top")}>
-                Send to Top
+              <ModalBtn accent disabled={!selectedId} onClick={handleAddToHand}>
+                Add to Hand
               </ModalBtn>
             </>
+          )}
+          {step === 2 && (
+            <ModalBtn accent onClick={() => handleSend(canSendToBottom ? "bottom" : "top")}>
+              {canSendToBottom ? "Place at Bottom" : "Place on Top"}
+            </ModalBtn>
           )}
         </div>
       </div>

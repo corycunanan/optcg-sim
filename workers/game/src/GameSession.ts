@@ -13,11 +13,14 @@ import type {
   GameInitPayload,
   GameState,
   ServerMessage,
+  PendingPromptState,
+  ResumeContext,
 } from "./types.js";
 import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
 import { setPlayerConnected } from "./engine/state.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
+import { resumeEffectChain } from "./engine/effect-resolver.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -200,6 +203,18 @@ export class GameSession implements DurableObject {
     this.broadcast({ type: "game:state", state: this.gameState! });
     this.broadcast({ type: "game:player_reconnected", playerIndex });
 
+    // Re-send pending prompt to the reconnecting player if they need to respond
+    if (this.gameState!.pendingPrompt?.respondingPlayer === playerIndex) {
+      const playerWs = this.getWebSocketForPlayer(playerIndex as 0 | 1);
+      if (playerWs) {
+        this.send(playerWs, {
+          type: "game:prompt",
+          promptType: this.gameState!.pendingPrompt.promptType,
+          options: this.gameState!.pendingPrompt.options,
+        });
+      }
+    }
+
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -313,6 +328,27 @@ export class GameSession implements DurableObject {
       return;
     }
 
+    // If an effect is awaiting player input, only allow prompt responses
+    if (this.gameState.pendingPrompt) {
+      const isPromptResponse =
+        action.type === "SELECT_TARGET" ||
+        action.type === "PLAYER_CHOICE" ||
+        action.type === "ARRANGE_TOP_CARDS" ||
+        action.type === "PASS";
+      if (isPromptResponse) {
+        if (playerIndex !== this.gameState.pendingPrompt.respondingPlayer) {
+          this.send(ws, { type: "game:error", message: "Waiting for opponent to respond to prompt" });
+          return;
+        }
+        await this.resumeFromPrompt(ws, playerIndex, action);
+        return;
+      }
+      if (action.type !== "CONCEDE") {
+        this.send(ws, { type: "game:error", message: "Waiting for player to respond to prompt" });
+        return;
+      }
+    }
+
     // CONCEDE is allowed even while "paused" for opponent away — player may always resign.
     if (action.type !== "CONCEDE") {
       // Only the active player can act, except for: PASS, DECLARE_BLOCKER, USE_COUNTER,
@@ -368,7 +404,11 @@ export class GameSession implements DurableObject {
     this.broadcast({ type: "game:update", action, state: this.gameState });
 
     // Send prompts if a player input is required
-    this.sendPendingPrompts();
+    if (this.gameState.pendingPrompt) {
+      this.sendEffectPrompt(this.gameState.pendingPrompt);
+    } else {
+      this.sendPendingPrompts();
+    }
   }
 
   /**
@@ -392,8 +432,62 @@ export class GameSession implements DurableObject {
     return current;
   }
 
+  private async resumeFromPrompt(
+    _ws: WebSocket,
+    _playerIndex: 0 | 1,
+    action: GameAction,
+  ): Promise<void> {
+    if (!this.gameState || !this.cardDb) return;
+
+    const prompt = this.gameState.pendingPrompt!;
+    const resumeCtx = prompt.resumeContext as ResumeContext;
+
+    // Clear the pending prompt before resuming
+    this.gameState = { ...this.gameState, pendingPrompt: null };
+
+    const resumeResult = resumeEffectChain(this.gameState, resumeCtx, action, this.cardDb);
+    this.gameState = resumeResult.state;
+
+    // If the resumed chain hit another prompt, store it
+    if (resumeResult.pendingPrompt) {
+      this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+    }
+
+    // Run start-of-turn auto phases in case this was end-of-turn
+    if (!this.gameState.pendingPrompt) {
+      this.gameState = this.runStartOfTurnAutoPhases(this.gameState);
+    }
+
+    await this.persist();
+    this.broadcast({ type: "game:update", action, state: this.gameState });
+
+    if (this.gameState.pendingPrompt) {
+      this.sendEffectPrompt(this.gameState.pendingPrompt);
+    } else {
+      this.sendPendingPrompts();
+    }
+  }
+
+  private sendEffectPrompt(prompt: PendingPromptState): void {
+    const playerWs = this.getWebSocketForPlayer(prompt.respondingPlayer);
+    if (playerWs) {
+      this.send(playerWs, {
+        type: "game:prompt",
+        promptType: prompt.promptType,
+        options: prompt.options,
+      });
+    }
+  }
+
   private sendPendingPrompts(): void {
     if (!this.gameState) return;
+
+    // Effect prompt takes priority over battle prompts
+    if (this.gameState.pendingPrompt) {
+      this.sendEffectPrompt(this.gameState.pendingPrompt);
+      return;
+    }
+
     const { battleSubPhase, battle } = this.gameState.turn;
     const inactiveIdx = this.gameState.turn.activePlayerIndex === 0 ? 1 : 0;
 

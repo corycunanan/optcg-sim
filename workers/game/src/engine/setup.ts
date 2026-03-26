@@ -17,6 +17,7 @@ import type {
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
 import { injectSchemasIntoCardDb } from "./schema-registry.js";
+import { registerTriggersForCard } from "./triggers.js";
 
 export function buildInitialState(payload: GameInitPayload): {
   state: GameState;
@@ -38,9 +39,11 @@ export function buildInitialState(payload: GameInitPayload): {
   const [p0State, p0Deck] = buildPlayerDeck(payload.player1, 0 as const, cardDb);
   const [p1State, p1Deck] = buildPlayerDeck(payload.player2, 1 as const, cardDb);
 
-  // Shuffle decks
-  const shuffled0 = shuffleDeck(p0Deck);
-  const shuffled1 = shuffleDeck(p1Deck);
+  // Shuffle decks; in dev (searchersFirst) move SEARCH_DECK cards to the front
+  const searcherIds0 = payload.player1.debug?.searchersFirst ? getSearchDeckCardIds(cardDb) : undefined;
+  const searcherIds1 = payload.player2.debug?.searchersFirst ? getSearchDeckCardIds(cardDb) : undefined;
+  const shuffled0 = prioritizeDeck(shuffleDeck(p0Deck), searcherIds0);
+  const shuffled1 = prioritizeDeck(shuffleDeck(p1Deck), searcherIds1);
 
   // Deal opening hands (5 cards each)
   const [hand0, remainingDeck0] = drawN(shuffled0, 5);
@@ -92,7 +95,7 @@ export function buildInitialState(payload: GameInitPayload): {
     actionsPerformedThisTurn: [],
   };
 
-  const state: GameState = {
+  let state: GameState = {
     id: payload.gameId,
     players: [player0, player1],
     turn,
@@ -101,11 +104,21 @@ export function buildInitialState(payload: GameInitPayload): {
     scheduledActions: [],
     oneTimeModifiers: [],
     triggerRegistry: [],
+    pendingPrompt: null,
     eventLog: [],
     status: "IN_PROGRESS",
     winner: null,
     winReason: null,
   };
+
+  // Register leader triggers — leaders enter the LEADER zone at setup, not via PLAY_CARD,
+  // so we must manually seed the trigger registry for both players' leaders here.
+  for (const player of state.players) {
+    const leaderData = cardDb.get(player.leader.cardId);
+    if (leaderData) {
+      state = registerTriggersForCard(state, player.leader, leaderData);
+    }
+  }
 
   return { state, cardDb };
 }
@@ -197,6 +210,45 @@ function buildDonDeck(owner: 0 | 1): DonInstance[] {
     attachedTo: null,
   }));
   void owner;
+}
+
+/**
+ * Returns the set of cardIds in the given cardDb that have at least one SEARCH_DECK action.
+ * Used in dev mode to put searcher cards at the top of the deck.
+ */
+function getSearchDeckCardIds(cardDb: Map<string, CardData>): Set<string> {
+  const ids = new Set<string>();
+  for (const [cardId, data] of cardDb.entries()) {
+    const schema = data.effectSchema as import("./effect-types.js").EffectSchema | null;
+    if (schema?.effects.some((b) => b.actions?.some((a) => a.type === "SEARCH_DECK"))) {
+      ids.add(cardId);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Move cards whose cardId is in priorityIds to the front of the deck (one copy each),
+ * leaving all other cards in their shuffled positions after them.
+ * Used in dev mode to guarantee searcher cards appear in the opening hand.
+ */
+function prioritizeDeck(deck: CardInstance[], priorityIds?: Set<string>): CardInstance[] {
+  if (!priorityIds || priorityIds.size === 0) return deck;
+
+  const priority: CardInstance[] = [];
+  const rest: CardInstance[] = [];
+  const seen = new Set<string>(); // track which cardIds we've already placed (one copy each)
+
+  for (const card of deck) {
+    if (priorityIds.has(card.cardId) && !seen.has(card.cardId)) {
+      seen.add(card.cardId);
+      priority.push(card);
+    } else {
+      rest.push(card);
+    }
+  }
+
+  return [...priority, ...rest];
 }
 
 function shuffleDeck(cards: CardInstance[]): CardInstance[] {

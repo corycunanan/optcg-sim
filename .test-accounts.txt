@@ -1,9 +1,21 @@
-  ┌───────────┬──────────────────┬─────────────┐
-  │ Username  │      Email       │  Password   │
-  ├───────────┼──────────────────┼─────────────┤
-  │ Luffy_D   │ luffy@optcg.test │ Gomugomu1!  │
-  ├───────────┼──────────────────┼─────────────┤
-  │ Roronoa_Z │ zoro@optcg.test  │ Santoryu1!  │
-  ├───────────┼──────────────────┼─────────────┤
-  │ Nami_Chan │ nami@optcg.test  │ BelliRain1! │
-  └───────────┴──────────────────┴─────────────┘
+┌───────────┬──────────────────┬─────────────┐
+│ Username  │      Email       │  Password   │
+├───────────┼──────────────────┼─────────────┤
+│ Luffy_D   │ luffy@optcg.test │ Gomugomu1!  │
+├───────────┼──────────────────┼─────────────┤
+│ Roronoa_Z │ zoro@optcg.test  │ Santoryu1!  │
+├───────────┼──────────────────┼─────────────┤
+│ Nami_Chan │ nami@optcg.test  │ BelliRain1! │
+└───────────┴──────────────────┴─────────────┘
+
+Luffy_D
+luffy@optcg.test
+Gomugomu1! 
+
+Roronoa_Z
+zoro@optcg.test
+Santoryu1!
+
+Nami_Chan
+nami@optcg.test
+BelliRain1!

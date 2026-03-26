@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Build init payload for the Durable Object
+    const devDebug = process.env.NODE_ENV === "development" ? { searchersFirst: true } : undefined;
     const payload = {
       gameId: gameSession.id,
       format: lobby.format,
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
           quantity: dc.quantity,
           cardData: toCardData(dc.card),
         })),
+        ...(devDebug && { debug: devDebug }),
       },
       player2: {
         userId,
@@ -165,6 +167,7 @@ export async function POST(request: NextRequest) {
           quantity: dc.quantity,
           cardData: toCardData(dc.card),
         })),
+        ...(devDebug && { debug: devDebug }),
       },
     };
 

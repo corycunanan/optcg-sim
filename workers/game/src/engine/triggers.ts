@@ -203,6 +203,11 @@ function matchesKeywordTrigger(
     if (cardInEvent && cardInEvent !== sourceCard.instanceId) return false;
   }
 
+  // ON_OPPONENT_ATTACK: only fires when it is the opponent's turn to attack
+  if (trigger.keyword === "ON_OPPONENT_ATTACK") {
+    if (state.turn.activePlayerIndex === sourceCard.controller) return false;
+  }
+
   // Turn restriction
   if (trigger.turn_restriction) {
     const isOwnersTurn = state.turn.activePlayerIndex === sourceCard.controller;

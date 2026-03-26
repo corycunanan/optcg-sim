@@ -25,7 +25,10 @@ import type {
   CardData,
   CardInstance,
   GameState,
+  GameAction,
   PendingEvent,
+  PendingPromptState,
+  ResumeContext,
 } from "../types.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
 import { nanoid } from "../util/nanoid.js";
@@ -34,6 +37,7 @@ export interface EffectResolverResult {
   state: GameState;
   events: PendingEvent[];
   resolved: boolean;
+  pendingPrompt?: PendingPromptState;
 }
 
 /**
@@ -60,10 +64,28 @@ export function resolveEffect(
     }
   }
 
-  // Step 2: Check optional flag
-  // In a real implementation, this would prompt the player.
-  // For now, auto-resolve: always activate if conditions are met.
-  // (The WebSocket layer will handle prompting in the future.)
+  // Step 2: Check optional flag — prompt the player before paying costs
+  if (block.flags?.optional) {
+    const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+    const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+    const effectDescription = sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "You may activate this effect.";
+    const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
+    const resumeCtx: ResumeContext = {
+      effectSourceInstanceId: sourceCardInstanceId,
+      controller,
+      pausedAction: null,
+      remainingActions: block.actions ?? [],
+      resultRefs: [],
+      validTargets: [],
+    };
+    const pendingPrompt: PendingPromptState = {
+      promptType: "OPTIONAL_EFFECT",
+      options: { effectDescription, cards },
+      respondingPlayer: controller,
+      resumeContext: resumeCtx,
+    };
+    return { state, events, resolved: false, pendingPrompt };
+  }
 
   // Step 3: Pay costs
   if (block.costs && block.costs.length > 0) {
@@ -93,6 +115,10 @@ export function resolveEffect(
     );
     state = chainResult.state;
     events.push(...chainResult.events);
+
+    if (chainResult.pendingPrompt) {
+      return { state, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+    }
   }
 
   return { state, events, resolved: true };
@@ -242,6 +268,7 @@ function payCosts(
 interface ChainResult {
   state: GameState;
   events: PendingEvent[];
+  pendingPrompt?: PendingPromptState;
 }
 
 function executeActionChain(
@@ -250,9 +277,10 @@ function executeActionChain(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
+  initialResultRefs?: Map<string, EffectResult>,
 ): ChainResult {
   const events: PendingEvent[] = [];
-  const resultRefs = new Map<string, EffectResult>();
+  const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
   let lastActionSucceeded = true;
 
   for (let i = 0; i < actions.length; i++) {
@@ -295,6 +323,21 @@ function executeActionChain(
     events.push(...result.events);
     lastActionSucceeded = result.succeeded;
 
+    if (result.pendingPrompt) {
+      // Pause — attach remaining actions into resume context and surface the prompt
+      const ctx = result.pendingPrompt.resumeContext as ResumeContext;
+      const updatedCtx: ResumeContext = {
+        ...ctx,
+        remainingActions: actions.slice(i + 1),
+        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+      };
+      return {
+        state: result.state,
+        events,
+        pendingPrompt: { ...result.pendingPrompt, resumeContext: updatedCtx },
+      };
+    }
+
     // Store result reference
     if (action.result_ref && result.result) {
       resultRefs.set(action.result_ref, result.result);
@@ -311,6 +354,7 @@ interface ActionResult {
   events: PendingEvent[];
   succeeded: boolean;
   result?: EffectResult;
+  pendingPrompt?: PendingPromptState;
 }
 
 function executeEffectAction(
@@ -320,6 +364,7 @@ function executeEffectAction(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -356,8 +401,11 @@ function executeEffectAction(
       const amount = resolveAmount(params.amount as number | { type: string }, resultRefs);
       const duration = action.duration ?? { type: "THIS_TURN" as const };
 
-      // Resolve target(s) — for now, auto-select based on target spec
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       // Create an active effect entry
@@ -399,7 +447,11 @@ function executeEffectAction(
     case "GRANT_KEYWORD": {
       const keyword = params.keyword as string;
       const duration = action.duration ?? { type: "THIS_TURN" as const };
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       const effect: RuntimeActiveEffect = {
@@ -428,7 +480,11 @@ function executeEffectAction(
     }
 
     case "KO": {
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       let nextState = state;
@@ -449,7 +505,11 @@ function executeEffectAction(
     }
 
     case "RETURN_TO_HAND": {
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       let nextState = state;
@@ -477,12 +537,16 @@ function executeEffectAction(
 
       const p = state.players[controller];
       const topCards = p.deck.slice(0, Math.min(lookAt, p.deck.length));
+      console.log(`[search] SEARCH_DECK controller=${controller} deckSize=${p.deck.length} topCards=${topCards.length} filter=${JSON.stringify(filter)}`);
 
-      // Find matching cards
+      if (topCards.length === 0) {
+        return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };
+      }
+
+      // Find matching cards (valid picks)
       const matching = topCards.filter((c) => {
         const data = cardDb.get(c.cardId);
         if (!data) return false;
-        // Basic filter matching
         if (filter.traits) {
           if (!filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
         }
@@ -495,36 +559,37 @@ function executeEffectAction(
         return true;
       });
 
-      // Pick up to N
-      const picked = matching.slice(0, pickUpTo);
-      const pickedIds = new Set(picked.map((c) => c.instanceId));
-      const remaining = topCards.filter((c) => !pickedIds.has(c.instanceId));
-      const restOfDeck = p.deck.slice(Math.min(lookAt, p.deck.length));
+      // All matching cards are selectable — pickUpTo limits how many the player can keep, not which are shown
+      const validTargets = matching.map((c) => c.instanceId);
+      console.log(`[search] matching=${matching.length} validTargets=${validTargets.length} building ARRANGE_TOP_CARDS prompt`);
 
-      // Add picked to hand
-      const newHand = [...p.hand, ...picked.map((c) => ({ ...c, zone: "HAND" as const }))];
+      // Build effect description from source card
+      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+      const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck.";
 
-      // Place rest at destination
-      let newDeck: CardInstance[];
-      if (restDest === "BOTTOM") {
-        newDeck = [...restOfDeck, ...remaining];
-      } else {
-        newDeck = [...remaining, ...restOfDeck];
-      }
-
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, deck: newDeck, hand: newHand };
-
-      for (const card of picked) {
-        events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId, source: "search" } });
-      }
-
-      return {
-        state: { ...state, players: newPlayers },
-        events,
-        succeeded: picked.length > 0,
-        result: { targetInstanceIds: picked.map((c) => c.instanceId), count: picked.length },
+      // Pause — ask the player to pick a card (ARRANGE_TOP_CARDS prompt)
+      const resumeCtx: ResumeContext = {
+        effectSourceInstanceId: sourceCardInstanceId,
+        controller,
+        pausedAction: action,
+        remainingActions: [],
+        resultRefs: [],
+        validTargets,
       };
+      const pendingPrompt: PendingPromptState = {
+        promptType: "ARRANGE_TOP_CARDS",
+        options: {
+          cards: topCards,
+          effectDescription,
+          canSendToBottom: restDest.toUpperCase() === "BOTTOM",
+          validTargets,
+        },
+        respondingPlayer: controller,
+        resumeContext: resumeCtx,
+      };
+
+      return { state, events, succeeded: false, pendingPrompt };
     }
 
     case "MILL": {
@@ -628,7 +693,11 @@ function executeEffectAction(
     case "APPLY_PROHIBITION": {
       const prohibType = params.prohibition_type as string;
       const duration = action.duration ?? { type: "THIS_TURN" as const };
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
 
       const prohibition: import("./effect-types.js").RuntimeProhibition = {
         id: nanoid(),
@@ -733,7 +802,11 @@ function executeEffectAction(
     }
 
     case "SET_ACTIVE": {
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       let nextState = state;
 
       for (const id of targetIds) {
@@ -744,7 +817,11 @@ function executeEffectAction(
     }
 
     case "SET_REST": {
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       let nextState = state;
 
       for (const id of targetIds) {
@@ -757,7 +834,11 @@ function executeEffectAction(
 
     case "GIVE_DON": {
       const amount = (params.amount as number) ?? 1;
-      const targetIds = resolveTargetInstances(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
       if (targetIds.length === 0) return { state, events, succeeded: false };
 
       let nextState = state;
@@ -860,7 +941,144 @@ function executeEffectAction(
 
 // ─── Target Resolution ────────────────────────────────────────────────────────
 
-function resolveTargetInstances(
+/**
+ * Returns ALL valid target candidates — no count limit applied.
+ * Use this before deciding whether to prompt the player.
+ */
+function computeAllValidTargets(
+  state: GameState,
+  target: import("./effect-types.js").Target | undefined,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+  _resultRefs: Map<string, EffectResult>,
+): string[] {
+  if (!target) return [];
+  const targetType = target.type;
+  if (!targetType) return [];
+
+  switch (targetType) {
+    case "SELF": return [sourceCardInstanceId];
+    case "YOUR_LEADER": return [state.players[controller].leader.instanceId];
+    case "OPPONENT_LEADER": {
+      const opp = controller === 0 ? 1 : 0;
+      return [state.players[opp].leader.instanceId];
+    }
+    case "ALL_YOUR_CHARACTERS":
+      return state.players[controller].characters.map((c) => c.instanceId);
+    case "ALL_OPPONENT_CHARACTERS": {
+      const opp = controller === 0 ? 1 : 0;
+      return state.players[opp].characters.map((c) => c.instanceId);
+    }
+    case "CHARACTER":
+    case "LEADER_OR_CHARACTER": {
+      const ctrl = target.controller ?? "SELF";
+      const pi = ctrl === "SELF" ? controller : ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : -1;
+      let candidates: import("../types.js").CardInstance[] = [];
+      if (pi === -1) {
+        candidates = [...state.players[0].characters, ...state.players[1].characters];
+        if (targetType === "LEADER_OR_CHARACTER") candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
+      } else {
+        candidates = [...state.players[pi].characters];
+        if (targetType === "LEADER_OR_CHARACTER") candidates = [state.players[pi].leader, ...candidates];
+      }
+      if (target.filter) {
+        candidates = candidates.filter((c) => {
+          if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
+          return matchesFilterForTarget(c, target.filter!, cardDb, state);
+        });
+      }
+      if (target.self_ref) return candidates.filter((c) => c.instanceId === sourceCardInstanceId).map((c) => c.instanceId);
+      return candidates.map((c) => c.instanceId);
+    }
+    case "CARD_IN_HAND": {
+      const ctrl = target.controller ?? "SELF";
+      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
+      let candidates = state.players[pi].hand;
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      return candidates.map((c) => c.instanceId);
+    }
+    default: return [];
+  }
+}
+
+function autoSelectTargets(
+  target: import("./effect-types.js").Target | undefined,
+  allValidIds: string[],
+): string[] {
+  if (!target || allValidIds.length === 0) return [];
+  const count = target.count;
+  if (!count) return allValidIds.slice(0, 1);
+  if ("all" in count) return allValidIds;
+  if ("exact" in count) return allValidIds.slice(0, count.exact);
+  if ("up_to" in count) return allValidIds.slice(0, count.up_to);
+  if ("any_number" in count) return allValidIds;
+  return allValidIds.slice(0, 1);
+}
+
+function needsPlayerTargetSelection(
+  target: import("./effect-types.js").Target | undefined,
+  allValidIds: string[],
+): boolean {
+  if (!target) return false;
+  if (!target.type) return false;
+  // Deterministic targets — never prompt
+  const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS"];
+  if (auto.includes(target.type)) return false;
+  if (target.self_ref) return false;
+  const count = target.count;
+  if (!count) return allValidIds.length > 1;
+  if ("all" in count || "any_number" in count) return false;
+  const maxCount = "exact" in count ? count.exact : "up_to" in count ? count.up_to : 1;
+  return allValidIds.length > maxCount;
+}
+
+function buildSelectTargetPrompt(
+  state: GameState,
+  action: import("./effect-types.js").Action,
+  allValidIds: string[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const count = action.target?.count;
+  const countMin = (count && "exact" in count) ? count.exact : 0;
+  const countMax = !count ? 1
+    : "exact" in count ? count.exact
+    : "up_to" in count ? count.up_to
+    : allValidIds.length;
+
+  const cards: import("../types.js").CardInstance[] = [];
+  for (const id of allValidIds) {
+    const c = findCardInstanceById(state, id);
+    if (c) cards.push(c);
+  }
+
+  const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const effectDescription = sourceCardData?.effectText ?? "";
+
+  const resumeCtx: ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [], // filled in by executeActionChain
+    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    validTargets: allValidIds,
+  };
+
+  const pendingPrompt: PendingPromptState = {
+    promptType: "SELECT_TARGET",
+    options: { cards, validTargets: allValidIds, effectDescription, countMin, countMax, ctaLabel: "Confirm" },
+    respondingPlayer: controller,
+    resumeContext: resumeCtx,
+  };
+
+  return { state, events: [], succeeded: false, pendingPrompt };
+}
+
+export function resolveTargetInstances(
   state: GameState,
   target: import("./effect-types.js").Target | undefined,
   controller: 0 | 1,
@@ -1184,4 +1402,125 @@ function computeExpiry(duration: Duration, state: GameState): ExpiryTiming {
     default:
       return { wave: "END_OF_TURN", turn: state.turn.number };
   }
+}
+
+// ─── Resume after player prompt response ──────────────────────────────────────
+
+export function resumeEffectChain(
+  state: GameState,
+  resumeCtx: ResumeContext,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+): EffectResolverResult {
+  const {
+    effectSourceInstanceId,
+    controller,
+    pausedAction,
+    remainingActions,
+    resultRefs: resultRefsEntries,
+    validTargets,
+  } = resumeCtx;
+
+  const resultRefs = new Map<string, EffectResult>(
+    resultRefsEntries.map(([k, v]) => [k, v as EffectResult]),
+  );
+  const events: PendingEvent[] = [];
+  let nextState = state;
+
+  // Player skipped the optional effect
+  if (action.type === "PASS") {
+    return { state, events, resolved: false };
+  }
+  if (action.type === "PLAYER_CHOICE" && action.choiceId === "skip") {
+    return { state, events, resolved: false };
+  }
+
+  // Resume from ARRANGE_TOP_CARDS response (SEARCH_DECK)
+  if (action.type === "ARRANGE_TOP_CARDS" && pausedAction !== null && pausedAction.type === "SEARCH_DECK") {
+    const params = pausedAction.params ?? {} as any;
+    const restDest = ((params as any).rest_destination as string) ?? "BOTTOM";
+
+    const p = nextState.players[controller];
+    const keptId = action.keptCardInstanceId;
+    const ordered = action.orderedInstanceIds ?? [];
+
+    // Cards being removed from deck = kept card + arranged rest
+    const removedIds = new Set(ordered);
+    if (keptId) removedIds.add(keptId);
+    const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
+
+    // Add kept card to hand
+    let newHand = [...p.hand];
+    if (keptId) {
+      const kept = p.deck.find((c) => c.instanceId === keptId);
+      if (kept) {
+        newHand = [...newHand, { ...kept, zone: "HAND" as const }];
+        events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
+      }
+    }
+
+    // Arrange remaining shown cards per player's chosen order, then place at destination
+    const arrangedCards = ordered
+      .map((id) => p.deck.find((c) => c.instanceId === id))
+      .filter(Boolean) as CardInstance[];
+
+    let newDeck: CardInstance[];
+    if ((action.destination ?? restDest.toLowerCase()) === "bottom") {
+      newDeck = [...restOfDeck, ...arrangedCards];
+    } else {
+      newDeck = [...arrangedCards, ...restOfDeck];
+    }
+
+    const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+    newPlayers[controller] = { ...p, deck: newDeck, hand: newHand };
+    nextState = { ...nextState, players: newPlayers };
+  }
+
+  // Resume from SELECT_TARGET response
+  if (action.type === "SELECT_TARGET" && pausedAction !== null) {
+    const selected = action.selectedInstanceIds ?? [];
+    // Validate — all selected ids must be in validTargets
+    if (selected.some((id) => !validTargets.includes(id))) {
+      return { state, events, resolved: false };
+    }
+
+    const actionResult = executeEffectAction(
+      nextState,
+      pausedAction,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      selected,
+    );
+    nextState = actionResult.state;
+    events.push(...actionResult.events);
+
+    if (actionResult.pendingPrompt) {
+      return { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt };
+    }
+    if (actionResult.result && (pausedAction as any).result_ref) {
+      resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+    }
+  }
+
+  // Execute remaining actions (also handles OPTIONAL_EFFECT resume where pausedAction is null)
+  if (remainingActions.length > 0) {
+    const chainResult = executeActionChain(
+      nextState,
+      remainingActions,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+    );
+    nextState = chainResult.state;
+    events.push(...chainResult.events);
+
+    if (chainResult.pendingPrompt) {
+      return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+    }
+  }
+
+  return { state: nextState, events, resolved: true };
 }

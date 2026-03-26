@@ -172,7 +172,8 @@ export const MidZone = React.memo(function MidZone({
           <span className="text-xs text-gb-accent-amber font-bold">
             &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
           </span>
-          {activePrompt.promptType === "REVEAL_TRIGGER" && (
+          {activePrompt.promptType === "REVEAL_TRIGGER" &&
+            !activePrompt.options.cards?.length && (
             <>
               <MidZoneBtn
                 onClick={() =>
@@ -190,7 +191,8 @@ export const MidZone = React.memo(function MidZone({
               </MidZoneBtn>
             </>
           )}
-          {activePrompt.options.optional && (
+          {activePrompt.options.optional &&
+            activePrompt.promptType !== "OPTIONAL_EFFECT" && (
             <MidZoneBtn onClick={() => onAction({ type: "PASS" })}>
               Skip
             </MidZoneBtn>

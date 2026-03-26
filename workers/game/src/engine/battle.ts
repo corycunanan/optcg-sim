@@ -373,7 +373,7 @@ function executeDamageStep(
       } else if (targetFound.card.zone === "CHARACTER") {
         // KO the character
         nextState = moveCard(nextState, targetInstanceId, "TRASH");
-        events.push({ type: "CARD_KO", playerIndex: pi, payload: { instanceId: targetInstanceId, cause: "battle" } });
+        events.push({ type: "CARD_KO", playerIndex: pi, payload: { cardInstanceId: targetInstanceId, cause: "battle" } });
         // [On K.O.] fires in M4
       }
     }

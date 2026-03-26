@@ -114,7 +114,12 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         connectionStatus={session.connectionStatus}
         activePrompt={activePrompt}
         onAction={(action) => {
-          if (action.type === "ARRANGE_TOP_CARDS") setDevPrompt(null);
+          if (
+            action.type === "ARRANGE_TOP_CARDS" ||
+            action.type === "PLAYER_CHOICE" ||
+            action.type === "REVEAL_TRIGGER" ||
+            action.type === "PASS"
+          ) setDevPrompt(null);
           session.sendAction(action);
         }}
         onLeave={session.handleBackToLobbies}
@@ -183,6 +188,28 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                     ctaLabel: "Confirm Selection",
                   },
                 });
+              } else if (val === "OPTIONAL_EFFECT") {
+                const card = session.me.hand[0] ?? session.me.characters.find(Boolean) ?? null;
+                setDevPrompt({
+                  promptType: "OPTIONAL_EFFECT",
+                  options: {
+                    effectDescription: "You may give 1 DON!! card to your Leader or 1 of your Characters.",
+                    cards: card ? [card] : [],
+                  },
+                });
+              } else if (val === "REVEAL_TRIGGER") {
+                const triggerCard = session.me.deck.find(
+                  (c) => session.cardDb[c.cardId]?.triggerText
+                ) ?? session.me.deck[0] ?? null;
+                if (!triggerCard) return;
+                const triggerText = session.cardDb[triggerCard.cardId]?.triggerText ?? "[Trigger] Play this card.";
+                setDevPrompt({
+                  promptType: "REVEAL_TRIGGER",
+                  options: {
+                    cards: [triggerCard],
+                    effectDescription: triggerText,
+                  },
+                });
               }
             }}
             className="px-2 py-1 text-xs font-mono bg-gb-surface-raised border border-gb-border-strong text-gb-text-dim rounded cursor-pointer"
@@ -191,8 +218,8 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
             <option value="ARRANGE_TOP_CARDS">Arrange Top Cards</option>
             <option value="SELECT_TARGET">Select Target</option>
             <option value="PLAYER_CHOICE">Player Choice</option>
-            <option value="OPTIONAL_EFFECT" disabled>Optional Effect (not built)</option>
-            <option value="REVEAL_TRIGGER" disabled>Reveal Trigger (not built)</option>
+            <option value="OPTIONAL_EFFECT">Optional Effect</option>
+            <option value="REVEAL_TRIGGER">Reveal Trigger</option>
           </select>
         </div>
       )}
