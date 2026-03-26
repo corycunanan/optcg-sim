@@ -322,19 +322,45 @@ export function resumeFromStack(
 
     // ── Cost selection response ──────────────────────────────────────────
     case "AWAITING_COST_SELECTION": {
-      if (action.type !== "SELECT_TARGET") {
-        return { state, events, resolved: false };
-      }
-
-      const selected = action.selectedInstanceIds ?? [];
       const cost = topFrame.costs[topFrame.currentCostIndex] as Cost;
 
-      nextState = applyCostSelection(nextState, cost, selected, controller);
-      events.push({
-        type: "CARD_TRASHED",
-        playerIndex: controller,
-        payload: { count: selected.length, reason: "cost" },
-      });
+      // LIFE_TO_HAND with TOP_OR_BOTTOM — player chose a position
+      if (action.type === "PLAYER_CHOICE" && cost.type === "LIFE_TO_HAND") {
+        const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
+        const p = nextState.players[controller];
+        if (p.life.length === 0) {
+          nextState = popFrame(nextState);
+          return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
+        }
+
+        const removed = position === "TOP" ? p.life.slice(0, 1) : p.life.slice(-1);
+        const newLife = position === "TOP" ? p.life.slice(1) : p.life.slice(0, -1);
+        const handCards = removed.map((l) => ({
+          instanceId: l.instanceId,
+          cardId: l.cardId,
+          zone: "HAND" as const,
+          state: "ACTIVE" as const,
+          attachedDon: [] as any[],
+          turnPlayed: null,
+          controller,
+          owner: controller,
+        }));
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
+        nextState = { ...nextState, players: newPlayers };
+        events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: 1 } });
+      } else if (action.type === "SELECT_TARGET") {
+        const selected = action.selectedInstanceIds ?? [];
+        nextState = applyCostSelection(nextState, cost, selected, controller);
+        events.push({
+          type: "CARD_TRASHED",
+          playerIndex: controller,
+          payload: { count: selected.length, reason: "cost" },
+        });
+      } else {
+        return { state, events, resolved: false };
+      }
 
       const block = topFrame.effectBlock as EffectBlock;
       const nextCostIndex = topFrame.currentCostIndex + 1;

@@ -5,7 +5,7 @@
 import type { Action, EffectResult } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt, matchesFilterForTarget } from "../target-resolver.js";
+import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
 
@@ -244,26 +244,37 @@ export function executeLifeToHand(
 export function executeAddToLifeFromHand(
   state: GameState,
   action: Action,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
   const face = (params.face as "UP" | "DOWN") ?? "DOWN";
   const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
 
   const p = state.players[controller];
-  let candidates = [...p.hand];
-  if (action.target?.filter) {
-    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state));
-  }
-  const count = Math.min(amount, candidates.length);
-  if (count === 0) return { state, events, succeeded: false };
 
-  const toLife = candidates.slice(0, count);
+  // Use target resolution for player selection when target is specified
+  let targetIds: string[];
+  if (action.target) {
+    const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+    if (allValidIds.length === 0) return { state, events, succeeded: false };
+
+    if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+      return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    }
+    targetIds = autoSelectTargets(action.target, allValidIds);
+  } else {
+    // No target specified — auto-select from hand
+    const amount = (params.amount as number) ?? 1;
+    targetIds = p.hand.slice(0, Math.min(amount, p.hand.length)).map((c) => c.instanceId);
+  }
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  const toLife = p.hand.filter((c) => targetIds.includes(c.instanceId));
   const toLifeIds = new Set(toLife.map((c) => c.instanceId));
   const newHand = p.hand.filter((c) => !toLifeIds.has(c.instanceId));
   const lifeCards = toLife.map((c) => ({

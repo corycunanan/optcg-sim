@@ -146,6 +146,34 @@ export function payCosts(
         break;
       }
 
+      case "LIFE_TO_HAND": {
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const position = (cost as any).position ?? "TOP";
+        if (position === "TOP_OR_BOTTOM") return null; // Needs player selection
+        const p = nextState.players[controller];
+        if (p.life.length < amount) return null;
+
+        const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
+        const newLife = position === "TOP" ? p.life.slice(amount) : p.life.slice(0, -amount);
+
+        const handCards = removed.map((l) => ({
+          instanceId: l.instanceId,
+          cardId: l.cardId,
+          zone: "HAND" as const,
+          state: "ACTIVE" as const,
+          attachedDon: [] as any[],
+          turnPlayed: null,
+          controller,
+          owner: controller,
+        }));
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
+        nextState = { ...nextState, players: newPlayers };
+        events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: amount } });
+        break;
+      }
+
       default:
         // Other cost types to be implemented
         break;
@@ -171,6 +199,7 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
 ]);
 
 export function costNeedsPlayerSelection(cost: Cost): boolean {
+  if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") return true;
   return SELECTION_COST_TYPES.has(cost.type);
 }
 
@@ -194,6 +223,47 @@ export function payCostsWithSelection(
     const cost = costs[i];
 
     if (costNeedsPlayerSelection(cost)) {
+      // Special handling for LIFE_TO_HAND with TOP_OR_BOTTOM — use PLAYER_CHOICE
+      if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") {
+        const p = nextState.players[controller];
+        if (p.life.length === 0) {
+          return { state: nextState, events, cannotPay: true };
+        }
+
+        const frame: EffectStackFrame = {
+          id: generateFrameId(),
+          sourceCardInstanceId,
+          controller,
+          effectBlock,
+          phase: "AWAITING_COST_SELECTION",
+          pausedAction: null,
+          remainingActions: effectBlock.actions ?? [],
+          resultRefs: [],
+          validTargets: ["TOP", "BOTTOM"],
+          costs,
+          currentCostIndex: i,
+          costsPaid: false,
+          oncePerTurnMarked: false,
+          pendingTriggers: [],
+          accumulatedEvents: events,
+        };
+        nextState = pushFrame(nextState, frame);
+
+        const pendingPrompt: PendingPromptState = {
+          promptType: "PLAYER_CHOICE",
+          options: {
+            effectDescription: "Choose top or bottom of your Life cards to add to your hand",
+            choices: [
+              { id: "0", label: "Top" },
+              { id: "1", label: "Bottom" },
+            ],
+          },
+          respondingPlayer: controller,
+          resumeContext: frame.id,
+        };
+        return { state: nextState, events, pendingPrompt };
+      }
+
       // Build valid targets for this cost
       const validTargets = computeCostTargets(nextState, cost, controller, cardDb);
       const amount = typeof cost.amount === "number" ? cost.amount : 1;

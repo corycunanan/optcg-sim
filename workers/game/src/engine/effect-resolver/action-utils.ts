@@ -2,7 +2,7 @@
  * Pure utility functions for action handlers.
  */
 
-import type { Action, Duration, DynamicValue, EffectResult } from "../effect-types.js";
+import type { Action, Duration, DynamicValue, EffectResult, EffectBlock } from "../effect-types.js";
 import type { CardData, GameState } from "../../types.js";
 import type { ExpiryTiming } from "../effect-types.js";
 
@@ -190,4 +190,99 @@ export function computeExpiry(duration: Duration, state: GameState): ExpiryTimin
     default:
       return { wave: "END_OF_TURN", turn: state.turn.number };
   }
+}
+
+// ─── extractEffectDescription ────────────────────────────────────────────────
+
+/** Bracket notations for trigger keywords in OPTCG card text. */
+const KEYWORD_BRACKETS: Record<string, string> = {
+  ON_PLAY: "[On Play]",
+  WHEN_ATTACKING: "[When Attacking]",
+  ON_OPPONENT_ATTACK: "[On Your Opponent's Attack]",
+  ON_KO: "[On K.O.]",
+  ON_BLOCK: "[On Block]",
+  ACTIVATE_MAIN: "[Activate: Main]",
+  MAIN_EVENT: "[Main]",
+  COUNTER: "[Counter]",
+  COUNTER_EVENT: "[Counter]",
+  TRIGGER: "[Trigger]",
+  END_OF_YOUR_TURN: "[End of Your Turn]",
+  END_OF_OPPONENT_TURN: "[End of Opponent's Turn]",
+  START_OF_TURN: "[Start of Your Turn]",
+};
+
+/**
+ * Extract the specific effect section from a card's full effect text
+ * based on the effect block's trigger keyword.
+ *
+ * Falls back to the full text if extraction fails.
+ */
+export function extractEffectDescription(
+  effectText: string,
+  block: EffectBlock,
+): string {
+  if (!effectText) return "You may activate this effect.";
+
+  // Get the bracket text for this block's trigger
+  const trigger = block.trigger;
+  if (!trigger) return effectText;
+
+  let keyword: string | undefined;
+  if ("keyword" in trigger) {
+    keyword = trigger.keyword;
+  } else if ("any_of" in trigger && Array.isArray(trigger.any_of)) {
+    // Compound trigger — try the first keyword trigger
+    const first = trigger.any_of.find((t) => t && typeof t === "object" && "keyword" in t);
+    if (first && "keyword" in first) {
+      keyword = (first as { keyword: string }).keyword;
+    }
+  }
+  if (!keyword) return effectText;
+
+  const bracket = KEYWORD_BRACKETS[keyword];
+  if (!bracket) return effectText;
+
+  // Split on <br> tags first, then further split on trigger bracket boundaries.
+  // Card text may use <br> between effects OR just concatenate them with spaces.
+  const brSegments = effectText.split(/<br\s*\/?>/i);
+
+  // All bracket strings that can start an effect section
+  const allBrackets = Object.values(KEYWORD_BRACKETS);
+
+  // Within each <br> segment, split further on bracket boundaries
+  const sections: string[] = [];
+  for (const seg of brSegments) {
+    // Find all positions where a trigger bracket starts
+    const starts: number[] = [];
+    for (const b of allBrackets) {
+      let idx = seg.indexOf(b);
+      while (idx !== -1) {
+        // Include DON!! prefix if present (e.g., "[DON!! x1] [On Play]")
+        let actual = idx;
+        const before = seg.substring(0, idx).trimEnd();
+        const donMatch = before.match(/\[DON!!(?:\s*[x×]\s*\d+)?\]\s*$/);
+        if (donMatch) {
+          actual = before.length - donMatch[0].length;
+        }
+        starts.push(actual);
+        idx = seg.indexOf(b, idx + b.length);
+      }
+    }
+
+    if (starts.length <= 1) {
+      sections.push(seg.trim());
+    } else {
+      const sorted = [...new Set(starts)].sort((a, b) => a - b);
+      for (let i = 0; i < sorted.length; i++) {
+        const end = i + 1 < sorted.length ? sorted[i + 1] : seg.length;
+        sections.push(seg.substring(sorted[i], end).trim());
+      }
+    }
+  }
+
+  // Find the section containing this trigger's bracket
+  const match = sections.find((s) => s.includes(bracket));
+  if (match) return match;
+
+  return effectText;
 }

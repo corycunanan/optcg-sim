@@ -19,7 +19,7 @@ import { evaluateCondition, type ConditionContext } from "../conditions.js";
 import { pushFrame, generateFrameId } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
 import type { EffectResolverResult, ActionResult, ActionHandler } from "./types.js";
-import { markOncePerTurnUsed } from "./action-utils.js";
+import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 
 // Action handlers
@@ -133,6 +133,12 @@ export function resolveEffect(
     cardDb,
   };
 
+  // Extract block-specific effect description for prompts
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const fullText = sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "";
+  const blockDescription = extractEffectDescription(fullText, block);
+
   // Step 1: Evaluate block-level conditions
   if (block.conditions) {
     if (!evaluateCondition(state, block.conditions, condCtx)) {
@@ -142,9 +148,6 @@ export function resolveEffect(
 
   // Step 2: Check optional flag — prompt the player before paying costs
   if (block.flags?.optional) {
-    const sourceCard = findCardInstance(state, sourceCardInstanceId);
-    const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-    const effectDescription = sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "You may activate this effect.";
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
 
     const frame: EffectStackFrame = {
@@ -168,7 +171,7 @@ export function resolveEffect(
 
     const pendingPrompt: PendingPromptState = {
       promptType: "OPTIONAL_EFFECT",
-      options: { effectDescription, cards },
+      options: { effectDescription: blockDescription, cards },
       respondingPlayer: controller,
       resumeContext: frame.id,
     };
@@ -207,6 +210,8 @@ export function resolveEffect(
       sourceCardInstanceId,
       controller,
       cardDb,
+      undefined,
+      blockDescription,
     );
     state = chainResult.state;
     events.push(...chainResult.events);
@@ -234,6 +239,7 @@ export function executeActionChain(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   initialResultRefs?: Map<string, EffectResult>,
+  effectDescription?: string,
 ): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
@@ -301,11 +307,13 @@ export function executeActionChain(
         accumulatedEvents: events,
       };
       const updatedState = pushFrame(result.state, frame);
-      return {
-        state: updatedState,
-        events,
-        pendingPrompt: { ...result.pendingPrompt, resumeContext: frame.id },
-      };
+      const prompt = { ...result.pendingPrompt, resumeContext: frame.id };
+      // Override with block-specific description so prompts show the triggered
+      // effect text rather than the full card text
+      if (effectDescription && prompt.options) {
+        prompt.options = { ...prompt.options, effectDescription };
+      }
+      return { state: updatedState, events, pendingPrompt: prompt };
     }
 
     // Store result reference
