@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { registerTriggersForCard, matchTriggersForEvent, orderMatchedTriggers, deregisterTriggersForCard } from "../engine/triggers.js";
-import { resolveEffect } from "../engine/effect-resolver.js";
+import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { checkProhibitions, isProhibitedForCard } from "../engine/prohibitions.js";
 import { checkReplacementForKO } from "../engine/replacements.js";
 import { expireEndOfTurnEffects, expireBattleEffects, expireSourceLeftZone, processScheduledActions } from "../engine/duration-tracker.js";

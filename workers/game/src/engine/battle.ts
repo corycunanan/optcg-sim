@@ -17,7 +17,7 @@ import {
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
 import { hasDoubleAttack, hasBanish, hasTrigger } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
-import { resolveEffect } from "./effect-resolver.js";
+import { resolveEffect } from "./effect-resolver/index.js";
 import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
 

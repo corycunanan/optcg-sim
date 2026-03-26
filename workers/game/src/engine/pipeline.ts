@@ -26,7 +26,7 @@ import {
   registerReplacementsForCard,
   deregisterTriggersForCard,
 } from "./triggers.js";
-import { resolveEffect } from "./effect-resolver.js";
+import { resolveEffect } from "./effect-resolver/index.js";
 import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
 import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";

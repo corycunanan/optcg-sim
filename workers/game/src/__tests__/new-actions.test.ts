@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { resolveEffect } from "../engine/effect-resolver.js";
+import { resolveEffect } from "../engine/effect-resolver/index.js";
 import type { GameState, CardData, CardInstance, DonInstance } from "../types.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 import { setupGame, CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";

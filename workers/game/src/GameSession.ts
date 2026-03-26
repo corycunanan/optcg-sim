@@ -23,7 +23,7 @@ import { resumeReplacement, type ReplacementResumeContext } from "./engine/repla
 import { setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
-import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver.js";
+import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 

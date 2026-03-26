@@ -23,7 +23,7 @@ import {
   executeUseCounterEvent,
   executeRevealTrigger,
 } from "./battle.js";
-import { resolveEffect } from "./effect-resolver.js";
+import { resolveEffect } from "./effect-resolver/index.js";
 import type { EffectSchema } from "./effect-types.js";
 
 export function execute(
