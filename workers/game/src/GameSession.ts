@@ -21,7 +21,7 @@ import { runPipeline } from "./engine/pipeline.js";
 import { resumeReplacement, type ReplacementResumeContext } from "./engine/replacements.js";
 import { setPlayerConnected } from "./engine/state.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
-import { resumeEffectChain } from "./engine/effect-resolver.js";
+import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -460,8 +460,16 @@ export class GameSession implements DurableObject {
       if (replacementResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
       }
+    } else if (this.gameState.effectStack.length > 0) {
+      // Stack-based resume — use new effect stack system
+      const resumeResult = resumeFromStack(this.gameState, action, this.cardDb);
+      this.gameState = resumeResult.state;
+
+      if (resumeResult.pendingPrompt) {
+        this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      }
     } else {
-      // Standard effect chain resume
+      // Legacy: bare ResumeContext (no stack frame) — fallback for backward compat
       const effectResumeCtx = resumeCtx as unknown as ResumeContext;
       const resumeResult = resumeEffectChain(this.gameState, effectResumeCtx, action, this.cardDb);
       this.gameState = resumeResult.state;
@@ -500,9 +508,13 @@ export class GameSession implements DurableObject {
   private sendPendingPrompts(): void {
     if (!this.gameState) return;
 
-    // Effect prompt takes priority over battle prompts
+    // Effect prompt or active effect stack takes priority over battle prompts
     if (this.gameState.pendingPrompt) {
       this.sendEffectPrompt(this.gameState.pendingPrompt);
+      return;
+    }
+    if (this.gameState.effectStack.length > 0) {
+      // Stack still has frames — defer battle prompts until stack unwinds
       return;
     }
 

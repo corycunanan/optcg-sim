@@ -105,6 +105,7 @@ export function buildInitialState(payload: GameInitPayload): {
     oneTimeModifiers: [],
     triggerRegistry: [],
     pendingPrompt: null,
+    effectStack: [],
     eventLog: [],
     status: "IN_PROGRESS",
     winner: null,

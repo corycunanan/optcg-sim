@@ -14,6 +14,9 @@ export type {
   ServerMessage, ClientMessage,
   PromptType, PromptOptions,
   PendingPromptState,
+  EffectStackPhase,
+  EffectStackFrame as SharedEffectStackFrame,
+  QueuedTrigger as SharedQueuedTrigger,
 } from "../../../shared/game-types.js";
 
 import type { CardData, GameEventType, GameState, PendingPromptState } from "../../../shared/game-types.js";
@@ -40,6 +43,41 @@ export interface ResumeContext {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, unknown][];
   validTargets: string[];
+}
+
+// ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
+
+export interface EffectStackFrame {
+  id: string;
+  sourceCardInstanceId: string;
+  controller: 0 | 1;
+  effectBlock: import("./engine/effect-types.js").EffectBlock;
+  phase: import("../../../shared/game-types.js").EffectStackPhase;
+
+  // Action chain state
+  pausedAction: import("./engine/effect-types.js").Action | null;
+  remainingActions: import("./engine/effect-types.js").Action[];
+  resultRefs: [string, unknown][];
+  validTargets: string[];
+
+  // Cost tracking
+  costs: import("./engine/effect-types.js").Cost[];
+  currentCostIndex: number;
+  costsPaid: boolean;
+  oncePerTurnMarked: boolean;
+
+  // Queued triggers waiting to resolve after this frame
+  pendingTriggers: QueuedTrigger[];
+
+  // Events accumulated during partial execution
+  accumulatedEvents: PendingEvent[];
+}
+
+export interface QueuedTrigger {
+  sourceCardInstanceId: string;
+  controller: 0 | 1;
+  effectBlock: import("./engine/effect-types.js").EffectBlock;
+  triggeringEvent: PendingEvent;
 }
 
 // ─── Init payload (Next.js → DO on game start) ────────────────────────────────

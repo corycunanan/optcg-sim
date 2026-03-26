@@ -21,6 +21,7 @@ import type {
   RuntimeActiveEffect,
   ExpiryTiming,
 } from "./effect-types.js";
+import type { Cost } from "./effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -29,10 +30,14 @@ import type {
   PendingEvent,
   PendingPromptState,
   ResumeContext,
+  EffectStackFrame,
+  QueuedTrigger,
 } from "../types.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "./replacements.js";
 import { nanoid } from "../util/nanoid.js";
+import { pushFrame, popFrame, peekFrame, updateTopFrame, generateFrameId } from "./effect-stack.js";
+import { emitEvent } from "./events.js";
 
 export interface EffectResolverResult {
   state: GameState;
@@ -71,33 +76,55 @@ export function resolveEffect(
     const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
     const effectDescription = sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "You may activate this effect.";
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
-    const resumeCtx: ResumeContext = {
-      effectSourceInstanceId: sourceCardInstanceId,
+
+    // Push a stack frame that carries the full block (including costs)
+    const frame: EffectStackFrame = {
+      id: generateFrameId(),
+      sourceCardInstanceId,
       controller,
+      effectBlock: block,
+      phase: "AWAITING_OPTIONAL_RESPONSE",
       pausedAction: null,
       remainingActions: block.actions ?? [],
       resultRefs: [],
       validTargets: [],
+      costs: block.costs ?? [],
+      currentCostIndex: 0,
+      costsPaid: false,
+      oncePerTurnMarked: false,
+      pendingTriggers: [],
+      accumulatedEvents: [],
     };
+    state = pushFrame(state, frame);
+
     const pendingPrompt: PendingPromptState = {
       promptType: "OPTIONAL_EFFECT",
       options: { effectDescription, cards },
       respondingPlayer: controller,
-      resumeContext: resumeCtx,
+      resumeContext: frame.id, // reference frame by ID
     };
     return { state, events, resolved: false, pendingPrompt };
   }
 
-  // Step 3: Pay costs
+  // Step 3: Pay costs (with player selection support)
   if (block.costs && block.costs.length > 0) {
-    const costResult = payCosts(state, block.costs, controller, cardDb);
-    if (!costResult) {
+    const costPayResult = payCostsWithSelection(
+      state, block.costs, 0, controller, cardDb, sourceCardInstanceId, block,
+    );
+
+    if (costPayResult.cannotPay) {
       // Cannot pay costs — mark once-per-turn as consumed anyway (per rules 8-3-1-3-1)
-      state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
+      state = markOncePerTurnUsed(costPayResult.state, block.id, sourceCardInstanceId);
       return { state, events, resolved: false };
     }
-    state = costResult.state;
-    events.push(...costResult.events);
+
+    state = costPayResult.state;
+    events.push(...costPayResult.events);
+
+    if (costPayResult.pendingPrompt) {
+      // Cost requires player selection — a stack frame was pushed by payCostsWithSelection
+      return { state, events, resolved: false, pendingPrompt: costPayResult.pendingPrompt };
+    }
   }
 
   // Mark once-per-turn as used
@@ -264,12 +291,255 @@ function payCosts(
   return { state: nextState, events, costResult };
 }
 
+// ─── Cost Payment with Player Selection ───────────────────────────────────────
+
+const SELECTION_COST_TYPES: Set<string> = new Set([
+  "TRASH_FROM_HAND",
+  "KO_OWN_CHARACTER",
+  "RETURN_OWN_CHARACTER_TO_HAND",
+  "PLACE_OWN_CHARACTER_TO_DECK",
+  "TRASH_FROM_LIFE",
+  "PLACE_HAND_TO_DECK",
+  "REST_CARDS",
+  "REST_NAMED_CARD",
+  "TRASH_OWN_CHARACTER",
+  "REVEAL_FROM_HAND",
+]);
+
+function costNeedsPlayerSelection(cost: Cost): boolean {
+  return SELECTION_COST_TYPES.has(cost.type);
+}
+
+interface CostSelectionResult {
+  state: GameState;
+  events: PendingEvent[];
+  cannotPay?: boolean;
+  pendingPrompt?: PendingPromptState;
+}
+
+/**
+ * Pay costs iteratively. Auto-payable costs are paid inline.
+ * Selection-based costs push a stack frame and return a prompt.
+ */
+export function payCostsWithSelection(
+  state: GameState,
+  costs: Cost[],
+  startIndex: number,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+  effectBlock: EffectBlock,
+): CostSelectionResult {
+  const events: PendingEvent[] = [];
+  let nextState = state;
+
+  for (let i = startIndex; i < costs.length; i++) {
+    const cost = costs[i];
+
+    if (costNeedsPlayerSelection(cost)) {
+      // Build valid targets for this cost
+      const validTargets = computeCostTargets(nextState, cost, controller, cardDb);
+      const amount = typeof cost.amount === "number" ? cost.amount : 1;
+
+      if (validTargets.length < amount) {
+        return { state: nextState, events, cannotPay: true };
+      }
+
+      // Push stack frame for cost selection
+      const frame: EffectStackFrame = {
+        id: generateFrameId(),
+        sourceCardInstanceId,
+        controller,
+        effectBlock,
+        phase: "AWAITING_COST_SELECTION",
+        pausedAction: null,
+        remainingActions: effectBlock.actions ?? [],
+        resultRefs: [],
+        validTargets,
+        costs,
+        currentCostIndex: i,
+        costsPaid: false,
+        oncePerTurnMarked: false,
+        pendingTriggers: [],
+        accumulatedEvents: events,
+      };
+      nextState = pushFrame(nextState, frame);
+
+      const costLabel = getCostLabel(cost);
+      const pendingPrompt: PendingPromptState = {
+        promptType: "SELECT_TARGET",
+        options: {
+          validTargets,
+          countMin: amount,
+          countMax: amount,
+          effectDescription: costLabel,
+          ctaLabel: getCostCtaLabel(cost),
+          cards: getCostCards(nextState, cost, validTargets, controller),
+        },
+        respondingPlayer: controller,
+        resumeContext: frame.id,
+      };
+      return { state: nextState, events, pendingPrompt };
+    }
+
+    // Auto-payable cost — use existing payCosts for this single cost
+    const singleResult = payCosts(nextState, [cost], controller, cardDb);
+    if (!singleResult) {
+      return { state: nextState, events, cannotPay: true };
+    }
+    nextState = singleResult.state;
+    events.push(...singleResult.events);
+  }
+
+  return { state: nextState, events };
+}
+
+function computeCostTargets(
+  state: GameState,
+  cost: Cost,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): string[] {
+  const player = state.players[controller];
+
+  switch (cost.type) {
+    case "TRASH_FROM_HAND":
+    case "PLACE_HAND_TO_DECK":
+    case "REVEAL_FROM_HAND": {
+      let candidates = player.hand;
+      if (cost.filter) {
+        candidates = candidates.filter((c) => {
+          const data = cardDb.get(c.cardId);
+          if (!data) return false;
+          if (cost.filter?.traits) {
+            return cost.filter.traits.every((t: string) => (data.types ?? []).includes(t));
+          }
+          if (cost.filter?.color) {
+            return (data.color ?? []).some((clr: string) => cost.filter!.color!.includes(clr as never));
+          }
+          return true;
+        });
+      }
+      return candidates.map((c) => c.instanceId);
+    }
+
+    case "KO_OWN_CHARACTER":
+    case "TRASH_OWN_CHARACTER":
+    case "RETURN_OWN_CHARACTER_TO_HAND":
+    case "PLACE_OWN_CHARACTER_TO_DECK": {
+      let candidates = player.characters;
+      if (cost.filter) {
+        candidates = candidates.filter((c) => {
+          const data = cardDb.get(c.cardId);
+          if (!data) return false;
+          if (cost.filter?.traits) {
+            return cost.filter.traits.every((t: string) => (data.types ?? []).includes(t));
+          }
+          if (cost.filter?.cost_max !== undefined) {
+            return (data.cost ?? 0) <= (cost.filter.cost_max as number);
+          }
+          return true;
+        });
+      }
+      return candidates.map((c) => c.instanceId);
+    }
+
+    case "TRASH_FROM_LIFE": {
+      return player.life.map((l) => l.instanceId);
+    }
+
+    case "REST_CARDS":
+    case "REST_NAMED_CARD": {
+      return player.characters
+        .filter((c) => c.state === "ACTIVE")
+        .map((c) => c.instanceId);
+    }
+
+    default:
+      return [];
+  }
+}
+
+function getCostLabel(cost: Cost): string {
+  const amount = typeof cost.amount === "number" ? cost.amount : 1;
+  switch (cost.type) {
+    case "TRASH_FROM_HAND": return `Choose ${amount} card(s) from hand to trash as cost`;
+    case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;
+    case "RETURN_OWN_CHARACTER_TO_HAND": return `Choose ${amount} character(s) to return to hand as cost`;
+    case "PLACE_OWN_CHARACTER_TO_DECK": return `Choose ${amount} character(s) to place on deck as cost`;
+    case "TRASH_FROM_LIFE": return `Choose ${amount} life card(s) to trash as cost`;
+    case "PLACE_HAND_TO_DECK": return `Choose ${amount} card(s) to place on deck as cost`;
+    case "REST_CARDS": return `Choose ${amount} card(s) to rest as cost`;
+    case "TRASH_OWN_CHARACTER": return `Choose ${amount} character(s) to trash as cost`;
+    case "REVEAL_FROM_HAND": return `Choose ${amount} card(s) from hand to reveal as cost`;
+    default: return "Select card(s) as cost";
+  }
+}
+
+function getCostCtaLabel(cost: Cost): string {
+  switch (cost.type) {
+    case "TRASH_FROM_HAND":
+    case "TRASH_OWN_CHARACTER":
+    case "TRASH_FROM_LIFE": return "Trash";
+    case "KO_OWN_CHARACTER": return "KO";
+    case "RETURN_OWN_CHARACTER_TO_HAND": return "Return";
+    case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "PLACE_HAND_TO_DECK": return "Place on Deck";
+    case "REST_CARDS":
+    case "REST_NAMED_CARD": return "Rest";
+    case "REVEAL_FROM_HAND": return "Reveal";
+    default: return "Confirm";
+  }
+}
+
+function getCostCards(
+  state: GameState,
+  cost: Cost,
+  validTargets: string[],
+  controller: 0 | 1,
+): CardInstance[] {
+  const player = state.players[controller];
+  const targetSet = new Set(validTargets);
+
+  switch (cost.type) {
+    case "TRASH_FROM_HAND":
+    case "PLACE_HAND_TO_DECK":
+    case "REVEAL_FROM_HAND":
+      return player.hand.filter((c) => targetSet.has(c.instanceId));
+
+    case "KO_OWN_CHARACTER":
+    case "TRASH_OWN_CHARACTER":
+    case "RETURN_OWN_CHARACTER_TO_HAND":
+    case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "REST_CARDS":
+    case "REST_NAMED_CARD":
+      return player.characters.filter((c) => targetSet.has(c.instanceId));
+
+    case "TRASH_FROM_LIFE":
+      // Life cards aren't CardInstance, return empty for now
+      return [];
+
+    default:
+      return [];
+  }
+}
+
 // ─── Action Chain Execution ───────────────────────────────────────────────────
 
 interface ChainResult {
   state: GameState;
   events: PendingEvent[];
   pendingPrompt?: PendingPromptState;
+}
+
+function promptTypeToPhase(promptType: string): EffectStackFrame["phase"] {
+  switch (promptType) {
+    case "OPTIONAL_EFFECT": return "AWAITING_OPTIONAL_RESPONSE";
+    case "SELECT_TARGET": return "AWAITING_TARGET_SELECTION";
+    case "ARRANGE_TOP_CARDS": return "AWAITING_ARRANGE_CARDS";
+    case "PLAYER_CHOICE": return "AWAITING_PLAYER_CHOICE";
+    default: return "AWAITING_TARGET_SELECTION";
+  }
 }
 
 function executeActionChain(
@@ -325,17 +595,31 @@ function executeActionChain(
     lastActionSucceeded = result.succeeded;
 
     if (result.pendingPrompt) {
-      // Pause — attach remaining actions into resume context and surface the prompt
+      // Pause — push a stack frame with the remaining actions and surface the prompt
       const ctx = result.pendingPrompt.resumeContext as ResumeContext;
-      const updatedCtx: ResumeContext = {
-        ...ctx,
+      const phaseForPrompt = promptTypeToPhase(result.pendingPrompt.promptType);
+      const frame: EffectStackFrame = {
+        id: generateFrameId(),
+        sourceCardInstanceId,
+        controller,
+        effectBlock: {} as EffectBlock, // not needed for mid-chain resumes
+        phase: phaseForPrompt,
+        pausedAction: ctx.pausedAction,
         remainingActions: actions.slice(i + 1),
         resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        validTargets: ctx.validTargets,
+        costs: [],
+        currentCostIndex: 0,
+        costsPaid: true, // costs already paid before action chain
+        oncePerTurnMarked: true,
+        pendingTriggers: [],
+        accumulatedEvents: events,
       };
+      const updatedState = pushFrame(result.state, frame);
       return {
-        state: result.state,
+        state: updatedState,
         events,
-        pendingPrompt: { ...result.pendingPrompt, resumeContext: updatedCtx },
+        pendingPrompt: { ...result.pendingPrompt, resumeContext: frame.id },
       };
     }
 
@@ -1664,6 +1948,405 @@ export function resumeEffectChain(
 
     if (chainResult.pendingPrompt) {
       return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+    }
+  }
+
+  return { state: nextState, events, resolved: true };
+}
+
+// ─── Stack-based resume (replaces direct resumeEffectChain calls) ─────────────
+
+/**
+ * Resume effect resolution using the effect stack.
+ * Routes based on the top frame's phase, handles cost payment,
+ * and processes remaining queued triggers after frame completion.
+ */
+export function resumeFromStack(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+): EffectResolverResult {
+  const topFrame = peekFrame(state) as EffectStackFrame | null;
+  if (!topFrame) {
+    return { state, events: [], resolved: true };
+  }
+
+  const {
+    sourceCardInstanceId,
+    controller,
+    phase,
+  } = topFrame;
+
+  const events: PendingEvent[] = [];
+  let nextState = state;
+
+  switch (phase) {
+    // ── Optional effect: accept or decline ──────────────────────────────
+    case "AWAITING_OPTIONAL_RESPONSE": {
+      if (action.type === "PASS" || (action.type === "PLAYER_CHOICE" && action.choiceId === "skip")) {
+        // Player declined — pop frame, process remaining triggers
+        nextState = popFrame(nextState);
+        return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
+      }
+
+      // Player accepted — now pay costs
+      const block = topFrame.effectBlock as EffectBlock;
+      if (topFrame.costs.length > 0) {
+        const costResult = payCostsWithSelection(
+          nextState, topFrame.costs as Cost[], 0, controller, cardDb,
+          sourceCardInstanceId, block,
+        );
+
+        if (costResult.cannotPay) {
+          // Can't pay — fizzle, mark OPT consumed
+          nextState = popFrame(costResult.state);
+          if (block.flags?.once_per_turn) {
+            nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
+          }
+          return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
+        }
+
+        nextState = costResult.state;
+        events.push(...costResult.events);
+
+        if (costResult.pendingPrompt) {
+          // Cost needs player selection — frame was already pushed by payCostsWithSelection,
+          // but we need to transfer pendingTriggers to the new frame
+          const newTop = peekFrame(nextState) as EffectStackFrame;
+          if (newTop && newTop.id !== topFrame.id) {
+            // Remove old frame (optional response frame), keep new cost frame
+            // Transfer pending triggers to new cost frame
+            nextState = popFrameById(nextState, topFrame.id);
+            nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+          }
+          return { state: nextState, events, resolved: false, pendingPrompt: costResult.pendingPrompt };
+        }
+      }
+
+      // Costs paid (or no costs) — mark once-per-turn and execute actions
+      nextState = popFrame(nextState);
+      if (block.flags?.once_per_turn) {
+        nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
+      }
+
+      // Execute action chain
+      if (topFrame.remainingActions.length > 0) {
+        const chainResult = executeActionChain(
+          nextState,
+          topFrame.remainingActions as Action[],
+          sourceCardInstanceId,
+          controller,
+          cardDb,
+        );
+        nextState = chainResult.state;
+        events.push(...chainResult.events);
+
+        if (chainResult.pendingPrompt) {
+          // Transfer pending triggers to the new frame
+          const newTop = peekFrame(nextState) as EffectStackFrame;
+          if (newTop) {
+            nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+          }
+          return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+        }
+      }
+
+      return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+    }
+
+    // ── Cost selection response ──────────────────────────────────────────
+    case "AWAITING_COST_SELECTION": {
+      if (action.type !== "SELECT_TARGET") {
+        return { state, events, resolved: false };
+      }
+
+      const selected = action.selectedInstanceIds ?? [];
+      const cost = topFrame.costs[topFrame.currentCostIndex] as Cost;
+
+      // Apply the cost selection
+      nextState = applyCostSelection(nextState, cost, selected, controller);
+      events.push({
+        type: "CARD_TRASHED",
+        playerIndex: controller,
+        payload: { count: selected.length, reason: "cost" },
+      });
+
+      // Continue to next cost
+      const block = topFrame.effectBlock as EffectBlock;
+      const nextCostIndex = topFrame.currentCostIndex + 1;
+
+      if (nextCostIndex < topFrame.costs.length) {
+        const remainingCostResult = payCostsWithSelection(
+          nextState, topFrame.costs as Cost[], nextCostIndex, controller, cardDb,
+          sourceCardInstanceId, block,
+        );
+
+        if (remainingCostResult.cannotPay) {
+          nextState = popFrame(remainingCostResult.state);
+          return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
+        }
+
+        nextState = remainingCostResult.state;
+        events.push(...remainingCostResult.events);
+
+        if (remainingCostResult.pendingPrompt) {
+          // Another cost needs selection — update existing frame or use new one
+          return { state: nextState, events, resolved: false, pendingPrompt: remainingCostResult.pendingPrompt };
+        }
+      }
+
+      // All costs paid — pop cost frame, mark OPT, execute actions
+      nextState = popFrame(nextState);
+
+      if (block.flags?.once_per_turn && !topFrame.oncePerTurnMarked) {
+        nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
+      }
+
+      if (topFrame.remainingActions.length > 0) {
+        const chainResult = executeActionChain(
+          nextState,
+          topFrame.remainingActions as Action[],
+          sourceCardInstanceId,
+          controller,
+          cardDb,
+        );
+        nextState = chainResult.state;
+        events.push(...chainResult.events);
+
+        if (chainResult.pendingPrompt) {
+          const newTop = peekFrame(nextState) as EffectStackFrame;
+          if (newTop) {
+            nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+          }
+          return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+        }
+      }
+
+      return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+    }
+
+    // ── Target selection / arrange cards / player choice (mid-action) ────
+    case "AWAITING_TARGET_SELECTION":
+    case "AWAITING_ARRANGE_CARDS":
+    case "AWAITING_PLAYER_CHOICE": {
+      // Pop this frame from the stack before resuming
+      nextState = popFrame(nextState);
+
+      // Use existing resumeEffectChain logic for mid-action prompts
+      const legacyCtx: ResumeContext = {
+        effectSourceInstanceId: sourceCardInstanceId,
+        controller,
+        pausedAction: topFrame.pausedAction as Action | null,
+        remainingActions: topFrame.remainingActions as Action[],
+        resultRefs: topFrame.resultRefs,
+        validTargets: topFrame.validTargets,
+      };
+
+      const result = resumeEffectChain(nextState, legacyCtx, action, cardDb);
+      nextState = result.state;
+      events.push(...result.events);
+
+      if (result.pendingPrompt) {
+        // A new frame was pushed by executeActionChain — transfer pending triggers
+        const newTop = peekFrame(nextState) as EffectStackFrame;
+        if (newTop) {
+          nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+        }
+        return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
+      }
+
+      return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+    }
+
+    // ── Interrupted by nested triggers (triggers have completed, resume) ─
+    case "INTERRUPTED_BY_TRIGGERS": {
+      nextState = popFrame(nextState);
+
+      // Resume action chain from where it was interrupted
+      if (topFrame.remainingActions.length > 0) {
+        const resultRefs = new Map<string, EffectResult>(
+          topFrame.resultRefs.map(([k, v]) => [k, v as EffectResult]),
+        );
+        const chainResult = executeActionChain(
+          nextState,
+          topFrame.remainingActions as Action[],
+          sourceCardInstanceId,
+          controller,
+          cardDb,
+          resultRefs,
+        );
+        nextState = chainResult.state;
+        events.push(...chainResult.events);
+
+        if (chainResult.pendingPrompt) {
+          return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+        }
+      }
+
+      return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+    }
+
+    default:
+      return { state, events, resolved: false };
+  }
+}
+
+// ─── Stack Helpers ────────────────────────────────────────────────────────────
+
+function popFrameById(state: GameState, frameId: string): GameState {
+  return {
+    ...state,
+    effectStack: state.effectStack.filter(
+      (f) => (f as unknown as EffectStackFrame).id !== frameId,
+    ) as GameState["effectStack"],
+  };
+}
+
+function applyCostSelection(
+  state: GameState,
+  cost: Cost,
+  selectedIds: string[],
+  controller: 0 | 1,
+): GameState {
+  const p = state.players[controller];
+  const selectedSet = new Set(selectedIds);
+
+  switch (cost.type) {
+    case "TRASH_FROM_HAND": {
+      const toTrash = p.hand.filter((c) => selectedSet.has(c.instanceId));
+      const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
+      const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
+      return { ...state, players: newPlayers };
+    }
+
+    case "KO_OWN_CHARACTER":
+    case "TRASH_OWN_CHARACTER": {
+      const toRemove = p.characters.filter((c) => selectedSet.has(c.instanceId));
+      const newChars = p.characters.filter((c) => !selectedSet.has(c.instanceId));
+      const newTrash = [
+        ...toRemove.map((c) => ({ ...c, zone: "TRASH" as const, attachedDon: [] as typeof c.attachedDon })),
+        ...p.trash,
+      ];
+      // Return attached DON to cost area (rested)
+      const returnedDon = toRemove.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = {
+        ...p,
+        characters: newChars,
+        trash: newTrash,
+        donCostArea: [...p.donCostArea, ...returnedDon],
+      };
+      return { ...state, players: newPlayers };
+    }
+
+    case "RETURN_OWN_CHARACTER_TO_HAND": {
+      const toReturn = p.characters.filter((c) => selectedSet.has(c.instanceId));
+      const newChars = p.characters.filter((c) => !selectedSet.has(c.instanceId));
+      const newHand = [
+        ...p.hand,
+        ...toReturn.map((c) => ({ ...c, zone: "HAND" as const, attachedDon: [] as typeof c.attachedDon })),
+      ];
+      const returnedDon = toReturn.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = {
+        ...p,
+        characters: newChars,
+        hand: newHand,
+        donCostArea: [...p.donCostArea, ...returnedDon],
+      };
+      return { ...state, players: newPlayers };
+    }
+
+    case "PLACE_HAND_TO_DECK":
+    case "PLACE_OWN_CHARACTER_TO_DECK": {
+      if (cost.type === "PLACE_HAND_TO_DECK") {
+        const toPlace = p.hand.filter((c) => selectedSet.has(c.instanceId));
+        const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
+        const position = cost.position ?? "BOTTOM";
+        const deckCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const }));
+        const newDeck = position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
+        const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+        newPlayers[controller] = { ...p, hand: newHand, deck: newDeck };
+        return { ...state, players: newPlayers };
+      } else {
+        const toPlace = p.characters.filter((c) => selectedSet.has(c.instanceId));
+        const newChars = p.characters.filter((c) => !selectedSet.has(c.instanceId));
+        const returnedDon = toPlace.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
+        const position = cost.position ?? "BOTTOM";
+        const deckCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const, attachedDon: [] as typeof c.attachedDon }));
+        const newDeck = position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
+        const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+        newPlayers[controller] = {
+          ...p,
+          characters: newChars,
+          deck: newDeck,
+          donCostArea: [...p.donCostArea, ...returnedDon],
+        };
+        return { ...state, players: newPlayers };
+      }
+    }
+
+    case "REST_CARDS":
+    case "REST_NAMED_CARD": {
+      const newChars = p.characters.map((c) =>
+        selectedSet.has(c.instanceId) ? { ...c, state: "RESTED" as const } : c,
+      );
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, characters: newChars };
+      return { ...state, players: newPlayers };
+    }
+
+    default:
+      return state;
+  }
+}
+
+/**
+ * Process remaining queued triggers after a frame completes.
+ * This is the mechanism that ensures all triggers from an event are resolved.
+ */
+export function processRemainingTriggers(
+  state: GameState,
+  pendingTriggers: QueuedTrigger[],
+  cardDb: Map<string, CardData>,
+  priorEvents: PendingEvent[] = [],
+): EffectResolverResult {
+  const events = [...priorEvents];
+  let nextState = state;
+
+  for (let i = 0; i < pendingTriggers.length; i++) {
+    const trigger = pendingTriggers[i];
+    const result = resolveEffect(
+      nextState,
+      trigger.effectBlock as EffectBlock,
+      trigger.sourceCardInstanceId,
+      trigger.controller,
+      cardDb,
+    );
+    nextState = result.state;
+    events.push(...result.events);
+
+    if (result.pendingPrompt) {
+      // Store remaining triggers in the top frame
+      const topFrame = peekFrame(nextState) as EffectStackFrame;
+      if (topFrame) {
+        nextState = updateTopFrame(nextState, {
+          pendingTriggers: pendingTriggers.slice(i + 1),
+        });
+      }
+      return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
+    }
+
+    // Emit events from this trigger's resolution
+    for (const event of result.events) {
+      nextState = emitEvent(
+        nextState,
+        event.type,
+        event.playerIndex ?? trigger.controller,
+        event.payload ?? {},
+      );
     }
   }
 

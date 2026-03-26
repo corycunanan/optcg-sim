@@ -18,18 +18,21 @@ By the end of M4, all cards in 1–2 initial sets have machine-readable effects,
 
 ### Deliverables
 
-- [ ] Effect schema TypeScript types finalized (full vocabulary for all known OPTCG mechanics)
+- [x] Effect schema TypeScript types finalized (full vocabulary for all known OPTCG mechanics) — `effect-types.ts`, 1049 lines, 80+ action types
 - [ ] JSON schema validator for `effectSchema`
-- [ ] Trigger system: registers triggers from `effectSchema`, matches events, queues for resolution
-- [ ] Effect resolver: reads `effectSchema` action chains, pays costs, executes effects
-- [ ] Target resolver: filters valid targets, auto-selects when only one option, prompts player
-- [ ] Prohibition registry active (pipeline step 2 populated)
-- [ ] Replacement interceptor active (pipeline step 3 populated)
-- [ ] Duration tracker: continuous effects, expiry waves (THIS_TURN, THIS_BATTLE, PERMANENT, WHILE_CONDITION)
-- [ ] Modifier layer system extended: Layer 1 (base-setting) and full Layer 2 (additive/subtractive effect modifiers)
-- [ ] One-time modifier support ("next time you play X, cost reduced by N")
-- [ ] Scheduled action queue (end-of-turn obligations, future-phase deferred actions)
-- [ ] Hand-authored `effectSchema` for all OP01 cards (~120 cards)
+- [x] Trigger system: registers triggers from `effectSchema`, matches events, queues for resolution — `triggers.ts`
+- [x] Effect resolver: reads `effectSchema` action chains, pays costs, executes effects — `effect-resolver.ts`
+- [x] Target resolver: filters valid targets, auto-selects when only one option, prompts player — integrated into `effect-resolver.ts`
+- [x] Prohibition registry active (pipeline step 2 populated) — `prohibitions.ts`
+- [x] Replacement interceptor active (pipeline step 3 populated) — `replacements.ts`
+- [x] Duration tracker: continuous effects, expiry waves (THIS_TURN, THIS_BATTLE, PERMANENT, WHILE_CONDITION) — `duration-tracker.ts`
+- [x] Modifier layer system extended: Layer 1 (base-setting) and full Layer 2 (additive/subtractive effect modifiers) — `modifiers.ts`
+- [x] One-time modifier support ("next time you play X, cost reduced by N")
+- [x] Scheduled action queue (end-of-turn obligations, future-phase deferred actions)
+- [x] Effect stack: LIFO stack for nested effect resolution with stack-based cost payment — `effect-stack.ts`
+- [x] Cost payment with player selection: selection-based costs (TRASH_FROM_HAND, KO_OWN_CHARACTER, etc.) prompt the player instead of auto-selecting
+- [x] LIFO trigger queue: nested triggers resolve newest-first per TCG stack semantics
+- [ ] Hand-authored `effectSchema` for all OP01 cards (~120 cards) — 51/~120 authored so far
 - [ ] Hand-authored `effectSchema` for OP02 cards (~120 cards) _(stretch)_
 
 ---
@@ -131,6 +134,7 @@ When a `GameEvent` fires, scan all `RegisteredTrigger`s:
 1. Turn player's triggers resolve before non-turn player's
 2. Within a player's triggers, that player chooses order
 3. During damage processing: non-[Trigger] effects queue until all damage is done; [Trigger] life card effects interrupt immediately
+4. **LIFO nesting:** When a resolved trigger emits events that match new triggers, those new triggers are inserted at the front of the queue and resolve before remaining triggers from the original event — matching standard TCG stack semantics
 
 ---
 
@@ -139,14 +143,22 @@ When a `GameEvent` fires, scan all `RegisteredTrigger`s:
 For each trigger in the ordered queue:
 
 1. **Condition check** — evaluate block `conditions` against current state; skip if not met
-2. **Optional check** — if `flags.optional`, prompt controller; skip if declined
-3. **Cost payment** — verify costs are payable, pay them via the action pipeline; if payment fails, Once Per Turn is still consumed
+2. **Optional check** — if `flags.optional`, push an `EffectStackFrame` and prompt controller; skip if declined
+3. **Cost payment** — auto-pay simple costs (DON_REST, DON_MINUS) immediately; prompt player for selection-based costs (TRASH_FROM_HAND, KO_OWN_CHARACTER, etc.) via `SELECT_TARGET`; if payment fails, Once Per Turn is still consumed
 4. **Action chain execution** — execute `actions` array respecting chain connectors:
    - `THEN`: execute next action regardless of prior success
    - `IF_DO`: execute only if prior action produced a result
    - `AND`: execute simultaneously with prior action (atomic)
 5. **Back-references** — actions using `target_ref` resolve from prior action's `result_ref`
-6. **Re-triggering** — each action enters the pipeline at step 1, may emit new events
+6. **Re-triggering** — resolved effects emit events that are scanned for new triggers; new triggers are inserted at the front of the queue (LIFO) and resolve before remaining triggers from the original event
+
+### Effect Stack
+
+The engine uses a LIFO effect stack (`GameState.effectStack`) for nested effect resolution. Each `EffectStackFrame` tracks a paused effect chain — its phase (optional prompt, cost selection, target selection, etc.), remaining actions, pending costs, and queued triggers.
+
+When a player responds to a prompt, `resumeFromStack()` reads the top frame, processes the response (pay cost, select target, etc.), and either produces a new prompt or pops the frame. If popping reveals more queued triggers, those are processed before returning control to the pipeline.
+
+This replaces the flat `ResumeContext` pattern for all new code paths. The legacy `resumeEffectChain()` remains as a fallback for any prompts created without a stack frame.
 
 ---
 
@@ -364,53 +376,67 @@ End of turn:
 
 After M4 ships, `MANUAL_EFFECT` actions should be rare — only for edge cases not yet in the schema or genuinely unimplemented mechanics.
 
+### Game Board UI (implemented in M3.75 and M4)
+
+The visual game board supports all M4 effect interactions:
+
+- **OptionalEffectModal** — prompts player to accept/decline optional effects
+- **SelectTargetModal** — target selection for effects and cost payment (reused for TRASH_FROM_HAND, etc.)
+- **PlayerChoiceModal** — multi-option branches ("Choose one:")
+- **ArrangeTopCardsModal** — search deck results (keep 1, arrange rest)
+- **RevealTriggerModal** — life card trigger accept/decline
+- **CardActionMenu** — context menu for activate effects on field cards
+- **EventLog** — displays effect resolution events in real time
+- **DevTestPanel** — dev-mode panel for testing effect scenarios
+
 ---
 
 ## Roadmap
 
-| Step | Task | Est. |
-|------|------|------|
-| 1 | Finalize effect schema TypeScript types (full vocabulary) | 1 day |
-| 2 | Build JSON schema validator for `effectSchema` | 0.5 day |
-| 3 | Implement trigger registration and deregistration (zone entry/exit) | 1 day |
-| 4 | Implement trigger matching (event type, filters, zone validity, once-per-turn) | 1–2 days |
-| 5 | Implement trigger ordering (turn-player-first, damage processing exception) | 1 day |
-| 6 | Implement effect resolver (cost payment, condition evaluation, action chain execution) | 3–4 days |
-| 7 | Implement target resolver (filter computation, auto-select, player prompt) | 2 days |
-| 8 | Implement duration tracker (all expiry waves, WHILE_CONDITION recalculation) | 2 days |
-| 9 | Extend modifier layer system (Layer 1 base-setting, full Layer 2) | 1 day |
-| 10 | Implement prohibition registry (pipeline step 2 active) | 1 day |
-| 11 | Implement replacement interceptor (pipeline step 3 active) | 2 days |
-| 12 | Implement scheduled action queue (end-of-turn obligations) | 1 day |
-| 13 | Implement one-time modifiers | 0.5 day |
-| 14 | Author `effectSchema` for all OP01 cards (~120 cards) | 5–7 days |
-| 15 | Test each effect type in actual game scenarios | 3 days |
-| 16 | Edge case testing (simultaneous triggers, chains, KO during effect) | 2–3 days |
-| 17 | Author `effectSchema` for OP02 cards (~120 cards) _(stretch)_ | 5–7 days |
-
-**Total estimate: ~27–38 days** (core) **/ ~32–45 days** (with OP02 stretch)
+| Step | Task | Status |
+|------|------|--------|
+| 1 | Finalize effect schema TypeScript types (full vocabulary) | Done |
+| 2 | Build JSON schema validator for `effectSchema` | Not started |
+| 3 | Implement trigger registration and deregistration (zone entry/exit) | Done |
+| 4 | Implement trigger matching (event type, filters, zone validity, once-per-turn) | Done |
+| 5 | Implement trigger ordering (turn-player-first, damage processing exception) | Done |
+| 6 | Implement effect resolver (cost payment, condition evaluation, action chain execution) | Done |
+| 7 | Implement target resolver (filter computation, auto-select, player prompt) | Done |
+| 8 | Implement duration tracker (all expiry waves, WHILE_CONDITION recalculation) | Done |
+| 9 | Extend modifier layer system (Layer 1 base-setting, full Layer 2) | Done |
+| 10 | Implement prohibition registry (pipeline step 2 active) | Done |
+| 11 | Implement replacement interceptor (pipeline step 3 active) | Done |
+| 12 | Implement scheduled action queue (end-of-turn obligations) | Done |
+| 13 | Implement one-time modifiers | Done |
+| 14 | Implement effect stack (LIFO nested resolution, stack-based cost payment) | Done |
+| 15 | Implement cost payment with player selection (TRASH_FROM_HAND, etc.) | Done |
+| 16 | Implement LIFO trigger queue (nested triggers resolve newest-first) | Done |
+| 17 | Author `effectSchema` for all OP01 cards (~120 cards) | 51/~120 done |
+| 18 | Test each effect type in actual game scenarios | Ongoing |
+| 19 | Edge case testing (simultaneous triggers, chains, KO during effect) | Ongoing |
+| 20 | Author `effectSchema` for OP02 cards (~120 cards) _(stretch)_ | Not started |
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] ON_PLAY effects fire and resolve when a card is played
-- [ ] WHEN_ATTACKING effects fire at Attack Step
-- [ ] COUNTER effects resolve automatically during Counter Step
-- [ ] [Trigger] effect text from life cards executes via effect resolver (not just keyword prompt)
-- [ ] ON_KO effects fire with correct two-phase semantics (activate on field, resolve in trash)
-- [ ] END_OF_TURN effects fire automatically during End Phase
-- [ ] Effects that require targeting prompt the correct player with valid targets only
-- [ ] Effect costs are paid before effects resolve (DON!! return, rest, trash)
-- [ ] Conditions are evaluated correctly (life count, character count, DON!! threshold, etc.)
-- [ ] Once-per-turn effects cannot be activated twice in the same turn
-- [ ] Optional effects can be declined by the player
-- [ ] Multiple simultaneous triggers are ordered correctly (turn player first, player chooses among their own)
-- [ ] Power modifications expire at the correct time (THIS_BATTLE, THIS_TURN, PERMANENT)
-- [ ] Prohibitions correctly block prohibited actions
-- [ ] Replacement effects correctly substitute actions and suppress original
-- [ ] "Cannot X" effects cannot be bypassed by simultaneous "do X" instructions
-- [ ] All cards in OP01 have authored `effectSchema` and function correctly in-game
+- [x] ON_PLAY effects fire and resolve when a card is played
+- [x] WHEN_ATTACKING effects fire at Attack Step
+- [x] COUNTER effects resolve automatically during Counter Step
+- [x] [Trigger] effect text from life cards executes via effect resolver (not just keyword prompt)
+- [x] ON_KO effects fire with correct two-phase semantics (activate on field, resolve in trash)
+- [x] END_OF_TURN effects fire automatically during End Phase
+- [x] Effects that require targeting prompt the correct player with valid targets only
+- [x] Effect costs are paid before effects resolve (DON!! return, rest, trash) — now with player selection for TRASH_FROM_HAND etc.
+- [x] Conditions are evaluated correctly (life count, character count, DON!! threshold, etc.)
+- [x] Once-per-turn effects cannot be activated twice in the same turn
+- [x] Optional effects can be declined by the player
+- [x] Multiple simultaneous triggers are ordered correctly (turn player first, player chooses among their own)
+- [x] Power modifications expire at the correct time (THIS_BATTLE, THIS_TURN, PERMANENT)
+- [x] Prohibitions correctly block prohibited actions
+- [x] Replacement effects correctly substitute actions and suppress original
+- [ ] "Cannot X" effects cannot be bypassed by simultaneous "do X" instructions — needs testing
+- [ ] All cards in OP01 have authored `effectSchema` and function correctly in-game — 51/~120 done
 - [ ] `MANUAL_EFFECT` usage is near zero for OP01/OP02 cards after M4
 
 ---
@@ -449,4 +475,4 @@ After M4 ships, `MANUAL_EFFECT` actions should be rare — only for edge cases n
 
 ---
 
-_Last updated: 2026-03-20_
+_Last updated: 2026-03-26_

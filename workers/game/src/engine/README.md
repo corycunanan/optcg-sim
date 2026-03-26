@@ -12,7 +12,8 @@ The OPTCG game engine is a **purely immutable**, **event-driven** state machine 
 | `validation.ts` | Step 1 — action legality checks (phase, cost, zone, timing) |
 | `prohibitions.ts` | Step 2 — effect-based vetoes (`CANNOT_ATTACK`, `CANNOT_BLOCK`, etc.) |
 | `replacements.ts` | Step 3 — action substitution ("KO → return to hand instead") |
-| `effect-resolver.ts` | Core effect engine — costs, conditions, action chains, target selection |
+| `effect-resolver.ts` | Core effect engine — costs, conditions, action chains, target selection, stack-based resume |
+| `effect-stack.ts` | Effect stack helpers — push/pop/peek/update frames for nested effect resolution |
 | `triggers.ts` | Trigger registration, event matching, and ordering |
 | `events.ts` | Event bus — appends `GameEvent` entries to `eventLog` |
 | `phases.ts` | Phase transitions: REFRESH → DRAW → DON → MAIN → END |
@@ -40,6 +41,7 @@ pipeline.ts (orchestrator)
   │   └─ phases.ts        (phase advancement)
   ├─ triggers.ts          (step 5 — match events → effects)
   │   └─ effect-resolver.ts
+  │       ├─ effect-stack.ts (LIFO stack for nested resolution)
   │       ├─ conditions.ts
   │       └─ modifiers.ts
   ├─ events.ts            (event logging)
@@ -65,7 +67,7 @@ Step 6: RECALCULATE    → Expire effects, recompute modifier layers
 Step 7: RULE PROCESS   → Check defeat conditions (defeat.ts)
 ```
 
-**Important:** Steps 5-6 can recurse — an effect's actions may emit events that fire further triggers.
+**Important:** Step 5 uses LIFO trigger resolution — when a resolved effect emits events that match new triggers, those triggers are inserted at the front of the queue and resolved before remaining triggers from the original event. This matches TCG stack semantics where the newest effect resolves first.
 
 ## Core Data Structures
 
@@ -84,6 +86,7 @@ GameState {
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED"
   winner: 0 | 1 | null
   pendingPrompt: PendingPromptState | null  // Awaiting player input
+  effectStack: EffectStackFrame[]         // LIFO stack for nested effect resolution
 }
 ```
 
@@ -197,12 +200,56 @@ EffectBlock {
 
 ```
 1. Evaluate conditions  → Block-level conditions must be true
-2. Check optional flag  → If optional, prompt player (creates PendingPrompt)
-3. Pay costs            → Execute cost actions (DON_REST, TRASH_FROM_HAND, etc.)
+2. Check optional flag  → If optional, push stack frame and prompt player
+3. Pay costs            → Auto-pay simple costs (DON_REST, DON_MINUS)
+                          Prompt player for selection-based costs (TRASH_FROM_HAND, etc.)
 4. Mark once-per-turn   → Record usage in turn.oncePerTurnUsed
 5. Execute action chain → Run actions with THEN/IF_DO/AND connectors
 6. Store result refs    → For back-references via result_ref
 ```
+
+### Effect Stack (effect-stack.ts)
+
+The engine uses a LIFO effect stack (`GameState.effectStack`) for nested effect resolution. Each `EffectStackFrame` represents a paused effect chain:
+
+```typescript
+EffectStackFrame {
+  id: string
+  sourceCardInstanceId: string
+  controller: 0 | 1
+  effectBlock: EffectBlock
+  phase: EffectStackPhase          // Where in the flow this frame paused
+  pausedAction: Action | null      // Action awaiting player input
+  remainingActions: Action[]       // Actions still to execute
+  costs: Cost[]                    // Full cost array
+  currentCostIndex: number         // Which cost we're on
+  costsPaid: boolean               // Whether all costs are paid
+  pendingTriggers: QueuedTrigger[] // Triggers waiting to resolve after this frame
+}
+```
+
+**Phases:**
+- `AWAITING_OPTIONAL_RESPONSE` — player deciding whether to activate
+- `AWAITING_COST_SELECTION` — player choosing cards for a selection-based cost
+- `AWAITING_TARGET_SELECTION` — player choosing targets for an action
+- `AWAITING_ARRANGE_CARDS` — player arranging search results
+- `AWAITING_PLAYER_CHOICE` — player choosing between branches
+- `INTERRUPTED_BY_TRIGGERS` — paused because a nested trigger pushed onto the stack
+
+**Stack flow:**
+```
+Attack declared → ON_OPPONENT_ATTACK trigger fires
+  → Frame pushed: AWAITING_OPTIONAL_RESPONSE (costs: TRASH_FROM_HAND)
+  → Player accepts
+  → Frame transitions to AWAITING_COST_SELECTION
+  → Player selects card to trash
+  → Costs paid, actions execute
+  → If actions trigger new effects → new frame pushed (LIFO)
+  → Nested effect resolves → frame popped → original frame resumes
+  → All frames popped → pipeline continues
+```
+
+**Resume entry point:** `resumeFromStack()` — routes player responses to the correct frame based on phase. Replaces direct `resumeEffectChain()` calls when the stack is non-empty.
 
 ### Supported Actions
 
@@ -224,7 +271,7 @@ Core actions executed by `executeEffectAction()`:
 
 ### Pending Prompts
 
-When effect resolution requires player input, the engine pauses by setting `state.pendingPrompt`:
+When effect resolution requires player input, the engine pauses by setting `state.pendingPrompt` and pushing an `EffectStackFrame`:
 
 ```typescript
 PendingPromptState {
@@ -232,13 +279,11 @@ PendingPromptState {
               "SEARCH_DECK" | "SEARCH_TRASH" | "REVEAL_TRIGGER"
   options: { ... }                // Context-specific options
   respondingPlayer: 0 | 1
-  resumeContext: {                // State needed to continue resolution
-    effectSourceInstanceId, controller, pausedAction, remainingActions, resultRefs
-  }
+  resumeContext: string           // Stack frame ID (full context lives on effectStack)
 }
 ```
 
-When the player responds, `pipeline.ts` resumes execution from the saved context.
+When the player responds, `GameSession.resumeFromPrompt()` delegates to `resumeFromStack()`, which reads the top frame from `effectStack`, processes the response, and either produces a new prompt or pops the frame and continues.
 
 ## Modifier Layer System (modifiers.ts)
 
@@ -340,7 +385,7 @@ export const OP01_006: EffectSchema = {
 
 ## Important Rules & Edge Cases
 
-- **Trigger ordering** (rules §8-6): Turn player's triggers resolve first, then opponent's
+- **Trigger ordering** (rules §8-6): Turn player's triggers resolve first, then opponent's. Triggers are processed via a LIFO queue — nested triggers (from resolved effects) are inserted at the front and resolve before remaining triggers from the original event.
 - **Once-per-turn** tracking uses `turn.oncePerTurnUsed[effectBlockId]` → array of source instanceIds
 - **Summoning sickness**: Characters can't attack on the turn they're played unless they have RUSH
 - **RUSH:Character** restriction: Can only attack characters (not leader) on the turn played

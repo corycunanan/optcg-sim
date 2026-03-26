@@ -27,6 +27,8 @@ import {
   deregisterTriggersForCard,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver.js";
+import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
+import type { QueuedTrigger } from "../types.js";
 import {
   expireEndOfTurnEffects,
   expireBattleEffects,
@@ -125,11 +127,10 @@ function fireEventsAndTriggers(
   // Handle trigger registration for zone changes
   state = handleZoneChangeTriggers(state, execResult, cardDb);
 
-  // Scan triggerRegistry for matches against emitted events
-  // Process only events emitted by this execution (not historical)
-  const eventsToProcess = execResult.events;
+  // Collect ALL matched triggers from ALL events, ordered per rule §8-6
+  const triggerQueue: QueuedTrigger[] = [];
 
-  for (const pendingEvent of eventsToProcess) {
+  for (const pendingEvent of execResult.events) {
     const gameEvent = {
       type: pendingEvent.type,
       playerIndex: pendingEvent.playerIndex ?? pi,
@@ -142,40 +143,128 @@ function fireEventsAndTriggers(
     if (matched.length === 0) continue;
 
     const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
-
-    // Resolve each matched trigger's effect block
     for (const match of ordered) {
-      console.log(`[pipeline] resolving trigger blockId=${match.effectBlock.id} card=${match.trigger.sourceCardInstanceId}`);
-      const result = resolveEffect(
-        state,
-        match.effectBlock,
-        match.trigger.sourceCardInstanceId,
-        match.trigger.controller,
-        cardDb,
-      );
-      console.log(`[pipeline] resolveEffect resolved=${result.resolved} hasPendingPrompt=${!!result.pendingPrompt}`);
-      state = result.state;
+      triggerQueue.push({
+        sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+        controller: match.trigger.controller,
+        effectBlock: match.effectBlock,
+        triggeringEvent: pendingEvent,
+      });
+    }
+  }
 
-      if (result.pendingPrompt) {
-        // Store pause state and stop processing further triggers
-        state = { ...state, pendingPrompt: result.pendingPrompt };
-        return state;
-      }
+  // Process trigger queue with LIFO insertion for nested triggers
+  if (triggerQueue.length > 0) {
+    const result = processTriggerQueuePipeline(state, triggerQueue, cardDb);
+    state = result.state;
 
-      // Emit events from effect resolution (which may trigger further effects)
-      for (const event of result.events) {
-        state = emitEvent(
-          state,
-          event.type,
-          event.playerIndex ?? match.trigger.controller,
-          event.payload ?? {},
-        );
-      }
+    if (result.pendingPrompt) {
+      state = { ...state, pendingPrompt: result.pendingPrompt };
+      // Record action before returning (so it's tracked even when paused)
+      state = recordAction(state, action);
+      return state;
     }
   }
 
   // Record the action performed
-  state = {
+  state = recordAction(state, action);
+  return state;
+}
+
+/**
+ * Process a queue of triggers with LIFO semantics.
+ * When a resolved trigger emits events that match new triggers,
+ * those new triggers are inserted at the FRONT of the queue (LIFO).
+ */
+function processTriggerQueuePipeline(
+  state: GameState,
+  queue: QueuedTrigger[],
+  cardDb: Map<string, CardData>,
+): { state: GameState; pendingPrompt?: PendingPromptState } {
+  let nextState = state;
+
+  while (queue.length > 0) {
+    const next = queue.shift()!;
+
+    console.log(`[pipeline] resolving trigger blockId=${(next.effectBlock as any).id} card=${next.sourceCardInstanceId}`);
+    const result = resolveEffect(
+      nextState,
+      next.effectBlock as import("./effect-types.js").EffectBlock,
+      next.sourceCardInstanceId,
+      next.controller,
+      cardDb,
+    );
+    console.log(`[pipeline] resolveEffect resolved=${result.resolved} hasPendingPrompt=${!!result.pendingPrompt}`);
+    nextState = result.state;
+
+    if (result.pendingPrompt) {
+      // Store remaining triggers in the top stack frame's pendingTriggers
+      const topFrame = peekStackFrame(nextState);
+      if (topFrame) {
+        nextState = updateStackTopFrame(nextState, {
+          pendingTriggers: [...(topFrame as any).pendingTriggers ?? [], ...queue],
+        });
+      }
+      return { state: nextState, pendingPrompt: result.pendingPrompt };
+    }
+
+    // Emit events from this trigger's resolution
+    for (const event of result.events) {
+      nextState = emitEvent(
+        nextState,
+        event.type,
+        event.playerIndex ?? next.controller,
+        event.payload ?? {},
+      );
+    }
+
+    // LIFO: scan result events for new triggers and insert at front
+    if (result.events.length > 0) {
+      const newTriggers = scanEventsForTriggers(nextState, result.events, next.controller, cardDb);
+      if (newTriggers.length > 0) {
+        queue.unshift(...newTriggers);
+      }
+    }
+  }
+
+  return { state: nextState };
+}
+
+function scanEventsForTriggers(
+  state: GameState,
+  events: { type: import("../types.js").GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[],
+  defaultController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): QueuedTrigger[] {
+  const triggers: QueuedTrigger[] = [];
+
+  for (const event of events) {
+    const gameEvent = {
+      type: event.type,
+      playerIndex: event.playerIndex ?? defaultController,
+      payload: event.payload ?? {},
+      timestamp: Date.now(),
+    };
+
+    const matched = matchTriggersForEvent(state, gameEvent, cardDb);
+    if (matched.length === 0) continue;
+
+    const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
+    for (const match of ordered) {
+      triggers.push({
+        sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+        controller: match.trigger.controller,
+        effectBlock: match.effectBlock,
+        triggeringEvent: event,
+      });
+    }
+  }
+
+  return triggers;
+}
+
+function recordAction(state: GameState, action: GameAction): GameState {
+  return {
     ...state,
     turn: {
       ...state.turn,
@@ -185,9 +274,8 @@ function fireEventsAndTriggers(
       ],
     },
   };
-
-  return state;
 }
+
 
 /**
  * Handle trigger registration/deregistration for zone changes.

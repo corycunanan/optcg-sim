@@ -170,6 +170,51 @@ export interface GameEvent {
   timestamp: number;
 }
 
+// ─── Effect Stack ────────────────────────────────────────────────────────────
+
+export type EffectStackPhase =
+  | "AWAITING_OPTIONAL_RESPONSE"
+  | "AWAITING_COST_SELECTION"
+  | "AWAITING_TARGET_SELECTION"
+  | "AWAITING_ARRANGE_CARDS"
+  | "AWAITING_PLAYER_CHOICE"
+  | "INTERRUPTED_BY_TRIGGERS";
+
+export interface EffectStackFrame {
+  id: string;
+  sourceCardInstanceId: string;
+  controller: 0 | 1;
+  /** EffectBlock — typed as unknown in shared layer, cast in worker */
+  effectBlock: unknown;
+  phase: EffectStackPhase;
+
+  // Action chain state
+  pausedAction: unknown | null;
+  remainingActions: unknown[];
+  resultRefs: [string, unknown][];
+  validTargets: string[];
+
+  // Cost tracking
+  costs: unknown[];
+  currentCostIndex: number;
+  costsPaid: boolean;
+  oncePerTurnMarked: boolean;
+
+  // Queued triggers waiting to resolve after this frame
+  pendingTriggers: QueuedTrigger[];
+
+  // Events accumulated during partial execution
+  accumulatedEvents: { type: GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[];
+}
+
+export interface QueuedTrigger {
+  sourceCardInstanceId: string;
+  controller: 0 | 1;
+  /** EffectBlock — typed as unknown in shared layer, cast in worker */
+  effectBlock: unknown;
+  triggeringEvent: { type: GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> };
+}
+
 // ─── Pending Prompt State ─────────────────────────────────────────────────────
 
 export interface PendingPromptState {
@@ -192,6 +237,7 @@ export interface GameState {
   oneTimeModifiers: ActiveOneTimeModifier[];
   triggerRegistry: RegisteredTrigger[];
   pendingPrompt: PendingPromptState | null;
+  effectStack: EffectStackFrame[];
   // Log
   eventLog: GameEvent[];
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";

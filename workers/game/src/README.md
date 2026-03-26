@@ -8,7 +8,7 @@ The game worker is a Cloudflare Worker using Durable Objects for real-time game 
 |------|---------|
 | `index.ts` | Worker entry point — HTTP routing, dispatches to Durable Object |
 | `GameSession.ts` | Durable Object — WebSocket handler, action routing, prompt/resume loop, reconnection |
-| `types.ts` | `GameInitPayload`, `ResumeContext`, shared worker types |
+| `types.ts` | `GameInitPayload`, `ResumeContext`, `EffectStackFrame`, `QueuedTrigger`, shared worker types |
 | `engine/` | Pure game engine (see `engine/README.md`) |
 
 ## Architecture Overview
@@ -145,10 +145,13 @@ Client sends prompt-response action (SELECT_TARGET, ARRANGE_TOP_CARDS, PLAYER_CH
     ↓
 GameSession.resumeFromPrompt():
   - Clears pendingPrompt
-  - Routes to resumeEffectChain() or resumeReplacement() based on resumeContext.type
-  - Executes remaining actions from saved context
+  - Routes by context type:
+    • REPLACEMENT → resumeReplacement()
+    • Effect stack non-empty → resumeFromStack() (reads top frame, routes by phase)
+    • Legacy fallback → resumeEffectChain()
+  - resumeFromStack handles: optional accept → cost payment → action execution
   - If new prompt needed → recurse
-  - Otherwise → persist + broadcast final state
+  - When stack fully unwinds → persist + broadcast final state
 ```
 
 ### Prompt Types
@@ -156,11 +159,13 @@ GameSession.resumeFromPrompt():
 | Type | When | Player Responds With |
 |------|------|---------------------|
 | `OPTIONAL_EFFECT` | "You may..." effects | action or PASS |
-| `SELECT_TARGET` | "Choose up to N" | `selectedInstanceIds` |
+| `SELECT_TARGET` | "Choose up to N" targets, or cost card selection | `selectedInstanceIds` |
 | `PLAYER_CHOICE` | "Choose one:" branches | `choiceId` |
 | `ARRANGE_TOP_CARDS` | Search deck, look at top N | `keptCardInstanceId`, `orderedInstanceIds` |
 | `SEARCH_DECK` | Full deck search | selection |
 | `REVEAL_TRIGGER` | Life card trigger | accept or decline |
+
+**Note:** `SELECT_TARGET` is reused for cost selection (e.g., "Choose a card to trash as cost"). The `effectDescription` and `ctaLabel` in prompt options distinguish the context for the client UI.
 
 ## Persistence
 
