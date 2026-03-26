@@ -7,9 +7,10 @@
  * - Expiry (wave-based processing at phase boundaries)
  */
 
-import type { RuntimeActiveEffect, ExpiryTiming } from "./effect-types.js";
-import type { GameState } from "../types.js";
+import type { RuntimeActiveEffect, ExpiryTiming, Condition } from "./effect-types.js";
+import type { GameState, CardData } from "../types.js";
 import { cleanupConsumedOneTimeModifiers, expireOneTimeModifiers } from "./modifiers.js";
+import { evaluateCondition, type ConditionContext } from "./conditions.js";
 
 /**
  * Expire all effects whose duration has elapsed.
@@ -117,6 +118,38 @@ export function expireProhibitions(
 
   if (remaining.length === prohibitions.length) return state;
   return { ...state, prohibitions: remaining as any };
+}
+
+/**
+ * Re-evaluate all WHILE_CONDITION effects.
+ * Effects whose condition is no longer true are removed.
+ * Effects whose condition becomes true again are NOT re-added — they must be
+ * re-registered through the trigger system. This function only handles removal.
+ */
+export function evaluateWhileConditions(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const remaining = effects.filter((e) => {
+    if (e.expiresAt.wave !== "CONDITION_FALSE") return true;
+
+    // Extract the condition from the duration
+    const duration = e.duration as { type: string; condition?: Condition };
+    if (duration.type !== "WHILE_CONDITION" || !duration.condition) return true;
+
+    // Evaluate the condition
+    const condCtx: ConditionContext = {
+      sourceCardInstanceId: e.sourceCardInstanceId,
+      controller: e.controller,
+      cardDb,
+    };
+
+    return evaluateCondition(state, duration.condition, condCtx);
+  });
+
+  if (remaining.length === effects.length) return state;
+  return { ...state, activeEffects: remaining as any };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

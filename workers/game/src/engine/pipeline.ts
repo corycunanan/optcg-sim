@@ -35,6 +35,7 @@ import {
   expireSourceLeftZone,
   expireProhibitions,
   processScheduledActions,
+  evaluateWhileConditions,
 } from "./duration-tracker.js";
 
 export interface PipelineResult {
@@ -346,6 +347,9 @@ function recalculateModifiers(
   action: GameAction,
   cardDb: Map<string, CardData>,
 ): GameState {
+  // Re-evaluate WHILE_CONDITION effects every step
+  state = evaluateWhileConditions(state, cardDb);
+
   // Expire battle-scoped effects when battle ends
   if (action.type === "PASS" && state.turn.battle) {
     state = expireBattleEffects(state, state.turn.battle.battleId);

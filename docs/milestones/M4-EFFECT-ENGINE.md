@@ -453,6 +453,23 @@ The visual game board supports all M4 effect interactions:
 
 ---
 
+## Tech Debt
+
+### Pre-game rule modifications not enforced in deck builder
+
+Cards with `rule_modification` effects that alter deck construction rules (deck restrictions, copy limit overrides, DON deck size changes) are encoded in the effect schema but **not enforced by the deck validation engine** (`src/lib/deck-builder/validation.ts`). The validator currently hardcodes universal rules (4-copy limit, 50 cards, color affinity) and has no awareness of leader-specific or card-specific rule modifications.
+
+**Known cards requiring this:**
+- **OP01-075 Pacifista** — `COPY_LIMIT_OVERRIDE`: "you may have any number of this card in your deck"
+- **OP12-001 Silvers Rayleigh** (Leader) — `DECK_RESTRICTION`: "you cannot include cards with a cost of 5 or more in your deck"
+- **OP13-079 Imu** (Leader) — `DECK_RESTRICTION` + `START_OF_GAME_EFFECT`: "you cannot include Events with a cost of 2 or more in your deck" + "at the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck"
+
+**Recommended approach:** Static lookup tables in the validator keyed by card ID — not dynamic schema interpretation. There are fewer than 10 cards across the entire game with these rules. `START_OF_GAME_EFFECT` should execute in `buildInitialState()` after deck setup but before turn 1.
+
+**When to address:** When encoding the sets containing these cards (OP01, OP12, OP13).
+
+---
+
 ## Dependencies
 
 - M3 complete (7-step pipeline, event bus, immutable state model, WebSocket sync, game board UI)

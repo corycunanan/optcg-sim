@@ -161,7 +161,14 @@ export type GameEventType =
   | "DON_STATE_CHANGED"
   | "CARD_STATE_CHANGED"
   | "POWER_MODIFIED"
-  | "GAME_OVER";
+  | "GAME_OVER"
+  | "CARD_RETURNED_TO_DECK"
+  | "DON_SET_ACTIVE"
+  | "DON_RESTED"
+  | "CARDS_REVEALED"
+  | "EFFECTS_NEGATED"
+  | "LIFE_CARD_TO_DECK"
+  | "LIFE_SCRIED";
 
 export interface GameEvent {
   type: GameEventType;
@@ -339,6 +346,7 @@ export interface PromptOptions {
   countMin?: number;
   countMax?: number;
   ctaLabel?: string;
+  blindSelection?: boolean; // true when selecting from hidden cards (opponent's hand)
   // PLAYER_CHOICE
   choices?: { id: string; label: string }[];
 }

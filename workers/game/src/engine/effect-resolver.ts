@@ -656,7 +656,7 @@ function executeEffectAction(
 
   switch (action.type) {
     case "DRAW": {
-      const amount = resolveAmount(params.amount as number | { type: string }, resultRefs);
+      const amount = resolveAmount(params.amount as number | { type: string }, resultRefs, state, controller, cardDb);
       if (amount <= 0) return { state, events, succeeded: false };
 
       const p = state.players[controller];
@@ -683,7 +683,7 @@ function executeEffectAction(
     }
 
     case "MODIFY_POWER": {
-      const amount = resolveAmount(params.amount as number | { type: string }, resultRefs);
+      const amount = resolveAmount(params.amount as number | { type: string }, resultRefs, state, controller, cardDb);
       const duration = action.duration ?? { type: "THIS_TURN" as const };
 
       const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -845,7 +845,6 @@ function executeEffectAction(
 
     case "SEARCH_DECK": {
       const lookAt = (params.look_at as number) ?? 5;
-      const pickUpTo = ((params.pick as any)?.up_to as number) ?? 1;
       const filter = (params.filter as any) ?? {};
       const restDest = (params.rest_destination as string) ?? "BOTTOM";
 
@@ -1308,6 +1307,1218 @@ function executeEffectAction(
       };
     }
 
+    // ─── RETURN_TO_DECK ────────────────────────────────────────────────────
+    case "RETURN_TO_DECK": {
+      const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      let nextState = state;
+      const returnedIds: string[] = [];
+      for (const id of targetIds) {
+        const replacement = checkReplacementForRemoval(nextState, id, controller, cardDb);
+        if (replacement.pendingPrompt) {
+          events.push(...replacement.events);
+          return { state: replacement.state, events, succeeded: false, pendingPrompt: replacement.pendingPrompt };
+        }
+        if (replacement.replaced) {
+          nextState = replacement.state;
+          events.push(...replacement.events);
+          continue;
+        }
+
+        const result = returnToDeck(nextState, id, position);
+        if (result) {
+          nextState = result.state;
+          events.push(...result.events);
+          returnedIds.push(id);
+        }
+      }
+
+      return {
+        state: nextState,
+        events,
+        succeeded: returnedIds.length > 0,
+        result: { targetInstanceIds: returnedIds, count: returnedIds.length },
+      };
+    }
+
+    // ─── PLAY_CARD ───────────────────────────────────────────────────────
+    case "PLAY_CARD": {
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      let nextState = state;
+      const playedIds: string[] = [];
+      for (const id of targetIds) {
+        const card = findCardInstanceById(nextState, id);
+        if (!card) continue;
+        const data = cardDb.get(card.cardId);
+        if (!data) continue;
+
+        const entryState = (params.entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
+
+        // Remove card from its source zone (hand, trash, or deck)
+        const removeFromSourceZone = (p: typeof nextState.players[0]): typeof nextState.players[0] => {
+          if (card.zone === "HAND") return { ...p, hand: p.hand.filter((c) => c.instanceId !== id) };
+          if (card.zone === "TRASH") return { ...p, trash: p.trash.filter((c) => c.instanceId !== id) };
+          if (card.zone === "DECK") return { ...p, deck: p.deck.filter((c) => c.instanceId !== id) };
+          return { ...p, hand: p.hand.filter((c) => c.instanceId !== id) }; // default to hand
+        };
+
+        if (data.type.toUpperCase() === "CHARACTER") {
+          const p = removeFromSourceZone(nextState.players[controller]);
+          const newChar: CardInstance = {
+            ...card,
+            instanceId: nanoid(),
+            zone: "CHARACTER",
+            state: entryState,
+            attachedDon: [],
+            turnPlayed: nextState.turn.number,
+            controller,
+            owner: controller,
+          };
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[controller] = { ...p, characters: [...p.characters, newChar] };
+          nextState = { ...nextState, players: newPlayers };
+          playedIds.push(newChar.instanceId);
+          events.push({
+            type: "CARD_PLAYED",
+            playerIndex: controller,
+            payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER" },
+          });
+        } else if (data.type.toUpperCase() === "STAGE") {
+          const p = removeFromSourceZone(nextState.players[controller]);
+          const newStage: CardInstance = {
+            ...card,
+            instanceId: nanoid(),
+            zone: "STAGE",
+            state: "ACTIVE",
+            attachedDon: [],
+            turnPlayed: nextState.turn.number,
+            controller,
+            owner: controller,
+          };
+          // If there's an existing stage, trash it
+          let newTrash = p.trash;
+          if (p.stage) {
+            newTrash = [{ ...p.stage, zone: "TRASH" as const }, ...newTrash];
+          }
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[controller] = { ...p, stage: newStage, trash: newTrash };
+          nextState = { ...nextState, players: newPlayers };
+          playedIds.push(newStage.instanceId);
+        }
+      }
+
+      return {
+        state: nextState,
+        events,
+        succeeded: playedIds.length > 0,
+        result: { targetInstanceIds: playedIds, count: playedIds.length },
+      };
+    }
+
+    // ─── SET_DON_ACTIVE ──────────────────────────────────────────────────
+    case "SET_DON_ACTIVE": {
+      const amount = (params.amount as number) ?? 1;
+      const p = state.players[controller];
+      const restedDon = p.donCostArea.filter((d) => d.state === "RESTED");
+      const count = Math.min(amount, restedDon.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      let activated = 0;
+      const newDonCostArea = p.donCostArea.map((d) => {
+        if (d.state === "RESTED" && activated < count) {
+          activated++;
+          return { ...d, state: "ACTIVE" as const };
+        }
+        return d;
+      });
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, donCostArea: newDonCostArea };
+
+      events.push({ type: "DON_SET_ACTIVE", playerIndex: controller, payload: { count: activated } });
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: [], count: activated },
+      };
+    }
+
+    // ─── TRASH_CARD ──────────────────────────────────────────────────────
+    case "TRASH_CARD": {
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      let nextState = state;
+      const trashedIds: string[] = [];
+      for (const id of targetIds) {
+        const found = findCardInstanceById(nextState, id);
+        if (!found) continue;
+
+        // For characters on field, use KO-like logic (return DON!!)
+        if (found.zone === "CHARACTER") {
+          const result = koCharacter(nextState, id, controller);
+          if (result) {
+            nextState = result.state;
+            events.push(...result.events);
+            trashedIds.push(id);
+          }
+        } else {
+          // For hand/deck cards, move to trash
+          for (const [pi, player] of nextState.players.entries()) {
+            const inHand = player.hand.findIndex((c) => c.instanceId === id);
+            if (inHand !== -1) {
+              const card = player.hand[inHand];
+              const newHand = player.hand.filter((_, i) => i !== inHand);
+              const newTrash = [{ ...card, zone: "TRASH" as const }, ...player.trash];
+              const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+              newPlayers[pi] = { ...player, hand: newHand, trash: newTrash };
+              nextState = { ...nextState, players: newPlayers };
+              trashedIds.push(id);
+              events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { cardInstanceId: id, reason: "effect" } });
+              break;
+            }
+          }
+        }
+      }
+
+      return {
+        state: nextState,
+        events,
+        succeeded: trashedIds.length > 0,
+        result: { targetInstanceIds: trashedIds, count: trashedIds.length },
+      };
+    }
+
+    // ─── TRASH_FROM_HAND (action, not cost) ──────────────────────────────
+    case "TRASH_FROM_HAND": {
+      const targetController = (action.target?.controller === "OPPONENT")
+        ? (controller === 0 ? 1 : 0) as 0 | 1
+        : controller;
+      const amount = resolveAmount(params.amount as number | { type: string }, resultRefs, state, controller, cardDb) || 1;
+      const p = state.players[targetController];
+
+      let candidates = [...p.hand];
+      if (action.target?.filter) {
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state));
+      }
+
+      if (candidates.length === 0) return { state, events, succeeded: false };
+
+      // If opponent choosing, prompt
+      if (action.target?.controller === "OPPONENT" || action.type === "TRASH_FROM_HAND") {
+        const validTargets = candidates.map((c) => c.instanceId);
+        if (validTargets.length > amount) {
+          const resumeCtx: ResumeContext = {
+            effectSourceInstanceId: sourceCardInstanceId,
+            controller,
+            pausedAction: action,
+            remainingActions: [],
+            resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+            validTargets,
+          };
+          const pendingPrompt: PendingPromptState = {
+            promptType: "SELECT_TARGET",
+            options: {
+              validTargets,
+              countMin: amount,
+              countMax: amount,
+              effectDescription: `Choose ${amount} card(s) to trash from hand`,
+              ctaLabel: "Trash",
+              cards: candidates.filter((c) => validTargets.includes(c.instanceId)),
+            },
+            respondingPlayer: targetController,
+            resumeContext: resumeCtx,
+          };
+          return { state, events, succeeded: false, pendingPrompt };
+        }
+      }
+
+      // Auto-select
+      const toTrash = candidates.slice(0, amount);
+      const toTrashIds = new Set(toTrash.map((c) => c.instanceId));
+      const newHand = p.hand.filter((c) => !toTrashIds.has(c.instanceId));
+      const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[targetController] = { ...p, hand: newHand, trash: newTrash };
+
+      events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: amount, reason: "effect" } });
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: toTrash.map((c) => c.instanceId), count: amount },
+      };
+    }
+
+    // ─── REVEAL ──────────────────────────────────────────────────────────
+    case "REVEAL": {
+      const amount = (params.amount as number) ?? 1;
+      const source = (params.source as string) ?? "DECK";
+
+      if (source === "DECK" || source === "DECK_TOP") {
+        const p = state.players[controller];
+        const count = Math.min(amount, p.deck.length);
+        if (count === 0) return { state, events, succeeded: false };
+
+        const revealed = p.deck.slice(0, count);
+        events.push({
+          type: "CARDS_REVEALED",
+          playerIndex: controller,
+          payload: { cards: revealed.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })), source },
+        });
+
+        return {
+          state,
+          events,
+          succeeded: true,
+          result: { targetInstanceIds: revealed.map((c) => c.instanceId), count },
+        };
+      }
+
+      return { state, events, succeeded: true };
+    }
+
+    // ─── NEGATE_EFFECTS ──────────────────────────────────────────────────
+    case "NEGATE_EFFECTS": {
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      // Remove all active effects sourced by negated cards
+      const negatedSet = new Set(targetIds);
+      const newActiveEffects = state.activeEffects.filter(
+        (e) => !negatedSet.has((e as any).sourceCardInstanceId),
+      );
+
+      events.push({
+        type: "EFFECTS_NEGATED",
+        playerIndex: controller,
+        payload: { targetInstanceIds: targetIds },
+      });
+
+      return {
+        state: { ...state, activeEffects: newActiveEffects },
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: targetIds, count: targetIds.length },
+      };
+    }
+
+    // ─── MODIFY_COST ─────────────────────────────────────────────────────
+    case "MODIFY_COST": {
+      const amount = resolveAmount(params.amount as number | { type: string }, resultRefs, state, controller, cardDb);
+      const duration = action.duration ?? { type: "THIS_TURN" as const };
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      const effect: RuntimeActiveEffect = {
+        id: nanoid(),
+        sourceCardInstanceId,
+        sourceEffectBlockId: "",
+        category: "auto",
+        modifiers: [{
+          type: "MODIFY_COST",
+          params: { amount },
+          duration,
+        }],
+        duration,
+        expiresAt: computeExpiry(duration, state),
+        controller,
+        appliesTo: targetIds,
+        timestamp: Date.now(),
+      };
+
+      return {
+        state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: targetIds, count: targetIds.length },
+      };
+    }
+
+    // ─── HAND_WHEEL ──────────────────────────────────────────────────────
+    case "HAND_WHEEL": {
+      const trashCount = resolveAmount(params.trash_count as number | { type: string }, resultRefs, state, controller, cardDb) || (params.amount as number) || 0;
+      const drawCount = resolveAmount(params.draw_count as number | { type: string }, resultRefs, state, controller, cardDb) || (params.amount as number) || 0;
+
+      const p = state.players[controller];
+
+      // Trash cards from hand
+      const toTrashCount = Math.min(trashCount, p.hand.length);
+      if (toTrashCount === 0 && trashCount > 0) return { state, events, succeeded: false };
+
+      const trashed = p.hand.slice(0, toTrashCount);
+      const newHand = p.hand.slice(toTrashCount);
+      const newTrash = [...trashed.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
+      let nextState = { ...state, players: newPlayers };
+
+      events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: toTrashCount, reason: "hand_wheel" } });
+
+      // Draw cards
+      const actualDraw = Math.min(drawCount, nextState.players[controller].deck.length);
+      if (actualDraw > 0) {
+        const pp = nextState.players[controller];
+        const drawn = pp.deck.slice(0, actualDraw);
+        const remainingDeck = pp.deck.slice(actualDraw);
+        const updatedHand = [...pp.hand, ...drawn.map((c) => ({ ...c, zone: "HAND" as const }))];
+
+        const np = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        np[controller] = { ...pp, deck: remainingDeck, hand: updatedHand };
+        nextState = { ...nextState, players: np };
+
+        for (const card of drawn) {
+          events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
+        }
+      }
+
+      return {
+        state: nextState,
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: [], count: toTrashCount + actualDraw },
+      };
+    }
+
+    // ─── FULL_DECK_SEARCH ────────────────────────────────────────────────
+    case "FULL_DECK_SEARCH": {
+      const filter = (params.filter as any) ?? {};
+      const shuffleAfter = (params.shuffle_after as boolean) ?? true;
+
+      const p = state.players[controller];
+      if (p.deck.length === 0) return { state, events, succeeded: false };
+
+      // Find matching cards in entire deck
+      const matching = p.deck.filter((c) => {
+        const data = cardDb.get(c.cardId);
+        if (!data) return false;
+        if (filter.traits && !filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
+        if (filter.exclude_name && data.name === filter.exclude_name) return false;
+        if (filter.name && data.name !== filter.name) return false;
+        if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
+        if (filter.card_type && data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
+        if (filter.cost_min !== undefined && (data.cost ?? 0) < filter.cost_min) return false;
+        if (filter.cost_max !== undefined && (data.cost ?? 0) > filter.cost_max) return false;
+        if (filter.color) {
+          const cardColors = data.color ?? [];
+          if (!cardColors.some((clr: string) => clr.toUpperCase() === (filter.color as string).toUpperCase())) return false;
+        }
+        return true;
+      });
+
+      const validTargets = matching.map((c) => c.instanceId);
+
+      if (validTargets.length === 0) {
+        // No matching cards — still shuffle if required
+        if (shuffleAfter) {
+          const shuffled = shuffleArray([...p.deck]);
+          const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+          newPlayers[controller] = { ...p, deck: shuffled };
+          return { state: { ...state, players: newPlayers }, events, succeeded: false };
+        }
+        return { state, events, succeeded: false };
+      }
+
+      // Build a prompt for the player to pick from matching cards
+      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+      const effectDescription = sourceCardData?.effectText ?? "Search your deck.";
+
+      const resumeCtx: ResumeContext = {
+        effectSourceInstanceId: sourceCardInstanceId,
+        controller,
+        pausedAction: action,
+        remainingActions: [],
+        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        validTargets,
+      };
+      const pendingPrompt: PendingPromptState = {
+        promptType: "ARRANGE_TOP_CARDS",
+        options: {
+          cards: matching,
+          effectDescription,
+          canSendToBottom: false,
+          validTargets,
+        },
+        respondingPlayer: controller,
+        resumeContext: resumeCtx,
+      };
+
+      return { state, events, succeeded: false, pendingPrompt };
+    }
+
+    // ─── DECK_SCRY ───────────────────────────────────────────────────────
+    case "DECK_SCRY": {
+      const lookAt = (params.look_at as number) ?? 5;
+      const p = state.players[controller];
+      const count = Math.min(lookAt, p.deck.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      const topCards = p.deck.slice(0, count);
+
+      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+      const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck and rearrange them.";
+
+      const resumeCtx: ResumeContext = {
+        effectSourceInstanceId: sourceCardInstanceId,
+        controller,
+        pausedAction: action,
+        remainingActions: [],
+        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        validTargets: [],
+      };
+      const pendingPrompt: PendingPromptState = {
+        promptType: "ARRANGE_TOP_CARDS",
+        options: {
+          cards: topCards,
+          effectDescription,
+          canSendToBottom: true,
+          validTargets: [], // no picks, just rearranging
+        },
+        respondingPlayer: controller,
+        resumeContext: resumeCtx,
+      };
+
+      return { state, events, succeeded: false, pendingPrompt };
+    }
+
+    // ─── SHUFFLE_DECK ────────────────────────────────────────────────────
+    case "SHUFFLE_DECK": {
+      const targetController = (action.target?.controller === "OPPONENT")
+        ? (controller === 0 ? 1 : 0) as 0 | 1
+        : controller;
+      const p = state.players[targetController];
+      const shuffled = shuffleArray([...p.deck]);
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[targetController] = { ...p, deck: shuffled };
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    // ─── REST_OPPONENT_DON ───────────────────────────────────────────────
+    case "REST_OPPONENT_DON": {
+      const amount = (params.amount as number) ?? 1;
+      const opp = controller === 0 ? 1 : 0;
+      const p = state.players[opp];
+      const activeDon = p.donCostArea.filter((d) => d.state === "ACTIVE");
+      const count = Math.min(amount, activeDon.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      let rested = 0;
+      const newDonCostArea = p.donCostArea.map((d) => {
+        if (d.state === "ACTIVE" && rested < count) {
+          rested++;
+          return { ...d, state: "RESTED" as const };
+        }
+        return d;
+      });
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[opp] = { ...p, donCostArea: newDonCostArea };
+
+      events.push({ type: "DON_RESTED", playerIndex: opp as 0 | 1, payload: { count } });
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    // ─── RETURN_DON_TO_DECK ──────────────────────────────────────────────
+    case "RETURN_DON_TO_DECK": {
+      const amount = (params.amount as number) ?? 1;
+      const p = state.players[controller];
+      const unattached = p.donCostArea.filter((d) => !d.attachedTo);
+      const count = Math.min(amount, unattached.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      // Prefer rested DON!! first
+      const sorted = [...unattached].sort((a, b) => {
+        if (a.state === "RESTED" && b.state !== "RESTED") return -1;
+        if (a.state !== "RESTED" && b.state === "RESTED") return 1;
+        return 0;
+      });
+      const toReturn = sorted.slice(0, count);
+      const toReturnIds = new Set(toReturn.map((d) => d.instanceId));
+
+      const remaining = p.donCostArea.filter((d) => !toReturnIds.has(d.instanceId));
+      const returned = toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }));
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, donCostArea: remaining, donDeck: [...p.donDeck, ...returned] };
+
+      events.push({ type: "DON_DETACHED", playerIndex: controller, payload: { count } });
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    // ─── LIFE CARD ACTIONS ───────────────────────────────────────────────
+
+    case "TURN_LIFE_FACE_UP": {
+      const amount = (params.amount as number) ?? 1;
+      const position = (params.position as "TOP" | "BOTTOM" | "ALL") ?? "TOP";
+      const p = state.players[controller];
+      if (p.life.length === 0) return { state, events, succeeded: false };
+
+      let newLife = [...p.life];
+      if (position === "ALL") {
+        newLife = newLife.map((l) => ({ ...l, face: "UP" as const }));
+      } else if (position === "TOP") {
+        const count = Math.min(amount, newLife.length);
+        for (let i = 0; i < count; i++) {
+          newLife[i] = { ...newLife[i], face: "UP" as const };
+        }
+      } else {
+        const count = Math.min(amount, newLife.length);
+        for (let i = newLife.length - count; i < newLife.length; i++) {
+          newLife[i] = { ...newLife[i], face: "UP" as const };
+        }
+      }
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, life: newLife };
+
+      events.push({ type: "LIFE_CARD_FACE_CHANGED", playerIndex: controller, payload: { face: "UP" } });
+
+      return { state: { ...state, players: newPlayers }, events, succeeded: true };
+    }
+
+    case "TURN_LIFE_FACE_DOWN": {
+      const amount = (params.amount as number) ?? 1;
+      const p = state.players[controller];
+      if (p.life.length === 0) return { state, events, succeeded: false };
+
+      const newLife = [...p.life];
+      const count = Math.min(amount, newLife.length);
+      for (let i = 0; i < count; i++) {
+        newLife[i] = { ...newLife[i], face: "DOWN" as const };
+      }
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, life: newLife };
+
+      events.push({ type: "LIFE_CARD_FACE_CHANGED", playerIndex: controller, payload: { face: "DOWN" } });
+
+      return { state: { ...state, players: newPlayers }, events, succeeded: true };
+    }
+
+    case "TURN_ALL_LIFE_FACE_DOWN": {
+      const p = state.players[controller];
+      const newLife = p.life.map((l) => ({ ...l, face: "DOWN" as const }));
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, life: newLife };
+
+      return { state: { ...state, players: newPlayers }, events, succeeded: true };
+    }
+
+    case "LIFE_TO_HAND": {
+      const amount = (params.amount as number) ?? 1;
+      const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+      const targetController = (action.target?.controller === "OPPONENT")
+        ? (controller === 0 ? 1 : 0) as 0 | 1
+        : controller;
+      const p = state.players[targetController];
+      const count = Math.min(amount, p.life.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      const removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
+      const newLife = position === "TOP" ? p.life.slice(count) : p.life.slice(0, -count);
+
+      // Convert life cards to hand cards
+      const handCards: CardInstance[] = removed.map((l) => ({
+        instanceId: l.instanceId,
+        cardId: l.cardId,
+        zone: "HAND" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [],
+        turnPlayed: null,
+        controller: targetController,
+        owner: targetController,
+      }));
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[targetController] = {
+        ...p,
+        life: newLife,
+        hand: [...p.hand, ...handCards],
+      };
+
+      for (const lc of removed) {
+        events.push({
+          type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+          playerIndex: targetController,
+          payload: { cardId: lc.cardId },
+        });
+      }
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: handCards.map((c) => c.instanceId), count },
+      };
+    }
+
+    case "ADD_TO_LIFE_FROM_HAND": {
+      const amount = (params.amount as number) ?? 1;
+      const face = (params.face as "UP" | "DOWN") ?? "DOWN";
+      const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+
+      const p = state.players[controller];
+      let candidates = [...p.hand];
+      if (action.target?.filter) {
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state));
+      }
+      const count = Math.min(amount, candidates.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      const toLife = candidates.slice(0, count);
+      const toLifeIds = new Set(toLife.map((c) => c.instanceId));
+      const newHand = p.hand.filter((c) => !toLifeIds.has(c.instanceId));
+      const lifeCards = toLife.map((c) => ({
+        instanceId: c.instanceId,
+        cardId: c.cardId,
+        face,
+      }));
+      const newLife = position === "TOP"
+        ? [...lifeCards, ...p.life]
+        : [...p.life, ...lifeCards];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, hand: newHand, life: newLife };
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    case "ADD_TO_LIFE_FROM_FIELD": {
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+        return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+      }
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      const face = (params.face as "UP" | "DOWN") ?? "DOWN";
+      let nextState = state;
+
+      for (const id of targetIds) {
+        const card = findCardInstanceById(nextState, id);
+        if (!card || card.zone !== "CHARACTER") continue;
+
+        // Remove from characters
+        for (const [pi, player] of nextState.players.entries()) {
+          const charIdx = player.characters.findIndex((c) => c.instanceId === id);
+          if (charIdx === -1) continue;
+
+          const char = player.characters[charIdx];
+          const newChars = player.characters.filter((_, i) => i !== charIdx);
+          const returnedDon = char.attachedDon.map((d) => ({
+            ...d, state: "RESTED" as const, attachedTo: null,
+          }));
+          const lifeCard = { instanceId: nanoid(), cardId: char.cardId, face };
+
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[pi] = {
+            ...player,
+            characters: newChars,
+            life: [lifeCard, ...player.life],
+            donCostArea: [...player.donCostArea, ...returnedDon],
+          };
+          nextState = { ...nextState, players: newPlayers };
+          break;
+        }
+      }
+
+      return { state: nextState, events, succeeded: true };
+    }
+
+    case "PLAY_FROM_LIFE": {
+      const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+      const p = state.players[controller];
+      if (p.life.length === 0) return { state, events, succeeded: false };
+
+      const lifeCard = position === "TOP" ? p.life[0] : p.life[p.life.length - 1];
+      const newLife = position === "TOP" ? p.life.slice(1) : p.life.slice(0, -1);
+      const data = cardDb.get(lifeCard.cardId);
+      if (!data) return { state, events, succeeded: false };
+
+      const entryState = (params.entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
+
+      if (data.type.toUpperCase() === "CHARACTER") {
+        const newChar: CardInstance = {
+          instanceId: nanoid(),
+          cardId: lifeCard.cardId,
+          zone: "CHARACTER",
+          state: entryState,
+          attachedDon: [],
+          turnPlayed: state.turn.number,
+          controller,
+          owner: controller,
+        };
+
+        const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+        newPlayers[controller] = {
+          ...p,
+          life: newLife,
+          characters: [...p.characters, newChar],
+        };
+
+        events.push({
+          type: "CARD_PLAYED",
+          playerIndex: controller,
+          payload: { cardInstanceId: newChar.instanceId, cardId: lifeCard.cardId, zone: "CHARACTER", source: "LIFE" },
+        });
+
+        return {
+          state: { ...state, players: newPlayers },
+          events,
+          succeeded: true,
+          result: { targetInstanceIds: [newChar.instanceId], count: 1 },
+        };
+      }
+
+      return { state, events, succeeded: false };
+    }
+
+    case "LIFE_CARD_TO_DECK": {
+      const amount = (params.amount as number) ?? 1;
+      const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
+      const targetController = (action.target?.controller === "OPPONENT")
+        ? (controller === 0 ? 1 : 0) as 0 | 1
+        : controller;
+      const p = state.players[targetController];
+      const count = Math.min(amount, p.life.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      const removed = p.life.slice(0, count);
+      const newLife = p.life.slice(count);
+
+      const deckCards: CardInstance[] = removed.map((l) => ({
+        instanceId: nanoid(),
+        cardId: l.cardId,
+        zone: "DECK" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [],
+        turnPlayed: null,
+        controller: targetController,
+        owner: targetController,
+      }));
+
+      const newDeck = position === "BOTTOM"
+        ? [...p.deck, ...deckCards]
+        : [...deckCards, ...p.deck];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[targetController] = { ...p, life: newLife, deck: newDeck };
+
+      events.push({ type: "LIFE_CARD_TO_DECK", playerIndex: targetController, payload: { count } });
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    case "TRASH_FACE_UP_LIFE": {
+      const p = state.players[controller];
+      const faceUp = p.life.filter((l) => l.face === "UP");
+      if (faceUp.length === 0) return { state, events, succeeded: false };
+
+      const newLife = p.life.filter((l) => l.face !== "UP");
+      const trashedCards: CardInstance[] = faceUp.map((l) => ({
+        instanceId: l.instanceId,
+        cardId: l.cardId,
+        zone: "TRASH" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [],
+        turnPlayed: null,
+        controller,
+        owner: controller,
+      }));
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = {
+        ...p,
+        life: newLife,
+        trash: [...trashedCards, ...p.trash],
+      };
+
+      events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: faceUp.length, reason: "face_up_life" } });
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    case "LIFE_SCRY": {
+      const lookAt = (params.look_at as number) ?? 1;
+      const p = state.players[controller];
+      const count = Math.min(lookAt, p.life.length);
+      if (count === 0) return { state, events, succeeded: false };
+
+      const lifeCards = p.life.slice(0, count);
+      events.push({
+        type: "LIFE_SCRIED",
+        playerIndex: controller,
+        payload: { cards: lifeCards.map((l) => ({ instanceId: l.instanceId, cardId: l.cardId })), count },
+      });
+
+      return { state, events, succeeded: true };
+    }
+
+    case "DRAIN_LIFE_TO_THRESHOLD": {
+      const threshold = (params.threshold as number) ?? 0;
+      const p = state.players[controller];
+      const excess = p.life.length - threshold;
+      if (excess <= 0) return { state, events, succeeded: false };
+
+      const removed = p.life.slice(0, excess);
+      const newLife = p.life.slice(excess);
+      const trashedCards: CardInstance[] = removed.map((l) => ({
+        instanceId: l.instanceId,
+        cardId: l.cardId,
+        zone: "TRASH" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [],
+        turnPlayed: null,
+        controller,
+        owner: controller,
+      }));
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = {
+        ...p,
+        life: newLife,
+        trash: [...trashedCards, ...p.trash],
+      };
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+      };
+    }
+
+    case "REORDER_ALL_LIFE": {
+      // This requires player input to reorder — for now, just acknowledge
+      return { state, events, succeeded: true };
+    }
+
+    // ─── RETURN_HAND_TO_DECK ─────────────────────────────────────────────
+    case "RETURN_HAND_TO_DECK": {
+      const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
+      const p = state.players[controller];
+      if (p.hand.length === 0) return { state, events, succeeded: false };
+
+      const deckCards = p.hand.map((c) => ({ ...c, zone: "DECK" as const }));
+      const newDeck = position === "BOTTOM"
+        ? [...p.deck, ...deckCards]
+        : [...deckCards, ...p.deck];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, hand: [], deck: newDeck };
+
+      return {
+        state: { ...state, players: newPlayers },
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: [], count: deckCards.length },
+      };
+    }
+
+    // ─── GRANT_ATTRIBUTE ─────────────────────────────────────────────────
+    case "GRANT_ATTRIBUTE": {
+      // Attribute grants are tracked through active effects (like keywords)
+      const attribute = params.attribute as string;
+      const duration = action.duration ?? { type: "THIS_TURN" as const };
+      const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+      const targetIds = autoSelectTargets(action.target, allValidIds);
+      if (targetIds.length === 0) return { state, events, succeeded: false };
+
+      const effect: RuntimeActiveEffect = {
+        id: nanoid(),
+        sourceCardInstanceId,
+        sourceEffectBlockId: "",
+        category: "auto",
+        modifiers: [{
+          type: "GRANT_ATTRIBUTE" as any,
+          params: { attribute },
+          duration,
+        }],
+        duration,
+        expiresAt: computeExpiry(duration, state),
+        controller,
+        appliesTo: targetIds,
+        timestamp: Date.now(),
+      };
+
+      return {
+        state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+        events,
+        succeeded: true,
+      };
+    }
+
+    // ─── REVEAL_HAND ──────────────────────────────────────────────────
+    case "REVEAL_HAND": {
+      const amount = (params.amount as number) ?? 1;
+      const targetController = (action.target?.controller === "OPPONENT")
+        ? (controller === 0 ? 1 : 0) as 0 | 1
+        : controller;
+      const p = state.players[targetController];
+
+      if (p.hand.length === 0) return { state, events, succeeded: false };
+
+      const count = Math.min(amount, p.hand.length);
+
+      // The choosing player selects blind (by position, not seeing card content)
+      // Build a prompt with card-back placeholders
+      const validTargets = p.hand.map((c) => c.instanceId);
+
+      if (validTargets.length > count) {
+        // Need player to choose which positions to reveal
+        const resumeCtx: ResumeContext = {
+          effectSourceInstanceId: sourceCardInstanceId,
+          controller,
+          pausedAction: action,
+          remainingActions: [],
+          resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+          validTargets,
+        };
+
+        const pendingPrompt: PendingPromptState = {
+          promptType: "SELECT_TARGET",
+          options: {
+            validTargets,
+            countMin: count,
+            countMax: count,
+            effectDescription: `Choose ${count} card(s) from opponent's hand to reveal`,
+            ctaLabel: "Reveal",
+            cards: p.hand, // cards shown as backs to the choosing player
+            blindSelection: true,
+          },
+          respondingPlayer: controller,
+          resumeContext: resumeCtx,
+        };
+
+        return { state, events, succeeded: false, pendingPrompt };
+      }
+
+      // All cards selected (hand size <= amount)
+      events.push({
+        type: "CARDS_REVEALED",
+        playerIndex: targetController,
+        payload: {
+          cards: p.hand.slice(0, count).map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })),
+          source: "HAND",
+        },
+      });
+
+      return {
+        state,
+        events,
+        succeeded: true,
+        result: { targetInstanceIds: p.hand.slice(0, count).map((c) => c.instanceId), count },
+      };
+    }
+
+    // ─── SEARCH_AND_PLAY ──────────────────────────────────────────────
+    case "SEARCH_AND_PLAY": {
+      const lookAt = (params.look_at as number) ?? 5;
+      const filter = (params.filter as any) ?? {};
+      const restDest = (params.rest_destination as string) ?? "BOTTOM";
+      const searchFullDeck = (params.search_full_deck as boolean) ?? false;
+      const shuffleAfter = (params.shuffle_after as boolean) ?? false;
+
+      const p = state.players[controller];
+      const searchPool = searchFullDeck ? p.deck : p.deck.slice(0, Math.min(lookAt, p.deck.length));
+
+      if (searchPool.length === 0) return { state, events, succeeded: false };
+
+      // Find matching cards
+      const matching = searchPool.filter((c) => {
+        const data = cardDb.get(c.cardId);
+        if (!data) return false;
+        if (filter.traits && !filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
+        if (filter.exclude_name && data.name === filter.exclude_name) return false;
+        if (filter.name && data.name !== filter.name) return false;
+        if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
+        if (filter.card_type && data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
+        if (filter.cost_min !== undefined && (data.cost ?? 0) < filter.cost_min) return false;
+        if (filter.cost_max !== undefined && (data.cost ?? 0) > filter.cost_max) return false;
+        if (filter.color) {
+          const cardColors = data.color ?? [];
+          if (!cardColors.some((clr: string) => clr.toUpperCase() === (filter.color as string).toUpperCase())) return false;
+        }
+        return true;
+      });
+
+      const validTargets = matching.map((c) => c.instanceId);
+
+      if (validTargets.length === 0) {
+        // No match — shuffle if needed, place rest at bottom
+        let nextState = state;
+        if (!searchFullDeck) {
+          const restOfDeck = p.deck.slice(searchPool.length);
+          const arrangedCards = searchPool.map((c) => ({ ...c, zone: "DECK" as const }));
+          const newDeck = restDest.toUpperCase() === "BOTTOM"
+            ? [...restOfDeck, ...arrangedCards]
+            : [...arrangedCards, ...restOfDeck];
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[controller] = { ...p, deck: newDeck };
+          nextState = { ...nextState, players: newPlayers };
+        }
+        if (shuffleAfter) {
+          const pp = nextState.players[controller];
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[controller] = { ...pp, deck: shuffleArray([...pp.deck]) };
+          nextState = { ...nextState, players: newPlayers };
+        }
+        return { state: nextState, events, succeeded: false };
+      }
+
+      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+      const effectDescription = sourceCardData?.effectText ?? "Search and play a card.";
+
+      // Tag the action with destination=FIELD so resume knows to play it
+      const taggedAction = { ...action, params: { ...params, destination: "FIELD" } };
+
+      const resumeCtx: ResumeContext = {
+        effectSourceInstanceId: sourceCardInstanceId,
+        controller,
+        pausedAction: taggedAction,
+        remainingActions: [],
+        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        validTargets,
+      };
+      const pendingPrompt: PendingPromptState = {
+        promptType: "ARRANGE_TOP_CARDS",
+        options: {
+          cards: searchFullDeck ? matching : searchPool,
+          effectDescription,
+          canSendToBottom: restDest.toUpperCase() === "BOTTOM",
+          validTargets,
+        },
+        respondingPlayer: controller,
+        resumeContext: resumeCtx,
+      };
+
+      return { state, events, succeeded: false, pendingPrompt };
+    }
+
+    // ─── PLAY_SELF ─────────────────────────────────────────────────────
+    case "PLAY_SELF": {
+      // Play this card from its current zone (trigger/hand) to the field
+      const card = findCardInstanceById(state, sourceCardInstanceId);
+      if (!card) return { state, events, succeeded: false };
+      const data = cardDb.get(card.cardId);
+      if (!data) return { state, events, succeeded: false };
+
+      // Only characters can be played to field via PLAY_SELF
+      if (data.type.toUpperCase() !== "CHARACTER") return { state, events, succeeded: false };
+
+      // Find which player owns this card and remove from source zone
+      for (const [pi, player] of state.players.entries()) {
+        const inHand = player.hand.findIndex((c) => c.instanceId === sourceCardInstanceId);
+        const inTrash = player.trash.findIndex((c) => c.instanceId === sourceCardInstanceId);
+        const inDeck = player.deck.findIndex((c) => c.instanceId === sourceCardInstanceId);
+
+        let updatedPlayer = { ...player };
+        let found = false;
+
+        if (inHand !== -1) {
+          updatedPlayer = { ...updatedPlayer, hand: player.hand.filter((_, i) => i !== inHand) };
+          found = true;
+        } else if (inTrash !== -1) {
+          updatedPlayer = { ...updatedPlayer, trash: player.trash.filter((_, i) => i !== inTrash) };
+          found = true;
+        } else if (inDeck !== -1) {
+          updatedPlayer = { ...updatedPlayer, deck: player.deck.filter((_, i) => i !== inDeck) };
+          found = true;
+        }
+
+        if (!found) continue;
+
+        const newChar: CardInstance = {
+          ...card,
+          instanceId: nanoid(),
+          zone: "CHARACTER",
+          state: "ACTIVE",
+          attachedDon: [],
+          turnPlayed: state.turn.number,
+          controller: pi as 0 | 1,
+          owner: pi as 0 | 1,
+        };
+
+        updatedPlayer = { ...updatedPlayer, characters: [...updatedPlayer.characters, newChar] };
+
+        const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+        newPlayers[pi] = updatedPlayer;
+
+        events.push({
+          type: "CARD_PLAYED",
+          playerIndex: pi as 0 | 1,
+          payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF" },
+        });
+
+        return {
+          state: { ...state, players: newPlayers },
+          events,
+          succeeded: true,
+          result: { targetInstanceIds: [newChar.instanceId], count: 1 },
+        };
+      }
+
+      return { state, events, succeeded: false };
+    }
+
     default:
       // Action type not yet implemented
       return { state, events, succeeded: true };
@@ -1370,6 +2581,20 @@ function computeAllValidTargets(
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates = state.players[pi].hand;
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      return candidates.map((c) => c.instanceId);
+    }
+    case "CARD_IN_TRASH": {
+      const ctrl = target.controller ?? "SELF";
+      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
+      let candidates = state.players[pi].trash;
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      return candidates.map((c) => c.instanceId);
+    }
+    case "CARD_IN_DECK": {
+      const ctrl = target.controller ?? "SELF";
+      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
+      let candidates = state.players[pi].deck;
       if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
       return candidates.map((c) => c.instanceId);
     }
@@ -1552,6 +2777,41 @@ export function resolveTargetInstances(
       return candidates.slice(0, 1).map((c) => c.instanceId);
     }
 
+    case "CARD_IN_TRASH": {
+      const ctrl = target.controller ?? "SELF";
+      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
+      let candidates = state.players[pi].trash;
+
+      if (target.filter) {
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      }
+
+      const count = target.count;
+      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
+      if ("all" in count) return candidates.map((c) => c.instanceId);
+      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
+      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
+
+      return candidates.slice(0, 1).map((c) => c.instanceId);
+    }
+
+    case "CARD_IN_DECK": {
+      const ctrl = target.controller ?? "SELF";
+      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
+      let candidates = state.players[pi].deck;
+
+      if (target.filter) {
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      }
+
+      const count = target.count;
+      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
+      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
+      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
+
+      return candidates.slice(0, 1).map((c) => c.instanceId);
+    }
+
     default:
       return [];
   }
@@ -1623,37 +2883,62 @@ function returnToHand(
   instanceId: string,
 ): { state: GameState; events: PendingEvent[] } | null {
   for (const [pi, player] of state.players.entries()) {
+    // Check characters first
     const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
-    if (charIdx === -1) continue;
+    if (charIdx !== -1) {
+      const char = player.characters[charIdx];
+      const newChars = player.characters.filter((_, i) => i !== charIdx);
 
-    const char = player.characters[charIdx];
-    const newChars = player.characters.filter((_, i) => i !== charIdx);
+      // Return attached DON!! to cost area
+      const returnedDon = char.attachedDon.map((d) => ({
+        ...d,
+        state: "RESTED" as const,
+        attachedTo: null,
+      }));
 
-    // Return attached DON!! to cost area
-    const returnedDon = char.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
+      const newHand = [...player.hand, { ...char, zone: "HAND" as const, attachedDon: [], state: "ACTIVE" as const }];
 
-    const newHand = [...player.hand, { ...char, zone: "HAND" as const, attachedDon: [], state: "ACTIVE" as const }];
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[pi] = {
+        ...player,
+        characters: newChars,
+        hand: newHand,
+        donCostArea: [...player.donCostArea, ...returnedDon],
+      };
 
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      characters: newChars,
-      hand: newHand,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
+      return {
+        state: { ...state, players: newPlayers },
+        events: [{
+          type: "CARD_RETURNED_TO_HAND",
+          playerIndex: pi as 0 | 1,
+          payload: { cardInstanceId: instanceId, cardId: char.cardId },
+        }],
+      };
+    }
 
-    return {
-      state: { ...state, players: newPlayers },
-      events: [{
-        type: "CARD_RETURNED_TO_HAND",
-        playerIndex: pi as 0 | 1,
-        payload: { cardInstanceId: instanceId, cardId: char.cardId },
-      }],
-    };
+    // Check trash (for "add from trash to hand" effects)
+    const trashIdx = player.trash.findIndex((c) => c.instanceId === instanceId);
+    if (trashIdx !== -1) {
+      const card = player.trash[trashIdx];
+      const newTrash = player.trash.filter((_, i) => i !== trashIdx);
+      const newHand = [...player.hand, { ...card, zone: "HAND" as const, state: "ACTIVE" as const }];
+
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[pi] = {
+        ...player,
+        trash: newTrash,
+        hand: newHand,
+      };
+
+      return {
+        state: { ...state, players: newPlayers },
+        events: [{
+          type: "CARD_RETURNED_TO_HAND",
+          playerIndex: pi as 0 | 1,
+          payload: { cardInstanceId: instanceId, cardId: card.cardId, source: "TRASH" },
+        }],
+      };
+    }
   }
   return null;
 }
@@ -1706,6 +2991,59 @@ function attachDonToCard(
 
   newPlayers[controller] = pp;
   return { ...state, players: newPlayers };
+}
+
+function returnToDeck(
+  state: GameState,
+  instanceId: string,
+  position: "TOP" | "BOTTOM" = "BOTTOM",
+): { state: GameState; events: PendingEvent[] } | null {
+  for (const [pi, player] of state.players.entries()) {
+    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    if (charIdx === -1) continue;
+
+    const char = player.characters[charIdx];
+    const newChars = player.characters.filter((_, i) => i !== charIdx);
+
+    // Return attached DON!! to cost area
+    const returnedDon = char.attachedDon.map((d) => ({
+      ...d,
+      state: "RESTED" as const,
+      attachedTo: null,
+    }));
+
+    const deckCard = { ...char, zone: "DECK" as const, attachedDon: [], state: "ACTIVE" as const };
+    const newDeck = position === "BOTTOM"
+      ? [...player.deck, deckCard]
+      : [deckCard, ...player.deck];
+
+    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+    newPlayers[pi] = {
+      ...player,
+      characters: newChars,
+      deck: newDeck,
+      donCostArea: [...player.donCostArea, ...returnedDon],
+    };
+
+    return {
+      state: { ...state, players: newPlayers },
+      events: [{
+        type: "CARD_RETURNED_TO_DECK",
+        playerIndex: pi as 0 | 1,
+        payload: { cardInstanceId: instanceId, cardId: char.cardId, position },
+      }],
+    };
+  }
+  return null;
+}
+
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 function findCardInstanceById(state: GameState, instanceId: string): CardInstance | null {
@@ -1768,24 +3106,109 @@ function markOncePerTurnUsed(state: GameState, effectBlockId: string, instanceId
 function resolveAmount(
   amount: number | { type: string; [key: string]: unknown } | undefined,
   resultRefs: Map<string, EffectResult>,
+  state?: GameState,
+  controller?: 0 | 1,
+  cardDb?: Map<string, CardData>,
 ): number {
   if (typeof amount === "number") return amount;
   if (!amount) return 0;
 
   if (amount.type === "FIXED") return (amount as any).value ?? 0;
-  if (amount.type === "PER_COUNT") {
+
+  if (amount.type === "PER_COUNT" && state != null && controller != null) {
     const multiplier = (amount as any).multiplier as number ?? 1;
-    // For PER_COUNT, we'd look at cost results or game state
-    // Simplified for now
-    return multiplier;
+    const divisor = (amount as any).divisor as number ?? 1;
+    const source = (amount as any).source as string;
+    const count = resolvePerCountSource(state, controller, source, cardDb);
+    return Math.floor(count / divisor) * multiplier;
   }
+
+  if (amount.type === "GAME_STATE" && state != null && controller != null) {
+    const source = (amount as any).source as string;
+    const ctrl = (amount as any).controller as string ?? "SELF";
+    const pi = ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
+    return resolveGameStateSource(state, pi as 0 | 1, source);
+  }
+
   if (amount.type === "ACTION_RESULT") {
     const ref = (amount as any).ref as string;
     const result = resultRefs.get(ref);
     return result?.count ?? 0;
   }
 
+  // Fallback for PER_COUNT without state (legacy calls)
+  if (amount.type === "PER_COUNT") {
+    return (amount as any).multiplier as number ?? 1;
+  }
+
   return 0;
+}
+
+function resolvePerCountSource(
+  state: GameState,
+  controller: 0 | 1,
+  source: string,
+  cardDb?: Map<string, CardData>,
+): number {
+  const p = state.players[controller];
+  const opp = state.players[controller === 0 ? 1 : 0];
+
+  switch (source) {
+    case "HAND_COUNT":
+      return p.hand.length;
+    case "CARDS_IN_TRASH":
+      return p.trash.length;
+    case "EVENTS_IN_TRASH": {
+      if (!cardDb) return 0;
+      return p.trash.filter((c) => {
+        const data = cardDb.get(c.cardId);
+        return data?.type.toUpperCase() === "EVENT";
+      }).length;
+    }
+    case "CHARACTERS_ON_FIELD":
+    case "MATCHING_CHARACTERS_ON_FIELD":
+      return p.characters.length;
+    case "DON_FIELD_COUNT":
+      return p.donCostArea.length + p.leader.attachedDon.length +
+        p.characters.reduce((sum, c) => sum + c.attachedDon.length, 0);
+    case "OPPONENT_CHARACTERS_ON_FIELD":
+      return opp.characters.length;
+    case "DON_RESTED_THIS_WAY":
+    case "CARDS_TRASHED_THIS_WAY":
+    case "CHARACTERS_RETURNED_THIS_WAY":
+    case "CHARACTERS_KO_THIS_WAY":
+    case "CARDS_PLACED_TO_DECK_THIS_WAY":
+      // These are populated from cost results / action results — return 0 as default
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function resolveGameStateSource(
+  state: GameState,
+  playerIndex: 0 | 1,
+  source: string,
+): number {
+  const p = state.players[playerIndex];
+  const opp = state.players[playerIndex === 0 ? 1 : 0];
+
+  switch (source) {
+    case "LIFE_COUNT": return p.life.length;
+    case "OPPONENT_LIFE_COUNT": return opp.life.length;
+    case "COMBINED_LIFE_COUNT": return p.life.length + opp.life.length;
+    case "DON_FIELD_COUNT":
+      return p.donCostArea.length + p.leader.attachedDon.length +
+        p.characters.reduce((sum, c) => sum + c.attachedDon.length, 0);
+    case "OPPONENT_DON_FIELD_COUNT":
+      return opp.donCostArea.length + opp.leader.attachedDon.length +
+        opp.characters.reduce((sum, c) => sum + c.attachedDon.length, 0);
+    case "HAND_COUNT": return p.hand.length;
+    case "DECK_COUNT": return p.deck.length;
+    case "RESTED_CARD_COUNT":
+      return p.characters.filter((c) => c.state === "RESTED").length;
+    default: return 0;
+  }
 }
 
 function computeExpiry(duration: Duration, state: GameState): ExpiryTiming {
@@ -1878,6 +3301,72 @@ export function resumeEffectChain(
 
     const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
     newPlayers[controller] = { ...p, deck: newDeck, hand: newHand };
+    nextState = { ...nextState, players: newPlayers };
+  }
+
+  // Resume from ARRANGE_TOP_CARDS response (SEARCH_AND_PLAY — play to field instead of hand)
+  if (action.type === "ARRANGE_TOP_CARDS" && pausedAction !== null && pausedAction.type === "SEARCH_AND_PLAY") {
+    const params = pausedAction.params ?? {} as any;
+    const restDest = ((params as any).rest_destination as string) ?? "BOTTOM";
+    const shuffleAfter = ((params as any).shuffle_after as boolean) ?? false;
+    const searchFullDeck = ((params as any).search_full_deck as boolean) ?? false;
+    const entryState = ((params as any).entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
+
+    const p = nextState.players[controller];
+    const keptId = action.keptCardInstanceId;
+    const ordered = action.orderedInstanceIds ?? [];
+
+    const removedIds = new Set(ordered);
+    if (keptId) removedIds.add(keptId);
+    const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
+
+    // Play kept card to CHARACTER zone instead of hand
+    let newCharacters = [...p.characters];
+    if (keptId) {
+      const kept = p.deck.find((c) => c.instanceId === keptId);
+      if (kept) {
+        const data = cardDb.get(kept.cardId);
+        if (data && data.type.toUpperCase() === "CHARACTER") {
+          const newChar: CardInstance = {
+            ...kept,
+            instanceId: nanoid(),
+            zone: "CHARACTER",
+            state: entryState,
+            attachedDon: [],
+            turnPlayed: nextState.turn.number,
+            controller,
+            owner: controller,
+          };
+          newCharacters = [...newCharacters, newChar];
+          events.push({
+            type: "CARD_PLAYED",
+            playerIndex: controller,
+            payload: { cardInstanceId: newChar.instanceId, cardId: kept.cardId, zone: "CHARACTER", source: "search_and_play" },
+          });
+        }
+      }
+    }
+
+    // Arrange remaining cards
+    const arrangedCards = ordered
+      .map((id) => p.deck.find((c) => c.instanceId === id))
+      .filter(Boolean) as CardInstance[];
+
+    let newDeck: CardInstance[];
+    if (searchFullDeck) {
+      newDeck = restOfDeck;
+    } else if ((action.destination ?? restDest.toLowerCase()) === "bottom") {
+      newDeck = [...restOfDeck, ...arrangedCards];
+    } else {
+      newDeck = [...arrangedCards, ...restOfDeck];
+    }
+
+    if (shuffleAfter) {
+      newDeck = shuffleArray(newDeck);
+    }
+
+    const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+    newPlayers[controller] = { ...p, deck: newDeck, characters: newCharacters };
     nextState = { ...nextState, players: newPlayers };
   }
 
