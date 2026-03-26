@@ -494,6 +494,30 @@ export function isSecretArea(zone: Zone): boolean {
   return zone === "HAND" || zone === "DECK" || zone === "LIFE";
 }
 
+// ─── Card instance lookup (flat) ─────────────────────────────────────────────
+
+/**
+ * Find a CardInstance by instanceId across field, hand, and trash zones.
+ * Returns null if not found. For a richer result that includes playerIndex
+ * and also searches deck/life/removedFromGame, use findCardInState().
+ */
+export function findCardInstance(
+  state: GameState,
+  instanceId: string,
+): CardInstance | null {
+  for (const player of state.players) {
+    if (player.leader.instanceId === instanceId) return player.leader;
+    const char = player.characters.find((c) => c.instanceId === instanceId);
+    if (char) return char;
+    if (player.stage?.instanceId === instanceId) return player.stage;
+    const hand = player.hand.find((c) => c.instanceId === instanceId);
+    if (hand) return hand;
+    const trash = player.trash.find((c) => c.instanceId === instanceId);
+    if (trash) return trash;
+  }
+  return null;
+}
+
 // ─── Player state helpers ─────────────────────────────────────────────────────
 
 export function setPlayerConnected(

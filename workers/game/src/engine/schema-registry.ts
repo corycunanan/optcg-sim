@@ -12,12 +12,14 @@
 
 import type { EffectSchema, EffectBlock, Action } from "./effect-types.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
+import { OP02_SCHEMAS } from "./schemas/op02.js";
 import { ACE_DECK_SCHEMAS } from "./schemas/ace-deck.js";
 import { NAMI_DECK_SCHEMAS } from "./schemas/nami-deck.js";
 
 /** All pre-authored schemas, keyed by card ID */
 const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...OP01_SCHEMAS,
+  ...OP02_SCHEMAS,
   ...ACE_DECK_SCHEMAS,
   ...NAMI_DECK_SCHEMAS,
 };

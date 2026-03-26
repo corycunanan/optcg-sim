@@ -38,6 +38,7 @@ import { checkReplacementForKO, checkReplacementForRemoval } from "./replacement
 import { nanoid } from "../util/nanoid.js";
 import { pushFrame, popFrame, peekFrame, updateTopFrame, generateFrameId } from "./effect-stack.js";
 import { emitEvent } from "./events.js";
+import { findCardInstance } from "./state.js";
 
 export interface EffectResolverResult {
   state: GameState;
@@ -72,7 +73,7 @@ export function resolveEffect(
 
   // Step 2: Check optional flag — prompt the player before paying costs
   if (block.flags?.optional) {
-    const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+    const sourceCard = findCardInstance(state, sourceCardInstanceId);
     const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
     const effectDescription = sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "You may activate this effect.";
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
@@ -850,7 +851,6 @@ function executeEffectAction(
 
       const p = state.players[controller];
       const topCards = p.deck.slice(0, Math.min(lookAt, p.deck.length));
-      console.log(`[search] SEARCH_DECK controller=${controller} deckSize=${p.deck.length} topCards=${topCards.length} filter=${JSON.stringify(filter)}`);
 
       if (topCards.length === 0) {
         return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };
@@ -874,10 +874,9 @@ function executeEffectAction(
 
       // All matching cards are selectable — pickUpTo limits how many the player can keep, not which are shown
       const validTargets = matching.map((c) => c.instanceId);
-      console.log(`[search] matching=${matching.length} validTargets=${validTargets.length} building ARRANGE_TOP_CARDS prompt`);
 
       // Build effect description from source card
-      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCard = findCardInstance(state, sourceCardInstanceId);
       const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
       const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck.";
 
@@ -1104,7 +1103,7 @@ function executeEffectAction(
       }));
 
       // Build prompt description from source card
-      const choiceSourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const choiceSourceCard = findCardInstance(state, sourceCardInstanceId);
       const choiceSourceData = choiceSourceCard ? cardDb.get(choiceSourceCard.cardId) : undefined;
       const effectDescription = choiceSourceData?.effectText ?? "Choose one";
 
@@ -1150,7 +1149,7 @@ function executeEffectAction(
     case "REUSE_EFFECT": {
       // Find the referenced effect block on the same card and resolve it
       const targetEffect = params.target_effect as string;
-      const card = findCardInstanceById(state, sourceCardInstanceId);
+      const card = findCardInstance(state, sourceCardInstanceId);
       if (!card) return { state, events, succeeded: false };
 
       const data = cardDb.get(card.cardId);
@@ -1359,7 +1358,7 @@ function executeEffectAction(
       let nextState = state;
       const playedIds: string[] = [];
       for (const id of targetIds) {
-        const card = findCardInstanceById(nextState, id);
+        const card = findCardInstance(nextState, id);
         if (!card) continue;
         const data = cardDb.get(card.cardId);
         if (!data) continue;
@@ -1469,7 +1468,7 @@ function executeEffectAction(
       let nextState = state;
       const trashedIds: string[] = [];
       for (const id of targetIds) {
-        const found = findCardInstanceById(nextState, id);
+        const found = findCardInstance(nextState, id);
         if (!found) continue;
 
         // For characters on field, use KO-like logic (return DON!!)
@@ -1749,7 +1748,7 @@ function executeEffectAction(
       }
 
       // Build a prompt for the player to pick from matching cards
-      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCard = findCardInstance(state, sourceCardInstanceId);
       const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
       const effectDescription = sourceCardData?.effectText ?? "Search your deck.";
 
@@ -1785,7 +1784,7 @@ function executeEffectAction(
 
       const topCards = p.deck.slice(0, count);
 
-      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCard = findCardInstance(state, sourceCardInstanceId);
       const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
       const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck and rearrange them.";
 
@@ -2045,7 +2044,7 @@ function executeEffectAction(
       let nextState = state;
 
       for (const id of targetIds) {
-        const card = findCardInstanceById(nextState, id);
+        const card = findCardInstance(nextState, id);
         if (!card || card.zone !== "CHARACTER") continue;
 
         // Remove from characters
@@ -2423,7 +2422,7 @@ function executeEffectAction(
         return { state: nextState, events, succeeded: false };
       }
 
-      const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+      const sourceCard = findCardInstance(state, sourceCardInstanceId);
       const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
       const effectDescription = sourceCardData?.effectText ?? "Search and play a card.";
 
@@ -2456,7 +2455,7 @@ function executeEffectAction(
     // ─── PLAY_SELF ─────────────────────────────────────────────────────
     case "PLAY_SELF": {
       // Play this card from its current zone (trigger/hand) to the field
-      const card = findCardInstanceById(state, sourceCardInstanceId);
+      const card = findCardInstance(state, sourceCardInstanceId);
       if (!card) return { state, events, succeeded: false };
       const data = cardDb.get(card.cardId);
       if (!data) return { state, events, succeeded: false };
@@ -2651,11 +2650,11 @@ function buildSelectTargetPrompt(
 
   const cards: import("../types.js").CardInstance[] = [];
   for (const id of allValidIds) {
-    const c = findCardInstanceById(state, id);
+    const c = findCardInstance(state, id);
     if (c) cards.push(c);
   }
 
-  const sourceCard = findCardInstanceById(state, sourceCardInstanceId);
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   const effectDescription = sourceCardData?.effectText ?? "";
 
@@ -3046,19 +3045,6 @@ function shuffleArray<T>(array: T[]): T[] {
   return result;
 }
 
-function findCardInstanceById(state: GameState, instanceId: string): CardInstance | null {
-  for (const player of state.players) {
-    if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
-    if (char) return char;
-    if (player.stage?.instanceId === instanceId) return player.stage;
-    const hand = player.hand.find((c) => c.instanceId === instanceId);
-    if (hand) return hand;
-    const trash = player.trash.find((c) => c.instanceId === instanceId);
-    if (trash) return trash;
-  }
-  return null;
-}
 
 // ─── Choice Label Generation ─────────────────────────────────────────────────
 

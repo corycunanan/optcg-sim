@@ -28,6 +28,7 @@ import {
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver.js";
 import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
+import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
 import {
   expireEndOfTurnEffects,
@@ -140,7 +141,6 @@ function fireEventsAndTriggers(
     };
 
     const matched = matchTriggersForEvent(state, gameEvent, cardDb);
-    console.log(`[pipeline] event=${pendingEvent.type} registry=${state.triggerRegistry.length} matched=${matched.length}`);
     if (matched.length === 0) continue;
 
     const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
@@ -187,7 +187,6 @@ function processTriggerQueuePipeline(
   while (queue.length > 0) {
     const next = queue.shift()!;
 
-    console.log(`[pipeline] resolving trigger blockId=${(next.effectBlock as any).id} card=${next.sourceCardInstanceId}`);
     const result = resolveEffect(
       nextState,
       next.effectBlock as import("./effect-types.js").EffectBlock,
@@ -195,7 +194,6 @@ function processTriggerQueuePipeline(
       next.controller,
       cardDb,
     );
-    console.log(`[pipeline] resolveEffect resolved=${result.resolved} hasPendingPrompt=${!!result.pendingPrompt}`);
     nextState = result.state;
 
     if (result.pendingPrompt) {
@@ -296,18 +294,15 @@ function handleZoneChangeTriggers(
       if (!cardId) continue;
 
       const cardData = cardDb.get(cardId);
-      console.log(`[zone] CARD_PLAYED cardId=${cardId} hasSchema=${!!cardData?.effectSchema} instanceId=${cardInstanceId}`);
       if (!cardData) continue;
 
       // Use instanceId from event (now correctly set to the post-moveCard instanceId)
       const instance = cardInstanceId
-        ? findCardInstanceAnywhere(state, cardInstanceId)
+        ? findCardInstance(state, cardInstanceId)
         : findNewlyPlayedCard(state, cardId);
-      console.log(`[zone] instance found=${!!instance} zone=${instance?.zone} triggersBefore=${state.triggerRegistry.length}`);
       if (instance) {
         state = registerTriggersForCard(state, instance, cardData);
         state = registerReplacementsForCard(state, instance, cardData);
-        console.log(`[zone] triggersAfter=${state.triggerRegistry.length}`);
       }
     }
 
@@ -441,20 +436,3 @@ function findNewlyPlayedCard(
   return null;
 }
 
-/** Find a card instance by instanceId in all zones (field, hand, trash, etc.) */
-function findCardInstanceAnywhere(
-  state: GameState,
-  instanceId: string,
-): import("../types.js").CardInstance | null {
-  for (const player of state.players) {
-    if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
-    if (char) return char;
-    if (player.stage?.instanceId === instanceId) return player.stage;
-    const hand = player.hand.find((c) => c.instanceId === instanceId);
-    if (hand) return hand;
-    const trash = player.trash.find((c) => c.instanceId === instanceId);
-    if (trash) return trash;
-  }
-  return null;
-}

@@ -102,3 +102,11 @@ export interface DeckCardData {
   quantity: number;
   cardData: CardData;
 }
+
+// ─── Worker environment bindings ─────────────────────────────────────────────
+
+export interface Env {
+  GAME_SESSION: DurableObjectNamespace;
+  NEXTJS_URL: string;
+  GAME_WORKER_SECRET: string;
+}

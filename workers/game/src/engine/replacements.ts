@@ -27,6 +27,7 @@ import type {
   PendingEvent,
   PendingPromptState,
 } from "../types.js";
+import { findCardInstance } from "./state.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -458,16 +459,3 @@ export function resumeReplacement(
   return applyReplacement(state, effect, params, ctx.targetInstanceId, cardDb);
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function findCardInstance(state: GameState, instanceId: string): CardInstance | null {
-  for (const player of state.players) {
-    if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
-    if (char) return char;
-    if (player.stage?.instanceId === instanceId) return player.stage;
-    const hand = player.hand.find((c) => c.instanceId === instanceId);
-    if (hand) return hand;
-  }
-  return null;
-}

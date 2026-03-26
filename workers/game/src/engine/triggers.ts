@@ -30,6 +30,7 @@ import type {
   GameState,
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
+import { findCardInstance } from "./state.js";
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -424,14 +425,3 @@ function isCardInValidZone(card: CardInstance, zone: EffectZone): boolean {
   return false;
 }
 
-function findCardInstance(state: GameState, instanceId: string): CardInstance | null {
-  for (const player of state.players) {
-    if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
-    if (char) return char;
-    if (player.stage?.instanceId === instanceId) return player.stage;
-    const hand = player.hand.find((c) => c.instanceId === instanceId);
-    if (hand) return hand;
-  }
-  return null;
-}

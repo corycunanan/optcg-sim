@@ -9,6 +9,7 @@
 import type {
   CardData,
   ClientMessage,
+  Env,
   GameAction,
   GameInitPayload,
   GameState,
@@ -20,6 +21,7 @@ import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
 import { resumeReplacement, type ReplacementResumeContext } from "./engine/replacements.js";
 import { setPlayerConnected } from "./engine/state.js";
+import { verifyGameToken } from "./util/auth.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver.js";
 
@@ -751,49 +753,4 @@ export class GameSession implements DurableObject {
   }
 }
 
-// ─── Game token verification ────────────────────────────────────────────────
-// Verifies the short-lived HS256 token minted by /api/game/token.
-// Signed with GAME_WORKER_SECRET (not NextAuth's JWE token, which uses
-// A256CBC-HS512 encryption and would be non-trivial to verify here).
 
-async function verifyGameToken(token: string, secret: string): Promise<string | null> {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-
-    const [headerB64, payloadB64, signatureB64] = parts;
-    const signingInput = `${headerB64}.${payloadB64}`;
-
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-
-    const signature = base64urlDecode(signatureB64);
-    const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(signingInput));
-    if (!valid) return null;
-
-    const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64)));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-
-    return (payload.sub as string) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function base64urlDecode(str: string): Uint8Array {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
-}
-
-interface Env {
-  GAME_SESSION: DurableObjectNamespace;
-  NEXTJS_URL: string;
-  GAME_WORKER_SECRET: string;
-}

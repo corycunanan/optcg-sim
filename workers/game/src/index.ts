@@ -7,12 +7,7 @@
  */
 
 export { GameSession } from "./GameSession.js";
-
-interface Env {
-  GAME_SESSION: DurableObjectNamespace;
-  NEXTJS_URL: string;
-  GAME_WORKER_SECRET: string;
-}
+import type { Env } from "./types.js";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
