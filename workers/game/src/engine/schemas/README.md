@@ -72,8 +72,8 @@ Each effect block represents one distinct ability on the card:
 
 | Category | Required Fields | Use When |
 |----------|----------------|----------|
-| `auto` | trigger, actions | `[On Play]`, `[When Attacking]`, `[On K.O.]`, custom event triggers |
-| `activate` | trigger, actions | `[Activate: Main]`, `[Main]` on Events |
+| `auto` | trigger, actions | `[On Play]`, `[When Attacking]`, `[On K.O.]`, `[Main]` on Events, custom event triggers |
+| `activate` | trigger, actions | `[Activate: Main]` on Characters/Leaders |
 | `permanent` | modifiers OR prohibitions | Auras, static buffs, "cannot X" restrictions |
 | `replacement` | replaces, replacement_actions | "Instead of X, do Y" |
 | `rule_modification` | rule | Name aliases, deck restrictions, counter grants |
@@ -248,17 +248,21 @@ For cards with multiple trigger conditions (OR logic):
 | `CARD_ON_FIELD` | "If you have a [Name]" | `{ type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Nami" } }` |
 | `CARD_ON_FIELD` | "If you have a Character with..." | `{ type: "CARD_ON_FIELD", controller: "SELF", filter: { traits: ["Straw Hat Crew"] }, count: { min: 2 } }` |
 | `MULTIPLE_NAMED_CARDS` | "If you have [A] and [B]" | `{ type: "MULTIPLE_NAMED_CARDS", controller: "SELF", names: ["Luffy", "Zoro"] }` |
+| `NAMED_CARD_WITH_PROPERTY` | "If you have [Name] with N+ power" | `{ type: "NAMED_CARD_WITH_PROPERTY", controller: "SELF", name: "Luffy", property: { power: { operator: ">=", value: 7000 } } }` |
 | `FIELD_PURITY` | "If only {Trait} Characters" | `{ type: "FIELD_PURITY", controller: "SELF", filter: { traits: ["Whitebeard Pirates"] } }` |
 
 **Leader Properties:**
 
 ```typescript
 { type: "LEADER_PROPERTY", controller: "SELF", property: {
-  trait: "Straw Hat Crew"   // OR
-  name: "Luffy"             // OR
+  trait: "Straw Hat Crew"        // OR — exact match ({X} type)
+  trait_contains: "Straw Hat"    // OR — substring match (type including "X")
+  name: "Luffy"                  // OR
   power: { operator: ">=", value: 6000 }  // OR
-  color_includes: ["RED"]   // OR
-  multicolored: true
+  color: "RED"                   // OR — single color
+  color_includes: "RED"          // OR — has this color (multicolor-safe)
+  attribute: "SLASH"             // OR — has this attribute
+  multicolored: true             // OR
 }}
 ```
 
@@ -271,13 +275,15 @@ For cards with multiple trigger conditions (OR logic):
 | `WAS_PLAYED_THIS_TURN` | "If played this turn" | `{ type: "WAS_PLAYED_THIS_TURN" }` |
 | `NO_BASE_EFFECT` | "Character with no effect" | `{ type: "NO_BASE_EFFECT" }` |
 | `HAS_EFFECT_TYPE` | "Card with [Trigger]" | `{ type: "HAS_EFFECT_TYPE", effect_type: "TRIGGER" }` |
+| `LACKS_EFFECT_TYPE` | "Card without [Blocker]" | `{ type: "LACKS_EFFECT_TYPE", effect_type: "BLOCKER" }` |
 
 **Comparative:**
 
 ```typescript
-{ type: "COMPARATIVE", metric: "LIFE_COUNT", comparison: "LESS_THAN" }
+{ type: "COMPARATIVE", metric: "LIFE_COUNT", operator: "<=", margin: 0 }
 // "If you have less Life than opponent"
-// Metrics: LIFE_COUNT, HAND_COUNT, DECK_COUNT, DON_FIELD_COUNT
+// Metrics: LIFE_COUNT, DON_FIELD_COUNT, CHARACTER_COUNT
+// operator compares self vs opponent+margin (margin defaults to 0)
 ```
 
 **Other:**
@@ -294,6 +300,7 @@ For cards with multiple trigger conditions (OR logic):
 | `SOURCE_PROPERTY` | "If K.O.'d by [type] card" |
 | `PLAY_METHOD` | "If played by effect / from hand" |
 | `FACE_UP_LIFE` | "If you have N face-up Life" |
+| `COMBINED_TOTAL` | "If total Characters across both players is N+" | `{ type: "COMBINED_TOTAL", metric: "CHARACTER_COUNT", operator: ">=", value: 5 }` |
 
 ### Compound Conditions
 
@@ -569,6 +576,8 @@ Filters narrow valid targets. Key fields:
 **Name:** `name` (exact), `name_any_of` (array), `name_includes` (substring), `exclude_name`, `exclude_self`, `name_matching_ref` (match name from a prior result_ref)
 
 **Keywords:** `keywords` (array), `has_trigger`, `attribute`, `attribute_not`, `has_effect`, `no_base_effect`, `lacks_effect_type`, `has_counter`
+
+**Card Type:** `card_type` (`"CHARACTER"` | `"EVENT"` | `"STAGE"` | `"LEADER"` — filter by card category)
 
 **State:** `is_rested`, `is_active`, `state` ("ACTIVE" | "RESTED")
 

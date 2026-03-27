@@ -21,7 +21,8 @@
 | If you see... | Category | Key fields |
 |---|---|---|
 | `[On Play]`, `[When Attacking]`, `[On K.O.]`, `[On Block]`, `[Counter]`, `[Trigger]`, `[End of Your Turn]`, `[On Your Opponent's Attack]`, "When X happens..." | `auto` | trigger + actions |
-| `[Activate: Main]`, `[Main]` on an Event | `activate` | trigger + costs + actions |
+| `[Activate: Main]` | `activate` | trigger + costs + actions |
+| `[Main]` on an Event | `auto` | trigger + actions (Event effects fire automatically on play) |
 | Static text with no trigger: "This Character gains...", "cannot...", "+X power", keyword grants to populations | `permanent` | modifiers and/or prohibitions |
 | "If X would be K.O.'d... instead", "would be removed... instead" | `replacement` | replaces + replacement_actions |
 | "Under the rules of this game", "according to the rules", "Also treat this card's name as", deck restrictions, "you may have any number" | `rule_modification` | rule |

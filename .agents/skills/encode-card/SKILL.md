@@ -99,7 +99,8 @@ Assign exactly one `category` per block. Use these rules:
 | Card Text Pattern | Category |
 |---|---|
 | `[On Play]`, `[When Attacking]`, `[On K.O.]`, `[Trigger]`, `[Counter]`, `[On Your Opponent's Attack]`, custom event triggers | `auto` |
-| `[Activate: Main]`, `[Main]` on Events | `activate` |
+| `[Activate: Main]` | `activate` |
+| `[Main]` on Events | `auto` |
 | Static text with no bracket trigger: "This Character gains...", "This Character cannot...", intrinsic keywords (`[Blocker]`, `[Rush]`, `[Double Attack]`, etc.) | `permanent` |
 | "If X would be Y, Z instead", "you may ... instead" | `replacement` |
 | "Under the rules of this game...", "Also treat this card's name as...", "you may have any number of this card" | `rule_modification` |

@@ -456,7 +456,7 @@ export const OP01_029_RADICAL_BEAM: EffectSchema = {
     {
       id: "counter_boost",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -681,7 +681,7 @@ export const OP01_002_TRAFALGAR_LAW: EffectSchema = {
       conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
-        filter: {},
+        filter: { card_type: "CHARACTER" },
         count: { operator: ">=", value: 5 },
       },
       actions: [
@@ -696,7 +696,7 @@ export const OP01_002_TRAFALGAR_LAW: EffectSchema = {
             type: "CARD_IN_HAND",
             controller: "SELF",
             count: { up_to: 1 },
-            filter: { card_type: "CHARACTER", cost_max: 5 },
+            filter: { card_type: "CHARACTER", cost_max: 5, color_not_matching_ref: "returned_char" },
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
           chain: "THEN",
@@ -1000,7 +1000,7 @@ export const OP01_026_RED_HAWK: EffectSchema = {
     {
       id: "counter_boost_ko",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1067,7 +1067,7 @@ export const OP01_028_GREEN_STAR: EffectSchema = {
     {
       id: "counter_debuff",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1081,7 +1081,7 @@ export const OP01_028_GREEN_STAR: EffectSchema = {
       id: "trigger_reuse",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "REUSE_EFFECT", params: { target_effect: "COUNTER" } }],
+      actions: [{ type: "REUSE_EFFECT", params: { target_effect: "COUNTER_EVENT" } }],
     },
   ],
 };
@@ -1425,7 +1425,7 @@ export const OP01_057_PARADISE_WATERFALL: EffectSchema = {
     {
       id: "counter_boost_active",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1471,7 +1471,7 @@ export const OP01_058_PUNK_GIBSON: EffectSchema = {
     {
       id: "counter_boost_rest",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1861,7 +1861,7 @@ export const OP01_119_THUNDER_BAGUA: EffectSchema = {
     {
       id: "counter_boost_don",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1903,7 +1903,7 @@ export const OP01_118_ULTI_MORTAR: EffectSchema = {
     {
       id: "counter_boost_draw",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
       actions: [
         {
@@ -1937,7 +1937,7 @@ export const OP01_086_OVERHEAT: EffectSchema = {
     {
       id: "counter_boost_bounce",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1978,7 +1978,7 @@ export const OP01_088_DESERT_SPADA: EffectSchema = {
     {
       id: "counter_boost_scry",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -2565,7 +2565,7 @@ export const OP01_087_OFFICER_AGENTS: EffectSchema = {
     {
       id: "counter_play",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2584,7 +2584,7 @@ export const OP01_087_OFFICER_AGENTS: EffectSchema = {
       id: "trigger_reuse",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "REUSE_EFFECT", params: { target_effect: "COUNTER" } }],
+      actions: [{ type: "REUSE_EFFECT", params: { target_effect: "COUNTER_EVENT" } }],
     },
   ],
 };
@@ -2600,7 +2600,7 @@ export const OP01_089_CRESCENT_CUTLASS: EffectSchema = {
     {
       id: "counter_bounce",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
@@ -2838,6 +2838,140 @@ export const OP01_105_BAO_HUANG: EffectSchema = {
   ],
 };
 
+// ─── 94. Roronoa Zoro (OP01-025) — Rush keyword ─────────────────────────────
+// [Rush] (This card can attack on the turn in which it is played.)
+
+export const OP01_025_RORONOA_ZORO: EffectSchema = {
+  card_id: "OP01-025",
+  card_name: "Roronoa Zoro",
+  card_type: "Character",
+  effects: [
+    {
+      id: "OP01_025_keywords",
+      category: "permanent",
+      flags: { keywords: ["RUSH"] },
+    },
+  ],
+};
+
+// ─── 95. Kouzuki Momonosuke (OP01-041) — Activate:Main + DON_REST + REST_SELF + search
+// [Activate: Main] ➀ You may rest this Character: Look at 5 cards from the top of your deck;
+// reveal up to 1 {Land of Wano} type card and add it to your hand. Then, place the rest at
+// the bottom of your deck in any order.
+
+export const OP01_041_MOMONOSUKE: EffectSchema = {
+  card_id: "OP01-041",
+  card_name: "Kouzuki Momonosuke",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_search_wano",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [
+        { type: "DON_REST", amount: 1 },
+        { type: "REST_SELF" },
+      ],
+      actions: [
+        {
+          type: "SEARCH_DECK",
+          params: {
+            look_at: 5,
+            pick: { up_to: 1 },
+            filter: { traits: ["Land of Wano"] },
+            rest_destination: "BOTTOM",
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── 96. Komurasaki (OP01-042) — On Play + DON_REST cost + leader condition + SET_ACTIVE
+// [On Play] ③: If your Leader is [Kouzuki Oden], set up to 1 of your {Land of Wano} type
+// Character cards with a cost of 3 or less as active.
+
+export const OP01_042_KOMURASAKI: EffectSchema = {
+  card_id: "OP01-042",
+  card_name: "Komurasaki",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_set_active_wano",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_REST", amount: 3 }],
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Kouzuki Oden" },
+      },
+      actions: [
+        {
+          type: "SET_ACTIVE",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { traits: ["Land of Wano"], cost_max: 3 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── 97. BE-BENG!! (OP01-059) — Main + trash cost + SET_ACTIVE ──────────────
+// [Main] You may trash 1 {Land of Wano} type card from your hand: Set up to 1 of your
+// {Land of Wano} type Character cards with a cost of 3 or less as active.
+
+export const OP01_059_BE_BENG: EffectSchema = {
+  card_id: "OP01-059",
+  card_name: "BE-BENG!!",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_set_active_wano",
+      category: "auto",
+      trigger: { keyword: "MAIN_EVENT" },
+      costs: [
+        { type: "TRASH_FROM_HAND", amount: 1, filter: { traits: ["Land of Wano"] } },
+      ],
+      actions: [
+        {
+          type: "SET_ACTIVE",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { traits: ["Land of Wano"], cost_max: 3 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── 98. Kurozumi Higurashi (OP01-100) — Blocker keyword ────────────────────
+// [Blocker] (After your opponent declares an attack, you may rest this card to make it the
+// new target of the attack.)
+
+export const OP01_100_HIGURASHI: EffectSchema = {
+  card_id: "OP01-100",
+  card_name: "Kurozumi Higurashi",
+  card_type: "Character",
+  effects: [
+    {
+      id: "OP01_100_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+  ],
+};
+
 // ─── Card Schema Registry ───────────────────────────────────────────────────
 
 export const OP01_SCHEMAS: Record<string, EffectSchema> = {
@@ -2933,5 +3067,10 @@ export const OP01_SCHEMAS: Record<string, EffectSchema> = {
   "OP01-068": OP01_068_GECKO_MORIA,
   "OP01-091": OP01_091_KING,
   "OP01-099": OP01_099_SEMIMARU,
+  "OP01-100": OP01_100_HIGURASHI,
   "OP01-105": OP01_105_BAO_HUANG,
+  "OP01-025": OP01_025_RORONOA_ZORO,
+  "OP01-041": OP01_041_MOMONOSUKE,
+  "OP01-042": OP01_042_KOMURASAKI,
+  "OP01-059": OP01_059_BE_BENG,
 };
