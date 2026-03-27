@@ -5,11 +5,27 @@ This directory contains authored effect schemas for OPTCG cards. Each schema def
 ## File Organization
 
 Schemas are grouped by set or deck:
-- `op01.ts` — Representative OP01 cards (18 cards)
-- `ace-deck.ts` — Ace test deck (19 cards, cross-set)
+- `op01.ts` — OP01 cards (98 cards)
+- `op02.ts` — OP02 cards (98 cards)
+- `op03/` — OP03 cards (directory with per-color files)
+- `ace-deck.ts` — Ace test deck (18 cards, cross-set)
 - `nami-deck.ts` — Nami test deck (15 cards)
 
-New files should follow the pattern `{set-id}.ts` (e.g., `op02.ts`) or `{deck-name}-deck.ts` for test decks. Each file exports named constants and an array of all schemas for registration.
+**New sets should use the per-color directory structure:**
+```
+op03/
+  red.ts      — Red card schemas + OP03_RED_SCHEMAS array
+  green.ts    — Green card schemas + OP03_GREEN_SCHEMAS array
+  blue.ts     — Blue card schemas + OP03_BLUE_SCHEMAS array
+  purple.ts   — Purple card schemas + OP03_PURPLE_SCHEMAS array
+  black.ts    — Black card schemas + OP03_BLACK_SCHEMAS array
+  yellow.ts   — Yellow card schemas + OP03_YELLOW_SCHEMAS array
+  index.ts    — Barrel: imports color arrays, exports OP03_SCHEMAS record + re-exports all constants
+```
+
+Each color file starts with `import type { EffectSchema } from "../../effect-types.js";` and exports its card constants plus a color array. The barrel `index.ts` builds the `Record<string, EffectSchema>` from all color arrays and re-exports individual constants for backwards compatibility. The registry imports from `./schemas/op03/index.js`.
+
+For smaller sets or test decks, a single `{set-id}.ts` or `{deck-name}-deck.ts` file is still acceptable.
 
 ## Registration
 
@@ -169,6 +185,8 @@ For effects that react to game events (not bracket-tag abilities):
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |
 | "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
 | "When Leader attack deals damage" | `{ event: "LEADER_ATTACK_DEALS_DAMAGE" }` |
+| "When card removed from Life" (alt) | `{ event: "LIFE_CARD_REMOVED" }` |
+| "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
 
 **Custom triggers support filters:**
 
@@ -269,7 +287,12 @@ For cards with multiple trigger conditions (OR logic):
 | `TURN_COUNT` | "If it is your second turn or later" |
 | `RESTED_CARD_COUNT` | "If you have N+ rested cards" |
 | `CARD_TYPE_IN_ZONE` | "N+ Events in trash" |
+| `COMBINED_ZONE_COUNT` | "N+ cards across hand and trash" |
 | `BOARD_WIDE_EXISTENCE` | "If there is a Character with N+ power" |
+| `DON_GIVEN` | "If a card has DON!! attached" |
+| `SOURCE_PROPERTY` | "If K.O.'d by [type] card" |
+| `PLAY_METHOD` | "If played by effect / from hand" |
+| `FACE_UP_LIFE` | "If you have N face-up Life" |
 
 ### Compound Conditions
 
@@ -325,9 +348,15 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | Type | Card Text |
 |------|-----------|
 | `LEADER_POWER_REDUCTION` | "Your Leader -N power" |
-| `LIFE_TO_HAND` | "Add N Life to hand" |
+| `LIFE_TO_HAND` | "Add N Life to hand" (with `position: "TOP"\|"BOTTOM"\|"TOP_OR_BOTTOM"`) |
 | `TRASH_FROM_LIFE` | "Trash N from Life" |
 | `PLACE_FROM_TRASH_TO_DECK` | "Return N from trash to deck" |
+| `PLACE_STAGE_TO_DECK` | "Place Stage at deck bottom" |
+| `PLACE_HAND_TO_DECK` | "Place N from hand to deck" |
+| `GIVE_OPPONENT_DON` | "Give DON!! to opponent" |
+| `RETURN_ATTACHED_DON_TO_COST` | "Return attached DON!!" |
+| `PLACE_SELF_AND_HAND_TO_DECK` | "Place this card and hand to deck" |
+| `REST_DON` | "Rest N DON!!" (as cost) |
 
 ---
 
@@ -378,6 +407,11 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `SET_DON_ACTIVE` | "Set up to N DON!! active" |
 | `REST_DON` | "Rest N DON!!" |
 | `FORCE_OPPONENT_DON_RETURN` | "Opponent returns N DON!!" |
+| `REST_OPPONENT_DON` | "Rest N of opponent's DON!!" |
+| `GIVE_OPPONENT_DON_TO_OPPONENT` | "Give DON!! to opponent's card" |
+| `DISTRIBUTE_DON` | "Distribute DON!! among cards" |
+| `RETURN_ATTACHED_DON_TO_COST` | "Return attached DON!! to cost area" |
+| `REDISTRIBUTE_DON` | "Redistribute DON!! among cards" |
 
 ### State Change
 
@@ -386,25 +420,80 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `SET_ACTIVE` | "Set card to active" |
 | `SET_REST` | "Set card to rested" |
 | `APPLY_PROHIBITION` | "Cannot X" (via action, not permanent) |
+| `REMOVE_PROHIBITION` | Remove an applied prohibition |
 
 ### Life Manipulation
 
+| Type | Card Text | Params |
+|------|-----------|--------|
+| `ADD_TO_LIFE_FROM_DECK` | "Add N from deck to Life" | `{ amount: N, face: "UP"\|"DOWN", position: "TOP"\|"BOTTOM" }` |
+| `ADD_TO_LIFE_FROM_HAND` | "Add from hand to Life" | `{ amount: N, face: "UP"\|"DOWN", position: "TOP"\|"BOTTOM" }` |
+| `ADD_TO_LIFE_FROM_FIELD` | "Add card from field to Life" | `{ face: "UP"\|"DOWN" }` |
+| `TRASH_FROM_LIFE` | "Trash N from Life" | `{ amount: N, position: "TOP"\|"BOTTOM" }` |
+| `TURN_LIFE_FACE_UP` | "Face up N Life cards" | `{ amount: N, position: "TOP"\|"BOTTOM"\|"ALL" }` |
+| `TURN_LIFE_FACE_DOWN` | "Turn N Life face down" | `{ amount: N }` |
+| `TURN_ALL_LIFE_FACE_DOWN` | "Turn all Life face down" | — |
+| `LIFE_SCRY` | "Look at top of Life cards" | `{ look_at: N }` |
+| `LIFE_TO_HAND` | "Add Life card to hand" | `{ amount: N, position: "TOP"\|"BOTTOM" }` |
+| `LIFE_CARD_TO_DECK` | "Place Life card to deck" | `{ amount: N, position: "TOP"\|"BOTTOM" }` |
+| `PLAY_FROM_LIFE` | "Play card from Life" | `{ position: "TOP"\|"BOTTOM", entry_state: "ACTIVE"\|"RESTED" }` |
+| `REORDER_ALL_LIFE` | "Rearrange all Life cards" | — |
+| `DRAIN_LIFE_TO_THRESHOLD` | "Reduce Life to N" | `{ threshold: N }` |
+| `TRASH_FACE_UP_LIFE` | "Trash face-up Life cards" | — |
+
+### Hand / Deck Manipulation
+
+| Type | Card Text | Params |
+|------|-----------|--------|
+| `HAND_WHEEL` | "Trash N from hand, draw M" | `{ trash_count: N, draw_count: M }` |
+| `PLACE_HAND_TO_DECK` | "Place N from hand to deck" | `{ amount: N, position: "TOP"\|"BOTTOM" }` |
+| `RETURN_HAND_TO_DECK` | "Return hand to deck" | `{ position: "TOP"\|"BOTTOM" }` |
+| `REVEAL` | "Reveal N cards" | `{ amount: N, source: "DECK_TOP"\|"HAND" }` |
+| `REVEAL_HAND` | "Reveal hand" | — |
+| `SHUFFLE_DECK` | "Shuffle deck" | — |
+| `SEARCH_TRASH_THE_REST` | "Look at N, pick some, trash rest" | Similar to SEARCH_DECK but rest goes to trash |
+
+### Battle
+
 | Type | Card Text |
 |------|-----------|
-| `ADD_TO_LIFE_FROM_DECK` | "Add N from deck to Life" |
-| `ADD_TO_LIFE_FROM_HAND` | "Add from hand to Life" |
-| `TRASH_FROM_LIFE` | "Trash N from Life" |
-| `TURN_LIFE_FACE_UP` | "Face up N Life cards" |
-| `PLAY_FROM_LIFE` | "Play card from Life" |
+| `REDIRECT_ATTACK` | "Redirect attack to this card" |
+| `DEAL_DAMAGE` | "Deal N damage" |
+| `SELF_TAKE_DAMAGE` | "Take N damage yourself" |
+
+### Effect / Meta
+
+| Type | Card Text | Params |
+|------|-----------|--------|
+| `ACTIVATE_EVENT_FROM_HAND` | "Activate Event from hand" | Target filter |
+| `ACTIVATE_EVENT_FROM_TRASH` | "Activate Event from trash" | Target filter |
+| `NEGATE_TRIGGER_TYPE` | "Negate [Trigger] effects" | `{ trigger_type: KeywordTriggerType }` |
+| `GRANT_ATTRIBUTE` | "Gains [Attribute]" | `{ attribute: "SLASH"\|"STRIKE"\|etc. }` |
+| `GRANT_COUNTER` | "Gains Counter" | — |
+| `APPLY_ONE_TIME_MODIFIER` | Apply a one-shot modifier | `{ modification: Modifier, applies_to: {...} }` |
+| `PLAY_SELF` | "Play this card" (from Trigger) | — |
+
+### Additional Power & Stats
+
+| Type | Card Text | Params |
+|------|-----------|--------|
+| `SET_COST` | "Set cost to N" | `{ value: N }` |
+| `SWAP_BASE_POWER` | "Swap base power" | Target |
+| `COPY_POWER` | "Copy power" | Target |
+| `SET_POWER_TO_ZERO` | "Set power to 0" | Target |
 
 ### Flow / Meta
 
 | Type | Card Text | Notes |
 |------|-----------|-------|
-| `PLAYER_CHOICE` | "Choose one:" | `{ choices: [{ id, label, actions }] }` |
-| `OPPONENT_CHOICE` | "Opponent chooses" | `{ options: [...] }` |
+| `PLAYER_CHOICE` | "Choose one:" | `{ options: [[actions], [actions]], labels: [...] }` |
+| `OPPONENT_CHOICE` | "Opponent chooses" | `{ options: [[actions], [actions]], labels: [...] }` |
+| `OPPONENT_ACTION` | "Opponent does X" | `{ action: Action }` |
+| `CHOOSE_VALUE` | "Choose a number" | Player selects a value |
 | `SCHEDULE_ACTION` | "At end of turn, do X" | `{ timing: "END_OF_THIS_TURN", action: {...} }` |
 | `REUSE_EFFECT` | "Activate [Trigger] effect" | `{ target_effect: "COUNTER" \| "MAIN_EVENT" }` |
+| `WIN_GAME` | "You win the game" | — |
+| `EXTRA_TURN` | "Take an extra turn" | — |
 
 ### Chain Connectors
 
@@ -440,10 +529,20 @@ actions: [
 | `ALL_YOUR_CHARACTERS` | Every Character you control | N/A |
 | `ALL_OPPONENT_CHARACTERS` | Every opponent Character | N/A |
 | `CHARACTER_CARD` | Character in a zone | Requires `source_zone` |
+| `STAGE` | Stage on field | Controller |
+| `STAGE_CARD` | Stage in a zone | Requires `source_zone` |
+| `EVENT_CARD` | Event in a zone | Requires `source_zone` |
 | `CARD_IN_HAND` | Card in hand | Controller |
 | `CARD_IN_TRASH` | Card in trash | Controller |
 | `CARD_ON_TOP_OF_DECK` | Top N of deck | Controller |
+| `CARD_IN_DECK` | Card in deck | Controller |
+| `LIFE_CARD` | Life card | Controller |
 | `DON_IN_COST_AREA` | DON!! in cost area | Controller |
+| `DON_ATTACHED` | DON!! attached to card | Controller |
+| `DON_IN_DON_DECK` | DON!! in DON deck | Controller |
+| `PLAYER` | Player (for direct actions) | Controller |
+| `SELECTED_CARDS` | Previously selected cards | Via `target_ref` |
+| `OPPONENT_LIFE` | Opponent's Life zone | N/A |
 
 ### Count Modes
 
@@ -464,13 +563,19 @@ Filters narrow valid targets. Key fields:
 
 **Color:** `color` (single), `color_includes` (array), `color_not_matching_ref`
 
-**Traits:** `traits` (all required, AND), `traits_any_of` (at least one, OR), `traits_exclude`
+**Traits:** `traits` (all required, AND), `traits_any_of` (at least one, OR), `traits_contains` (substring match — "type including X"), `traits_exclude`
 
 **Name:** `name` (exact), `name_any_of` (array), `name_includes` (substring), `exclude_name`, `exclude_self`
 
-**Keywords:** `keywords` (array), `has_trigger`, `attribute`, `has_effect`, `no_base_effect`
+**Keywords:** `keywords` (array), `has_trigger`, `attribute`, `attribute_not`, `has_effect`, `no_base_effect`, `lacks_effect_type`, `has_counter`
 
-**State:** `is_rested`, `is_active`
+**State:** `is_rested`, `is_active`, `state` ("ACTIVE" | "RESTED")
+
+**DON:** `don_given_count` (`{ operator, value }` — cards with N DON!! attached)
+
+**Refs:** `exclude_ref` (exclude cards from a prior result_ref)
+
+**Uniqueness:** `unique_names` (selected cards must have distinct names)
 
 **Disjunctive:** `any_of: TargetFilter[]` — OR combination of filter sets
 
@@ -504,7 +609,9 @@ actions: [
 { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" }
 { type: "UNTIL_END_OF_YOUR_NEXT_TURN" }
 { type: "UNTIL_START_OF_YOUR_NEXT_TURN" }
+{ type: "SKIP_NEXT_REFRESH" }                      // Stays rested through next Refresh Phase
 { type: "PERMANENT" }                              // Until card leaves field
+{ type: "WHILE_CONDITION", condition: Condition }   // While a condition is true
 ```
 
 ---
@@ -524,6 +631,20 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 | `CANNOT_DRAW` | "Cannot draw by effects" | |
 | `CANNOT_ADD_LIFE_TO_HAND` | "Cannot add Life to hand" | |
 | `CANNOT_SET_DON_ACTIVE` | "Cannot activate DON!!" | |
+| `CANNOT_BE_BLOCKED` | "Cannot be blocked" | |
+| `CANNOT_PLAY_CHARACTER` | "Cannot play Characters" | filter |
+| `CANNOT_PLAY_EVENT` | "Cannot play Events" | |
+| `CANNOT_USE_COUNTER` | "Cannot use Counter" | |
+| `CANNOT_USE_BLOCKER` | "Cannot use [Blocker]" | |
+| `CANNOT_ACTIVATE_EFFECT` | "Cannot activate effects" | |
+| `CANNOT_ACTIVATE_ON_PLAY` | "Cannot activate [On Play]" | |
+| `CANNOT_ADD_LIFE` | "Cannot add to Life" | |
+| `CANNOT_BE_PLAYED_BY_EFFECTS` | "Cannot be played by effects" | |
+| `CANNOT_LEAVE_FIELD` | "Cannot leave field" | |
+| `CANNOT_REFRESH` | "Cannot refresh (stays rested)" | |
+| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | |
+| `CANNOT_BE_RETURNED_TO_HAND` | "Cannot be returned to hand" | |
+| `CANNOT_BE_RETURNED_TO_DECK` | "Cannot be returned to deck" | |
 
 ---
 
@@ -538,6 +659,12 @@ Used in `rule_modification` effect blocks:
 | `DECK_RESTRICTION` | "Cannot include X" | `{ rule_type: "DECK_RESTRICTION", restriction: "CANNOT_INCLUDE", filter: {...} }` |
 | `COPY_LIMIT_OVERRIDE` | "Any number of copies" | `{ rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" }` |
 | `DON_DECK_SIZE_OVERRIDE` | "DON!! deck is N" | `{ rule_type: "DON_DECK_SIZE_OVERRIDE", size: 6 }` |
+| `LOSS_CONDITION_MOD` | "Win instead of losing" | `{ rule_type: "LOSS_CONDITION_MOD", trigger_event: "DECK_OUT", modification: "WIN_INSTEAD" }` |
+| `DON_PHASE_BEHAVIOR` | "DON!! placed differently" | `{ rule_type: "DON_PHASE_BEHAVIOR", count: N, destination: "GIVEN_TO_LEADER" }` |
+| `START_OF_GAME_EFFECT` | "At start of game, do X" | `{ rule_type: "START_OF_GAME_EFFECT", actions: [...] }` |
+| `TRIGGER_TYPE_NEGATION` | "Negate [Trigger] effects" | `{ rule_type: "TRIGGER_TYPE_NEGATION", trigger_type: "ON_PLAY", affected_controller: "OPPONENT" }` |
+| `PLAY_STATE_MOD` | "Characters enter rested" | `{ rule_type: "PLAY_STATE_MOD", card_type: "CHARACTER", entry_state: "RESTED" }` |
+| `DAMAGE_RULE_MOD` | "Face-up Life goes to deck" | `{ rule_type: "DAMAGE_RULE_MOD", applies_to: "FACE_UP_LIFE", destination: "DECK_BOTTOM" }` |
 
 ---
 
@@ -599,6 +726,8 @@ flags: {
 5. **Intrinsic vs granted keywords.** Printed keywords go in `flags.keywords`. Keywords given by effects use the `GRANT_KEYWORD` action.
 
 6. **Zone for in-hand effects.** Effects active in hand (not on field) must set `zone: "HAND"`.
+
+9. **"Type including" uses `traits_contains`.** Card text like "type including Whitebeard Pirates" or "type includes CP" uses `traits_contains: ["Whitebeard Pirates"]`. This is a substring match — a card with trait "Whitebeard Pirates" matches. Use `traits` (exact AND) or `traits_any_of` (exact OR) only for exact trait matches.
 
 7. **Each bracket tag = one effect block.** `[On Play] ...` and `[When Attacking] ...` on the same card are separate effect blocks.
 
@@ -710,6 +839,8 @@ Card text: `[Once Per Turn] If this Character would be K.O.'d, you may trash 1 {
 {
   id: "CARD_ko_protection",
   category: "replacement",
+  // Replacement events: WOULD_BE_KO, WOULD_BE_REMOVED_FROM_FIELD,
+  // WOULD_LEAVE_FIELD, WOULD_BE_RESTED, WOULD_LOSE_GAME, LIFE_ADDED_TO_HAND
   replaces: { event: "WOULD_BE_KO" },
   replacement_actions: [
     {

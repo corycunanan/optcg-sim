@@ -38,28 +38,40 @@ Process an entire set file from `docs/cards/<SET>.md`. Read the file, identify e
 
 ## Context Loading
 
-Before encoding any card, read these files in order. Do not skip this step — the encoding depends on pattern-matching tables and examples in these files.
+Before encoding any card, read these files in order. Do not skip this step — the encoding depends on pattern-matching tables, type definitions, and examples in these files.
 
 ### Required (always read first)
 
-1. **`docs/game-engine/11-ENCODING-GUIDE.md`** — Primary reference. Contains pattern-matching tables that map card text phrases to schema fields. This is the main lookup resource during encoding.
-2. **`docs/game-engine/09-EXAMPLE-ENCODINGS.md`** — Ten fully annotated reference encodings. Use these as few-shot calibration before encoding new cards. Pay attention to the annotations — they explain why each encoding decision was made.
+1. **`workers/game/src/engine/effect-types.ts`** — **Source of truth** for all valid enum values: action types, trigger types, condition types, cost types, filter fields, target types, prohibition types, duration types, and rule modification types. Always verify enum values against this file. Documentation may lag behind — this file is canonical.
+2. **`docs/game-engine/11-ENCODING-GUIDE.md`** — Primary reference. Contains pattern-matching tables that map card text phrases to schema fields. This is the main lookup resource during encoding.
+3. **`docs/game-engine/09-EXAMPLE-ENCODINGS.md`** — Ten fully annotated reference encodings. Use these as few-shot calibration before encoding new cards. Pay attention to the annotations — they explain why each encoding decision was made.
+4. **`workers/game/src/engine/schemas/README.md`** — Authoring guide with complete catalogs of triggers, conditions, actions, costs, targets, filters, and examples.
 
 ### Required (read on first use per session)
 
-3. **`docs/game-engine/01-SCHEMA-OVERVIEW.md`** — Core type system: EffectBlock structure, categories, flags, costs, chain semantics, durations, dynamic values. Defines every type referenced by the encoding guide.
+5. **`docs/game-engine/01-SCHEMA-OVERVIEW.md`** — Core type system: EffectBlock structure, categories, flags, costs, chain semantics, durations, dynamic values.
 
 ### On-demand (consult for edge cases)
 
 Read these only when a pattern is not covered by the encoding guide or example encodings:
 
-4. `docs/game-engine/02-TRIGGERS.md` — Full trigger type catalog
-5. `docs/game-engine/03-CONDITIONS.md` — All condition types and compound conditions
-6. `docs/game-engine/04-ACTIONS.md` — Complete action type reference
-7. `docs/game-engine/05-TARGETING.md` — Target types, filters, controller semantics
-8. `docs/game-engine/06-PROHIBITIONS-AND-REPLACEMENTS.md` — Prohibition types, replacement effects, proxy replacements
-9. `docs/game-engine/07-RULE-MODIFICATIONS.md` — Rule modification types
-10. `docs/game-engine/10-KEYWORD-REFERENCE.md` — Keyword definitions and encoding rules
+6. `docs/game-engine/02-TRIGGERS.md` — Full trigger type catalog
+7. `docs/game-engine/03-CONDITIONS.md` — All condition types and compound conditions
+8. `docs/game-engine/04-ACTIONS.md` — Complete action type reference
+9. `docs/game-engine/05-TARGETING.md` — Target types, filters, controller semantics
+10. `docs/game-engine/06-PROHIBITIONS-AND-REPLACEMENTS.md` — Prohibition types, replacement effects, proxy replacements
+11. `docs/game-engine/07-RULE-MODIFICATIONS.md` — Rule modification types
+12. `docs/game-engine/10-KEYWORD-REFERENCE.md` — Keyword definitions and encoding rules
+
+### Pre-scan for deferred patterns
+
+Before encoding a set, run the deferred pattern scanner to identify cards that may be unencodable:
+
+```
+node workers/game/src/engine/schemas/pre-scan.sh docs/cards/<SET>.md
+```
+
+Review flagged cards against `docs/game-engine/DEFERRED-CARD-EFFECTS.md`. Skip flagged cards during encoding and add them to the deferred list if confirmed.
 
 ---
 
@@ -262,6 +274,42 @@ These are the most frequent encoding errors. Review this list before and after e
 - In OPTCG card text, the colon (`:`) separates cost from effect.
 - Everything before the colon is a cost. Everything after is the effect.
 - Example: "You may trash 1 card from your hand: Draw 2 cards." — the trash is a cost, the draw is the action.
+
+### "Type Including" Uses `traits_contains`
+
+- Card text "type including X" or "type includes X" (e.g., "type including Whitebeard Pirates", "type includes CP") uses `traits_contains: ["X"]` in filters.
+- `traits_contains` is a substring match — a card with trait "CP9" matches `traits_contains: ["CP"]`.
+- `traits` (exact AND) and `traits_any_of` (exact OR) are for exact trait name matches.
+- This distinction is critical in OP03 where many cards reference "type including" patterns.
+
+### "Play this card" Trigger Effects
+
+- When a Trigger effect says `[Trigger] Play this card.`, encode as: `{ type: "PLAY_SELF" }` action with trigger `{ keyword: "TRIGGER" }`.
+- `PLAY_SELF` means the card plays itself from wherever it is (typically from Life after Trigger reveal).
+
+### Life Card Manipulation
+
+- "Look at up to 1 card from the top of your or opponent's Life cards, and place it at the top or bottom" uses `LIFE_SCRY` action.
+- "Add up to 1 card from the top of your deck to the top of your Life cards" uses `ADD_TO_LIFE_FROM_DECK` with `position: "TOP"`.
+- "Trash up to 1 card from the top of your opponent's Life cards" uses `TRASH_FROM_LIFE` on opponent's life.
+- "You may add 1 card from the top or bottom of your Life cards to your hand" is a `LIFE_TO_HAND` cost with `position: "TOP_OR_BOTTOM"`.
+- "Add Character to Life cards face-up" uses `ADD_TO_LIFE_FROM_FIELD` with `face: "UP"`.
+
+### "Win Instead of Losing" Rule Modifications
+
+- Cards like "When your deck is reduced to 0, you win the game instead of losing" use `rule_modification` category with `LOSS_CONDITION_MOD`:
+  ```json
+  { "rule_type": "LOSS_CONDITION_MOD", "trigger_event": "DECK_OUT", "modification": "WIN_INSTEAD" }
+  ```
+
+### DON!! −N (Return to Deck) as Cost
+
+- "DON!! −N" in card text (often with parenthetical explanation) is a cost: `{ type: "DON_MINUS", amount: N }`.
+- The `flags.optional` should be set if the DON!! cost is optional (preceded by "You may").
+
+### "Activate this card's [Main] effect" Trigger
+
+- Common Trigger effect pattern. Uses `REUSE_EFFECT` action with `{ target_effect: "MAIN_EVENT" }`.
 
 ---
 
