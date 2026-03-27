@@ -29,7 +29,7 @@ export const OP02_001_EDWARD_NEWGATE: EffectSchema = {
       actions: [
         {
           type: "LIFE_TO_HAND",
-          params: { amount: 1, from: "TOP" },
+          params: { amount: 1, position: "TOP" },
         },
       ],
     },
@@ -232,7 +232,7 @@ export const OP02_009_SQUARD: EffectSchema = {
         },
         {
           type: "LIFE_TO_HAND",
-          params: { amount: 1, from: "TOP" },
+          params: { amount: 1, position: "TOP" },
           chain: "AND",
         },
       ],
@@ -574,7 +574,7 @@ export const OP02_021_SEAQUAKE: EffectSchema = {
   effects: [
     {
       id: "main_ko",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -626,7 +626,7 @@ export const OP02_022_WHITEBEARD_PIRATES: EffectSchema = {
   effects: [
     {
       id: "main_search",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -666,7 +666,7 @@ export const OP02_023_YOU_MAY_BE_A_FOOL: EffectSchema = {
   effects: [
     {
       id: "main_prohibition",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LIFE_COUNT",
@@ -1244,7 +1244,7 @@ export const OP02_046_DIABLE_JAMBE: EffectSchema = {
   effects: [
     {
       id: "main_ko_rested",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -1294,7 +1294,7 @@ export const OP02_047_PARADISE_TOTSUKA: EffectSchema = {
   effects: [
     {
       id: "main_rest",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -1743,7 +1743,7 @@ export const OP02_066_IMPEL_DOWN_ALL_STARS: EffectSchema = {
   effects: [
     {
       id: "main_draw",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [
         { type: "TRASH_FROM_HAND", amount: 2 },
@@ -1781,7 +1781,7 @@ export const OP02_067_ARABESQUE_BRICK_FIST: EffectSchema = {
   effects: [
     {
       id: "main_bounce",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -1875,7 +1875,7 @@ export const OP02_069_DEATH_WINK: EffectSchema = {
     {
       id: "counter_boost_draw",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -2638,7 +2638,7 @@ export const OP02_090_HYDRA: EffectSchema = {
   effects: [
     {
       id: "main_debuff",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
       actions: [
@@ -2686,7 +2686,7 @@ export const OP02_091_VENOM_ROAD: EffectSchema = {
   effects: [
     {
       id: "main_add_don",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -3334,7 +3334,7 @@ export const OP02_117_ICE_AGE: EffectSchema = {
   effects: [
     {
       id: "main_cost_reduce",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -3430,7 +3430,7 @@ export const OP02_119_METEOR_VOLCANO: EffectSchema = {
   effects: [
     {
       id: "main_ko",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {

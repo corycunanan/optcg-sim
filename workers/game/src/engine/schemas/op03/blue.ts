@@ -447,8 +447,8 @@ export const OP03_054_USOPPS_RUBBER_BAND: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_mill",
-      category: "activate",
-      trigger: { keyword: "COUNTER" },
+      category: "auto",
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -502,8 +502,8 @@ export const OP03_055_GUM_GUM_GIANT_GAVEL: EffectSchema = {
   effects: [
     {
       id: "counter_power_boost",
-      category: "activate",
-      trigger: { keyword: "COUNTER" },
+      category: "auto",
+      trigger: { keyword: "COUNTER_EVENT" },
       costs: [
         { type: "TRASH_FROM_HAND", amount: 1 },
       ],
@@ -554,7 +554,7 @@ export const OP03_056_SANJIS_PILAF: EffectSchema = {
   effects: [
     {
       id: "main_draw_2",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -590,7 +590,7 @@ export const OP03_057_THREE_THOUSAND_WORLDS: EffectSchema = {
   effects: [
     {
       id: "main_return_to_deck",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {

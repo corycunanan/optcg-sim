@@ -25,7 +25,7 @@ export const OP03_021_KURO: EffectSchema = {
           amount: 2,
           filter: {
             card_type: "CHARACTER",
-            traits_contains: ["East Blue"],
+            traits: ["East Blue"],
           },
         },
       ],
@@ -282,7 +282,7 @@ export const OP03_028_JANGO: EffectSchema = {
                     controller: "SELF",
                     count: { up_to: 1 },
                     filter: {
-                      traits_contains: ["East Blue"],
+                      traits: ["East Blue"],
                       cost_max: 6,
                     },
                   },
@@ -372,7 +372,7 @@ export const OP03_030_NAMI: EffectSchema = {
             pick: { up_to: 1 },
             filter: {
               color: "GREEN",
-              traits_contains: ["East Blue"],
+              traits: ["East Blue"],
               exclude_name: "Nami",
             },
             rest_destination: "BOTTOM",
@@ -467,7 +467,7 @@ export const OP03_036_OUT_OF_THE_BAG: EffectSchema = {
   effects: [
     {
       id: "main_rest_set_kuro_active",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [
         {
@@ -475,7 +475,7 @@ export const OP03_036_OUT_OF_THE_BAG: EffectSchema = {
           amount: 1,
           filter: {
             card_type: "CHARACTER",
-            traits_contains: ["East Blue"],
+            traits: ["East Blue"],
           },
         },
       ],
@@ -524,7 +524,7 @@ export const OP03_037_TOOTH_ATTACK: EffectSchema = {
   effects: [
     {
       id: "main_rest_ko_rested",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [
         {
@@ -532,7 +532,7 @@ export const OP03_037_TOOTH_ATTACK: EffectSchema = {
           amount: 1,
           filter: {
             card_type: "CHARACTER",
-            traits_contains: ["East Blue"],
+            traits: ["East Blue"],
           },
         },
       ],
@@ -581,7 +581,7 @@ export const OP03_038_DEATHLY_POISON_GAS_BOMB_MH5: EffectSchema = {
   effects: [
     {
       id: "main_rest_opponents",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -627,7 +627,7 @@ export const OP03_039_ONE_TWO_JANGO: EffectSchema = {
   effects: [
     {
       id: "main_rest_then_buff",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {

@@ -549,7 +549,7 @@ export const OP03_094_AIR_DOOR: EffectSchema = {
   effects: [
     {
       id: "main_search_and_play_cp",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -606,7 +606,7 @@ export const OP03_095_SOAP_SHEEP: EffectSchema = {
   effects: [
     {
       id: "main_cost_reduce",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -652,7 +652,7 @@ export const OP03_096_TEMPEST_KICK: EffectSchema = {
   effects: [
     {
       id: "main_ko_choice",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -714,7 +714,7 @@ export const OP03_097_SIX_KING_PISTOL: EffectSchema = {
   effects: [
     {
       id: "counter_power_buff",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [

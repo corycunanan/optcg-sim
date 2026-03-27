@@ -478,7 +478,7 @@ export const OP03_016_FLAME_EMPEROR: EffectSchema = {
   effects: [
     {
       id: "main_ko_and_buff",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -589,7 +589,7 @@ export const OP03_018_FIRE_FIST: EffectSchema = {
   effects: [
     {
       id: "main_dual_ko",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [
         {
@@ -652,7 +652,7 @@ export const OP03_019_FIERY_DOLL: EffectSchema = {
   effects: [
     {
       id: "main_leader_buff",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {

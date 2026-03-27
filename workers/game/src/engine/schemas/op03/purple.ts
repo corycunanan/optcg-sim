@@ -428,7 +428,7 @@ export const OP03_072_GUM_GUM_JET_GATLING: EffectSchema = {
     {
       id: "counter_power_buff",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
         {
@@ -470,7 +470,7 @@ export const OP03_073_HULL_DISMANTLER_SLASH: EffectSchema = {
   effects: [
     {
       id: "main_conditional_ko",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
       conditions: {
@@ -511,7 +511,7 @@ export const OP03_074_TOP_KNOT: EffectSchema = {
   effects: [
     {
       id: "main_return_to_deck",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
       actions: [
