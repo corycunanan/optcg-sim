@@ -728,7 +728,11 @@ flags: {
 
 6. **Zone for in-hand effects.** Effects active in hand (not on field) must set `zone: "HAND"`.
 
-9. **"Type including" uses `traits_contains`.** Card text like "type including Whitebeard Pirates" or "type includes CP" uses `traits_contains: ["Whitebeard Pirates"]`. This is a substring match — a card with trait "Whitebeard Pirates" matches. Use `traits` (exact AND) or `traits_any_of` (exact OR) only for exact trait matches.
+9. **`traits` vs `traits_contains` — match the card text exactly.**
+   - `{Whitebeard Pirates} type` (curly braces) → `traits: ["Whitebeard Pirates"]` — **exact match** per trait. "Former Whitebeard Pirates" does NOT match.
+   - `type including "Whitebeard Pirates"` → `traits_contains: ["Whitebeard Pirates"]` — **substring match**. "Former Whitebeard Pirates" DOES match.
+   - Same for LEADER_PROPERTY: `{X} type` → `trait: "X"` (exact), `type includes "X"` → `trait_contains: "X"` (substring).
+   - Do NOT use `traits_contains` for `{X} type` card text.
 
 7. **Each bracket tag = one effect block.** `[On Play] ...` and `[When Attacking] ...` on the same card are separate effect blocks.
 

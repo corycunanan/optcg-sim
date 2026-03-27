@@ -93,7 +93,7 @@ export const OP01_008_CAVENDISH: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [
-        { type: "TRASH_FROM_LIFE", amount: 1 },
+        { type: "LIFE_TO_HAND", amount: 1 },
       ],
       actions: [
         {
@@ -238,6 +238,11 @@ export const OP01_014_JINBE: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_014_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "on_block_play",
       category: "auto",
       trigger: {
@@ -334,6 +339,11 @@ export const OP01_047_TRAFALGAR_LAW: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_047_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "on_play_swap",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
@@ -423,7 +433,13 @@ export const OP01_075_PACIFISTA: EffectSchema = {
   rule_modifications: [
     { rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" },
   ],
-  effects: [],
+  effects: [
+    {
+      id: "OP01_075_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+  ],
 };
 
 // ─── 15. Radical Beam!! (OP01-029) — COUNTER + MODIFY_POWER + conditional chain
@@ -866,6 +882,11 @@ export const OP01_019_BARTOLOMEO: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_019_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "opp_turn_buff",
       category: "permanent",
       trigger: {
@@ -947,7 +968,7 @@ export const OP01_024_LUFFY: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
-          scope: { cause: "BATTLE", source_filter: { attribute: "SLASH" } },
+          scope: { cause: "BATTLE", source_filter: { attribute: "STRIKE" } },
         },
       ],
     },
@@ -1198,6 +1219,11 @@ export const OP01_039_KILLER: EffectSchema = {
   card_name: "Killer",
   card_type: "Character",
   effects: [
+    {
+      id: "OP01_039_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
     {
       id: "on_block_draw",
       category: "auto",
@@ -1553,6 +1579,11 @@ export const OP01_073_DOFLAMINGO: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_073_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "on_play_scry",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
@@ -1569,6 +1600,11 @@ export const OP01_074_KUMA: EffectSchema = {
   card_name: "Bartholomew Kuma",
   card_type: "Character",
   effects: [
+    {
+      id: "OP01_074_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
     {
       id: "on_ko_play_pacifista",
       category: "auto",
@@ -1614,6 +1650,11 @@ export const OP01_078_BOA_HANCOCK: EffectSchema = {
   card_name: "Boa Hancock",
   card_type: "Character",
   effects: [
+    {
+      id: "OP01_078_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
     {
       id: "draw_on_attack_or_block",
       category: "auto",
@@ -1996,6 +2037,11 @@ export const OP01_120_SHANKS: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_120_keywords",
+      category: "permanent",
+      flags: { keywords: ["RUSH"] },
+    },
+    {
       id: "when_attacking_no_blocker",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
@@ -2022,7 +2068,13 @@ export const OP01_121_YAMATO: EffectSchema = {
   rule_modifications: [
     { rule_type: "NAME_ALIAS", aliases: ["Kouzuki Oden"] },
   ],
-  effects: [],
+  effects: [
+    {
+      id: "OP01_121_keywords",
+      category: "permanent",
+      flags: { keywords: ["DOUBLE_ATTACK", "BANISH"] },
+    },
+  ],
 };
 
 // ─── 68. X.Drake (OP01-114) — On Play DON -1 opponent trash ────────────────
@@ -2223,7 +2275,7 @@ export const OP01_072_SMILEY: EffectSchema = {
         {
           type: "MODIFY_POWER",
           target: { type: "SELF" },
-          params: { amount: { type: "PER_COUNT", source: "HAND_COUNT", multiplier: 1000 } },
+          params: { amount: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } },
         },
       ],
     },
@@ -2356,6 +2408,11 @@ export const OP01_079_MS_ALL_SUNDAY: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_079_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "on_ko_recover_event",
       category: "auto",
       trigger: { keyword: "ON_KO" },
@@ -2448,6 +2505,11 @@ export const OP01_111_BLACK_MARIA: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_111_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "on_block_buff",
       category: "auto",
       trigger: { keyword: "ON_BLOCK" },
@@ -2508,12 +2570,13 @@ export const OP01_087_OFFICER_AGENTS: EffectSchema = {
         {
           type: "PLAY_CARD",
           target: {
-            type: "CARD_IN_HAND",
+            type: "CHARACTER_CARD",
             controller: "SELF",
             count: { up_to: 1 },
-            filter: { card_type: "CHARACTER", traits: ["Baroque Works"], cost_max: 3 },
+            source_zone: "HAND",
+            filter: { traits: ["Baroque Works"], cost_max: 3 },
           },
-          params: { source_zone: "HAND", cost_override: "FREE" },
+          params: { cost_override: "FREE" },
         },
       ],
     },
@@ -2592,6 +2655,11 @@ export const OP01_044_SHACHI: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "OP01_044_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
       id: "on_play_play_penguin",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
@@ -2627,6 +2695,11 @@ export const OP01_050_PENGUIN: EffectSchema = {
   card_name: "Penguin",
   card_type: "Character",
   effects: [
+    {
+      id: "OP01_050_keywords",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
     {
       id: "on_play_play_shachi",
       category: "auto",
@@ -2728,10 +2801,12 @@ export const OP01_099_SEMIMARU: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
-          scope: {
-            cause: "BATTLE",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
             filter: { traits: ["Kurozumi Clan"], exclude_name: "Kurozumi Semimaru" },
           },
+          scope: { cause: "BATTLE" },
           duration: { type: "PERMANENT" },
         },
       ],

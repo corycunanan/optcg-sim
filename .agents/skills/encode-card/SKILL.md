@@ -275,12 +275,18 @@ These are the most frequent encoding errors. Review this list before and after e
 - Everything before the colon is a cost. Everything after is the effect.
 - Example: "You may trash 1 card from your hand: Draw 2 cards." — the trash is a cost, the draw is the action.
 
-### "Type Including" Uses `traits_contains`
+### Trait Filters: `traits` vs `traits_contains`
 
-- Card text "type including X" or "type includes X" (e.g., "type including Whitebeard Pirates", "type includes CP") uses `traits_contains: ["X"]` in filters.
-- `traits_contains` is a substring match — a card with trait "CP9" matches `traits_contains: ["CP"]`.
-- `traits` (exact AND) and `traits_any_of` (exact OR) are for exact trait name matches.
-- This distinction is critical in OP03 where many cards reference "type including" patterns.
+These are **different operations** — use the one that matches the card text:
+
+- **`{Whitebeard Pirates} type`** (curly braces) → `traits: ["Whitebeard Pirates"]` — **exact match**. One of the card's traits must exactly equal the string. A card with trait "Former Whitebeard Pirates" does NOT match.
+- **`type including "Whitebeard Pirates"`** or **`type includes "CP"`** → `traits_contains: ["Whitebeard Pirates"]` — **substring match**. One of the card's traits must contain the string. A card with trait "CP9" DOES match `traits_contains: ["CP"]`.
+
+The same distinction applies to LEADER_PROPERTY conditions:
+- "has the {Baroque Works} type" → `property: { trait: "Baroque Works" }` (exact)
+- "Leader's type includes 'Baroque Works'" → `property: { trait_contains: "Baroque Works" }` (substring)
+
+**Do NOT use `traits_contains` when the card text uses `{X} type` notation.** Only use it for explicit "type including" / "type includes" wording.
 
 ### "Play this card" Trigger Effects
 

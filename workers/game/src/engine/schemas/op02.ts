@@ -574,7 +574,7 @@ export const OP02_021_SEAQUAKE: EffectSchema = {
   effects: [
     {
       id: "main_ko",
-      category: "auto",
+      category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -626,7 +626,7 @@ export const OP02_022_WHITEBEARD_PIRATES: EffectSchema = {
   effects: [
     {
       id: "main_search",
-      category: "auto",
+      category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
@@ -666,7 +666,7 @@ export const OP02_023_YOU_MAY_BE_A_FOOL: EffectSchema = {
   effects: [
     {
       id: "main_prohibition",
-      category: "auto",
+      category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LIFE_COUNT",
@@ -746,9 +746,7 @@ export const OP02_024_MOBY_DICK: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       actions: [
         {
-          type: "PLAY_CARD",
-          target: { type: "SELF" },
-          params: { source_zone: "LIFE", cost_override: "FREE" },
+          type: "PLAY_SELF",
         },
       ],
     },
@@ -1186,7 +1184,7 @@ export const OP02_045_THREE_SWORD_STYLE: EffectSchema = {
     {
       id: "counter_boost_play",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1825,7 +1823,7 @@ export const OP02_068_GUM_GUM_RAIN: EffectSchema = {
     {
       id: "counter_boost",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       costs: [
         { type: "TRASH_FROM_HAND", amount: 1 },
       ],
@@ -2038,13 +2036,13 @@ export const OP02_031_KOUZUKI_TOKI: EffectSchema = {
           params: { keyword: "BLOCKER" },
           duration: {
             type: "WHILE_CONDITION",
-            condition: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Kouzuki Oden" } },
+            condition: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Kouzuki Oden", card_type: "CHARACTER" } },
           },
         },
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Kouzuki Oden" } },
+        condition: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Kouzuki Oden", card_type: "CHARACTER" } },
       },
     },
   ],
@@ -2592,7 +2590,7 @@ export const OP02_089_JUDGMENT_OF_HELL: EffectSchema = {
     {
       id: "counter_debuff",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
       actions: [
         {
@@ -3383,7 +3381,7 @@ export const OP02_118_YASAKANI_SACRED_JEWEL: EffectSchema = {
     {
       id: "counter_protection",
       category: "auto",
-      trigger: { keyword: "COUNTER" },
+      trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
         {
