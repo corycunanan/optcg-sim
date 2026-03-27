@@ -142,7 +142,8 @@ These map to printed bracket tags on cards:
 | `[On Your Opponent's Attack]` | `{ keyword: "ON_OPPONENT_ATTACK" }` | When opponent declares attack |
 | `[Activate: Main]` | `{ keyword: "ACTIVATE_MAIN" }` | Manual activation in Main Phase |
 | `[Main]` (Events) | `{ keyword: "MAIN_EVENT" }` | Event card activation |
-| `[Counter]` | `{ keyword: "COUNTER" }` | During Counter Step |
+| `[Counter]` (Characters) | `{ keyword: "COUNTER" }` | During Counter Step |
+| `[Counter]` (Events) | `{ keyword: "COUNTER_EVENT" }` | Counter Event card |
 | `[Trigger]` | `{ keyword: "TRIGGER" }` | When revealed from Life |
 | `[End of Your Turn]` | `{ keyword: "END_OF_YOUR_TURN" }` | End of your turn |
 | `[End of Your Opponent's Turn]` | `{ keyword: "END_OF_OPPONENT_TURN" }` | End of opponent's turn |
@@ -565,7 +566,7 @@ Filters narrow valid targets. Key fields:
 
 **Traits:** `traits` (all required, AND), `traits_any_of` (at least one, OR), `traits_contains` (substring match — "type including X"), `traits_exclude`
 
-**Name:** `name` (exact), `name_any_of` (array), `name_includes` (substring), `exclude_name`, `exclude_self`
+**Name:** `name` (exact), `name_any_of` (array), `name_includes` (substring), `exclude_name`, `exclude_self`, `name_matching_ref` (match name from a prior result_ref)
 
 **Keywords:** `keywords` (array), `has_trigger`, `attribute`, `attribute_not`, `has_effect`, `no_base_effect`, `lacks_effect_type`, `has_counter`
 
