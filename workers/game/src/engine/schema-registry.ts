@@ -15,6 +15,23 @@ import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
 import { OP03_SCHEMAS } from "./schemas/op03.js";
 import { OP04_SCHEMAS } from "./schemas/op04.js";
+import { OP05_SCHEMAS } from "./schemas/op05.js";
+import { OP06_SCHEMAS } from "./schemas/op06.js";
+import { OP07_SCHEMAS } from "./schemas/op07.js";
+import { OP08_SCHEMAS } from "./schemas/op08.js";
+import { OP09_SCHEMAS } from "./schemas/op09.js";
+import { OP10_SCHEMAS } from "./schemas/op10.js";
+import { OP11_SCHEMAS } from "./schemas/op11.js";
+import { OP12_SCHEMAS } from "./schemas/op12.js";
+import { OP13_SCHEMAS } from "./schemas/op13.js";
+import { OP14_SCHEMAS } from "./schemas/op14.js";
+import { OP15_SCHEMAS } from "./schemas/op15.js";
+import { EB01_SCHEMAS } from "./schemas/eb01.js";
+import { EB02_SCHEMAS } from "./schemas/eb02.js";
+import { EB03_SCHEMAS } from "./schemas/eb03.js";
+import { EB04_SCHEMAS } from "./schemas/eb04.js";
+import { PRB01_SCHEMAS } from "./schemas/prb01.js";
+import { PRB02_SCHEMAS } from "./schemas/prb02.js";
 import { ACE_DECK_SCHEMAS } from "./schemas/ace-deck.js";
 import { NAMI_DECK_SCHEMAS } from "./schemas/nami-deck.js";
 
@@ -24,6 +41,23 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...OP02_SCHEMAS,
   ...OP03_SCHEMAS,
   ...OP04_SCHEMAS,
+  ...OP05_SCHEMAS,
+  ...OP06_SCHEMAS,
+  ...OP07_SCHEMAS,
+  ...OP08_SCHEMAS,
+  ...OP09_SCHEMAS,
+  ...OP10_SCHEMAS,
+  ...OP11_SCHEMAS,
+  ...OP12_SCHEMAS,
+  ...OP13_SCHEMAS,
+  ...OP14_SCHEMAS,
+  ...OP15_SCHEMAS,
+  ...EB01_SCHEMAS,
+  ...EB02_SCHEMAS,
+  ...EB03_SCHEMAS,
+  ...EB04_SCHEMAS,
+  ...PRB01_SCHEMAS,
+  ...PRB02_SCHEMAS,
   ...ACE_DECK_SCHEMAS,
   ...NAMI_DECK_SCHEMAS,
 };
