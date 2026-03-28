@@ -32,6 +32,16 @@ import { EB03_SCHEMAS } from "./schemas/eb03.js";
 import { EB04_SCHEMAS } from "./schemas/eb04.js";
 import { PRB01_SCHEMAS } from "./schemas/prb01.js";
 import { PRB02_SCHEMAS } from "./schemas/prb02.js";
+import { ST01_SCHEMAS } from "./schemas/st01.js";
+import { ST02_SCHEMAS } from "./schemas/st02.js";
+import { ST03_SCHEMAS } from "./schemas/st03.js";
+import { ST04_SCHEMAS } from "./schemas/st04.js";
+import { ST05_SCHEMAS } from "./schemas/st05.js";
+import { ST06_SCHEMAS } from "./schemas/st06.js";
+import { ST07_SCHEMAS } from "./schemas/st07.js";
+import { ST08_SCHEMAS } from "./schemas/st08.js";
+import { ST09_SCHEMAS } from "./schemas/st09.js";
+import { ST10_SCHEMAS } from "./schemas/st10.js";
 import { ACE_DECK_SCHEMAS } from "./schemas/ace-deck.js";
 import { NAMI_DECK_SCHEMAS } from "./schemas/nami-deck.js";
 
@@ -58,6 +68,16 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...EB04_SCHEMAS,
   ...PRB01_SCHEMAS,
   ...PRB02_SCHEMAS,
+  ...ST01_SCHEMAS,
+  ...ST02_SCHEMAS,
+  ...ST03_SCHEMAS,
+  ...ST04_SCHEMAS,
+  ...ST05_SCHEMAS,
+  ...ST06_SCHEMAS,
+  ...ST07_SCHEMAS,
+  ...ST08_SCHEMAS,
+  ...ST09_SCHEMAS,
+  ...ST10_SCHEMAS,
   ...ACE_DECK_SCHEMAS,
   ...NAMI_DECK_SCHEMAS,
 };
