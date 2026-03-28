@@ -34,7 +34,18 @@ Read these files before encoding any card:
 
 ### Card text source
 
-**`docs/cards/{SET}.md` is the encoding source of truth for card effect text.** These files contain cleaned, human-readable effect text derived from the official card data. Do not query the PostgreSQL database for card text — the markdown files are authoritative for encoding and are validated by the pre-check scripts in Phase 1. The database `Card.effectText` field contains the same text but lacks the structured format (card name, ID grouping) that the pre-check tooling and encoding workflow depend on.
+**`docs/cards/{SET}.md` is the encoding source of truth for card effect text, card type, and card color.** Each card entry includes the card name, ID with type and color metadata, and effect text:
+
+```
+## Card Name
+**{SET}-NNN** · Type · Color
+
+[Effect text...]
+```
+
+For example: `**EB03-001** · Leader · Red/Blue` tells you this is a Leader card with colors Red and Blue. Multi-color cards use `/` (e.g., `Red/Green`).
+
+Do not query the PostgreSQL database for card text, type, or color — the markdown files are authoritative for encoding and contain all metadata needed. The database is not part of the encoding workflow.
 
 ## Phase 3: Encode by color group (parallel) → merge into single file
 

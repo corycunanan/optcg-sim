@@ -81,6 +81,8 @@ Follow these steps for every card. Do not skip steps.
 
 ### Step 1: Parse Card Text
 
+Each card entry in the set file provides the card name (heading), card ID with type and color (`**{SET}-NNN** · Type · Color`), and the effect text. Read the `card_type` and color directly from this metadata line — do not query the database.
+
 Split the card text into independent effect blocks. Each of these starts a new block:
 
 - A bracket tag: `[On Play]`, `[Activate: Main]`, `[When Attacking]`, `[On K.O.]`, `[Counter]`, `[Trigger]`, `[Once Per Turn]`, etc.
@@ -356,7 +358,7 @@ Run these after completing all encodings (single or batch). These are post-encod
 When processing a full set file:
 
 1. Read the set file at `docs/cards/<SET>.md`.
-2. Parse the file to extract all cards. Each card entry has a heading (card name), a bold card ID, and effect text. Cards are separated by `---` dividers.
+2. Parse the file to extract all cards. Each card entry has a heading (card name), a bold card ID line with type and color metadata (e.g., `**EB03-001** · Leader · Red/Blue`), and effect text. Cards are separated by `---` dividers. Use the type and color from this line — do not query the database.
 3. Skip cards with no effect text (vanilla cards).
 4. For each card with effects:
    a. Run the full encoding process (Steps 1-5).
