@@ -355,14 +355,135 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
+## ST22 Deferred Cards (5 remaining)
+
+### ST22-003 Edward.Newgate (On Play effect only)
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards.
+
+**Blocker:** Reveal top card, check trait, conditionally draw.
+
+**Note:** [Double Attack] keyword is encoded in `st22.ts`.
+
+**Unblocked by:** Same REVEAL pipeline as OP01-060.
+
+---
+
+### ST22-006 Jozu
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards and trash 1 card from your hand.
+
+**Blocker:** Reveal top card, check trait, conditionally draw + trash.
+
+**Unblocked by:** Same REVEAL pipeline as OP01-060.
+
+---
+
+### ST22-007 Squard
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [Activate: Main] [Once Per Turn] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", give up to 1 rested DON!! card to your Leader or 1 of your Characters.
+
+**Blocker:** Reveal top card, check trait, conditionally give DON.
+
+**Unblocked by:** Same REVEAL pipeline as OP01-060.
+
+---
+
+### ST22-012 Marco (When Attacking effect only)
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [When Attacking] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", this Character gains +1000 power until the end of your opponent's next turn.
+
+**Blocker:** Reveal top card, check trait, conditionally grant power.
+
+**Note:** Replacement effect (K.O. protection) is encoded in `st22.ts`.
+
+**Unblocked by:** Same REVEAL pipeline as OP01-060.
+
+---
+
+### ST22-016 Take That Back!! (Counter effect only)
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [Counter] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", up to 1 of your Leader or Character cards gains +4000 power during this battle.
+
+**Blocker:** Reveal top card, check trait, conditionally grant power.
+
+**Note:** [Trigger] effect (Draw 1 card) is encoded in `st22.ts`.
+
+**Unblocked by:** Same REVEAL pipeline as OP01-060.
+
+---
+
+## ST23 Deferred Cards (2 remaining)
+
+### ST23-001 Uta (Hand cost reduction only)
+**Tags:** `HAND_ZONE_MODIFIER`
+
+> If you have a Character with 10000 power or more, give this card in your hand −4 cost.
+
+**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on field state.
+
+**Note:** [Blocker] keyword is encoded in `st23.ts`.
+
+**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + field existence condition.
+
+---
+
+### ST23-002 Shanks (Hand cost reduction only)
+**Tags:** `HAND_ZONE_MODIFIER`
+
+> If your opponent has a Character with 8000 base power or more, give this card in your hand −3 cost.
+
+**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on opponent's field state.
+
+**Note:** [On Play] effect is encoded in `st23.ts`.
+
+**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + field existence condition.
+
+---
+
+## ST26 Deferred Cards (1 remaining)
+
+### ST26-001 Soba Mask (Hand cost reduction only)
+**Tags:** `HAND_ZONE_MODIFIER`
+
+> If you have a [San-Gorou] or [Sanji] Character with 7000 base power or more, give this card in your hand −5 cost.
+
+**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on named card with power threshold.
+
+**Note:** [On Play] effect is encoded in `st26.ts`.
+
+**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + named card with property condition.
+
+---
+
+## P (Promo) Deferred Cards (1 remaining)
+
+### P-106 Monkey.D.Luffy (End of Turn effect only)
+**Tags:** `LIFE_FACE_COST`
+
+> [End of Your Turn] You may turn 1 card from the top of your Life cards face-up: Set up to 1 of your {Egghead} type Characters as active.
+
+**Blocker:** `TURN_LIFE_FACE_UP` is not a valid `CostType`. Requires adding it to the cost type enum.
+
+**Note:** [Trigger] effect (Draw 1 card and KO) is encoded in `p.ts`.
+
+**Unblocked by:** Adding `TURN_LIFE_FACE_UP` to the `CostType` enum — same as ST13-009 and ST20-001.
+
+---
+
 ## Summary by Blocker
 
 | Blocker | Cards affected | Effort |
 |---------|---------------|--------|
 | `FULL_DECK_SEARCH_AND_PLAY` | OP01-069, OP01-098, OP01-116, OP02-030, OP13-079 | Medium |
-| `REVEAL_CONDITIONAL` | OP01-060, OP11-066, OP11-071, OP11-073, OP11-074, OP11-079, OP11-081, OP12-058, OP14-044, OP15-065, ST13-007, ST13-010, ST13-014, ST17-001 | Medium |
-| `HAND_ZONE_MODIFIER` | OP01-067, OP14-053, OP15-013, OP15-102 | Medium |
+| `REVEAL_CONDITIONAL` | OP01-060, OP11-066, OP11-071, OP11-073, OP11-074, OP11-079, OP11-081, OP12-058, OP14-044, OP15-065, ST13-007, ST13-010, ST13-014, ST17-001, ST22-003, ST22-006, ST22-007, ST22-012, ST22-016 | Medium |
+| `HAND_ZONE_MODIFIER` | OP01-067, OP14-053, OP15-013, OP15-102, ST23-001, ST23-002, ST26-001 | Medium |
 | `HAND_REVEAL` blind selection | OP01-063, OP01-105 | Medium |
 | `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | Medium |
 | `SELF_REF_TRACKING` | OP01-062 | Low |
-| `LIFE_FACE_COST` | ST13-009, ST20-001 | Low |
+| `LIFE_FACE_COST` | ST13-009, ST20-001, P-106 | Low |
