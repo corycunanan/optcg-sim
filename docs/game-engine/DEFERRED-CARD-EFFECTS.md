@@ -294,13 +294,75 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
+## ST13 Deferred Cards (4 remaining)
+
+### ST13-007 Sabo (cost 2)
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Sabo] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
+
+**Blocker:** Reveal from Life + conditional play based on revealed card name and cost.
+
+---
+
+### ST13-009 Shanks
+**Tags:** `LIFE_FACE_COST`
+
+> [On Play] You may turn 1 of your face-up Life cards face-down: If your opponent has 7 or more cards in their hand, trash up to 1 card from the top of your opponent's Life cards.
+
+**Blocker:** `TURN_LIFE_FACE_DOWN` is not a valid `CostType`. Requires adding it to the cost type enum.
+
+---
+
+### ST13-010 Portgas.D.Ace (cost 2)
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Portgas.D.Ace] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
+
+**Blocker:** Reveal from Life + conditional play based on revealed card name and cost.
+
+---
+
+### ST13-014 Monkey.D.Luffy (cost 2)
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Monkey.D.Luffy] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
+
+**Blocker:** Reveal from Life + conditional play based on revealed card name and cost.
+
+---
+
+## ST17 Deferred Cards (1 remaining)
+
+### ST17-001 Crocodile
+**Tags:** `REVEAL_CONDITIONAL`
+
+> [On Play] Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea} type card, draw 2 cards and place 1 card from your hand at the top of your deck.
+
+**Blocker:** Reveal top card + conditional branch based on revealed card's trait.
+
+---
+
+## ST20 Deferred Cards (1 remaining)
+
+### ST20-001 Charlotte Katakuri
+**Tags:** `LIFE_FACE_COST`
+
+> [Blocker]
+> [Activate: Main] [Once Per Turn] You may turn 1 card from the top of your Life cards face-up: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.
+
+**Blocker:** `TURN_LIFE_FACE_UP` is not a valid `CostType`. Requires adding it to the cost type enum.
+
+---
+
 ## Summary by Blocker
 
 | Blocker | Cards affected | Effort |
 |---------|---------------|--------|
 | `FULL_DECK_SEARCH_AND_PLAY` | OP01-069, OP01-098, OP01-116, OP02-030, OP13-079 | Medium |
-| `REVEAL_CONDITIONAL` | OP01-060, OP11-066, OP11-071, OP11-073, OP11-074, OP11-079, OP11-081, OP12-058, OP14-044, OP15-065 | Medium |
+| `REVEAL_CONDITIONAL` | OP01-060, OP11-066, OP11-071, OP11-073, OP11-074, OP11-079, OP11-081, OP12-058, OP14-044, OP15-065, ST13-007, ST13-010, ST13-014, ST17-001 | Medium |
 | `HAND_ZONE_MODIFIER` | OP01-067, OP14-053, OP15-013, OP15-102 | Medium |
 | `HAND_REVEAL` blind selection | OP01-063, OP01-105 | Medium |
 | `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | Medium |
 | `SELF_REF_TRACKING` | OP01-062 | Low |
+| `LIFE_FACE_COST` | ST13-009, ST20-001 | Low |

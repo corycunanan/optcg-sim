@@ -42,6 +42,16 @@ import { ST07_SCHEMAS } from "./schemas/st07.js";
 import { ST08_SCHEMAS } from "./schemas/st08.js";
 import { ST09_SCHEMAS } from "./schemas/st09.js";
 import { ST10_SCHEMAS } from "./schemas/st10.js";
+import { ST11_SCHEMAS } from "./schemas/st11.js";
+import { ST12_SCHEMAS } from "./schemas/st12.js";
+import { ST13_SCHEMAS } from "./schemas/st13.js";
+import { ST14_SCHEMAS } from "./schemas/st14.js";
+import { ST15_SCHEMAS } from "./schemas/st15.js";
+import { ST16_SCHEMAS } from "./schemas/st16.js";
+import { ST17_SCHEMAS } from "./schemas/st17.js";
+import { ST18_SCHEMAS } from "./schemas/st18.js";
+import { ST19_SCHEMAS } from "./schemas/st19.js";
+import { ST20_SCHEMAS } from "./schemas/st20.js";
 import { ACE_DECK_SCHEMAS } from "./schemas/ace-deck.js";
 import { NAMI_DECK_SCHEMAS } from "./schemas/nami-deck.js";
 
@@ -78,6 +88,16 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...ST08_SCHEMAS,
   ...ST09_SCHEMAS,
   ...ST10_SCHEMAS,
+  ...ST11_SCHEMAS,
+  ...ST12_SCHEMAS,
+  ...ST13_SCHEMAS,
+  ...ST14_SCHEMAS,
+  ...ST15_SCHEMAS,
+  ...ST16_SCHEMAS,
+  ...ST17_SCHEMAS,
+  ...ST18_SCHEMAS,
+  ...ST19_SCHEMAS,
+  ...ST20_SCHEMAS,
   ...ACE_DECK_SCHEMAS,
   ...NAMI_DECK_SCHEMAS,
 };
