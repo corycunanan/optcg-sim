@@ -157,8 +157,13 @@ export const ST13_004_EDWARD_NEWGATE: EffectSchema = {
           params: { amount: 1, position: "TOP", face: "DOWN" },
         },
         {
-          type: "REORDER_ALL_LIFE",
+          type: "LIFE_CARD_TO_DECK",
+          params: { amount: 1, position: "TOP" },
           chain: "THEN",
+        },
+        {
+          type: "REORDER_ALL_LIFE",
+          chain: "AND",
         },
       ],
     },
@@ -416,11 +421,18 @@ export const ST13_016_YAMATO: EffectSchema = {
       flags: { keywords: ["RUSH"] },
     },
     {
-      id: "on_play_reorder_life",
+      id: "on_play_life_to_deck_reorder",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "REORDER_ALL_LIFE" },
+        {
+          type: "LIFE_CARD_TO_DECK",
+          params: { amount: 1, position: "TOP" },
+        },
+        {
+          type: "REORDER_ALL_LIFE",
+          chain: "AND",
+        },
       ],
     },
   ],
