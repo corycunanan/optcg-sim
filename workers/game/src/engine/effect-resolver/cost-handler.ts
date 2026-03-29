@@ -258,8 +258,182 @@ export function payCosts(
         break;
       }
 
+      case "REST_DON": {
+        // Alias for DON_REST — rest N active DON in cost area
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        const activeDon = p.donCostArea.filter((d) => d.state === "ACTIVE");
+        if (activeDon.length < amount) return null;
+
+        let rested = 0;
+        const newDonCostArea = p.donCostArea.map((d) => {
+          if (d.state === "ACTIVE" && rested < amount) {
+            rested++;
+            return { ...d, state: "RESTED" as const };
+          }
+          return d;
+        });
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, donCostArea: newDonCostArea };
+        nextState = { ...nextState, players: newPlayers };
+        costResult.donRestedCount = rested;
+        break;
+      }
+
+      case "PLACE_FROM_TRASH_TO_DECK": {
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        if (p.trash.length < amount) return null;
+
+        // Auto-select from trash (player selection handled by payCostsWithSelection)
+        const toMove = p.trash.slice(0, amount);
+        const newTrash = p.trash.slice(amount);
+        const newDeck = [...p.deck, ...toMove.map((c) => ({ ...c, zone: "DECK" as const }))];
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
+        nextState = { ...nextState, players: newPlayers };
+        break;
+      }
+
+      case "LEADER_POWER_REDUCTION": {
+        const amount = typeof cost.amount === "number" ? cost.amount : 1000;
+        // This is tracked as a temporary power modifier on the leader
+        // For cost payment, we just verify the leader exists
+        const p = nextState.players[controller];
+        if (!p.leader) return null;
+        // Power reduction is applied as an active effect by the caller
+        break;
+      }
+
+      case "GIVE_OPPONENT_DON": {
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        const opp = controller === 0 ? 1 : 0;
+        const unattached = p.donCostArea.filter((d) => !d.attachedTo);
+        if (unattached.length < amount) return null;
+
+        const toGive = unattached.slice(0, amount);
+        const toGiveIds = new Set(toGive.map((d) => d.instanceId));
+        const remaining = p.donCostArea.filter((d) => !toGiveIds.has(d.instanceId));
+        const given = toGive.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }));
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, donCostArea: remaining };
+        newPlayers[opp as 0 | 1] = { ...nextState.players[opp as 0 | 1], donCostArea: [...nextState.players[opp as 0 | 1].donCostArea, ...given] };
+        nextState = { ...nextState, players: newPlayers };
+        break;
+      }
+
+      case "VARIABLE_DON_RETURN": {
+        // Return a variable number of DON from field to DON deck (like DON_MINUS but amount varies)
+        const amount = typeof cost.amount === "number" ? cost.amount : 0;
+        if (amount === 0) break;
+        const p = nextState.players[controller];
+        const unattached = p.donCostArea.filter((d) => !d.attachedTo);
+        if (unattached.length < amount) return null;
+
+        const toReturn = unattached.slice(0, amount);
+        const toReturnIds = new Set(toReturn.map((d) => d.instanceId));
+        const remaining = p.donCostArea.filter((d) => !toReturnIds.has(d.instanceId));
+        const returned = toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }));
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, donCostArea: remaining, donDeck: [...p.donDeck, ...returned] };
+        nextState = { ...nextState, players: newPlayers };
+        break;
+      }
+
+      case "PLACE_STAGE_TO_DECK": {
+        const p = nextState.players[controller];
+        if (!p.stage) return null;
+
+        const stage = p.stage;
+        const newDeck = [...p.deck, { ...stage, zone: "DECK" as const }];
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, stage: null, deck: newDeck };
+        nextState = { ...nextState, players: newPlayers };
+        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId } });
+        break;
+      }
+
+      case "RETURN_ATTACHED_DON_TO_COST": {
+        // Detach DON from a card and return to cost area
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        if (!sourceCardInstanceId) return null;
+
+        let found = false;
+        for (let pIdx = 0; pIdx < 2 && !found; pIdx++) {
+          const player = nextState.players[pIdx as 0 | 1];
+          // Check characters
+          const charIdx = player.characters.findIndex((c) => c.instanceId === sourceCardInstanceId);
+          if (charIdx !== -1) {
+            const char = player.characters[charIdx];
+            const detachCount = Math.min(amount, char.attachedDon.length);
+            if (detachCount === 0) return null;
+            const detached = char.attachedDon.slice(0, detachCount).map((d: any) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
+            const remainingDon = char.attachedDon.slice(detachCount);
+            const newChars = [...player.characters];
+            newChars[charIdx] = { ...char, attachedDon: remainingDon };
+            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+            newPlayers[pIdx as 0 | 1] = { ...player, characters: newChars, donCostArea: [...player.donCostArea, ...detached] };
+            nextState = { ...nextState, players: newPlayers };
+            found = true;
+          }
+          // Check leader
+          if (!found && player.leader?.instanceId === sourceCardInstanceId) {
+            const leader = player.leader;
+            const detachCount = Math.min(amount, leader.attachedDon.length);
+            if (detachCount === 0) return null;
+            const detached = leader.attachedDon.slice(0, detachCount).map((d: any) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
+            const remainingDon = leader.attachedDon.slice(detachCount);
+            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+            newPlayers[pIdx as 0 | 1] = { ...player, leader: { ...leader, attachedDon: remainingDon }, donCostArea: [...player.donCostArea, ...detached] };
+            nextState = { ...nextState, players: newPlayers };
+            found = true;
+          }
+        }
+        if (!found) return null;
+        break;
+      }
+
+      case "PLACE_SELF_AND_HAND_TO_DECK": {
+        if (!sourceCardInstanceId) return null;
+        const p = nextState.players[controller];
+        // Move source card + specified hand cards to deck bottom
+        // For auto-pay, just move the source card
+        let found = false;
+        const charIdx = p.characters.findIndex((c) => c.instanceId === sourceCardInstanceId);
+        if (charIdx !== -1) {
+          const card = p.characters[charIdx];
+          const newChars = p.characters.filter((_, i) => i !== charIdx);
+          const newDeck = [...p.deck, { ...card, zone: "DECK" as const }];
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[controller] = { ...p, characters: newChars, deck: newDeck };
+          nextState = { ...nextState, players: newPlayers };
+          found = true;
+        }
+        if (!found) return null;
+        break;
+      }
+
+      case "PLAY_NAMED_CARD_FROM_HAND": {
+        // Play a specific named card from hand as part of the cost
+        const p = nextState.players[controller];
+        const cardName = (cost as any).card_name;
+        if (!cardName) return null;
+        const handIdx = p.hand.findIndex((c) => {
+          const data = _cardDb.get(c.cardId);
+          return data && data.name === cardName;
+        });
+        if (handIdx === -1) return null;
+        // Card will be played by the action chain — just verify it exists
+        break;
+      }
+
       default:
-        // Other cost types to be implemented
+        // Unrecognized cost type — skip
         break;
     }
   }
