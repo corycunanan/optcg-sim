@@ -25,6 +25,7 @@ export function payCosts(
   costs: Cost[],
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
 ): CostPaymentResult | null {
   const events: PendingEvent[] = [];
   const costResult: CostResult = {
@@ -105,6 +106,49 @@ export function payCosts(
       case "REST_SELF": {
         // Rest the source card — this is handled at the trigger level
         // For now, a no-op since the card would be rested by the caller
+        break;
+      }
+
+      case "TRASH_SELF": {
+        if (!sourceCardInstanceId) return null;
+        // Trash the source card (the card whose effect is being activated)
+        let found = false;
+        for (let pIdx = 0; pIdx < 2; pIdx++) {
+          const player = nextState.players[pIdx as 0 | 1];
+          const charIdx = player.characters.findIndex(
+            (c) => c.instanceId === sourceCardInstanceId,
+          );
+          if (charIdx !== -1) {
+            const card = player.characters[charIdx];
+            const newChars = player.characters.filter((_, i) => i !== charIdx);
+            const newTrash = [{ ...card, zone: "TRASH" as const, attachedDon: [] as typeof card.attachedDon }, ...player.trash];
+            const returnedDon = card.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
+            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+            newPlayers[pIdx as 0 | 1] = {
+              ...player,
+              characters: newChars,
+              trash: newTrash,
+              donCostArea: [...player.donCostArea, ...returnedDon],
+            };
+            nextState = { ...nextState, players: newPlayers };
+            events.push({ type: "CARD_TRASHED", playerIndex: pIdx as 0 | 1, payload: { cardInstanceId: card.instanceId, cardId: card.cardId, reason: "cost" } });
+            costResult.cardsTrashedCount = 1;
+            found = true;
+            break;
+          }
+          if (player.stage?.instanceId === sourceCardInstanceId) {
+            const card = player.stage;
+            const newTrash = [{ ...card, zone: "TRASH" as const, attachedDon: [] as typeof card.attachedDon }, ...player.trash];
+            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+            newPlayers[pIdx as 0 | 1] = { ...player, stage: null, trash: newTrash };
+            nextState = { ...nextState, players: newPlayers };
+            events.push({ type: "CARD_TRASHED", playerIndex: pIdx as 0 | 1, payload: { cardInstanceId: card.instanceId, cardId: card.cardId, reason: "cost" } });
+            costResult.cardsTrashedCount = 1;
+            found = true;
+            break;
+          }
+        }
+        if (!found) return null;
         break;
       }
 
@@ -312,7 +356,7 @@ export function payCostsWithSelection(
     }
 
     // Auto-payable cost — use existing payCosts for this single cost
-    const singleResult = payCosts(nextState, [cost], controller, cardDb);
+    const singleResult = payCosts(nextState, [cost], controller, cardDb, sourceCardInstanceId);
     if (!singleResult) {
       return { state: nextState, events, cannotPay: true };
     }

@@ -134,8 +134,12 @@ export function needsPlayerTargetSelection(
   const count = target.count;
   if (!count) return allValidIds.length > 1;
   if ("all" in count || "any_number" in count) return false;
-  const maxCount = "exact" in count ? count.exact : "up_to" in count ? count.up_to : 1;
-  return allValidIds.length > maxCount;
+  // "up to N" — always prompt when there are valid targets, since the player
+  // can choose 0 to N targets (skipping is valid)
+  if ("up_to" in count) return allValidIds.length > 0;
+  // "exact N" — only prompt when there are more candidates than needed
+  if ("exact" in count) return allValidIds.length > count.exact;
+  return allValidIds.length > 1;
 }
 
 // ─── buildSelectTargetPrompt ─────────────────────────────────────────────────

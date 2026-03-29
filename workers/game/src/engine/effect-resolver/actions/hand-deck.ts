@@ -13,10 +13,11 @@ import { findCardInstance } from "../../state.js";
 export function executePlaceHandToDeck(
   state: GameState,
   action: Action,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -24,12 +25,40 @@ export function executePlaceHandToDeck(
   const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
 
   const p = state.players[controller];
-  const count = Math.min(amount, p.hand.length);
-  if (count === 0) return { state, events, succeeded: false };
+  if (p.hand.length === 0) return { state, events, succeeded: false };
 
-  // Auto-select last cards from hand
-  const toPlace = p.hand.slice(-count);
-  const newHand = p.hand.slice(0, -count);
+  // If the player needs to choose which cards to place, prompt them
+  if (!preselectedTargets && p.hand.length > amount) {
+    const validTargets = p.hand.map((c) => c.instanceId);
+    const resumeCtx: ResumeContext = {
+      effectSourceInstanceId: sourceCardInstanceId,
+      controller,
+      pausedAction: action,
+      remainingActions: [],
+      resultRefs: [],
+      validTargets,
+    };
+    const pendingPrompt: PendingPromptState = {
+      promptType: "SELECT_TARGET",
+      options: {
+        cards: [...p.hand],
+        validTargets,
+        countMin: Math.min(amount, p.hand.length),
+        countMax: Math.min(amount, p.hand.length),
+        effectDescription: `Choose ${amount} card(s) from your hand to place on ${position.toLowerCase()} of your deck`,
+        ctaLabel: "Place on Deck",
+      },
+      respondingPlayer: controller,
+      resumeContext: resumeCtx,
+    };
+    return { state, events, succeeded: false, pendingPrompt };
+  }
+
+  // Resolve selected cards
+  const selectedIds = preselectedTargets ?? p.hand.slice(-amount).map((c) => c.instanceId);
+  const selectedSet = new Set(selectedIds);
+  const toPlace = p.hand.filter((c) => selectedSet.has(c.instanceId));
+  const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
   const placedCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const }));
   const newDeck = position === "BOTTOM"
     ? [...p.deck, ...placedCards]
@@ -42,7 +71,7 @@ export function executePlaceHandToDeck(
     state: { ...state, players: newPlayers },
     events,
     succeeded: true,
-    result: { targetInstanceIds: toPlace.map((c) => c.instanceId), count },
+    result: { targetInstanceIds: toPlace.map((c) => c.instanceId), count: toPlace.length },
   };
 }
 

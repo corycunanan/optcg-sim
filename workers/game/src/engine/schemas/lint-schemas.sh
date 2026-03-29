@@ -206,8 +206,8 @@ function* walkTriggers(trigger) {
 function* walkConditions(cond) {
   if (!cond) return;
   yield cond;
-  if (cond.all) for (const c of cond.all) yield* walkConditions(c);
-  if (cond.any) for (const c of cond.any) yield* walkConditions(c);
+  if (cond.all_of) for (const c of cond.all_of) yield* walkConditions(c);
+  if (cond.any_of) for (const c of cond.any_of) yield* walkConditions(c);
   if (cond.not) yield* walkConditions(cond.not);
 }
 
