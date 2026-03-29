@@ -10,9 +10,41 @@ import type { EffectSchema } from "../effect-types.js";
 // YELLOW — Big Mom Pirates (ST20-001 to ST20-005)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ST20-001 Charlotte Katakuri — deferred: TURN_LIFE_FACE_UP not a valid CostType
+// ─── ST20-001 Charlotte Katakuri (Character) — Blocker + Activate turn life face-up to give DON
 // [Blocker]
-// [Activate: Main] [Once Per Turn] You may turn 1 card from the top of your Life cards face-up: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.
+// [Activate: Main] [Once Per Turn] You may turn 1 card from the top of your Life
+// cards face-up: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.
+
+export const ST20_001_CHARLOTTE_KATAKURI: EffectSchema = {
+  card_id: "ST20-001",
+  card_name: "Charlotte Katakuri",
+  card_type: "Character",
+  effects: [
+    {
+      id: "ST20-001_blocker",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
+      id: "ST20-001_activate_main",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      actions: [
+        {
+          type: "GIVE_DON",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 1 },
+        },
+      ],
+      flags: { once_per_turn: true, optional: true },
+    },
+  ],
+};
 
 // ─── ST20-002 Charlotte Cracker (Character) — replacement KO by effect + trigger play self
 // [Once Per Turn] If this Character would be K.O.'d by an effect, you may trash 1 card from the top of your Life cards instead.
@@ -152,7 +184,7 @@ export const ST20_005_CHARLOTTE_LINLIN: EffectSchema = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const ST20_SCHEMAS: Record<string, EffectSchema> = {
-  // ST20-001 Charlotte Katakuri — deferred: TURN_LIFE_FACE_UP cost type unsupported
+  "ST20-001": ST20_001_CHARLOTTE_KATAKURI,
   "ST20-002": ST20_002_CHARLOTTE_CRACKER,
   "ST20-004": ST20_004_CHARLOTTE_PUDDING,
   "ST20-005": ST20_005_CHARLOTTE_LINLIN,

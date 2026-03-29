@@ -405,8 +405,38 @@ export const ST13_008_SABO: EffectSchema = {
   ],
 };
 
-// ST13-009 Shanks — deferred: TURN_LIFE_FACE_DOWN not a valid CostType
-// [On Play] You may turn 1 of your face-up Life cards face-down: If your opponent has 7 or more cards in their hand, trash up to 1 card from the top of your opponent's Life cards.
+// ─── ST13-009 Shanks (Character) — On Play turn life face-down to trash opponent life
+// [On Play] You may turn 1 of your face-up Life cards face-down: If your opponent
+// has 7 or more cards in their hand, trash up to 1 card from the top of your
+// opponent's Life cards.
+
+export const ST13_009_SHANKS: EffectSchema = {
+  card_id: "ST13-009",
+  card_name: "Shanks",
+  card_type: "Character",
+  effects: [
+    {
+      id: "ST13-009_on_play",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      conditions: {
+        type: "HAND_COUNT",
+        controller: "OPPONENT",
+        operator: ">=",
+        value: 7,
+      },
+      actions: [
+        {
+          type: "TRASH_FROM_LIFE",
+          target: { type: "OPPONENT_LIFE", controller: "OPPONENT" },
+          params: { amount: 1, position: "TOP" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
 
 // ─── ST13-011 Portgas.D.Ace (Character, cost 5) — On Play conditional Rush
 // [On Play] If you have 2 or less Life cards, this Character gains [Rush].
@@ -723,7 +753,7 @@ export const ST13_SCHEMAS: Record<string, EffectSchema> = {
   "ST13-006": ST13_006_CURLY_DADAN,
   "ST13-007": ST13_007_SABO_COST2,
   "ST13-008": ST13_008_SABO,
-  // ST13-009 Shanks — deferred: TURN_LIFE_FACE_DOWN cost type unsupported
+  "ST13-009": ST13_009_SHANKS,
   "ST13-010": ST13_010_PORTGAS_D_ACE_COST2,
   "ST13-011": ST13_011_PORTGAS_D_ACE,
   "ST13-012": ST13_012_MAKINO,

@@ -254,7 +254,7 @@ Hand cost reduction + On Play fully encoded in `op15.ts`.
 
 ---
 
-## ST13 Deferred Cards (4 remaining)
+## ST13 Deferred Cards (3 remaining)
 
 ### ST13-007 Sabo (cost 2)
 **Tags:** `REVEAL_CONDITIONAL`
@@ -265,12 +265,8 @@ Hand cost reduction + On Play fully encoded in `op15.ts`.
 
 ---
 
-### ST13-009 Shanks
-**Tags:** `LIFE_FACE_COST`
-
-> [On Play] You may turn 1 of your face-up Life cards face-down: If your opponent has 7 or more cards in their hand, trash up to 1 card from the top of your opponent's Life cards.
-
-**Blocker:** `TURN_LIFE_FACE_DOWN` is not a valid `CostType`. Requires adding it to the cost type enum.
+### ~~ST13-009 Shanks~~ — ENCODED
+On Play with TURN_LIFE_FACE_DOWN cost fully encoded in `st13.ts`.
 
 ---
 
@@ -303,15 +299,10 @@ Hand cost reduction + On Play fully encoded in `op15.ts`.
 
 ---
 
-## ST20 Deferred Cards (1 remaining)
+## ST20 Deferred Cards (0 remaining)
 
-### ST20-001 Charlotte Katakuri
-**Tags:** `LIFE_FACE_COST`
-
-> [Blocker]
-> [Activate: Main] [Once Per Turn] You may turn 1 card from the top of your Life cards face-up: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.
-
-**Blocker:** `TURN_LIFE_FACE_UP` is not a valid `CostType`. Requires adding it to the cost type enum.
+### ~~ST20-001 Charlotte Katakuri~~ — ENCODED
+Blocker + Activate Main with TURN_LIFE_FACE_UP cost fully encoded in `st20.ts`.
 
 ---
 
@@ -397,18 +388,10 @@ Hand cost reduction + On Play fully encoded in `st26.ts`.
 
 ---
 
-## P (Promo) Deferred Cards (1 remaining)
+## P (Promo) Deferred Cards (0 remaining)
 
-### P-106 Monkey.D.Luffy (End of Turn effect only)
-**Tags:** `LIFE_FACE_COST`
-
-> [End of Your Turn] You may turn 1 card from the top of your Life cards face-up: Set up to 1 of your {Egghead} type Characters as active.
-
-**Blocker:** `TURN_LIFE_FACE_UP` is not a valid `CostType`. Requires adding it to the cost type enum.
-
-**Note:** [Trigger] effect (Draw 1 card and KO) is encoded in `p.ts`.
-
-**Unblocked by:** Adding `TURN_LIFE_FACE_UP` to the `CostType` enum — same as ST13-009 and ST20-001.
+### ~~P-106 Monkey.D.Luffy~~ — ENCODED
+Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supports it.
 
 ---
 
@@ -419,7 +402,7 @@ Hand cost reduction + On Play fully encoded in `st26.ts`.
 | `REVEAL_CONDITIONAL` | OP01-060, OP07-048, OP08-049, OP11-066/071/073/074/079/081, OP12-058, OP14-044, OP15-065, ST13-007/010/014, ST17-001, ST22-003/006/007/012/016 | 19 | Medium |
 | `HAND_ZONE_MODIFIER` | OP14-053 | 1 | Medium |
 | `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
-| `LIFE_FACE_COST` | ST13-009, ST20-001, P-106 | 3 | Low |
+| ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |
 | `HAND_REVEAL_CONDITIONAL` | OP01-063, OP01-105 | 2 | Medium |
 | `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | 2 | Medium |
 | `SELF_REF_TRACKING` | OP01-062 | 1 | Low |
@@ -471,7 +454,7 @@ Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confi
 
 | Category | Count |
 |---|---|
-| Original deferrals (pre-QA) | 27 |
+| Original deferrals (pre-QA) | 24 |
 | NEW: unhandled action types (F9) | 50 |
 | NEW: low-confidence encodings (LC) | 56 |
 | Overlap (flagged by multiple sources) | ~24 |
