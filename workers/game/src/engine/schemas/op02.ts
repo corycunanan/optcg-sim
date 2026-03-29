@@ -817,12 +817,10 @@ export const OP02_029_CARROT: EffectSchema = {
   ],
 };
 
-// ─── OP02-030 Kouzuki Oden — ACTIVATE_MAIN + DON_REST cost + SET_ACTIVE ─────
-//     + ON_KO + SEARCH_AND_PLAY from deck (deferred)
-// [Activate: Main] [Once Per Turn] 3: Set this Character as active.
+// ─── OP02-030 Kouzuki Oden — ACTIVATE_MAIN + ON_KO full deck search and play
+// [Activate: Main] [Once Per Turn] ③: Set this Character as active.
 // [On K.O.] Play up to 1 green {Land of Wano} type Character card with a cost
 //   of 3 from your deck. Then, shuffle your deck.
-// NOTE: The On K.O. effect is a full deck search + play, deferred as FULL_DECK_SEARCH_AND_PLAY.
 
 export const OP02_030_ODEN: EffectSchema = {
   card_id: "OP02-030",
@@ -842,8 +840,26 @@ export const OP02_030_ODEN: EffectSchema = {
       ],
       flags: { once_per_turn: true },
     },
-    // On K.O. effect deferred — see DEFERRED section at bottom of file.
-    // Full deck search + play is not yet supported.
+    {
+      id: "on_ko_search_play",
+      category: "auto",
+      trigger: { keyword: "ON_KO" },
+      actions: [
+        {
+          type: "SEARCH_AND_PLAY",
+          params: {
+            search_full_deck: true,
+            filter: {
+              color: "GREEN",
+              traits: ["Land of Wano"],
+              card_type: "CHARACTER",
+              cost_exact: 3,
+            },
+            shuffle_after: true,
+          },
+        },
+      ],
+    },
   ],
 };
 
@@ -2008,15 +2024,6 @@ export const OP02_027_INUARASHI: EffectSchema = {
     },
   ],
 };
-
-// ─── OP02-030 Kouzuki Oden (On K.O. effect only) ────────────────────────────
-// DEFERRED: FULL_DECK_SEARCH_AND_PLAY
-//
-// [On K.O.] Play up to 1 green {Land of Wano} type Character card with a cost
-// of 3 from your deck. Then, shuffle your deck.
-//
-// Blocker: Full deck search that plays to field. Needs SEARCH_AND_PLAY with
-// search_full_deck: true or FULL_DECK_SEARCH with destination: "FIELD".
 
 // ─── OP02-031 Kouzuki Toki — WHILE_CONDITION keyword grant ─────────────────
 // If you have a [Kouzuki Oden] Character, this Character gains [Blocker].

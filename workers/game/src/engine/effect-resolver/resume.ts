@@ -113,8 +113,10 @@ export function resumeEffectChain(
     if (keptId) removedIds.add(keptId);
     const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
 
-    // Play kept card to CHARACTER zone instead of hand
+    // Play kept card to field (CHARACTER or STAGE zone)
     let newCharacters = [...p.characters];
+    let newStage = p.stage;
+    let newTrash = [...p.trash];
     if (keptId) {
       const kept = p.deck.find((c) => c.instanceId === keptId);
       if (kept) {
@@ -135,6 +137,26 @@ export function resumeEffectChain(
             type: "CARD_PLAYED",
             playerIndex: controller,
             payload: { cardInstanceId: newChar.instanceId, cardId: kept.cardId, zone: "CHARACTER", source: "search_and_play" },
+          });
+        } else if (data && data.type.toUpperCase() === "STAGE") {
+          // If a Stage already exists, trash it first
+          if (newStage) {
+            newTrash = [{ ...newStage, zone: "TRASH" as const } as CardInstance, ...newTrash];
+          }
+          newStage = {
+            ...kept,
+            instanceId: nanoid(),
+            zone: "STAGE" as const,
+            state: "ACTIVE" as const,
+            attachedDon: [],
+            turnPlayed: nextState.turn.number,
+            controller,
+            owner: controller,
+          } as CardInstance;
+          events.push({
+            type: "CARD_PLAYED",
+            playerIndex: controller,
+            payload: { cardInstanceId: newStage.instanceId, cardId: kept.cardId, zone: "STAGE", source: "search_and_play" },
           });
         }
       }
@@ -159,7 +181,7 @@ export function resumeEffectChain(
     }
 
     const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-    newPlayers[controller] = { ...p, deck: newDeck, characters: newCharacters };
+    newPlayers[controller] = { ...p, deck: newDeck, characters: newCharacters, stage: newStage, trash: newTrash };
     nextState = { ...nextState, players: newPlayers };
   }
 

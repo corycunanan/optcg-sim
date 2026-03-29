@@ -343,6 +343,7 @@ export function executeSearchAndPlay(
     if (filter.name && data.name !== filter.name) return false;
     if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
     if (filter.card_type && data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
+    if (filter.cost_exact !== undefined && (data.cost ?? 0) !== (filter.cost_exact as number)) return false;
     if (filter.cost_min !== undefined && (data.cost ?? 0) < (filter.cost_min as number)) return false;
     if (filter.cost_max !== undefined && (data.cost ?? 0) > (filter.cost_max as number)) return false;
     if (filter.color) {

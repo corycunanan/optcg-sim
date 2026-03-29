@@ -72,14 +72,8 @@ Encoded in `op01.ts` with field-to-hand MODIFY_COST pattern.
 
 ---
 
-### OP02-030 Kouzuki Oden (On K.O. effect only)
-**Tags:** `FULL_DECK_SEARCH_AND_PLAY`
-
-> [On K.O.] Play up to 1 green {Land of Wano} type Character card with a cost of 3 from your deck. Then, shuffle your deck.
-
-**Blocker:** Full deck search that plays to field. `SEARCH_AND_PLAY` exists but currently only supports top-N search. This needs `search_full_deck: true` on `SEARCH_AND_PLAY`.
-
-**Unblocked by:** `SEARCH_AND_PLAY` with `search_full_deck: true` — already supported in the action implementation, just needs the resume handler verified for full-deck mode.
+### ~~OP02-030 Kouzuki Oden~~ — ENCODED
+On K.O. full-deck SEARCH_AND_PLAY encoded in `op02.ts`.
 
 ---
 
@@ -203,11 +197,9 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 > Under the rules of this game ... at the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck.
 
-**Blocker:** Start-of-game full deck search that plays a Stage to field. Requires `START_OF_GAME_EFFECT` rule modification with `SEARCH_AND_PLAY` using `search_full_deck: true`.
+**Schema:** START_OF_GAME_EFFECT rule_modification with SEARCH_AND_PLAY encoded in `op13.ts`. Stage support added to resume handler.
 
-**Note:** The deck restriction and activate_main effects are encoded in `op13.ts`.
-
-**Unblocked by:** `START_OF_GAME_EFFECT` rule modification with `SEARCH_AND_PLAY` full-deck mode.
+**Remaining blocker:** Engine setup (`setup.ts`) does not yet process `START_OF_GAME_EFFECT` rule modifications during game initialization. Needs game session integration to fire actions before first turn.
 
 ---
 
@@ -426,7 +418,7 @@ Hand cost reduction + On Play fully encoded in `st26.ts`.
 |---------|-------|-------|--------|
 | `REVEAL_CONDITIONAL` | OP01-060, OP07-048, OP08-049, OP11-066/071/073/074/079/081, OP12-058, OP14-044, OP15-065, ST13-007/010/014, ST17-001, ST22-003/006/007/012/016 | 19 | Medium |
 | `HAND_ZONE_MODIFIER` | OP14-053 | 1 | Medium |
-| `FULL_DECK_SEARCH_AND_PLAY` | OP01-069, OP01-098, OP01-116, OP02-030, OP13-079 | 5 | Medium |
+| `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
 | `LIFE_FACE_COST` | ST13-009, ST20-001, P-106 | 3 | Low |
 | `HAND_REVEAL_CONDITIONAL` | OP01-063, OP01-105 | 2 | Medium |
 | `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | 2 | Medium |
@@ -479,7 +471,7 @@ Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confi
 
 | Category | Count |
 |---|---|
-| Original deferrals (pre-QA) | 31 |
+| Original deferrals (pre-QA) | 27 |
 | NEW: unhandled action types (F9) | 50 |
 | NEW: low-confidence encodings (LC) | 56 |
 | Overlap (flagged by multiple sources) | ~24 |

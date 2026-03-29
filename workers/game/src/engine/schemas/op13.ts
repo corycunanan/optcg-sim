@@ -2752,8 +2752,9 @@ export const OP13_078_ORO_JACKSON: EffectSchema = {
 // [Activate: Main] [Once Per Turn] You may trash 1 of your {Celestial Dragons}
 // type Characters or 1 card from your hand: Draw 1 card.
 //
-// NOTE: Start-of-game play effect is DEFERRED. Only the deck restriction and
-// activate_main are encoded here.
+// NOTE: START_OF_GAME_EFFECT schema is encoded but engine setup does not yet
+// process start-of-game rule modifications. The schema is ready for when that
+// support is added.
 
 export const OP13_079_IMU: EffectSchema = {
   card_id: "OP13-079",
@@ -2785,6 +2786,19 @@ export const OP13_079_IMU: EffectSchema = {
       rule_type: "DECK_RESTRICTION",
       restriction: "CANNOT_INCLUDE",
       filter: { card_type: "EVENT", cost_min: 2 },
+    },
+    {
+      rule_type: "START_OF_GAME_EFFECT",
+      actions: [
+        {
+          type: "SEARCH_AND_PLAY",
+          params: {
+            search_full_deck: true,
+            filter: { traits: ["Mary Geoise"], card_type: "STAGE" },
+            shuffle_after: true,
+          },
+        },
+      ],
     },
   ],
 };
