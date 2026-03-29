@@ -1,5 +1,5 @@
 /**
- * Action handlers: DRAW, SEARCH_DECK, FULL_DECK_SEARCH, DECK_SCRY, MILL
+ * Action handlers: DRAW, SEARCH_DECK, SEARCH_TRASH_THE_REST, FULL_DECK_SEARCH, DECK_SCRY, MILL
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
@@ -107,6 +107,82 @@ export function executeSearchDeck(
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
       validTargets,
+    },
+    respondingPlayer: controller,
+    resumeContext: resumeCtx,
+  };
+
+  return { state, events, succeeded: false, pendingPrompt };
+}
+
+export function executeSearchTrashTheRest(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const p_ = action.params ?? {};
+  const lookAt = (p_.look_at as number) ?? 5;
+  const filter = p_.filter ?? {};
+  const restDest = (p_.rest_destination as string) ?? "TRASH";
+
+  const p = state.players[controller];
+  const topCards = p.deck.slice(0, Math.min(lookAt, p.deck.length));
+
+  if (topCards.length === 0) {
+    return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };
+  }
+
+  // Find matching cards (valid picks) — reuse same filter logic as SEARCH_DECK
+  const matching = topCards.filter((c) => {
+    const data = cardDb.get(c.cardId);
+    if (!data) return false;
+    if (filter.traits) {
+      if (!filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
+    }
+    if (filter.traits_contains) {
+      const cardTraits = data.types ?? [];
+      if (!filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
+    }
+    if (filter.card_type) {
+      if (data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
+    }
+    if (filter.cost_min !== undefined && (data.cost ?? 0) < (filter.cost_min as number)) return false;
+    if (filter.cost_max !== undefined && (data.cost ?? 0) > (filter.cost_max as number)) return false;
+    if (filter.power_min !== undefined && (data.power ?? 0) < (filter.power_min as number)) return false;
+    if (filter.power_max !== undefined && (data.power ?? 0) > (filter.power_max as number)) return false;
+    if (filter.color) {
+      const cardColors = data.color ?? [];
+      if (!cardColors.some((clr: string) => clr.toUpperCase() === (filter.color as string).toUpperCase())) return false;
+    }
+    return true;
+  });
+
+  const validTargets = matching.map((c) => c.instanceId);
+
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck.";
+
+  const resumeCtx: ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [],
+    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    validTargets,
+  };
+  const pendingPrompt: PendingPromptState = {
+    promptType: "ARRANGE_TOP_CARDS",
+    options: {
+      cards: topCards,
+      effectDescription,
+      canSendToBottom: restDest.toUpperCase() === "BOTTOM",
+      validTargets,
+      restDestination: restDest,
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,

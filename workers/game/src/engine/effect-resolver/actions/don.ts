@@ -1,6 +1,7 @@
 /**
  * Action handlers: GIVE_DON, ADD_DON_FROM_DECK, FORCE_OPPONENT_DON_RETURN,
- * SET_DON_ACTIVE, REST_OPPONENT_DON, RETURN_DON_TO_DECK
+ * SET_DON_ACTIVE, REST_OPPONENT_DON, RETURN_DON_TO_DECK,
+ * REST_DON, DISTRIBUTE_DON, REDISTRIBUTE_DON, GIVE_OPPONENT_DON_TO_OPPONENT
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
@@ -225,4 +226,181 @@ export function executeReturnDonToDeck(
     events,
     succeeded: true,
   };
+}
+
+// ─── REST_DON ────────────────────────────────────────────────────────────────
+
+export function executeRestDon(
+  state: GameState,
+  action: Action,
+  _sourceCardInstanceId: string,
+  controller: 0 | 1,
+  _cardDb: Map<string, CardData>,
+  _resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const params = action.params ?? {};
+  const amount = (params.amount as number) ?? 1;
+  const p = state.players[controller];
+  const activeDon = p.donCostArea.filter((d) => d.state === "ACTIVE");
+  const count = Math.min(amount, activeDon.length);
+  if (count === 0) return { state, events, succeeded: false };
+
+  let rested = 0;
+  const newDonCostArea = p.donCostArea.map((d) => {
+    if (d.state === "ACTIVE" && rested < count) {
+      rested++;
+      return { ...d, state: "RESTED" as const };
+    }
+    return d;
+  });
+
+  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+  newPlayers[controller] = { ...p, donCostArea: newDonCostArea };
+
+  events.push({ type: "DON_RESTED", playerIndex: controller, payload: { count } });
+
+  return { state: { ...state, players: newPlayers }, events, succeeded: true, result: { targetInstanceIds: [], count } };
+}
+
+// ─── DISTRIBUTE_DON ──────────────────────────────────────────────────────────
+
+export function executeDistributeDon(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const params = action.params ?? {};
+  const amountPerTarget = (params.amount_per_target as number) ?? (params.amount as number) ?? 1;
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  let nextState = state;
+  let totalGiven = 0;
+  for (const targetId of targetIds) {
+    for (let i = 0; i < amountPerTarget; i++) {
+      const result = attachDonToCard(nextState, controller, targetId);
+      if (!result) break;
+      nextState = result;
+      totalGiven++;
+    }
+  }
+
+  if (totalGiven > 0) {
+    events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: totalGiven } });
+  }
+
+  return { state: nextState, events, succeeded: totalGiven > 0, result: { targetInstanceIds: targetIds, count: totalGiven } };
+}
+
+// ─── REDISTRIBUTE_DON ────────────────────────────────────────────────────────
+
+export function executeRedistributeDon(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const params = action.params ?? {};
+  const amount = (params.amount as number) ?? 1;
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  let nextState = state;
+  let given = 0;
+  for (const targetId of targetIds) {
+    for (let i = 0; i < amount; i++) {
+      const result = attachDonToCard(nextState, controller, targetId);
+      if (!result) break;
+      nextState = result;
+      given++;
+    }
+  }
+
+  if (given > 0) {
+    events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: given } });
+  }
+
+  return { state: nextState, events, succeeded: given > 0, result: { targetInstanceIds: targetIds, count: given } };
+}
+
+// ─── GIVE_OPPONENT_DON_TO_OPPONENT ───────────────────────────────────────────
+
+export function executeGiveOpponentDonToOpponent(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const params = action.params ?? {};
+  const amount = (params.amount as number) ?? 1;
+  const opp = (controller === 0 ? 1 : 0) as 0 | 1;
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  // Take rested DON from opponent's cost area and attach to opponent's character
+  let nextState = state;
+  let given = 0;
+  for (const targetId of targetIds) {
+    for (let i = 0; i < amount; i++) {
+      const oppPlayer = nextState.players[opp];
+      const restedIdx = oppPlayer.donCostArea.findIndex((d) => d.state === "RESTED" && !d.attachedTo);
+      if (restedIdx === -1) break;
+
+      const donCard = oppPlayer.donCostArea[restedIdx];
+      const newDonCostArea = oppPlayer.donCostArea.filter((_, idx) => idx !== restedIdx);
+      const attachedDon = { ...donCard, attachedTo: targetId };
+
+      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+      const targetPlayer = newPlayers[opp];
+      const charIdx = targetPlayer.characters.findIndex((c) => c.instanceId === targetId);
+      if (charIdx !== -1) {
+        const char = targetPlayer.characters[charIdx];
+        const newChars = [...targetPlayer.characters];
+        newChars[charIdx] = { ...char, attachedDon: [...char.attachedDon, attachedDon] };
+        newPlayers[opp] = { ...targetPlayer, characters: newChars, donCostArea: newDonCostArea };
+      } else if (targetPlayer.leader?.instanceId === targetId) {
+        const newLeader = { ...targetPlayer.leader, attachedDon: [...targetPlayer.leader.attachedDon, attachedDon] };
+        newPlayers[opp] = { ...targetPlayer, leader: newLeader, donCostArea: newDonCostArea };
+      } else {
+        break;
+      }
+      nextState = { ...nextState, players: newPlayers };
+      given++;
+    }
+  }
+
+  if (given > 0) {
+    events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: opp, payload: { count: given } });
+  }
+
+  return { state: nextState, events, succeeded: given > 0, result: { targetInstanceIds: targetIds, count: given } };
 }

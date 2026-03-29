@@ -1,5 +1,6 @@
 /**
- * Action handlers: PLAY_CARD, PLAY_SELF, SET_ACTIVE, SET_REST
+ * Action handlers: PLAY_CARD, PLAY_SELF, SET_ACTIVE, SET_REST,
+ * ACTIVATE_EVENT_FROM_HAND, ACTIVATE_EVENT_FROM_TRASH
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
@@ -218,4 +219,77 @@ export function executeSetRest(
   }
 
   return { state: nextState, events, succeeded: targetIds.length > 0 };
+}
+
+// ─── ACTIVATE_EVENT_FROM_HAND ────────────────────────────────────────────────
+
+export function executeActivateEventFromHand(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const events: PendingEvent[] = [];
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  const eventInstanceId = targetIds[0];
+  const p = state.players[controller];
+  const cardIdx = p.hand.findIndex((c) => c.instanceId === eventInstanceId);
+  if (cardIdx === -1) return { state, events, succeeded: false };
+
+  const eventCard = p.hand[cardIdx];
+  const newHand = p.hand.filter((_, i) => i !== cardIdx);
+  const newTrash = [{ ...eventCard, zone: "TRASH" as const }, ...p.trash];
+
+  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+  newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
+
+  events.push({ type: "EVENT_ACTIVATED", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: eventCard.instanceId } });
+
+  return {
+    state: { ...state, players: newPlayers },
+    events,
+    succeeded: true,
+    result: { targetInstanceIds: [eventInstanceId], count: 1 },
+  };
+}
+
+// ─── ACTIVATE_EVENT_FROM_TRASH ───────────────────────────────────────────────
+
+export function executeActivateEventFromTrash(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const events: PendingEvent[] = [];
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  const eventInstanceId = targetIds[0];
+  events.push({ type: "EVENT_ACTIVATED", playerIndex: controller, payload: { cardInstanceId: eventInstanceId, source: "TRASH" } });
+
+  return {
+    state,
+    events,
+    succeeded: true,
+    result: { targetInstanceIds: [eventInstanceId], count: 1 },
+  };
 }

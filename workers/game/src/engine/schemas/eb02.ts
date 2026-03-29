@@ -2129,7 +2129,7 @@ export const EB02_057_MAD_TREASURE: EffectSchema = {
       flags: { optional: true },
       actions: [
         {
-          type: "ADD_TO_LIFE",
+          type: "ADD_TO_LIFE_FROM_FIELD",
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

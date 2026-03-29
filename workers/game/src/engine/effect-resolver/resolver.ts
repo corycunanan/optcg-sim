@@ -31,6 +31,7 @@ import * as don from "./actions/don.js";
 import * as play from "./actions/play.js";
 import * as handDeck from "./actions/hand-deck.js";
 import * as effects from "./actions/effects.js";
+import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 
 import type { ActionType } from "../effect-types.js";
@@ -41,6 +42,7 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   // Draw / search
   DRAW: drawSearch.executeDraw,
   SEARCH_DECK: drawSearch.executeSearchDeck,
+  SEARCH_TRASH_THE_REST: drawSearch.executeSearchTrashTheRest,
   MILL: drawSearch.executeMill,
   FULL_DECK_SEARCH: drawSearch.executeFullDeckSearch,
   DECK_SCRY: drawSearch.executeDeckScry,
@@ -51,6 +53,10 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   GRANT_KEYWORD: modifiers.executeGrantKeyword,
   GRANT_ATTRIBUTE: modifiers.executeGrantAttribute,
   NEGATE_EFFECTS: modifiers.executeNegateEffects,
+  SET_BASE_POWER: modifiers.executeSetBasePower,
+  SET_POWER_TO_ZERO: modifiers.executeSetPowerToZero,
+  COPY_POWER: modifiers.executeCopyPower,
+  SWAP_BASE_POWER: modifiers.executeSwapBasePower,
 
   // Removal
   KO: removal.executeKO,
@@ -82,12 +88,18 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   SET_DON_ACTIVE: don.executeSetDonActive,
   REST_OPPONENT_DON: don.executeRestOpponentDon,
   RETURN_DON_TO_DECK: don.executeReturnDonToDeck,
+  REST_DON: don.executeRestDon,
+  DISTRIBUTE_DON: don.executeDistributeDon,
+  REDISTRIBUTE_DON: don.executeRedistributeDon,
+  GIVE_OPPONENT_DON_TO_OPPONENT: don.executeGiveOpponentDonToOpponent,
 
   // Play / state
   PLAY_CARD: play.executePlayCard,
   PLAY_SELF: play.executePlaySelf,
   SET_ACTIVE: play.executeSetActive,
   SET_REST: play.executeSetRest,
+  ACTIVATE_EVENT_FROM_HAND: play.executeActivateEventFromHand,
+  ACTIVATE_EVENT_FROM_TRASH: play.executeActivateEventFromTrash,
 
   // Hand / deck
   PLACE_HAND_TO_DECK: handDeck.executePlaceHandToDeck,
@@ -102,6 +114,15 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   APPLY_PROHIBITION: effects.executeApplyProhibition,
   SCHEDULE_ACTION: effects.executeScheduleAction,
   APPLY_ONE_TIME_MODIFIER: effects.executeApplyOneTimeModifier,
+  SET_COST: effects.executeSetCost,
+  WIN_GAME: effects.executeWinGame,
+  NEGATE_TRIGGER_TYPE: effects.executeNegateTriggerType,
+  EXTRA_TURN: effects.executeExtraTurn,
+
+  // Battle
+  REDIRECT_ATTACK: battleActions.executeRedirectAttack,
+  DEAL_DAMAGE: battleActions.executeDealDamage,
+  SELF_TAKE_DAMAGE: battleActions.executeSelfTakeDamage,
 
   // Choice
   PLAYER_CHOICE: executePlayerChoice,
