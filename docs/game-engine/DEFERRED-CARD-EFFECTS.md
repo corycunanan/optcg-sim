@@ -19,7 +19,7 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## OP01 Deferred Cards (2 remaining)
+## OP01 Deferred Cards (1 remaining)
 
 ### OP01-060 Donquixote Doflamingo
 **Tags:** `REVEAL_CONDITIONAL`
@@ -32,14 +32,8 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-### OP01-062 Crocodile (Leader)
-**Tags:** `SELF_REF_TRACKING`
-
-> [DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or less cards in your hand and haven't drawn a card using this Leader's effect during this turn.
-
-**Blocker:** "haven't drawn using this Leader's effect during this turn" requires tracking beyond `once_per_turn`.
-
-**Workaround:** Encodable with `once_per_turn: true` as an approximation.
+### ~~OP01-062 Crocodile (Leader)~~ — ENCODED
+Encoded in `op01.ts` with `once_per_turn: true` approximation for self-ref tracking.
 
 ---
 
@@ -379,7 +373,7 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 | ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |
 | ~~`HAND_REVEAL_CONDITIONAL`~~ | ~~OP01-063, OP01-105~~ | 0 | Done |
 | ~~`NEXT_EVENT_COST_REDUCTION`~~ | ~~OP02-025, OP12-061~~ | 0 | Done |
-| `SELF_REF_TRACKING` | OP01-062 | 1 | Low |
+| ~~`SELF_REF_TRACKING`~~ | ~~OP01-062~~ | 0 | Done (approx.) |
 
 ---
 

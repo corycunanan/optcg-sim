@@ -1691,6 +1691,43 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
   ],
 };
 
+// ─── OP01-062 Crocodile (Leader) — DON!!×1 draw on event activation
+// [DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or
+// less cards in your hand and haven't drawn a card using this Leader's effect
+// during this turn.
+// NOTE: "haven't drawn using this Leader's effect" approximated as once_per_turn.
+
+export const OP01_062_CROCODILE: EffectSchema = {
+  card_id: "OP01-062",
+  card_name: "Crocodile",
+  card_type: "Leader",
+  effects: [
+    {
+      id: "OP01-062_event_draw",
+      category: "auto",
+      trigger: {
+        event: "EVENT_ACTIVATED",
+        filter: { controller: "SELF" },
+        don_requirement: 1,
+        once_per_turn: true,
+      },
+      conditions: {
+        type: "HAND_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 4,
+      },
+      actions: [
+        {
+          type: "DRAW",
+          params: { amount: 1 },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
 // ─── OP01-063 Arlong (Character) — DON!!×1 Activate rest self to reveal opponent hand + conditional life removal
 // [DON!! x1] [Activate: Main] You may rest this Character: Choose 1 card from your
 // opponent's hand; your opponent reveals that card. If the revealed card is an Event,
@@ -3149,6 +3186,7 @@ export const OP01_SCHEMAS: Record<string, EffectSchema> = {
   // Blue
   "OP01-060": OP01_060_DONQUIXOTE_DOFLAMINGO,
   "OP01-061": OP01_061_KAIDO_LEADER,
+  "OP01-062": OP01_062_CROCODILE,
   "OP01-063": OP01_063_ARLONG,
   "OP01-064": OP01_064_ALVIDA,
   "OP01-067": OP01_067_CROCODILE,
