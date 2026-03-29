@@ -19,7 +19,7 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## OP01 Deferred Cards (3 remaining)
+## OP01 Deferred Cards (2 remaining)
 
 ### OP01-060 Donquixote Doflamingo
 **Tags:** `REVEAL_CONDITIONAL`
@@ -43,14 +43,8 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-### OP01-063 Arlong
-**Tags:** `HAND_REVEAL_CONDITIONAL`
-
-> [DON!! x1] [Activate: Main] You may rest this Character: Choose 1 card from your opponent's hand; your opponent reveals that card. If the revealed card is an Event, place up to 1 card from your opponent's Life area at the bottom of the owner's deck.
-
-**Blocker:** Blind hand selection + reveal + conditional branch on revealed card type ("if Event, do X").
-
-**Unblocked by:** Extending `REVEAL_HAND` resume to check revealed card type and conditionally gate subsequent action.
+### ~~OP01-063 Arlong~~ — ENCODED
+REVEAL_HAND + REVEALED_CARD_PROPERTY condition on Event type encoded in `op01.ts`.
 
 ---
 
@@ -403,7 +397,7 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 | `HAND_ZONE_MODIFIER` | OP14-053 | 1 | Medium |
 | `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
 | ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |
-| `HAND_REVEAL_CONDITIONAL` | OP01-063, OP01-105 | 2 | Medium |
+| ~~`HAND_REVEAL_CONDITIONAL`~~ | ~~OP01-063, OP01-105~~ | 0 | Done |
 | `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | 2 | Medium |
 | `SELF_REF_TRACKING` | OP01-062 | 1 | Low |
 

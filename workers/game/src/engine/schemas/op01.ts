@@ -1691,6 +1691,45 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
   ],
 };
 
+// ─── OP01-063 Arlong (Character) — DON!!×1 Activate rest self to reveal opponent hand + conditional life removal
+// [DON!! x1] [Activate: Main] You may rest this Character: Choose 1 card from your
+// opponent's hand; your opponent reveals that card. If the revealed card is an Event,
+// place up to 1 card from your opponent's Life area at the bottom of the owner's deck.
+
+export const OP01_063_ARLONG: EffectSchema = {
+  card_id: "OP01-063",
+  card_name: "Arlong",
+  card_type: "Character",
+  effects: [
+    {
+      id: "OP01-063_activate_reveal_conditional",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN", don_requirement: 1 },
+      costs: [{ type: "REST_SELF" }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "REVEAL_HAND",
+          target: { controller: "OPPONENT" },
+          params: { amount: 1 },
+          result_ref: "revealed",
+        },
+        {
+          type: "LIFE_CARD_TO_DECK",
+          target: { type: "OPPONENT_LIFE", controller: "OPPONENT" },
+          params: { amount: 1, position: "BOTTOM" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { card_type: "EVENT" },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP01-064 Alvida — DON!!x1 When Attacking trash + bounce
 // [DON!! x1] [When Attacking] You may trash 1 card from hand: Return opponent char cost≤3.
 
@@ -3110,6 +3149,7 @@ export const OP01_SCHEMAS: Record<string, EffectSchema> = {
   // Blue
   "OP01-060": OP01_060_DONQUIXOTE_DOFLAMINGO,
   "OP01-061": OP01_061_KAIDO_LEADER,
+  "OP01-063": OP01_063_ARLONG,
   "OP01-064": OP01_064_ALVIDA,
   "OP01-067": OP01_067_CROCODILE,
   "OP01-068": OP01_068_GECKO_MORIA,
