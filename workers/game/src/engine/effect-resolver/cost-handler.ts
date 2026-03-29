@@ -224,12 +224,12 @@ export function payCosts(
         // Find face-down life cards (from top)
         const faceDownIndices: number[] = [];
         for (let i = 0; i < p.life.length && faceDownIndices.length < amount; i++) {
-          if (!(p.life[i] as any).faceUp) faceDownIndices.push(i);
+          if (p.life[i].face === "DOWN") faceDownIndices.push(i);
         }
         if (faceDownIndices.length < amount) return null;
 
         const newLife = p.life.map((card, i) =>
-          faceDownIndices.includes(i) ? { ...card, faceUp: true } : card,
+          faceDownIndices.includes(i) ? { ...card, face: "UP" as const } : card,
         );
         const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
         newPlayers[controller] = { ...p, life: newLife };
@@ -244,12 +244,12 @@ export function payCosts(
         // Find face-up life cards
         const faceUpIndices: number[] = [];
         for (let i = 0; i < p.life.length && faceUpIndices.length < amount; i++) {
-          if ((p.life[i] as any).faceUp) faceUpIndices.push(i);
+          if (p.life[i].face === "UP") faceUpIndices.push(i);
         }
         if (faceUpIndices.length < amount) return null;
 
         const newLife = p.life.map((card, i) =>
-          faceUpIndices.includes(i) ? { ...card, faceUp: false } : card,
+          faceUpIndices.includes(i) ? { ...card, face: "DOWN" as const } : card,
         );
         const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
         newPlayers[controller] = { ...p, life: newLife };

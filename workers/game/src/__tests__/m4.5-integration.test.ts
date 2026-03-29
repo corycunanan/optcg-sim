@@ -17,6 +17,7 @@ import { executeTurnLifeFaceUp, executeTurnLifeFaceDown } from "../engine/effect
 import { executeSetBasePower } from "../engine/effect-resolver/actions/modifiers.js";
 import { executeSearchTrashTheRest } from "../engine/effect-resolver/actions/draw-search.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
+import { payCosts } from "../engine/effect-resolver/cost-handler.js";
 import { findCardInstance } from "../engine/state.js";
 import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
 
@@ -669,6 +670,42 @@ describe("5. TURN_LIFE_FACE Costs", () => {
     );
 
     expect(failResult.succeeded).toBe(false);
+  });
+});
+
+// ─── 5c–d. TURN_LIFE_FACE as Cost (cost-handler regression) ─────────────────
+
+describe("5c–d. TURN_LIFE_FACE as Cost (cost-handler)", () => {
+  it("5c. TURN_LIFE_FACE_UP cost flips face-down life to face UP and uses face property", () => {
+    const cardDb = createTestCardDb();
+    const state = buildMinimalState();
+    // All life starts face-down
+
+    const costs = [{ type: "TURN_LIFE_FACE_UP", amount: 1 }];
+    const result = payCosts(state, costs, 0, cardDb, "leader-0");
+
+    expect(result).not.toBeNull();
+    const p0 = result!.state.players[0];
+    // Should set face: "UP", not faceUp: true
+    expect(p0.life[0].face).toBe("UP");
+    expect((p0.life[0] as any).faceUp).toBeUndefined();
+  });
+
+  it("5d. TURN_LIFE_FACE_DOWN cost fails when no face-up life exists", () => {
+    const cardDb = createTestCardDb();
+    const state = buildMinimalState();
+    // All life is face-down — cost should fail (returns null)
+
+    const costs = [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }];
+    const result = payCosts(state, costs, 0, cardDb, "leader-0");
+    expect(result).toBeNull();
+
+    // Now flip one face-up first, then try the cost
+    state.players[0].life[0] = { ...state.players[0].life[0], face: "UP" as const };
+    const result2 = payCosts(state, costs, 0, cardDb, "leader-0");
+    expect(result2).not.toBeNull();
+    expect(result2!.state.players[0].life[0].face).toBe("DOWN");
+    expect((result2!.state.players[0].life[0] as any).faceUp).toBeUndefined();
   });
 });
 
