@@ -19,16 +19,10 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## OP01 Deferred Cards (1 remaining)
+## OP01 Deferred Cards (0 remaining)
 
-### OP01-060 Donquixote Doflamingo
-**Tags:** `REVEAL_CONDITIONAL`
-
-> [DON!! x2] [When Attacking] (1): Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea} type Character card with a cost of 4 or less, you may play that card rested.
-
-**Blocker:** Requires reveal-then-conditional-play pipeline: reveal top card, evaluate filter against revealed card data, then optionally play it to field rested.
-
-**Unblocked by:** `REVEAL` action returning revealed card data + inline condition checking revealed card properties + `PLAY_CARD` targeting revealed card.
+### ~~OP01-060 Donquixote Doflamingo~~ — ENCODED
+REVEAL + REVEALED_CARD_PROPERTY + PLAY_CARD encoded in `op01.ts`.
 
 ---
 
