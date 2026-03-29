@@ -115,6 +115,9 @@ function loadSchemasFromFile(filePath) {
   // Strip `as Type` assertions (e.g. `as never`, `as const`)
   code = code.replace(/\bas\s+\w+/g, "");
 
+  // Strip TypeScript non-null assertions (e.g. `foo.card_id!`)
+  code = code.replace(/(\w)!/g, "$1");
+
   const exports = {};
   try {
     const fn = new Function("exports", code);
@@ -520,18 +523,11 @@ function lintCrossField(block, ctx, issues) {
     }
   }
 
-  // A3: permanent blocks must not have trigger or actions
+  // A3: permanent blocks must not have actions (triggered effects belong in auto).
+  // Permanent blocks MAY have a trigger as a scope condition (e.g., "while attacking",
+  // "on your turn") when paired with modifiers — this is the standard aura pattern.
+  // But permanent + trigger + actions (no modifiers) is likely miscategorized.
   if (cat === "permanent") {
-    if (block.trigger) {
-      issues.push(
-        err(
-          cardId,
-          blockId,
-          "A3",
-          "Permanent block has trigger (triggered effects belong in auto)",
-        ),
-      );
-    }
     if (block.actions && block.actions.length > 0) {
       issues.push(
         err(
@@ -539,6 +535,16 @@ function lintCrossField(block, ctx, issues) {
           blockId,
           "A3",
           "Permanent block has actions (triggered effects belong in auto)",
+        ),
+      );
+    }
+    if (block.trigger && !(block.modifiers && block.modifiers.length > 0) && !(block.prohibitions && block.prohibitions.length > 0)) {
+      issues.push(
+        err(
+          cardId,
+          blockId,
+          "A3",
+          "Permanent block has trigger but no modifiers/prohibitions (should this be auto?)",
         ),
       );
     }
@@ -582,28 +588,41 @@ function lintCrossField(block, ctx, issues) {
     }
   }
 
-  // A6: result_ref must be referenced by a later target_ref (and vice versa)
+  // A6: result_ref must be referenced somewhere (target_ref, filter *_ref, ACTION_RESULT ref, nested action)
   if (block.actions && block.actions.length > 0) {
     const allActions = [...walkActions(block.actions)];
     const resultRefs = new Set();
-    const targetRefs = new Set();
+    const consumedRefs = new Set();
     for (const action of allActions) {
       if (action.result_ref) resultRefs.add(action.result_ref);
-      if (action.target_ref) targetRefs.add(action.target_ref);
+      // Deep-scan the entire action object for consumed refs:
+      // target_ref fields, filter *_ref fields, ACTION_RESULT refs
+      (function scanConsumed(obj, depth) {
+        if (!obj || typeof obj !== "object" || depth > 10) return;
+        for (const [key, val] of Object.entries(obj)) {
+          if (key === "result_ref") continue; // result_ref is a producer, not consumer
+          if (key === "target_ref" && typeof val === "string") consumedRefs.add(val);
+          if (key.endsWith("_ref") && typeof val === "string" && key !== "result_ref") consumedRefs.add(val);
+          if (typeof val === "object" && val !== null) {
+            if (val.type === "ACTION_RESULT" && val.ref) consumedRefs.add(val.ref);
+            scanConsumed(val, depth + 1);
+          }
+        }
+      })(action, 0);
     }
     for (const ref of resultRefs) {
-      if (!targetRefs.has(ref)) {
+      if (!consumedRefs.has(ref)) {
         issues.push(
           err(
             cardId,
             blockId,
             "A6",
-            `result_ref "${ref}" is never used by a target_ref`,
+            `result_ref "${ref}" is never consumed by a target_ref, filter ref, or ACTION_RESULT`,
           ),
         );
       }
     }
-    for (const ref of targetRefs) {
+    for (const ref of consumedRefs) {
       if (!resultRefs.has(ref)) {
         issues.push(
           err(

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "research/CARD-GAME-UX-RESEARCH.md",
+                "file": "game-engine/11-ENCODING-GUIDE.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "CARD-GAME-UX-RESEARCH"
+              "title": "11-ENCODING-GUIDE"
             }
           }
         ]
@@ -94,7 +94,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "research/CARD-GAME-UX-RESEARCH.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +103,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for CARD-GAME-UX-RESEARCH"
+              "title": "Backlinks"
             }
           },
           {
@@ -113,12 +112,11 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "research/CARD-GAME-UX-RESEARCH.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from CARD-GAME-UX-RESEARCH"
+              "title": "Outgoing links"
             }
           },
           {
@@ -156,13 +154,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "research/CARD-GAME-UX-RESEARCH.md",
+                "file": "Encoding prompt.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of CARD-GAME-UX-RESEARCH"
+              "title": "Outline of Encoding prompt"
             }
           }
         ]
@@ -183,8 +181,25 @@
       "bases:Create new base": false
     }
   },
-  "active": "920ae3bb94c2a2ae",
+  "active": "5098370a81a06fc2",
   "lastOpenFiles": [
+    "encoding/ENCODING-PROMPT.md",
+    "game-engine/11-ENCODING-GUIDE.md",
+    "Encoding prompt.md",
+    "encoding",
+    "research/semantic-schema-linter.md",
+    "milestones/M6-EFFECT-SHOWCASE.md",
+    "audits/workers-codebase-audit-2026-03-26.md",
+    "audits",
+    "game-engine/GAME-ENGINE-REQUIREMENTS.md",
+    "game-engine/DEFERRED-CARD-EFFECTS.md",
+    "game-engine/06-PROHIBITIONS-AND-REPLACEMENTS.md",
+    "game-engine/07-RULE-MODIFICATIONS.md",
+    "game-engine/08-ENGINE-ARCHITECTURE.md",
+    "game-engine/09-EXAMPLE-ENCODINGS.md",
+    "game-engine/10-KEYWORD-REFERENCE.md",
+    "game-engine/CARD-EFFECT-EXAMPLES.md",
+    "research/CARD-GAME-UX-RESEARCH.md",
     "design/INTERRUPTION-MODALS.md",
     "milestones/M3.75-GAME-BOARD-UI-TECH-DEBT.md",
     "design/GAME-BOARD-LAYOUT-REFERENCE.md"

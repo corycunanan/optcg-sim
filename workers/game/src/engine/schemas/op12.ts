@@ -1892,7 +1892,7 @@ export const OP12_054_MARSHALL_D_TEACH: EffectSchema = {
             type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
-            filter: { cost_max: 1, exclude_self: true },
+            filter: { cost_max: 1 },
           },
         },
       ],
@@ -3796,6 +3796,30 @@ export const OP12_108_DONQUIXOTE_ROSINANTE: EffectSchema = {
 // [Trigger] K.O. up to 1 of your opponent's Characters with a cost of 1 or
 // less and add this card to your hand.
 
+// ─── OP12-112 Baby 5 (Character) ─────────────────────────────────────────────
+// [Trigger] If your leader is multicolored, draw 2 cards.
+
+export const OP12_112_BABY5: EffectSchema = {
+  card_id: "OP12-112",
+  card_name: "Baby 5",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_multicolor_draw",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { multicolored: true },
+      },
+      actions: [
+        { type: "DRAW", params: { amount: 2 } },
+      ],
+    },
+  ],
+};
+
 export const OP12_113_RORONOA_ZORO: EffectSchema = {
   card_id: "OP12-113",
   card_name: "Roronoa Zoro",
@@ -4197,6 +4221,7 @@ export const OP12_SCHEMAS: Record<string, EffectSchema> = {
   "OP12-106": OP12_106_TRAFALGAR_LAW,
   "OP12-107": OP12_107_DONQUIXOTE_DOFLAMINGO,
   "OP12-108": OP12_108_DONQUIXOTE_ROSINANTE,
+  "OP12-112": OP12_112_BABY5,
   "OP12-113": OP12_113_RORONOA_ZORO,
   "OP12-115": OP12_115_I_LOVE_YOU,
   "OP12-116": OP12_116_WELL_RING_THE_BELL,

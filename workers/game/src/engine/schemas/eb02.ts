@@ -1436,13 +1436,15 @@ export const EB02_039_GERMA_66: EffectSchema = {
       actions: [
         {
           type: "PLAY_CARD",
+          // TODO: Card text requires "same card name as the trashed card" filter.
+          // Cost result_ref not yet supported — name filter omitted until cost-to-action
+          // ref passing is implemented. Review during M4.5 Phase 2.
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
             count: { up_to: 1 },
             filter: {
               power_range: { min: 5000, max: 7000 },
-              name_matching_ref: "cost_trash",
             },
             source_zone: "TRASH",
           },

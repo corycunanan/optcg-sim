@@ -62,8 +62,6 @@ import { ST27_SCHEMAS } from "./schemas/st27.js";
 import { ST28_SCHEMAS } from "./schemas/st28.js";
 import { ST29_SCHEMAS } from "./schemas/st29.js";
 import { P_SCHEMAS } from "./schemas/p.js";
-import { ACE_DECK_SCHEMAS } from "./schemas/ace-deck.js";
-import { NAMI_DECK_SCHEMAS } from "./schemas/nami-deck.js";
 
 /** All pre-authored schemas, keyed by card ID */
 const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
@@ -118,8 +116,6 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...ST28_SCHEMAS,
   ...ST29_SCHEMAS,
   ...P_SCHEMAS,
-  ...ACE_DECK_SCHEMAS,
-  ...NAMI_DECK_SCHEMAS,
 };
 
 /**

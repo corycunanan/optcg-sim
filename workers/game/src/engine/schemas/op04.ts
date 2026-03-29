@@ -1015,7 +1015,7 @@ export const OP04_031_DONQUIXOTE_DOFLAMINGO_CHARACTER: EffectSchema = {
             filter: { is_rested: true },
           },
           params: {
-            prohibition_type: "CANNOT_BECOME_ACTIVE",
+            prohibition_type: "CANNOT_REFRESH",
           },
           duration: { type: "SKIP_NEXT_REFRESH" },
         },
@@ -3125,7 +3125,7 @@ export const OP04_090_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "APPLY_PROHIBITION",
           target: { type: "SELF" },
-          params: { prohibition_type: "CANNOT_SET_ACTIVE" },
+          params: { prohibition_type: "CANNOT_REFRESH" },
           duration: { type: "SKIP_NEXT_REFRESH" },
           chain: "THEN",
         },

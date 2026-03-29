@@ -1360,7 +1360,7 @@ export const OP01_051_EUSTASS_KID: EffectSchema = {
   effects: [
     {
       id: "taunt_prohibition",
-      category: "permanent",
+      category: "auto",
       trigger: {
         keyword: "ON_OPPONENT_ATTACK",
         don_requirement: 1,
