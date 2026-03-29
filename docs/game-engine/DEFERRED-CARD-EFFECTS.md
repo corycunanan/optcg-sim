@@ -476,14 +476,67 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## Summary by Blocker
+## Summary by Blocker (Original Deferrals)
 
-| Blocker | Cards affected | Effort |
-|---------|---------------|--------|
-| `FULL_DECK_SEARCH_AND_PLAY` | OP01-069, OP01-098, OP01-116, OP02-030, OP13-079 | Medium |
-| `REVEAL_CONDITIONAL` | OP01-060, OP11-066, OP11-071, OP11-073, OP11-074, OP11-079, OP11-081, OP12-058, OP14-044, OP15-065, ST13-007, ST13-010, ST13-014, ST17-001, ST22-003, ST22-006, ST22-007, ST22-012, ST22-016 | Medium |
-| `HAND_ZONE_MODIFIER` | OP01-067, OP14-053, OP15-013, OP15-102, ST23-001, ST23-002, ST26-001 | Medium |
-| `HAND_REVEAL` blind selection | OP01-063, OP01-105 | Medium |
-| `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | Medium |
-| `SELF_REF_TRACKING` | OP01-062 | Low |
-| `LIFE_FACE_COST` | ST13-009, ST20-001, P-106 | Low |
+| Blocker | Cards | Count | Effort |
+|---------|-------|-------|--------|
+| `REVEAL_CONDITIONAL` | OP01-060, OP07-048, OP08-049, OP11-066/071/073/074/079/081, OP12-058, OP14-044, OP15-065, ST13-007/010/014, ST17-001, ST22-003/006/007/012/016 | 19 | Medium |
+| `HAND_ZONE_MODIFIER` | OP01-067, OP14-053, OP15-013, OP15-102, ST23-001, ST23-002, ST26-001 | 7 | Medium |
+| `FULL_DECK_SEARCH_AND_PLAY` | OP01-069, OP01-098, OP01-116, OP02-030, OP13-079 | 5 | Medium |
+| `LIFE_FACE_COST` | ST13-009, ST20-001, P-106 | 3 | Low |
+| `HAND_REVEAL_CONDITIONAL` | OP01-063, OP01-105 | 2 | Medium |
+| `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | 2 | Medium |
+| `SELF_REF_TRACKING` | OP01-062 | 1 | Low |
+
+---
+
+## M4.5 QA Findings — Additional Cards Needing Engine Work
+
+Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confidence encoding detector). These cards have schemas encoded with action types that have no engine handler, or card text that doesn't cleanly map to the schema's action types.
+
+### Cards Using Unhandled Action Types (F9)
+
+| Action Type | Count | Cards |
+|---|---|---|
+| `SEARCH_TRASH_THE_REST` | 13 | EB04-029, OP03-083, OP04-039, OP04-092, OP11-047, OP11-099, OP12-086, OP12-097, OP13-086, OP13-096, OP14-087, OP14-097, OP14-099 |
+| `GIVE_OPPONENT_DON_TO_OPPONENT` | 5 | OP15-008, OP15-015, OP15-025, OP15-026, OP15-028 |
+| `COPY_POWER` | 4 | EB01-061, EB04-052, OP04-069, OP06-009 |
+| `DISTRIBUTE_DON` | 4 | EB03-026, OP04-004, OP08-001, OP14-105 |
+| `SET_BASE_POWER` | 3 | EB04-004, P-092, ST26-005 |
+| `ACTIVATE_EVENT_FROM_HAND` | 3 | OP12-041, OP15-014, OP15-046 |
+| `SWAP_BASE_POWER` | 3 | OP14-001, OP14-009, OP14-017 |
+| `REDIRECT_ATTACK` | 2 | EB01-038, OP14-060 |
+| `REDISTRIBUTE_DON` | 2 | EB02-009, OP07-001 |
+| `SET_POWER_TO_ZERO` | 2 | EB04-010, OP07-002 |
+| `ADD_TO_LIFE` | 1 | EB02-057 |
+| `ACTIVATE_EVENT_FROM_TRASH` | 1 | EB03-031 |
+| `DEAL_DAMAGE` | 1 | EB03-055 |
+| `SET_COST` | 1 | OP03-091 |
+| `EXTRA_TURN` | 1 | OP05-119 |
+| `NEGATE_TRIGGER_TYPE` | 1 | OP09-081 |
+| `WIN_GAME` | 1 | OP09-118 |
+| `REST_DON` | 1 | OP12-018 |
+| `SELF_TAKE_DAMAGE` | 1 | OP14-115 |
+
+### Low-Confidence Encodings (Card Text / Schema Mismatch)
+
+| Pattern | Count | Cards |
+|---|---|---|
+| `REVEAL_WITHOUT_ACTION` | 18 | OP06-057, OP06-119, OP08-040/044/052/054/055, OP14-044, ST11-001, ST12-010/013/017, ST22-001/003/011/012/016/017 |
+| `HAND_COST_REDUCTION` | 10 | EB04-061, OP07-064, OP11-023, OP15-013/021/102, PRB02-014, ST23-001/002, ST26-001 |
+| `SEARCH_TRASH_THE_REST` | 9 | EB01-009, EB02-025/056, OP01-116, OP06-003, OP08-007, OP11-051, OP14-010, ST12-013 |
+| `TURN_LIFE_FACE` | 7 | EB03-053/056, OP10-099, OP12-102, OP13-109, P-106, ST29-008 |
+| `BASE_POWER_BECOMES` | 6 | EB01-061, EB04-003/052, OP04-069, OP06-009, OP14-053 |
+| `PLAY_FROM_DECK` | 4 | OP02-030, OP08-071/073, OP13-079 |
+| `SAME_NAME_AS_TRASHED` | 1 | EB02-039 |
+| `NEXT_TIME_YOU_PLAY` | 1 | OP12-061 |
+
+### Totals
+
+| Category | Count |
+|---|---|
+| Original deferrals (pre-QA) | 38 |
+| NEW: unhandled action types (F9) | 50 |
+| NEW: low-confidence encodings (LC) | 56 |
+| Overlap (flagged by multiple sources) | ~24 |
+| **Total unique cards needing work** | **~124** |
