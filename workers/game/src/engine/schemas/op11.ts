@@ -780,12 +780,9 @@ export const OP11_022_SHIRAHOSHI: EffectSchema = {
       flags: { once_per_turn: true, optional: true },
       costs: [
         { type: "REST_DON", amount: 1 },
+        { type: "TURN_LIFE_FACE_UP", amount: 1 },
       ],
       actions: [
-        {
-          type: "TURN_LIFE_FACE_UP",
-          params: { amount: 1, position: "TOP" },
-        },
         {
           type: "PLAY_CARD",
           target: {
@@ -3186,16 +3183,12 @@ export const OP11_100_OTOHIME: EffectSchema = {
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
       flags: { optional: true },
       actions: [
         {
-          type: "TURN_LIFE_FACE_DOWN",
-          params: { amount: 1 },
-        },
-        {
           type: "DRAW",
           params: { amount: 1 },
-          chain: "IF_DO",
         },
       ],
     },
@@ -3306,17 +3299,16 @@ export const OP11_103_LONG_JAW_NEPTUNIAN: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
-      costs: [{ type: "REST_SELF" }],
+      costs: [
+        { type: "REST_SELF" },
+        { type: "TURN_LIFE_FACE_DOWN", amount: 1 },
+      ],
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_DOWN",
-          params: { amount: 1 },
-        },
         {
           type: "KO",
           target: {
@@ -3325,7 +3317,6 @@ export const OP11_103_LONG_JAW_NEPTUNIAN: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 3 },
           },
-          chain: "IF_DO",
         },
       ],
     },
@@ -3353,12 +3344,9 @@ export const OP11_104_SHIRLEY: EffectSchema = {
       id: "on_play_search",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
       flags: { optional: true },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_DOWN",
-          params: { amount: 1 },
-        },
         {
           type: "SEARCH_DECK",
           params: {
@@ -3367,7 +3355,6 @@ export const OP11_104_SHIRLEY: EffectSchema = {
             filter: { traits: ["Fish-Man Island"] },
             rest_destination: "TOP_OR_BOTTOM",
           },
-          chain: "IF_DO",
         },
       ],
     },
@@ -3425,6 +3412,7 @@ export const OP11_107_TOPKNOT_NEPTUNIAN: EffectSchema = {
       id: "activate_set_active_at_eot",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
       flags: { once_per_turn: true, optional: true },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -3432,10 +3420,6 @@ export const OP11_107_TOPKNOT_NEPTUNIAN: EffectSchema = {
         property: { name: "Shirahoshi" },
       },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_DOWN",
-          params: { amount: 1 },
-        },
         {
           type: "SCHEDULE_ACTION",
           params: {
@@ -3445,7 +3429,6 @@ export const OP11_107_TOPKNOT_NEPTUNIAN: EffectSchema = {
               target: { type: "SELF" },
             },
           },
-          chain: "IF_DO",
         },
       ],
     },
@@ -3470,16 +3453,12 @@ export const OP11_108_NEPTUNE: EffectSchema = {
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
       flags: { optional: true },
       actions: [
         {
-          type: "TURN_LIFE_FACE_DOWN",
-          params: { amount: 1 },
-        },
-        {
           type: "DRAW",
           params: { amount: 2 },
-          chain: "IF_DO",
         },
         {
           type: "TRASH_FROM_HAND",
@@ -3774,6 +3753,7 @@ export const OP11_117_FISH_MAN_ISLAND: EffectSchema = {
       id: "activate_buff",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
       flags: { once_per_turn: true, optional: true },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -3781,10 +3761,6 @@ export const OP11_117_FISH_MAN_ISLAND: EffectSchema = {
         property: { name: "Shirahoshi" },
       },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_UP",
-          params: { amount: 1, position: "TOP" },
-        },
         {
           type: "MODIFY_POWER",
           target: {
@@ -3795,7 +3771,6 @@ export const OP11_117_FISH_MAN_ISLAND: EffectSchema = {
           },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "IF_DO",
         },
       ],
     },

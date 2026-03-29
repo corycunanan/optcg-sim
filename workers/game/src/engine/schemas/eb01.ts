@@ -1436,11 +1436,8 @@ export const EB01_040_KYROS: EffectSchema = {
       id: "activate_ko",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
       actions: [
-        {
-          type: "TURN_LIFE_FACE_UP",
-          params: { amount: 1, position: "TOP" },
-        },
         {
           type: "KO",
           target: {
@@ -1449,7 +1446,6 @@ export const EB01_040_KYROS: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_exact: 0 },
           },
-          chain: "THEN",
         },
       ],
       flags: { once_per_turn: true, optional: true },

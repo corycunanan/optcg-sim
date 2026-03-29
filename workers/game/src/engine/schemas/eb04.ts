@@ -2689,6 +2689,7 @@ export const EB04_059_BLACK_ROPE_DRAGON_TWISTER: EffectSchema = {
       id: "main_ko_two",
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
       flags: { optional: true },
       conditions: {
         type: "COMPARATIVE",
@@ -2696,10 +2697,6 @@ export const EB04_059_BLACK_ROPE_DRAGON_TWISTER: EffectSchema = {
         operator: "<",
       },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_UP",
-          params: { amount: 1, position: "TOP" },
-        },
         {
           type: "KO",
           target: {

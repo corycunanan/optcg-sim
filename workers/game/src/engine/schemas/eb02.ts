@@ -2252,13 +2252,12 @@ export const EB02_060_MERRY_GO: EffectSchema = {
       id: "activate_power_buff",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "REST_SELF" }],
+      costs: [
+        { type: "REST_SELF" },
+        { type: "TURN_LIFE_FACE_UP", amount: 1 },
+      ],
       flags: { optional: true },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_UP",
-          params: { amount: 1, position: "TOP" },
-        },
         {
           type: "MODIFY_POWER",
           target: {
@@ -2269,7 +2268,6 @@ export const EB02_060_MERRY_GO: EffectSchema = {
           },
           params: { amount: 1000 },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
-          chain: "THEN",
         },
       ],
     },
