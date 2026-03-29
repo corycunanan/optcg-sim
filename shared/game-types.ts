@@ -81,6 +81,7 @@ export interface TurnState {
   battle: BattleContext | null;
   oncePerTurnUsed: Record<string, string[]>; // effectId → instanceIds used this turn
   actionsPerformedThisTurn: PerformedAction[];
+  extraTurnsPending?: number;
 }
 
 // ─── Player State ─────────────────────────────────────────────────────────────
@@ -168,7 +169,13 @@ export type GameEventType =
   | "CARDS_REVEALED"
   | "EFFECTS_NEGATED"
   | "LIFE_CARD_TO_DECK"
-  | "LIFE_SCRIED";
+  | "LIFE_SCRIED"
+  | "ATTACK_REDIRECTED"
+  | "CARD_REMOVED_FROM_LIFE"
+  | "EXTRA_TURN_GRANTED"
+  | "EVENT_ACTIVATED"
+  | "LIFE_CARD_TURNED_FACE_UP"
+  | "LIFE_CARD_TURNED_FACE_DOWN";
 
 export interface GameEvent {
   type: GameEventType;
@@ -353,4 +360,5 @@ export interface PromptOptions {
   blindSelection?: boolean; // true when selecting from hidden cards (opponent's hand)
   // PLAYER_CHOICE
   choices?: { id: string; label: string }[];
+  restDestination?: string;
 }

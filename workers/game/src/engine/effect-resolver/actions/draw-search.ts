@@ -126,7 +126,7 @@ export function executeSearchTrashTheRest(
   const events: PendingEvent[] = [];
   const p_ = action.params ?? {};
   const lookAt = (p_.look_at as number) ?? 5;
-  const filter = p_.filter ?? {};
+  const filter = (p_.filter ?? {}) as Record<string, any>;
   const restDest = (p_.rest_destination as string) ?? "TRASH";
 
   const p = state.players[controller];

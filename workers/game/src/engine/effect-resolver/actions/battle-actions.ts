@@ -3,7 +3,7 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, GameState, PendingEvent } from "../../../types.js";
+import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 
@@ -67,7 +67,17 @@ export function executeDealDamage(
 
     const lifeCard = player.life[0];
     const newLife = player.life.slice(1);
-    const newHand = [...player.hand, { ...lifeCard, zone: "HAND" as const }];
+    const handCard: CardInstance = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "HAND" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: opp,
+      owner: opp,
+    };
+    const newHand = [...player.hand, handCard];
     const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
     newPlayers[opp] = { ...player, life: newLife, hand: newHand };
     nextState = { ...nextState, players: newPlayers };
@@ -101,7 +111,17 @@ export function executeSelfTakeDamage(
 
     const lifeCard = player.life[0];
     const newLife = player.life.slice(1);
-    const newHand = [...player.hand, { ...lifeCard, zone: "HAND" as const }];
+    const handCard: CardInstance = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "HAND" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: controller,
+      owner: controller,
+    };
+    const newHand = [...player.hand, handCard];
     const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
     newPlayers[controller] = { ...player, life: newLife, hand: newHand };
     nextState = { ...nextState, players: newPlayers };

@@ -298,7 +298,6 @@ export function payCosts(
       }
 
       case "LEADER_POWER_REDUCTION": {
-        const amount = typeof cost.amount === "number" ? cost.amount : 1000;
         // This is tracked as a temporary power modifier on the leader
         // For cost payment, we just verify the leader exists
         const p = nextState.players[controller];
