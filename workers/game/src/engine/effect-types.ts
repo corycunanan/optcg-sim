@@ -887,7 +887,9 @@ export type CostType =
   | "RETURN_ATTACHED_DON_TO_COST"
   | "PLACE_SELF_AND_HAND_TO_DECK"
   | "LIFE_TO_HAND"
-  | "REST_DON";
+  | "REST_DON"
+  | "TURN_LIFE_FACE_UP"
+  | "TURN_LIFE_FACE_DOWN";
 
 // ─── Durations (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────
 

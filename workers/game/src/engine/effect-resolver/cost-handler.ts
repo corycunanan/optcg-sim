@@ -218,6 +218,46 @@ export function payCosts(
         break;
       }
 
+      case "TURN_LIFE_FACE_UP": {
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        // Find face-down life cards (from top)
+        const faceDownIndices: number[] = [];
+        for (let i = 0; i < p.life.length && faceDownIndices.length < amount; i++) {
+          if (!(p.life[i] as any).faceUp) faceDownIndices.push(i);
+        }
+        if (faceDownIndices.length < amount) return null;
+
+        const newLife = p.life.map((card, i) =>
+          faceDownIndices.includes(i) ? { ...card, faceUp: true } : card,
+        );
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, life: newLife };
+        nextState = { ...nextState, players: newPlayers };
+        events.push({ type: "LIFE_CARD_TURNED_FACE_UP", playerIndex: controller, payload: { count: amount } });
+        break;
+      }
+
+      case "TURN_LIFE_FACE_DOWN": {
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        // Find face-up life cards
+        const faceUpIndices: number[] = [];
+        for (let i = 0; i < p.life.length && faceUpIndices.length < amount; i++) {
+          if ((p.life[i] as any).faceUp) faceUpIndices.push(i);
+        }
+        if (faceUpIndices.length < amount) return null;
+
+        const newLife = p.life.map((card, i) =>
+          faceUpIndices.includes(i) ? { ...card, faceUp: false } : card,
+        );
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, life: newLife };
+        nextState = { ...nextState, players: newPlayers };
+        events.push({ type: "LIFE_CARD_TURNED_FACE_DOWN", playerIndex: controller, payload: { count: amount } });
+        break;
+      }
+
       default:
         // Other cost types to be implemented
         break;
