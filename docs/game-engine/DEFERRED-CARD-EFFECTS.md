@@ -55,14 +55,8 @@ Encoded in `op01.ts` with field-to-hand MODIFY_COST pattern.
 
 ## OP02 Deferred Cards
 
-### OP02-025 Kin'emon
-**Tags:** `NEXT_EVENT_COST_REDUCTION`
-
-> [Activate: Main] [Once Per Turn] If you have 1 or less Characters, the next time you play a {Land of Wano} type Character card with a cost of 3 or more from your hand during this turn, the cost will be reduced by 1.
-
-**Blocker:** "The next time you play..." requires one-time cost reduction modifier scoped to the next qualifying play event.
-
-**Unblocked by:** One-time modifier system with play-event scoping in the effect resolver.
+### ~~OP02-025 Kin'emon~~ — ENCODED
+APPLY_ONE_TIME_MODIFIER with MODIFY_COST + trait/costMin filter encoded in `op02.ts`.
 
 ---
 
@@ -173,14 +167,8 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-### OP12-061 Donquixote Rosinante (Activate:Main effect only)
-**Tags:** `NEXT_EVENT_COST_REDUCTION`
-
-> [Activate: Main] [Once Per Turn] DON!! −1: The next time you play [Trafalgar Law] with a cost of 4 or more from your hand during this turn, the cost will be reduced by 2.
-
-**Blocker:** "The next time you play..." requires one-time cost reduction modifier scoped to the next qualifying play event with name + cost filter.
-
-**Unblocked by:** One-time modifier system with play-event scoping — same as OP02-025.
+### ~~OP12-061 Donquixote Rosinante~~ — ENCODED
+APPLY_ONE_TIME_MODIFIER with MODIFY_COST + name/costMin filter encoded in `op12.ts`.
 
 ---
 
@@ -398,7 +386,7 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 | `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
 | ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |
 | ~~`HAND_REVEAL_CONDITIONAL`~~ | ~~OP01-063, OP01-105~~ | 0 | Done |
-| `NEXT_EVENT_COST_REDUCTION` | OP02-025, OP12-061 | 2 | Medium |
+| ~~`NEXT_EVENT_COST_REDUCTION`~~ | ~~OP02-025, OP12-061~~ | 0 | Done |
 | `SELF_REF_TRACKING` | OP01-062 | 1 | Low |
 
 ---

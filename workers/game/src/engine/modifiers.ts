@@ -381,8 +381,11 @@ function matchesOneTimeFilter(
   const filter = otm.appliesTo.filter;
   if (!filter) return true;
 
-  if ((filter as TargetFilter & { costMax?: number }).costMax !== undefined) {
+  if ((filter as any).costMax !== undefined) {
     if ((cardData.cost ?? 0) > ((filter as any).costMax as number)) return false;
+  }
+  if ((filter as any).costMin !== undefined) {
+    if ((cardData.cost ?? 0) < ((filter as any).costMin as number)) return false;
   }
   if ((filter as any).traits) {
     const traits = (filter as any).traits as string[];
@@ -392,6 +395,12 @@ function matchesOneTimeFilter(
   if ((filter as any).color) {
     const colors = Array.isArray((filter as any).color) ? (filter as any).color : [(filter as any).color];
     if (!colors.includes(cardData.color)) return false;
+  }
+  if ((filter as any).name) {
+    if (cardData.name !== (filter as any).name) return false;
+  }
+  if ((filter as any).card_type) {
+    if (cardData.type?.toUpperCase() !== ((filter as any).card_type as string).toUpperCase()) return false;
   }
   return true;
 }

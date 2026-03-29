@@ -2155,10 +2155,11 @@ export const OP12_060_BOEUF_BURST: EffectSchema = {
   ],
 };
 
-// ─── OP12-061 Donquixote Rosinante ──────────────────────────────────────────
+// ─── OP12-061 Donquixote Rosinante — replacement KO protection + next-play cost reduction
 // [Once Per Turn] If your [Trafalgar Law] would be K.O.'d, you may add 1 card
 // from the top of your Life cards to your hand instead.
-// NOTE: Second effect (NEXT_EVENT_COST_REDUCTION) is DEFERRED.
+// [Activate: Main] [Once Per Turn] DON!! −1: The next time you play [Trafalgar Law]
+// with a cost of 4 or more from your hand during this turn, the cost will be reduced by 2.
 
 export const OP12_061_DONQUIXOTE_ROSINANTE: EffectSchema = {
   card_id: "OP12-061",
@@ -2181,6 +2182,29 @@ export const OP12_061_DONQUIXOTE_ROSINANTE: EffectSchema = {
           params: { amount: 1, position: "TOP" },
         },
       ],
+    },
+    {
+      id: "OP12-061_activate_cost_reduction",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      actions: [
+        {
+          type: "APPLY_ONE_TIME_MODIFIER",
+          params: {
+            modification: {
+              type: "MODIFY_COST",
+              params: { amount: -2 },
+            },
+            applies_to: {
+              action: "MODIFY_COST",
+              filter: { name: "Trafalgar Law", costMin: 4 },
+            },
+          },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+      flags: { once_per_turn: true },
     },
   ],
 };

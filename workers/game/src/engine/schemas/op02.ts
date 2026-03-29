@@ -1986,18 +1986,46 @@ export const OP02_070_NEW_KAMA_LAND: EffectSchema = {
 // the required pattern. See docs/game-engine/DEFERRED-CARD-EFFECTS.md.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── OP02-025 Kin'emon ──────────────────────────────────────────────────────
-// Tags: NEXT_EVENT_COST_REDUCTION
-//
+// ─── OP02-025 Kin'emon (Character) — Activate next-play cost reduction
 // [Activate: Main] [Once Per Turn] If you have 1 or less Characters, the next
 // time you play a {Land of Wano} type Character card with a cost of 3 or more
 // from your hand during this turn, the cost will be reduced by 1.
-//
-// Blocker: "The next time you play..." is a one-time cost reduction modifier
-// scoped to the next qualifying play event. Requires APPLY_ONE_TIME_MODIFIER
-// with a cost reduction that triggers on the next CHARACTER_PLAYED event
-// matching a filter. The one-time modifier system exists in the types but
-// the "next play event" trigger scoping is not wired up in the resolver.
+
+export const OP02_025_KINEMON: EffectSchema = {
+  card_id: "OP02-025",
+  card_name: "Kin'emon",
+  card_type: "Character",
+  effects: [
+    {
+      id: "OP02-025_activate_cost_reduction",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER" },
+        count: { operator: "<=", value: 1 },
+      },
+      actions: [
+        {
+          type: "APPLY_ONE_TIME_MODIFIER",
+          params: {
+            modification: {
+              type: "MODIFY_COST",
+              params: { amount: -1 },
+            },
+            applies_to: {
+              action: "MODIFY_COST",
+              filter: { traits: ["Land of Wano"], card_type: "CHARACTER", costMin: 3 },
+            },
+          },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+      flags: { once_per_turn: true },
+    },
+  ],
+};
 
 // ─── OP02-027 Inuarashi — WHILE_CONDITION prohibition ───────────────────────
 // If all of your DON!! cards are rested, this Character cannot be removed from
@@ -3630,6 +3658,7 @@ export const OP02_SCHEMAS: Record<string, EffectSchema> = {
   "OP02-022": OP02_022_WHITEBEARD_PIRATES,
   "OP02-023": OP02_023_YOU_MAY_BE_A_FOOL,
   "OP02-024": OP02_024_MOBY_DICK,
+  "OP02-025": OP02_025_KINEMON,
   "OP02-026": OP02_026_SANJI,
   "OP02-027": OP02_027_INUARASHI,
   "OP02-029": OP02_029_CARROT,
