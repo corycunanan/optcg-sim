@@ -11,7 +11,14 @@
  */
 
 import type { CardInstance, CardData, GameState } from "../types.js";
-import type { RuntimeActiveEffect, RuntimeOneTimeModifier, TargetFilter } from "./effect-types.js";
+import type {
+  RuntimeActiveEffect,
+  RuntimeOneTimeModifier,
+  TargetFilter,
+  EffectSchema,
+} from "./effect-types.js";
+import { evaluateCondition, type ConditionContext } from "./conditions.js";
+import { findCardInstance } from "./state.js";
 
 /**
  * Returns the effective power of a card in the current game state.
@@ -65,11 +72,14 @@ export function getEffectivePower(
 /**
  * Returns the effective cost for playing a card.
  * Clamped to minimum 0 for payment purposes (rules §1-3-5-1).
+ *
+ * @param cardDb - Optional card database, required for hand-zone modifier evaluation
  */
 export function getEffectiveCost(
   cardData: CardData,
   state?: GameState,
   cardInstanceId?: string,
+  cardDb?: Map<string, CardData>,
 ): number {
   // Layer 0
   let cost = cardData.cost ?? 0;
@@ -100,9 +110,168 @@ export function getEffectiveCost(
         cost += otm.modification.params.amount as number;
       }
     }
+
+    // Hand-zone permanent modifiers (self-cost-reduction while in hand)
+    if (cardDb) {
+      cost += getHandZoneSelfCostModifier(cardData, state, cardInstanceId, cardDb);
+      cost += getFieldToHandCostModifier(cardData, state, cardInstanceId, cardDb);
+    }
   }
 
   return Math.max(0, cost);
+}
+
+// ─── Hand-Zone Modifiers ────────────────────────────────────────────────────
+
+/**
+ * Evaluate hand-zone permanent blocks on a card's own schema.
+ * Returns the total cost adjustment (negative = cheaper).
+ *
+ * These are permanent effect blocks with `zone: "HAND"` and MODIFY_COST modifiers
+ * that reduce the card's own cost while it sits in hand, conditioned on game state.
+ */
+function getHandZoneSelfCostModifier(
+  cardData: CardData,
+  state: GameState,
+  cardInstanceId: string,
+  cardDb: Map<string, CardData>,
+): number {
+  const card = findCardInstance(state, cardInstanceId);
+  if (!card || card.zone !== "HAND") return 0;
+
+  const schema = cardData.effectSchema as EffectSchema | null;
+  if (!schema?.effects) return 0;
+
+  const ctx: ConditionContext = {
+    sourceCardInstanceId: cardInstanceId,
+    controller: card.controller,
+    cardDb,
+  };
+
+  let adjustment = 0;
+
+  for (const block of schema.effects) {
+    if (block.category !== "permanent") continue;
+    if (block.zone !== "HAND") continue;
+    if (!block.modifiers) continue;
+
+    // Evaluate block-level conditions
+    if (block.conditions && !evaluateCondition(state, block.conditions, ctx)) continue;
+
+    for (const mod of block.modifiers) {
+      if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
+        adjustment += mod.params.amount as number;
+      }
+    }
+  }
+
+  return adjustment;
+}
+
+/**
+ * Evaluate field-to-hand cost modifiers from other cards on the field.
+ * Returns the total cost adjustment for a card in hand.
+ *
+ * Example: OP01-067 Crocodile — while on field with DON!!×1, gives blue Events
+ * in your hand −1 cost. These are permanent blocks on field cards whose modifiers
+ * target CARD_IN_HAND.
+ */
+function getFieldToHandCostModifier(
+  cardData: CardData,
+  state: GameState,
+  cardInstanceId: string,
+  cardDb: Map<string, CardData>,
+): number {
+  const card = findCardInstance(state, cardInstanceId);
+  if (!card || card.zone !== "HAND") return 0;
+
+  let adjustment = 0;
+
+  for (const player of state.players) {
+    // Check leader, characters, and stage for field-to-hand modifiers
+    const fieldCards: CardInstance[] = [
+      player.leader,
+      ...player.characters,
+      ...(player.stage ? [player.stage] : []),
+    ];
+
+    for (const fieldCard of fieldCards) {
+      const fieldCardData = cardDb.get(fieldCard.cardId);
+      if (!fieldCardData) continue;
+
+      const schema = fieldCardData.effectSchema as EffectSchema | null;
+      if (!schema?.effects) continue;
+
+      for (const block of schema.effects) {
+        if (block.category !== "permanent") continue;
+        // Default zone is FIELD — skip HAND-zone blocks (those are self-reduction)
+        if (block.zone === "HAND") continue;
+        if (!block.modifiers) continue;
+
+        // Only consider blocks that have MODIFY_COST targeting CARD_IN_HAND
+        const handCostMods = block.modifiers.filter(
+          (m) => m.type === "MODIFY_COST" && m.target?.type === "CARD_IN_HAND",
+        );
+        if (handCostMods.length === 0) continue;
+
+        // Evaluate block-level conditions
+        const ctx: ConditionContext = {
+          sourceCardInstanceId: fieldCard.instanceId,
+          controller: fieldCard.controller,
+          cardDb,
+        };
+        if (block.conditions && !evaluateCondition(state, block.conditions, ctx)) continue;
+
+        // Check if the hand card matches the modifier's target filter
+        for (const mod of handCostMods) {
+          if (!mod.target?.controller) continue;
+
+          // Controller check: the modifier's controller is relative to the field card
+          const targetControllerIdx = mod.target.controller === "SELF"
+            ? fieldCard.controller
+            : mod.target.controller === "OPPONENT"
+              ? (1 - fieldCard.controller) as 0 | 1
+              : null;
+          if (targetControllerIdx !== null && targetControllerIdx !== card.controller) continue;
+
+          // Filter check
+          if (mod.target.filter && !matchesHandCardFilter(mod.target.filter, cardData)) continue;
+
+          if (mod.params?.amount !== undefined) {
+            adjustment += mod.params.amount as number;
+          }
+        }
+      }
+    }
+  }
+
+  return adjustment;
+}
+
+/**
+ * Check if a card in hand matches a target filter from a field-to-hand modifier.
+ */
+function matchesHandCardFilter(filter: TargetFilter, cardData: CardData): boolean {
+  if (filter.color) {
+    const cardColors = Array.isArray(cardData.color) ? cardData.color : [cardData.color];
+    if (!cardColors.includes(filter.color)) return false;
+  }
+  if (filter.color_includes) {
+    const cardColors = Array.isArray(cardData.color) ? cardData.color : [cardData.color];
+    if (!filter.color_includes.some((c) => cardColors.includes(c))) return false;
+  }
+  if (filter.card_type) {
+    const types = Array.isArray(filter.card_type) ? filter.card_type : [filter.card_type];
+    if (!types.includes(cardData.type?.toUpperCase() ?? "")) return false;
+  }
+  if (filter.traits) {
+    const cardTraits = cardData.types ?? [];
+    if (!filter.traits.every((t: string) => cardTraits.includes(t))) return false;
+  }
+  if (filter.cost_max !== undefined) {
+    if (typeof filter.cost_max === "number" && (cardData.cost ?? 0) > filter.cost_max) return false;
+  }
+  return true;
 }
 
 /**

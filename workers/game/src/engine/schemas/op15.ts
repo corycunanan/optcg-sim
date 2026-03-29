@@ -534,13 +534,29 @@ export const OP15_012_BUGGY: EffectSchema = {
 // ─── OP15-013 Pincers ────────────────────────────────────────────────────────
 // If your Leader has 0 power or less, give this card in your hand −2 cost.
 // [Blocker]
-// DEFERRED: HAND_ZONE_MODIFIER (hand cost reduction) — only encoding [Blocker]
 
 export const OP15_013_PINCERS: EffectSchema = {
   card_id: "OP15-013",
   card_name: "Pincers",
   card_type: "Character",
   effects: [
+    {
+      id: "OP15-013_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { power: { operator: "<=", value: 0 } },
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -2 },
+        },
+      ],
+    },
     {
       id: "OP15-013_blocker",
       category: "permanent",
@@ -824,14 +840,32 @@ export const OP15_020_FIRE_FIST: EffectSchema = {
 // If you have 4 or more Events in your trash, give this card in your hand −3 cost.
 // [Main]/[Counter] Give up to 1 of your opponent's Characters −3000 power
 // during this turn.
-// NOTE: Hand cost reduction is a HAND_ZONE_MODIFIER pattern but simple enough
-// to encode as a _comment. The main effect is the [Main]/[Counter].
 
 export const OP15_021_JUST_WATCH_ME_ACE: EffectSchema = {
   card_id: "OP15-021",
   card_name: "Just Watch Me, Ace!!!",
   card_type: "Event",
   effects: [
+    {
+      id: "OP15-021_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "CARD_TYPE_IN_ZONE",
+        controller: "SELF",
+        card_type: "EVENT",
+        zone: "TRASH",
+        operator: ">=",
+        value: 4,
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -3 },
+        },
+      ],
+    },
     {
       id: "OP15-021_main_counter",
       category: "auto",
@@ -4116,13 +4150,29 @@ export const OP15_101_KALGARA: EffectSchema = {
 // card in your hand −3 cost.
 // [On Play] Rest up to 1 of your opponent's Characters with a cost equal to or
 // less than the number of your opponent's Life cards.
-// DEFERRED: HAND_ZONE_MODIFIER — only encoding [On Play]
 
 export const OP15_102_GAN_FALL: EffectSchema = {
   card_id: "OP15-102",
   card_name: "Gan.Fall",
   card_type: "Character",
   effects: [
+    {
+      id: "OP15-102_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { traits: ["Sky Island"], card_type: "CHARACTER", power_min: 7000 },
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -3 },
+        },
+      ],
+    },
     {
       id: "OP15-102_on_play",
       category: "auto",

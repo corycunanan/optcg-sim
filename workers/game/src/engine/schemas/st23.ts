@@ -3,8 +3,7 @@
  *
  * Red (Film Red): ST23-001 to ST23-005
  *
- * Deferred: ST23-001 Uta (HAND_ZONE_MODIFIER — hand cost reduction),
- *           ST23-002 Shanks (HAND_ZONE_MODIFIER — hand cost reduction)
+ * All cards fully encoded.
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -13,8 +12,8 @@ import type { EffectSchema } from "../effect-types.js";
 // RED — Film Red (ST23-001 to ST23-005)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── ST23-001 Uta (Character) — Blocker + DEFERRED hand cost reduction
-// "If you have a Character with 10000 power or more, give this card in your hand −4 cost." — DEFERRED (HAND_ZONE_MODIFIER)
+// ─── ST23-001 Uta (Character) — hand cost reduction + Blocker
+// If you have a Character with 10000 power or more, give this card in your hand −4 cost.
 // [Blocker]
 
 export const ST23_001_UTA: EffectSchema = {
@@ -23,15 +22,32 @@ export const ST23_001_UTA: EffectSchema = {
   card_type: "Character",
   effects: [
     {
-      id: "blocker",
+      id: "ST23-001_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", power_min: 10000 },
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -4 },
+        },
+      ],
+    },
+    {
+      id: "ST23-001_blocker",
       category: "permanent",
       flags: { keywords: ["BLOCKER"] },
     },
   ],
 };
 
-// ─── ST23-002 Shanks (Character) — on play leader power boost + DEFERRED hand cost reduction
-// "If your opponent has a Character with 8000 base power or more, give this card in your hand −3 cost." — DEFERRED (HAND_ZONE_MODIFIER)
+// ─── ST23-002 Shanks (Character) — hand cost reduction + on play leader power boost
+// If your opponent has a Character with 8000 base power or more, give this card in your hand −3 cost.
 // [On Play] If your Leader has the {Red-Haired Pirates} type or is [Uta], your Leader gains +2000 power until the end of your opponent's next End Phase.
 
 export const ST23_002_SHANKS: EffectSchema = {
@@ -40,7 +56,24 @@ export const ST23_002_SHANKS: EffectSchema = {
   card_type: "Character",
   effects: [
     {
-      id: "on_play_leader_power",
+      id: "ST23-002_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "OPPONENT",
+        filter: { card_type: "CHARACTER", base_power_min: 8000 },
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -3 },
+        },
+      ],
+    },
+    {
+      id: "ST23-002_on_play_leader_power",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {

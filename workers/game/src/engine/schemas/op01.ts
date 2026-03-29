@@ -1715,6 +1715,46 @@ export const OP01_064_ALVIDA: EffectSchema = {
   ],
 };
 
+// ─── OP01-067 Crocodile (Character) — Banish + DON!!×1 hand cost reduction for blue Events
+// [Banish]
+// [DON!! x1] Give blue Events in your hand −1 cost.
+
+export const OP01_067_CROCODILE: EffectSchema = {
+  card_id: "OP01-067",
+  card_name: "Crocodile",
+  card_type: "Character",
+  effects: [
+    {
+      id: "OP01-067_banish",
+      category: "permanent",
+      flags: { keywords: ["BANISH"] },
+    },
+    {
+      id: "OP01-067_hand_cost_reduction_aura",
+      category: "permanent",
+      // zone defaults to FIELD — active while Crocodile is on field
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            filter: { color: "BLUE", card_type: "EVENT" },
+          },
+          params: { amount: -1 },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP01-068 Gecko Moria — WHILE_CONDITION keyword grant
 // [Your Turn] This Character gains [Double Attack] if you have 5 or more cards in your hand.
 
@@ -3071,6 +3111,7 @@ export const OP01_SCHEMAS: Record<string, EffectSchema> = {
   "OP01-060": OP01_060_DONQUIXOTE_DOFLAMINGO,
   "OP01-061": OP01_061_KAIDO_LEADER,
   "OP01-064": OP01_064_ALVIDA,
+  "OP01-067": OP01_067_CROCODILE,
   "OP01-068": OP01_068_GECKO_MORIA,
   "OP01-069": OP01_069_CAESAR_CLOWN,
   "OP01-070": OP01_070_MIHAWK,

@@ -78,7 +78,7 @@ function executePlayCard(
 
   const found = findCardInState(state, cardInstanceId)!;
   const cardData = cardDb.get(found.card.cardId)!;
-  const cost = getEffectiveCost(cardData, state, cardInstanceId);
+  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);
 
   // Pay cost: rest DON!!
   let nextState = restDonForCost(state, pi, cost)!;

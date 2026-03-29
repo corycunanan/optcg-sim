@@ -95,7 +95,7 @@ function validatePlayCard(
     return "This Event cannot be played during the Main Phase";
   }
 
-  const cost = getEffectiveCost(cardData);
+  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);
   const player = getActivePlayer(state);
   const activeDon = player.donCostArea.filter((d) => d.state === "ACTIVE" && !d.attachedTo).length;
 
@@ -257,7 +257,7 @@ function validateUseCounterEvent(
   if (!cardData.effectText.includes("[Counter]")) return "This Event does not have [Counter]";
 
   // Check cost
-  const cost = getEffectiveCost(cardData);
+  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);
   const player = state.players[inactiveIdx];
   const activeDon = player.donCostArea.filter((d) => d.state === "ACTIVE" && !d.attachedTo).length;
   if (activeDon < cost) return `Not enough active DON!! to pay counter event cost (need ${cost})`;

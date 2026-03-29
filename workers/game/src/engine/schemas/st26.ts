@@ -3,7 +3,7 @@
  *
  * Purple (Straw Hat Crew — Vinsmoke Sanji): ST26-001 to ST26-005
  *
- * Deferred: ST26-001 Soba Mask (HAND_ZONE_MODIFIER — hand cost reduction)
+ * All cards fully encoded.
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -12,8 +12,8 @@ import type { EffectSchema } from "../effect-types.js";
 // PURPLE — Straw Hat Crew (ST26-001 to ST26-005)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── ST26-001 Soba Mask (Character) — on play return San-Gorou/Sanji + DEFERRED hand cost reduction
-// "If you have a [San-Gorou] or [Sanji] Character with 7000 base power or more, give this card in your hand −5 cost." — DEFERRED (HAND_ZONE_MODIFIER)
+// ─── ST26-001 Soba Mask (Character) — hand cost reduction + on play return San-Gorou/Sanji
+// If you have a [San-Gorou] or [Sanji] Character with 7000 base power or more, give this card in your hand −5 cost.
 // [On Play] Return all of your [San-Gorou] and [Sanji] Characters to the owner's hand.
 
 export const ST26_001_SOBA_MASK: EffectSchema = {
@@ -22,7 +22,28 @@ export const ST26_001_SOBA_MASK: EffectSchema = {
   card_type: "Character",
   effects: [
     {
-      id: "on_play_return_characters",
+      id: "ST26-001_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: {
+          name_any_of: ["San-Gorou", "Sanji"],
+          card_type: "CHARACTER",
+          base_power_min: 7000,
+        },
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -5 },
+        },
+      ],
+    },
+    {
+      id: "ST26-001_on_play_return_characters",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [

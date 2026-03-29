@@ -2235,15 +2235,34 @@ export const OP07_063_CAPOTE: EffectSchema = {
   ],
 };
 
-// ─── OP07-064 Sanji — DEFERRED (HAND_ZONE_MODIFIER)
-// [Blocker] keyword only — hand cost reduction deferred.
-// See docs/game-engine/DEFERRED-CARD-EFFECTS.md
+// ─── OP07-064 Sanji — hand cost reduction + Blocker
+// If the number of DON!! cards on your field is at least 2 less than the number
+// on your opponent's field, give this card in your hand −3 cost.
+// [Blocker]
 
 export const OP07_064_SANJI: EffectSchema = {
   card_id: "OP07-064",
   card_name: "Sanji",
   card_type: "Character",
   effects: [
+    {
+      id: "OP07-064_hand_cost_reduction",
+      category: "permanent",
+      zone: "HAND",
+      conditions: {
+        type: "COMPARATIVE",
+        metric: "DON_FIELD_COUNT",
+        operator: "<=",
+        margin: -2,
+      },
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { self_ref: true },
+          params: { amount: -3 },
+        },
+      ],
+    },
     {
       id: "OP07-064_keywords",
       category: "permanent",

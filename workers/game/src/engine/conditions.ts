@@ -23,6 +23,7 @@ import type {
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import { getEffectivePower } from "./modifiers.js";
+import { findCardInstance } from "./state.js";
 
 export interface ConditionContext {
   /** The card instance the effect is on */
@@ -322,7 +323,16 @@ function evaluateSimple(
         const allCards = [p.leader, ...p.characters];
         return allCards.some((c) => c.attachedDon.length > 0);
       }
-      // SPECIFIC_CARD mode — typically used as a target filter
+      // SPECIFIC_CARD mode — check if the source card has DON attached
+      if (cond.mode === "SPECIFIC_CARD") {
+        const sourceCard = findCardInstance(state, ctx.sourceCardInstanceId);
+        if (!sourceCard) return false;
+        const donCount = sourceCard.attachedDon.length;
+        if (cond.operator && cond.value !== undefined) {
+          return compareNum(donCount, cond.operator, cond.value);
+        }
+        return donCount > 0;
+      }
       return false;
     }
 

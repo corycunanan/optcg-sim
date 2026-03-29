@@ -19,7 +19,7 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## OP01 Deferred Cards (4 remaining)
+## OP01 Deferred Cards (3 remaining)
 
 ### OP01-060 Donquixote Doflamingo
 **Tags:** `REVEAL_CONDITIONAL`
@@ -54,15 +54,8 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-### OP01-067 Crocodile (Character)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> [Banish]
-> [DON!! x1] Give blue Events in your hand -1 cost.
-
-**Blocker:** Permanent cost modifier applied to cards in the hand zone filtered by color and type.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope on `MODIFY_COST` modifiers, and `getEffectiveCost` checking hand-zone modifiers.
+### ~~OP01-067 Crocodile (Character)~~ — ENCODED
+Encoded in `op01.ts` with field-to-hand MODIFY_COST pattern.
 
 ---
 
@@ -90,7 +83,7 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## OP07 Deferred Cards (2 remaining)
+## OP07 Deferred Cards (1 remaining)
 
 ### OP07-048 Donquixote Doflamingo
 **Tags:** `REVEAL_CONDITIONAL`
@@ -103,17 +96,8 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-### OP07-064 Sanji (Hand cost reduction only)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> If the number of DON!! cards on your field is at least 2 less than the number on your opponent's field, give this card in your hand −3 cost.
-> [Blocker]
-
-**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on DON field count comparison. Same pattern as OP01-067 Crocodile.
-
-**Note:** [Blocker] keyword is encoded in `op07.ts`. Only the hand cost reduction is deferred.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope on `MODIFY_COST` modifiers with comparative condition.
+### ~~OP07-064 Sanji~~ — ENCODED
+Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
@@ -255,18 +239,10 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## OP15 Deferred Cards (3 remaining)
+## OP15 Deferred Cards (1 remaining)
 
-### OP15-013 Pincers (Hand zone cost reduction)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> If your Leader has 0 power or less, give this card in your hand −2 cost.
-
-**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on Leader power.
-
-**Note:** [Blocker] keyword is encoded in `op15.ts`.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + Leader power condition.
+### ~~OP15-013 Pincers~~ — ENCODED
+Hand cost reduction + Blocker fully encoded in `op15.ts`.
 
 ---
 
@@ -281,16 +257,8 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-### OP15-102 Gan.Fall (Hand zone cost reduction)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> If you have a {Sky Island} type Character with 7000 power or more, give this card in your hand −3 cost.
-
-**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on field state.
-
-**Note:** [On Play] effect is encoded in `op15.ts`.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + field existence condition.
+### ~~OP15-102 Gan.Fall~~ — ENCODED
+Hand cost reduction + On Play fully encoded in `op15.ts`.
 
 ---
 
@@ -418,46 +386,22 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 
 ---
 
-## ST23 Deferred Cards (2 remaining)
+## ST23 Deferred Cards (0 remaining)
 
-### ST23-001 Uta (Hand cost reduction only)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> If you have a Character with 10000 power or more, give this card in your hand −4 cost.
-
-**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on field state.
-
-**Note:** [Blocker] keyword is encoded in `st23.ts`.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + field existence condition.
+### ~~ST23-001 Uta~~ — ENCODED
+Hand cost reduction + Blocker fully encoded in `st23.ts`.
 
 ---
 
-### ST23-002 Shanks (Hand cost reduction only)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> If your opponent has a Character with 8000 base power or more, give this card in your hand −3 cost.
-
-**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on opponent's field state.
-
-**Note:** [On Play] effect is encoded in `st23.ts`.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + field existence condition.
+### ~~ST23-002 Shanks~~ — ENCODED
+Hand cost reduction + On Play fully encoded in `st23.ts`.
 
 ---
 
-## ST26 Deferred Cards (1 remaining)
+## ST26 Deferred Cards (0 remaining)
 
-### ST26-001 Soba Mask (Hand cost reduction only)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> If you have a [San-Gorou] or [Sanji] Character with 7000 base power or more, give this card in your hand −5 cost.
-
-**Blocker:** Permanent cost modifier applied to this card while in hand, conditioned on named card with power threshold.
-
-**Note:** [On Play] effect is encoded in `st26.ts`.
-
-**Unblocked by:** Modifier system supporting `zone: "HAND"` scope + named card with property condition.
+### ~~ST26-001 Soba Mask~~ — ENCODED
+Hand cost reduction + On Play fully encoded in `st26.ts`.
 
 ---
 
@@ -481,7 +425,7 @@ Cards are removed from this list once they are encoded in `workers/game/src/engi
 | Blocker | Cards | Count | Effort |
 |---------|-------|-------|--------|
 | `REVEAL_CONDITIONAL` | OP01-060, OP07-048, OP08-049, OP11-066/071/073/074/079/081, OP12-058, OP14-044, OP15-065, ST13-007/010/014, ST17-001, ST22-003/006/007/012/016 | 19 | Medium |
-| `HAND_ZONE_MODIFIER` | OP01-067, OP14-053, OP15-013, OP15-102, ST23-001, ST23-002, ST26-001 | 7 | Medium |
+| `HAND_ZONE_MODIFIER` | OP14-053 | 1 | Medium |
 | `FULL_DECK_SEARCH_AND_PLAY` | OP01-069, OP01-098, OP01-116, OP02-030, OP13-079 | 5 | Medium |
 | `LIFE_FACE_COST` | ST13-009, ST20-001, P-106 | 3 | Low |
 | `HAND_REVEAL_CONDITIONAL` | OP01-063, OP01-105 | 2 | Medium |
@@ -535,7 +479,7 @@ Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confi
 
 | Category | Count |
 |---|---|
-| Original deferrals (pre-QA) | 38 |
+| Original deferrals (pre-QA) | 31 |
 | NEW: unhandled action types (F9) | 50 |
 | NEW: low-confidence encodings (LC) | 56 |
 | Overlap (flagged by multiple sources) | ~24 |
