@@ -69,7 +69,7 @@ describe("RETURN_TO_DECK action", () => {
         target: {
           type: "CHARACTER",
           controller: "OPPONENT",
-          count: { up_to: 1 },
+          count: { exact: 1 },
           filter: { cost_max: 7 },
         },
         params: { position: "BOTTOM" },
@@ -106,7 +106,7 @@ describe("RETURN_TO_DECK action", () => {
         target: {
           type: "CHARACTER",
           controller: "OPPONENT",
-          count: { up_to: 1 },
+          count: { exact: 1 },
         },
         params: { position: "TOP" },
       }],
@@ -173,7 +173,7 @@ describe("PLAY_CARD action", () => {
         target: {
           type: "CARD_IN_HAND",
           controller: "SELF",
-          count: { up_to: 1 },
+          count: { exact: 1 },
           filter: { card_type: "CHARACTER" },
         },
         params: { source_zone: "HAND", cost_override: "FREE" },
@@ -423,7 +423,7 @@ describe("NEGATE_EFFECTS action", () => {
         target: {
           type: "CHARACTER",
           controller: "OPPONENT",
-          count: { up_to: 1 },
+          count: { exact: 1 },
         },
       }],
     });
@@ -665,7 +665,7 @@ describe("TRASH_CARD action", () => {
         target: {
           type: "CHARACTER",
           controller: "OPPONENT",
-          count: { up_to: 1 },
+          count: { exact: 1 },
         },
       }],
     });
@@ -742,7 +742,7 @@ describe("Action chain integration", () => {
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
-            count: { up_to: 1 },
+            count: { exact: 1 },
             filter: { cost_max: 3 },
           },
         },
@@ -790,7 +790,7 @@ describe("CARD_IN_TRASH targeting", () => {
         target: {
           type: "CARD_IN_TRASH",
           controller: "SELF",
-          count: { up_to: 1 },
+          count: { exact: 1 },
           filter: { card_type: "CHARACTER" },
         },
       }],
