@@ -86,7 +86,7 @@ export function resolveAmount(
   if (dv.type === "GAME_STATE" && state != null && controller != null) {
     const ctrl = (dv.controller as string) ?? "SELF";
     const pi = ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
-    return resolveGameStateSource(state, pi as 0 | 1, dv.source as string);
+    return resolveGameStateSource(state, pi as 0 | 1, dv.source as string, cardDb);
   }
 
   if (dv.type === "ACTION_RESULT") {
@@ -147,6 +147,7 @@ function resolveGameStateSource(
   state: GameState,
   playerIndex: 0 | 1,
   source: string,
+  cardDb?: Map<string, CardData>,
 ): number {
   const p = state.players[playerIndex];
   const opp = state.players[playerIndex === 0 ? 1 : 0];
@@ -165,6 +166,10 @@ function resolveGameStateSource(
     case "DECK_COUNT": return p.deck.length;
     case "RESTED_CARD_COUNT":
       return p.characters.filter((c) => c.state === "RESTED").length;
+    case "LEADER_BASE_POWER": {
+      const leaderData = cardDb?.get(p.leader.cardId);
+      return leaderData?.power ?? 0;
+    }
     default: return 0;
   }
 }

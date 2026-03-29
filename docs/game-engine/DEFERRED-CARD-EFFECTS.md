@@ -185,7 +185,7 @@ APPLY_ONE_TIME_MODIFIER with MODIFY_COST + name/costMin filter encoded in `op12.
 
 ---
 
-## OP14 Deferred Cards (2 remaining)
+## OP14 Deferred Cards (1 remaining)
 
 ### OP14-044 Edward.Newgate (On Play effect only)
 **Tags:** `REVEAL_CONDITIONAL`
@@ -200,16 +200,8 @@ APPLY_ONE_TIME_MODIFIER with MODIFY_COST + name/costMin filter encoded in `op12.
 
 ---
 
-### OP14-053 Vista (Opponent's Turn effect only)
-**Tags:** `HAND_ZONE_MODIFIER`
-
-> [Opponent's Turn] If you have 7 or less cards in your hand, this Character's base power becomes the same as your Leader's base power.
-
-**Blocker:** Dynamic base power copy — "becomes the same as your Leader's base power" requires a dynamic value reference to leader's current base power.
-
-**Note:** [Blocker] keyword is encoded in `op14.ts`.
-
-**Unblocked by:** `SET_BASE_POWER` with a dynamic value `{ type: "GAME_STATE", source: "LEADER_BASE_POWER" }` or similar.
+### ~~OP14-053 Vista~~ — ENCODED
+SET_POWER with dynamic GAME_STATE LEADER_BASE_POWER value encoded in `op14.ts`.
 
 ---
 
@@ -382,7 +374,7 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 | Blocker | Cards | Count | Effort |
 |---------|-------|-------|--------|
 | `REVEAL_CONDITIONAL` | OP01-060, OP07-048, OP08-049, OP11-066/071/073/074/079/081, OP12-058, OP14-044, OP15-065, ST13-007/010/014, ST17-001, ST22-003/006/007/012/016 | 19 | Medium |
-| `HAND_ZONE_MODIFIER` | OP14-053 | 1 | Medium |
+| ~~`HAND_ZONE_MODIFIER`~~ | ~~OP14-053~~ | 0 | Done |
 | `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
 | ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |
 | ~~`HAND_REVEAL_CONDITIONAL`~~ | ~~OP01-063, OP01-105~~ | 0 | Done |

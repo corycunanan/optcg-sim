@@ -1986,11 +1986,10 @@ export const OP14_052_HANNYABAL: EffectSchema = {
   ],
 };
 
-// ─── OP14-053 Vista ──────────────────────────────────────────────────────────
+// ─── OP14-053 Vista — Blocker + Opponent's Turn dynamic base power copy
 // [Blocker]
 // [Opponent's Turn] If you have 7 or less cards in your hand, this Character's base
 // power becomes the same as your Leader's base power.
-// NOTE: The HAND_ZONE_MODIFIER effect is DEFERRED — only [Blocker] encoded.
 
 export const OP14_053_VISTA: EffectSchema = {
   card_id: "OP14-053",
@@ -2002,7 +2001,23 @@ export const OP14_053_VISTA: EffectSchema = {
       category: "permanent",
       flags: { keywords: ["BLOCKER"] },
     },
-    // DEFERRED: OP14-053_opponent_turn_copy_power — HAND_ZONE_MODIFIER
+    {
+      id: "OP14-053_opponent_turn_copy_power",
+      category: "permanent",
+      conditions: {
+        type: "HAND_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 7,
+      },
+      modifiers: [
+        {
+          type: "SET_POWER",
+          target: { type: "SELF" },
+          params: { value: { type: "GAME_STATE", source: "LEADER_BASE_POWER" } },
+        },
+      ],
+    },
   ],
 };
 

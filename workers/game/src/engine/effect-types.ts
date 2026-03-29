@@ -485,7 +485,8 @@ export type GameStateSource =
   | "HAND_COUNT"
   | "DECK_COUNT"
   | "RESTED_CARD_COUNT"
-  | "MATCHING_CARD_COUNT";
+  | "MATCHING_CARD_COUNT"
+  | "LEADER_BASE_POWER";
 
 // ─── Actions (04-ACTIONS) ────────────────────────────────────────────────────
 
