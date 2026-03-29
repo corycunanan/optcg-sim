@@ -34,6 +34,9 @@ jobs:
       - name: Type check
         run: pnpm type-check
 
+      - name: Game engine tests
+        run: cd workers/game && npx vitest run
+
       - name: Build
         run: pnpm build
         env:
