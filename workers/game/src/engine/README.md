@@ -12,7 +12,7 @@ The OPTCG game engine is a **purely immutable**, **event-driven** state machine 
 | `validation.ts` | Step 1 — action legality checks (phase, cost, zone, timing) |
 | `prohibitions.ts` | Step 2 — effect-based vetoes (`CANNOT_ATTACK`, `CANNOT_BLOCK`, etc.) |
 | `replacements.ts` | Step 3 — action substitution ("KO → return to hand instead") |
-| `effect-resolver.ts` | Core effect engine — costs, conditions, action chains, target selection, stack-based resume |
+| `effect-resolver/` | Core effect engine — decomposed into focused modules (see below) |
 | `effect-stack.ts` | Effect stack helpers — push/pop/peek/update frames for nested effect resolution |
 | `triggers.ts` | Trigger registration, event matching, and ordering |
 | `events.ts` | Event bus — appends `GameEvent` entries to `eventLog` |
@@ -40,10 +40,17 @@ pipeline.ts (orchestrator)
   │   ├─ battle.ts        (combat sub-phases)
   │   └─ phases.ts        (phase advancement)
   ├─ triggers.ts          (step 5 — match events → effects)
-  │   └─ effect-resolver.ts
-  │       ├─ effect-stack.ts (LIFO stack for nested resolution)
-  │       ├─ conditions.ts
-  │       └─ modifiers.ts
+  │   └─ effect-resolver/
+  │       ├─ resolver.ts     (resolveEffect, action dispatcher)
+  │       ├─ resume.ts       (resumeFromStack, resumeEffectChain)
+  │       ├─ cost-handler.ts (cost payment + selection)
+  │       ├─ target-resolver.ts (target resolution + prompts)
+  │       ├─ card-mutations.ts (koCharacter, returnToHand, etc.)
+  │       ├─ action-utils.ts (resolveAmount, computeExpiry)
+  │       └─ actions/        (9 handler files by category)
+  │           ├─ draw-search, modifiers, removal, life, don,
+  │           └─ play, hand-deck, effects, choice
+  │       (imports: effect-stack.ts, conditions.ts, modifiers.ts)
   ├─ events.ts            (event logging)
   ├─ duration-tracker.ts  (step 6 — expire effects)
   └─ defeat.ts            (step 7 — win/loss)
@@ -196,7 +203,7 @@ EffectBlock {
 
 **Custom triggers:** `OPPONENT_CHARACTER_KO`, `ANY_CHARACTER_KO`, `CHARACTER_PLAYED`, `DON_GIVEN_TO_CARD`, `CARD_REMOVED_FROM_LIFE`, `COMBAT_VICTORY`, `CHARACTER_BATTLES`, `END_OF_BATTLE`
 
-### Effect Resolution Flow (effect-resolver.ts)
+### Effect Resolution Flow (effect-resolver/resolver.ts)
 
 ```
 1. Evaluate conditions  → Block-level conditions must be true
@@ -253,7 +260,7 @@ Attack declared → ON_OPPONENT_ATTACK trigger fires
 
 ### Supported Actions
 
-Core actions executed by `executeEffectAction()`:
+Core actions dispatched via `ACTION_HANDLERS` map in `resolver.ts` to category-specific handler files in `actions/`:
 
 | Action | What It Does |
 |--------|-------------|
@@ -364,13 +371,15 @@ export const OP01_006: EffectSchema = {
 
 ## Adding a New Action Type
 
-1. Add the type to the `Action` union in `effect-types.ts`
-2. Add execution logic in `effect-resolver.ts` → `executeEffectAction()`
-3. Add a corresponding `GameEventType` in the types file
-4. Emit the event in `events.ts` if needed
-5. If the action can be prohibited, add a case in `prohibitions.ts`
-6. If the action can be replaced, add a case in `replacements.ts`
-7. If the action needs validation, add a case in `validation.ts`
+1. Add the type to `ActionType` union in `effect-types.ts`
+2. Add the params shape to `ActionParamsMap` in `effect-types.ts`
+3. Create the handler function in the appropriate `effect-resolver/actions/*.ts` file
+4. Register it in the `ACTION_HANDLERS` map in `effect-resolver/resolver.ts`
+5. Add a corresponding `GameEventType` in the types file
+6. Emit the event in `events.ts` if needed
+7. If the action can be prohibited, add a case in `prohibitions.ts`
+8. If the action can be replaced, add a case in `replacements.ts`
+9. If the action needs validation, add a case in `validation.ts`
 
 ## Adding a New Trigger Type
 

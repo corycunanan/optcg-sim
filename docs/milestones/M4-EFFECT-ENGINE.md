@@ -455,6 +455,17 @@ The visual game board supports all M4 effect interactions:
 
 ## Tech Debt
 
+### Card type metadata missing from card text files
+
+The `docs/cards/*.md` files contain card names, IDs, and effect text but **no card type** (Leader / Character / Event / Stage). Encoding agents must guess `card_type` from context (effect text patterns, ID position in set), which leads to misclassification (e.g., OP06-021 Perona was labeled "Character" instead of "Leader").
+
+**Action items:**
+1. Update all `docs/cards/*.md` files to include card type metadata per card (e.g., `**OP06-021** Leader` or a `Type: Leader` field)
+2. Cross-reference `card_type` labels in all authored schema files (op01–op08) against the database `Card.cardType` field or updated markdown files
+3. Fix any mismatches found
+
+**When to address:** Before encoding additional sets. The pipeline database already has card type data — a script can backfill the markdown files.
+
 ### Pre-game rule modifications not enforced in deck builder
 
 Cards with `rule_modification` effects that alter deck construction rules (deck restrictions, copy limit overrides, DON deck size changes) are encoded in the effect schema but **not enforced by the deck validation engine** (`src/lib/deck-builder/validation.ts`). The validator currently hardcodes universal rules (4-copy limit, 50 cards, color affinity) and has no awareness of leader-specific or card-specific rule modifications.

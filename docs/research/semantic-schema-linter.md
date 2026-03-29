@@ -112,7 +112,7 @@ node lint-schemas.sh schemas/op03/red.ts          # lint one file
 
 ```
 [ERROR] OP03-013 effect "on_ko_play_from_trash": B2 — PLAY_CARD in auto block missing duration
-[WARN]  OP03-080 effect "on_play_ko": C1 — traits: ["CP"] may need traits_contains (card text says "type including")
+[WARN]  OP03-080 effect "on_play_ko": C2 — Filter has both base_cost and cost filters on KO
 ```
 
 ### Integration with encoding workflow
