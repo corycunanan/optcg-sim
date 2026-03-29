@@ -177,12 +177,22 @@ export function computeExpiry(duration: Duration, state: GameState): ExpiryTimin
       return { wave: "END_OF_TURN", turn: state.turn.number };
     case "THIS_BATTLE":
       return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
-    case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE": {
+    case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE":
+    case "UNTIL_END_OF_OPPONENT_NEXT_TURN": {
+      // Both mean "until the end of opponent's next turn"
       const oppTurn = state.turn.activePlayerIndex === 0 ? state.turn.number + 1 : state.turn.number + 2;
       return { wave: "END_OF_END_PHASE", turn: oppTurn };
     }
     case "UNTIL_START_OF_YOUR_NEXT_TURN":
       return { wave: "REFRESH_PHASE", turn: state.turn.number + 2 };
+    case "UNTIL_END_OF_YOUR_NEXT_TURN": {
+      // Lasts until the end of your next turn (2 turns from now)
+      return { wave: "END_OF_TURN", turn: state.turn.number + 2 };
+    }
+    case "SKIP_NEXT_REFRESH": {
+      // Effect lasts until the character's next refresh phase
+      return { wave: "REFRESH_PHASE", turn: state.turn.number + 2 };
+    }
     case "PERMANENT":
       return { wave: "SOURCE_LEAVES_ZONE" };
     case "WHILE_CONDITION":
