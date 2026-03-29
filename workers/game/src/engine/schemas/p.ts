@@ -2696,14 +2696,29 @@ export const P_105_SABO: EffectSchema = {
 // ─── P-106 Monkey.D.Luffy (Character) — End of Turn face-up life (DEFERRED) + Trigger draw+KO
 // [End of Your Turn] You may turn 1 card from the top of your Life cards face-up: Set up to 1 of your {Egghead} type Characters as active.
 // [Trigger] Draw 1 card and K.O. up to 1 of your opponent's Characters with a cost of 2 or less.
-// DEFERRED: End of Turn effect requires TURN_LIFE_FACE_UP as cost type (LIFE_FACE_COST)
-
 export const P_106_MONKEY_D_LUFFY: EffectSchema = {
   card_id: "P-106",
   card_name: "Monkey.D.Luffy",
   card_type: "Character",
   effects: [
-    // DEFERRED: End of Turn effect requires TURN_LIFE_FACE_UP as cost type (LIFE_FACE_COST)
+    {
+      id: "eot_set_active",
+      category: "auto",
+      trigger: { keyword: "END_OF_YOUR_TURN" },
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "SET_ACTIVE",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { traits: ["Egghead"] },
+          },
+        },
+      ],
+    },
     {
       id: "trigger_draw_and_ko",
       category: "auto",
