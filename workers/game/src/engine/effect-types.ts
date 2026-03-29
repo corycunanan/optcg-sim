@@ -669,7 +669,7 @@ export interface ActionParamsMap {
 
   // Unimplemented — forward-compatible
   ADD_TO_LIFE: Record<string, unknown>;
-  SEARCH_TRASH_THE_REST: Record<string, unknown>;
+  SEARCH_TRASH_THE_REST: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string };
   SET_BASE_POWER: Record<string, unknown>;
   SET_POWER_TO_ZERO: Record<string, unknown>;
   SWAP_BASE_POWER: Record<string, unknown>;

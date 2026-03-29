@@ -97,6 +97,59 @@ export function resumeEffectChain(
     nextState = { ...nextState, players: newPlayers };
   }
 
+  // Resume from ARRANGE_TOP_CARDS response (SEARCH_TRASH_THE_REST — kept to hand, rest to trash or bottom)
+  if (action.type === "ARRANGE_TOP_CARDS" && pausedAction !== null && pausedAction.type === "SEARCH_TRASH_THE_REST") {
+    const sp = (pausedAction.params ?? {}) as Record<string, unknown>;
+    const restDest = (sp.rest_destination as string) ?? "TRASH";
+
+    const p = nextState.players[controller];
+    const keptId = action.keptCardInstanceId;
+    const ordered = action.orderedInstanceIds ?? [];
+
+    const removedIds = new Set(ordered);
+    if (keptId) removedIds.add(keptId);
+    const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
+
+    // Add kept card to hand
+    let newHand = [...p.hand];
+    if (keptId) {
+      const kept = p.deck.find((c) => c.instanceId === keptId);
+      if (kept) {
+        newHand = [...newHand, { ...kept, zone: "HAND" as const }];
+        events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
+      }
+    }
+
+    // Handle remaining cards based on rest_destination
+    const remainingCards = ordered
+      .map((id) => p.deck.find((c) => c.instanceId === id))
+      .filter(Boolean) as CardInstance[];
+
+    let newDeck: CardInstance[];
+    let newTrash = [...p.trash];
+
+    if (restDest.toUpperCase() === "TRASH") {
+      // Trash the remaining cards
+      newDeck = restOfDeck;
+      for (const card of remainingCards) {
+        newTrash = [{ ...card, zone: "TRASH" as const } as CardInstance, ...newTrash];
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { cardId: card.cardId, reason: "search_trash" } });
+      }
+    } else {
+      // Place at bottom (or top) like SEARCH_DECK
+      if ((action.destination ?? restDest.toLowerCase()) === "bottom") {
+        newDeck = [...restOfDeck, ...remainingCards];
+      } else {
+        newDeck = [...remainingCards, ...restOfDeck];
+      }
+      newTrash = p.trash;
+    }
+
+    const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+    newPlayers[controller] = { ...p, deck: newDeck, hand: newHand, trash: newTrash };
+    nextState = { ...nextState, players: newPlayers };
+  }
+
   // Resume from ARRANGE_TOP_CARDS response (SEARCH_AND_PLAY — play to field instead of hand)
   if (action.type === "ARRANGE_TOP_CARDS" && pausedAction !== null && pausedAction.type === "SEARCH_AND_PLAY") {
     const sap = getActionParams(pausedAction, "SEARCH_AND_PLAY");

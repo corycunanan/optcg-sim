@@ -413,29 +413,13 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 
 Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confidence encoding detector). These cards have schemas encoded with action types that have no engine handler, or card text that doesn't cleanly map to the schema's action types.
 
-### Cards Using Unhandled Action Types (F9)
+### ~~Cards Using Unhandled Action Types (F9)~~ — ALL RESOLVED
 
-| Action Type | Count | Cards |
-|---|---|---|
-| `SEARCH_TRASH_THE_REST` | 13 | EB04-029, OP03-083, OP04-039, OP04-092, OP11-047, OP11-099, OP12-086, OP12-097, OP13-086, OP13-096, OP14-087, OP14-097, OP14-099 |
-| `GIVE_OPPONENT_DON_TO_OPPONENT` | 5 | OP15-008, OP15-015, OP15-025, OP15-026, OP15-028 |
-| `COPY_POWER` | 4 | EB01-061, EB04-052, OP04-069, OP06-009 |
-| `DISTRIBUTE_DON` | 4 | EB03-026, OP04-004, OP08-001, OP14-105 |
-| `SET_BASE_POWER` | 3 | EB04-004, P-092, ST26-005 |
-| `ACTIVATE_EVENT_FROM_HAND` | 3 | OP12-041, OP15-014, OP15-046 |
-| `SWAP_BASE_POWER` | 3 | OP14-001, OP14-009, OP14-017 |
-| `REDIRECT_ATTACK` | 2 | EB01-038, OP14-060 |
-| `REDISTRIBUTE_DON` | 2 | EB02-009, OP07-001 |
-| `SET_POWER_TO_ZERO` | 2 | EB04-010, OP07-002 |
-| `ADD_TO_LIFE` | 1 | EB02-057 |
-| `ACTIVATE_EVENT_FROM_TRASH` | 1 | EB03-031 |
-| `DEAL_DAMAGE` | 1 | EB03-055 |
-| `SET_COST` | 1 | OP03-091 |
-| `EXTRA_TURN` | 1 | OP05-119 |
-| `NEGATE_TRIGGER_TYPE` | 1 | OP09-081 |
-| `WIN_GAME` | 1 | OP09-118 |
-| `REST_DON` | 1 | OP12-018 |
-| `SELF_TAKE_DAMAGE` | 1 | OP14-115 |
+All 18 action types now have handlers registered in `resolver.ts`. The F9 scan was run before
+handlers were implemented. Additionally, `SEARCH_TRASH_THE_REST` resume handler was added
+to process player card selections.
+
+`ADD_TO_LIFE` (EB02-057) was a false positive — the schema correctly uses `ADD_TO_LIFE_FROM_FIELD`.
 
 ### Low-Confidence Encodings (Card Text / Schema Mismatch)
 
@@ -455,7 +439,7 @@ Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confi
 | Category | Count |
 |---|---|
 | Original deferrals (pre-QA) | 24 |
-| NEW: unhandled action types (F9) | 50 |
+| ~~NEW: unhandled action types (F9)~~ | ~~50~~ 0 (all handlers exist) |
 | NEW: low-confidence encodings (LC) | 56 |
 | Overlap (flagged by multiple sources) | ~24 |
-| **Total unique cards needing work** | **~124** |
+| **Total unique cards needing work** | **~80** |
