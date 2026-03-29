@@ -990,9 +990,9 @@ export const EB01_029_SORRY_IM_A_GONER: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          // Conditional: only if revealed card has cost >= 4
           conditions: {
-            type: "BOARD_WIDE_EXISTENCE",
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed_card",
             filter: { cost_min: 4 },
           },
           chain: "THEN",

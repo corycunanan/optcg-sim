@@ -211,7 +211,8 @@ export type SimpleCondition =
   | RestedCardCountCondition
   | DonGivenCondition
   | TurnCountCondition
-  | SourcePropertyCondition;
+  | SourcePropertyCondition
+  | RevealedCardPropertyCondition;
 
 export interface LifeCountCondition {
   type: "LIFE_COUNT";
@@ -440,6 +441,12 @@ export interface SourcePropertyCondition {
 }
 
 export type SourceContext = "KO_BY_EFFECT" | "KO_IN_BATTLE" | "REMOVAL_BY_EFFECT" | "REST_BY_EFFECT";
+
+export interface RevealedCardPropertyCondition {
+  type: "REVEALED_CARD_PROPERTY";
+  result_ref: string;
+  filter: TargetFilter;
+}
 
 // ─── Numeric Ranges ───────────────────────────────────────────────────────────
 
@@ -707,6 +714,9 @@ export interface Target {
   filter?: TargetFilter;
   source_zone?: SourceZone | SourceZone[];
   self_ref?: boolean;
+
+  // Result ref (for SELECTED_CARDS target type)
+  ref?: string;
 
   // Advanced patterns
   aggregate_constraint?: AggregateConstraint;

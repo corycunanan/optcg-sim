@@ -2517,10 +2517,39 @@ export const OP15_064_KOTORI: EffectSchema = {
   ],
 };
 
-// ─── OP15-065 Goro ───────────────────────────────────────────────────────────
+// ─── OP15-065 Goro (Character) — On Play reveal conditional add DON
 // [On Play] Reveal 1 card from the top of your deck. If the revealed card has
 // a cost of 2 or less, add up to 1 DON!! card from your DON!! deck and rest it.
-// DEFERRED: REVEAL_CONDITIONAL — skipped entirely
+
+export const OP15_065_GORO: EffectSchema = {
+  card_id: "OP15-065",
+  card_name: "Goro",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_reveal_add_don",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "RESTED" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { cost_max: 2 },
+          },
+        },
+      ],
+    },
+  ],
+};
 
 // ─── OP15-066 Satori ─────────────────────────────────────────────────────────
 // [On Play] DON!! −1: Draw 1 card.
@@ -4798,6 +4827,7 @@ export const OP15_SCHEMAS: Record<string, EffectSchema> = {
   "OP15-061": OP15_061_OHM,
   "OP15-063": OP15_063_GEDATSU,
   "OP15-064": OP15_064_KOTORI,
+  "OP15-065": OP15_065_GORO,
   "OP15-066": OP15_066_SATORI,
   "OP15-067": OP15_067_SHURA,
   "OP15-068": OP15_068_HEAVENLY_WARRIORS,

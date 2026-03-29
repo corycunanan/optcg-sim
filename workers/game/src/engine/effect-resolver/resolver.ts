@@ -286,10 +286,20 @@ export function executeActionChain(
         sourceCardInstanceId,
         controller,
         cardDb,
+        resultRefs,
       };
       if (!evaluateCondition(state, action.conditions, condCtx)) {
         lastActionSucceeded = false;
         continue;
+      }
+    }
+
+    // Resolve target_ref to preselected targets
+    let preselected: string[] | undefined;
+    if (action.target_ref && resultRefs.has(action.target_ref)) {
+      const refResult = resultRefs.get(action.target_ref);
+      if (refResult?.targetInstanceIds?.length) {
+        preselected = refResult.targetInstanceIds;
       }
     }
 
@@ -301,6 +311,7 @@ export function executeActionChain(
       controller,
       cardDb,
       resultRefs,
+      preselected,
     );
 
     state = result.state;

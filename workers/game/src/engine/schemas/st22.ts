@@ -2,12 +2,6 @@
  * ST22 Effect Schemas
  *
  * Blue (Whitebeard Pirates): ST22-001 to ST22-017
- *
- * Deferred: ST22-003 Edward.Newgate (On Play REVEAL_CONDITIONAL),
- *           ST22-006 Jozu (On Play REVEAL_CONDITIONAL),
- *           ST22-007 Squard (Activate REVEAL_CONDITIONAL),
- *           ST22-012 Marco (When Attacking REVEAL_CONDITIONAL — K.O. protection encoded),
- *           ST22-016 Take That Back!! (Counter REVEAL_CONDITIONAL — Trigger encoded)
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -94,9 +88,9 @@ export const ST22_002_IZO: EffectSchema = {
   ],
 };
 
-// ─── ST22-003 Edward.Newgate (Character) — Double Attack + DEFERRED reveal conditional
+// ─── ST22-003 Edward.Newgate (Character) — Double Attack + On Play reveal conditional draw
 // [Double Attack] (This card deals 2 damage.)
-// [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards. — DEFERRED
+// [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards.
 
 export const ST22_003_EDWARD_NEWGATE: EffectSchema = {
   card_id: "ST22-003",
@@ -107,6 +101,28 @@ export const ST22_003_EDWARD_NEWGATE: EffectSchema = {
       id: "double_attack",
       category: "permanent",
       flags: { keywords: ["DOUBLE_ATTACK"] },
+    },
+    {
+      id: "on_play_reveal_draw",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "DRAW",
+          params: { amount: 2 },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+      ],
     },
   ],
 };
@@ -147,6 +163,87 @@ export const ST22_005_KOUZUKI_ODEN: EffectSchema = {
         { type: "SET_ACTIVE", target: { type: "SELF" } },
       ],
       flags: { once_per_turn: true, optional: true },
+    },
+  ],
+};
+
+// ─── ST22-006 Jozu (Character) — On Play reveal conditional draw + trash
+// [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards and trash 1 card from your hand.
+
+export const ST22_006_JOZU: EffectSchema = {
+  card_id: "ST22-006",
+  card_name: "Jozu",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_reveal_draw_trash",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "DRAW",
+          params: { amount: 2 },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+        {
+          type: "TRASH_FROM_HAND",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { exact: 1 },
+          },
+          params: { amount: 1 },
+          chain: "AND",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── ST22-007 Squard (Character) — Activate reveal conditional give DON
+// [Activate: Main] [Once Per Turn] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", give up to 1 rested DON!! card to your Leader or 1 of your Characters.
+
+export const ST22_007_SQUARD: EffectSchema = {
+  card_id: "ST22-007",
+  card_name: "Squard",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_reveal_give_don",
+      category: "activate",
+      flags: { once_per_turn: true },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "GIVE_DON",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 1 },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+      ],
     },
   ],
 };
@@ -199,9 +296,9 @@ export const ST22_011_WHITEY_BAY: EffectSchema = {
   ],
 };
 
-// ─── ST22-012 Marco (Character) — KO protection replacement (When Attacking reveal DEFERRED)
+// ─── ST22-012 Marco (Character) — KO protection replacement + When Attacking reveal conditional power
 // [Once Per Turn] If this Character would be K.O.'d by your opponent's effect, you may trash 1 card from your hand instead.
-// [When Attacking] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", this Character gains +1000 power until the end of your opponent's next turn. — DEFERRED
+// [When Attacking] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", this Character gains +1000 power until the end of your opponent's next turn.
 
 export const ST22_012_MARCO: EffectSchema = {
   card_id: "ST22-012",
@@ -219,6 +316,30 @@ export const ST22_012_MARCO: EffectSchema = {
         { type: "TRASH_FROM_HAND", params: { amount: 1 } },
       ],
       flags: { once_per_turn: true, optional: true },
+    },
+    {
+      id: "when_attacking_reveal_power",
+      category: "auto",
+      trigger: { keyword: "WHEN_ATTACKING" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "SELF" },
+          params: { amount: 1000 },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+      ],
     },
   ],
 };
@@ -270,8 +391,8 @@ export const ST22_015_I_AM_WHITEBEARD: EffectSchema = {
   ],
 };
 
-// ─── ST22-016 Take That Back!! (Event) — Counter DEFERRED, Trigger draw
-// [Counter] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", up to 1 of your Leader or Character cards gains +4000 power during this battle. — DEFERRED
+// ─── ST22-016 Take That Back!! (Event) — Counter reveal conditional power + Trigger draw
+// [Counter] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", up to 1 of your Leader or Character cards gains +4000 power during this battle.
 // [Trigger] Draw 1 card.
 
 export const ST22_016_TAKE_THAT_BACK: EffectSchema = {
@@ -279,6 +400,34 @@ export const ST22_016_TAKE_THAT_BACK: EffectSchema = {
   card_name: "Take That Back!! Take Back What You Said!!",
   card_type: "Event",
   effects: [
+    {
+      id: "counter_reveal_power",
+      category: "auto",
+      trigger: { keyword: "COUNTER_EVENT" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 4000 },
+          duration: { type: "THIS_BATTLE" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+      ],
+    },
     {
       id: "trigger_draw",
       category: "auto",
@@ -354,6 +503,8 @@ export const ST22_SCHEMAS: Record<string, EffectSchema> = {
   "ST22-002": ST22_002_IZO,
   "ST22-003": ST22_003_EDWARD_NEWGATE,
   "ST22-005": ST22_005_KOUZUKI_ODEN,
+  "ST22-006": ST22_006_JOZU,
+  "ST22-007": ST22_007_SQUARD,
   "ST22-009": ST22_009_VISTA,
   "ST22-011": ST22_011_WHITEY_BAY,
   "ST22-012": ST22_012_MARCO,

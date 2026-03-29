@@ -1631,6 +1631,43 @@ export const OP01_059_BE_BENG: EffectSchema = {
 // BLUE — The Seven Warlords of the Sea (OP01-060 to OP01-090)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ─── OP01-060 Donquixote Doflamingo (Leader) — When Attacking reveal conditional play
+// [DON!! x2] [When Attacking] ➀: Reveal 1 card from the top of your deck. If that card is a
+// {The Seven Warlords of the Sea} type Character card with a cost of 4 or less, you may play that card rested.
+
+export const OP01_060_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
+  card_id: "OP01-060",
+  card_name: "Donquixote Doflamingo",
+  card_type: "Leader",
+  effects: [
+    {
+      id: "when_attacking_reveal_play",
+      category: "auto",
+      trigger: { keyword: "WHEN_ATTACKING", don_requirement: 2 },
+      costs: [{ type: "DON_REST", amount: 1 }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "PLAY_CARD",
+          target: { type: "SELECTED_CARDS", ref: "revealed" },
+          params: { source_zone: "DECK", cost_override: "FREE", entry_state: "RESTED" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits: ["The Seven Warlords of the Sea"], card_type: "CHARACTER", cost_max: 4 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP01-061 Kaido (Leader) — custom trigger
 // [DON!! x1] [Your Turn] [Once Per Turn] When opponent's Character is KO'd, add DON + set active.
 
@@ -3031,6 +3068,7 @@ export const OP01_SCHEMAS: Record<string, EffectSchema> = {
   "OP01-058": OP01_058_PUNK_GIBSON,
   "OP01-059": OP01_059_BE_BENG,
   // Blue
+  "OP01-060": OP01_060_DONQUIXOTE_DOFLAMINGO,
   "OP01-061": OP01_061_KAIDO_LEADER,
   "OP01-064": OP01_064_ALVIDA,
   "OP01-068": OP01_068_GECKO_MORIA,

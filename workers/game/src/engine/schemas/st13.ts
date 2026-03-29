@@ -3,8 +3,6 @@
  *
  * Red/Yellow, Blue/Yellow, Black/Yellow Leaders + Yellow Characters: ST13-001 to ST13-019
  *
- * Deferred: ST13-007 Sabo (cost 2), ST13-010 Portgas.D.Ace (cost 2),
- *           ST13-014 Monkey.D.Luffy (cost 2) — REVEAL_CONDITIONAL from Life
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -240,6 +238,138 @@ export const ST13_006_CURLY_DADAN: EffectSchema = {
             },
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── ST13-007 Sabo (Character, cost 2) — Activate trash self, reveal life, conditional play + power
+// [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards.
+// If that card is a [Sabo] with a cost of 5, you may play that card.
+// If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
+
+export const ST13_007_SABO_COST2: EffectSchema = {
+  card_id: "ST13-007",
+  card_name: "Sabo",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_reveal_life_play",
+      category: "activate",
+      costs: [{ type: "TRASH_SELF" }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "LIFE_TOP" },
+          result_ref: "revealed_life",
+        },
+        {
+          type: "PLAY_CARD",
+          target: { type: "SELECTED_CARDS", ref: "revealed_life" },
+          params: { source_zone: "LIFE", cost_override: "FREE" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed_life",
+            filter: { name: "Sabo", cost_exact: 5 },
+          },
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER", count: { up_to: 1 } },
+          params: { amount: 2000 },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
+          chain: "IF_DO",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── ST13-010 Portgas.D.Ace (Character, cost 2) — Activate trash self, reveal life, conditional play + power
+// [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards.
+// If that card is a [Portgas.D.Ace] with a cost of 5, you may play that card.
+// If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
+
+export const ST13_010_PORTGAS_D_ACE_COST2: EffectSchema = {
+  card_id: "ST13-010",
+  card_name: "Portgas.D.Ace",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_reveal_life_play",
+      category: "activate",
+      costs: [{ type: "TRASH_SELF" }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "LIFE_TOP" },
+          result_ref: "revealed_life",
+        },
+        {
+          type: "PLAY_CARD",
+          target: { type: "SELECTED_CARDS", ref: "revealed_life" },
+          params: { source_zone: "LIFE", cost_override: "FREE" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed_life",
+            filter: { name: "Portgas.D.Ace", cost_exact: 5 },
+          },
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER", count: { up_to: 1 } },
+          params: { amount: 2000 },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
+          chain: "IF_DO",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── ST13-014 Monkey.D.Luffy (Character, cost 2) — Activate trash self, reveal life, conditional play + power
+// [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards.
+// If that card is a [Monkey.D.Luffy] with a cost of 5, you may play that card.
+// If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
+
+export const ST13_014_MONKEY_D_LUFFY_COST2: EffectSchema = {
+  card_id: "ST13-014",
+  card_name: "Monkey.D.Luffy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_reveal_life_play",
+      category: "activate",
+      costs: [{ type: "TRASH_SELF" }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "LIFE_TOP" },
+          result_ref: "revealed_life",
+        },
+        {
+          type: "PLAY_CARD",
+          target: { type: "SELECTED_CARDS", ref: "revealed_life" },
+          params: { source_zone: "LIFE", cost_override: "FREE" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed_life",
+            filter: { name: "Monkey.D.Luffy", cost_exact: 5 },
+          },
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER", count: { up_to: 1 } },
+          params: { amount: 2000 },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
+          chain: "IF_DO",
         },
       ],
     },
@@ -591,14 +721,14 @@ export const ST13_SCHEMAS: Record<string, EffectSchema> = {
   "ST13-004": ST13_004_EDWARD_NEWGATE,
   "ST13-005": ST13_005_EMPORIO_IVANKOV,
   "ST13-006": ST13_006_CURLY_DADAN,
-  // ST13-007 Sabo (cost 2) — deferred: REVEAL_CONDITIONAL from Life
+  "ST13-007": ST13_007_SABO_COST2,
   "ST13-008": ST13_008_SABO,
   // ST13-009 Shanks — deferred: TURN_LIFE_FACE_DOWN cost type unsupported
-  // ST13-010 Portgas.D.Ace (cost 2) — deferred: REVEAL_CONDITIONAL from Life
+  "ST13-010": ST13_010_PORTGAS_D_ACE_COST2,
   "ST13-011": ST13_011_PORTGAS_D_ACE,
   "ST13-012": ST13_012_MAKINO,
   "ST13-013": ST13_013_MONKEY_D_GARP,
-  // ST13-014 Monkey.D.Luffy (cost 2) — deferred: REVEAL_CONDITIONAL from Life
+  "ST13-014": ST13_014_MONKEY_D_LUFFY_COST2,
   "ST13-015": ST13_015_MONKEY_D_LUFFY,
   "ST13-016": ST13_016_YAMATO,
   "ST13-017": ST13_017_FLAME_DRAGON_KING,

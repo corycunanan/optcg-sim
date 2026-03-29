@@ -3,7 +3,6 @@
  *
  * Blue (The Seven Warlords of the Sea): ST17-001 to ST17-005
  *
- * Deferred: ST17-001 Crocodile — REVEAL_CONDITIONAL (reveal + branch on card properties)
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -12,8 +11,49 @@ import type { EffectSchema } from "../effect-types.js";
 // BLUE — The Seven Warlords of the Sea (ST17-001 to ST17-005)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ST17-001 Crocodile — deferred: REVEAL_CONDITIONAL
-// [On Play] Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea} type card, draw 2 cards and place 1 card from your hand at the top of your deck.
+// ─── ST17-001 Crocodile (Leader) — On Play reveal conditional draw + place
+// [On Play] Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea}
+// type card, draw 2 cards and place 1 card from your hand at the top of your deck.
+
+export const ST17_001_CROCODILE: EffectSchema = {
+  card_id: "ST17-001",
+  card_name: "Crocodile",
+  card_type: "Leader",
+  effects: [
+    {
+      id: "on_play_reveal_draw_place",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "DRAW",
+          params: { amount: 2 },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits: ["The Seven Warlords of the Sea"] },
+          },
+        },
+        {
+          type: "PLACE_HAND_TO_DECK",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { exact: 1 },
+          },
+          params: { position: "TOP", amount: 1 },
+          chain: "AND",
+        },
+      ],
+    },
+  ],
+};
 
 // ─── ST17-002 Trafalgar Law (Character) — On Play bounce cost + conditional bounce
 // [On Play] You may return 1 of your Characters to the owner's hand: If your Leader has the {The Seven Warlords of the Sea} type, return up to 1 Character with a cost of 4 or less to the owner's hand.
@@ -138,7 +178,7 @@ export const ST17_005_MARSHALL_D_TEACH: EffectSchema = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const ST17_SCHEMAS: Record<string, EffectSchema> = {
-  // ST17-001 Crocodile — deferred: REVEAL_CONDITIONAL
+  "ST17-001": ST17_001_CROCODILE,
   "ST17-002": ST17_002_TRAFALGAR_LAW,
   "ST17-003": ST17_003_BUGGY,
   "ST17-004": ST17_004_BOA_HANCOCK,

@@ -1585,8 +1585,48 @@ export const OP07_047_TRAFALGAR_LAW: EffectSchema = {
   ],
 };
 
-// ─── OP07-048 Donquixote Doflamingo — DEFERRED (REVEAL_CONDITIONAL)
-// See docs/game-engine/DEFERRED-CARD-EFFECTS.md
+// ─── OP07-048 Donquixote Doflamingo (Character) — Activate reveal conditional play
+// [Activate: Main] [Once Per Turn] ➁: Reveal 1 card from the top of your deck.
+// If that card is a {The Seven Warlords of the Sea} type Character card with a cost of 4 or less,
+// you may play that card rested. Then, place the rest at the bottom of your deck.
+
+export const OP07_048_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
+  card_id: "OP07-048",
+  card_name: "Donquixote Doflamingo",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_reveal_play",
+      category: "activate",
+      costs: [{ type: "DON_REST", amount: 2 }],
+      flags: { once_per_turn: true },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "PLAY_CARD",
+          target: { type: "SELECTED_CARDS", ref: "revealed" },
+          params: { source_zone: "DECK", cost_override: "FREE", entry_state: "RESTED" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits: ["The Seven Warlords of the Sea"], card_type: "CHARACTER", cost_max: 4 },
+          },
+        },
+        {
+          type: "RETURN_TO_DECK",
+          target_ref: "revealed",
+          params: { position: "BOTTOM" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
 
 // ─── OP07-049 Buckin — ON_PLAY play Edward Weevil from hand rested ──────────
 // [On Play] Play up to 1 [Edward Weevil] with a cost of 4 or less from your
@@ -4231,7 +4271,7 @@ export const OP07_SCHEMAS: Record<string, EffectSchema> = {
   "OP07-045": OP07_045_JINBE,
   "OP07-046": OP07_046_SENGOKU,
   "OP07-047": OP07_047_TRAFALGAR_LAW,
-  // OP07-048 deferred (REVEAL_CONDITIONAL)
+  "OP07-048": OP07_048_DONQUIXOTE_DOFLAMINGO,
   "OP07-049": OP07_049_BUCKIN,
   "OP07-050": OP07_050_BOA_SANDERSONIA,
   "OP07-051": OP07_051_BOA_HANCOCK,

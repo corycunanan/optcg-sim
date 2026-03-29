@@ -651,7 +651,11 @@ function lintCrossField(block, ctx, issues) {
       (function scanConsumed(obj, depth) {
         if (!obj || typeof obj !== "object" || depth > 10) return;
         for (const [key, val] of Object.entries(obj)) {
-          if (key === "result_ref") continue; // result_ref is a producer, not consumer
+          if (key === "result_ref") {
+            // result_ref is a producer on actions, but a consumer on REVEALED_CARD_PROPERTY conditions
+            if (obj.type === "REVEALED_CARD_PROPERTY" && typeof val === "string") consumedRefs.add(val);
+            continue;
+          }
           if (key === "target_ref" && typeof val === "string") consumedRefs.add(val);
           if (key.endsWith("_ref") && typeof val === "string" && key !== "result_ref") consumedRefs.add(val);
           if (typeof val === "object" && val !== null) {

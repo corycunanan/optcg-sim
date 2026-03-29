@@ -1989,7 +1989,62 @@ export const OP12_057_ICE_BLOCK_PHEASANT_PECK: EffectSchema = {
   ],
 };
 
-// ─── OP12-058 SKIPPED (DEFERRED — REVEAL_CONDITIONAL) ──────────────────────
+// ─── OP12-058 I Will Make Whitebeard the King (Event) — Main reveal conditional play + Rush + Trigger draw
+// [Main] If your Leader's type includes "Whitebeard Pirates", reveal 1 card from the top of your deck.
+// If that card is a Character card with a type including "Whitebeard Pirates" and a cost of 9 or less,
+// you may play that card. If you do, that Character gains [Rush] during this turn.
+// [Trigger] Draw 1 card.
+
+export const OP12_058_I_WILL_MAKE_WHITEBEARD_THE_KING: EffectSchema = {
+  card_id: "OP12-058",
+  card_name: "I Will Make Whitebeard the King",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_reveal_play",
+      category: "activate",
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait_contains: "Whitebeard Pirates" },
+      },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "PLAY_CARD",
+          target: { type: "SELECTED_CARDS", ref: "revealed" },
+          params: { source_zone: "DECK", cost_override: "FREE" },
+          chain: "THEN",
+          result_ref: "played",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"], card_type: "CHARACTER", cost_max: 9 },
+          },
+        },
+        {
+          type: "GRANT_KEYWORD",
+          target_ref: "played",
+          params: { keyword: "RUSH" },
+          duration: { type: "THIS_TURN" },
+          chain: "IF_DO",
+        },
+      ],
+    },
+    {
+      id: "trigger_draw",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+      ],
+    },
+  ],
+};
 
 // ─── OP12-059 Concasser (Event) ─────────────────────────────────────────────
 // [Main] If your Leader is [Sanji], draw 1 card.
@@ -4175,6 +4230,7 @@ export const OP12_SCHEMAS: Record<string, EffectSchema> = {
   "OP12-054": OP12_054_MARSHALL_D_TEACH,
   "OP12-056": OP12_056_MONKEY_D_GARP,
   "OP12-057": OP12_057_ICE_BLOCK_PHEASANT_PECK,
+  "OP12-058": OP12_058_I_WILL_MAKE_WHITEBEARD_THE_KING,
   "OP12-059": OP12_059_CONCASSER,
   "OP12-060": OP12_060_BOEUF_BURST,
   "OP12-061": OP12_061_DONQUIXOTE_ROSINANTE,

@@ -196,15 +196,20 @@ export function executeReveal(
   const amount = (params.amount as number) ?? 1;
   const source = (params.source as string) ?? "DECK";
 
+  // Resolve which player's zone to reveal from
+  const targetController = (action.target?.controller === "OPPONENT")
+    ? (controller === 0 ? 1 : 0) as 0 | 1
+    : controller;
+
   if (source === "DECK" || source === "DECK_TOP") {
-    const p = state.players[controller];
+    const p = state.players[targetController];
     const count = Math.min(amount, p.deck.length);
     if (count === 0) return { state, events, succeeded: false };
 
     const revealed = p.deck.slice(0, count);
     events.push({
       type: "CARDS_REVEALED",
-      playerIndex: controller,
+      playerIndex: targetController,
       payload: { cards: revealed.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })), source },
     });
 
@@ -213,6 +218,25 @@ export function executeReveal(
       events,
       succeeded: true,
       result: { targetInstanceIds: revealed.map((c) => c.instanceId), count },
+    };
+  }
+
+  if (source === "LIFE_TOP") {
+    const p = state.players[targetController];
+    if (p.life.length === 0) return { state, events, succeeded: false };
+
+    const topLife = p.life[0];
+    events.push({
+      type: "CARDS_REVEALED",
+      playerIndex: targetController,
+      payload: { cards: [{ instanceId: topLife.instanceId, cardId: topLife.cardId }], source },
+    });
+
+    return {
+      state,
+      events,
+      succeeded: true,
+      result: { targetInstanceIds: [topLife.instanceId], count: 1 },
     };
   }
 

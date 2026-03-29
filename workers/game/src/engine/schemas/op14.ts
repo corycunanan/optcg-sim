@@ -1644,7 +1644,6 @@ export const OP14_043_ALADINE: EffectSchema = {
 // [Blocker]
 // [On Play] Reveal 1 card from the top of your deck. If that card's type includes
 // "Whitebeard Pirates", draw 2 cards and trash 1 card from your hand.
-// NOTE: The [On Play] reveal-conditional effect is DEFERRED — only [Blocker] encoded.
 
 export const OP14_044_EDWARD_NEWGATE: EffectSchema = {
   card_id: "OP14-044",
@@ -1656,7 +1655,38 @@ export const OP14_044_EDWARD_NEWGATE: EffectSchema = {
       category: "permanent",
       flags: { keywords: ["BLOCKER"] },
     },
-    // DEFERRED: OP14-044_on_play — REVEAL_CONDITIONAL
+    {
+      id: "OP14-044_on_play_reveal",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "DRAW",
+          params: { amount: 2 },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+        {
+          type: "TRASH_FROM_HAND",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { exact: 1 },
+          },
+          params: { amount: 1 },
+          chain: "AND",
+        },
+      ],
+    },
   ],
 };
 

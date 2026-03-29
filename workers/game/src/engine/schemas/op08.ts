@@ -1683,8 +1683,41 @@ export const OP08_047_JOZU: EffectSchema = {
   ],
 };
 
-// ─── OP08-049 Speed Jil — DEFERRED (REVEAL_CONDITIONAL)
-// See docs/game-engine/DEFERRED-CARD-EFFECTS.md
+// ─── OP08-049 Speed Jil (Character) — On Play reveal conditional Rush
+// [On Play] Reveal 1 card from the top of your deck and place it at the top or bottom of your deck.
+// If the revealed card's type includes "Whitebeard Pirates", this Character gains [Rush] during this turn.
+
+export const OP08_049_SPEED_JIL: EffectSchema = {
+  card_id: "OP08-049",
+  card_name: "Speed Jil",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_reveal_rush",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "REVEAL",
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+        },
+        {
+          type: "GRANT_KEYWORD",
+          target: { type: "SELF" },
+          params: { keyword: "RUSH" },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
+        },
+      ],
+    },
+  ],
+};
 
 // ─── OP08-050 Namule ────────────────────────────────────────────────────────
 // [Blocker]
@@ -4294,7 +4327,7 @@ export const OP08_SCHEMAS: Record<string, EffectSchema> = {
   "OP08-045": OP08_045_THATCH,
   "OP08-046": OP08_046_SHAKUYAKU,
   "OP08-047": OP08_047_JOZU,
-  // OP08-049 deferred (REVEAL_CONDITIONAL)
+  "OP08-049": OP08_049_SPEED_JIL,
   "OP08-050": OP08_050_NAMULE,
   "OP08-051": OP08_051_BUCKIN,
   "OP08-052": OP08_052_PORTGAS_D_ACE,

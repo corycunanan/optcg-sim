@@ -19,6 +19,7 @@ import type {
   TargetFilter,
   NumericRange,
   DynamicValue,
+  EffectResult,
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import { getEffectivePower } from "./modifiers.js";
@@ -30,6 +31,8 @@ export interface ConditionContext {
   controller: 0 | 1;
   /** Card database for property lookups */
   cardDb: Map<string, CardData>;
+  /** Result refs from prior actions in the chain (for REVEALED_CARD_PROPERTY) */
+  resultRefs?: Map<string, EffectResult>;
 }
 
 /**
@@ -342,6 +345,18 @@ function evaluateSimple(
       // These require event context not available in static evaluation
       return true;
 
+    case "REVEALED_CARD_PROPERTY": {
+      if (!ctx.resultRefs) return false;
+      const result = ctx.resultRefs.get(cond.result_ref);
+      if (!result || result.targetInstanceIds.length === 0) return false;
+      for (const instanceId of result.targetInstanceIds) {
+        const card = findInstanceById(state, instanceId);
+        if (!card) continue;
+        if (matchesFilter(card, cond.filter, ctx.cardDb, state)) return true;
+      }
+      return false;
+    }
+
     default:
       return true;
   }
@@ -396,6 +411,12 @@ function findInstanceById(state: GameState, instanceId: string): CardInstance | 
     if (player.stage?.instanceId === instanceId) return player.stage;
     const hand = player.hand.find((c) => c.instanceId === instanceId);
     if (hand) return hand;
+    const deck = player.deck.find((c) => c.instanceId === instanceId);
+    if (deck) return deck;
+    const trash = player.trash.find((c) => c.instanceId === instanceId);
+    if (trash) return trash;
+    const life = player.life.find((c: any) => c.instanceId === instanceId);
+    if (life) return life as unknown as CardInstance;
   }
   return null;
 }
