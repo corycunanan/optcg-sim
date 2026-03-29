@@ -195,6 +195,8 @@ export function executeReveal(
   const params = action.params ?? {};
   const amount = (params.amount as number) ?? 1;
   const source = (params.source as string) ?? "DECK";
+  // "BOTH" = reveal (both players see), "CONTROLLER_ONLY" = look at (private peek)
+  const visibility = (params.visibility as string) ?? "BOTH";
 
   // Resolve which player's zone to reveal from
   const targetController = (action.target?.controller === "OPPONENT")
@@ -210,7 +212,7 @@ export function executeReveal(
     events.push({
       type: "CARDS_REVEALED",
       playerIndex: targetController,
-      payload: { cards: revealed.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })), source },
+      payload: { cards: revealed.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })), source, visibility },
     });
 
     return {
@@ -229,7 +231,7 @@ export function executeReveal(
     events.push({
       type: "CARDS_REVEALED",
       playerIndex: targetController,
-      payload: { cards: [{ instanceId: topLife.instanceId, cardId: topLife.cardId }], source },
+      payload: { cards: [{ instanceId: topLife.instanceId, cardId: topLife.cardId }], source, visibility },
     });
 
     return {

@@ -2183,7 +2183,7 @@ export const OP11_062_CHARLOTTE_KATAKURI: EffectSchema = {
             type: "CARD_ON_TOP_OF_DECK",
             controller: "OPPONENT",
           },
-          params: { amount: 1, source: "DECK_TOP" },
+          params: { amount: 1, source: "DECK_TOP", visibility: "CONTROLLER_ONLY" },
         },
         {
           type: "MODIFY_POWER",
@@ -2380,7 +2380,7 @@ export const OP11_070_CHARLOTTE_PUDDING: EffectSchema = {
             type: "CARD_ON_TOP_OF_DECK",
             controller: "OPPONENT",
           },
-          params: { amount: 1, source: "DECK_TOP" },
+          params: { amount: 1, source: "DECK_TOP", visibility: "CONTROLLER_ONLY" },
         },
       ],
     },
