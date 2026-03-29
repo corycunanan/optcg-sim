@@ -96,6 +96,37 @@ const ENUMS = {
   ),
 };
 
+// ─── Engine Handler Coverage ─────────────────────────────────────────────────
+// Action types that have actual handlers in effect-resolver/resolver.ts.
+// Schemas using action types NOT in this set will be flagged by rule F9.
+// Update this list when new handlers are added to ACTION_HANDLERS.
+
+const HANDLED_ACTION_TYPES = new Set([
+  // Draw / search
+  "DRAW", "SEARCH_DECK", "MILL", "FULL_DECK_SEARCH", "DECK_SCRY",
+  // Modifiers
+  "MODIFY_POWER", "MODIFY_COST", "GRANT_KEYWORD", "GRANT_ATTRIBUTE", "NEGATE_EFFECTS",
+  // Removal
+  "KO", "RETURN_TO_HAND", "RETURN_TO_DECK", "TRASH_CARD", "TRASH_FROM_HAND",
+  // Life
+  "ADD_TO_LIFE_FROM_DECK", "TRASH_FROM_LIFE", "TURN_LIFE_FACE_UP", "TURN_LIFE_FACE_DOWN",
+  "TURN_ALL_LIFE_FACE_DOWN", "LIFE_TO_HAND", "ADD_TO_LIFE_FROM_HAND", "ADD_TO_LIFE_FROM_FIELD",
+  "PLAY_FROM_LIFE", "LIFE_CARD_TO_DECK", "TRASH_FACE_UP_LIFE", "LIFE_SCRY",
+  "DRAIN_LIFE_TO_THRESHOLD", "REORDER_ALL_LIFE",
+  // DON
+  "GIVE_DON", "ADD_DON_FROM_DECK", "FORCE_OPPONENT_DON_RETURN", "SET_DON_ACTIVE",
+  "REST_OPPONENT_DON", "RETURN_DON_TO_DECK",
+  // Play / state
+  "PLAY_CARD", "PLAY_SELF", "SET_ACTIVE", "SET_REST",
+  // Hand / deck
+  "PLACE_HAND_TO_DECK", "RETURN_HAND_TO_DECK", "HAND_WHEEL", "SHUFFLE_DECK",
+  "REVEAL", "REVEAL_HAND", "SEARCH_AND_PLAY",
+  // Effects / scheduling
+  "APPLY_PROHIBITION", "SCHEDULE_ACTION", "APPLY_ONE_TIME_MODIFIER",
+  // Choice
+  "PLAYER_CHOICE", "OPPONENT_CHOICE", "OPPONENT_ACTION", "REUSE_EFFECT",
+]);
+
 // ─── Schema Loading ──────────────────────────────────────────────────────────
 
 function loadSchemasFromFile(filePath) {
@@ -460,6 +491,20 @@ function lintEnums(block, ctx, issues) {
           ),
         );
       }
+    }
+  }
+
+  // F9: Action types without engine handlers
+  for (const action of walkActions(block.actions)) {
+    if (action.type && !HANDLED_ACTION_TYPES.has(action.type)) {
+      issues.push(
+        err(
+          cardId,
+          blockId,
+          "F9",
+          `Action type "${action.type}" has no engine handler — card should be deferred or action type corrected`,
+        ),
+      );
     }
   }
 }
