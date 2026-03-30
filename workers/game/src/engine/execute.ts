@@ -114,10 +114,26 @@ function executePlayCard(
     events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER" } });
 
   } else if (cardData.type === "Event") {
-    // Trash the event, then the effect fires (MANUAL_EFFECT in M3)
+    // Trash the event, then resolve its MAIN_EVENT effect block directly
     nextState = moveCard(nextState, cardInstanceId, "TRASH");
     const newEventInstance = nextState.players[pi].trash[0]; // trash is LIFO, newest at [0]
     events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH" } });
+
+    // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
+    const schema = cardData.effectSchema as EffectSchema | null;
+    if (schema?.effects) {
+      const mainBlock = schema.effects.find(
+        (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
+      );
+      if (mainBlock) {
+        const result = resolveEffect(nextState, mainBlock, newEventInstance.instanceId, pi, cardDb);
+        nextState = result.state;
+        events.push(...result.events);
+        if (result.pendingPrompt) {
+          return { state: nextState, events, pendingPrompt: result.pendingPrompt };
+        }
+      }
+    }
 
   } else if (cardData.type === "Stage") {
     // Trash existing stage first

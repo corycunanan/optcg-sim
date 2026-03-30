@@ -17,6 +17,7 @@ import type {
 } from "../../types.js";
 import { generateFrameId, pushFrame } from "../effect-stack.js";
 import type { CostPaymentResult, CostSelectionResult } from "./types.js";
+import { setCardState } from "./card-mutations.js";
 
 // ─── payCosts (auto-payable) ─────────────────────────────────────────────────
 
@@ -104,8 +105,13 @@ export function payCosts(
       }
 
       case "REST_SELF": {
-        // Rest the source card — this is handled at the trigger level
-        // For now, a no-op since the card would be rested by the caller
+        if (!sourceCardInstanceId) return null;
+        nextState = setCardState(nextState, sourceCardInstanceId, "RESTED");
+        events.push({
+          type: "CARD_STATE_CHANGED",
+          playerIndex: controller,
+          payload: { targetInstanceId: sourceCardInstanceId, newState: "RESTED" },
+        });
         break;
       }
 
