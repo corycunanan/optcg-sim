@@ -128,8 +128,8 @@ function fireEventsAndTriggers(
     state = emitEvent(state, event.type, event.playerIndex ?? pi, event.payload ?? {});
   }
 
-  // Handle trigger registration for zone changes
-  state = handleZoneChangeTriggers(state, execResult, cardDb);
+  // Register triggers for newly played cards BEFORE matching
+  state = registerNewCardTriggers(state, execResult, cardDb);
 
   // Collect ALL matched triggers from ALL events, ordered per rule §8-6
   const triggerQueue: QueuedTrigger[] = [];
@@ -155,6 +155,9 @@ function fireEventsAndTriggers(
       });
     }
   }
+
+  // Deregister triggers for cards that left the field AFTER matching
+  state = deregisterLeftFieldTriggers(state, execResult);
 
   // Group triggers by controller — turn player resolves first (§8-6),
   // and within each group the player chooses the order.
@@ -257,14 +260,14 @@ function recordAction(state: GameState, action: GameAction): GameState {
  * When a card enters the field, register its triggers.
  * When a card leaves the field, deregister + expire source-bound effects.
  */
-function handleZoneChangeTriggers(
+/** Register triggers for newly played cards (CARD_PLAYED events). */
+function registerNewCardTriggers(
   state: GameState,
   execResult: ExecuteResult,
   cardDb: Map<string, CardData>,
 ): GameState {
   for (const event of execResult.events) {
     if (event.type === "CARD_PLAYED") {
-      // Card entered the field — register triggers
       const cardId = event.payload?.cardId as string | undefined;
       const cardInstanceId = event.payload?.cardInstanceId as string | undefined;
       if (!cardId) continue;
@@ -272,7 +275,6 @@ function handleZoneChangeTriggers(
       const cardData = cardDb.get(cardId);
       if (!cardData) continue;
 
-      // Use instanceId from event (now correctly set to the post-moveCard instanceId)
       const instance = cardInstanceId
         ? findCardInstance(state, cardInstanceId)
         : findNewlyPlayedCard(state, cardId);
@@ -281,9 +283,17 @@ function handleZoneChangeTriggers(
         state = registerReplacementsForCard(state, instance, cardData);
       }
     }
+  }
+  return state;
+}
 
+/** Deregister triggers for cards that left the field (KO, bounce, trash). */
+function deregisterLeftFieldTriggers(
+  state: GameState,
+  execResult: ExecuteResult,
+): GameState {
+  for (const event of execResult.events) {
     if (event.type === "CARD_KO" || event.type === "CARD_RETURNED_TO_HAND") {
-      // Card left the field — deregister triggers and expire source-bound effects
       const instanceId = event.payload?.cardInstanceId as string | undefined;
       if (!instanceId) continue;
 
@@ -292,10 +302,8 @@ function handleZoneChangeTriggers(
     }
 
     if (event.type === "CARD_TRASHED") {
-      // If trashed from field (stage replaced, overflow), deregister
       const cardId = event.payload?.cardId as string | undefined;
       if (cardId) {
-        // Find by cardId in trash (most recent)
         for (const player of state.players) {
           const trashed = player.trash.find((c) => c.cardId === cardId);
           if (trashed) {
