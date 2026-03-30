@@ -1,31 +1,33 @@
-# M6 — Effect Showcase
+# M7 — Effect Showcase
 
 > Interactive testing harness for card effect executions: pick a scenario, see the board, walk through prompts, observe the result. Storybook for card effects.
+
+> _Note: This was previously M6. Renumbered when M5 was restructured as the UI Overhaul milestone._
 
 ---
 
 ## Scope
 
-M6 builds an isolated, interactive showcase for testing and demonstrating individual card effect flows. Each scenario presents a pre-built board state, executes a single effect chain with full prompt interaction, and stops when the effect resolves. No full games — just focused effect walkthroughs.
+M7 builds an isolated, interactive showcase for testing and demonstrating individual card effect flows. Each scenario presents a pre-built board state, executes a single effect chain with full prompt interaction, and stops when the effect resolves. No full games — just focused effect walkthroughs.
 
 This serves three purposes:
 1. **Effect development** — test new effect schemas without setting up a full game
 2. **QA/regression** — verify prompt flows, targeting, and state transitions for each effect archetype
 3. **Documentation** — show exactly what happens when a card is played, step by step
 
-### What M6 Is
+### What M7 Is
 
 - A `/admin/showcase` page with a scenario catalog and live board rendering
 - A local effect runner that executes the pipeline without a WebSocket/Durable Object
 - Pre-built scenario fixtures that set up deterministic board states for each effect type
 - Reuse of all existing board UI components and prompt modals
 
-### What M6 Is NOT
+### What M7 Is NOT
 
 - **Not a full game mode** — scenarios stop after the effect resolves, no continuing play
 - **Not a visual scenario builder** — fixtures are hand-authored TypeScript, not a drag-and-drop editor
 - **Not new engine work** — the pipeline, resolver, and schemas are unchanged from M4
-- **Not a replay viewer** — M5 covers post-game replay; M6 is forward-only effect execution
+- **Not a replay viewer** — M6 covers post-game replay; M7 is forward-only effect execution
 
 ### Deliverables
 
@@ -42,7 +44,7 @@ This serves three purposes:
 
 ## Architecture
 
-M6 introduces no new services or infrastructure. It composes existing pieces with a thin orchestration layer.
+M7 introduces no new services or infrastructure. It composes existing pieces with a thin orchestration layer.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -147,8 +149,6 @@ function createShowcaseState(config: {
 }): GameState
 ```
 
-This avoids duplicating `buildInitialState()` logic — it constructs a minimal valid `GameState` with only the zones that matter for the scenario populated. Cards not relevant to the scenario get placeholder IDs.
-
 ---
 
 ## Local Effect Runner
@@ -204,30 +204,30 @@ interface TimelineEntry {
 ### Layout
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Effect Showcase                                [Admin]   │
-├──────────────┬───────────────────────────────────────────┤
-│              │                                            │
-│  Categories  │  Board Area                               │
-│              │  ┌──────────────────────────────────────┐ │
-│  ▸ Searcher  │  │                                      │ │
-│  ▸ Removal   │  │         BoardLayout                  │ │
-│  ▸ Buff      │  │         (+ active prompt modal)      │ │
-│  ▸ Choice    │  │                                      │ │
-│  ▸ Cost      │  └──────────────────────────────────────┘ │
-│  ▸ Counter   │                                            │
-│  ▸ Trigger   │  Timeline                                  │
-│  ▸ DON!!     │  ┌──────────────────────────────────────┐ │
-│  ▸ Life      │  │ Step 1: Nami played from hand        │ │
-│  ▸ Activate  │  │ Step 2: ON_PLAY triggered → search   │ │
-│              │  │ Step 3: Prompt: select 1 of 3        │ │
-│  Scenarios   │  │ Step 4: ✓ Added Luffy to hand        │ │
-│  ────────    │  │ Step 5: Rest placed on deck bottom   │ │
-│  • Nami      │  │ ✓ Effect complete                    │ │
-│  • Chopper   │  └──────────────────────────────────────┘ │
-│  • Robin     │                                            │
-│              │  [Reset]  [Step ▶]  [Auto-play ▶▶]        │
-└──────────────┴───────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Effect Showcase                                [Admin]       │
+├──────────────┬───────────────────────────────────────────────┤
+│              │                                                │
+│  Categories  │  Board Area                                   │
+│              │  ┌──────────────────────────────────────────┐ │
+│  ▸ Searcher  │  │                                          │ │
+│  ▸ Removal   │  │         BoardLayout                      │ │
+│  ▸ Buff      │  │         (+ active prompt modal)          │ │
+│  ▸ Choice    │  │                                          │ │
+│  ▸ Cost      │  └──────────────────────────────────────────┘ │
+│  ▸ Counter   │                                                │
+│  ▸ Trigger   │  Timeline                                      │
+│  ▸ DON!!     │  ┌──────────────────────────────────────────┐ │
+│  ▸ Life      │  │ Step 1: Nami played from hand            │ │
+│  ▸ Activate  │  │ Step 2: ON_PLAY triggered → search       │ │
+│              │  │ Step 3: Prompt: select 1 of 3            │ │
+│  Scenarios   │  │ Step 4: ✓ Added Luffy to hand            │ │
+│  ────────    │  │ Step 5: Rest placed on deck bottom       │ │
+│  • Nami      │  │ ✓ Effect complete                        │ │
+│  • Chopper   │  └──────────────────────────────────────────┘ │
+│  • Robin     │                                                │
+│              │  [Reset]  [Step ▶]  [Auto-play ▶▶]            │
+└──────────────┴───────────────────────────────────────────────┘
 ```
 
 ### Controls
@@ -356,12 +356,13 @@ Exact cards for slots 5–12 will be selected from authored OP01/OP02 schemas du
 
 - M4 effect engine (pipeline, resolver, schemas) — complete and stable
 - M3 board UI components (BoardLayout, prompt modals) — complete
+- M5 UI overhaul (shadcn components, design tokens) — showcase benefits from but doesn't strictly require
 - OP01/OP02 effect schemas authored — at least the cards used in scenarios
 - Card database populated (M0 pipeline)
 
 ---
 
-## Future Extensions (Not M6 Scope)
+## Future Extensions (Not M7 Scope)
 
 - **Visual scenario builder** — drag cards onto a board to create fixtures
 - **Automated regression suite** — run all scenarios headlessly, assert final state matches expected
@@ -371,4 +372,4 @@ Exact cards for slots 5–12 will be selected from authored OP01/OP02 schemas du
 
 ---
 
-_Last updated: 2026-03-26_
+_Last updated: 2026-03-30_

@@ -1,351 +1,194 @@
-# M5 — Polish & Scale
+# M5 — UI Overhaul & Design System
 
-> LLM-assisted effect parsing, full card database, spectator mode, game replay, and mobile polish.
+> shadcn component library, motion.dev animations, new visual direction, and page redesigns. Transform the simulator into a polished, immersive gaming product.
 
 ---
 
 ## Scope
 
-M5 transitions the project from "functional simulator for 1–2 sets" to a polished, scalable product covering the full OPTCG card pool. It introduces LLM-assisted effect parsing to scale effect authoring, adds spectator and replay features, and delivers a mobile-responsive experience.
+M5 runs in parallel with playtesting and game engine bug fixes. It overhauls the UI from a functional tool with loose styling into a cohesive, animated, premium gaming experience. The milestone replaces the hand-built component library with shadcn/ui, deeply integrates motion.dev for interactive feel, and redesigns all major pages under a unified design system.
 
 ### Deliverables
 
-- [ ] LLM-assisted effect text → effectSchema parser (Claude API)
-- [ ] Full card database (all released OPTCG sets)
-- [ ] Spectator mode (friends can watch ongoing games)
-- [ ] Game replay / log viewer (post-game review)
-- [ ] Mobile-responsive polish across all features
-- [ ] Performance optimization (card search, game rendering, image loading)
+- [ ] Design brief — new visual direction, token values, typography, motion language
+- [ ] shadcn/ui component library replacing all hand-built Radix wrappers
+- [ ] motion.dev animation system with shared presets and utilities
+- [ ] Redesigned pages: Navbar, Home, Login, Onboarding, Deck List, Deck Builder, Lobbies
+- [ ] Game board motion integration (card play, attacks, DON!! attach, life damage, modals)
+- [ ] Updated design documentation (`.impeccable.md`, `CLAUDE.md`, design system docs)
 
 ---
 
 ## Architecture (M5-Specific)
 
-M5 doesn't introduce new services — it extends and scales existing ones.
+M5 doesn't introduce new services — it transforms the client layer.
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  Enhancements to existing systems                              │
-│                                                                │
-│  Data Pipeline (extended)                                      │
-│  ┌──────┐  ┌───────┐  ┌───────────┐  ┌───────────────────┐   │
-│  │Fetch │─▶│ Parse │─▶│ Normalize │─▶│ LLM Effect Parser │   │
-│  │(all  │  │       │  │           │  │ (Claude API)       │   │
-│  │sets) │  └───────┘  └───────────┘  │                    │   │
-│  └──────┘                            │ effectText → JSON  │   │
-│                                      │ + confidence score │   │
-│                                      │ + human review     │   │
-│                                      └───────────────────┘   │
-│                                                                │
-│  Game Server (extended)                                        │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │ + Spectator WebSocket connections                         │ │
-│  │ + Full action log persistence for replay                  │ │
-│  │ + Spectator room management                               │ │
-│  └──────────────────────────────────────────────────────────┘ │
-│                                                                │
-│  Client (extended)                                             │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │ + Spectator view (read-only game board)                   │ │
-│  │ + Replay viewer (step through game actions)               │ │
-│  │ + Mobile-optimized layouts                                │ │
-│  │ + Image optimization (WebP, lazy loading, blur-up)        │ │
-│  └──────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  Design System Foundation                                          │
+│                                                                    │
+│  Design Brief (Phase 0)                                            │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │ Riftbound reference analysis                                  │ │
+│  │ New palette, typography, motion language                      │ │
+│  │ Token mapping: current values → new values                    │ │
+│  │ Updated .impeccable.md + CLAUDE.md                            │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  Component Library (Phase 1-2)                                     │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │ shadcn/ui init + token application                            │ │
+│  │ Replace: Button, Dialog, Input, Badge, Tabs, Toast, Tooltip   │ │
+│  │ Add: Card, DropdownMenu, Select, Sheet, Skeleton, Avatar, ... │ │
+│  │ motion.dev utility module (presets, springs, easing)           │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  Page Redesigns (Phase 3)                                          │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │ Navbar → Home → Login/Onboarding → Deck List → Builder → Lobby│ │
+│  │ New components + design tokens + motion throughout             │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  Animation Layer (Phase 4-5)                                       │
+│  ┌──────────────────────────────────────────────────────────────┐ │
+│  │ Page transitions, micro-interactions, scroll animations       │ │
+│  │ Game board: card play, attack, DON!!, life, phase transitions │ │
+│  │ Performance validated at 60fps                                │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Implementation Plan
 
-### 1. LLM-Assisted Effect Parser
+### Phase 0: Design Brief
 
-The biggest scaling bottleneck in M4 is hand-authoring effectSchema for every card. M5 automates this with Claude API.
+**Goal**: Produce a comprehensive design brief that locks in all visual decisions before code changes begin. This happens in a dedicated conversation.
 
-#### Architecture
+**Inputs:**
+- Riftbound (riftbound.leagueoflegends.com) HTML/CSS sources provided by user
+- Current design tokens in `src/app/globals.css`
+- Current brand direction in `.impeccable.md`
 
-```
-Card effectText (raw English)
-  → Claude API (few-shot prompt with schema spec + examples)
-  → Candidate effectSchema JSON
-  → Confidence scoring
-  → If high confidence → auto-accept
-  → If low confidence → queue for human review
-  → Validated effectSchema written to DB
-```
+**Outputs:**
+1. `docs/design/RIFTBOUND-REFERENCE.md` — extracted design patterns (layout, spacing, animation timings, component patterns)
+2. Design brief deliverable defining:
+   - Color palette and token values (what to keep, what to change, what to adopt)
+   - Typography system (display font, body font, type scale)
+   - Motion language and timing standards
+   - Component visual patterns
+   - Token mapping: current tokens → new values
+3. Updated `.impeccable.md` and `CLAUDE.md` Design Context section
 
-#### Prompt Design
+### Phase 1: Foundation — Tooling & Tokens
 
-The prompt includes:
-1. **System prompt:** "You are an OPTCG card effect parser. Translate card effect text into the following JSON schema."
-2. **Schema specification:** Full EffectSchema TypeScript types (from M4 docs)
-3. **Examples:** 15–20 hand-authored effectSchema samples covering all common patterns
-4. **Card context:** Card name, type, color, cost, traits (helps disambiguate effect text)
-5. **Output format:** Strict JSON output, no prose
+**Goal**: Install tools, apply token values from the design brief. App renders in new palette with zero component changes.
 
-**Prompt template:**
-```
-Given this OPTCG card:
-  Name: {name}
-  Type: {type}
-  Color: {color}
-  Cost: {cost}
-  Traits: {traits}
-  Effect Text: "{effectText}"
+| Task | Files |
+|------|-------|
+| Install `motion` (motion.dev) | `package.json` |
+| Install shadcn/ui | creates `components.json` |
+| Apply new design tokens from brief | `src/app/globals.css` |
+| Add shadcn CSS variable aliases alongside existing tokens | `src/app/globals.css` |
+| Update font configuration per brief | `src/app/layout.tsx` |
+| Verify all pages render correctly with new tokens | visual QA |
 
-Translate the effect text into the following JSON schema:
-{schema_spec}
+**Key insight**: The existing token architecture is solid — components reference semantic names (`bg-surface-1`, `text-content-primary`), not literal colors. Swapping token values transforms the entire app without touching component files.
 
-Examples:
-{examples}
+### Phase 2: shadcn Component Library
 
-Output ONLY the JSON effectSchema. No explanation.
-```
+**Goal**: Replace all 7 hand-built UI components with shadcn equivalents, add new components needed for redesigns.
 
-#### Confidence Scoring
+**Replace existing** (`src/components/ui/`):
 
-Each parsed result is scored on:
-- **Structural validity:** Does the JSON match the schema? (binary)
-- **Trigger accuracy:** Does the trigger type match keywords in the effect text? (heuristic)
-- **Action coverage:** Are all clauses in the effect text represented in actions? (heuristic)
-- **Known pattern match:** Does this effect match a template we've seen before? (fuzzy match)
+| Current | shadcn Replacement | Notes |
+|---------|-------------------|-------|
+| `button.tsx` | shadcn Button | Preserve variant names (primary/secondary/ghost/destructive) |
+| `dialog.tsx` | shadcn Dialog | Preserve custom `size` prop, add `DialogBody` extension |
+| `input.tsx` | shadcn Input | Preserve `error` prop |
+| `badge.tsx` | shadcn Badge | Add TCG card color variants |
+| `tabs.tsx` | shadcn Tabs | Direct replacement |
+| `toast.tsx` | shadcn Sonner | Different API — update all toast call sites |
+| `tooltip.tsx` | shadcn Tooltip | Direct replacement |
 
-| Confidence | Action |
-|-----------|--------|
-| ≥ 0.9 | Auto-accept, write to DB |
-| 0.7 – 0.89 | Auto-accept with flag for spot-check |
-| < 0.7 | Queue for human review |
+**Add new components:**
+- Card, DropdownMenu, Select, Separator, Avatar, Sheet, Skeleton, Command
 
-#### Human Review Pipeline
+**Motion utilities** (parallel with component work):
+- New `src/lib/motion.ts` — animation presets, transition defaults, spring presets, `useReducedMotion` wrapper
+- Values derived from the design brief's motion language
 
-A simple admin UI (or CLI tool) for reviewing flagged effects:
-- Shows card image + effect text + LLM-generated JSON side by side
-- Reviewer can accept, edit, or reject
-- Edits feed back into the example set (improving future LLM accuracy)
+### Phase 3: Page Redesigns
 
-#### Cost Estimation
+Pages redesigned in priority order. Each gets new shadcn components, design tokens, and motion treatment.
 
-Assuming ~1,500 total cards across all OPTCG sets:
-- ~500 tokens per prompt (schema spec cached in system prompt)
-- ~200 tokens per response
-- Total: ~1,500 × 700 = ~1.05M tokens
-- At Claude 3.5 Sonnet pricing: ~$3–5 total (very cheap)
-- Multiple passes for low-confidence cards: 2–3x → ~$10–15 total
+| Priority | Page | File(s) | Impact |
+|----------|------|---------|--------|
+| 3A | Navbar | `src/components/nav/navbar.tsx` | Highest — visible on every page |
+| 3B | Home/Landing | `src/app/page.tsx` | First impression — emotional impact |
+| 3C | Login + Onboarding | `src/app/(auth)/login/page.tsx`, `onboarding/page.tsx` | Auth flow polish |
+| 3D | Deck List | `src/app/decks/page.tsx` | Collection browsing |
+| 3E | Deck Builder | `src/components/deck-builder/deck-builder-shell.tsx` + children | Highest effort — most user time |
+| 3F | Lobbies | `src/components/lobbies/lobbies-shell.tsx` | Play enablement |
 
-### 2. Full Card Database
+All redesigns include mobile/responsive treatment (3 breakpoints: <640px, 640-1024px, >1024px).
 
-#### Scale
+### Phase 4: Motion Deep Integration
 
-As of 2026, OPTCG has released multiple sets (OP01 through OP10+). The pipeline must handle:
+**Goal**: Layer animation across all non-game surfaces.
 
-| Metric | Estimate |
-|--------|---------|
-| Total cards | ~1,500–2,000 |
-| Art variants | ~500–800 (parallels, SECs, promos) |
-| Card images | ~2,500–3,000 files |
-| Image storage | ~2–3 GB (compressed WebP) |
-| DB records | ~2,000 card rows |
+| Task | Scope |
+|------|-------|
+| Page transitions | `AnimatePresence` in layout wrapper, fade+slide between routes |
+| Micro-interactions | Button press, card hover, toast entrance, dialog/tooltip animation, dropdown cascade |
+| Scroll animations | Element reveal on scroll, parallax where appropriate |
+| Loading states | Skeleton shimmer, staggered grid skeleton, smooth skeleton→content transition |
 
-#### Pipeline Scaling
+### Phase 5: Game Board Motion & Polish
 
-- **Batch processing:** Run pipeline per-set; each set is independent
-- **Incremental updates:** Diff against existing DB; only update changed cards
-- **Errata tracking:** When a card's text changes, update `effectText` + re-run LLM parser for new `effectSchema`
-- **New set onboarding:** Scrape → Parse → LLM-parse effects → Review → Publish (target: < 1 week per new set)
+**Goal**: Bring motion.dev to the game board without breaking drag-drop or performance.
 
-#### Image Optimization
-
-- Convert all card images to WebP (30–50% smaller than JPEG)
-- Generate multiple sizes: thumbnail (150px), grid (300px), detail (600px), full (900px)
-- Serve via Cloudflare CDN with cache headers (cards are immutable once published)
-- Lazy loading on card grids with blur-up placeholder
-
-### 3. Spectator Mode
-
-#### Design
-
-- Friends of either player can join a game as spectators
-- Spectators see the same game board as players, but:
-  - Hands are hidden (or optionally shown with a delay)
-  - No interaction buttons (read-only)
-  - Spectator count shown to players
-- Spectators join via a link shared by a player or from the friend's "in-game" status
-
-#### Implementation
-
-**WebSocket changes:**
-- New room type: `game:{gameId}:spectators`
-- Spectators receive `game:update` events (same as players)
-- Spectator-specific state filtering: remove hand contents from broadcast
-- Hand reveal option: host can enable "spectator hand view" (with configurable delay, e.g. 30 seconds)
-
-**API changes:**
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/games/:id/spectate` | Join as spectator |
-| `GET` | `/api/games/:id/spectators` | List spectators |
-| `DELETE` | `/api/games/:id/spectate` | Leave spectator view |
-
-**UI changes:**
-- Spectator uses the same `GameBoard` component in read-only mode
-- "Spectating" banner at top with spectator count
-- Chat sidebar for spectator commentary (text-only, visible to other spectators)
-
-### 4. Game Replay / Log Viewer
-
-#### Design
-
-After a game ends, either player can review the full game as a step-by-step replay.
-
-#### Implementation
-
-**Data source:** `GameActionLog` table (from M3) already stores every action with turn, phase, and timestamp.
-
-**Replay engine:**
-```typescript
-class ReplayEngine {
-  private actions: GameActionLog[];
-  private currentIndex: number;
-  private gameState: GameState;
-
-  constructor(actions: GameActionLog[]) {
-    this.actions = actions;
-    this.currentIndex = 0;
-    this.gameState = this.buildInitialState();
-  }
-
-  stepForward(): GameState {
-    // Apply next action to game state
-    this.currentIndex++;
-    return this.applyAction(this.actions[this.currentIndex]);
-  }
-
-  stepBackward(): GameState {
-    // Rebuild state from start up to currentIndex - 1
-    this.currentIndex--;
-    return this.rebuildState(this.currentIndex);
-  }
-
-  jumpToTurn(turn: number): GameState {
-    // Rebuild state up to the first action of the given turn
-  }
-
-  getTimeline(): TimelineEntry[] {
-    // Return summarized timeline for scrubber UI
-  }
-}
-```
-
-**UI:**
-- Same `GameBoard` component, rendered from replay state
-- Playback controls: ⏮ ⏪ ▶️ ⏩ ⏭ (start, back, play, forward, end)
-- Turn scrubber: slider or timeline showing all turns
-- Speed control: 1x, 2x, 4x
-- Action-by-action text log alongside the board
-
-**Access:**
-- Both players can access replay from their game history
-- Replay link shareable (public replays as stretch goal)
-- Spectators can also access replay after game ends
-
-### 5. Mobile-Responsive Polish
-
-#### Breakpoints
-
-| Breakpoint | Width | Target |
-|-----------|-------|--------|
-| Mobile | < 640px | Phones |
-| Tablet | 640–1024px | Tablets, small laptops |
-| Desktop | > 1024px | Desktop browsers |
-
-#### Module-Specific Mobile Adaptations
-
-**Deck Builder:**
-- Single-column layout (search on top, deck list below)
-- Card grid: 2 columns on mobile (vs 4–5 on desktop)
-- Filter panel: collapsible bottom sheet
-- Deck stats (cost curve, colors): horizontal scroll cards
-
-**Social:**
-- Friend list: full-width list with swipe actions (message, invite)
-- Messaging: standard mobile chat layout (conversation list → thread)
-- Lobby browser: card-style list items
-
-**Game Board:**
-- Most complex mobile layout
-- Opponent area at top (compressed), your area at bottom
-- Hand as a horizontal scrollable row at bottom
-- Tap card → action menu (play, attach DON!!, etc.)
-- Phase/action buttons as a fixed bottom bar
-- Game log: slide-up panel
-
-**Game board mobile layout:**
-```
-┌─────────────────────────────┐
-│ Opponent: Leader │ Chars... │  ← compressed, tap to expand
-│ Life: 4 │ DON: 8 │ Deck: 38│
-├─────────────────────────────┤
-│                             │
-│   Your Characters           │
-│   [Card] [Card] [Card]     │
-│                             │
-│   Your Leader    │ Stage    │
-│                             │
-├─────────────────────────────┤
-│ Hand: [C][C][C][C][C] →    │  ← horizontal scroll
-├─────────────────────────────┤
-│ [MAIN] [End Phase] [Menu]  │  ← fixed bottom bar
-└─────────────────────────────┘
-```
-
-### 6. Performance Optimization
-
-| Area | Optimization |
-|------|-------------|
-| Card search | Client-side index (Fuse.js or MiniSearch) for instant search if total cards < 5,000; server for complex filters |
-| Card images | WebP format, responsive `srcset`, lazy loading, CDN cache |
-| Game state | Delta updates over WebSocket (send only changes, not full state) |
-| Bundle size | Dynamic imports for game board, replay viewer; tree-shake unused components |
-| DB queries | Query plan analysis on card search; add indexes as needed |
-| WebSocket | Binary protocol (MessagePack) if JSON overhead becomes measurable |
+| Task | Files |
+|------|-------|
+| Card play animation (hand → field) | `hand-layer.tsx`, `field-card.tsx` |
+| Attack animation | `field-card.tsx` |
+| DON!! attach animation | `don-zone.tsx` |
+| Life damage feedback | `life-zone.tsx` |
+| Phase/turn transitions | `mid-zone.tsx` |
+| Modal animations | All 6 game modals |
+| Performance validation (60fps) | Profile on mid-range hardware |
+| `useReducedMotion` fallbacks | All animated components |
 
 ---
 
-## Roadmap
+## Sequencing
 
-| Step | Task | Est. |
-|------|------|------|
-| 1 | Build LLM effect parser (prompt design, Claude API integration) | 3–4 days |
-| 2 | Build confidence scoring system | 1–2 days |
-| 3 | Build human review CLI/UI | 1–2 days |
-| 4 | Run LLM parser on all remaining sets, review results | 5–7 days |
-| 5 | Scale data pipeline to all sets (scrape, parse, publish) | 3–4 days |
-| 6 | Image optimization pipeline (WebP conversion, responsive sizes) | 1–2 days |
-| 7 | Implement spectator WebSocket + UI | 3–4 days |
-| 8 | Build replay engine + viewer UI | 3–4 days |
-| 9 | Mobile-responsive pass: deck builder | 2–3 days |
-| 10 | Mobile-responsive pass: social features | 1–2 days |
-| 11 | Mobile-responsive pass: game board | 3–5 days |
-| 12 | Performance optimization pass | 2–3 days |
-| 13 | Cross-browser testing + bug fixes | 2–3 days |
+```
+Phase 0 (Design Brief)  ████                    ← separate conversation
+Phase 1 (Foundation)          ████████
+Phase 2 (Components)                  ████████
+Phase 3 (Redesigns)                           ████████████████
+Phase 4 (Motion)                                      ████████████
+Phase 5 (Game Board)                                            ████████████
 
-**Total estimate: ~26–38 days**
+Playtesting/Bug fixes    ████████████████████████████████████████████████████████
+```
+
+Phases 0→1→2→3 are strictly sequential. Within Phase 3, pages can be parallelized after the navbar (3A) is done. Phase 4 overlaps with late Phase 3. Phase 5 is last — most complex and most sensitive to regressions.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] LLM parser produces valid effectSchema for ≥ 80% of cards without human intervention
-- [ ] Human review pipeline clears remaining cards within 1 week per set
-- [ ] All released OPTCG sets are fully populated in the card database
-- [ ] Card images load in < 200ms (CDN, optimized formats)
-- [ ] Spectators can watch a live game without affecting gameplay
-- [ ] Spectator view correctly hides hand information
-- [ ] Game replay accurately reproduces the full game state at every step
-- [ ] Replay controls (forward, back, jump to turn) work correctly
-- [ ] Deck builder is fully usable on mobile (320px+ width)
-- [ ] Game board is playable on mobile (touch targets ≥ 44px, readable text)
-- [ ] Lighthouse performance score ≥ 80 on key pages (card search, deck builder)
+- [ ] Design brief reviewed and approved before implementation begins
+- [ ] All existing pages render with new tokens — no broken styles, no console errors
+- [ ] All existing functionality works with shadcn components — no import errors
+- [ ] Each redesigned page matches design brief, responsive at mobile/tablet/desktop
+- [ ] Animations at 60fps, `prefers-reduced-motion` respected, no layout shifts
+- [ ] Game board drag-drop works flawlessly with motion.dev, no frame drops
+- [ ] Full user flow (home → login → deck builder → lobby → game) feels cohesive and polished
+- [ ] WCAG AA accessibility maintained (4.5:1 contrast, focus visible, 44px touch targets)
 
 ---
 
@@ -353,37 +196,31 @@ class ReplayEngine {
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
-| LLM parser accuracy lower than expected | More manual review needed | Iterate on prompt with more examples; fine-tune or use structured output mode |
-| New card mechanics not in schema vocabulary | Parser can't handle them | Schema is extensible — add new ActionTypes/TriggerTypes as mechanics are introduced |
-| Mobile game board UX is too cramped | Players can't effectively play on mobile | Prioritize tablet (640px+) as minimum playable size; mobile shows read-only spectator view |
-| Replay engine slow for long games (300+ actions) | Laggy scrubber | Cache state snapshots every N actions; rebuild from nearest snapshot instead of from start |
-| Full card image set exceeds R2 free tier | Storage costs | R2 free tier is 10GB — estimate 2–3GB for all images. Should be fine; monitor usage |
-| Official OPTCG site structure changes break scraper | Pipeline fails silently | Store raw HTML snapshots; add scraper health checks; alert on parse failure rate > 5% |
+| shadcn init conflicts with Tailwind v4 | Blocks foundation | shadcn v2+ supports Tailwind v4 natively via `@theme inline` — same mechanism project uses |
+| Replacing UI components breaks existing pages | Regressions | Keep API surface identical where possible; replace one component at a time; test all usages |
+| motion.dev performance on game board | Frame drops | Profile early; use GPU-accelerated transforms only; `useReducedMotion` for accessibility |
+| Design brief iteration takes longer than expected | Delays all phases | Brief is a dedicated focused conversation; keep scope to tokens + typography + motion language |
+| Scope creep with animation polish | Never ships | Ship functional redesign (Phases 1-3) first, layer motion (4-5) incrementally |
 
 ---
 
 ## Dependencies
 
-- M0–M4 complete (full game simulator with automated effects for 1–2 sets)
-- Claude API key (for LLM effect parsing)
-- All OPTCG set data accessible (scraper or community sources)
+- M0–M4 complete (full game simulator with automated effects)
+- Riftbound HTML/CSS reference sources (provided by user)
+- Playtesting feedback informing UX priorities
 
 ---
 
-## Post-M5 Considerations
+## Relationship to Other Milestones
 
-These are out of scope for v1 but worth tracking:
-
-| Feature | Notes |
-|---------|-------|
-| AI/Bot opponent | Single-player mode; requires game-playing agent (hard problem) |
-| Tournament brackets | Lobby system could extend to bracket management |
-| Card trading/marketplace | Requires economy design; probably not aligned with simulator focus |
-| Animated card effects | WebGL/Canvas rendering for flashy effect resolution |
-| Native mobile app | React Native or Capacitor wrapper around the web app |
-| Deck analytics | Win rate tracking per deck, meta analysis, popular card stats |
-| Community features | Deck sharing, deck comments, user ratings |
+| Milestone | Relationship |
+|-----------|-------------|
+| M2.5 (Design System) | M5 supersedes — replaces token system and component library |
+| M4/M4.5 (Effect Engine) | Game board motion (Phase 5) builds on stable M4 engine |
+| M6 (Scale & Features) | Old M5 content — LLM parsing, spectator, replay, full card DB |
+| M7 (Effect Showcase) | Old M6 content — interactive effect testing harness |
 
 ---
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-30_
