@@ -231,9 +231,10 @@ function processTriggerQueuePipeline(
 
     // LIFO: scan result events for new triggers and insert at front
     if (result.events.length > 0) {
-      const newTriggers = scanEventsForTriggers(nextState, result.events, next.controller, cardDb);
-      if (newTriggers.length > 0) {
-        queue.unshift(...newTriggers);
+      const scanResult = scanEventsForTriggers(nextState, result.events, next.controller, cardDb);
+      nextState = scanResult.state;
+      if (scanResult.triggers.length > 0) {
+        queue.unshift(...scanResult.triggers);
       }
     }
   }

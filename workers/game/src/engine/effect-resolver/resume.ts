@@ -391,6 +391,16 @@ export function resumeFromStack(
           }
           return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
         }
+
+        // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
+        if (chainResult.events.length > 0) {
+          const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
+          nextState = chainScan.state;
+          if (chainScan.triggers.length > 0) {
+            const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+            return processRemainingTriggers(nextState, allTriggers, cardDb, events);
+          }
+        }
       }
 
       return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
@@ -484,6 +494,16 @@ export function resumeFromStack(
           }
           return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
         }
+
+        // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
+        if (chainResult.events.length > 0) {
+          const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
+          nextState = chainScan.state;
+          if (chainScan.triggers.length > 0) {
+            const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+            return processRemainingTriggers(nextState, allTriggers, cardDb, events);
+          }
+        }
       }
 
       return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
@@ -516,6 +536,16 @@ export function resumeFromStack(
         return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
       }
 
+      // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
+      if (result.events.length > 0) {
+        const chainScan = scanEventsForTriggers(nextState, result.events, controller, cardDb);
+        nextState = chainScan.state;
+        if (chainScan.triggers.length > 0) {
+          const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+          return processRemainingTriggers(nextState, allTriggers, cardDb, events);
+        }
+      }
+
       return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
     }
 
@@ -540,6 +570,16 @@ export function resumeFromStack(
 
         if (chainResult.pendingPrompt) {
           return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+        }
+
+        // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
+        if (chainResult.events.length > 0) {
+          const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
+          nextState = chainScan.state;
+          if (chainScan.triggers.length > 0) {
+            const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+            return processRemainingTriggers(nextState, allTriggers, cardDb, events);
+          }
         }
       }
 
@@ -609,12 +649,13 @@ export function resumeFromStack(
 
       // Scan for nested triggers (LIFO — resolve before returning to simultaneous set)
       if (result.events.length > 0) {
-        const nestedTriggers = scanEventsForTriggers(
+        const scanResult = scanEventsForTriggers(
           nextState, result.events, chosenTrigger.controller, cardDb,
         );
-        if (nestedTriggers.length > 0) {
+        nextState = scanResult.state;
+        if (scanResult.triggers.length > 0) {
           // Process nested triggers first, then come back to remaining simultaneous
-          const nestedResult = processRemainingTriggers(nextState, nestedTriggers, cardDb, events);
+          const nestedResult = processRemainingTriggers(nextState, scanResult.triggers, cardDb, events);
           nextState = nestedResult.state;
           // nestedResult.events already includes our prior events (passed as priorEvents)
           if (nestedResult.pendingPrompt) {
@@ -674,11 +715,12 @@ export function resumeFromStack(
 
         // Scan for nested triggers from last resolved trigger
         if (lastResult.events.length > 0) {
-          const nestedTriggers = scanEventsForTriggers(
+          const scanResult2 = scanEventsForTriggers(
             nextState, lastResult.events, remaining[0].controller, cardDb,
           );
-          if (nestedTriggers.length > 0) {
-            const nestedResult = processRemainingTriggers(nextState, nestedTriggers, cardDb, events);
+          nextState = scanResult2.state;
+          if (scanResult2.triggers.length > 0) {
+            const nestedResult = processRemainingTriggers(nextState, scanResult2.triggers, cardDb, events);
             nextState = nestedResult.state;
             if (nestedResult.pendingPrompt) {
               const newTop = peekFrame(nextState) as EffectStackFrame | null;

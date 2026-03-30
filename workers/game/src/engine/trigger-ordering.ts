@@ -10,6 +10,8 @@ import type { EffectBlock } from "./effect-types.js";
 import {
   matchTriggersForEvent,
   orderMatchedTriggers,
+  registerTriggersForCard,
+  registerReplacementsForCard,
 } from "./triggers.js";
 import { pushFrame, generateFrameId } from "./effect-stack.js";
 import { findCardInstance } from "./state.js";
@@ -26,8 +28,27 @@ export function scanEventsForTriggers(
   events: { type: import("../types.js").GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[],
   defaultController: 0 | 1,
   cardDb: Map<string, CardData>,
-): QueuedTrigger[] {
+): { triggers: QueuedTrigger[]; state: GameState } {
   const triggers: QueuedTrigger[] = [];
+  let nextState = state;
+
+  // Register triggers for newly played cards before matching
+  for (const event of events) {
+    if (event.type === "CARD_PLAYED") {
+      const cardId = event.payload?.cardId as string | undefined;
+      const cardInstanceId = event.payload?.cardInstanceId as string | undefined;
+      if (!cardId || !cardInstanceId) continue;
+
+      const cardData = cardDb.get(cardId);
+      if (!cardData) continue;
+
+      const instance = findCardInstance(nextState, cardInstanceId);
+      if (instance) {
+        nextState = registerTriggersForCard(nextState, instance, cardData);
+        nextState = registerReplacementsForCard(nextState, instance, cardData);
+      }
+    }
+  }
 
   for (const event of events) {
     const gameEvent = {
@@ -37,10 +58,10 @@ export function scanEventsForTriggers(
       timestamp: Date.now(),
     };
 
-    const matched = matchTriggersForEvent(state, gameEvent, cardDb);
+    const matched = matchTriggersForEvent(nextState, gameEvent, cardDb);
     if (matched.length === 0) continue;
 
-    const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
+    const ordered = orderMatchedTriggers(matched, nextState.turn.activePlayerIndex);
     for (const match of ordered) {
       triggers.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
@@ -51,7 +72,7 @@ export function scanEventsForTriggers(
     }
   }
 
-  return triggers;
+  return { triggers, state: nextState };
 }
 
 // ─── buildTriggerSelectionPrompt ────────────────────────────────────────────
