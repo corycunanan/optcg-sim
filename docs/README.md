@@ -23,8 +23,12 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 | M2.5 | Design System | [M2.5-DESIGN-SYSTEM.md](./milestones/M2.5-DESIGN-SYSTEM.md) |
 | M3 | Simulator (Core) | [M3-SIMULATOR-CORE.md](./milestones/M3-SIMULATOR-CORE.md) |
 | M3.5 | Simulator Tech Debt | [M3.5-SIMULATOR-TECH-DEBT.md](./milestones/M3.5-SIMULATOR-TECH-DEBT.md) |
+| M3.75 | Game Board UI Tech Debt | [M3.75-GAME-BOARD-UI-TECH-DEBT.md](./milestones/M3.75-GAME-BOARD-UI-TECH-DEBT.md) |
 | M4 | Effect Engine | [M4-EFFECT-ENGINE.md](./milestones/M4-EFFECT-ENGINE.md) |
+| M4.5 | Schema QA | [M4.5-SCHEMA-QA.md](./milestones/M4.5-SCHEMA-QA.md) |
+| M4.5 P4 | Integration Testing | [M4.5-PHASE4-INTEGRATION-TESTING.md](./milestones/M4.5-PHASE4-INTEGRATION-TESTING.md) |
 | M5 | Polish & Scale | [M5-POLISH-AND-SCALE.md](./milestones/M5-POLISH-AND-SCALE.md) |
+| M6 | Effect Showcase | [M6-EFFECT-SHOWCASE.md](./milestones/M6-EFFECT-SHOWCASE.md) |
 
 ## Game Engine
 
@@ -62,4 +66,4 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ---
 
-_Last updated: 2026-03-23_
+_Last updated: 2026-03-30_

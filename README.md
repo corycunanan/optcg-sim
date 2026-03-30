@@ -15,7 +15,7 @@ A full-featured web application for playing the **One Piece Trading Card Game** 
 | **Image CDN** | Cloudflare R2 + Workers |
 | **Card Data** | vegapull v1.2.0 (Rust CLI) → TypeScript ETL pipeline |
 | **Frontend Hosting** | Vercel |
-| **Testing** | Vitest (game engine) |
+| **Testing** | Vitest (game engine, 158 tests) |
 
 ## Getting Started
 
@@ -30,7 +30,7 @@ A full-featured web application for playing the **One Piece Trading Card Game** 
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-org/optcg-sim.git
+git clone https://github.com/cory-cunanan/optcg-sim.git
 cd optcg-sim
 
 # Install dependencies (root + workers)
@@ -180,11 +180,8 @@ The game engine is **purely functional** — all logic is `(state, action) → n
 | **M3.5** | Simulator Tech Debt | Engine decomposition (execute→phases/battle split), `shared/game-types.ts`, Vitest suite (~95 tests), rules fixes (life-out, blocker once-per-battle), M4 prep utilities, design-token migration for game board | **Done** |
 | **M3.75** | Game Board UI Tech Debt | Single visual board path, `useGameSession` hook, board-layout modular extraction (7 zone modules), `CardDb`/`TooltipStat` consolidation, React.memo + error boundary, retire text board | **Done** |
 
-### In Progress
-
-| Phase | Title | Scope | Status |
-|-------|-------|-------|--------|
-| **M4** | Effect Engine | Automated effect resolution from `effectSchema`: triggers, resolver, targeting, prohibitions/replacements, durations, modifier layers, scheduled actions. Hand-authored schemas for OP01 (~120 cards). Interruption modals (arrange cards, select targets, player choices). | **Active** |
+| **M4** | Effect Engine | Automated effect resolution from `effectSchema`: triggers, resolver, targeting, prohibitions/replacements, durations, modifier layers, scheduled actions. Hand-authored schemas for all 51 sets (~2,500 cards). Interruption modals (arrange cards, select targets, player choices). | **Done** |
+| **M4.5** | Schema QA | Validate, fix, and harden all card effect schemas. TypeScript fixes, low-confidence review, deferred pattern implementation (~480 cards unblocked), 158 integration tests. | **Done** |
 
 ### Not Started
 
@@ -193,15 +190,15 @@ The game engine is **purely functional** — all logic is `(state, action) → n
 | **M1** | Deck Builder | Card search API + UI, deck editor with real-time OPTCG validation, cost curve/color stats, bulk import/export, per-user deck CRUD, mobile-responsive |
 | **M2** | Social | Friends (search/request/list), real-time DMs, lobbies (create/browse/invite/join), WebSocket presence layer |
 | **M5** | Polish & Scale | LLM-assisted effect parsing for full card pool, spectator mode, replay viewer, mobile polish, performance optimization |
+| **M6** | Effect Showcase | Interactive testing harness for card effect executions — scenario catalog, pre-built board states, step-by-step prompt walkthroughs |
 
 > **Note:** M1 (Deck Builder) and M2 (Social) have basic functional implementations already — deck building and lobbies work — but haven't been formally scoped/polished to milestone spec yet. M3 was prioritized ahead of them.
 
-### Post-M5 (Future)
+### Post-M6 (Future)
 
 - AI opponents / bots
 - Tournament bracket system
 - Ranked matchmaking
-- OP02+ card set encoding
 - Mobile-native app
 
 ## Game Engine
@@ -216,7 +213,7 @@ The engine lives in `workers/game/src/engine/` and processes every game action t
 6. **Advance** — auto-advance phases when possible (refresh, draw, DON)
 7. **Prompt** — if player input is needed, set `activePrompt` and wait
 
-All state is immutable — no mutations, no side effects. ~95 tests cover pipeline integration and unit behavior.
+All state is immutable — no mutations, no side effects. 158 tests cover pipeline integration and unit behavior.
 
 ## Documentation
 
