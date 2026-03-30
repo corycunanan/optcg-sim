@@ -271,12 +271,10 @@ export function executeRevealTrigger(
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
-        // If the trigger effect needs player input, surface the prompt
+        // If the trigger effect needs player input, end the battle first
+        // then surface the prompt — battle is over, we're just resolving the effect
         if (effectResult.pendingPrompt) {
-          // Clear pending trigger and pass through prompt
-          const cleanedBattle = { ...battle };
-          delete (cleanedBattle as any).pendingTriggerLifeCard;
-          nextState = { ...nextState, turn: { ...nextState.turn, battle: cleanedBattle } };
+          nextState = endBattle(nextState, events);
           return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
         }
       }

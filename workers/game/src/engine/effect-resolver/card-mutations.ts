@@ -33,6 +33,8 @@ export function koCharacter(
       donCostArea: [...player.donCostArea, ...returnedDon],
     };
 
+    const isOpponentEffect = causingController !== pi;
+
     return {
       state: { ...state, players: newPlayers },
       events: [{
@@ -41,7 +43,7 @@ export function koCharacter(
         payload: {
           cardInstanceId: instanceId,
           cardId: char.cardId,
-          cause: "EFFECT",
+          cause: isOpponentEffect ? "OPPONENT_EFFECT" : "EFFECT",
           causingController,
         },
       }],
