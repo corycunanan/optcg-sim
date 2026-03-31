@@ -27,7 +27,7 @@ export default async function Home() {
       <div className="relative z-10 mt-auto ml-auto">
         <Link
           href={session ? "/lobbies" : "/login"}
-          className="btn-ornamental inline-block rounded-md bg-gold-500 px-12 py-5 text-xl font-semibold text-navy-900 transition-colors hover:bg-gold-400"
+          className="btn-ornamental inline-block rounded-md bg-gold-500 px-12 py-5 text-xl font-semibold text-navy-900 transition-colors hover:bg-gold-400 [--btn-ornamental-color:var(--gold-500)] hover:[--btn-ornamental-color:var(--gold-400)]"
         >
           Play Now
         </Link>
