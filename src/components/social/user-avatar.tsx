@@ -1,3 +1,8 @@
+"use client";
+
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+
 interface User {
   username: string | null;
   name: string | null;
@@ -8,32 +13,30 @@ interface UserAvatarProps {
   user: User;
   size?: "sm" | "md";
   variant?: "light" | "dark";
+  className?: string;
 }
 
-export function UserAvatar({ user, size = "md", variant = "light" }: UserAvatarProps) {
-  const sizeClass = size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm";
+export function UserAvatar({ user, size = "md", variant = "light", className }: UserAvatarProps) {
   const initials = (user.username || user.name || "?").charAt(0).toUpperCase();
-  const fallbackClass =
-    variant === "dark"
-      ? "bg-navy-700 text-content-inverse"
-      : "bg-navy-900 text-content-inverse";
-
-  if (user.image) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={user.image}
-        alt=""
-        className={`${sizeClass} rounded-full object-cover`}
-      />
-    );
-  }
 
   return (
-    <div
-      className={`${sizeClass} flex items-center justify-center rounded-full font-semibold ${fallbackClass}`}
+    <Avatar
+      className={cn(
+        size === "sm" ? "size-8" : "size-10",
+        className,
+      )}
     >
-      {initials}
-    </div>
+      {user.image && <AvatarImage src={user.image} alt="" />}
+      <AvatarFallback
+        className={cn(
+          "text-xs font-semibold",
+          variant === "dark"
+            ? "bg-navy-700 text-content-inverse"
+            : "bg-navy-900 text-content-inverse",
+        )}
+      >
+        {initials}
+      </AvatarFallback>
+    </Avatar>
   );
 }

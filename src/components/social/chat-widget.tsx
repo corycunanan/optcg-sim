@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { X, Minus, ChevronUp } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 
 interface User {
@@ -35,12 +38,10 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
 
-  // Keep ref in sync so the poll interval can read latest messages without stale closure
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
-  // Initial load
   useEffect(() => {
     setLoading(true);
     fetch(`/api/messages/${user.id}`)
@@ -52,7 +53,6 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       .catch(() => setLoading(false));
   }, [user.id]);
 
-  // Poll for new messages every 5 seconds when widget is open
   useEffect(() => {
     if (loading) return;
     const interval = setInterval(async () => {
@@ -113,7 +113,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
         sidebarCollapsed ? "right-10" : "right-64",
       )}
     >
-      {/* Header — click to minimize/restore */}
+      {/* Header */}
       <div
         className="flex cursor-pointer items-center gap-2 rounded-t-lg bg-navy-900 px-3 py-2"
         onClick={() => setMinimized((v) => !v)}
@@ -122,20 +122,24 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
         <span className="flex-1 truncate text-sm font-semibold text-content-inverse">
           {displayName}
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}
-          className="rounded px-1 text-xs text-content-inverse/60 transition-colors hover:text-content-inverse"
+          className="size-6 text-content-inverse/60 hover:text-content-inverse hover:bg-transparent"
           title={minimized ? "Expand" : "Minimize"}
         >
-          {minimized ? "▲" : "▼"}
-        </button>
-        <button
+          {minimized ? <ChevronUp className="size-3" /> : <Minus className="size-3" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="rounded px-1 text-xs text-content-inverse/60 transition-colors hover:text-content-inverse"
+          className="size-6 text-content-inverse/60 hover:text-content-inverse hover:bg-transparent"
           title="Close"
         >
-          ✕
-        </button>
+          <X className="size-3" />
+        </Button>
       </div>
 
       {/* Body */}
@@ -145,7 +149,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
           <div className="h-80 overflow-y-auto bg-surface-1 px-3 py-3 space-y-2">
             {loading && (
               <p className="py-6 text-center text-xs text-content-tertiary">
-                Loading…
+                Loading...
               </p>
             )}
             {!loading && messages.length === 0 && (
@@ -181,21 +185,21 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
             onSubmit={send}
             className="flex gap-2 border-t border-border bg-surface-1 px-3 py-2"
           >
-            <input
+            <Input
               ref={inputRef}
               type="text"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={`Message ${displayName}…`}
-              className="flex-1 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-content-primary placeholder:text-content-tertiary focus:outline-none"
+              placeholder={`Message ${displayName}...`}
+              className="h-8 flex-1 bg-surface-2 text-xs"
             />
-            <button
+            <Button
               type="submit"
+              size="sm"
               disabled={!body.trim() || sending}
-              className="rounded-md bg-navy-900 px-3 py-2 text-xs font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50"
             >
               Send
-            </button>
+            </Button>
           </form>
         </>
       )}

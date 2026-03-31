@@ -2,6 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { UserPlus, ChevronRight, ChevronLeft, Check, X, MoreHorizontal } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -21,32 +30,6 @@ interface FriendEntry {
 interface FriendRequest {
   id: string;
   fromUser?: SidebarUser;
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function IconAddFriend({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={cn("h-4 w-4", className)}>
-      <path d="M8 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6a5 5 0 0 1 10 0H3zm13-5v-2h-2V8h2V6h1v2h2v1h-2v2h-1z" />
-    </svg>
-  );
-}
-
-function IconChevronRight({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={cn("h-4 w-4", className)}>
-      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0z" clipRule="evenodd" />
-    </svg>
-  );
-}
-
-function IconChevronLeft({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={cn("h-4 w-4", className)}>
-      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 0 1 0 1.414L9.414 10l3.293 3.293a1 1 0 0 1-1.414 1.414l-4-4a1 1 0 0 1 0-1.414l4-4a1 1 0 0 1 1.414 0z" clipRule="evenodd" />
-    </svg>
-  );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -75,7 +58,6 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SidebarUser[]>([]);
   const [pendingSent, setPendingSent] = useState<Set<string>>(new Set());
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; userId: string } | null>(null);
 
   const fetchFriendsData = useCallback(async () => {
     const [friendsRes, requestsRes] = await Promise.all([
@@ -98,13 +80,6 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
     return () => clearInterval(t);
   }, [fetchFriendsData]);
 
-  useEffect(() => {
-    if (!contextMenu) return;
-    function dismiss() { setContextMenu(null); }
-    document.addEventListener("mousedown", dismiss);
-    return () => document.removeEventListener("mousedown", dismiss);
-  }, [contextMenu]);
-
   const search = useCallback(async (q: string) => {
     setSearchQ(q);
     if (q.length < 2) { setSearchResults([]); return; }
@@ -114,7 +89,6 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
   }, []);
 
   const removeFriend = useCallback(async (userId: string) => {
-    setContextMenu(null);
     await fetch(`/api/friends/${userId}`, { method: "DELETE" });
     setFriends((prev) => prev.filter((f) => f.user.id !== userId));
   }, []);
@@ -151,15 +125,17 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
         "sticky z-20 flex w-10 shrink-0 flex-col items-center border-l border-navy-700 bg-navy-900 py-3 gap-3",
         hideNav ? "top-0 h-screen" : "top-16 h-[calc(100vh-4rem)]",
       )}>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={() => onCollapse(false)}
           title="Expand"
-          className="rounded p-1 text-content-inverse/50 transition-colors hover:bg-navy-800 hover:text-content-inverse"
+          className="text-content-inverse/50 hover:bg-navy-800 hover:text-content-inverse"
         >
-          <IconChevronLeft />
-        </button>
+          <ChevronLeft className="size-4" />
+        </Button>
         {incoming.length > 0 && (
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gold-500 text-[10px] font-bold text-navy-900">
+          <span className="flex size-4 items-center justify-center rounded-full bg-gold-500 text-[10px] font-bold text-navy-900">
             {incoming.length > 9 ? "9+" : incoming.length}
           </span>
         )}
@@ -178,23 +154,26 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
       {/* Header */}
       <div className="flex items-center gap-1 border-b border-navy-700 px-3 py-3">
         <span className="flex-1 text-xs font-semibold text-content-inverse/70">Friends</span>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={() => { setAddOpen((v) => !v); setSearchQ(""); setSearchResults([]); }}
           title="Add friend"
           className={cn(
-            "rounded p-1 transition-colors",
             addOpen ? "text-gold-500" : "text-content-inverse/50 hover:bg-navy-800 hover:text-content-inverse",
           )}
         >
-          <IconAddFriend />
-        </button>
-        <button
+          <UserPlus className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={() => onCollapse(true)}
           title="Collapse"
-          className="rounded p-1 text-content-inverse/50 transition-colors hover:bg-navy-800 hover:text-content-inverse"
+          className="text-content-inverse/50 hover:bg-navy-800 hover:text-content-inverse"
         >
-          <IconChevronRight />
-        </button>
+          <ChevronRight className="size-4" />
+        </Button>
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -202,12 +181,12 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
         {/* Add friend search */}
         {addOpen && (
           <div className="border-b border-navy-700 px-3 py-3 space-y-2">
-            <input
+            <Input
               type="text"
               value={searchQ}
               onChange={(e) => search(e.target.value)}
-              placeholder="Search by username…"
-              className="w-full rounded-md bg-navy-800 px-3 py-2 text-xs text-content-inverse placeholder:text-content-inverse/40 focus:outline-none"
+              placeholder="Search by username..."
+              className="h-8 bg-navy-800 text-xs text-content-inverse placeholder:text-content-inverse/40 border-transparent focus-visible:outline-gold-500"
             />
             {searchResults.length > 0 && (
               <div className="space-y-1">
@@ -251,20 +230,24 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
                   <span className="flex-1 truncate text-xs font-medium text-content-inverse">
                     {req.fromUser?.username || req.fromUser?.name}
                   </span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => handleFriendRequest(req.id, "accept")}
                     title="Accept"
-                    className="rounded px-1 py-1 text-xs font-bold text-gold-500 transition-colors hover:text-gold-400"
+                    className="size-6 text-gold-500 hover:text-gold-400"
                   >
-                    ✓
-                  </button>
-                  <button
+                    <Check className="size-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => handleFriendRequest(req.id, "decline")}
                     title="Decline"
-                    className="rounded px-1 py-1 text-xs text-content-inverse/40 transition-colors hover:text-content-inverse/70"
+                    className="size-6 text-content-inverse/40 hover:text-content-inverse/70"
                   >
-                    ✗
-                  </button>
+                    <X className="size-3" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -283,44 +266,44 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
           ) : (
             <div className="space-y-0.5">
               {friends.map(({ friendshipId, user }) => (
-                <button
-                  key={friendshipId}
-                  onClick={() => onOpenChat(user)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY, userId: user.id });
-                  }}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-navy-800"
-                >
-                  <div className="relative shrink-0">
-                    <UserAvatar user={user} size="sm" variant="dark" />
-                    <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-navy-900 bg-navy-500" />
-                  </div>
-                  <span className="truncate text-xs font-medium text-content-inverse">
-                    {user.username || user.name}
-                  </span>
-                </button>
+                <div key={friendshipId} className="group flex items-center">
+                  <button
+                    onClick={() => onOpenChat(user)}
+                    className="flex flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-navy-800"
+                  >
+                    <div className="relative shrink-0">
+                      <UserAvatar user={user} size="sm" variant="dark" />
+                      <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-navy-900 bg-navy-500" />
+                    </div>
+                    <span className="truncate text-xs font-medium text-content-inverse">
+                      {user.username || user.name}
+                    </span>
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-6 opacity-0 group-hover:opacity-100 text-content-inverse/40 hover:text-content-inverse"
+                      >
+                        <MoreHorizontal className="size-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-32">
+                      <DropdownMenuItem
+                        onClick={() => removeFriend(user.id)}
+                        className="text-error focus:text-error"
+                      >
+                        Unfriend
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               ))}
             </div>
           )}
         </div>
       </div>
-
-      {/* Context menu */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 min-w-36 rounded-lg border border-border bg-background py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => removeFriend(contextMenu.userId)}
-            className="block w-full px-4 py-2 text-left text-sm text-error transition-colors hover:bg-error-soft"
-          >
-            Unfriend
-          </button>
-        </div>
-      )}
     </aside>
   );
 }
