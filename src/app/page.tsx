@@ -1,16 +1,14 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { CardRings } from "@/components/home/CardRings";
 
 export default async function Home() {
   const session = await auth();
 
   return (
     <main className="relative flex flex-1 flex-col bg-background p-12">
-      {/* Background image */}
-      <div
-        className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-10"
-        style={{ backgroundImage: "url('/images/panels/jaya.webp')" }}
-      />
+      {/* Concentric card rings — top right */}
+      <CardRings />
 
       {/* Left — header and subtitle, vertically centered */}
       <div className="relative z-10 my-auto">
