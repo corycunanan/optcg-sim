@@ -5,67 +5,14 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
-
-function NavLink({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-        active
-          ? "bg-white/10 text-content-inverse"
-          : "text-content-inverse/70 hover:bg-white/10 hover:text-content-inverse",
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
-
-function NavDropdown({
-  label,
-  active,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className={cn(
-            "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            active
-              ? "bg-white/10 text-content-inverse"
-              : "text-content-inverse/70 hover:bg-white/10 hover:text-content-inverse",
-          )}
-        >
-          {label}
-          <ChevronDown className="size-3 transition-transform group-data-[state=open]:rotate-180" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {children}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuTrigger,
+  NavigationMenuContent,
+  NavigationMenuLink,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -74,9 +21,19 @@ export function Navbar() {
   if (!session?.user) return null;
   if (pathname.startsWith("/game/")) return null;
 
-  const cardsActive = pathname.startsWith("/admin/cards") || pathname.startsWith("/admin/sets");
+  const cardsActive =
+    pathname.startsWith("/admin/cards") || pathname.startsWith("/admin/sets");
   const decksActive = pathname.startsWith("/decks");
-  const playActive = pathname.startsWith("/lobbies") || pathname.startsWith("/game");
+  const playActive =
+    pathname.startsWith("/lobbies") || pathname.startsWith("/game");
+
+  const triggerStyles =
+    "bg-transparent text-content-inverse/70 hover:bg-white/10 hover:text-content-inverse focus:bg-white/10 focus:text-content-inverse data-popup-open:bg-white/10 data-popup-open:text-content-inverse data-popup-open:hover:bg-white/15 data-open:bg-white/10 data-open:text-content-inverse data-open:hover:bg-white/15";
+  const activeTriggerStyles =
+    "bg-white/10 text-content-inverse hover:bg-white/15";
+
+  const linkStyles =
+    "text-sm font-medium hover:bg-accent/10 focus:bg-accent/10 rounded-md px-3 py-2";
 
   return (
     <nav className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-8 border-b border-black/20 bg-surface-nav px-6">
@@ -89,33 +46,97 @@ export function Navbar() {
       </Link>
 
       {/* Nav links */}
-      <div className="flex items-center gap-1">
-        <NavLink href="/" active={pathname === "/"}>
-          Home
-        </NavLink>
+      <NavigationMenu viewport={false}>
+        <NavigationMenuList className="gap-1">
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild>
+              <Link
+                href="/"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  triggerStyles,
+                  pathname === "/" && activeTriggerStyles,
+                )}
+              >
+                Home
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
 
-        <NavDropdown label="Cards" active={cardsActive}>
-          <DropdownMenuItem asChild>
-            <Link href="/admin/cards">All Cards</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/admin/sets">Sets</Link>
-          </DropdownMenuItem>
-        </NavDropdown>
+          <NavigationMenuItem>
+            <NavigationMenuTrigger
+              className={cn(
+                triggerStyles,
+                cardsActive && activeTriggerStyles,
+              )}
+            >
+              Cards
+            </NavigationMenuTrigger>
+            <NavigationMenuContent className="bg-surface-nav border border-white/10">
+              <ul className="flex w-48 flex-col gap-1 p-1">
+                <li>
+                  <NavigationMenuLink asChild>
+                    <Link href="/admin/cards" className={linkStyles}>
+                      All Cards
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+                <li>
+                  <NavigationMenuLink asChild>
+                    <Link href="/admin/sets" className={linkStyles}>
+                      Sets
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+              </ul>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
 
-        <NavLink href="/lobbies" active={playActive}>
-          Play
-        </NavLink>
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild>
+              <Link
+                href="/lobbies"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  triggerStyles,
+                  playActive && activeTriggerStyles,
+                )}
+              >
+                Play
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
 
-        <NavDropdown label="Decks" active={decksActive}>
-          <DropdownMenuItem asChild>
-            <Link href="/decks">My Decks</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/decks/new">+ New Deck</Link>
-          </DropdownMenuItem>
-        </NavDropdown>
-      </div>
+          <NavigationMenuItem>
+            <NavigationMenuTrigger
+              className={cn(
+                triggerStyles,
+                decksActive && activeTriggerStyles,
+              )}
+            >
+              Decks
+            </NavigationMenuTrigger>
+            <NavigationMenuContent className="bg-surface-nav border border-white/10">
+              <ul className="flex w-48 flex-col gap-1 p-1">
+                <li>
+                  <NavigationMenuLink asChild>
+                    <Link href="/decks" className={linkStyles}>
+                      My Decks
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+                <li>
+                  <NavigationMenuLink asChild>
+                    <Link href="/decks/new" className={linkStyles}>
+                      + New Deck
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+              </ul>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
+        </NavigationMenuList>
+      </NavigationMenu>
     </nav>
   );
 }
