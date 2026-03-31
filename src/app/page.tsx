@@ -6,6 +6,12 @@ export default async function Home() {
 
   return (
     <main className="relative flex flex-1 flex-col bg-background p-12">
+      {/* Background image */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-10"
+        style={{ backgroundImage: "url('/images/panels/jaya.webp')" }}
+      />
+
       {/* Top left — header and subtitle */}
       <div>
         <h1 className="font-display text-6xl font-bold leading-none tracking-tight text-content-primary">
