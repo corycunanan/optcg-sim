@@ -12,8 +12,8 @@ export default async function Home() {
         style={{ backgroundImage: "url('/images/panels/jaya.webp')" }}
       />
 
-      {/* Top left — header and subtitle */}
-      <div className="relative z-10">
+      {/* Left — header and subtitle, vertically centered */}
+      <div className="relative z-10 my-auto">
         <h1 className="font-display text-6xl font-bold leading-none tracking-tight text-content-primary">
           OPTCG{" "}
           <span className="text-navy-900">Simulator</span>
