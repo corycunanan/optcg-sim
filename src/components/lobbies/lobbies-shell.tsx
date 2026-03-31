@@ -4,6 +4,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
 interface Deck {
   id: string;
@@ -406,40 +414,42 @@ export function LobbiesShell() {
                       <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Deck
                       </label>
-                      <select
-                        value={createDeckId}
-                        onChange={(e) => setCreateDeckId(e.target.value)}
-                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
-                      >
-                        {userDecks.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Select value={createDeckId} onValueChange={setCreateDeckId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a deck" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {userDecks.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Format
                       </label>
-                      <select
-                        value={createFormat}
-                        onChange={(e) => setCreateFormat(e.target.value)}
-                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
-                      >
-                        <option>Standard</option>
-                        <option>Block</option>
-                      </select>
+                      <Select value={createFormat} onValueChange={setCreateFormat}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Standard">Standard</SelectItem>
+                          <SelectItem value="Block">Block</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  <button
+                  <Button
                     onClick={createLobby}
                     disabled={creating || !createDeckId}
-                    className="mt-4 rounded-md bg-navy-900 px-5 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50"
+                    className="mt-4"
                   >
-                    {creating ? "Creating…" : "Create Lobby"}
-                  </button>
+                    {creating ? "Creating..." : "Create Lobby"}
+                  </Button>
 
                   {createError && (
                     <p className="mt-3 text-sm text-error">{createError}</p>
@@ -482,30 +492,28 @@ export function LobbiesShell() {
                       <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Deck
                       </label>
-                      <select
-                        value={joinDeckId}
-                        onChange={(e) => setJoinDeckId(e.target.value)}
-                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
-                      >
-                        {userDecks.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Select value={joinDeckId} onValueChange={setJoinDeckId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a deck" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {userDecks.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex items-end">
-                      <button
+                      <Button
                         onClick={joinLobby}
                         disabled={
                           joining || !joinDeckId || joinCode.trim().length === 0
                         }
-                        className={cn(
-                          "rounded-md bg-navy-900 px-5 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50",
-                        )}
                       >
-                        {joining ? "Joining…" : "Join"}
-                      </button>
+                        {joining ? "Joining..." : "Join"}
+                      </Button>
                     </div>
                   </div>
 
