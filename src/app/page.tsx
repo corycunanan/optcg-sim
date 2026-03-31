@@ -11,7 +11,7 @@ export default async function Home() {
       <CardRings />
 
       {/* Left — header and subtitle, vertically centered */}
-      <div className="relative z-10 my-auto">
+      <div className="relative z-10 my-auto translate-y-10">
         <h1 className="font-display text-6xl font-bold leading-none tracking-tight text-content-primary">
           OPTCG{" "}
           <span className="text-navy-900">Simulator</span>
