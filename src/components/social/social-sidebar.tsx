@@ -204,10 +204,10 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
             <SidebarGroup>
               <SidebarGroupLabel>Requests ({incoming.length})</SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="gap-1">
                   {incoming.map((req) => (
                     <SidebarMenuItem key={req.id}>
-                      <SidebarMenuButton className="cursor-default">
+                      <SidebarMenuButton size="lg" className="cursor-default">
                         <UserAvatar user={req.fromUser!} size="sm" variant="dark" />
                         <span className="truncate">
                           {req.fromUser?.username || req.fromUser?.name}
@@ -253,10 +253,10 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                 No friends yet. Search above to add players.
               </p>
             ) : (
-              <SidebarMenu>
+              <SidebarMenu className="gap-1">
                 {friends.map(({ friendshipId, user: friendUser }) => (
                   <SidebarMenuItem key={friendshipId}>
-                    <SidebarMenuButton onClick={() => onOpenChat(friendUser)}>
+                    <SidebarMenuButton size="lg" onClick={() => onOpenChat(friendUser)}>
                       <UserAvatar user={friendUser} size="sm" variant="dark" showOnline />
                       <span className="truncate">
                         {friendUser.username || friendUser.name}
