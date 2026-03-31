@@ -1,5 +1,5 @@
 export { cn } from "@/lib/utils";
-export { Button } from "./button";
+export { Button, buttonVariants } from "./button";
 export { Badge } from "./badge";
 export { Input } from "./input";
 export {
@@ -12,6 +12,8 @@ export {
   DialogDescription,
   DialogBody,
   DialogFooter,
+  DialogOverlay,
+  DialogPortal,
 } from "./dialog";
 export {
   Tooltip,
@@ -21,6 +23,7 @@ export {
   TooltipContent,
 } from "./tooltip";
 export {
+  Tabs,
   TabsRoot,
   TabsList,
   TabsTrigger,

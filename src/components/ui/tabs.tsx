@@ -1,44 +1,69 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import * as RadixTabs from "@radix-ui/react-tabs";
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import { Tabs as TabsPrimitive } from "radix-ui"
 
-export const TabsRoot = RadixTabs.Root;
+import { cn } from "@/lib/utils"
 
-export function TabsList({ className, ...props }: RadixTabs.TabsListProps) {
+function Tabs({
+  className,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
-    <RadixTabs.List
+    <TabsPrimitive.Root
+      data-slot="tabs"
+      className={cn("flex flex-col gap-2", className)}
+      {...props}
+    />
+  )
+}
+
+// Backwards-compat alias
+const TabsRoot = Tabs
+
+function TabsList({
+  className,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.List>) {
+  return (
+    <TabsPrimitive.List
+      data-slot="tabs-list"
       className={cn(
-        "inline-flex items-center gap-1 rounded bg-surface-2 p-1",
+        "inline-flex h-10 items-center justify-center rounded-md bg-surface-2 p-1 text-content-secondary",
         className
       )}
       {...props}
     />
-  );
+  )
 }
 
-export function TabsTrigger({ className, ...props }: RadixTabs.TabsTriggerProps) {
+function TabsTrigger({
+  className,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
-    <RadixTabs.Trigger
+    <TabsPrimitive.Trigger
+      data-slot="tabs-trigger"
       className={cn(
-        "inline-flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium transition-colors",
-        "text-content-secondary hover:text-content-primary",
-        "data-[state=active]:bg-surface-1 data-[state=active]:text-content-primary data-[state=active]:shadow-sm",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-        "disabled:opacity-40 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-surface-base data-[state=active]:text-content-primary data-[state=active]:shadow-sm",
         className
       )}
       {...props}
     />
-  );
+  )
 }
 
-export function TabsContent({ className, ...props }: RadixTabs.TabsContentProps) {
+function TabsContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
-    <RadixTabs.Content
-      className={cn("focus-visible:outline-none", className)}
+    <TabsPrimitive.Content
+      data-slot="tabs-content"
+      className={cn("flex-1 outline-none", className)}
       {...props}
     />
-  );
+  )
 }
+
+export { Tabs, TabsRoot, TabsList, TabsTrigger, TabsContent }

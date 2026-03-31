@@ -75,7 +75,7 @@ export function ExportModal({ name, leader, cards, onClose }: ExportModalProps) 
           <Button variant="secondary" onClick={handleDownload}>Download .txt</Button>
           <Button
             onClick={handleCopy}
-            variant={copied ? "secondary" : "primary"}
+            variant={copied ? "secondary" : "default"}
           >
             {copied ? "Copied!" : "Copy to Clipboard"}
           </Button>

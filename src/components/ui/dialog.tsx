@@ -1,104 +1,161 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import * as RadixDialog from "@radix-ui/react-dialog";
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import { Dialog as DialogPrimitive } from "radix-ui"
+import { XIcon } from "lucide-react"
 
-export const Dialog = RadixDialog.Root;
-export const DialogTrigger = RadixDialog.Trigger;
-export const DialogClose = RadixDialog.Close;
+import { cn } from "@/lib/utils"
 
-export function DialogOverlay({ className, ...props }: RadixDialog.DialogOverlayProps) {
+function Dialog({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+}
+
+function DialogTrigger({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+}
+
+function DialogPortal({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+}
+
+function DialogClose({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+}
+
+function DialogOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
-    <RadixDialog.Overlay
+    <DialogPrimitive.Overlay
+      data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-overlay",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-overlay data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-200",
         className
       )}
       {...props}
     />
-  );
-}
-
-interface DialogContentProps extends RadixDialog.DialogContentProps {
-  size?: "sm" | "md" | "lg" | "xl";
+  )
 }
 
 const sizeClasses = {
-  sm: "max-w-sm",
-  md: "max-w-lg",
-  lg: "max-w-2xl",
-  xl: "max-w-4xl",
-};
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+} as const
 
-export function DialogContent({
-  size = "md",
+function DialogContent({
   className,
   children,
+  size = "md",
+  showCloseButton = true,
   ...props
-}: DialogContentProps) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size?: keyof typeof sizeClasses
+  showCloseButton?: boolean
+}) {
   return (
-    <RadixDialog.Portal>
+    <DialogPortal>
       <DialogOverlay />
-      <RadixDialog.Content
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-          "w-full rounded bg-surface-1 shadow-lg border border-border",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
-          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-          "focus:outline-none",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg bg-surface-1 p-6 text-content-primary shadow-lg duration-200 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           sizeClasses[size],
           className
         )}
         {...props}
       >
         {children}
-      </RadixDialog.Content>
-    </RadixDialog.Portal>
-  );
+        {showCloseButton && (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            className="absolute top-4 right-4 rounded-md p-1 text-content-secondary transition-colors hover:text-content-primary hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+          >
+            <XIcon className="size-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
 }
 
-export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex items-center justify-between px-6 py-4 border-b border-border", className)}
+      data-slot="dialog-header"
+      className={cn("flex flex-col gap-2", className)}
       {...props}
     />
-  );
+  )
 }
 
-export function DialogTitle({ className, ...props }: RadixDialog.DialogTitleProps) {
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <RadixDialog.Title
+    <div
+      data-slot="dialog-body"
+      className={cn("flex-1 overflow-y-auto", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn("flex justify-end gap-3 pt-4", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  return (
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
       className={cn("text-lg font-semibold text-content-primary", className)}
       {...props}
     />
-  );
+  )
 }
 
-export function DialogDescription({ className, ...props }: RadixDialog.DialogDescriptionProps) {
+function DialogDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
-    <RadixDialog.Description
+    <DialogPrimitive.Description
+      data-slot="dialog-description"
       className={cn("text-sm text-content-secondary", className)}
       {...props}
     />
-  );
+  )
 }
 
-export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-6 py-4", className)} {...props} />;
-}
-
-export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("flex items-center justify-end gap-3 px-6 py-4 border-t border-border", className)}
-      {...props}
-    />
-  );
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
 }
