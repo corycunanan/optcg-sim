@@ -313,12 +313,16 @@
    See docs/design/BRANDING-GUIDELINES.md Section 8. */
 
 .btn-ornamental {
-  outline: 1px solid var(--gold-500);
+  outline: 1px solid currentBackgroundColor;
   outline-offset: 3px;
+  outline-color: var(--btn-ornamental-color, currentColor);
 }
-.btn-ornamental:hover {
-  outline-color: var(--gold-400);
-}
+
+/* Variant-specific ornamental colors — matches the button background */
+.bg-gold-500.btn-ornamental { --btn-ornamental-color: var(--gold-500); }
+.bg-gold-500.btn-ornamental:hover { --btn-ornamental-color: var(--gold-400); }
+.bg-navy-900.btn-ornamental { --btn-ornamental-color: var(--navy-900); }
+.bg-navy-900.btn-ornamental:hover { --btn-ornamental-color: var(--navy-800); }
 
 /* ─── Display Font Treatment ─────────────────────────────────── */
 /* All display headings are italic + uppercase by default.

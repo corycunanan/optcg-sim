@@ -21,7 +21,7 @@ export default async function Home() {
       <div className="mt-auto ml-auto">
         <Link
           href={session ? "/lobbies" : "/login"}
-          className="btn-ornamental inline-block rounded-md bg-navy-900 px-12 py-5 text-xl font-semibold text-content-inverse transition-colors hover:bg-navy-800"
+          className="btn-ornamental inline-block rounded-md bg-gold-500 px-12 py-5 text-xl font-semibold text-navy-900 transition-colors hover:bg-gold-400"
         >
           Play Now
         </Link>
