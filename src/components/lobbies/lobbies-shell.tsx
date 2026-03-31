@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface Deck {
   id: string;
@@ -467,14 +468,14 @@ export function LobbiesShell() {
                       <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                         Code
                       </label>
-                      <input
+                      <Input
                         value={joinCode}
                         onChange={(e) =>
                           setJoinCode(e.target.value.toUpperCase())
                         }
                         placeholder="ABCD12"
                         maxLength={6}
-                        className="w-full rounded border border-border bg-surface-2 px-4 py-2 text-sm uppercase tracking-[0.2em] text-content-primary transition-colors focus:outline-none"
+                        className="uppercase tracking-[0.2em]"
                       />
                     </div>
                     <div>

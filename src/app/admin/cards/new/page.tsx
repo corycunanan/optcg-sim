@@ -121,21 +121,20 @@ export default function NewCardPage() {
         {/* Card ID + Name row */}
         <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
           <Field label="Card ID" required>
-            <input
+            <Input
               type="text"
               value={form.id}
               onChange={(e) => update("id", e.target.value)}
               placeholder="OP15-096"
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-content-primary focus:outline-none"
+              className="font-mono"
             />
           </Field>
           <Field label="Name" required>
-            <input
+            <Input
               type="text"
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
               placeholder="Monkey D. Luffy"
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
             />
           </Field>
         </div>
@@ -270,22 +269,20 @@ export default function NewCardPage() {
 
         {/* Attribute + Traits */}
         <Field label="Attributes" hint="Comma-separated">
-          <input
+          <Input
             type="text"
             value={form.attribute}
             onChange={(e) => update("attribute", e.target.value)}
             placeholder="Strike, Slash, Ranged"
-            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
         <Field label="Traits" hint="Comma-separated">
-          <input
+          <Input
             type="text"
             value={form.traits}
             onChange={(e) => update("traits", e.target.value)}
             placeholder="Straw Hat Crew, Supernovas"
-            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           />
         </Field>
 
@@ -311,12 +308,11 @@ export default function NewCardPage() {
 
         {/* Image URL */}
         <Field label="Image URL">
-          <input
+          <Input
             type="text"
             value={form.imageUrl}
             onChange={(e) => update("imageUrl", e.target.value)}
             placeholder="https://..."
-            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
           />
         </Field>
 

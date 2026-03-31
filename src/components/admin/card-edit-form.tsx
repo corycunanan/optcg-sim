@@ -160,11 +160,10 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Name */}
       <Field label="Name" required>
-        <input
+        <Input
           type="text"
           value={form.name}
           onChange={(e) => update("name", e.target.value)}
-          className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
         />
       </Field>
 
@@ -298,22 +297,20 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Attribute + Traits */}
       <Field label="Attributes" hint="Comma-separated">
-        <input
+        <Input
           type="text"
           value={form.attribute}
           onChange={(e) => update("attribute", e.target.value)}
           placeholder="Strike, Slash, Ranged"
-          className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
         />
       </Field>
 
       <Field label="Traits" hint="Comma-separated">
-        <input
+        <Input
           type="text"
           value={form.traits}
           onChange={(e) => update("traits", e.target.value)}
           placeholder="Straw Hat Crew, Supernovas"
-          className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
         />
       </Field>
 
@@ -339,12 +336,11 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Image URL */}
       <Field label="Image URL">
-        <input
+        <Input
           type="text"
           value={form.imageUrl}
           onChange={(e) => update("imageUrl", e.target.value)}
           placeholder="https://..."
-          className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
         />
       </Field>
 

@@ -144,12 +144,11 @@ export function DeckBuilderSearch({
       <div className="flex h-full flex-col">
         {/* Search input */}
         <div className="px-3 pt-3">
-          <input
+          <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search cards…"
-            className="w-full rounded border border-border bg-surface-1 px-3 py-2 text-sm text-content-primary placeholder:text-content-tertiary transition-colors hover:border-border-strong focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-navy-900/10"
+            placeholder="Search cards..."
           />
         </div>
 

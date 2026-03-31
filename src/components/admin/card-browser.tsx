@@ -2,6 +2,8 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { CardGrid } from "./card-grid";
 import { CardFilters } from "./card-filters";
 import { Pagination } from "./pagination";
@@ -144,19 +146,16 @@ export function CardBrowser({
         {/* Search bar */}
         <form onSubmit={handleSearch} className="mb-4">
           <div className="flex gap-2">
-            <input
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search cards by name..."
-              className="flex-1 rounded border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary transition-colors focus:outline-none"
+              className="flex-1"
             />
-            <button
-              type="submit"
-              className="rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
-            >
+            <Button type="submit">
               Search
-            </button>
+            </Button>
             {hasFilters && (
               <button
                 type="button"

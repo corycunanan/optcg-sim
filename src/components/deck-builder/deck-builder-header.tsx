@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 interface DeckBuilderHeaderProps {
   name: string;
   isDirty: boolean;
@@ -63,7 +64,7 @@ export function DeckBuilderHeader({
       {/* Deck name */}
       <div className="flex items-center gap-2">
         {editing ? (
-          <input
+          <Input
             ref={inputRef}
             type="text"
             value={editName}
@@ -76,7 +77,7 @@ export function DeckBuilderHeader({
                 setEditing(false);
               }
             }}
-            className="rounded border border-border-focus bg-surface-2 px-2 py-1 font-display text-xl font-bold leading-tight tracking-tight text-content-primary outline-none ring-2 ring-navy-900/10"
+            className="h-auto border-border-focus px-2 py-1 font-display text-xl font-bold leading-tight tracking-tight ring-2 ring-navy-900/10"
           />
         ) : (
           <button

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface Set {
   setLabel: string;
@@ -179,13 +180,13 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
         <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-background shadow-lg">
           {/* Search */}
           <div className="border-b border-border px-2 py-2">
-            <input
+            <Input
               ref={searchRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search sets…"
-              className="w-full rounded-md border border-border bg-surface-2 px-3 py-1.5 text-sm text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:outline-none"
+              placeholder="Search sets..."
+              className="h-8"
             />
           </div>
 
