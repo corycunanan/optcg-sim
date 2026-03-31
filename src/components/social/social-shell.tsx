@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { SocialSidebar, type SidebarUser } from "./social-sidebar";
 import { ChatWidget } from "./chat-widget";
 
@@ -17,7 +16,7 @@ export function SocialShell() {
   if (isGame) return null;
 
   return (
-    <SidebarProvider>
+    <>
       <SocialSidebar onOpenChat={setChatUser} />
       {chatUser && (
         <ChatWidget
@@ -27,6 +26,6 @@ export function SocialShell() {
           onClose={() => setChatUser(null)}
         />
       )}
-    </SidebarProvider>
+    </>
   );
 }

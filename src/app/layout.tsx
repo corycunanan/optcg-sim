@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, DM_Serif_Display } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { Navbar } from "@/components/nav/navbar";
 import { SocialShell } from "@/components/social/social-shell";
 import { Toaster } from "@/components/ui/sonner";
@@ -41,13 +42,15 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${dmSerifDisplay.variable} antialiased`}
       >
         <SessionProvider>
-          <div className="flex h-screen flex-col overflow-hidden">
-            <Navbar />
-            <div className="flex flex-1 min-h-0">
-              <main className="flex flex-1 flex-col min-w-0 min-h-0">{children}</main>
-              <SocialShell />
+          <SidebarProvider>
+            <div className="flex h-screen w-full flex-col overflow-hidden">
+              <Navbar />
+              <div className="flex flex-1 min-h-0">
+                <main className="flex flex-1 flex-col min-w-0 min-h-0">{children}</main>
+                <SocialShell />
+              </div>
             </div>
-          </div>
+          </SidebarProvider>
         </SessionProvider>
         <Toaster />
       </body>
