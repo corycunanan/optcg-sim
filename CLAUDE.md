@@ -31,7 +31,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `docs/architecture/` | System design — architecture, tech stack, data pipeline |
 | `docs/milestones/` | Phase docs M0–M5 — scope, plans, acceptance criteria |
 | `docs/game-engine/` | Game engine design — requirements, card analysis, effect examples |
-| `docs/design/` | UI/UX design audits and critiques |
+| `docs/design/` | UI/UX design — branding guidelines, audits, critiques, game board layout |
 | `docs/project/` | Project management — PRD, planning, workflows, learnings |
 | `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.0 |
 | `docs/cards/` | Card effect text for all 51 sets |
@@ -98,7 +98,9 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
 
 ### References
 - **[Official OPTCG Website](https://en.onepiece-cardgame.com/)** — bright white surfaces, deep navy navigation, gold accents, generous whitespace, card art as hero. This is the primary reference.
+- **[Riftbound (League of Legends TCG)](https://riftbound.leagueoflegends.com/)** — blade section architecture, ornamental CTA buttons, carousel with progress bar, responsive spacing variables, dramatic serif display typography, backdrop overlays. Key structural reference for layout and component patterns.
 - **[MTG Arena](https://magic.wizards.com/en/mtgarena)** — spacing discipline, fluid typography, purposeful motion, CSS variable system.
+- **[Branding Guidelines](docs/design/BRANDING-GUIDELINES.md)** — comprehensive design brief for M5 UI Overhaul. Defines all token values, typography, motion language, component patterns, and game board theming architecture. Source of truth for implementation.
 
 ### Aesthetic Direction
 - **Visual tone:** Clean and bright, with purposeful dark moments for the game board. Not dark/moody/gamer — that's not what One Piece is.
@@ -110,9 +112,9 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
   - One Piece red (`oklch(55% 0.20 25)`) for emphasis, energy, and destructive actions only
   - Six TCG card colors (Red, Blue, Green, Purple, Black, Yellow) remain functional identifiers only
 - **Typography:**
-  - **Display/headings:** Barlow Condensed (Google Fonts) — bold condensed for page titles, section headers. Weights 600–800.
+  - **Display/headings:** DM Serif Display (Google Fonts) — high-contrast display serif for page titles, section headers. Uppercase. Italic variant for featured callouts and pull-quotes.
   - **Body:** Geist Sans — all body text, labels, UI elements.
-  - Strict type scale: 12/14/16/18/20/24/30px. No custom `text-[Xpx]` sizes in components.
+  - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. See `docs/design/BRANDING-GUIDELINES.md` for full scale.
 - **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible.
 - **Card presentation:** Warm white or light surfaces let art breathe. Single, clean hover state — no stacking of lift + shadow + blur.
 - **Anti-references:** NOT dark/teal/moody. NOT gamer-neon. NOT generic SaaS dashboard. NOT over-decorated with gradients and backdrop blurs.
