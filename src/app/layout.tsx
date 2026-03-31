@@ -43,12 +43,14 @@ export default function RootLayout({
       >
         <SessionProvider>
           <SidebarProvider>
-            <div className="flex h-screen w-full flex-col overflow-hidden">
-              <Navbar />
-              <div className="flex flex-1 min-h-0">
+            <div className="flex h-screen w-full overflow-hidden">
+              {/* Left column: navbar + content */}
+              <div className="flex flex-1 flex-col min-w-0">
+                <Navbar />
                 <main className="flex flex-1 flex-col min-w-0 min-h-0">{children}</main>
-                <SocialShell />
               </div>
+              {/* Right column: sidebar (full viewport height) */}
+              <SocialShell />
             </div>
           </SidebarProvider>
         </SessionProvider>

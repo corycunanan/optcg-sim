@@ -127,70 +127,48 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
 
   return (
     <Sidebar side="right" collapsible="none">
-      {/* Header — Add Friend popover */}
+      {/* Header — User avatar + account menu */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu open={addOpen} onOpenChange={(open) => {
-              setAddOpen(open);
-              if (!open) { setSearchQ(""); setSearchResults([]); }
-            }}>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg">
-                  <div className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                    <Search className="size-4" />
-                  </div>
+                  <UserAvatar
+                    user={{ username: user?.username ?? null, name: user?.name ?? null, image: user?.image ?? null }}
+                    size="sm"
+                  />
                   <div className="flex flex-col gap-0.5 leading-none">
-                    <span className="font-semibold">Add Friend</span>
-                    <span className="text-xs opacity-60">Search by username</span>
+                    <span className="truncate font-semibold">{userName}</span>
+                    {user?.email && (
+                      <span className="truncate text-xs opacity-60">{user.email}</span>
+                    )}
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="bottom"
-                align="start"
-                className="w-[--radix-dropdown-menu-trigger-width] p-2"
+                align="end"
+                className="w-[--radix-dropdown-menu-trigger-width]"
               >
-                <Input
-                  type="text"
-                  value={searchQ}
-                  onChange={(e) => search(e.target.value)}
-                  placeholder="Search by username..."
-                  className="h-8 text-xs"
-                  autoFocus
-                />
-                {searchResults.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {searchResults.map((u) => {
-                      const isFriend = friendIds.has(u.id);
-                      const alreadySent = pendingSent.has(u.id);
-                      return (
-                        <div key={u.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-                          <UserAvatar user={u} size="sm" />
-                          <span className="flex-1 truncate">{u.username || u.name}</span>
-                          {isFriend ? (
-                            <span className="text-xs opacity-50">Friends</span>
-                          ) : alreadySent ? (
-                            <span className="text-xs opacity-50">Sent</span>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => sendRequest(u.id)}
-                              className="size-6"
-                            >
-                              <UserPlus className="size-3 text-gold-500" />
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
+                <DropdownMenuItem disabled className="flex items-center gap-2 opacity-100">
+                  <UserAvatar
+                    user={{ username: user?.username ?? null, name: user?.name ?? null, image: user?.image ?? null }}
+                    size="sm"
+                  />
+                  <div className="flex flex-col gap-0.5 leading-none">
+                    <span className="truncate font-semibold">{userName}</span>
+                    {user?.email && (
+                      <span className="truncate text-xs opacity-60">{user.email}</span>
+                    )}
                   </div>
-                )}
-                {searchQ.length >= 2 && searchResults.length === 0 && (
-                  <p className="mt-2 text-center text-xs opacity-50">No users found</p>
-                )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
+                  <LogOut className="size-4" />
+                  Sign Out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
@@ -250,7 +228,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
           <SidebarGroupContent>
             {friends.length === 0 ? (
               <p className="px-2 text-xs opacity-50">
-                No friends yet. Search above to add players.
+                No friends yet. Search below to add players.
               </p>
             ) : (
               <SidebarMenu className="gap-1">
@@ -285,48 +263,70 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer — User avatar + account menu */}
+      {/* Footer — Add Friend */}
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
+            <DropdownMenu open={addOpen} onOpenChange={(open) => {
+              setAddOpen(open);
+              if (!open) { setSearchQ(""); setSearchResults([]); }
+            }}>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg">
-                  <UserAvatar
-                    user={{ username: user?.username ?? null, name: user?.name ?? null, image: user?.image ?? null }}
-                    size="sm"
-                  />
+                  <div className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                    <Search className="size-4" />
+                  </div>
                   <div className="flex flex-col gap-0.5 leading-none">
-                    <span className="truncate font-semibold">{userName}</span>
-                    {user?.email && (
-                      <span className="truncate text-xs opacity-60">{user.email}</span>
-                    )}
+                    <span className="font-semibold">Add Friend</span>
+                    <span className="text-xs opacity-60">Search by username</span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
-                align="end"
-                className="w-[--radix-dropdown-menu-trigger-width]"
+                align="start"
+                className="w-[--radix-dropdown-menu-trigger-width] p-2"
               >
-                <DropdownMenuItem disabled className="flex items-center gap-2 opacity-100">
-                  <UserAvatar
-                    user={{ username: user?.username ?? null, name: user?.name ?? null, image: user?.image ?? null }}
-                    size="sm"
-                  />
-                  <div className="flex flex-col gap-0.5 leading-none">
-                    <span className="truncate font-semibold">{userName}</span>
-                    {user?.email && (
-                      <span className="truncate text-xs opacity-60">{user.email}</span>
-                    )}
+                <Input
+                  type="text"
+                  value={searchQ}
+                  onChange={(e) => search(e.target.value)}
+                  placeholder="Search by username..."
+                  className="h-8 text-xs"
+                  autoFocus
+                />
+                {searchResults.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {searchResults.map((u) => {
+                      const isFriend = friendIds.has(u.id);
+                      const alreadySent = pendingSent.has(u.id);
+                      return (
+                        <div key={u.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
+                          <UserAvatar user={u} size="sm" />
+                          <span className="flex-1 truncate">{u.username || u.name}</span>
+                          {isFriend ? (
+                            <span className="text-xs opacity-50">Friends</span>
+                          ) : alreadySent ? (
+                            <span className="text-xs opacity-50">Sent</span>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => sendRequest(u.id)}
+                              className="size-6"
+                            >
+                              <UserPlus className="size-3 text-gold-500" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
-                  <LogOut className="size-4" />
-                  Sign Out
-                </DropdownMenuItem>
+                )}
+                {searchQ.length >= 2 && searchResults.length === 0 && (
+                  <p className="mt-2 text-center text-xs opacity-50">No users found</p>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
