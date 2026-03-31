@@ -1,23 +1,34 @@
 import Link from "next/link";
 import { auth } from "@/auth";
-import { CardRings } from "@/components/home/CardRings";
+import { CardColumns } from "@/components/home/CardColumns";
 
 export default async function Home() {
   const session = await auth();
 
   return (
-    <main className="relative flex flex-1 flex-col bg-background p-12">
-      {/* Concentric card rings — top right */}
-      <CardRings />
+    <main className="relative flex flex-1 flex-col overflow-hidden bg-navy-900 p-12">
+      {/* Subtle inverted map background */}
+      <div
+        className="pointer-events-none absolute -inset-16 bg-cover bg-center opacity-15"
+        style={{
+          backgroundImage: "url('/images/maps/map2.jpg')",
+          filter: "invert(1)",
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Scrolling card columns — top right */}
+      <CardColumns />
 
       {/* Left — header and subtitle, vertically centered */}
       <div className="relative z-10 my-auto translate-y-10">
-        <h1 className="font-display text-6xl font-bold leading-none tracking-tight text-content-primary">
-          OPTCG{" "}
-          <span className="text-navy-900">Simulator</span>
+        <h1 className="font-display text-6xl font-bold leading-none tracking-tight bg-gradient-to-b from-gold-400 to-[oklch(60%_0.14_75)] bg-clip-text text-transparent">
+          One Piece
+          <br />
+          TCG Simulator
         </h1>
-        <p className="mt-3 text-lg text-content-tertiary">
-          One Piece Trading Card Game — Deck Builder &amp; Simulator
+        <p className="mt-6 text-lg text-background">
+          Deck builder, simulator, and playground
         </p>
       </div>
 
