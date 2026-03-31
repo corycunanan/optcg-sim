@@ -1,50 +1,73 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import * as RadixTooltip from "@radix-ui/react-tooltip";
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import { Tooltip as TooltipPrimitive } from "radix-ui"
 
-export const TooltipProvider = RadixTooltip.Provider;
-export const TooltipRoot = RadixTooltip.Root;
-export const TooltipTrigger = RadixTooltip.Trigger;
+import { cn } from "@/lib/utils"
 
-export function TooltipContent({
-  className,
-  sideOffset = 6,
+function TooltipProvider({
+  delayDuration = 300,
   ...props
-}: RadixTooltip.TooltipContentProps) {
+}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (
-    <RadixTooltip.Portal>
-      <RadixTooltip.Content
+    <TooltipPrimitive.Provider
+      data-slot="tooltip-provider"
+      delayDuration={delayDuration}
+      {...props}
+    />
+  )
+}
+
+function TooltipRoot({
+  ...props
+}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+}
+
+function TooltipTrigger({
+  ...props
+}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+}
+
+function TooltipContent({
+  className,
+  sideOffset = 4,
+  ...props
+}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  return (
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Content
+        data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 rounded bg-navy-900 px-3 py-1.5 text-xs text-content-inverse shadow-md",
-          "data-[state=delayed-open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=delayed-open]:zoom-in-95",
-          "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
+          "z-50 max-w-xs rounded-md bg-navy-900 px-3 py-1.5 text-xs text-content-inverse animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className
         )}
         {...props}
       />
-    </RadixTooltip.Portal>
-  );
+    </TooltipPrimitive.Portal>
+  )
 }
 
-interface TooltipProps {
-  content: React.ReactNode;
-  children: React.ReactNode;
-  side?: RadixTooltip.TooltipContentProps["side"];
-  delayDuration?: number;
-}
-
-export function Tooltip({ content, children, side = "top", delayDuration = 400 }: TooltipProps) {
+/** Convenience wrapper — renders a tooltip with minimal boilerplate */
+function Tooltip({
+  content,
+  children,
+  side,
+  delayDuration,
+}: {
+  content: React.ReactNode
+  children: React.ReactNode
+  side?: "top" | "right" | "bottom" | "left"
+  delayDuration?: number
+}) {
   return (
-    <TooltipProvider>
-      <TooltipRoot delayDuration={delayDuration}>
-        <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side={side}>{content}</TooltipContent>
-      </TooltipRoot>
-    </TooltipProvider>
-  );
+    <TooltipRoot delayDuration={delayDuration}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side}>{content}</TooltipContent>
+    </TooltipRoot>
+  )
 }
+
+export { Tooltip, TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent }

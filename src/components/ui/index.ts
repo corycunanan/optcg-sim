@@ -1,6 +1,6 @@
 export { cn } from "@/lib/utils";
 export { Button, buttonVariants } from "./button";
-export { Badge } from "./badge";
+export { Badge, badgeVariants } from "./badge";
 export { Input } from "./input";
 export {
   Dialog,
@@ -29,11 +29,4 @@ export {
   TabsTrigger,
   TabsContent,
 } from "./tabs";
-export {
-  ToastProvider,
-  ToastViewport,
-  Toast,
-  ToastRoot,
-  ToastAction,
-  ToastClose,
-} from "./toast";
+export { Toaster } from "./sonner";

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, DM_Serif_Display } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { Navbar } from "@/components/nav/navbar";
 import { SocialShell } from "@/components/social/social-shell";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -48,6 +49,7 @@ export default function RootLayout({
             </div>
           </div>
         </SessionProvider>
+        <Toaster />
       </body>
     </html>
   );

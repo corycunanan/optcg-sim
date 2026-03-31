@@ -1,26 +1,25 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
+import * as React from "react"
 
-type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
-  error?: boolean;
-};
+import { cn } from "@/lib/utils"
 
-export function Input({ error, className, ...props }: InputProps) {
+function Input({
+  className,
+  type,
+  error,
+  ...props
+}: React.ComponentProps<"input"> & { error?: boolean }) {
   return (
     <input
+      type={type}
+      data-slot="input"
       className={cn(
-        "w-full rounded border bg-surface-1 px-3 py-2 text-sm text-content-primary",
-        "placeholder:text-content-tertiary",
-        "transition-colors",
-        "hover:border-border-strong",
-        "focus:outline-none focus:border-border-focus focus:ring-2 focus:ring-navy-900/10",
-        "disabled:opacity-40 disabled:cursor-not-allowed",
-        error
-          ? "border-error focus:border-error focus:ring-error/10"
-          : "border-border",
+        "h-10 w-full rounded-md border border-border bg-surface-base px-3 py-2 text-sm text-content-primary transition-colors outline-none placeholder:text-content-tertiary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        error && "border-error focus-visible:outline-error",
         className
       )}
       {...props}
     />
-  );
+  )
 }
+
+export { Input }
