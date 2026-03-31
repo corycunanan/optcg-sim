@@ -2,18 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 function NavLink({
   href,
@@ -81,9 +78,6 @@ export function Navbar() {
   const decksActive = pathname.startsWith("/decks");
   const playActive = pathname.startsWith("/lobbies") || pathname.startsWith("/game");
 
-  const userInitial = (session.user.username || session.user.name || "?").charAt(0).toUpperCase();
-  const userName = session.user.username || session.user.name;
-
   return (
     <nav className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-8 border-b border-black/20 bg-surface-nav px-6">
       {/* Logo */}
@@ -122,32 +116,6 @@ export function Navbar() {
           </DropdownMenuItem>
         </NavDropdown>
       </div>
-
-      {/* Account */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="ml-auto gap-2 text-content-inverse/80 hover:bg-white/10 hover:text-content-inverse"
-          >
-            <Avatar className="size-7">
-              {session.user.image && <AvatarImage src={session.user.image} alt="" />}
-              <AvatarFallback className="bg-gold-500 text-xs font-bold text-navy-900">
-                {userInitial}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium">{userName}</span>
-            <ChevronDown className="size-3 text-content-inverse/50" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
-            <LogOut className="size-4" />
-            Sign Out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </nav>
   );
 }
