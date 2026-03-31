@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
@@ -194,41 +195,41 @@ export default function NewCardPage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label="Cost">
-            <input
+            <Input
               type="number"
               value={form.cost}
               onChange={(e) => update("cost", e.target.value)}
               min={0}
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
+              className="tabular-nums"
             />
           </Field>
           <Field label="Power">
-            <input
+            <Input
               type="number"
               value={form.power}
               onChange={(e) => update("power", e.target.value)}
               min={0}
               step={1000}
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
+              className="tabular-nums"
             />
           </Field>
           <Field label="Counter">
-            <input
+            <Input
               type="number"
               value={form.counter}
               onChange={(e) => update("counter", e.target.value)}
               min={0}
               step={1000}
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
+              className="tabular-nums"
             />
           </Field>
           <Field label="Life" hint="Leaders only">
-            <input
+            <Input
               type="number"
               value={form.life}
               onChange={(e) => update("life", e.target.value)}
               min={0}
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm tabular-nums text-content-primary focus:outline-none"
+              className="tabular-nums"
             />
           </Field>
         </div>
@@ -236,22 +237,20 @@ export default function NewCardPage() {
         {/* Metadata row */}
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Rarity">
-            <input
+            <Input
               type="text"
               value={form.rarity}
               onChange={(e) => update("rarity", e.target.value)}
-              placeholder="Rare, SuperRare…"
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
+              placeholder="Rare, SuperRare..."
             />
           </Field>
           <Field label="Block Number" required>
-            <input
+            <Input
               type="number"
               value={form.blockNumber}
               onChange={(e) => update("blockNumber", e.target.value)}
               min={1}
               max={10}
-              className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
             />
           </Field>
           <Field label="Ban Status">

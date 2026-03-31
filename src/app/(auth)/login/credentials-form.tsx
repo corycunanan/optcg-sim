@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type Mode = "signin" | "signup";
 
@@ -134,35 +136,29 @@ export function CredentialsForm({
             <label className="mb-1 block text-xs font-semibold text-content-secondary">
               Email
             </label>
-            <input
+            <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-md border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary focus:border-border-focus focus:outline-none"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-content-secondary">
               Password
             </label>
-            <input
+            <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full rounded-md border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary focus:border-border-focus focus:outline-none"
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-navy-900 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50"
-          >
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
         </form>
       ) : (
         <form onSubmit={handleSignUp} className="space-y-3">
@@ -170,63 +166,55 @@ export function CredentialsForm({
             <label className="mb-1 block text-xs font-semibold text-content-secondary">
               Email
             </label>
-            <input
+            <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-md border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary focus:border-border-focus focus:outline-none"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-content-secondary">
               Username
             </label>
-            <input
+            <Input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
-              placeholder="3–20 chars, letters/numbers/_"
-              className="w-full rounded-md border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:outline-none"
+              placeholder="3-20 chars, letters/numbers/_"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-content-secondary">
               Password
             </label>
-            <input
+            <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="new-password"
               placeholder="Minimum 8 characters"
-              className="w-full rounded-md border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:outline-none"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-content-secondary">
               Confirm Password
             </label>
-            <input
+            <Input
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
               autoComplete="new-password"
-              className="w-full rounded-md border border-border bg-surface-2 px-4 py-2 text-sm text-content-primary focus:border-border-focus focus:outline-none"
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-navy-900 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50"
-          >
-            {loading ? "Creating account…" : "Create Account"}
-          </button>
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Creating account..." : "Create Account"}
+          </Button>
         </form>
       )}
     </div>

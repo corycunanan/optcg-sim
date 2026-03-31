@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
+import { Input } from "@/components/ui/input";
 import { CardDetailModal } from "@/components/admin/card-detail-modal";
 import { cn } from "@/lib/utils";
 
@@ -190,24 +191,24 @@ export function DeckBuilderSearch({
             </select>
 
             <div className="flex items-center gap-1">
-              <input
+              <Input
                 type="number"
-                min="0"
-                max="10"
+                min={0}
+                max={10}
                 placeholder="Min"
                 value={costMin}
                 onChange={(e) => setCostMin(e.target.value)}
-                className="w-14 rounded border border-border bg-surface-1 px-2 py-1 text-xs text-content-secondary focus:outline-none focus:border-border-focus"
+                className="h-7 w-14 px-2 text-xs"
               />
-              <span className="text-xs text-content-tertiary">–</span>
-              <input
+              <span className="text-xs text-content-tertiary">-</span>
+              <Input
                 type="number"
-                min="0"
-                max="10"
+                min={0}
+                max={10}
                 placeholder="Max"
                 value={costMax}
                 onChange={(e) => setCostMax(e.target.value)}
-                className="w-14 rounded border border-border bg-surface-1 px-2 py-1 text-xs text-content-secondary focus:outline-none focus:border-border-focus"
+                className="h-7 w-14 px-2 text-xs"
               />
               <span className="text-xs text-content-tertiary">Cost</span>
             </div>
