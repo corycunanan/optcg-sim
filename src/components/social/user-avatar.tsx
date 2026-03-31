@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback, AvatarBadge } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 interface User {
@@ -13,14 +13,16 @@ interface UserAvatarProps {
   user: User;
   size?: "sm" | "md";
   variant?: "light" | "dark";
+  showOnline?: boolean;
   className?: string;
 }
 
-export function UserAvatar({ user, size = "md", variant = "light", className }: UserAvatarProps) {
+export function UserAvatar({ user, size = "md", variant = "light", showOnline, className }: UserAvatarProps) {
   const initials = (user.username || user.name || "?").charAt(0).toUpperCase();
 
   return (
     <Avatar
+      size={size === "sm" ? "default" : "lg"}
       className={cn(
         size === "sm" ? "size-8" : "size-10",
         className,
@@ -37,6 +39,9 @@ export function UserAvatar({ user, size = "md", variant = "light", className }: 
       >
         {initials}
       </AvatarFallback>
+      {showOnline && (
+        <AvatarBadge className="bg-success ring-navy-900" />
+      )}
     </Avatar>
   );
 }

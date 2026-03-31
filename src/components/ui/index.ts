@@ -85,7 +85,7 @@ export {
 
 // Layout
 export { Separator } from "./separator";
-export { Avatar, AvatarImage, AvatarFallback } from "./avatar";
+export { Avatar, AvatarImage, AvatarFallback, AvatarBadge } from "./avatar";
 export { Skeleton } from "./skeleton";
 
 // Sheet (mobile nav, side panels)

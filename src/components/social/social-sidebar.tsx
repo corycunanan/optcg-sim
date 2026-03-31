@@ -271,10 +271,7 @@ export function SocialSidebar({ collapsed, onCollapse, onOpenChat, hideNav }: So
                     onClick={() => onOpenChat(user)}
                     className="flex flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-navy-800"
                   >
-                    <div className="relative shrink-0">
-                      <UserAvatar user={user} size="sm" variant="dark" />
-                      <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-navy-900 bg-navy-500" />
-                    </div>
+                    <UserAvatar user={user} size="sm" variant="dark" showOnline />
                     <span className="truncate text-xs font-medium text-content-inverse">
                       {user.username || user.name}
                     </span>
