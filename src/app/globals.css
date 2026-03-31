@@ -308,6 +308,16 @@
   }
 }
 
+/* ─── Display Font Treatment ─────────────────────────────────── */
+/* All display headings are italic + uppercase by default.
+   See docs/design/BRANDING-GUIDELINES.md Section 4. */
+
+.font-display {
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
 /* ─── Base Styles ────────────────────────────────────────────── */
 
 html {
