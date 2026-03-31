@@ -6,8 +6,8 @@ export default async function Home() {
 
   return (
     <main className="relative flex flex-1 flex-col bg-background p-12">
-      {/* Top right — header and subtitle */}
-      <div className="ml-auto text-right">
+      {/* Top left — header and subtitle */}
+      <div>
         <h1 className="font-display text-6xl font-bold leading-none tracking-tight text-content-primary">
           OPTCG{" "}
           <span className="text-navy-900">Simulator</span>

@@ -308,6 +308,18 @@
   }
 }
 
+/* ─── Ornamental CTA ─────────────────────────────────────────── */
+/* Riftbound-inspired ornamental outline for hero CTAs.
+   See docs/design/BRANDING-GUIDELINES.md Section 8. */
+
+.btn-ornamental {
+  outline: 1px solid var(--gold-500);
+  outline-offset: 3px;
+}
+.btn-ornamental:hover {
+  outline-color: var(--gold-400);
+}
+
 /* ─── Display Font Treatment ─────────────────────────────────── */
 /* All display headings are italic + uppercase by default.
    See docs/design/BRANDING-GUIDELINES.md Section 4. */
