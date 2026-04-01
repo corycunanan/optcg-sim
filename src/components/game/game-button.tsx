@@ -6,7 +6,7 @@ import { Slot } from "radix-ui";
 import { cn } from "@/lib/utils";
 
 const gameButtonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-bold whitespace-nowrap transition-colors cursor-pointer outline-none select-none focus-visible:ring-2 focus-visible:ring-gb-accent-blue focus-visible:outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none",
+  "inline-flex items-center justify-center gap-2 rounded text-sm font-bold whitespace-nowrap transition-colors cursor-pointer outline-none select-none focus-visible:ring-2 focus-visible:ring-gb-accent-blue focus-visible:outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none",
   {
     variants: {
       variant: {
