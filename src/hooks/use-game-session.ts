@@ -103,18 +103,36 @@ export function useGameSession(
   const cardDbFetched = useRef(false);
   useEffect(() => {
     if (cardDbFetched.current) return;
-    cardDbFetched.current = true;
-    getToken()
-      .then((token) =>
-        fetch(
-          `${workerUrl}/game/${gameId}/cards?token=${encodeURIComponent(token)}`,
-        ),
-      )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: CardDb | null) => {
-        if (data) setCardDb(data);
-      })
-      .catch(() => {});
+
+    let cancelled = false;
+    let attempt = 0;
+    const maxAttempts = 3;
+
+    async function fetchCards() {
+      while (attempt < maxAttempts && !cancelled) {
+        try {
+          const token = await getToken();
+          const r = await fetch(
+            `${workerUrl}/game/${gameId}/cards?token=${encodeURIComponent(token)}`,
+          );
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data: CardDb = await r.json();
+          if (!cancelled) {
+            cardDbFetched.current = true;
+            setCardDb(data);
+          }
+          return;
+        } catch {
+          attempt++;
+          if (attempt < maxAttempts && !cancelled) {
+            await new Promise((r) => setTimeout(r, 1000 * attempt));
+          }
+        }
+      }
+    }
+
+    fetchCards();
+    return () => { cancelled = true; };
   }, [gameId, workerUrl, getToken]);
 
   /* ── Player derivation ────────────────────────────────────────────── */

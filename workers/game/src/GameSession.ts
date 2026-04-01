@@ -147,22 +147,24 @@ export class GameSession implements DurableObject {
   // ─── Card DB ────────────────────────────────────────────────────────────────
 
   private async handleGetCards(request: Request): Promise<Response> {
+    const corsHeaders = { "Access-Control-Allow-Origin": this.env.NEXTJS_URL };
+
     if (!this.cardDb || !this.gameState) {
       const loaded = await this.loadFromStorage();
-      if (!loaded) return new Response("Game not initialized", { status: 404 });
+      if (!loaded) return new Response("Game not initialized", { status: 404, headers: corsHeaders });
     }
 
     const url = new URL(request.url);
     const token = url.searchParams.get("token");
 
-    if (!token) return new Response("Missing token", { status: 401 });
+    if (!token) return new Response("Missing token", { status: 401, headers: corsHeaders });
     const playerIndex = await this.validateToken(token);
-    if (playerIndex === null) return new Response("Unauthorized", { status: 401 });
+    if (playerIndex === null) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
 
     return new Response(JSON.stringify(Object.fromEntries(this.cardDb!)), {
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": this.env.NEXTJS_URL,
+        ...corsHeaders,
       },
     });
   }
