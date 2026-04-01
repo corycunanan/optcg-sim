@@ -2,8 +2,10 @@
 
 import React, { useCallback, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { cardHover, cardTap } from "@/lib/motion";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
 import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
@@ -106,6 +108,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   style: React.CSSProperties;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   const {
     attributes,
@@ -141,15 +144,19 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     [],
   );
 
+  const skipMotion = reducedMotion || isDragging;
+
   return (
     <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
       <DropdownMenuTrigger asChild>
-        <div
+        <motion.div
           ref={mergedRef}
           {...attributes}
           {...listeners}
           onClick={onSelect}
           onContextMenu={handleContextMenu}
+          whileHover={skipMotion ? undefined : cardHover}
+          whileTap={skipMotion ? undefined : cardTap}
           style={{
             ...style,
             width: SQUARE,
@@ -171,7 +178,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             height={BOARD_CARD_H}
             className="relative z-[1]"
           />
-        </div>
+        </motion.div>
       </DropdownMenuTrigger>
 
       {onAction && (
@@ -197,6 +204,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   activeDragType: string | null;
   style: React.CSSProperties;
 }) {
+  const reducedMotion = useReducedMotion();
   const accepts = activeDragType === "attacker";
   const { setNodeRef, isOver } = useDroppable({
     id: `attack-target-${card.instanceId}`,
@@ -204,8 +212,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   });
 
   return (
-    <div
+    <motion.div
       ref={setNodeRef}
+      whileHover={reducedMotion ? undefined : cardHover}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"
     >
@@ -217,6 +226,6 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         height={BOARD_CARD_H}
         className="relative z-[1]"
       />
-    </div>
+    </motion.div>
   );
 });

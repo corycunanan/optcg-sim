@@ -2,7 +2,9 @@
 
 import React from "react";
 import { useDraggable } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
+import { handCardHover } from "@/lib/motion";
 import { BoardCard } from "../board-card";
 import { FIELD_W, HAND_CARD_W, HAND_CARD_H, type HandCardDrag } from "./constants";
 
@@ -30,17 +32,21 @@ function DraggableHandCard({
   dimmed?: boolean;
   style?: React.CSSProperties;
 }) {
+  const reducedMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `hand-${card.instanceId}`,
     data: { type: "hand-card", card } satisfies HandCardDrag,
     disabled,
   });
 
+  const skipMotion = reducedMotion || isDragging;
+
   return (
-    <div
+    <motion.div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      whileHover={skipMotion ? undefined : handCardHover}
       style={{
         ...style,
         opacity: isDragging ? 0.3 : dimmed ? 0.35 : 1,
@@ -48,7 +54,7 @@ function DraggableHandCard({
       }}
     >
       <BoardCard card={card} cardDb={cardDb} width={width} height={height} />
-    </div>
+    </motion.div>
   );
 }
 

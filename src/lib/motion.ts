@@ -39,3 +39,33 @@ export const springs = {
   /** Lively, playful — card gallery modal, game board elements */
   bouncy: { type: "spring" as const, stiffness: 300, damping: 15 },
 } as const;
+
+// ─── Game Board Card Animations ──────────────────────────────────────────────
+
+export const cardTransitions = {
+  /** Card flying between zones */
+  zoneMove: { type: "spring" as const, stiffness: 250, damping: 28 },
+  /** Card entering a zone (scale in) */
+  zoneEnter: { type: "spring" as const, stiffness: 300, damping: 25 },
+  /** Card leaving a zone (fade out) */
+  zoneExit: { duration: 0.1, ease: "easeIn" as const },
+} as const;
+
+/** Field card hover: scale(1.03), 200ms ease-out */
+export const cardHover = {
+  scale: 1.03,
+  transition: { duration: 0.2, ease: "easeOut" as const },
+} as const;
+
+/** Field card tap: scale(0.97), 150ms ease-out */
+export const cardTap = {
+  scale: 0.97,
+  transition: { duration: 0.15, ease: "easeOut" as const },
+} as const;
+
+/** Hand card hover: lift + scale, 200ms ease-out */
+export const handCardHover = {
+  scale: 1.05,
+  y: -8,
+  transition: { duration: 0.2, ease: "easeOut" as const },
+} as const;
