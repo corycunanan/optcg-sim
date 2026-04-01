@@ -7,8 +7,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  Button,
 } from "@/components/ui";
+import { GameButton } from "./game-button";
 
 interface PlayerChoiceModalProps {
   effectDescription: string;
@@ -35,28 +35,23 @@ export function PlayerChoiceModal({
           <DialogTitle className="text-sm font-bold text-gb-text-bright">
             {effectDescription}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text hover:bg-gb-surface-raised h-auto px-2 py-1"
-          >
+          <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
-          </Button>
+          </GameButton>
         </DialogHeader>
 
         <div className="flex flex-col gap-2 px-4 py-4">
           {choices.map((choice) => (
-            <Button
+            <GameButton
               key={choice.id}
               variant="secondary"
               onClick={() =>
                 onAction({ type: "PLAYER_CHOICE", choiceId: choice.id })
               }
-              className="w-full justify-start px-4 py-3 h-auto text-sm font-medium bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted hover:text-gb-text-bright"
+              className="w-full justify-start px-4 py-3 h-auto text-sm"
             >
               {choice.label}
-            </Button>
+            </GameButton>
           ))}
         </div>
       </DialogContent>

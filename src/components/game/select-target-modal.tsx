@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  Button,
 } from "@/components/ui";
+import { GameButton } from "./game-button";
 import { CardTooltip } from "./use-card-tooltip";
 
 const CARD_W = 80;
@@ -140,14 +140,9 @@ export function SelectTargetModal({
           <DialogTitle className="text-sm font-bold text-gb-text-bright">
             {effectDescription}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text hover:bg-gb-surface-raised h-auto px-2 py-1"
-          >
+          <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
-          </Button>
+          </GameButton>
         </DialogHeader>
 
         <div className="px-4 py-4 overflow-y-auto" style={{ maxHeight: 300 }}>
@@ -177,19 +172,14 @@ export function SelectTargetModal({
               </span>
             )}
           </span>
-          <Button
+          <GameButton
+            variant={canConfirm ? "amber" : "secondary"}
+            size="sm"
             onClick={handleConfirm}
             disabled={!canConfirm}
-            size="sm"
-            className={cn(
-              "text-xs font-bold",
-              canConfirm
-                ? "bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:bg-gb-accent-amber/25 hover:border-gb-accent-amber/60"
-                : "bg-gb-surface-raised text-gb-text border-gb-border-strong hover:bg-gb-surface-raised",
-            )}
           >
             {ctaLabel}
-          </Button>
+          </GameButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

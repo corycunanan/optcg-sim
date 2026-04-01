@@ -8,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  Button,
 } from "@/components/ui";
+import { GameButton } from "./game-button";
 import { CardTooltip } from "./use-card-tooltip";
 
 const CARD_W = 80;
@@ -42,14 +42,9 @@ export function OptionalEffectModal({
           <DialogTitle className="text-xs font-semibold text-gb-text-subtle tracking-wider uppercase">
             Optional Effect
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text hover:bg-gb-surface-raised h-auto px-2 py-1"
-          >
+          <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
-          </Button>
+          </GameButton>
         </DialogHeader>
 
         <div className="flex items-start gap-4 px-4 py-4">
@@ -60,19 +55,20 @@ export function OptionalEffectModal({
         </div>
 
         <DialogFooter className="flex-row gap-2 px-4 pb-4 pt-0">
-          <Button
+          <GameButton
+            variant="primary"
             onClick={() => onAction({ type: "PLAYER_CHOICE", choiceId: "activate" })}
-            className="flex-1 bg-gb-accent-navy text-white border-gb-accent-navy hover:bg-gb-accent-navy hover:opacity-90"
+            className="flex-1"
           >
             Activate
-          </Button>
-          <Button
+          </GameButton>
+          <GameButton
             variant="secondary"
             onClick={() => onAction({ type: "PASS" })}
-            className="flex-1 bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted hover:text-gb-text-bright"
+            className="flex-1"
           >
             Skip
-          </Button>
+          </GameButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

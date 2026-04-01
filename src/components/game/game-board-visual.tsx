@@ -8,8 +8,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  Button,
 } from "@/components/ui";
+import { GameButton } from "./game-button";
 import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
@@ -53,27 +53,27 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   {session.fallbackError}
                 </div>
               )}
-              <Button
-                variant="ghost"
+              <GameButton
+                variant="danger"
                 size="sm"
                 onClick={session.handleFallbackConcede}
                 disabled={session.fallbackSubmitting}
-                className="bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red hover:bg-gb-surface-raised hover:border-gb-accent-red/50 font-mono"
+                className="font-mono"
               >
                 {session.fallbackSubmitting
                   ? "Conceding\u2026"
                   : "Concede Match"}
-              </Button>
+              </GameButton>
             </div>
           )}
-          <Button
+          <GameButton
             variant="ghost"
             size="sm"
             onClick={session.handleBackToLobbies}
-            className="mt-4 text-xs text-gb-text-subtle border border-gb-border-strong hover:text-gb-text-bright"
+            className="mt-4"
           >
             &larr; Back to Lobbies
-          </Button>
+          </GameButton>
         </div>
       </div>
     );
@@ -143,12 +143,14 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
       {process.env.NODE_ENV === "development" && session.me && (
         <div className="fixed bottom-4 right-4 z-[300] flex items-center gap-2">
           {devPrompt && (
-            <button
+            <GameButton
+              variant="danger"
+              size="sm"
               onClick={() => setDevPrompt(null)}
-              className="px-2 py-1 text-xs font-mono bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red rounded cursor-pointer"
+              className="font-mono"
             >
               clear
-            </button>
+            </GameButton>
           )}
           <select
             defaultValue=""
@@ -267,13 +269,14 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
           <p className="text-sm text-gb-text leading-relaxed">
             {session.endReason}
           </p>
-          <Button
-            onClick={session.handleBackToLobbies}
+          <GameButton
+            variant="primary"
             size="lg"
-            className="w-full bg-navy-800 text-gb-text-bright hover:bg-navy-700 border-none"
+            onClick={session.handleBackToLobbies}
+            className="w-full"
           >
             Back to Lobbies
-          </Button>
+          </GameButton>
         </DialogContent>
       </Dialog>
     </GameErrorBoundary>

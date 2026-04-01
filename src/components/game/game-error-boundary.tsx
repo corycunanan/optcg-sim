@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { GameButton } from "./game-button";
 
 interface Props {
   children: React.ReactNode;
@@ -41,15 +42,16 @@ export class GameErrorBoundary extends React.Component<Props, State> {
                 {this.state.error.message}
               </p>
             )}
-            <button
-              type="button"
+            <GameButton
+              variant="primary"
+              size="lg"
               onClick={() => {
                 window.location.href = "/lobbies";
               }}
-              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-base font-bold cursor-pointer hover:bg-navy-700 transition-colors"
+              className="w-full"
             >
               Return to Lobbies
-            </button>
+            </GameButton>
           </div>
         </div>
       );

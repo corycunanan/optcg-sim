@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  Button,
 } from "@/components/ui";
+import { GameButton } from "./game-button";
 import { CardTooltip } from "./use-card-tooltip";
 
 const CARD_W = 80;
@@ -185,14 +185,9 @@ export function ArrangeTopCardsModal({
           <DialogTitle className="text-sm font-bold text-gb-text-bright">
             {title}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text hover:bg-gb-surface-raised h-auto px-2 py-1"
-          >
+          <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
-          </Button>
+          </GameButton>
         </DialogHeader>
 
         <div className="px-4 py-5">
@@ -231,33 +226,28 @@ export function ArrangeTopCardsModal({
           {step === 1 && (
             <>
               {validTargets !== undefined && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSkip}
-                  className="text-xs font-bold bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted"
-                >
+                <GameButton variant="secondary" size="sm" onClick={handleSkip}>
                   Keep None
-                </Button>
+                </GameButton>
               )}
-              <Button
+              <GameButton
+                variant="amber"
                 size="sm"
                 disabled={!selectedId}
                 onClick={handleAddToHand}
-                className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:bg-gb-accent-amber/25 hover:border-gb-accent-amber/60"
               >
                 Add to Hand
-              </Button>
+              </GameButton>
             </>
           )}
           {step === 2 && (
-            <Button
+            <GameButton
+              variant="amber"
               size="sm"
               onClick={() => handleSend(canSendToBottom ? "bottom" : "top")}
-              className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:bg-gb-accent-amber/25 hover:border-gb-accent-amber/60"
             >
               {canSendToBottom ? "Place at Bottom" : "Place on Top"}
-            </Button>
+            </GameButton>
           )}
         </DialogFooter>
       </DialogContent>

@@ -1,5 +1,6 @@
 import type React from "react";
 import { cn } from "@/lib/utils";
+import { GameButton } from "./game-button";
 
 export function ActionBtn({
   children, onClick, accent, className,
@@ -10,18 +11,14 @@ export function ActionBtn({
   className?: string;
 }) {
   return (
-    <button
+    <GameButton
+      variant={accent ? "green" : "secondary"}
+      size="sm"
       onClick={onClick}
-      className={cn(
-        "block w-full px-2 py-1 mb-1 text-left text-xs font-mono rounded cursor-pointer transition-[border-color] duration-100",
-        "bg-gb-surface-raised border border-gb-border-strong text-gb-text",
-        "hover:border-gb-text-muted focus-visible:ring-2 focus-visible:ring-gb-accent-blue focus-visible:outline-none",
-        accent && "bg-gb-accent-green/15 text-gb-accent-green border-gb-accent-green/30 hover:border-gb-accent-green/50",
-        className,
-      )}
+      className={cn("block w-full mb-1 text-left font-mono", className)}
     >
       {children}
-    </button>
+    </GameButton>
   );
 }
 
