@@ -323,7 +323,7 @@ export function BoardLayout({
   const sideCardOffsetX = CARD_OFFSET_X;
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
