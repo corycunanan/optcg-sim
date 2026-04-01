@@ -26,6 +26,7 @@ interface RemoteGameStatus {
 export interface UseGameSessionReturn {
   gameState: GameState | null;
   cardDb: CardDb;
+  cardDbReady: boolean;
   connectionStatus: string;
   lastError: string | null;
   activePrompt: { promptType: PromptType; options: PromptOptions } | null;
@@ -320,9 +321,12 @@ export function useGameSession(
     remoteGameStatus?.winReason ??
     "The game has ended.";
 
+  const cardDbReady = Object.keys(cardDb).length > 0;
+
   return {
     gameState,
     cardDb,
+    cardDbReady,
     connectionStatus,
     lastError,
     activePrompt,

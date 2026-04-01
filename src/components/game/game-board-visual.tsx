@@ -19,14 +19,16 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   const [devPrompt, setDevPrompt] = useState<{ promptType: PromptType; options: PromptOptions } | null>(null);
   const activePrompt = devPrompt ?? session.activePrompt;
 
-  if (!session.gameState) {
+  if (!session.gameState || !session.cardDbReady) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gb-board">
         <div className="text-center">
           <div className="text-sm text-gb-text-bright font-bold mb-2">
             {session.connectionStatus === "connecting"
               ? "Connecting\u2026"
-              : "Waiting for game state\u2026"}
+              : !session.gameState
+                ? "Waiting for game state\u2026"
+                : "Loading card data\u2026"}
           </div>
           {session.lastError && (
             <div className="text-xs text-gb-accent-red">

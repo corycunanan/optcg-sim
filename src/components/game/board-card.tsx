@@ -232,7 +232,7 @@ export const BoardCard = React.memo(function BoardCard({
             className="fixed z-[100] pointer-events-none bg-gb-surface border border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg"
             style={{ opacity: 0 }}
           >
-            <CardTooltipContent data={data!} cardId={resolvedCardId} card={card} />
+            <CardTooltipContent data={data} cardId={resolvedCardId} card={card} />
           </div>,
           document.body,
         )}
@@ -245,10 +245,11 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   cardId,
   card,
 }: {
-  data: CardData;
+  data: CardData | null;
   cardId: string | undefined;
   card?: CardInstance | null;
 }) {
+  if (!data) return <span className="text-gb-text-muted text-xs">Unknown card</span>;
   const isFieldCard = data.type === "Leader" || data.type === "Character";
   const donCount = card?.attachedDon.length ?? 0;
   const basePower = data.power ?? 0;
