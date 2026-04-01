@@ -184,8 +184,8 @@ export function SelectTargetModal({
             className={cn(
               "text-xs font-bold",
               canConfirm
-                ? "bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60"
-                : "bg-gb-surface-raised text-gb-text border-gb-border-strong",
+                ? "bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:bg-gb-accent-amber/25 hover:border-gb-accent-amber/60"
+                : "bg-gb-surface-raised text-gb-text border-gb-border-strong hover:bg-gb-surface-raised",
             )}
           >
             {ctaLabel}

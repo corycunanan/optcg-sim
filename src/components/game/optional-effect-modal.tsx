@@ -62,7 +62,7 @@ export function OptionalEffectModal({
         <DialogFooter className="flex-row gap-2 px-4 pb-4 pt-0">
           <Button
             onClick={() => onAction({ type: "PLAYER_CHOICE", choiceId: "activate" })}
-            className="flex-1 bg-gb-accent-navy text-white border-gb-accent-navy hover:opacity-90"
+            className="flex-1 bg-gb-accent-navy text-white border-gb-accent-navy hover:bg-gb-accent-navy hover:opacity-90"
           >
             Activate
           </Button>

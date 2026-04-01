@@ -54,11 +54,11 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                 </div>
               )}
               <Button
-                variant="destructive"
+                variant="ghost"
                 size="sm"
                 onClick={session.handleFallbackConcede}
                 disabled={session.fallbackSubmitting}
-                className="bg-gb-surface-raised border-gb-accent-red/30 text-gb-accent-red hover:border-gb-accent-red/50 font-mono"
+                className="bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red hover:bg-gb-surface-raised hover:border-gb-accent-red/50 font-mono"
               >
                 {session.fallbackSubmitting
                   ? "Conceding\u2026"

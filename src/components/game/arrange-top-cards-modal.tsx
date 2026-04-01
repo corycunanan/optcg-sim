@@ -244,7 +244,7 @@ export function ArrangeTopCardsModal({
                 size="sm"
                 disabled={!selectedId}
                 onClick={handleAddToHand}
-                className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60"
+                className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:bg-gb-accent-amber/25 hover:border-gb-accent-amber/60"
               >
                 Add to Hand
               </Button>
@@ -254,7 +254,7 @@ export function ArrangeTopCardsModal({
             <Button
               size="sm"
               onClick={() => handleSend(canSendToBottom ? "bottom" : "top")}
-              className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60"
+              className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:bg-gb-accent-amber/25 hover:border-gb-accent-amber/60"
             >
               {canSendToBottom ? "Place at Bottom" : "Place on Top"}
             </Button>

@@ -62,7 +62,7 @@ export function RevealTriggerModal({
         <DialogFooter className="flex-row gap-2 px-4 py-4 pt-0">
           <Button
             onClick={() => onAction({ type: "REVEAL_TRIGGER", reveal: true })}
-            className="flex-1 bg-gb-accent-navy text-white border-gb-accent-navy hover:opacity-90"
+            className="flex-1 bg-gb-accent-navy text-white border-gb-accent-navy hover:bg-gb-accent-navy hover:opacity-90"
           >
             Reveal &amp; Activate
           </Button>
