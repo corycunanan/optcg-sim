@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { CardDb, GameEvent } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui";
 
 interface EventLogProps {
   events: GameEvent[];
@@ -134,9 +135,9 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
         </span>
         <div className="flex items-center gap-2">
           {collapsed && displayEvents.length > 0 && (
-            <span className="text-xs text-gb-text-muted">
+            <Badge variant="secondary" className="text-xs px-1 py-0 h-auto bg-gb-surface-raised text-gb-text-muted border-gb-border-strong">
               {displayEvents.length}
-            </span>
+            </Badge>
           )}
           <svg
             width="12"
