@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Button,
+} from "@/components/ui";
 import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
@@ -46,23 +53,27 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   {session.fallbackError}
                 </div>
               )}
-              <button
+              <Button
+                variant="destructive"
+                size="sm"
                 onClick={session.handleFallbackConcede}
                 disabled={session.fallbackSubmitting}
-                className="px-2 py-1 bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red cursor-pointer rounded text-xs font-mono hover:border-gb-accent-red/50"
+                className="bg-gb-surface-raised border-gb-accent-red/30 text-gb-accent-red hover:border-gb-accent-red/50 font-mono"
               >
                 {session.fallbackSubmitting
                   ? "Conceding\u2026"
                   : "Concede Match"}
-              </button>
+              </Button>
             </div>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={session.handleBackToLobbies}
-            className="mt-4 px-3 py-1 text-xs text-gb-text-subtle border border-gb-border-strong rounded-md hover:text-gb-text-bright transition-colors cursor-pointer"
+            className="mt-4 text-xs text-gb-text-subtle border border-gb-border-strong hover:text-gb-text-bright"
           >
             &larr; Back to Lobbies
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -234,41 +245,37 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
       />
 
       {/* Match ended overlay */}
-      {session.matchClosed && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="match-end-title"
+      <Dialog open={session.matchClosed}>
+        <DialogContent
+          showCloseButton={false}
+          className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] text-center"
+          onInteractOutside={(e) => e.preventDefault()}
         >
-          <div className="max-w-[400px] w-full bg-gb-surface border border-gb-border-strong rounded-lg p-6 text-center mx-4">
-            <p
-              id="match-end-title"
-              className="text-xs font-semibold text-gb-text-subtle tracking-widest mb-2"
-            >
+          <DialogHeader className="items-center">
+            <DialogTitle className="text-xs font-semibold text-gb-text-subtle tracking-widest">
               MATCH COMPLETE
-            </p>
-            <p
-              className={cn(
-                "text-3xl font-extrabold mb-3",
-                session.endColorClass,
-              )}
-            >
-              {session.endTitle}
-            </p>
-            <p className="text-sm text-gb-text leading-relaxed mb-6">
-              {session.endReason}
-            </p>
-            <button
-              type="button"
-              onClick={session.handleBackToLobbies}
-              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-base font-bold cursor-pointer hover:bg-navy-700 transition-colors"
-            >
-              Back to Lobbies
-            </button>
-          </div>
-        </div>
-      )}
+            </DialogTitle>
+          </DialogHeader>
+          <p
+            className={cn(
+              "text-3xl font-extrabold",
+              session.endColorClass,
+            )}
+          >
+            {session.endTitle}
+          </p>
+          <p className="text-sm text-gb-text leading-relaxed">
+            {session.endReason}
+          </p>
+          <Button
+            onClick={session.handleBackToLobbies}
+            size="lg"
+            className="w-full bg-navy-800 text-gb-text-bright hover:bg-navy-700 border-none"
+          >
+            Back to Lobbies
+          </Button>
+        </DialogContent>
+      </Dialog>
     </GameErrorBoundary>
   );
 }

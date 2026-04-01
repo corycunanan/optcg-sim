@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type {
   CardDb,
   CardInstance,
@@ -19,6 +19,13 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
+import {
+  TooltipProvider,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui";
 import { BoardCard } from "../board-card";
 import {
   NAVBAR_H,
@@ -82,67 +89,40 @@ function NavMenu({
   onConcede: () => void;
   matchClosed: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const close = useCallback(() => setOpen(false), []);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        close();
-      }
-    }
-    document.addEventListener("pointerdown", handleClick);
-    return () => document.removeEventListener("pointerdown", handleClick);
-  }, [open, close]);
-
   return (
-    <div ref={menuRef} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-md transition-colors cursor-pointer",
-          open
-            ? "bg-gb-surface-raised text-gb-text-bright"
-            : "text-gb-text-subtle hover:text-gb-text-bright",
-        )}
-        aria-label="Game menu"
-        aria-expanded={open}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-md transition-colors cursor-pointer text-gb-text-subtle hover:text-gb-text-bright data-[state=open]:bg-gb-surface-raised data-[state=open]:text-gb-text-bright"
+          aria-label="Game menu"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor" />
+            <rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor" />
+            <rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor" />
+          </svg>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-48 bg-gb-surface border-gb-border-strong"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor" />
-          <rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor" />
-          <rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 rounded-md border border-gb-border-strong bg-gb-surface py-1 shadow-lg z-50">
-          <button
-            onClick={() => {
-              close();
-              onLeave();
-            }}
-            className="w-full text-left px-3 py-2 text-xs text-gb-text hover:bg-gb-surface-raised transition-colors cursor-pointer"
+        <DropdownMenuItem
+          onClick={onLeave}
+          className="text-xs text-gb-text focus:bg-gb-surface-raised"
+        >
+          &larr; Back to Lobbies
+        </DropdownMenuItem>
+        {!matchClosed && (
+          <DropdownMenuItem
+            onClick={onConcede}
+            className="text-xs text-gb-accent-red focus:bg-gb-surface-raised focus:text-gb-accent-red"
           >
-            &larr; Back to Lobbies
-          </button>
-          {!matchClosed && (
-            <button
-              onClick={() => {
-                close();
-                onConcede();
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-gb-accent-red hover:bg-gb-surface-raised transition-colors cursor-pointer"
-            >
-              Concede
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+            Concede
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -343,6 +323,7 @@ export function BoardLayout({
   const sideCardOffsetX = CARD_OFFSET_X;
 
   return (
+    <TooltipProvider delayDuration={0}>
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
@@ -786,5 +767,6 @@ export function BoardLayout({
       )}
     </DragOverlay>
     </DndContext>
+    </TooltipProvider>
   );
 }

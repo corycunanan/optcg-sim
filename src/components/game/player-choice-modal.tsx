@@ -2,7 +2,13 @@
 
 import React from "react";
 import type { GameAction } from "@shared/game-types";
-import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Button,
+} from "@/components/ui";
 
 interface PlayerChoiceModalProps {
   effectDescription: string;
@@ -19,46 +25,41 @@ export function PlayerChoiceModal({
   onHide,
   onAction,
 }: PlayerChoiceModalProps) {
-  if (isHidden) return null;
-
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div
-        className="bg-gb-surface border border-gb-border-strong rounded-lg flex flex-col"
-        style={{ width: 400, maxWidth: "calc(100vw - 32px)" }}
+    <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] p-0 gap-0"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gb-border">
-          <span className="text-sm font-bold text-gb-text-bright">
+        <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
+          <DialogTitle className="text-sm font-bold text-gb-text-bright">
             {effectDescription}
-          </span>
-          <button
+          </DialogTitle>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text px-2 py-1 rounded-md hover:bg-gb-surface-raised transition-colors cursor-pointer"
+            className="text-xs text-gb-text-dim hover:text-gb-text hover:bg-gb-surface-raised h-auto px-2 py-1"
           >
             Hide
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
-        {/* Options */}
         <div className="flex flex-col gap-2 px-4 py-4">
           {choices.map((choice) => (
-            <button
+            <Button
               key={choice.id}
+              variant="secondary"
               onClick={() =>
                 onAction({ type: "PLAYER_CHOICE", choiceId: choice.id })
               }
-              className={cn(
-                "w-full px-4 py-3 text-sm text-left font-medium rounded-md border transition-colors cursor-pointer",
-                "bg-gb-surface-raised text-gb-text border-gb-border-strong",
-                "hover:border-gb-text-muted hover:text-gb-text-bright",
-              )}
+              className="w-full justify-start px-4 py-3 h-auto text-sm font-medium bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted hover:text-gb-text-bright"
             >
               {choice.label}
-            </button>
+            </Button>
           ))}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

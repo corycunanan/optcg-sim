@@ -3,7 +3,15 @@
 import React, { useState } from "react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-import { useCardTooltip } from "./use-card-tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  Button,
+} from "@/components/ui";
+import { CardTooltip } from "./use-card-tooltip";
 
 const CARD_W = 80;
 const CARD_H = 112;
@@ -30,18 +38,15 @@ function ModalCard({
   onDrop: () => void;
 }) {
   const data = cardDb[card.cardId] ?? null;
-  const { triggerRef, hoverHandlers, portal } = useCardTooltip(data, card.cardId, card);
 
   return (
-    <>
+    <CardTooltip data={data} cardId={card.cardId} card={card}>
       <div
-        ref={triggerRef}
         draggable
         onClick={onSelect}
         onDragStart={(e) => { e.stopPropagation(); onDragStart(); }}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(); }}
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(); }}
-        {...hoverHandlers}
         className={cn(
           "relative rounded-md overflow-hidden cursor-grab border-2 transition-colors select-none shrink-0",
           selected
@@ -79,36 +84,7 @@ function ModalCard({
           </div>
         )}
       </div>
-      {portal}
-    </>
-  );
-}
-
-function ModalBtn({
-  children,
-  onClick,
-  disabled,
-  accent,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  accent?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "px-3 py-2 text-xs font-bold rounded-md border transition-colors cursor-pointer",
-        accent
-          ? "bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60"
-          : "bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted",
-        disabled && "opacity-40 cursor-not-allowed pointer-events-none",
-      )}
-    >
-      {children}
-    </button>
+    </CardTooltip>
   );
 }
 
@@ -140,8 +116,6 @@ export function ArrangeTopCardsModal({
   const [keptCardInstanceId, setKeptCardInstanceId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
-
-  if (isHidden) return null;
 
   // If validTargets is provided, only those cards can be selected
   const canSelectCard = (instanceId: string) =>
@@ -181,7 +155,6 @@ export function ArrangeTopCardsModal({
   }
 
   function handleSkip() {
-    // Keep no card — go straight to arrange step
     setKeptCardInstanceId("");
     setStep(2);
   }
@@ -201,25 +174,27 @@ export function ArrangeTopCardsModal({
       : `Put the remaining ${orderedCards.length} card${orderedCards.length !== 1 ? "s" : ""} back`;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div
-        className="bg-gb-surface border border-gb-border-strong rounded-lg flex flex-col"
-        style={{ width: 520, maxWidth: "calc(100vw - 32px)" }}
+    <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDragEnd}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gb-border">
-          <span className="text-sm font-bold text-gb-text-bright">{title}</span>
-          <button
+        <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
+          <DialogTitle className="text-sm font-bold text-gb-text-bright">
+            {title}
+          </DialogTitle>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text px-2 py-1 rounded-md hover:bg-gb-surface-raised transition-colors cursor-pointer"
+            className="text-xs text-gb-text-dim hover:text-gb-text hover:bg-gb-surface-raised h-auto px-2 py-1"
           >
             Hide
-          </button>
-        </div>
+          </Button>
+        </DialogHeader>
 
-        {/* Body */}
         <div className="px-4 py-5">
           <div className="flex items-center justify-center gap-3 flex-wrap">
             {orderedCards.map((card, i) => (
@@ -252,27 +227,40 @@ export function ArrangeTopCardsModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gb-border">
+        <DialogFooter className="flex-row items-center justify-end gap-2 px-4 py-3 border-t border-gb-border pt-3">
           {step === 1 && (
             <>
               {validTargets !== undefined && (
-                <ModalBtn onClick={handleSkip}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSkip}
+                  className="text-xs font-bold bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted"
+                >
                   Keep None
-                </ModalBtn>
+                </Button>
               )}
-              <ModalBtn accent disabled={!selectedId} onClick={handleAddToHand}>
+              <Button
+                size="sm"
+                disabled={!selectedId}
+                onClick={handleAddToHand}
+                className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60"
+              >
                 Add to Hand
-              </ModalBtn>
+              </Button>
             </>
           )}
           {step === 2 && (
-            <ModalBtn accent onClick={() => handleSend(canSendToBottom ? "bottom" : "top")}>
+            <Button
+              size="sm"
+              onClick={() => handleSend(canSendToBottom ? "bottom" : "top")}
+              className="text-xs font-bold bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60"
+            >
               {canSendToBottom ? "Place at Bottom" : "Place on Top"}
-            </ModalBtn>
+            </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
