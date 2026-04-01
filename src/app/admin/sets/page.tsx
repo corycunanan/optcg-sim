@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function SetsPage() {
   };
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-7xl px-6 py-8">
       <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
         Sets
       </h1>
@@ -51,9 +52,9 @@ export default async function SetsPage() {
                     {s.setName}
                   </p>
                 </div>
-                <span className="rounded-full bg-surface-3 px-3 py-1 text-xs font-semibold tabular-nums text-content-secondary">
+                <Badge variant="secondary" className="rounded-full tabular-nums">
                   {s._count.cardId}
-                </span>
+                </Badge>
               </Link>
             ))}
           </div>

@@ -3,6 +3,14 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { DeckDeleteButton } from "@/components/deck-builder/deck-delete-button";
+import {
+  PageHeader,
+  PageHeaderContent,
+  PageHeaderTitle,
+  PageHeaderDescription,
+  PageHeaderActions,
+} from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: "My Decks — OPTCG Simulator",
@@ -43,19 +51,22 @@ export default async function DecksPage() {
   const leaderMap = new Map(leaders.map((l) => [l.id, l]));
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-8">
-      <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-content-primary">
-          My Decks
-        </h1>
-        <Link
-          href="/decks/new"
-          className="rounded bg-navy-900 px-4 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
-        >
-          + New Deck
-        </Link>
-      </div>
+    <>
+      <PageHeader>
+        <PageHeaderContent>
+          <PageHeaderTitle>My Decks</PageHeaderTitle>
+          <PageHeaderDescription>
+            Build and manage your OPTCG decks.
+          </PageHeaderDescription>
+        </PageHeaderContent>
+        <PageHeaderActions>
+          <Button variant="secondary" asChild>
+            <Link href="/decks/new">+ New Deck</Link>
+          </Button>
+        </PageHeaderActions>
+      </PageHeader>
 
+      <div className="mx-auto w-full max-w-5xl px-6 py-8">
       {decks.length === 0 ? (
         <div className="py-20 text-center">
           <p className="text-lg font-semibold text-content-secondary">No decks yet</p>
@@ -124,6 +135,7 @@ export default async function DecksPage() {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

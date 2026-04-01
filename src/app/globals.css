@@ -335,7 +335,7 @@ html {
 }
 
 body {
-  overflow-x: hidden;
+  overflow: hidden;
   background: var(--surface-base);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
@@ -361,6 +361,14 @@ body {
 /* ─── Focus Visible ──────────────────────────────────────────── */
 
 :focus-visible {
-  outline: 2px solid var(--border-focus);
+  outline: 2px solid color-mix(in oklch, var(--border-focus) 40%, transparent);
   outline-offset: 2px;
+}
+
+/* Inputs handle their own focus styles via border + ring — remove the global outline */
+input:focus-visible,
+textarea:focus-visible,
+[data-slot="command-input"]:focus-visible,
+[cmdk-input]:focus-visible {
+  outline: none;
 }

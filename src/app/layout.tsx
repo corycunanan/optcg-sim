@@ -47,7 +47,7 @@ export default function RootLayout({
               {/* Left column: navbar + content */}
               <div className="flex flex-1 flex-col min-w-0">
                 <Navbar />
-                <main className="flex flex-1 flex-col min-w-0 min-h-0">{children}</main>
+                <main className="flex flex-1 flex-col overflow-hidden min-w-0 min-h-0">{children}</main>
               </div>
               {/* Right column: sidebar (full viewport height) */}
               <SocialShell />

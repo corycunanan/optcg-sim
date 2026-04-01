@@ -2,12 +2,20 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
+import { Filter } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CardGrid } from "./card-grid";
-import { CardFilters } from "./card-filters";
 import { Pagination } from "./pagination";
 import { CardDetailModal } from "./card-detail-modal";
+import {
+  PageHeader,
+  PageHeaderContent,
+  PageHeaderTitle,
+  PageHeaderDescription,
+  PageHeaderActions,
+} from "@/components/ui/page-header";
 
 interface CardBrowserProps {
   initialCards: CardWithRelations[];
@@ -118,77 +126,65 @@ export function CardBrowser({
     currentFilters.originOnly;
 
   return (
-    <div>
-      {/* Page header */}
-      <div className="-mx-6 -mt-8 mb-8 bg-surface-1 px-6 pb-6 pt-8">
-        {/* Title + count */}
-        <div className="mb-4 flex items-baseline justify-between">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-content-primary">
-            Card Database
-          </h1>
-          <span className="text-sm tabular-nums text-content-tertiary">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Page header — fixed to top */}
+      <PageHeader className="z-20 shrink-0">
+        <PageHeaderContent>
+          <PageHeaderTitle>Card Database</PageHeaderTitle>
+          <PageHeaderDescription>
             Showing {initialCards.length} of {total.toLocaleString()} cards
             {currentFilters.q && (
               <span>
                 {" "}matching &ldquo;
-                <strong className="text-content-secondary">{currentFilters.q}</strong>
+                <strong className="text-content-inverse">{currentFilters.q}</strong>
                 &rdquo;
               </span>
             )}
-            {currentFilters.originOnly === "true" && (
-              <span className="ml-3 rounded-full bg-gold-100 px-2 py-1 text-xs font-medium text-gold-500">
-                Origin sets only
-              </span>
-            )}
-          </span>
+          </PageHeaderDescription>
+        </PageHeaderContent>
+        <PageHeaderActions>
+          <Button>
+            <Filter data-icon="inline-start" />
+            Filter
+          </Button>
+        </PageHeaderActions>
+      </PageHeader>
+
+      {/* Scrollable content area */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* Search bar */}
+        <div className="px-6 py-6">
+          <form onSubmit={handleSearch}>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search cards by name..."
+                className="flex-1"
+              />
+              <Button type="submit">
+                Search
+              </Button>
+            </div>
+          </form>
         </div>
 
-        {/* Search bar */}
-        <form onSubmit={handleSearch} className="mb-4">
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search cards by name..."
-              className="flex-1"
+        <div className={cn("px-6", totalPages <= 1 && "pb-6")}>
+          <CardGrid cards={initialCards} onCardClick={setModalCardId} />
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 pb-6">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={(newPage) => updateFilters({ page: String(newPage) })}
             />
-            <Button type="submit">
-              Search
-            </Button>
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  router.push("/admin/cards");
-                }}
-                className="rounded border border-border px-4 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
-              >
-                Clear
-              </button>
-            )}
           </div>
-        </form>
-
-        {/* Filters */}
-        <CardFilters
-          sets={sets}
-          currentFilters={currentFilters}
-          onFilterChange={updateFilters}
-        />
+        )}
       </div>
-
-      <CardGrid cards={initialCards} onCardClick={setModalCardId} />
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={(newPage) => updateFilters({ page: String(newPage) })}
-        />
-      )}
 
       {/* Card detail modal */}
       {modalCardId && (

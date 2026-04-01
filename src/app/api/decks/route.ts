@@ -24,16 +24,27 @@ export async function GET() {
       },
     });
 
+    // Fetch leader card images in bulk
+    const leaderIds = [...new Set(decks.map((d) => d.leaderId))];
+    const leaderCards = await prisma.card.findMany({
+      where: { id: { in: leaderIds } },
+      select: { id: true, name: true, imageUrl: true },
+    });
+    const leaderMap = new Map(leaderCards.map((c) => [c.id, c]));
+
     // Transform to include computed fields
     const data = decks.map((deck) => {
       const totalCards = deck.cards.reduce((sum, dc) => sum + dc.quantity, 0);
       const colors = new Set<string>();
       deck.cards.forEach((dc) => dc.card.color.forEach((c) => colors.add(c)));
+      const leader = leaderMap.get(deck.leaderId);
 
       return {
         id: deck.id,
         name: deck.name,
         leaderId: deck.leaderId,
+        leaderName: leader?.name ?? null,
+        leaderImageUrl: deck.leaderArtUrl ?? leader?.imageUrl ?? null,
         format: deck.format,
         totalCards,
         colors: Array.from(colors),

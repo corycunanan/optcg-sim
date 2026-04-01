@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CardImageGallery } from "@/components/admin/card-image-gallery";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,15 @@ const COLOR_ACCENT: Record<string, string> = {
   Purple: "var(--card-purple)",
   Black: "var(--card-black)",
   Yellow: "var(--card-yellow)",
+};
+
+const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
+  Red: "card-red",
+  Blue: "card-blue",
+  Green: "card-green",
+  Purple: "card-purple",
+  Black: "card-black",
+  Yellow: "card-yellow",
 };
 
 export default async function CardDetailPage({
@@ -36,7 +47,7 @@ export default async function CardDetailPage({
   const accentColor = COLOR_ACCENT[primaryColor] || "var(--navy-900)";
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-7xl px-6 py-8">
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-sm">
         <Link
@@ -74,25 +85,22 @@ export default async function CardDetailPage({
                 </p>
               </div>
               {card.banStatus !== "LEGAL" && (
-                <span className="rounded bg-error px-3 py-1 text-xs font-bold text-content-inverse">
+                <Badge variant="error" className="font-bold">
                   {card.banStatus}
-                </span>
+                </Badge>
               )}
             </div>
 
             {/* Colors */}
             <div className="mt-3 flex flex-wrap gap-2">
               {card.color.map((c) => (
-                <span
+                <Badge
                   key={c}
-                  className="rounded-full px-3 py-1 text-xs font-semibold"
-                  style={{
-                    background: COLOR_ACCENT[c] || "var(--surface-3)",
-                    color: c === "Yellow" ? "var(--text-primary)" : "var(--text-inverse)",
-                  }}
+                  variant={COLOR_TO_VARIANT[c] || "secondary"}
+                  className="rounded-full px-3 py-1"
                 >
                   {c}
-                </span>
+                </Badge>
               ))}
             </div>
           </div>
@@ -178,9 +186,9 @@ export default async function CardDetailPage({
                       {cs.setName}
                     </span>
                     {cs.isOrigin && (
-                      <span className="rounded-full bg-gold-100 px-2 py-1 text-xs font-semibold text-gold-500">
+                      <Badge variant="warning" className="rounded-full">
                         Origin
-                      </span>
+                      </Badge>
                     )}
                   </div>
                 ))}
@@ -190,18 +198,16 @@ export default async function CardDetailPage({
 
           {/* Edit link */}
           <div className="flex gap-3 pt-2">
-            <Link
-              href={`/admin/cards/${card.id}/edit`}
-              className="rounded-md bg-navy-900 px-5 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
-            >
-              Edit Card
-            </Link>
-            <Link
-              href="/admin/cards"
-              className="rounded-md border border-border px-5 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
-            >
-              Back to Cards
-            </Link>
+            <Button asChild>
+              <Link href={`/admin/cards/${card.id}/edit`}>
+                Edit Card
+              </Link>
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link href="/admin/cards">
+                Back to Cards
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -240,9 +246,5 @@ function Section({
 }
 
 function Tag({ text }: { text: string }) {
-  return (
-    <span className="rounded bg-surface-3 px-3 py-1 text-xs font-medium text-content-secondary">
-      {text}
-    </span>
-  );
+  return <Badge variant="secondary">{text}</Badge>;
 }

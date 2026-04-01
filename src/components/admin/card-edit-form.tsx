@@ -4,6 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
@@ -132,27 +143,27 @@ export function CardEditForm({ card }: { card: Card }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
+    <form onSubmit={handleSubmit} className="flex max-w-2xl flex-col gap-5">
       {error && (
-        <div className="rounded bg-error-soft p-3 text-sm font-medium text-error">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
       {success && (
-        <div className="rounded bg-success-soft p-3 text-sm font-medium text-success">
-          Saved! Redirecting…
-        </div>
+        <Alert variant="success">
+          <AlertDescription>Saved! Redirecting…</AlertDescription>
+        </Alert>
       )}
 
       {/* Card ID + Origin Set (read-only) */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Card ID" hint="Read-only">
-          <div className="w-full rounded border border-border bg-surface-1 px-3 py-2 font-mono text-sm text-content-tertiary">
+          <div className="w-full rounded-md border border-border bg-surface-1 px-3 py-2 font-mono text-sm text-content-tertiary">
             {card.id}
           </div>
         </Field>
         <Field label="Origin Set" hint="Derived from ID">
-          <div className="w-full rounded border border-border bg-surface-1 px-3 py-2 text-sm text-content-tertiary">
+          <div className="w-full rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-content-tertiary">
             {card.originSet}
           </div>
         </Field>
@@ -171,19 +182,15 @@ export function CardEditForm({ card }: { card: Card }) {
       <Field label="Type" required>
         <div className="flex gap-2">
           {CARD_TYPES.map((t) => (
-            <button
+            <Button
               key={t}
               type="button"
+              variant={form.type === t ? "default" : "secondary"}
+              size="sm"
               onClick={() => update("type", t)}
-              className={cn(
-                "rounded border px-4 py-1 text-xs font-medium transition-all",
-                form.type === t
-                  ? "border-navy-900 bg-navy-900 text-content-inverse"
-                  : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
-              )}
             >
               {t}
-            </button>
+            </Button>
           ))}
         </div>
       </Field>
@@ -199,7 +206,7 @@ export function CardEditForm({ card }: { card: Card }) {
                 type="button"
                 onClick={() => toggleColor(c)}
                 className={cn(
-                  "rounded border px-3 py-1 text-xs font-medium transition-all",
+                  "rounded-md border px-3 py-1 text-xs font-medium transition-all",
                   !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
                 )}
                 style={
@@ -281,17 +288,18 @@ export function CardEditForm({ card }: { card: Card }) {
           />
         </Field>
         <Field label="Ban Status">
-          <select
-            value={form.banStatus}
-            onChange={(e) => update("banStatus", e.target.value)}
-            className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-sm text-content-primary focus:outline-none"
-          >
-            {BAN_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <Select value={form.banStatus} onValueChange={(v) => update("banStatus", v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BAN_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
       </div>
 
@@ -316,21 +324,21 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Effect Text */}
       <Field label="Effect Text">
-        <textarea
+        <Textarea
           value={form.effectText}
           onChange={(e) => update("effectText", e.target.value)}
           rows={5}
-          className="w-full rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-content-primary focus:outline-none"
+          className="font-mono"
         />
       </Field>
 
       {/* Trigger Text */}
       <Field label="Trigger Text">
-        <textarea
+        <Textarea
           value={form.triggerText}
           onChange={(e) => update("triggerText", e.target.value)}
           rows={2}
-          className="w-full rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-content-primary focus:outline-none"
+          className="font-mono"
         />
       </Field>
 
@@ -346,7 +354,7 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Image Preview */}
       {form.imageUrl && (
-        <div className="w-48 overflow-hidden rounded border border-border">
+        <div className="w-48 overflow-hidden rounded-md border border-border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={form.imageUrl} alt="Preview" className="w-full" />
         </div>
@@ -354,12 +362,10 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Reprint flag */}
       <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
+        <Checkbox
           id="isReprint"
           checked={form.isReprint}
-          onChange={(e) => update("isReprint", e.target.checked)}
-          className="h-4 w-4 rounded accent-navy-900"
+          onCheckedChange={(checked) => update("isReprint", !!checked)}
         />
         <label htmlFor="isReprint" className="text-sm text-content-secondary">
           This card is a reprint (ID prefix doesn&apos;t match origin pack)
@@ -368,20 +374,16 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Actions */}
       <div className="flex gap-3 pt-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save Changes"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => router.back()}
-          className="rounded-md border border-border px-6 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -403,7 +405,7 @@ function Field({
       <label className="mb-2 block text-sm font-medium text-content-secondary">
         {label}
         {required && (
-          <span className="ml-1 text-red-600">*</span>
+          <span className="ml-1 text-error">*</span>
         )}
         {hint && (
           <span className="ml-1 font-normal text-content-tertiary">

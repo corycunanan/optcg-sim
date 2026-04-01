@@ -88,6 +88,62 @@ export { Separator } from "./separator";
 export { Avatar, AvatarImage, AvatarFallback, AvatarBadge } from "./avatar";
 export { Skeleton } from "./skeleton";
 
+// AlertDialog
+export {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "./alert-dialog";
+
+// Alert
+export { Alert, AlertTitle, AlertDescription } from "./alert";
+
+// Popover
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "./popover";
+
+// HoverCard
+export {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "./hover-card";
+
+// Checkbox
+export { Checkbox } from "./checkbox";
+
+// Textarea
+export { Textarea } from "./textarea";
+
+// Page Header
+export {
+  PageHeader,
+  PageHeaderContent,
+  PageHeaderTitle,
+  PageHeaderDescription,
+  PageHeaderActions,
+} from "./page-header";
+
+// Pagination
+export {
+  Pagination as PaginationRoot,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "./pagination";
+
 // Sheet (mobile nav, side panels)
 export {
   Sheet,
@@ -127,6 +183,9 @@ export {
   SidebarTrigger,
   useSidebar,
 } from "./sidebar";
+
+// Input OTP
+export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "./input-otp";
 
 // Command (search palette)
 export {

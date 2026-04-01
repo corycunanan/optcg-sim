@@ -4,10 +4,8 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex-1 overflow-y-auto bg-background text-content-primary">
-      <main className="mx-auto w-full max-w-7xl px-6 py-8">
-        {children}
-      </main>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-content-primary">
+      {children}
     </div>
   );
 }

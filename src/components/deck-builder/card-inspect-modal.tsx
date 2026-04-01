@@ -7,6 +7,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface ArtVariant {
@@ -59,13 +60,13 @@ interface CardInspectModalProps {
   onClose: () => void;
 }
 
-const COLOR_BG: Record<string, string> = {
-  Red: "var(--card-red)",
-  Blue: "var(--card-blue)",
-  Green: "var(--card-green)",
-  Purple: "var(--card-purple)",
-  Black: "var(--card-black)",
-  Yellow: "var(--card-yellow)",
+const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
+  Red: "card-red",
+  Blue: "card-blue",
+  Green: "card-green",
+  Purple: "card-purple",
+  Black: "card-black",
+  Yellow: "card-yellow",
 };
 
 export function CardInspectModal({
@@ -114,7 +115,11 @@ export function CardInspectModal({
   }, [card, selectedArtUrl, displayImage]);
 
   const primaryColor = card?.color[0] || "Black";
-  const accentColor = COLOR_BG[primaryColor] || "var(--navy-700)";
+  const colorCssVars: Record<string, string> = {
+    Red: "var(--card-red)", Blue: "var(--card-blue)", Green: "var(--card-green)",
+    Purple: "var(--card-purple)", Black: "var(--card-black)", Yellow: "var(--card-yellow)",
+  };
+  const accentColor = colorCssVars[primaryColor] || "var(--navy-700)";
 
   const allArtworks = card
     ? [
@@ -226,9 +231,9 @@ export function CardInspectModal({
                     </p>
                   </div>
                   {card.banStatus !== "LEGAL" && (
-                    <span className="shrink-0 rounded bg-error px-2 py-0.5 text-xs font-bold text-content-inverse">
+                    <Badge variant="error" className="shrink-0 font-bold">
                       {card.banStatus}
-                    </span>
+                    </Badge>
                   )}
                 </div>
 
@@ -240,16 +245,13 @@ export function CardInspectModal({
                   <SectionLabel text="Color" />
                   <div className="flex flex-wrap gap-1">
                     {card.color.map((c) => (
-                      <span
+                      <Badge
                         key={c}
-                        className={cn(
-                          "rounded-full px-3 py-1 text-xs font-semibold",
-                          c === "Yellow" ? "text-content-primary" : "text-content-inverse"
-                        )}
-                        style={{ background: COLOR_BG[c] || "var(--surface-3)" }}
+                        variant={COLOR_TO_VARIANT[c] || "secondary"}
+                        className="rounded-full px-3 py-1"
                       >
                         {c}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </div>
@@ -318,9 +320,9 @@ export function CardInspectModal({
                         <span className="text-content-tertiary">—</span>
                         <span className="text-content-secondary">{cs.setName}</span>
                         {cs.isOrigin && (
-                          <span className="rounded-full bg-gold-100 px-1.5 py-0.5 text-xs font-semibold text-gold-500">
+                          <Badge variant="warning" className="rounded-full">
                             Origin
-                          </span>
+                          </Badge>
                         )}
                       </div>
                     ))}
@@ -396,9 +398,5 @@ function SectionLabel({ text }: { text: string }) {
 }
 
 function Tag({ text }: { text: string }) {
-  return (
-    <span className="rounded bg-surface-3 px-2 py-0.5 text-xs font-medium text-content-secondary">
-      {text}
-    </span>
-  );
+  return <Badge variant="secondary">{text}</Badge>;
 }

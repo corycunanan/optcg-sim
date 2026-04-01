@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
+import { Badge } from "@/components/ui/badge";
 import { CardDetailModal } from "@/components/admin/card-detail-modal";
 
 interface DeckBuilderListProps {
@@ -66,9 +67,9 @@ export function DeckBuilderList({
             <div key={type}>
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
                 <span>{type}s</span>
-                <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-bold tabular-nums text-content-secondary">
+                <Badge variant="secondary" className="rounded-full font-bold tabular-nums">
                   {groupTotal}
-                </span>
+                </Badge>
               </div>
 
               <div className="divide-y divide-border">

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -12,10 +12,42 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import {
+  PageHeader,
+  PageHeaderContent,
+  PageHeaderTitle,
+  PageHeaderDescription,
+  PageHeaderActions,
+} from "@/components/ui/page-header";
+import { DeckPreviewModal } from "./deck-preview-modal";
 
 interface Deck {
   id: string;
   name: string;
+  leaderId: string;
+  leaderName: string | null;
+  leaderImageUrl: string | null;
 }
 
 interface LobbyState {
@@ -24,42 +56,64 @@ interface LobbyState {
   joinCode: string;
   format: string;
   gameId: string | null;
-  guest: { user: { username: string | null; name: string | null } } | null;
+  host: { username: string | null; name: string | null; image: string | null } | null;
+  hostDeck: {
+    id: string;
+    name: string;
+    leaderName: string | null;
+    leaderImageUrl: string | null;
+  };
+  guest: {
+    user: { username: string | null; name: string | null; image: string | null };
+    deck: {
+      id: string;
+      name: string;
+      leaderName: string | null;
+      leaderImageUrl: string | null;
+    } | null;
+  } | null;
 }
 
-export function LobbiesShell() {
+interface LobbiesShellProps {
+  user: {
+    name: string;
+    image: string | null;
+  };
+}
+
+export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
 
   const [userDecks, setUserDecks] = useState<Deck[]>([]);
+  const [selectedDeckId, setSelectedDeckId] = useState("");
   const [activeLobby, setActiveLobby] = useState<LobbyState | null>(null);
 
   // Active game guard
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [activeGameLoading, setActiveGameLoading] = useState(true);
-  const [concedeConfirm, setConcedeConfirm] = useState(false);
   const [conceding, setConceding] = useState(false);
   const [concedeError, setConcedeError] = useState<string | null>(null);
 
-  // Create form
-  const [createDeckId, setCreateDeckId] = useState("");
-  const [createFormat, setCreateFormat] = useState("Standard");
+  // Lobby creation
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const lobbyCreatedRef = useRef(false);
 
-  // Join form
+  // Join popover
+  const [joinOpen, setJoinOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
-  const [joinDeckId, setJoinDeckId] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
-  // Clipboard copy
+  // Clipboard
   const [copied, setCopied] = useState(false);
+
+  // Deck preview
+  const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
 
   // Polling ref
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ─── Active game: load on mount, re-sync when tab/window regains focus ─────
-  // (avoids stale "Rejoin" after a natural win/loss if the first fetch races Postgres)
+  // ─── Active game: load on mount, re-sync on focus ─────────────────────────
 
   const syncActiveGameFromServer = useCallback(async () => {
     try {
@@ -68,7 +122,7 @@ export function LobbiesShell() {
       const data = await res.json();
       setActiveGameId(data.game?.id ?? null);
     } catch {
-      /* network error — leave prior value */
+      /* network error */
     }
   }, []);
 
@@ -86,11 +140,9 @@ export function LobbiesShell() {
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        void syncActiveGameFromServer();
-      }
+      if (document.visibilityState === "visible") void syncActiveGameFromServer();
     };
-    const onFocus = () => { void syncActiveGameFromServer(); };
+    const onFocus = () => void syncActiveGameFromServer();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onFocus);
     return () => {
@@ -105,14 +157,19 @@ export function LobbiesShell() {
     const res = await fetch("/api/decks");
     if (!res.ok) return;
     const data = await res.json();
-    const decks: Deck[] = (data.data ?? []).map((d: Deck) => ({
-      id: d.id,
-      name: d.name,
-    }));
+    const decks: Deck[] = (data.data ?? []).map(
+      (d: { id: string; name: string; leaderId: string; leaderName: string | null; leaderImageUrl: string | null }) => ({
+        id: d.id,
+        name: d.name,
+        leaderId: d.leaderId,
+        leaderName: d.leaderName,
+        leaderImageUrl: d.leaderImageUrl,
+      }),
+    );
     setUserDecks(decks);
-    if (decks.length > 0 && !createDeckId) setCreateDeckId(decks[0].id);
-    if (decks.length > 0 && !joinDeckId) setJoinDeckId(decks[0].id);
-  }, [createDeckId, joinDeckId]);
+    if (decks.length > 0 && !selectedDeckId) setSelectedDeckId(decks[0].id);
+    return decks;
+  }, [selectedDeckId]);
 
   useEffect(() => {
     fetchDecks();
@@ -137,12 +194,13 @@ export function LobbiesShell() {
 
         if (data.status === "CLOSED") {
           setActiveLobby(null);
+          lobbyCreatedRef.current = false;
           return;
         }
 
         setActiveLobby(data);
       } catch {
-        // Network blip — keep polling
+        /* network blip */
       }
     },
     [router],
@@ -166,53 +224,79 @@ export function LobbiesShell() {
     };
   }, [activeLobby, pollLobby]);
 
-  // ─── Actions ──────────────────────────────────────────────────────────────
+  // ─── Auto-create lobby ────────────────────────────────────────────────────
 
-  const createLobby = async () => {
-    if (!createDeckId) return;
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const res = await fetch("/api/lobbies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deckId: createDeckId, format: createFormat }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setActiveLobby({
-          id: data.lobbyId,
-          status: "WAITING",
-          joinCode: data.joinCode,
-          format: createFormat,
-          gameId: null,
-          guest: null,
+  const createLobby = useCallback(
+    async (deckId: string) => {
+      if (!deckId || creating) return;
+      setCreating(true);
+      try {
+        const res = await fetch("/api/lobbies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deckId, format: "Standard" }),
         });
-      } else {
-        setCreateError(data.error ?? "Failed to create lobby");
+        const data = await res.json();
+        if (res.ok) {
+          // Find the selected deck to populate hostDeck info
+          const deck = userDecks.find((d) => d.id === deckId);
+          setActiveLobby({
+            id: data.lobbyId,
+            status: "WAITING",
+            joinCode: data.joinCode,
+            format: "Standard",
+            gameId: null,
+            host: null,
+            hostDeck: {
+              id: deckId,
+              name: deck?.name ?? "Deck",
+              leaderName: deck?.leaderName ?? null,
+              leaderImageUrl: deck?.leaderImageUrl ?? null,
+            },
+            guest: null,
+          });
+          lobbyCreatedRef.current = true;
+        }
+      } catch {
+        /* network error */
+      } finally {
+        setCreating(false);
       }
-    } catch {
-      setCreateError("Network error");
-    } finally {
-      setCreating(false);
+    },
+    [creating, userDecks],
+  );
+
+  useEffect(() => {
+    if (
+      !activeGameLoading &&
+      !activeGameId &&
+      !activeLobby &&
+      !lobbyCreatedRef.current &&
+      selectedDeckId &&
+      userDecks.length > 0
+    ) {
+      createLobby(selectedDeckId);
     }
-  };
+  }, [activeGameLoading, activeGameId, activeLobby, selectedDeckId, userDecks, createLobby]);
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
 
   const cancelLobby = async () => {
     if (!activeLobby) return;
     await fetch(`/api/lobbies/${activeLobby.id}`, { method: "DELETE" });
     setActiveLobby(null);
+    lobbyCreatedRef.current = false;
   };
 
   const joinLobby = async () => {
-    if (!joinDeckId || !joinCode.trim()) return;
+    if (!selectedDeckId || joinCode.length < 6) return;
     setJoining(true);
     setJoinError(null);
     try {
       const res = await fetch("/api/lobbies/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: joinCode, deckId: joinDeckId }),
+        body: JSON.stringify({ code: joinCode, deckId: selectedDeckId }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -250,7 +334,6 @@ export function LobbiesShell() {
       });
       if (res.ok) {
         setActiveGameId(null);
-        setConcedeConfirm(false);
       } else {
         const data = await res.json().catch(() => ({}));
         setConcedeError(data.error ?? "Failed to concede");
@@ -262,270 +345,322 @@ export function LobbiesShell() {
     }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const handleDeckChange = async (deckId: string) => {
+    setSelectedDeckId(deckId);
+    if (activeLobby) {
+      const deck = userDecks.find((d) => d.id === deckId);
+      await fetch(`/api/lobbies/${activeLobby.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deckId }),
+      });
+      setActiveLobby((prev) =>
+        prev
+          ? {
+              ...prev,
+              hostDeck: {
+                id: deckId,
+                name: deck?.name ?? "Deck",
+                leaderName: deck?.leaderName ?? null,
+                leaderImageUrl: deck?.leaderImageUrl ?? null,
+              },
+            }
+          : null,
+      );
+    }
+  };
+
+  // ─── Derived state ────────────────────────────────────────────────────────
 
   const hasDecks = userDecks.length > 0;
   const isWaiting = activeLobby?.status === "WAITING";
+  const selectedDeck = userDecks.find((d) => d.id === selectedDeckId);
+
+  // ─── Loading state ────────────────────────────────────────────────────────
 
   if (activeGameLoading) {
     return (
       <div className="flex-1 overflow-y-auto bg-surface-base">
         <div className="mx-auto max-w-xl px-6 py-10">
-          <div className="flex items-center gap-2 text-sm text-content-secondary">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-content-tertiary" />
-            Loading…
+          <div className="flex items-center gap-2 text-sm text-text-secondary">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
+            Loading...
           </div>
         </div>
       </div>
     );
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <div className="flex-1 overflow-y-auto bg-surface-base">
-      <div className="mx-auto max-w-xl px-6 py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="font-display text-4xl font-bold text-content-primary">
-            Play
-          </h1>
-          <p className="mt-1 text-sm text-content-secondary">
+      {/* Header */}
+      <PageHeader>
+        <PageHeaderContent>
+          <PageHeaderTitle>Play</PageHeaderTitle>
+          <PageHeaderDescription>
             {activeGameId
               ? "You have a game in progress."
-              : "Create a lobby and share the code, or join with a code from a friend."}
-          </p>
-        </div>
+              : isWaiting
+                ? "Waiting for an opponent to join your lobby."
+                : "Setting up your lobby..."}
+          </PageHeaderDescription>
+        </PageHeaderContent>
+        <PageHeaderActions>
+          {!activeGameId && (
+            <Popover open={joinOpen} onOpenChange={setJoinOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="secondary">Join Lobby</Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-auto">
+                <div className="flex flex-col gap-4 p-2">
+                  <p className="text-sm font-medium text-text-primary">
+                    Enter lobby code
+                  </p>
+                  <InputOTP
+                    maxLength={6}
+                    value={joinCode}
+                    onChange={(value) => setJoinCode(value.toUpperCase())}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                  {joinError && (
+                    <p className="text-xs text-error">{joinError}</p>
+                  )}
+                  <Button
+                    onClick={joinLobby}
+                    disabled={joining || joinCode.length < 6 || !selectedDeckId}
+                    className="w-full"
+                  >
+                    {joining ? "Joining..." : "Join"}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </PageHeaderActions>
+      </PageHeader>
 
+      {/* Main content */}
+      <div className="mx-auto max-w-5xl px-6 py-10">
         {/* Active game guard */}
         {activeGameId && (
-          <div className="mb-8 rounded-lg border border-gold-500/30 bg-gold-500/10 p-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gold-700">
+          <div className="rounded-lg border border-gold-500/30 bg-gold-100 p-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
               Game In Progress
             </p>
-            <p className="mt-2 text-sm text-content-primary">
+            <p className="mt-2 text-sm text-text-primary">
               You have an ongoing game that needs to be resolved before you can
               start a new one.
             </p>
-
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => router.push(`/game/${activeGameId}`)}
-                className="rounded-md bg-navy-900 px-5 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
-              >
+              <Button onClick={() => router.push(`/game/${activeGameId}`)}>
                 Rejoin Game
-              </button>
-
-              {!concedeConfirm ? (
-                <button
-                  onClick={() => setConcedeConfirm(true)}
-                  className="rounded-md border border-border px-4 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
-                >
-                  Concede
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-content-secondary">
-                    Are you sure?
-                  </span>
-                  <button
-                    onClick={concedeGame}
-                    disabled={conceding}
-                    className="rounded-md bg-error px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-error/90 disabled:opacity-50"
-                  >
-                    {conceding ? "Conceding…" : "Yes, Concede"}
-                  </button>
-                  <button
-                    onClick={() => setConcedeConfirm(false)}
-                    className="rounded-md border border-border px-3 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="secondary">Concede</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Concede Game</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to concede? This will end the game
+                      and count as a loss.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={conceding}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={concedeGame}
+                      disabled={conceding}
+                    >
+                      {conceding ? "Conceding..." : "Yes, Concede"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
-
             {concedeError && (
               <p className="mt-3 text-sm text-error">{concedeError}</p>
             )}
           </div>
         )}
 
-        {/* Host waiting state (only when no active game) */}
-        {!activeGameId && isWaiting && (
-          <div className="mb-8 rounded-lg border border-border bg-surface-1 p-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-              Your Lobby
+        {/* No decks state */}
+        {!activeGameId && !hasDecks && (
+          <div className="rounded-lg border border-border bg-surface-1 p-6 text-center">
+            <p className="text-sm text-text-secondary">
+              You need to build a deck before you can play.
             </p>
-            <p className="mt-2 text-sm text-content-secondary">
-              Share this code with your opponent:
-            </p>
-
-            <div className="mt-4 flex items-center gap-3">
-              <code className="rounded-md bg-surface-2 px-4 py-3 font-mono text-2xl font-bold tracking-[0.3em] text-content-primary">
-                {activeLobby.joinCode}
-              </code>
-              <button
-                onClick={copyCode}
-                className="rounded-md border border-border px-4 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
-              >
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-
-            <div className="mt-6 flex items-center gap-2">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-content-tertiary" />
-              <p className="text-sm text-content-secondary">
-                {activeLobby.guest
-                  ? `${activeLobby.guest.user.username ?? activeLobby.guest.user.name ?? "Guest"} joined — starting game…`
-                  : "Waiting for opponent to join…"}
-              </p>
-            </div>
-
-            <div className="mt-4">
-              <button
-                onClick={cancelLobby}
-                className="rounded-md border border-border px-4 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2"
-              >
-                Cancel Lobby
-              </button>
-            </div>
+            <Button
+              className="mt-4"
+              onClick={() => router.push("/decks")}
+            >
+              Build a Deck
+            </Button>
           </div>
         )}
 
-        {/* Create + Join forms (only when no active lobby and no active game) */}
-        {!activeGameId && !isWaiting && (
-          <>
-            {/* Create lobby */}
-            <div className="mb-6 rounded-lg border border-border bg-surface-1 p-6">
-              <h2 className="text-sm font-semibold text-content-primary">
-                Create Lobby
-              </h2>
-              <p className="mt-1 text-sm text-content-secondary">
-                Pick a deck and format, then share the code.
-              </p>
-
-              {!hasDecks ? (
-                <p className="mt-4 text-sm text-content-tertiary">
-                  You need to build a deck before you can play.
-                </p>
-              ) : (
-                <>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-                        Deck
-                      </label>
-                      <Select value={createDeckId} onValueChange={setCreateDeckId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a deck" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {userDecks.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-                        Format
-                      </label>
-                      <Select value={createFormat} onValueChange={setCreateFormat}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Standard">Standard</SelectItem>
-                          <SelectItem value="Block">Block</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button
-                    onClick={createLobby}
-                    disabled={creating || !createDeckId}
-                    className="mt-4"
+        {/* Lobby layout */}
+        {!activeGameId && hasDecks && (
+          <div className="flex flex-col gap-6">
+            {/* Players row */}
+            <div className="flex justify-center gap-6">
+              {/* Player */}
+              <div className="flex min-h-[420px] min-w-60 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-surface-1 p-6">
+                {selectedDeck?.leaderImageUrl ? (
+                  <button
+                    onClick={() => setPreviewDeckId(selectedDeckId)}
+                    className="cursor-pointer transition-transform hover:scale-105"
                   >
-                    {creating ? "Creating..." : "Create Lobby"}
-                  </Button>
-
-                  {createError && (
-                    <p className="mt-3 text-sm text-error">{createError}</p>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Join by code */}
-            <div className="rounded-lg border border-border bg-surface-1 p-6">
-              <h2 className="text-sm font-semibold text-content-primary">
-                Join by Code
-              </h2>
-              <p className="mt-1 text-sm text-content-secondary">
-                Enter a lobby code and pick your deck to start playing immediately.
-              </p>
-
-              {!hasDecks ? (
-                <p className="mt-4 text-sm text-content-tertiary">
-                  You need to build a deck before you can join a game.
-                </p>
-              ) : (
-                <>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-                        Code
-                      </label>
-                      <Input
-                        value={joinCode}
-                        onChange={(e) =>
-                          setJoinCode(e.target.value.toUpperCase())
-                        }
-                        placeholder="ABCD12"
-                        maxLength={6}
-                        className="uppercase tracking-[0.2em]"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-                        Deck
-                      </label>
-                      <Select value={joinDeckId} onValueChange={setJoinDeckId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a deck" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {userDecks.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-end">
-                      <Button
-                        onClick={joinLobby}
-                        disabled={
-                          joining || !joinDeckId || joinCode.trim().length === 0
-                        }
-                      >
-                        {joining ? "Joining..." : "Join"}
-                      </Button>
-                    </div>
+                    <img
+                      src={selectedDeck.leaderImageUrl}
+                      alt={selectedDeck.leaderName ?? "Leader"}
+                      className="w-48 rounded-lg shadow-[var(--shadow-md)]"
+                    />
+                  </button>
+                ) : (
+                  <div className="flex h-64 w-48 items-center justify-center rounded-lg bg-surface-2">
+                    <span className="text-xs text-text-tertiary">
+                      No leader
+                    </span>
                   </div>
+                )}
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-text-primary">
+                    {selectedDeck?.name ?? "No deck selected"}
+                  </p>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {user.name}
+                  </p>
+                </div>
+                {userDecks.length > 1 && (
+                  <Select
+                    value={selectedDeckId}
+                    onValueChange={handleDeckChange}
+                  >
+                    <SelectTrigger className="w-full max-w-48">
+                      <SelectValue placeholder="Select a deck" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userDecks.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
 
-                  {joinError && (
-                    <p className="mt-3 text-sm text-error">{joinError}</p>
-                  )}
-                </>
-              )}
+              {/* Opponent */}
+              <div className="flex min-h-[420px] min-w-60 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-surface-1 p-6">
+                {activeLobby?.guest ? (
+                  <>
+                    {activeLobby.guest.deck?.leaderImageUrl ? (
+                      <button
+                        onClick={() => {
+                          if (activeLobby.guest?.deck?.id)
+                            setPreviewDeckId(activeLobby.guest.deck.id);
+                        }}
+                        className="cursor-pointer transition-transform hover:scale-105"
+                      >
+                        <img
+                          src={activeLobby.guest.deck.leaderImageUrl}
+                          alt={activeLobby.guest.deck.leaderName ?? "Leader"}
+                          className="w-48 rounded-lg shadow-[var(--shadow-md)]"
+                        />
+                      </button>
+                    ) : (
+                      <div className="flex h-64 w-48 items-center justify-center rounded-lg bg-surface-2">
+                        <span className="text-xs text-text-tertiary">
+                          No leader
+                        </span>
+                      </div>
+                    )}
+                    <div className="text-center">
+                      <p className="text-lg font-semibold text-text-primary">
+                        {activeLobby.guest.deck?.name ?? "Deck"}
+                      </p>
+                      <p className="mt-1 text-sm text-text-secondary">
+                        {activeLobby.guest.user.username ??
+                          activeLobby.guest.user.name ??
+                          "Opponent"}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    className={cn(
+                      "flex h-16 w-16 items-center justify-center rounded-full",
+                      "border-2 border-dashed border-border-strong",
+                      "text-text-tertiary transition-colors",
+                      "hover:border-navy-500 hover:text-navy-500",
+                    )}
+                    onClick={() => setJoinOpen(true)}
+                    aria-label="Invite opponent"
+                  >
+                    <Plus className="h-6 w-6" />
+                  </button>
+                )}
+              </div>
             </div>
-          </>
+
+            {/* Lobby info */}
+            {isWaiting && activeLobby && (
+              <div className="flex flex-col items-center gap-3">
+                <code className="rounded-md bg-surface-1 border border-border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em] text-text-primary">
+                  {activeLobby.joinCode}
+                </code>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={copyCode}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy Code
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {creating && !isWaiting && (
+              <div className="flex items-center justify-center gap-2 text-sm text-text-secondary">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
+                Creating lobby...
+              </div>
+            )}
+          </div>
         )}
       </div>
+
+      <DeckPreviewModal
+        deckId={previewDeckId}
+        open={previewDeckId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewDeckId(null);
+        }}
+      />
     </div>
   );
 }

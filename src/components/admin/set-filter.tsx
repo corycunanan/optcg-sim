@@ -1,8 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { ChevronDown, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Set {
   setLabel: string;
@@ -16,43 +32,15 @@ interface SetFilterProps {
   onChange: (sets: string[]) => void;
 }
 
-function ChevronDown({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" className={cn("h-3 w-3", className)}>
-      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" className={cn("h-3 w-3", className)}>
-      <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 12 12" fill="none" className={cn("h-3 w-3", className)}>
-      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
 
-  // draft = in-progress selections while dropdown is open.
+  // draft = in-progress selections while popover is open.
   // We update draft locally on every click (instant), and only call onChange
   // (which triggers router.push + Neon query) when the user commits.
   const [draft, setDraft] = useState<string[]>(selectedSets);
   const draftRef = useRef(draft);
   const selectedSetsRef = useRef(selectedSets);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   // Keep refs in sync
   useEffect(() => { draftRef.current = draft; }, [draft]);
@@ -71,37 +59,6 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
       onChange(next);
     }
   }, [onChange]);
-
-  const closeAndCommit = useCallback(() => {
-    setOpen(false);
-    setQuery("");
-    commit(draftRef.current);
-  }, [commit]);
-
-  // Close on outside click → commit
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        closeAndCommit();
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [closeAndCommit]);
-
-  // Focus search when opening
-  useEffect(() => {
-    if (open) searchRef.current?.focus();
-    else setQuery("");
-  }, [open]);
-
-  const filtered = query.trim()
-    ? sets.filter(
-        (s) =>
-          s.setLabel.toLowerCase().includes(query.toLowerCase()) ||
-          s.setName.toLowerCase().includes(query.toLowerCase()),
-      )
-    : sets;
 
   // Toggle in draft only — no onChange, no navigation
   const toggleDraft = (label: string) => {
@@ -128,115 +85,101 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
     commit([]);
   };
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      commit(draftRef.current);
+    }
+  };
+
   return (
-    <div ref={containerRef} className="relative">
-      {/* Trigger */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => e.key === "Enter" || e.key === " " ? setOpen((v) => !v) : undefined}
-        className={cn(
-          "flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded border bg-surface-2 px-3 py-1 text-left text-sm transition-colors",
-          open
-            ? "border-border-focus ring-2 ring-navy-900/10"
-            : "border-border hover:border-border-strong",
-        )}
-      >
-        {draft.length === 0 ? (
-          <span className="py-0.5 text-content-tertiary">All Sets</span>
-        ) : (
-          draft.map((label) => (
-            <span
-              key={label}
-              className="flex items-center gap-1 rounded bg-navy-900 px-2 py-0.5 text-xs font-medium text-content-inverse"
-            >
-              {label}
-              <button type="button" tabIndex={-1} onClick={(e) => removeOne(label, e)} className="opacity-70 transition-opacity hover:opacity-100">
-                <XIcon />
-              </button>
-            </span>
-          ))
-        )}
-
-        <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
-          {draft.length > 0 && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={clearAll}
-              className="rounded p-0.5 text-content-tertiary transition-colors hover:text-content-secondary"
-              title="Clear selection"
-            >
-              <XIcon />
-            </button>
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <div
+          role="button"
+          tabIndex={0}
+          className={cn(
+            "flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border bg-surface-2 px-3 py-1 text-left text-sm transition-colors",
+            open
+              ? "border-border-focus ring-2 ring-navy-900/10"
+              : "border-border hover:border-border-strong",
           )}
-          <ChevronDown className={cn("text-content-tertiary transition-transform", open && "rotate-180")} />
-        </span>
-      </div>
+        >
+          {draft.length === 0 ? (
+            <span className="py-0.5 text-content-tertiary">All Sets</span>
+          ) : (
+            draft.map((label) => (
+              <Badge key={label} variant="default" className="gap-1">
+                {label}
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={(e) => removeOne(label, e)}
+                  className="opacity-70 transition-opacity hover:opacity-100"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            ))
+          )}
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-background shadow-lg">
-          {/* Search */}
-          <div className="border-b border-border px-2 py-2">
-            <Input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search sets..."
-              className="h-8"
-            />
-          </div>
+          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+            {draft.length > 0 && (
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={clearAll}
+                className="rounded p-0.5 text-content-tertiary transition-colors hover:text-content-secondary"
+                title="Clear selection"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+            <ChevronDown className={cn("size-3 text-content-tertiary transition-transform", open && "rotate-180")} />
+          </span>
+        </div>
+      </PopoverTrigger>
 
-          {/* List */}
-          <div className="max-h-64 overflow-y-auto p-1">
-            {filtered.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-content-tertiary">No sets found</p>
-            ) : (
-              filtered.map((s) => {
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search sets..." />
+          <CommandList className="max-h-64">
+            <CommandEmpty>No sets found</CommandEmpty>
+            <CommandGroup>
+              {sets.map((s) => {
                 const selected = draft.includes(s.setLabel);
                 return (
-                  <button
+                  <CommandItem
                     key={s.packId}
-                    type="button"
-                    onClick={() => toggleDraft(s.setLabel)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                      selected ? "bg-navy-100 text-navy-900" : "text-content-primary hover:bg-surface-2",
-                    )}
+                    value={`${s.setLabel} ${s.setName}`}
+                    onSelect={() => toggleDraft(s.setLabel)}
+                    className="gap-3"
                   >
-                    <span
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                        selected ? "border-navy-900 bg-navy-900 text-content-inverse" : "border-border",
-                      )}
-                    >
-                      {selected && <CheckIcon />}
-                    </span>
+                    <Checkbox
+                      checked={selected}
+                      className="pointer-events-none"
+                    />
                     <span className="shrink-0 font-mono text-xs font-bold">{s.setLabel}</span>
                     <span className="truncate text-xs text-content-secondary">{s.setName}</span>
-                  </button>
+                  </CommandItem>
                 );
-              })
-            )}
-          </div>
+              })}
+            </CommandGroup>
+          </CommandList>
 
           {/* Footer: Apply */}
           <div className="border-t border-border px-2 py-2">
-            <button
-              type="button"
-              onClick={closeAndCommit}
-              className="w-full rounded-md bg-navy-900 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
+            <Button
+              className="w-full"
+              onClick={() => handleOpenChange(false)}
             >
               {draft.length === 0
                 ? "Show All Sets"
                 : `Apply ${draft.length} Set${draft.length > 1 ? "s" : ""}`}
-            </button>
+            </Button>
           </div>
-        </div>
-      )}
-    </div>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

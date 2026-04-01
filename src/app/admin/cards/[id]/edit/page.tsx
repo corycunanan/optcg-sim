@@ -19,7 +19,7 @@ export default async function CardEditPage({
   if (!card) notFound();
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-7xl px-6 py-8">
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-sm">
         <Link

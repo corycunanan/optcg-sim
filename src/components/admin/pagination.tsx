@@ -1,6 +1,13 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Pagination as PaginationRoot,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+} from "@/components/ui/pagination";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
 interface PaginationProps {
   page: number;
@@ -30,46 +37,52 @@ export function Pagination({
   }
 
   return (
-    <div className="mt-8 flex items-center justify-center gap-1">
-      <button
-        onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
-        className="rounded border border-border px-3 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        Prev
-      </button>
-
-      {pages.map((p, i) =>
-        p === "..." ? (
-          <span
-            key={`dots-${i}`}
-            className="px-2 text-sm text-content-tertiary"
+    <PaginationRoot className="mt-8">
+      <PaginationContent>
+        <PaginationItem>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1}
+            aria-label="Go to previous page"
           >
-            …
-          </span>
-        ) : (
-          <button
-            key={p}
-            onClick={() => onPageChange(p)}
-            className={cn(
-              "rounded px-3 py-2 text-sm font-medium tabular-nums transition-colors",
-              p === page
-                ? "bg-navy-900 text-content-inverse"
-                : "border border-border text-content-secondary hover:bg-surface-2",
+            <ChevronLeftIcon data-icon="inline-start" />
+            <span className="hidden sm:block">Prev</span>
+          </Button>
+        </PaginationItem>
+
+        {pages.map((p, i) => (
+          <PaginationItem key={p === "..." ? `dots-${i}` : p}>
+            {p === "..." ? (
+              <PaginationEllipsis />
+            ) : (
+              <Button
+                variant={p === page ? "outline" : "ghost"}
+                size="icon"
+                onClick={() => onPageChange(p)}
+                aria-current={p === page ? "page" : undefined}
+                className="tabular-nums"
+              >
+                {p}
+              </Button>
             )}
-          >
-            {p}
-          </button>
-        ),
-      )}
+          </PaginationItem>
+        ))}
 
-      <button
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
-        className="rounded border border-border px-3 py-2 text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        Next
-      </button>
-    </div>
+        <PaginationItem>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages}
+            aria-label="Go to next page"
+          >
+            <span className="hidden sm:block">Next</span>
+            <ChevronRightIcon data-icon="inline-end" />
+          </Button>
+        </PaginationItem>
+      </PaginationContent>
+    </PaginationRoot>
   );
 }

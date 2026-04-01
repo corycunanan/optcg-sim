@@ -2,6 +2,7 @@
 
 import type { ValidationResult } from "@/lib/deck-builder/validation";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface DeckBuilderValidationProps {
   results: ValidationResult[];
@@ -20,47 +21,35 @@ export function DeckBuilderValidation({ results, totalCards }: DeckBuilderValida
   return (
     <div className="flex flex-col gap-2">
       {/* X/50 deck size tag */}
-      <span
+      <Badge
+        variant={deckFull ? "success" : "secondary"}
         className={cn(
-          "self-start rounded px-3 py-1 text-sm font-bold tabular-nums",
-          deckFull
-            ? "bg-success text-content-inverse"
-            : "bg-surface-3 text-content-secondary"
+          "self-start px-3 py-1 text-sm font-bold tabular-nums",
+          deckFull && "border-transparent bg-success text-content-inverse"
         )}
       >
         {totalCards}/50
-      </span>
+      </Badge>
 
       {/* Error tags */}
       {errors.map((r) => (
-        <span
-          key={r.id}
-          className="self-start rounded bg-error-soft px-2 py-1 text-xs font-semibold text-error"
-          title={r.message}
-        >
+        <Badge key={r.id} variant="error" className="self-start" title={r.message}>
           ✕ {r.rule}
-        </span>
+        </Badge>
       ))}
 
       {/* Warning tags */}
       {warnings.map((r) => (
-        <span
-          key={r.id}
-          className="self-start rounded bg-warning-soft px-2 py-1 text-xs font-semibold text-warning"
-          title={r.message}
-        >
+        <Badge key={r.id} variant="warning" className="self-start" title={r.message}>
           ⚠ {r.rule}
-        </span>
+        </Badge>
       ))}
 
       {/* Passed tags */}
       {passed.map((r) => (
-        <span
-          key={r.id}
-          className="self-start rounded bg-success-soft px-2 py-1 text-xs font-medium text-success"
-        >
+        <Badge key={r.id} variant="success" className="self-start">
           ✓ {r.rule}
-        </span>
+        </Badge>
       ))}
     </div>
   );

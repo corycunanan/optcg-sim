@@ -2,6 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface DeckDeleteButtonProps {
   deckId: string;
@@ -10,7 +21,6 @@ interface DeckDeleteButtonProps {
 
 export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
   const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -24,48 +34,38 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
       // noop
     } finally {
       setDeleting(false);
-      setConfirming(false);
     }
   };
 
-  if (confirming) {
-    return (
-      <div
-        className="flex items-center gap-2"
-        onClick={(e) => e.preventDefault()}
-      >
-        <span className="text-xs text-error">
-          Delete &ldquo;{deckName}&rdquo;?
-        </span>
-        <button
-          aria-label="Confirm delete"
-          onClick={handleDelete}
-          disabled={deleting}
-          className="rounded bg-error px-2 py-1 text-xs font-bold text-content-inverse transition-colors hover:bg-red-600 active:scale-95 disabled:opacity-50"
-        >
-          {deleting ? "…" : "Yes"}
-        </button>
-        <button
-          aria-label="Cancel delete"
-          onClick={() => setConfirming(false)}
-          className="rounded border border-border px-2 py-1 text-xs text-content-secondary transition-colors hover:bg-surface-2"
-        >
-          No
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <button
-      aria-label={`Delete deck ${deckName}`}
-      onClick={(e) => {
-        e.preventDefault();
-        setConfirming(true);
-      }}
-      className="rounded px-2 py-1 text-xs text-error opacity-0 transition-all hover:bg-error-soft group-hover:opacity-100"
-    >
-      Delete
-    </button>
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button
+          aria-label={`Delete deck ${deckName}`}
+          onClick={(e) => e.preventDefault()}
+          className="rounded px-2 py-1 text-xs text-error opacity-0 transition-all hover:bg-error-soft group-hover:opacity-100"
+        >
+          Delete
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Deck</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete &ldquo;{deckName}&rdquo;? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

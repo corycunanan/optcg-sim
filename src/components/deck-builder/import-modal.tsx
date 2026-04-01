@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ImportModalProps {
   onImport: (leader: DeckLeaderEntry | null, cards: DeckCardEntry[]) => void;
@@ -112,12 +113,14 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           />
 
           {errors.length > 0 && (
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               {errors.map((err, i) => (
-                <div key={i} className="rounded bg-error-soft px-3 py-2 text-xs text-error">
-                  {err.line > 0 && `Line ${err.line}: `}
-                  {err.error}
-                </div>
+                <Alert key={i} variant="destructive">
+                  <AlertDescription>
+                    {err.line > 0 && `Line ${err.line}: `}
+                    {err.error}
+                  </AlertDescription>
+                </Alert>
               ))}
             </div>
           )}

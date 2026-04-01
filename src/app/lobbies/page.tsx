@@ -7,5 +7,12 @@ export const metadata = { title: "Play — OPTCG Simulator" };
 export default async function LobbiesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  return <LobbiesShell />;
+  return (
+    <LobbiesShell
+      user={{
+        name: session.user.name ?? session.user.email ?? "Player",
+        image: session.user.image ?? null,
+      }}
+    />
+  );
 }
