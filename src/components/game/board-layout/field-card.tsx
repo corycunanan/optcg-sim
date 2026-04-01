@@ -6,8 +6,45 @@ import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
-import { BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
+import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
+
+/** Colored overlay that sits behind the card in a zone during drag. */
+function DropOverlay({
+  active,
+  hovered,
+  color,
+}: {
+  active: boolean;
+  hovered: boolean;
+  color: "blue" | "amber" | "red" | "green";
+}) {
+  if (!active) return null;
+
+  const colorMap = {
+    blue: "bg-gb-accent-blue/25",
+    amber: "bg-gb-accent-amber/25",
+    red: "bg-gb-accent-red/25",
+    green: "bg-gb-accent-green/25",
+  };
+
+  const hoveredColorMap = {
+    blue: "bg-gb-accent-blue/50",
+    amber: "bg-gb-accent-amber/50",
+    red: "bg-gb-accent-red/50",
+    green: "bg-gb-accent-green/50",
+  };
+
+  return (
+    <div
+      className={cn(
+        "absolute inset-0 z-0 rounded-md transition-colors",
+        hovered ? hoveredColorMap[color] : colorMap[color],
+        hovered && "animate-pulse",
+      )}
+    />
+  );
+}
 
 export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   slotIndex,
@@ -31,19 +68,17 @@ export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={cn(
-        "rounded-md transition-shadow",
-        accepts && "ring-2 ring-gb-accent-blue/30",
-        isOver && accepts && "ring-2 ring-gb-accent-green",
-      )}
+      style={{ ...style, width: SQUARE, height: SQUARE }}
+      className="relative flex items-center justify-center rounded-md"
     >
+      <DropOverlay active={accepts} hovered={isOver && accepts} color="blue" />
       <BoardCard
         cardDb={cardDb}
         empty
         label={label}
         width={BOARD_CARD_W}
         height={BOARD_CARD_H}
+        className="relative z-[1]"
       />
     </div>
   );
@@ -107,7 +142,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   );
 
   return (
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+    <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
       <DropdownMenuTrigger asChild>
         <div
           ref={mergedRef}
@@ -117,22 +152,24 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           onContextMenu={handleContextMenu}
           style={{
             ...style,
+            width: SQUARE,
+            height: SQUARE,
             opacity: isDragging ? 0.3 : 1,
             cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
           }}
           className={cn(
-            "rounded-md transition-shadow",
-            acceptsDon && "ring-2 ring-gb-accent-amber/30",
-            isOver && acceptsDon && "ring-2 ring-gb-accent-amber",
+            "relative flex items-center justify-center rounded-md transition-shadow",
             selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
             blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
           )}
         >
+          <DropOverlay active={acceptsDon} hovered={isOver && acceptsDon} color="amber" />
           <BoardCard
             card={card}
             cardDb={cardDb}
             width={BOARD_CARD_W}
             height={BOARD_CARD_H}
+            className="relative z-[1]"
           />
         </div>
       </DropdownMenuTrigger>
@@ -169,18 +206,16 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={cn(
-        "rounded-md",
-        accepts && "ring-2 ring-gb-accent-red/30",
-        isOver && accepts && "ring-2 ring-gb-accent-red",
-      )}
+      style={{ ...style, width: SQUARE, height: SQUARE }}
+      className="relative flex items-center justify-center rounded-md"
     >
+      <DropOverlay active={accepts} hovered={isOver && accepts} color="red" />
       <BoardCard
         card={card}
         cardDb={cardDb}
         width={BOARD_CARD_W}
         height={BOARD_CARD_H}
+        className="relative z-[1]"
       />
     </div>
   );

@@ -49,9 +49,11 @@ export const BoardCard = React.memo(function BoardCard({
   if (empty) {
     return (
       <div
+        onClick={onClick}
         className={cn(
           "rounded border border-dashed flex items-center justify-center",
           "border-gb-border-strong/30 bg-gb-board/50",
+          onClick && "cursor-pointer",
           className,
         )}
         style={{ width, height, ...style }}
@@ -68,9 +70,11 @@ export const BoardCard = React.memo(function BoardCard({
   if (faceDown || sleeve) {
     return (
       <div
+        onClick={onClick}
         className={cn(
           "rounded border border-gb-border-strong relative overflow-hidden",
           sleeve ? "bg-gb-board-dark" : "bg-gb-surface-inset",
+          onClick && "cursor-pointer",
           className,
         )}
         style={{ width, height, ...style }}

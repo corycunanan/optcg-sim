@@ -61,6 +61,8 @@ import { PlayerChoiceModal } from "../player-choice-modal";
 import { OptionalEffectModal } from "../optional-effect-modal";
 import { RevealTriggerModal } from "../reveal-trigger-modal";
 import { DroppableTrashZone } from "./trash-zone";
+import { GameDeckPreviewModal } from "../deck-preview-modal";
+import { TrashPreviewModal } from "../trash-preview-modal";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -142,6 +144,11 @@ export function BoardLayout({
 }: BoardLayoutProps) {
   const [viewport, setViewport] = useState(getViewportSize);
   const [isPromptHidden, setIsPromptHidden] = useState(false);
+  const [zonePreview, setZonePreview] = useState<
+    | { type: "deck"; owner: "me" | "opp" }
+    | { type: "trash"; owner: "me" | "opp" }
+    | null
+  >(null);
 
   // Reset hidden state whenever a new prompt arrives
   useEffect(() => {
@@ -175,10 +182,10 @@ export function BoardLayout({
   const playerLeaderTop = playerTop + SQUARE + ROW_GAP;
 
   const charSlotCenters = Array.from({ length: 5 }, (_, i) => ({
-    left: zone2Left + i * (SQUARE + CHAR_ROW_GAP) + CARD_OFFSET_X,
+    left: zone2Left + i * (SQUARE + CHAR_ROW_GAP),
   }));
 
-  const leaderLeft = zone2Left + (CHAR_ROW_W - SQUARE) / 2 + CARD_OFFSET_X;
+  const leaderLeft = zone2Left + (CHAR_ROW_W - SQUARE) / 2;
   const stgDonWidth = (CHAR_ROW_W - SQUARE - 2 * LEADER_GAP) / 2;
 
   /* ── Scale ─────────────────────────────────────────────────────── */
@@ -428,6 +435,7 @@ export function BoardLayout({
             width={BOARD_CARD_W}
             height={BOARD_CARD_H}
             style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}
+            onClick={() => opp && opp.trash.length > 0 && setZonePreview({ type: "trash", owner: "opp" })}
           />
           <BoardCard
             cardDb={cardDb}
@@ -437,6 +445,7 @@ export function BoardLayout({
             width={BOARD_CARD_W}
             height={BOARD_CARD_H}
             style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}
+            onClick={() => opp && setZonePreview({ type: "deck", owner: "opp" })}
           />
 
           {/* Zone 2: Leader row — STG / LDR / DON */}
@@ -471,8 +480,8 @@ export function BoardLayout({
               cardDb={cardDb}
               empty
               label="LDR"
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
+              width={SQUARE}
+              height={SQUARE}
               style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
             />
           )}
@@ -499,8 +508,8 @@ export function BoardLayout({
                 cardDb={cardDb}
                 empty
                 label={`C${i + 1}`}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
+                width={SQUARE}
+                height={SQUARE}
                 style={{ position: "absolute", left: pos.left, top: oppCharTop }}
               />
             );
@@ -600,8 +609,8 @@ export function BoardLayout({
               cardDb={cardDb}
               empty
               label="LDR"
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
+              width={SQUARE}
+              height={SQUARE}
               style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
             />
           )}
@@ -634,12 +643,14 @@ export function BoardLayout({
             width={BOARD_CARD_W}
             height={BOARD_CARD_H}
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}
+            onClick={() => me && setZonePreview({ type: "deck", owner: "me" })}
           />
           <DroppableTrashZone
             trash={me?.trash ?? []}
             cardDb={cardDb}
             activeDrag={activeDrag}
             battleSubPhase={turn?.battleSubPhase ?? null}
+            onClickTrash={() => me && me.trash.length > 0 && setZonePreview({ type: "trash", owner: "me" })}
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
           />
         </div>
@@ -766,6 +777,27 @@ export function BoardLayout({
         />
       )}
     </DragOverlay>
+
+    {/* ── Zone preview modals ─────────────────────────────────────── */}
+    {zonePreview?.type === "deck" && (
+      <GameDeckPreviewModal
+        deck={zonePreview.owner === "me" ? (me?.deck ?? []) : (opp?.deck ?? [])}
+        cardDb={cardDb}
+        title={zonePreview.owner === "me" ? "Your Deck" : "Opponent\u2019s Deck"}
+        open
+        onOpenChange={(open) => { if (!open) setZonePreview(null); }}
+      />
+    )}
+    {zonePreview?.type === "trash" && (
+      <TrashPreviewModal
+        trash={zonePreview.owner === "me" ? (me?.trash ?? []) : (opp?.trash ?? [])}
+        cardDb={cardDb}
+        title={zonePreview.owner === "me" ? "Your Trash" : "Opponent\u2019s Trash"}
+        open
+        onOpenChange={(open) => { if (!open) setZonePreview(null); }}
+      />
+    )}
+
     </DndContext>
     </TooltipProvider>
   );

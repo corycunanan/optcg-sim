@@ -21,12 +21,14 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
   cardDb,
   activeDrag,
   battleSubPhase,
+  onClickTrash,
   style,
 }: {
   trash: CardInstance[];
   cardDb: CardDb;
   activeDrag: DragPayload | null;
   battleSubPhase: BattleSubPhase | null;
+  onClickTrash?: () => void;
   style?: React.CSSProperties;
 }) {
   const inCounterStep = battleSubPhase === "COUNTER_STEP";
@@ -57,6 +59,7 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
           count={trash.length > 1 ? trash.length : undefined}
           width={BOARD_CARD_W}
           height={BOARD_CARD_H}
+          onClick={onClickTrash}
         />
       </div>
     </div>
