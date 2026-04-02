@@ -5,7 +5,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-import { cardHover, cardTap } from "@/lib/motion";
+import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
@@ -102,12 +102,14 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   activeDragType,
   zoneKey,
   style,
+  animationDelay,
 }: {
   card: CardInstance | null;
   cardDb: CardDb;
   activeDragType: string | null;
   zoneKey: string;
   style: React.CSSProperties;
+  animationDelay?: number;
 }) {
   const zonePos = useZonePosition();
   const accepts = activeDragType === "hand-card";
@@ -133,13 +135,24 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="green" />
       {card ? (
-        <BoardCard
-          card={card}
-          cardDb={cardDb}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
+        <motion.div
+          animate={{
+            rotate: card.state === "RESTED" ? 90 : 0,
+            filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+          }}
+          transition={{
+            ...(card.state === "RESTED" ? cardRest : cardActivate),
+            delay: animationDelay ?? 0,
+          }}
           className="relative z-[1]"
-        />
+        >
+          <BoardCard
+            card={card}
+            cardDb={cardDb}
+            width={BOARD_CARD_W}
+            height={BOARD_CARD_H}
+          />
+        </motion.div>
       ) : (
         <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
           STG
@@ -160,6 +173,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   onAction,
   zoneKey,
   style,
+  animationDelay,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -171,6 +185,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   onAction?: (action: GameAction) => void;
   zoneKey?: string;
   style: React.CSSProperties;
+  animationDelay?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const reducedMotion = useReducedMotion();
@@ -236,13 +251,21 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           {...listeners}
           onClick={onSelect}
           onContextMenu={handleContextMenu}
+          animate={{
+            rotate: card.state === "RESTED" ? 90 : 0,
+            opacity: isDragging ? 0.3 : 1,
+            filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+          }}
+          transition={{
+            ...(card.state === "RESTED" ? cardRest : cardActivate),
+            delay: animationDelay ?? 0,
+          }}
           whileHover={skipMotion ? undefined : cardHover}
           whileTap={skipMotion ? undefined : cardTap}
           style={{
             ...style,
             width: SQUARE,
             height: SQUARE,
-            opacity: isDragging ? 0.3 : 1,
             cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
           }}
           className={cn(
@@ -280,12 +303,14 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   activeDragType,
   zoneKey,
   style,
+  animationDelay,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
   zoneKey?: string;
   style: React.CSSProperties;
+  animationDelay?: number;
 }) {
   const reducedMotion = useReducedMotion();
   const zonePos = useZonePosition();
@@ -320,6 +345,14 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   return (
     <motion.div
       ref={ref}
+      animate={{
+        rotate: card.state === "RESTED" ? 90 : 0,
+        filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+      }}
+      transition={{
+        ...(card.state === "RESTED" ? cardRest : cardActivate),
+        delay: animationDelay ?? 0,
+      }}
       whileHover={reducedMotion ? undefined : cardHover}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"

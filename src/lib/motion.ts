@@ -82,6 +82,12 @@ const board = {
     /** Card leaving a zone (fade out) */
     zoneExit: { duration: 0.1, ease: "easeIn" as const },
   },
+  stateChange: {
+    /** Resting (attack/block/cost): decisive, snappy */
+    rest: { type: "spring" as const, stiffness: 300, damping: 25 },
+    /** Activating (refresh): slight bounce, feels refreshing */
+    activate: { type: "spring" as const, stiffness: 300, damping: 18 },
+  },
 } as const;
 
 // ─── Combined Export ─────────────────────────────────────────────────
@@ -100,3 +106,5 @@ export const cardHover = board.card.hover;
 export const cardTap = board.card.tap;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
+export const cardRest = board.stateChange.rest;
+export const cardActivate = board.stateChange.activate;

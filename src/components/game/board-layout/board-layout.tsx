@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   CardDb,
   GameAction,
@@ -11,6 +11,8 @@ import type {
   TurnState,
 } from "@shared/game-types";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "motion/react";
+import { cardRest, cardActivate } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   TooltipProvider,
@@ -229,6 +231,22 @@ function BoardLayoutInner({
   const playerHandAnim = useHandAnimationState(cardAnimations, me?.hand ?? [], "p-hand");
   const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
 
+  /* ── Refresh phase stagger detection ────────────────────────── */
+
+  const reducedMotion = useReducedMotion();
+  const prevPhaseRef = useRef(turn?.phase);
+  const [refreshWave, setRefreshWave] = useState(false);
+
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = turn?.phase;
+    if (!reducedMotion && prevPhase === "REFRESH" && turn?.phase === "DRAW") {
+      setRefreshWave(true);
+      const timer = setTimeout(() => setRefreshWave(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [turn?.phase, reducedMotion]);
+
   return (
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
@@ -352,12 +370,23 @@ function BoardLayoutInner({
           {/* Zone 2: Leader row — STG / LDR / DON */}
           <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
             {opp?.stage ? (
-              <BoardCard
-                card={opp.stage}
-                cardDb={cardDb}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
-              />
+              <motion.div
+                animate={{
+                  rotate: opp.stage.state === "RESTED" ? 90 : 0,
+                  filter: opp.stage.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+                }}
+                transition={{
+                  ...(opp.stage.state === "RESTED" ? cardRest : cardActivate),
+                  delay: refreshWave ? 0.18 : 0,
+                }}
+              >
+                <BoardCard
+                  card={opp.stage}
+                  cardDb={cardDb}
+                  width={BOARD_CARD_W}
+                  height={BOARD_CARD_H}
+                />
+              </motion.div>
             ) : (
               <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
                 STG
@@ -372,6 +401,7 @@ function BoardLayoutInner({
               activeDragType={activeDragType}
               zoneKey="o-leader"
               style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
+              animationDelay={refreshWave ? 0 : undefined}
             />
           ) : (
             <BoardCard
@@ -388,6 +418,7 @@ function BoardLayoutInner({
             player={opp}
             zoneKey="o-don"
             style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
+            animationDelay={refreshWave ? 0.2 : undefined}
           />
 
           {/* Zone 2: Character row */}
@@ -401,6 +432,7 @@ function BoardLayoutInner({
                 activeDragType={activeDragType}
                 zoneKey={`o-char-${i}`}
                 style={{ position: "absolute", left: pos.left, top: oppCharTop }}
+                animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
               />
             ) : (
               <BoardCard
@@ -487,6 +519,7 @@ function BoardLayoutInner({
                 onSelect={isBlockerEligible ? () => bs.setSelectedBlockerId(char.instanceId) : undefined}
                 onAction={onAction}
                 zoneKey={`p-char-${i}`}
+                animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />
             );
@@ -498,6 +531,7 @@ function BoardLayoutInner({
             enableDrag={bs.canInteract}
             zoneKey="p-don"
             style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
+            animationDelay={refreshWave ? 0.2 : undefined}
           />
 
           {me?.leader ? (
@@ -509,6 +543,7 @@ function BoardLayoutInner({
               onAction={onAction}
               zoneKey="p-leader"
               style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
+              animationDelay={refreshWave ? 0 : undefined}
             />
           ) : (
             <BoardCard
@@ -527,6 +562,7 @@ function BoardLayoutInner({
             activeDragType={activeDragType}
             zoneKey="p-stage"
             style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
+            animationDelay={refreshWave ? 0.18 : undefined}
           />
 
           {/* Zone 3 (right): Deck + Trash */}

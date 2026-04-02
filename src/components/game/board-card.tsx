@@ -43,7 +43,6 @@ export const BoardCard = React.memo(function BoardCard({
 }: BoardCardProps) {
   const resolvedCardId = card?.cardId ?? cardIdOverride;
   const data = resolvedCardId ? cardDb[resolvedCardId] : null;
-  const isRested = card?.state === "RESTED";
   const donCount = card?.attachedDon.length ?? 0;
 
   if (empty) {
@@ -115,7 +114,7 @@ export const BoardCard = React.memo(function BoardCard({
 
   const cardElement = (
     <div
-      className={cn("relative", isRested && "opacity-60", className)}
+      className={cn("relative", className)}
       style={{ width, height, ...style }}
     >
       <div
@@ -128,11 +127,7 @@ export const BoardCard = React.memo(function BoardCard({
           onClick && "cursor-pointer hover:border-gb-text-muted",
           !imageUrl && "flex flex-col bg-gb-surface-raised",
         )}
-        style={{
-          width,
-          height,
-          ...(isRested ? { transform: "rotate(90deg)" } : undefined),
-        }}
+        style={{ width, height }}
       >
         {imageUrl ? (
           <>
@@ -177,11 +172,7 @@ export const BoardCard = React.memo(function BoardCard({
       {donCount > 0 && (
         <div
           className="absolute z-10 text-center bg-gb-board-dark/75 py-1"
-          style={{
-            bottom: isRested ? (height - width) / 2 : 0,
-            left: isRested ? -(height - width) / 2 : 0,
-            width: isRested ? height : width,
-          }}
+          style={{ bottom: 0, left: 0, width }}
         >
           <span className="text-xs font-extrabold text-white leading-none">
             +{donCount} DON
