@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { cardHover, cardTap } from "@/lib/motion";
+import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
 import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
@@ -53,12 +54,14 @@ export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   label,
   cardDb,
   activeDragType,
+  zoneKey,
   style,
 }: {
   slotIndex: number;
   label: string;
   cardDb: CardDb;
   activeDragType: string | null;
+  zoneKey?: string;
   style: React.CSSProperties;
 }) {
   const accepts = activeDragType === "hand-card";
@@ -67,9 +70,21 @@ export const DroppableCharSlot = React.memo(function DroppableCharSlot({
     data: { type: "character-slot", slotIndex },
   });
 
+  const zonePos = useZonePosition();
+  const slotRef = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [setNodeRef, zoneKey, zonePos],
+  );
+
   return (
     <div
-      ref={setNodeRef}
+      ref={slotRef}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"
     >
@@ -95,6 +110,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected,
   onSelect,
   onAction,
+  zoneKey,
   style,
 }: {
   card: CardInstance;
@@ -105,10 +121,12 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected?: boolean;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
+  zoneKey?: string;
   style: React.CSSProperties;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const reducedMotion = useReducedMotion();
+  const zonePos = useZonePosition();
 
   const {
     attributes,
@@ -131,8 +149,12 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     (node: HTMLElement | null) => {
       setDragRef(node);
       setDropRef(node);
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
     },
-    [setDragRef, setDropRef],
+    [setDragRef, setDropRef, zoneKey, zonePos],
   );
 
   const handleContextMenu = useCallback(
@@ -197,23 +219,37 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card,
   cardDb,
   activeDragType,
+  zoneKey,
   style,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
+  zoneKey?: string;
   style: React.CSSProperties;
 }) {
   const reducedMotion = useReducedMotion();
+  const zonePos = useZonePosition();
   const accepts = activeDragType === "attacker";
   const { setNodeRef, isOver } = useDroppable({
     id: `attack-target-${card.instanceId}`,
     data: { type: "attack-target", targetInstanceId: card.instanceId },
   });
 
+  const ref = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [setNodeRef, zoneKey, zonePos],
+  );
+
   return (
     <motion.div
-      ref={setNodeRef}
+      ref={ref}
       whileHover={reducedMotion ? undefined : cardHover}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"

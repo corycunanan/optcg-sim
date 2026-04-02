@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { handCardHover } from "@/lib/motion";
+import { useZonePosition } from "@/contexts/zone-position-context";
 import { BoardCard } from "../board-card";
 import { FIELD_W, HAND_CARD_W, HAND_CARD_H, type HandCardDrag } from "./constants";
 
@@ -64,14 +65,28 @@ export const HandLayer = React.memo(function HandLayer({
   cardDb,
   enableDrag,
   counterMode,
+  zoneKey,
 }: {
   cards: CardInstance[];
   faceDown?: boolean;
   cardDb: CardDb;
   enableDrag?: boolean;
   counterMode?: boolean;
+  zoneKey?: string;
 }) {
   const count = cards.length;
+  const zonePos = useZonePosition();
+
+  const handRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [zoneKey, zonePos],
+  );
+
   if (count === 0) return null;
 
   const maxWidth = FIELD_W - 60;
@@ -80,7 +95,7 @@ export const HandLayer = React.memo(function HandLayer({
   const gap = Math.min(12, rawGap);
 
   return (
-    <div className="flex items-center pointer-events-auto">
+    <div ref={handRef} className="flex items-center pointer-events-auto">
       {cards.map((card, i) => {
         if (faceDown) {
           return (

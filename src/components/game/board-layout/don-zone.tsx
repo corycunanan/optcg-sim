@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { DonInstance, PlayerState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { useZonePosition } from "@/contexts/zone-position-context";
 import { type ActiveDonDrag } from "./constants";
 
 const DON_CARD_W = 50;
@@ -87,20 +88,34 @@ export const DonZone = React.memo(function DonZone({
   style,
   className,
   enableDrag,
+  zoneKey,
 }: {
   player: PlayerState | null;
   style: React.CSSProperties;
   className?: string;
   enableDrag?: boolean;
+  zoneKey?: string;
 }) {
+  const zonePos = useZonePosition();
   const activeDon =
     player?.donCostArea.filter((d) => d.state === "ACTIVE") ?? [];
   const restedDon =
     player?.donCostArea.filter((d) => d.state === "RESTED") ?? [];
   const hasAny = activeDon.length > 0 || restedDon.length > 0;
 
+  const donRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [zoneKey, zonePos],
+  );
+
   return (
     <div
+      ref={donRef}
       className={cn(
         "absolute flex items-center rounded-md border border-gb-border-strong/30",
         !hasAny && "justify-center",

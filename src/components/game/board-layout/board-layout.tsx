@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type {
   CardDb,
   CardInstance,
   GameAction,
+  GameEvent,
   PlayerState,
   PromptOptions,
   PromptType,
@@ -61,8 +62,29 @@ import { PlayerChoiceModal } from "../player-choice-modal";
 import { OptionalEffectModal } from "../optional-effect-modal";
 import { RevealTriggerModal } from "../reveal-trigger-modal";
 import { DroppableTrashZone } from "./trash-zone";
+import { CardAnimationLayer } from "./card-animation-layer";
 import { GameDeckPreviewModal } from "../deck-preview-modal";
 import { TrashPreviewModal } from "../trash-preview-modal";
+import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
+
+/** Registers a DOM element as a zone position anchor. */
+function ZoneRef({ zoneKey, children, style, className }: {
+  zoneKey: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  className?: string;
+}) {
+  const zonePos = useZonePosition();
+  const ref = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) zonePos.register(zoneKey, node);
+      else zonePos.unregister(zoneKey);
+    },
+    [zoneKey, zonePos],
+  );
+  return <div ref={ref} style={style} className={className}>{children}</div>;
+}
+import { useCardTransitions } from "@/hooks/use-card-transitions";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -73,6 +95,7 @@ export interface BoardLayoutProps {
   isMyTurn: boolean;
   battlePhase: string | null;
   connectionStatus: string;
+  eventLog: GameEvent[];
   activePrompt: {
     promptType: PromptType;
     options: PromptOptions;
@@ -137,6 +160,7 @@ export function BoardLayout({
   isMyTurn,
   battlePhase,
   connectionStatus,
+  eventLog,
   activePrompt,
   onAction,
   onLeave,
@@ -329,7 +353,16 @@ export function BoardLayout({
 
   const sideCardOffsetX = CARD_OFFSET_X;
 
+  /* ── Card flight animations ──────────────────────────────────── */
+
+  const { transitions: cardAnimations, removeTransition } = useCardTransitions(
+    eventLog,
+    myIndex,
+    activeDrag !== null,
+  );
+
   return (
+    <ZonePositionProvider>
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
       sensors={sensors}
@@ -405,7 +438,7 @@ export function BoardLayout({
             transformOrigin: "top center",
           }}
         >
-          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} />
+          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" />
         </div>
       </div>
 
@@ -437,16 +470,17 @@ export function BoardLayout({
             style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}
             onClick={() => opp && opp.trash.length > 0 && setZonePreview({ type: "trash", owner: "opp" })}
           />
-          <BoardCard
-            cardDb={cardDb}
-            sleeve
-            label="DECK"
-            count={opp?.deck.length}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}
-            onClick={() => opp && setZonePreview({ type: "deck", owner: "opp" })}
-          />
+          <ZoneRef zoneKey="o-deck" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}>
+            <BoardCard
+              cardDb={cardDb}
+              sleeve
+              label="DECK"
+              count={opp?.deck.length}
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              onClick={() => opp && setZonePreview({ type: "deck", owner: "opp" })}
+            />
+          </ZoneRef>
 
           {/* Zone 2: Leader row — STG / LDR / DON */}
           {opp?.stage ? (
@@ -473,6 +507,7 @@ export function BoardLayout({
               card={opp.leader}
               cardDb={cardDb}
               activeDragType={activeDragType}
+              zoneKey="o-leader"
               style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
             />
           ) : (
@@ -488,6 +523,7 @@ export function BoardLayout({
 
           <DonZone
             player={opp}
+            zoneKey="o-don"
             style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
           />
 
@@ -500,6 +536,7 @@ export function BoardLayout({
                 card={char}
                 cardDb={cardDb}
                 activeDragType={activeDragType}
+                zoneKey={`o-char-${i}`}
                 style={{ position: "absolute", left: pos.left, top: oppCharTop }}
               />
             ) : (
@@ -519,6 +556,7 @@ export function BoardLayout({
           <LifeZone
             life={opp?.life ?? []}
             cardDb={cardDb}
+            zoneKey="o-life"
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: oppTop }}
           />
 
@@ -552,6 +590,7 @@ export function BoardLayout({
           <LifeZone
             life={me?.life ?? []}
             cardDb={cardDb}
+            zoneKey="p-life"
             style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
           />
 
@@ -566,6 +605,7 @@ export function BoardLayout({
                   label={`C${i + 1}`}
                   cardDb={cardDb}
                   activeDragType={activeDragType}
+                  zoneKey={`p-char-${i}`}
                   style={{ position: "absolute", left: pos.left, top: playerCharTop }}
                 />
               );
@@ -583,6 +623,7 @@ export function BoardLayout({
                 selected={selectedBlockerId === char.instanceId}
                 onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
                 onAction={onAction}
+                zoneKey={`p-char-${i}`}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />
             );
@@ -592,6 +633,7 @@ export function BoardLayout({
           <DonZone
             player={me}
             enableDrag={canInteract}
+            zoneKey="p-don"
             style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
           />
 
@@ -602,6 +644,7 @@ export function BoardLayout({
               activeDragType={activeDragType}
               canAttack={canInteract && me.leader.state === "ACTIVE"}
               onAction={onAction}
+              zoneKey="p-leader"
               style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
             />
           ) : (
@@ -635,22 +678,24 @@ export function BoardLayout({
           )}
 
           {/* Zone 3 (right): Deck + Trash */}
-          <BoardCard
-            cardDb={cardDb}
-            sleeve
-            label="DECK"
-            count={me?.deck.length}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}
-            onClick={() => me && setZonePreview({ type: "deck", owner: "me" })}
-          />
+          <ZoneRef zoneKey="p-deck" style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}>
+            <BoardCard
+              cardDb={cardDb}
+              sleeve
+              label="DECK"
+              count={me?.deck.length}
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              onClick={() => me && setZonePreview({ type: "deck", owner: "me" })}
+            />
+          </ZoneRef>
           <DroppableTrashZone
             trash={me?.trash ?? []}
             cardDb={cardDb}
             activeDrag={activeDrag}
             battleSubPhase={turn?.battleSubPhase ?? null}
             onClickTrash={() => me && me.trash.length > 0 && setZonePreview({ type: "trash", owner: "me" })}
+            zoneKey="p-trash"
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
           />
         </div>
@@ -675,6 +720,7 @@ export function BoardLayout({
             cardDb={cardDb}
             enableDrag={canInteract || canDragCounter}
             counterMode={canDragCounter}
+            zoneKey="p-hand"
           />
         </div>
       </div>
@@ -799,6 +845,14 @@ export function BoardLayout({
     )}
 
     </DndContext>
+
+    <CardAnimationLayer
+      transitions={cardAnimations}
+      cardDb={cardDb}
+      onComplete={removeTransition}
+    />
+
     </TooltipProvider>
+    </ZonePositionProvider>
   );
 }

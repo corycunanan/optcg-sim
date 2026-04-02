@@ -125,6 +125,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         isMyTurn={session.isMyTurn}
         battlePhase={session.battlePhase}
         connectionStatus={session.connectionStatus}
+        eventLog={session.gameState.eventLog}
         activePrompt={activePrompt}
         onAction={(action) => {
           if (
