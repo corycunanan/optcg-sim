@@ -214,10 +214,11 @@ model Deck {
 // ─── DeckCard ───────────────────────────────────────────────
 
 model DeckCard {
-  id       String @id @default(uuid())
-  deckId   String
-  cardId   String
-  quantity Int
+  id             String  @id @default(uuid())
+  deckId         String
+  cardId         String
+  quantity       Int
+  selectedArtUrl String? // Selected art variant URL (null = base card.imageUrl)
 
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
   card Card @relation(fields: [cardId], references: [id])

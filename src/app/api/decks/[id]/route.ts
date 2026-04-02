@@ -96,7 +96,7 @@ export async function PUT(
       leaderId?: string;
       leaderArtUrl?: string | null;
       format?: string;
-      cards?: { cardId: string; quantity: number }[];
+      cards?: { cardId: string; quantity: number; selectedArtUrl?: string | null }[];
     };
 
     // If changing leader, validate it
@@ -123,6 +123,7 @@ export async function PUT(
             deckId: id,
             cardId: c.cardId,
             quantity: c.quantity,
+            selectedArtUrl: c.selectedArtUrl ?? null,
           })),
         });
       }

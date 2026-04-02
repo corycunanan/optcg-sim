@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       leaderId: string;
       leaderArtUrl?: string | null;
       format?: string;
-      cards?: { cardId: string; quantity: number }[];
+      cards?: { cardId: string; quantity: number; selectedArtUrl?: string | null }[];
     };
 
     if (!name || !leaderId) {
@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
                 data: cards.map((c) => ({
                   cardId: c.cardId,
                   quantity: c.quantity,
+                  selectedArtUrl: c.selectedArtUrl ?? null,
                 })),
               },
             }

@@ -14,7 +14,6 @@ import { DeckBuilderList } from "./deck-builder-list";
 import { DeckBuilderHeader } from "./deck-builder-header";
 import { DeckBuilderStatsCharts } from "./deck-builder-stats";
 import { DeckBuilderValidation } from "./deck-builder-validation";
-import { CardDetailModal } from "@/components/admin/card-detail-modal";
 import { ImportModal } from "./import-modal";
 import { ExportModal } from "./export-modal";
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -29,7 +28,6 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [isLoading, setIsLoading] = useState(!!deckId);
-  const [inspectingLeader, setInspectingLeader] = useState(false);
   const [leaderSelectedArtUrl, setLeaderSelectedArtUrl] = useState<string | null>(null);
 
   // Load existing deck
@@ -50,7 +48,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           cardsMap.set(dc.cardId, {
             cardId: dc.cardId,
             quantity: dc.quantity,
-            selectedArtUrl: null,
+            selectedArtUrl: dc.selectedArtUrl ?? null,
             card: dc.card,
           });
         }
@@ -104,6 +102,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       cards: Array.from(state.cards.values()).map((c) => ({
         cardId: c.cardId,
         quantity: c.quantity,
+        selectedArtUrl: c.selectedArtUrl ?? null,
       })),
     };
 
@@ -134,7 +133,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     } catch {
       dispatch({ type: "SAVE_ERROR" });
     }
-  }, [state, router]);
+  }, [state, leaderSelectedArtUrl, router]);
 
   // Add card handler
   const addCard = useCallback(
@@ -185,8 +184,6 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       </div>
     );
   }
-
-  const leaderDisplayUrl = leaderSelectedArtUrl || state.leader?.imageUrl;
 
   return (
     <div className="flex flex-1 flex-col min-h-0 bg-background text-content-primary overflow-hidden">
@@ -241,58 +238,30 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
             {/* Cards tab */}
             <TabsContent value="cards" className="flex min-h-0 flex-1">
-              {/* Left column: card list */}
               <div className="flex-1 overflow-y-auto p-5">
                 <DeckBuilderList
                   cards={Array.from(state.cards.values())}
+                  leader={state.leader}
+                  leaderArtUrl={leaderSelectedArtUrl}
                   onIncrement={(id) => dispatch({ type: "INCREMENT_CARD", cardId: id })}
                   onDecrement={(id) => dispatch({ type: "DECREMENT_CARD", cardId: id })}
                   onSetArtVariant={setArtVariant}
                   onAddCard={addCard}
-                />
-              </div>
-
-              {/* Right column: leader + validation */}
-              <div className="w-52 shrink-0 overflow-y-auto p-5">
-                {/* Leader card */}
-                {state.leader ? (
-                  <div className="group relative mb-4">
-                    <button
-                      aria-label={`Inspect leader: ${state.leader.name}`}
-                      onClick={() => setInspectingLeader(true)}
-                      className="w-full overflow-hidden rounded"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={leaderDisplayUrl}
-                        alt={state.leader.name}
-                        className="w-full transition-transform duration-200 group-hover:scale-[1.02]"
-                      />
-                    </button>
-                    <button
-                      aria-label="Remove leader"
-                      onClick={() => {
-                        dispatch({ type: "REMOVE_LEADER" });
-                        setLeaderSelectedArtUrl(null);
-                      }}
-                      className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-overlay text-xs text-error opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mb-4 flex aspect-[600/838] w-full items-center justify-center rounded border-2 border-dashed border-border p-3 text-center">
-                    <p className="text-xs font-medium text-content-tertiary">
-                      Search &amp; click a Leader to select
-                    </p>
-                  </div>
-                )}
-
-                {/* Validation badges */}
-                <DeckBuilderValidation
-                  results={validation.results}
+                  onRemoveLeader={() => {
+                    dispatch({ type: "REMOVE_LEADER" });
+                    setLeaderSelectedArtUrl(null);
+                  }}
+                  onSetLeaderArt={setLeaderSelectedArtUrl}
                   totalCards={validation.stats.totalCards}
                 />
+
+                {/* Validation */}
+                <div className="mt-6">
+                  <DeckBuilderValidation
+                    results={validation.results}
+                    totalCards={validation.stats.totalCards}
+                  />
+                </div>
               </div>
             </TabsContent>
 
@@ -303,22 +272,6 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           </TabsRoot>
         </div>
       </div>
-
-      {/* Leader inspect modal */}
-      {inspectingLeader && state.leader && (
-        <CardDetailModal
-          cardId={state.leader.id}
-          onClose={() => setInspectingLeader(false)}
-          deckActions={{
-            quantityInDeck: 0,
-            selectedArtUrl: leaderSelectedArtUrl,
-            isLeader: true,
-            onAdd: () => {},
-            onRemove: () => {},
-            onSetArtVariant: (artUrl) => setLeaderSelectedArtUrl(artUrl),
-          }}
-        />
-      )}
 
       {/* Modals */}
       {showImport && (
