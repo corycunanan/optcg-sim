@@ -13,7 +13,7 @@ import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constan
 import { CardActionMenuContent } from "../card-action-menu";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
-function DropOverlay({
+export function DropOverlay({
   active,
   hovered,
   color,
