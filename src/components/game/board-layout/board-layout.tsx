@@ -361,6 +361,19 @@ export function BoardLayout({
     activeDrag !== null,
   );
 
+  // Build a count map of cardIds in-flight to each hand zone.
+  // HandLayer uses this to render invisible placeholders for cards still animating.
+  const inFlightToHand = useMemo(() => {
+    const counts: Record<string, Map<string, number>> = {};
+    for (const t of cardAnimations) {
+      if (t.toZoneKey.endsWith("-hand") && t.cardId) {
+        const map = (counts[t.toZoneKey] ??= new Map());
+        map.set(t.cardId, (map.get(t.cardId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [cardAnimations]);
+
   return (
     <ZonePositionProvider>
     <TooltipProvider delayDuration={0} disableHoverableContent>
@@ -438,7 +451,7 @@ export function BoardLayout({
             transformOrigin: "top center",
           }}
         >
-          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" />
+          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightCardIds={inFlightToHand["o-hand"]} />
         </div>
       </div>
 
@@ -721,6 +734,7 @@ export function BoardLayout({
             enableDrag={canInteract || canDragCounter}
             counterMode={canDragCounter}
             zoneKey="p-hand"
+            inFlightCardIds={inFlightToHand["p-hand"]}
           />
         </div>
       </div>

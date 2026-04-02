@@ -66,6 +66,7 @@ export const HandLayer = React.memo(function HandLayer({
   enableDrag,
   counterMode,
   zoneKey,
+  inFlightCardIds,
 }: {
   cards: CardInstance[];
   faceDown?: boolean;
@@ -73,6 +74,8 @@ export const HandLayer = React.memo(function HandLayer({
   enableDrag?: boolean;
   counterMode?: boolean;
   zoneKey?: string;
+  /** Count map of cardIds currently in-flight to this hand (render as placeholders). */
+  inFlightCardIds?: Map<string, number>;
 }) {
   const count = cards.length;
   const zonePos = useZonePosition();
@@ -94,9 +97,33 @@ export const HandLayer = React.memo(function HandLayer({
   const rawGap = count > 1 ? (maxWidth - totalCardsW) / (count - 1) : 0;
   const gap = Math.min(12, rawGap);
 
+  // Track remaining in-flight counts so we only hide the right number of duplicates
+  const remainingInFlight = inFlightCardIds ? new Map(inFlightCardIds) : null;
+
   return (
     <div ref={handRef} className="flex items-center pointer-events-auto">
       {cards.map((card, i) => {
+        const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
+
+        // Check if this card is still in-flight (render as invisible placeholder)
+        let isInFlight = false;
+        if (remainingInFlight) {
+          const remaining = remainingInFlight.get(card.cardId);
+          if (remaining && remaining > 0) {
+            isInFlight = true;
+            remainingInFlight.set(card.cardId, remaining - 1);
+          }
+        }
+
+        if (isInFlight) {
+          return (
+            <div
+              key={card.instanceId}
+              style={{ width: HAND_CARD_W, height: HAND_CARD_H, ...marginStyle, visibility: "hidden" }}
+            />
+          );
+        }
+
         if (faceDown) {
           return (
             <BoardCard
@@ -105,7 +132,7 @@ export const HandLayer = React.memo(function HandLayer({
               sleeve
               width={HAND_CARD_W}
               height={HAND_CARD_H}
-              style={i > 0 ? { marginLeft: gap } : undefined}
+              style={marginStyle}
             />
           );
         }
@@ -124,7 +151,7 @@ export const HandLayer = React.memo(function HandLayer({
             dimmed={counterMode && !eligible}
             width={HAND_CARD_W}
             height={HAND_CARD_H}
-            style={i > 0 ? { marginLeft: gap } : undefined}
+            style={marginStyle}
           />
         );
       })}

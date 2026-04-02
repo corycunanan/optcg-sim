@@ -36,6 +36,14 @@ function FlyingCard({
 
   if (!canAnimate) return null;
 
+  const isHandBound = transition.toZoneKey.endsWith("-hand");
+
+  // Cards arriving in hand target the right edge (end of hand fan)
+  const toX = isHandBound
+    ? toRect.right - BOARD_CARD_W
+    : toRect.left + (toRect.width - BOARD_CARD_W) / 2;
+  const toY = toRect.top + (toRect.height - BOARD_CARD_H) / 2;
+
   return (
     <motion.div
       initial={{
@@ -45,8 +53,8 @@ function FlyingCard({
         scale: 1,
       }}
       animate={{
-        x: toRect.left + (toRect.width - BOARD_CARD_W) / 2,
-        y: toRect.top + (toRect.height - BOARD_CARD_H) / 2,
+        x: toX,
+        y: toY,
         opacity: 1,
         scale: 1,
       }}
