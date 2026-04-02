@@ -89,6 +89,7 @@ export const DonZone = React.memo(function DonZone({
   animationDelay?: number;
 }) {
   const zonePos = useZonePosition();
+  const reducedMotion = useReducedMotion();
   // Stable sort: active first, rested second, preserving relative order within each group
   const allDon = [...(player?.donCostArea ?? [])].sort((a, b) => {
     if (a.state === b.state) return 0;
@@ -130,6 +131,7 @@ export const DonZone = React.memo(function DonZone({
               <motion.div
                 key={don.instanceId}
                 layout
+                whileHover={reducedMotion ? undefined : cardHover}
                 transition={{
                   ...(cardActivate),
                   delay: animationDelay ? animationDelay + i * 0.02 : 0,
@@ -155,6 +157,7 @@ export const DonZone = React.memo(function DonZone({
                 <motion.div
                   key={don.instanceId}
                   layout
+                  whileHover={reducedMotion ? undefined : cardHover}
                   className="flex items-center justify-center shrink-0"
                   transition={{
                     ...(cardRest),
