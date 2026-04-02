@@ -86,17 +86,65 @@ export const DroppableCharSlot = React.memo(function DroppableCharSlot({
     <div
       ref={slotRef}
       style={{ ...style, width: SQUARE, height: SQUARE }}
-      className="relative flex items-center justify-center rounded-md"
+      className="relative flex items-center justify-center rounded-md border border-gb-border-strong/30"
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="blue" />
-      <BoardCard
-        cardDb={cardDb}
-        empty
-        label={label}
-        width={BOARD_CARD_W}
-        height={BOARD_CARD_H}
-        className="relative z-[1]"
-      />
+      <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none relative z-[1]">
+        {label}
+      </span>
+    </div>
+  );
+});
+
+export const DroppableStageZone = React.memo(function DroppableStageZone({
+  card,
+  cardDb,
+  activeDragType,
+  zoneKey,
+  style,
+}: {
+  card: CardInstance | null;
+  cardDb: CardDb;
+  activeDragType: string | null;
+  zoneKey: string;
+  style: React.CSSProperties;
+}) {
+  const zonePos = useZonePosition();
+  const accepts = activeDragType === "hand-card";
+  const { setNodeRef, isOver } = useDroppable({
+    id: `stage-zone-${zoneKey}`,
+    data: { type: "stage-zone" },
+  });
+
+  const mergedRef = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (node) zonePos.register(zoneKey, node);
+      else zonePos.unregister(zoneKey);
+    },
+    [setNodeRef, zoneKey, zonePos],
+  );
+
+  return (
+    <div
+      ref={mergedRef}
+      style={style}
+      className="absolute flex items-center justify-center rounded-md border border-gb-border-strong/30"
+    >
+      <DropOverlay active={accepts} hovered={isOver && accepts} color="green" />
+      {card ? (
+        <BoardCard
+          card={card}
+          cardDb={cardDb}
+          width={BOARD_CARD_W}
+          height={BOARD_CARD_H}
+          className="relative z-[1]"
+        />
+      ) : (
+        <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
+          STG
+        </span>
+      )}
     </div>
   );
 });

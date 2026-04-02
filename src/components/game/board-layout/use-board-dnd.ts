@@ -39,6 +39,11 @@ export function useBoardDnd(
         cardInstanceId: dragData.card.instanceId,
         position: dropData.slotIndex as number,
       });
+    } else if (dragData.type === "hand-card" && dropData.type === "stage-zone") {
+      onAction({
+        type: "PLAY_CARD",
+        cardInstanceId: dragData.card.instanceId,
+      });
     } else if (
       dragData.type === "active-don" &&
       dropData.type === "don-target"

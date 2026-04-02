@@ -54,7 +54,7 @@ import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
 import { DonCard, DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
-import { DroppableCharSlot, PlayerFieldCard, OpponentFieldCard } from "./field-card";
+import { DroppableCharSlot, DroppableStageZone, PlayerFieldCard, OpponentFieldCard } from "./field-card";
 import { MidZone } from "./mid-zone";
 import { DroppableTrashZone } from "./trash-zone";
 import { CardAnimationLayer } from "./card-animation-layer";
@@ -350,7 +350,7 @@ function BoardLayoutInner({
           </ZoneRef>
 
           {/* Zone 2: Leader row — STG / LDR / DON */}
-          <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left + (stgDonWidth - BOARD_CARD_W) / 2, top: oppLeaderTop }}>
+          <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
             {opp?.stage ? (
               <BoardCard
                 card={opp.stage}
@@ -359,13 +359,9 @@ function BoardLayoutInner({
                 height={BOARD_CARD_H}
               />
             ) : (
-              <BoardCard
-                cardDb={cardDb}
-                empty
-                label="STG"
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
-              />
+              <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
+                STG
+              </span>
             )}
           </ZoneRef>
 
@@ -525,24 +521,13 @@ function BoardLayoutInner({
             />
           )}
 
-          <ZoneRef zoneKey="p-stage" style={{ position: "absolute", left: zone2Right - stgDonWidth + (stgDonWidth - BOARD_CARD_W) / 2, top: playerLeaderTop }}>
-            {me?.stage ? (
-              <BoardCard
-                card={me.stage}
-                cardDb={cardDb}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
-              />
-            ) : (
-              <BoardCard
-                cardDb={cardDb}
-                empty
-                label="STG"
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
-              />
-            )}
-          </ZoneRef>
+          <DroppableStageZone
+            card={me?.stage ?? null}
+            cardDb={cardDb}
+            activeDragType={activeDragType}
+            zoneKey="p-stage"
+            style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
+          />
 
           {/* Zone 3 (right): Deck + Trash */}
           <ZoneRef zoneKey="p-deck" style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}>
