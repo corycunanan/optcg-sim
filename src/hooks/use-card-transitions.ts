@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameEvent, GameEventType } from "@shared/game-types";
+import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 
 export interface CardTransition {
   id: string;
@@ -25,13 +26,20 @@ function nextId() {
 function eventToTransition(
   event: GameEvent,
   myIndex: 0 | 1 | null,
+  zoneRegistry: ZonePositionRegistry | null,
 ): CardTransition | null {
   const { type, playerIndex, payload } = event;
   const cardId = (payload.cardId as string) ?? null;
+  const cardInstanceId = (payload.cardInstanceId as string) ?? null;
   const prefix = playerIndex === myIndex ? "p" : "o";
 
   let from: string | null = null;
   let to: string | null = null;
+
+  // Try to resolve the actual zone via the card→zone registry
+  const resolvedZone = cardInstanceId && zoneRegistry
+    ? zoneRegistry.getCardZone(cardInstanceId)
+    : null;
 
   switch (type) {
     case "CARD_PLAYED": {
@@ -41,29 +49,25 @@ function eventToTransition(
       if (zone === "STAGE") {
         to = `${prefix}-stage`;
       } else if (zone === "TRASH") {
-        // Event cards go to trash — animate hand → trash
         to = `${prefix}-trash`;
       } else {
-        // Character zone — no slot index in payload, use middle slot
-        to = `${prefix}-char-2`;
+        // Use resolved zone if available, otherwise fall back to center slot
+        to = resolvedZone ?? `${prefix}-char-2`;
       }
       break;
     }
     case "CARD_KO": {
-      // From character field to trash
-      from = `${prefix}-char-2`; // approximate — no slot info available
+      from = resolvedZone ?? `${prefix}-char-2`;
       to = `${prefix}-trash`;
       break;
     }
     case "CARD_TRASHED": {
-      // Skip count-based trashes (milling, etc.) — no single card to animate
       if (!cardId && payload.count) return null;
-      // From hand or field to trash
       const source = payload.from as string | undefined;
       if (source === "HAND") {
         from = `${prefix}-hand`;
       } else {
-        from = `${prefix}-char-2`; // approximate
+        from = resolvedZone ?? `${prefix}-char-2`;
       }
       to = `${prefix}-trash`;
       break;
@@ -71,12 +75,15 @@ function eventToTransition(
     case "CARD_DRAWN": {
       from = `${prefix}-deck`;
       to = `${prefix}-hand`;
-      // cardId may be null for opponent draws (hidden info)
       break;
     }
     case "CARD_RETURNED_TO_HAND": {
       const source = payload.source as string | undefined;
-      from = source === "TRASH" ? `${prefix}-trash` : `${prefix}-char-2`;
+      if (source === "TRASH") {
+        from = `${prefix}-trash`;
+      } else {
+        from = resolvedZone ?? `${prefix}-char-2`;
+      }
       to = `${prefix}-hand`;
       break;
     }
@@ -86,7 +93,6 @@ function eventToTransition(
       break;
     }
     case "DON_PLACED_ON_FIELD": {
-      // DON deck doesn't have a registered zone — skip for now
       return null;
     }
     default:
@@ -109,6 +115,7 @@ export function useCardTransitions(
   eventLog: GameEvent[],
   myIndex: 0 | 1 | null,
   isDragging: boolean,
+  zoneRegistry?: ZonePositionRegistry | null,
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
   const prevLengthRef = useRef(0);
@@ -120,7 +127,6 @@ export function useCardTransitions(
     if (isDragging) {
       dragCooldownRef.current = true;
     } else if (dragCooldownRef.current) {
-      // Drag just ended — keep cooldown active for one state update cycle
       const timer = setTimeout(() => {
         dragCooldownRef.current = false;
       }, 300);
@@ -134,14 +140,13 @@ export function useCardTransitions(
     const newLen = eventLog.length;
     prevLengthRef.current = newLen;
 
-    // Skip if no new events, during/just-after drag, or on initial load
     if (newLen <= prevLen || isDragging || dragCooldownRef.current || prevLen === 0) return;
 
     const newEvents = eventLog.slice(prevLen);
     const newTransitions: CardTransition[] = [];
 
     for (const event of newEvents) {
-      const t = eventToTransition(event, myIndex);
+      const t = eventToTransition(event, myIndex, zoneRegistry ?? null);
       if (t) newTransitions.push(t);
     }
 
@@ -149,10 +154,9 @@ export function useCardTransitions(
 
     setTransitions((prev) => {
       const combined = [...prev, ...newTransitions];
-      // Cap at MAX_CONCURRENT, keep most recent
       return combined.slice(-MAX_CONCURRENT);
     });
-  }, [eventLog.length, eventLog, myIndex, isDragging]);
+  }, [eventLog.length, eventLog, myIndex, isDragging, zoneRegistry]);
 
   // Auto-expire old transitions
   useEffect(() => {

@@ -150,12 +150,23 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       setDragRef(node);
       setDropRef(node);
       if (zoneKey) {
-        if (node) zonePos.register(zoneKey, node);
-        else zonePos.unregister(zoneKey);
+        if (node) {
+          zonePos.register(zoneKey, node);
+          zonePos.registerCard(card.instanceId, zoneKey);
+        } else {
+          zonePos.unregister(zoneKey);
+          zonePos.unregisterCard(card.instanceId);
+        }
       }
     },
-    [setDragRef, setDropRef, zoneKey, zonePos],
+    [setDragRef, setDropRef, zoneKey, zonePos, card.instanceId],
   );
+
+  // Keep card→zone mapping up to date if instanceId changes while mounted
+  useEffect(() => {
+    if (zoneKey) zonePos.registerCard(card.instanceId, zoneKey);
+    return () => { zonePos.unregisterCard(card.instanceId); };
+  }, [card.instanceId, zoneKey, zonePos]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
@@ -240,12 +251,23 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     (node: HTMLElement | null) => {
       setNodeRef(node);
       if (zoneKey) {
-        if (node) zonePos.register(zoneKey, node);
-        else zonePos.unregister(zoneKey);
+        if (node) {
+          zonePos.register(zoneKey, node);
+          zonePos.registerCard(card.instanceId, zoneKey);
+        } else {
+          zonePos.unregister(zoneKey);
+          zonePos.unregisterCard(card.instanceId);
+        }
       }
     },
-    [setNodeRef, zoneKey, zonePos],
+    [setNodeRef, zoneKey, zonePos, card.instanceId],
   );
+
+  // Keep card→zone mapping up to date if instanceId changes while mounted
+  useEffect(() => {
+    if (zoneKey) zonePos.registerCard(card.instanceId, zoneKey);
+    return () => { zonePos.unregisterCard(card.instanceId); };
+  }, [card.instanceId, zoneKey, zonePos]);
 
   return (
     <motion.div
