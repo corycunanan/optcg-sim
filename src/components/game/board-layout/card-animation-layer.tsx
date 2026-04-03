@@ -7,7 +7,7 @@ import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { cardTransitions } from "@/lib/motion";
 import { BoardCard } from "../board-card";
-import { BOARD_CARD_W, BOARD_CARD_H } from "./constants";
+import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constants";
 
 interface CardAnimationLayerProps {
   transitions: CardTransition[];
@@ -36,25 +36,36 @@ function FlyingCard({
 
   if (!canAnimate) return null;
 
+  const isFromHand = transition.fromZoneKey.endsWith("-hand");
   const isHandBound = transition.toZoneKey.endsWith("-hand");
+
+  // Use hand card dimensions when the card starts or ends in a hand zone
+  const fromW = isFromHand ? HAND_CARD_W : BOARD_CARD_W;
+  const fromH = isFromHand ? HAND_CARD_H : BOARD_CARD_H;
+  const toW = isHandBound ? HAND_CARD_W : BOARD_CARD_W;
+  const toH = isHandBound ? HAND_CARD_H : BOARD_CARD_H;
 
   // Cards arriving in hand target the right edge (end of hand fan)
   const toX = isHandBound
-    ? toRect.right - BOARD_CARD_W
-    : toRect.left + (toRect.width - BOARD_CARD_W) / 2;
-  const toY = toRect.top + (toRect.height - BOARD_CARD_H) / 2;
+    ? toRect.right - toW
+    : toRect.left + (toRect.width - toW) / 2;
+  const toY = toRect.top + (toRect.height - toH) / 2;
 
   return (
     <motion.div
       initial={{
-        x: fromRect.left + (fromRect.width - BOARD_CARD_W) / 2,
-        y: fromRect.top + (fromRect.height - BOARD_CARD_H) / 2,
+        x: fromRect.left + (fromRect.width - fromW) / 2,
+        y: fromRect.top + (fromRect.height - fromH) / 2,
+        width: fromW,
+        height: fromH,
         opacity: 1,
         scale: 1,
       }}
       animate={{
         x: toX,
         y: toY,
+        width: toW,
+        height: toH,
         opacity: 1,
         scale: 1,
       }}
@@ -63,8 +74,6 @@ function FlyingCard({
       onAnimationComplete={onComplete}
       style={{
         position: "fixed",
-        width: BOARD_CARD_W,
-        height: BOARD_CARD_H,
         pointerEvents: "none",
         zIndex: 9999,
       }}
@@ -73,8 +82,8 @@ function FlyingCard({
         cardId={transition.cardId ?? undefined}
         cardDb={cardDb}
         sleeve={!transition.cardId}
-        width={BOARD_CARD_W}
-        height={BOARD_CARD_H}
+        width={toW}
+        height={toH}
       />
     </motion.div>
   );
