@@ -13,6 +13,7 @@ import type {
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import { cardRest, cardActivate } from "@/lib/motion";
+import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
 import {
   TooltipProvider,
@@ -210,6 +211,8 @@ function BoardLayoutInner({
     handleDragEnd,
   } = useBoardDnd(cardDb, bs.battle, onAction);
 
+  const dragTilt = useDragTilt();
+
   /* ── Status indicator ──────────────────────────────────────────── */
 
   const statusDot =
@@ -251,8 +254,9 @@ function BoardLayoutInner({
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
       sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+      onDragStart={(e) => { handleDragStart(e); dragTilt.handleDragStart(e); }}
+      onDragMove={dragTilt.handleDragMove}
+      onDragEnd={(e) => { handleDragEnd(e); dragTilt.handleDragEnd(e); }}
     >
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
@@ -628,31 +632,35 @@ function BoardLayoutInner({
     </div>
 
     <DragOverlay dropAnimation={null}>
-      {activeDrag?.type === "hand-card" && (
-        <BoardCard
-          card={activeDrag.card}
-          cardDb={cardDb}
-          width={HAND_CARD_W * boardScale}
-          height={HAND_CARD_H * boardScale}
-        />
-      )}
-      {activeDrag?.type === "active-don" && (
-        <div
-          style={{
-            transform: `scale(${boardScale})`,
-            transformOrigin: "top left",
-          }}
-        >
-          <DonCard />
-        </div>
-      )}
-      {activeDrag?.type === "attacker" && (
-        <BoardCard
-          card={activeDrag.card}
-          cardDb={cardDb}
-          width={BOARD_CARD_W * boardScale}
-          height={BOARD_CARD_H * boardScale}
-        />
+      {activeDrag && (
+        <motion.div style={{ rotate: dragTilt.tilt }}>
+          {activeDrag.type === "hand-card" && (
+            <BoardCard
+              card={activeDrag.card}
+              cardDb={cardDb}
+              width={HAND_CARD_W * boardScale}
+              height={HAND_CARD_H * boardScale}
+            />
+          )}
+          {activeDrag.type === "active-don" && (
+            <div
+              style={{
+                transform: `scale(${boardScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <DonCard />
+            </div>
+          )}
+          {activeDrag.type === "attacker" && (
+            <BoardCard
+              card={activeDrag.card}
+              cardDb={cardDb}
+              width={BOARD_CARD_W * boardScale}
+              height={BOARD_CARD_H * boardScale}
+            />
+          )}
+        </motion.div>
       )}
     </DragOverlay>
 
