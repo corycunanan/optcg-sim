@@ -229,7 +229,7 @@ export function executeLifeToHand(
     events.push({
       type: "CARD_ADDED_TO_HAND_FROM_LIFE",
       playerIndex: targetController,
-      payload: { cardId: lc.cardId },
+      payload: { cardId: lc.cardId, cardInstanceId: lc.instanceId },
     });
   }
 

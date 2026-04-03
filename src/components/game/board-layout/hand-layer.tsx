@@ -5,7 +5,6 @@ import { useDraggable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { handCardHover } from "@/lib/motion";
-import { useCardTilt } from "@/hooks/use-card-tilt";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { BoardCard } from "../board-card";
 import { FIELD_W, HAND_CARD_W, HAND_CARD_H, type HandCardDrag } from "./constants";
@@ -44,28 +43,16 @@ function DraggableHandCard({
     disabled: disabled || hidden,
   });
 
-  const tilt = useCardTilt({ enabled: !reducedMotion && !isDragging && !hidden });
-
-  const mergedRef = useCallback(
-    (node: HTMLElement | null) => {
-      setNodeRef(node);
-      tilt.ref.current = node;
-    },
-    [setNodeRef, tilt.ref],
-  );
-
   const skipMotion = reducedMotion || isDragging;
 
   return (
     <motion.div
-      ref={mergedRef}
+      ref={setNodeRef}
       {...attributes}
       {...listeners}
-      {...tilt.handlers}
       whileHover={skipMotion || hidden ? undefined : handCardHover}
       style={{
         ...style,
-        ...tilt.style,
         opacity: isDragging ? 0.3 : dimmed ? 0.35 : 1,
         cursor: disabled || hidden ? "default" : "grab",
         visibility: hidden ? "hidden" : undefined,

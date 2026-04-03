@@ -55,7 +55,9 @@ export function executeAdvancePhase(state: GameState, _cardDb: Map<string, CardD
         const drawn = nextState.players[pi].deck[0];
         if (drawn) {
           nextState = moveCard(nextState, drawn.instanceId, "HAND");
-          events.push({ type: "CARD_DRAWN", playerIndex: pi, payload: { cardId: drawn.cardId } });
+          // moveCard assigns a new instanceId; find the card that just arrived in hand
+          const arrivedCard = nextState.players[pi].hand[nextState.players[pi].hand.length - 1];
+          events.push({ type: "CARD_DRAWN", playerIndex: pi, payload: { cardId: drawn.cardId, cardInstanceId: arrivedCard?.instanceId } });
         }
         // Deck-out is checked in step 7 (defeat.ts)
       }

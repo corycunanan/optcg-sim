@@ -5,9 +5,7 @@ import type { CardInstance } from "@shared/game-types";
 import type { CardTransition } from "./use-card-transitions";
 
 export interface HandAnimationState {
-  /** Count map of cardIds in-flight to each hand zone key. */
-  inFlightByZone: Record<string, Map<string, number>>;
-  /** Card instanceIds currently in-flight to a specific hand zone. */
+  /** Card instanceIds currently in-flight to/from this hand zone. */
   inFlightInstanceIds: Set<string>;
   /** Total number of cards that will be in hand after flights complete. */
   projectedCount: number;
@@ -30,58 +28,52 @@ export function useHandAnimationState(
   handCards: CardInstance[],
   zoneKey: string,
 ): HandAnimationState {
-  const inFlightByZone = useMemo(() => {
-    const counts: Record<string, Map<string, number>> = {};
-    for (const t of transitions) {
-      if (t.toZoneKey.endsWith("-hand") && t.cardId) {
-        const map = (counts[t.toZoneKey] ??= new Map());
-        map.set(t.cardId, (map.get(t.cardId) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [transitions]);
-
   const inFlightInstanceIds = useMemo(() => {
     const ids = new Set<string>();
-    // Cards departing from this hand zone
     for (const t of transitions) {
-      if (t.fromZoneKey === zoneKey && t.cardId) {
-        // Find matching card in hand by cardId
-        for (const card of handCards) {
-          if (card.cardId === t.cardId) {
-            ids.add(card.instanceId);
-            break;
+      // Cards departing from this hand zone
+      if (t.fromZoneKey === zoneKey) {
+        if (t.instanceId) {
+          ids.add(t.instanceId);
+        } else if (t.cardId) {
+          // Fallback: match first hand card by cardId
+          for (const card of handCards) {
+            if (card.cardId === t.cardId) {
+              ids.add(card.instanceId);
+              break;
+            }
+          }
+        }
+      }
+      // Cards arriving to this hand zone
+      if (t.toZoneKey === zoneKey) {
+        if (t.instanceId) {
+          ids.add(t.instanceId);
+        } else if (t.cardId) {
+          // Fallback: match from end (newly-appended cards are last)
+          for (let i = handCards.length - 1; i >= 0; i--) {
+            if (handCards[i].cardId === t.cardId && !ids.has(handCards[i].instanceId)) {
+              ids.add(handCards[i].instanceId);
+              break;
+            }
           }
         }
       }
     }
-    // Cards arriving to this hand zone (matched by cardId in hand)
-    const arriving = inFlightByZone[zoneKey];
-    if (arriving) {
-      const remainingCounts = new Map(arriving);
-      for (const card of handCards) {
-        const remaining = remainingCounts.get(card.cardId);
-        if (remaining && remaining > 0) {
-          ids.add(card.instanceId);
-          remainingCounts.set(card.cardId, remaining - 1);
-        }
-      }
-    }
     return ids;
-  }, [transitions, handCards, zoneKey, inFlightByZone]);
+  }, [transitions, handCards, zoneKey]);
 
   const arrivingCount = useMemo(() => {
-    const map = inFlightByZone[zoneKey];
-    if (!map) return 0;
-    let total = 0;
-    for (const count of map.values()) total += count;
-    return total;
-  }, [inFlightByZone, zoneKey]);
+    let count = 0;
+    for (const t of transitions) {
+      if (t.toZoneKey === zoneKey) count++;
+    }
+    return count;
+  }, [transitions, zoneKey]);
 
   const projectedCount = handCards.length + arrivingCount;
 
   return {
-    inFlightByZone,
     inFlightInstanceIds,
     projectedCount,
   };

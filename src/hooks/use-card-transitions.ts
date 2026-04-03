@@ -8,6 +8,8 @@ export interface CardTransition {
   id: string;
   /** Card ID for rendering. Null means render face-down (sleeve). */
   cardId: string | null;
+  /** Instance ID of the card in its destination zone (for exact placeholder matching). */
+  instanceId: string | null;
   fromZoneKey: string;
   toZoneKey: string;
   playerIndex: 0 | 1;
@@ -104,6 +106,7 @@ function eventToTransition(
   return {
     id: nextId(),
     cardId,
+    instanceId: cardInstanceId,
     fromZoneKey: from,
     toZoneKey: to,
     playerIndex,
