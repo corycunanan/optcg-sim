@@ -71,6 +71,7 @@ export const HandLayer = React.memo(function HandLayer({
   counterMode,
   zoneKey,
   inFlightInstanceIds,
+  sleeveUrl,
 }: {
   cards: CardInstance[];
   faceDown?: boolean;
@@ -80,6 +81,7 @@ export const HandLayer = React.memo(function HandLayer({
   zoneKey?: string;
   /** Set of instanceIds currently in-flight (render as invisible placeholders). */
   inFlightInstanceIds?: Set<string>;
+  sleeveUrl?: string | null;
 }) {
   const count = cards.length;
   const zonePos = useZonePosition();
@@ -131,6 +133,7 @@ export const HandLayer = React.memo(function HandLayer({
               key={card.instanceId}
               cardDb={cardDb}
               sleeve
+              sleeveUrl={sleeveUrl}
               width={HAND_CARD_W}
               height={HAND_CARD_H}
               style={marginStyle}

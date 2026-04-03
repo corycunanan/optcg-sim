@@ -11,9 +11,12 @@ import {
 import { validateDeck, type DeckCard, type DeckLeader } from "@/lib/deck-builder/validation";
 import { DeckBuilderSearch } from "./deck-builder-search";
 import { DeckBuilderList } from "./deck-builder-list";
+import { DeckBuilderBacks } from "./deck-builder-backs";
+import { DeckBuilderDon } from "./deck-builder-don";
 import { DeckBuilderHeader } from "./deck-builder-header";
-import { DeckBuilderStatsCharts } from "./deck-builder-stats";
 import { DeckBuilderValidation } from "./deck-builder-validation";
+import { SleevePicker } from "./sleeve-picker";
+import { DonPicker } from "./don-picker";
 import { ImportModal } from "./import-modal";
 import { ExportModal } from "./export-modal";
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -25,6 +28,7 @@ interface DeckBuilderShellProps {
 export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(deckBuilderReducer, createInitialState());
+  const [activeTab, setActiveTab] = useState("cards");
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [isLoading, setIsLoading] = useState(!!deckId);
@@ -61,6 +65,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             format: data.format,
             leader: data.leader,
             cards: cardsMap,
+            sleeveUrl: data.sleeveUrl ?? null,
+            donArtUrl: data.donArtUrl ?? null,
             lastSavedAt: new Date(data.updatedAt),
           },
         });
@@ -98,6 +104,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       name: state.name,
       leaderId: state.leader.id,
       leaderArtUrl: leaderSelectedArtUrl ?? null,
+      sleeveUrl: state.sleeveUrl ?? null,
+      donArtUrl: state.donArtUrl ?? null,
       format: state.format,
       cards: Array.from(state.cards.values()).map((c) => ({
         cardId: c.cardId,
@@ -200,25 +208,44 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
       {/* Main split layout */}
       <div className="flex min-h-0 flex-1">
-        {/* Left: Card search */}
+        {/* Left column: context-dependent */}
         <div className="flex w-[420px] shrink-0 flex-col overflow-hidden border-r border-border">
-          <DeckBuilderSearch
-            onAddCard={addCard}
-            onRemoveCard={removeCard}
-            onSetArtVariant={setArtVariant}
-            deckCards={state.cards}
-            leaderColors={state.leader?.color ?? []}
-          />
+          {activeTab === "cards" && (
+            <DeckBuilderSearch
+              onAddCard={addCard}
+              onRemoveCard={removeCard}
+              onSetArtVariant={setArtVariant}
+              deckCards={state.cards}
+              leaderColors={state.leader?.color ?? []}
+            />
+          )}
+          {activeTab === "backs" && (
+            <div className="flex-1 overflow-y-auto">
+              <SleevePicker
+                selectedUrl={state.sleeveUrl}
+                onSelect={(url) => dispatch({ type: "SET_SLEEVE", sleeveUrl: url })}
+              />
+            </div>
+          )}
+          {activeTab === "don" && (
+            <div className="flex-1 overflow-y-auto">
+              <DonPicker
+                selectedUrl={state.donArtUrl}
+                onSelect={(url) => dispatch({ type: "SET_DON_ART", donArtUrl: url })}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right: Deck editor with tabs */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <TabsRoot defaultValue="cards" className="flex min-h-0 flex-1 flex-col">
+          <TabsRoot defaultValue="cards" className="flex min-h-0 flex-1 flex-col" onValueChange={setActiveTab}>
             {/* Tab bar */}
             <div className="flex items-center justify-between px-5 pt-4">
               <TabsList>
                 <TabsTrigger value="cards">Cards</TabsTrigger>
-                <TabsTrigger value="stats">Stats</TabsTrigger>
+                <TabsTrigger value="backs">Backs</TabsTrigger>
+                <TabsTrigger value="don">DON</TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
                 <button
@@ -265,9 +292,20 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
               </div>
             </TabsContent>
 
-            {/* Stats tab */}
-            <TabsContent value="stats" className="overflow-y-auto p-5">
-              <DeckBuilderStatsCharts stats={validation.stats} />
+            {/* Backs tab */}
+            <TabsContent value="backs" className="flex min-h-0 flex-1">
+              <div className="flex-1 overflow-y-auto p-5">
+                <DeckBuilderBacks
+                  cards={Array.from(state.cards.values())}
+                  leader={state.leader}
+                  sleeveUrl={state.sleeveUrl}
+                />
+              </div>
+            </TabsContent>
+
+            {/* DON tab */}
+            <TabsContent value="don" className="flex min-h-0 flex-1">
+              <DeckBuilderDon donArtUrl={state.donArtUrl} />
             </TabsContent>
           </TabsRoot>
         </div>

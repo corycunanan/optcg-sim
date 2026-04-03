@@ -13,16 +13,19 @@ interface CardAnimationLayerProps {
   transitions: CardTransition[];
   cardDb: CardDb;
   onComplete: (id: string) => void;
+  sleeveUrls?: [string | null, string | null];
 }
 
 function FlyingCard({
   transition,
   cardDb,
   onComplete,
+  sleeveUrl,
 }: {
   transition: CardTransition;
   cardDb: CardDb;
   onComplete: () => void;
+  sleeveUrl?: string | null;
 }) {
   const zonePos = useZonePosition();
   const fromRect = zonePos.getRect(transition.fromZoneKey);
@@ -82,6 +85,7 @@ function FlyingCard({
         cardId={transition.cardId ?? undefined}
         cardDb={cardDb}
         sleeve={!transition.cardId}
+        sleeveUrl={sleeveUrl}
         width={toW}
         height={toH}
       />
@@ -93,6 +97,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   transitions,
   cardDb,
   onComplete,
+  sleeveUrls,
 }: CardAnimationLayerProps) {
   const reducedMotion = useReducedMotion();
 
@@ -109,6 +114,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
             transition={t}
             cardDb={cardDb}
             onComplete={() => onComplete(t.id)}
+            sleeveUrl={sleeveUrls?.[t.playerIndex] ?? null}
           />
         ))}
       </AnimatePresence>

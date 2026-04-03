@@ -69,10 +69,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, leaderId, leaderArtUrl, format, cards } = body as {
+    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, format, cards } = body as {
       name: string;
       leaderId: string;
       leaderArtUrl?: string | null;
+      sleeveUrl?: string | null;
+      donArtUrl?: string | null;
       format?: string;
       cards?: { cardId: string; quantity: number; selectedArtUrl?: string | null }[];
     };
@@ -98,6 +100,8 @@ export async function POST(request: NextRequest) {
         name,
         leaderId,
         leaderArtUrl: leaderArtUrl ?? null,
+        sleeveUrl: sleeveUrl ?? null,
+        donArtUrl: donArtUrl ?? null,
         format: format || "Standard",
         userId: session.user.id,
         cards: cards?.length

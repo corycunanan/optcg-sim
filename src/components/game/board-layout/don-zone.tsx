@@ -13,8 +13,8 @@ const DON_CARD_W = 50;
 const DON_CARD_H = 70;
 const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
-const DON_IMG = "/images/DON/zoro.jpg";
-export const DonCard = React.memo(function DonCard({ rested }: { rested?: boolean }) {
+const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
+export const DonCard = React.memo(function DonCard({ rested, donArtUrl }: { rested?: boolean; donArtUrl?: string | null }) {
   return (
     <motion.div
       className="rounded shrink-0 overflow-hidden shadow-don"
@@ -27,7 +27,7 @@ export const DonCard = React.memo(function DonCard({ rested }: { rested?: boolea
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={DON_IMG}
+        src={donArtUrl || DEFAULT_DON_IMG}
         alt="DON!!"
         className="h-full w-full object-cover"
         draggable={false}
@@ -40,10 +40,12 @@ function DraggableDonCard({
   don,
   index,
   disabled,
+  donArtUrl,
 }: {
   don: DonInstance;
   index: number;
   disabled?: boolean;
+  donArtUrl?: string | null;
 }) {
   const reducedMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -68,7 +70,7 @@ function DraggableDonCard({
         cursor: disabled ? "default" : "grab",
       }}
     >
-      <DonCard />
+      <DonCard donArtUrl={donArtUrl} />
     </motion.div>
   );
 }
@@ -80,6 +82,7 @@ export const DonZone = React.memo(function DonZone({
   enableDrag,
   zoneKey,
   animationDelay,
+  donArtUrl,
 }: {
   player: PlayerState | null;
   style: React.CSSProperties;
@@ -87,6 +90,7 @@ export const DonZone = React.memo(function DonZone({
   enableDrag?: boolean;
   zoneKey?: string;
   animationDelay?: number;
+  donArtUrl?: string | null;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -142,9 +146,9 @@ export const DonZone = React.memo(function DonZone({
                 }}
               >
                 {enableDrag ? (
-                  <DraggableDonCard don={don} index={0} />
+                  <DraggableDonCard don={don} index={0} donArtUrl={donArtUrl} />
                 ) : (
-                  <DonCard />
+                  <DonCard donArtUrl={donArtUrl} />
                 )}
               </motion.div>
             ))}
@@ -170,7 +174,7 @@ export const DonZone = React.memo(function DonZone({
                     zIndex: i,
                   }}
                 >
-                  <DonCard rested />
+                  <DonCard rested donArtUrl={donArtUrl} />
                 </motion.div>
               ))}
             </div>

@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
       format: lobby.format,
       player1: {
         userId: lobby.hostUserId,
+        sleeveUrl: lobby.hostDeck.sleeveUrl ?? null,
+        donArtUrl: lobby.hostDeck.donArtUrl ?? null,
         leader: {
           cardId: hostLeader.id,
           quantity: 1,
@@ -171,6 +173,8 @@ export async function POST(request: NextRequest) {
       },
       player2: {
         userId,
+        sleeveUrl: guestDeck.sleeveUrl ?? null,
+        donArtUrl: guestDeck.donArtUrl ?? null,
         leader: {
           cardId: guestLeader.id,
           quantity: 1,

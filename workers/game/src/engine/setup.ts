@@ -200,6 +200,8 @@ function buildPlayerDeck(
     connected: false,
     awayReason: null,
     rejoinDeadlineAt: null,
+    sleeveUrl: playerData.sleeveUrl ?? null,
+    donArtUrl: playerData.donArtUrl ?? null,
   };
 
   return [partialState, deckCards];

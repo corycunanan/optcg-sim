@@ -13,11 +13,13 @@ export const LifeZone = React.memo(function LifeZone({
   cardDb,
   zoneKey,
   style,
+  sleeveUrl,
 }: {
   life: LifeCard[];
   cardDb: CardDb;
   zoneKey?: string;
   style: React.CSSProperties;
+  sleeveUrl?: string | null;
 }) {
   const zonePos = useZonePosition();
   const ref = useCallback(
@@ -52,6 +54,7 @@ export const LifeZone = React.memo(function LifeZone({
           key={card.instanceId}
           cardDb={cardDb}
           sleeve
+          sleeveUrl={sleeveUrl}
           count={i === 0 ? count : undefined}
           width={BOARD_CARD_W}
           height={BOARD_CARD_H}

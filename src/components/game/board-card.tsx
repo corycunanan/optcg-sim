@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { TooltipRoot, TooltipTrigger, TooltipContent } from "@/components/ui";
 import { TooltipStat } from "./game-ui";
 
-const SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
+const DEFAULT_SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
 
 interface BoardCardProps {
   card?: CardInstance | null;
@@ -14,6 +14,7 @@ interface BoardCardProps {
   cardDb: CardDb;
   faceDown?: boolean;
   sleeve?: boolean;
+  sleeveUrl?: string | null;
   empty?: boolean;
   label?: string;
   count?: number;
@@ -31,6 +32,7 @@ export const BoardCard = React.memo(function BoardCard({
   cardDb,
   faceDown,
   sleeve,
+  sleeveUrl,
   empty,
   label,
   count,
@@ -81,7 +83,7 @@ export const BoardCard = React.memo(function BoardCard({
         {sleeve ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={SLEEVE_IMG}
+            src={sleeveUrl || DEFAULT_SLEEVE_IMG}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
             draggable={false}

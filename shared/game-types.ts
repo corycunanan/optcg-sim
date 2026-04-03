@@ -101,6 +101,8 @@ export interface PlayerState {
   connected: boolean;
   awayReason: "LEFT" | "DISCONNECTED" | null;
   rejoinDeadlineAt: number | null;
+  sleeveUrl: string | null;
+  donArtUrl: string | null;
 }
 
 // ─── Effect / Modifier stubs (populated in M4) ────────────────────────────────

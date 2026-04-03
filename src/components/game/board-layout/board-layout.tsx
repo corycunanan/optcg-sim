@@ -234,6 +234,12 @@ function BoardLayoutInner({
   const playerHandAnim = useHandAnimationState(cardAnimations, me?.hand ?? [], "p-hand");
   const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
 
+  /* ── Sleeve/DON URLs per player index ────────────────────────── */
+
+  const sleeveUrls: [string | null, string | null] = myIndex === 0
+    ? [me?.sleeveUrl ?? null, opp?.sleeveUrl ?? null]
+    : [opp?.sleeveUrl ?? null, me?.sleeveUrl ?? null];
+
   /* ── Refresh phase stagger detection ────────────────────────── */
 
   const reducedMotion = useReducedMotion();
@@ -326,7 +332,7 @@ function BoardLayoutInner({
             transformOrigin: "top center",
           }}
         >
-          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} />
+          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={opp?.sleeveUrl} />
         </div>
       </div>
 
@@ -363,6 +369,7 @@ function BoardLayoutInner({
             <BoardCard
               cardDb={cardDb}
               sleeve
+              sleeveUrl={opp?.sleeveUrl}
               label="DECK"
               count={opp?.deck.length}
               width={BOARD_CARD_W}
@@ -422,6 +429,7 @@ function BoardLayoutInner({
           <DonZone
             player={opp}
             zoneKey="o-don"
+            donArtUrl={opp?.donArtUrl}
             style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
             animationDelay={refreshWave ? 0.2 : undefined}
           />
@@ -457,6 +465,7 @@ function BoardLayoutInner({
             life={opp?.life ?? []}
             cardDb={cardDb}
             zoneKey="o-life"
+            sleeveUrl={opp?.sleeveUrl}
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: oppTop }}
           />
 
@@ -491,6 +500,7 @@ function BoardLayoutInner({
             life={me?.life ?? []}
             cardDb={cardDb}
             zoneKey="p-life"
+            sleeveUrl={me?.sleeveUrl}
             style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
           />
 
@@ -535,6 +545,7 @@ function BoardLayoutInner({
             player={me}
             enableDrag={bs.canInteract}
             zoneKey="p-don"
+            donArtUrl={me?.donArtUrl}
             style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
             animationDelay={refreshWave ? 0.2 : undefined}
           />
@@ -576,6 +587,7 @@ function BoardLayoutInner({
             <BoardCard
               cardDb={cardDb}
               sleeve
+              sleeveUrl={me?.sleeveUrl}
               label="DECK"
               count={me?.deck.length}
               width={BOARD_CARD_W}
@@ -616,6 +628,7 @@ function BoardLayoutInner({
             counterMode={bs.canDragCounter}
             zoneKey="p-hand"
             inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
+            sleeveUrl={me?.sleeveUrl}
           />
         </div>
       </div>
@@ -651,7 +664,7 @@ function BoardLayoutInner({
                 transformOrigin: "top left",
               }}
             >
-              <DonCard />
+              <DonCard donArtUrl={me?.donArtUrl} />
             </div>
           )}
           {activeDrag.type === "attacker" && (
@@ -670,6 +683,7 @@ function BoardLayoutInner({
       transitions={cardAnimations}
       cardDb={cardDb}
       onComplete={removeTransition}
+      sleeveUrls={sleeveUrls}
     />
 
     </DndContext>
