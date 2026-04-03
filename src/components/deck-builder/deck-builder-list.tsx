@@ -1,53 +1,225 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
-import { Badge } from "@/components/ui/badge";
+import type { DeckLeaderEntry } from "@/lib/deck-builder/state";
 import { CardDetailModal } from "@/components/admin/card-detail-modal";
+import {
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui";
 
 interface DeckBuilderListProps {
   cards: DeckCardEntry[];
+  leader: DeckLeaderEntry | null;
+  leaderArtUrl: string | null;
   onIncrement: (cardId: string) => void;
   onDecrement: (cardId: string) => void;
   onSetArtVariant: (cardId: string, artUrl: string | null) => void;
   onAddCard: (card: DeckCardEntry["card"]) => void;
+  onRemoveLeader: () => void;
+  onSetLeaderArt: (artUrl: string | null) => void;
+  totalCards: number;
 }
 
-export function DeckBuilderList({
-  cards,
-  onIncrement,
-  onDecrement,
-  onSetArtVariant,
-  onAddCard,
-}: DeckBuilderListProps) {
-  const [inspectCardId, setInspectCardId] = useState<string | null>(null);
-  const inspectEntry = inspectCardId ? cards.find((e) => e.cardId === inspectCardId) ?? null : null;
+interface CardGroup {
+  cardId: string;
+  name: string;
+  imageUrl: string;
+  type: string;
+  cost: number | null;
+  power: number | null;
+  counter: number | null;
+  life: number | null;
+  effectText: string;
+  triggerText: string | null;
+  traits: string[];
+  count: number;
+  isLeader: boolean;
+}
 
-  const typeOrder: Record<string, number> = {
-    Character: 0,
-    Event: 1,
-    Stage: 2,
-    Leader: 3,
-  };
+/** Deterministic pseudo-random rotation for a card instance. */
+function cardRotation(cardId: string, index: number): number {
+  let hash = index * 31;
+  for (let i = 0; i < cardId.length; i++) {
+    hash = (hash * 37 + cardId.charCodeAt(i)) & 0xffff;
+  }
+  return ((hash % 100) / 100) * 3 - 1.5;
+}
+
+function buildGroups(
+  leader: DeckLeaderEntry | null,
+  leaderArtUrl: string | null,
+  cards: DeckCardEntry[],
+): CardGroup[] {
+  const groups: CardGroup[] = [];
+
+  if (leader) {
+    groups.push({
+      cardId: leader.id,
+      name: leader.name,
+      imageUrl: leaderArtUrl || leader.imageUrl,
+      type: "Leader",
+      cost: null,
+      power: leader.power,
+      counter: null,
+      life: leader.life,
+      effectText: leader.effectText || "",
+      triggerText: null,
+      traits: leader.traits,
+      count: 1,
+      isLeader: true,
+    });
+  }
 
   const sorted = [...cards].sort((a, b) => {
-    const typeA = typeOrder[a.card.type] ?? 4;
-    const typeB = typeOrder[b.card.type] ?? 4;
-    if (typeA !== typeB) return typeA - typeB;
     const costA = a.card.cost ?? -1;
     const costB = b.card.cost ?? -1;
     if (costA !== costB) return costA - costB;
     return a.card.name.localeCompare(b.card.name);
   });
 
-  const groups = new Map<string, DeckCardEntry[]>();
   for (const entry of sorted) {
-    const key = entry.card.type;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(entry);
+    groups.push({
+      cardId: entry.cardId,
+      name: entry.card.name,
+      imageUrl: entry.selectedArtUrl || entry.card.imageUrl,
+      type: entry.card.type,
+      cost: entry.card.cost,
+      power: entry.card.power,
+      counter: entry.card.counter ?? null,
+      life: entry.card.life ?? null,
+      effectText: entry.card.effectText || "",
+      triggerText: entry.card.triggerText ?? null,
+      traits: entry.card.traits,
+      count: entry.quantity,
+      isLeader: false,
+    });
   }
 
-  if (cards.length === 0) {
+  return groups;
+}
+
+/* ── Stat pill ──────────────────────────────────────────────────────── */
+
+function StatPill({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  className?: string;
+}) {
+  return (
+    <div className="text-center px-2">
+      <div className={cn("font-bold text-sm", className)}>{String(value)}</div>
+      <div className="text-xs text-content-tertiary uppercase tracking-wide">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* ── Card tooltip ───────────────────────────────────────────────────── */
+
+function CardTooltipBody({ group }: { group: CardGroup }) {
+  const isFieldCard = group.type === "Leader" || group.type === "Character";
+
+  return (
+    <>
+      <div className="font-bold text-sm text-content-primary">{group.name}</div>
+      <div className="text-xs text-content-tertiary mb-3">
+        {group.type} &middot; {group.cardId}
+      </div>
+
+      {isFieldCard ? (
+        <div className="flex gap-5 flex-wrap mb-3 text-xs">
+          {group.type === "Leader" ? (
+            <StatPill
+              label="Life"
+              value={group.life ?? group.cost ?? 0}
+              className="text-error"
+            />
+          ) : (
+            <StatPill
+              label="Cost"
+              value={group.cost ?? 0}
+              className="text-gold-600"
+            />
+          )}
+          <StatPill
+            label="Power"
+            value={(group.power ?? 0).toLocaleString()}
+            className="text-green-600"
+          />
+          {group.type !== "Leader" && (
+            <StatPill
+              label="Counter"
+              value={group.counter != null ? `+${group.counter}` : "—"}
+              className="text-purple-600"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-3 flex-wrap mb-3 text-xs">
+          {group.cost != null && (
+            <StatPill
+              label="Cost"
+              value={group.cost}
+              className="text-gold-600"
+            />
+          )}
+          {group.life != null && (
+            <StatPill
+              label="Life"
+              value={group.life}
+              className="text-error"
+            />
+          )}
+        </div>
+      )}
+
+      {group.effectText && (
+        <div className="text-xs text-content-secondary leading-relaxed border-t border-border pt-3 flex flex-col gap-2">
+          {group.effectText.split(/\n{2,}/).map((paragraph, i) => (
+            <p key={i} className="whitespace-pre-wrap">
+              {paragraph}
+            </p>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ── Main component ─────────────────────────────────────────────────── */
+
+export function DeckBuilderList({
+  cards,
+  leader,
+  leaderArtUrl,
+  onIncrement,
+  onDecrement,
+  onSetArtVariant,
+  onAddCard,
+  onRemoveLeader,
+  onSetLeaderArt,
+  totalCards,
+}: DeckBuilderListProps) {
+  const [inspectCardId, setInspectCardId] = useState<string | null>(null);
+  const [inspectIsLeader, setInspectIsLeader] = useState(false);
+
+  const inspectEntry = inspectCardId && !inspectIsLeader
+    ? cards.find((e) => e.cardId === inspectCardId) ?? null
+    : null;
+
+  const groups = buildGroups(leader, leaderArtUrl, cards);
+
+  if (!leader && cards.length === 0) {
     return (
       <div className="rounded border border-border bg-surface-1 p-8 text-center">
         <p className="text-sm font-medium text-content-tertiary">No cards in deck yet</p>
@@ -60,93 +232,116 @@ export function DeckBuilderList({
 
   return (
     <>
-      <div className="space-y-4">
-        {Array.from(groups.entries()).map(([type, entries]) => {
-          const groupTotal = entries.reduce((sum, e) => sum + e.quantity, 0);
-          return (
-            <div key={type}>
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-                <span>{type}s</span>
-                <Badge variant="secondary" className="rounded-full font-bold tabular-nums">
-                  {groupTotal}
-                </Badge>
-              </div>
-
-              <div className="divide-y divide-border">
-                {entries.map((entry) => {
-                  const displayUrl = entry.selectedArtUrl || entry.card.imageUrl;
-                  return (
+      <TooltipProvider disableHoverableContent>
+      <div className="flex flex-wrap justify-start gap-4">
+        {groups.map((group) => (
+          <TooltipRoot key={group.cardId} delayDuration={200}>
+            <TooltipTrigger asChild>
+              <div className="group/stack flex w-min flex-col items-center">
+                {/* Card stack */}
+                <div
+                  className="relative flex cursor-pointer"
+                  onClick={() => {
+                    setInspectCardId(group.cardId);
+                    setInspectIsLeader(group.isLeader);
+                  }}
+                >
+                  {Array.from({ length: group.count }, (_, i) => (
                     <div
-                      key={entry.cardId}
-                      className="flex items-center gap-3 py-1"
+                      key={`${group.cardId}-${i}`}
+                      className={cn(
+                        "relative flex-shrink-0 transition-transform duration-150 group-hover/stack:-translate-y-2",
+                        i > 0 && "-ml-16",
+                      )}
+                      style={{
+                        zIndex: group.count - i,
+                        ...(i > 0 && {
+                          rotate: `${cardRotation(group.cardId, i)}deg`,
+                        }),
+                      }}
                     >
-                      {/* Thumbnail */}
-                      <button
-                        aria-label={`Inspect ${entry.card.name}`}
-                        onClick={() => setInspectCardId(entry.cardId)}
-                        className="h-12 w-[34px] shrink-0 overflow-hidden rounded transition-transform hover:scale-105"
-                      >
+                      <div className="w-[100px] overflow-hidden rounded border border-border shadow-sm aspect-[600/838]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={displayUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
+                          src={group.imageUrl}
+                          alt={group.name}
+                          className={cn(
+                            "h-full w-full object-cover",
+                            group.count > 1 && i > 0 && "brightness-90",
+                          )}
                           loading="lazy"
                         />
-                      </button>
-
-                      {/* Card info */}
-                      <button aria-label={`Inspect ${entry.card.name}`} onClick={() => setInspectCardId(entry.cardId)} className="min-w-0 flex-1 text-left">
-                        <p className="truncate text-sm font-medium leading-tight text-content-primary">
-                          {entry.card.name}
-                        </p>
-                        {entry.card.power !== null && (
-                          <p className="text-xs tabular-nums text-content-tertiary">
-                            {entry.card.power.toLocaleString()} PWR
-                          </p>
-                        )}
-                      </button>
-
-                      {/* Quantity controls */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          aria-label="Remove one"
-                          onClick={() => onDecrement(entry.cardId)}
-                          className="flex h-6 w-6 items-center justify-center rounded text-sm font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary active:scale-95"
-                        >
-                          −
-                        </button>
-                        <span className="w-4 text-center text-sm font-bold tabular-nums text-content-primary">
-                          {entry.quantity}
-                        </span>
-                        <button
-                          aria-label="Add one"
-                          onClick={() => onIncrement(entry.cardId)}
-                          disabled={entry.quantity >= 4}
-                          className="flex h-6 w-6 items-center justify-center rounded text-sm font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary active:scale-95 disabled:opacity-30"
-                        >
-                          +
-                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  ))}
+                </div>
 
-      {inspectEntry && (
+                {/* Quantity controls — below the stack */}
+                {!group.isLeader && (
+                  <div className="mt-2 flex items-center gap-1">
+                    <button
+                      aria-label="Remove one"
+                      onClick={() => onDecrement(group.cardId)}
+                      className="flex h-5 w-5 items-center justify-center rounded text-xs font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary"
+                    >
+                      −
+                    </button>
+                    <span className="min-w-4 text-center text-xs font-bold tabular-nums text-content-primary">
+                      {group.count}
+                    </span>
+                    <button
+                      aria-label="Add one"
+                      onClick={() => onIncrement(group.cardId)}
+                      disabled={group.count >= 4 || totalCards >= 50}
+                      className="flex h-5 w-5 items-center justify-center rounded text-xs font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary disabled:opacity-30"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="w-72 bg-surface-base border-border text-content-primary p-3">
+              <CardTooltipBody group={group} />
+            </TooltipContent>
+          </TooltipRoot>
+        ))}
+      </div>
+      </TooltipProvider>
+
+      {/* Inspect modal for deck cards */}
+      {inspectEntry && !inspectIsLeader && (
         <CardDetailModal
           cardId={inspectEntry.cardId}
-          onClose={() => setInspectCardId(null)}
+          onClose={() => {
+            setInspectCardId(null);
+            setInspectIsLeader(false);
+          }}
           deckActions={{
             quantityInDeck: inspectEntry.quantity,
             selectedArtUrl: inspectEntry.selectedArtUrl,
             onAdd: () => onAddCard(inspectEntry.card),
             onRemove: () => onDecrement(inspectEntry.cardId),
             onSetArtVariant: (artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl),
+          }}
+        />
+      )}
+
+      {/* Inspect modal for leader */}
+      {inspectIsLeader && leader && (
+        <CardDetailModal
+          cardId={leader.id}
+          onClose={() => {
+            setInspectCardId(null);
+            setInspectIsLeader(false);
+          }}
+          deckActions={{
+            quantityInDeck: 0,
+            selectedArtUrl: leaderArtUrl,
+            isLeader: true,
+            onAdd: () => {},
+            onRemove: () => {},
+            onSetArtVariant: (artUrl) => onSetLeaderArt(artUrl),
           }}
         />
       )}

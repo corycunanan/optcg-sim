@@ -297,7 +297,7 @@ export function executeRevealTrigger(
       hand: [...newPlayers[inactiveIdx].hand, handCard],
     };
     nextState = { ...nextState, players: newPlayers };
-    events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId } });
+    events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId } });
   }
 
   // Clear pending trigger and end battle
@@ -442,7 +442,7 @@ function executeDamageStep(
               hand: [...newPlayers[inactiveIdx].hand, handCard],
             };
             nextState = { ...nextState, players: newPlayers };
-            events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId } });
+            events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId } });
           }
         }
       } else if (targetFound.card.zone === "CHARACTER") {

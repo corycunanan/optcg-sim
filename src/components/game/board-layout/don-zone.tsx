@@ -1,75 +1,68 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useDraggable } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "motion/react";
 import type { DonInstance, PlayerState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
+import { useZonePosition } from "@/contexts/zone-position-context";
 import { type ActiveDonDrag } from "./constants";
 
 const DON_CARD_W = 50;
 const DON_CARD_H = 70;
 const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
-const DON_GROUP_GAP = -20;
-const DON_IMG = "/images/DON/zoro.jpg";
-export const DonCard = React.memo(function DonCard({ rested }: { rested?: boolean }) {
-  const card = (
-    <div
+const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
+export const DonCard = React.memo(function DonCard({ rested, donArtUrl }: { rested?: boolean; donArtUrl?: string | null }) {
+  return (
+    <motion.div
       className="rounded shrink-0 overflow-hidden shadow-don"
-      style={{
-        width: DON_CARD_W,
-        height: DON_CARD_H,
+      style={{ width: DON_CARD_W, height: DON_CARD_H }}
+      animate={{
+        rotate: rested ? 90 : 0,
+        filter: rested ? "brightness(0.6)" : "brightness(1)",
       }}
+      transition={rested ? cardRest : cardActivate}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={DON_IMG}
+        src={donArtUrl || DEFAULT_DON_IMG}
         alt="DON!!"
         className="h-full w-full object-cover"
         draggable={false}
       />
-    </div>
+    </motion.div>
   );
-
-  if (rested) {
-    return (
-      <div
-        className="relative shrink-0"
-        style={{ width: DON_CARD_H, height: DON_CARD_W }}
-      >
-        <div
-          className="absolute left-1/2 top-1/2"
-          style={{ transform: "translate(-50%, -50%) rotate(90deg)" }}
-        >
-          {card}
-        </div>
-      </div>
-    );
-  }
-
-  return card;
 });
 
 function DraggableDonCard({
   don,
   index,
   disabled,
+  donArtUrl,
 }: {
   don: DonInstance;
   index: number;
   disabled?: boolean;
+  donArtUrl?: string | null;
 }) {
+  const reducedMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `don-${don.instanceId}`,
     data: { type: "active-don", don } satisfies ActiveDonDrag,
     disabled,
   });
 
+  const skipMotion = reducedMotion || isDragging;
+
   return (
-    <div
+    <motion.div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      whileHover={skipMotion ? undefined : cardHover}
+      whileTap={skipMotion ? undefined : cardTap}
       style={{
         marginLeft: index > 0 ? -DON_ACTIVE_OVERLAP : 0,
         zIndex: index,
@@ -77,8 +70,8 @@ function DraggableDonCard({
         cursor: disabled ? "default" : "grab",
       }}
     >
-      <DonCard />
-    </div>
+      <DonCard donArtUrl={donArtUrl} />
+    </motion.div>
   );
 }
 
@@ -87,22 +80,42 @@ export const DonZone = React.memo(function DonZone({
   style,
   className,
   enableDrag,
+  zoneKey,
+  animationDelay,
+  donArtUrl,
 }: {
   player: PlayerState | null;
   style: React.CSSProperties;
   className?: string;
   enableDrag?: boolean;
+  zoneKey?: string;
+  animationDelay?: number;
+  donArtUrl?: string | null;
 }) {
-  const activeDon =
-    player?.donCostArea.filter((d) => d.state === "ACTIVE") ?? [];
-  const restedDon =
-    player?.donCostArea.filter((d) => d.state === "RESTED") ?? [];
-  const hasAny = activeDon.length > 0 || restedDon.length > 0;
+  const zonePos = useZonePosition();
+  const reducedMotion = useReducedMotion();
+  // Stable sort: active first, rested second, preserving relative order within each group
+  const allDon = [...(player?.donCostArea ?? [])].sort((a, b) => {
+    if (a.state === b.state) return 0;
+    return a.state === "ACTIVE" ? -1 : 1;
+  });
+  const hasAny = allDon.length > 0;
+
+  const donRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [zoneKey, zonePos],
+  );
 
   return (
     <div
+      ref={donRef}
       className={cn(
-        "absolute flex items-center rounded-md border border-gb-border-strong/30",
+        "absolute flex items-center overflow-hidden rounded-md border border-gb-border-strong/30",
         !hasAny && "justify-center",
         className,
       )}
@@ -114,44 +127,58 @@ export const DonZone = React.memo(function DonZone({
         </span>
       )}
 
-      {activeDon.length > 0 && (
-        <div className="flex items-center">
-          {activeDon.map((don, i) =>
-            enableDrag ? (
-              <DraggableDonCard key={don.instanceId} don={don} index={i} />
-            ) : (
-              <div
+      {hasAny && (
+        <div className="flex items-center w-full">
+          {/* Active DON group */}
+          <div className="flex items-center">
+            {allDon.filter((d) => d.state === "ACTIVE").map((don, i) => (
+              <motion.div
                 key={don.instanceId}
+                layout
+                whileHover={reducedMotion ? undefined : cardHover}
+                transition={{
+                  ...(cardActivate),
+                  delay: animationDelay ? animationDelay + i * 0.02 : 0,
+                }}
                 style={{
                   marginLeft: i > 0 ? -DON_ACTIVE_OVERLAP : 0,
                   zIndex: i,
                 }}
               >
-                <DonCard />
-              </div>
-            ),
-          )}
-        </div>
-      )}
+                {enableDrag ? (
+                  <DraggableDonCard don={don} index={0} donArtUrl={donArtUrl} />
+                ) : (
+                  <DonCard donArtUrl={donArtUrl} />
+                )}
+              </motion.div>
+            ))}
+          </div>
 
-      {restedDon.length > 0 && (
-        <div
-          className="flex items-center"
-          style={{
-            marginLeft: activeDon.length > 0 ? DON_GROUP_GAP : 0,
-          }}
-        >
-          {restedDon.map((don, i) => (
-            <div
-              key={don.instanceId}
-              style={{
-                marginLeft: i > 0 ? -DON_RESTED_OVERLAP : 0,
-                zIndex: i,
-              }}
-            >
-              <DonCard rested />
+          {/* Rested DON group — pushed to opposite end */}
+          {allDon.some((d) => d.state === "RESTED") && (
+            <div className="flex items-center ml-auto">
+              {allDon.filter((d) => d.state === "RESTED").map((don, i) => (
+                <motion.div
+                  key={don.instanceId}
+                  layout
+                  whileHover={reducedMotion ? undefined : cardHover}
+                  className="flex items-center justify-center shrink-0"
+                  transition={{
+                    ...(cardRest),
+                    delay: animationDelay ? animationDelay + i * 0.02 : 0,
+                  }}
+                  style={{
+                    width: DON_CARD_H,
+                    height: DON_CARD_W,
+                    marginLeft: i > 0 ? -DON_RESTED_OVERLAP : 0,
+                    zIndex: i,
+                  }}
+                >
+                  <DonCard rested donArtUrl={donArtUrl} />
+                </motion.div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

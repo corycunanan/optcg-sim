@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { BattleSubPhase, CardDb, CardInstance } from "@shared/game-types";
-import { cn } from "@/lib/utils";
+import { useZonePosition } from "@/contexts/zone-position-context";
 import { BoardCard } from "../board-card";
 import { BOARD_CARD_W, BOARD_CARD_H, type DragPayload } from "./constants";
+import { DropOverlay } from "./field-card";
 
 function isValidCounterDrag(drag: DragPayload | null, cardDb: CardDb): boolean {
   if (!drag || drag.type !== "hand-card") return false;
@@ -21,16 +22,21 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
   cardDb,
   activeDrag,
   battleSubPhase,
+  onClickTrash,
+  zoneKey,
   style,
 }: {
   trash: CardInstance[];
   cardDb: CardDb;
   activeDrag: DragPayload | null;
   battleSubPhase: BattleSubPhase | null;
+  onClickTrash?: () => void;
+  zoneKey?: string;
   style?: React.CSSProperties;
 }) {
   const inCounterStep = battleSubPhase === "COUNTER_STEP";
   const validDrag = inCounterStep && isValidCounterDrag(activeDrag, cardDb);
+  const zonePos = useZonePosition();
 
   const { setNodeRef, isOver } = useDroppable({
     id: "counter-trash",
@@ -38,27 +44,37 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
     disabled: !inCounterStep,
   });
 
+  const ref = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [setNodeRef, zoneKey, zonePos],
+  );
+
   const topCard = trash.length > 0 ? trash[0] : undefined;
 
   return (
-    <div ref={setNodeRef} className="relative" style={style}>
-      <div
-        className={cn(
-          "rounded transition-shadow duration-150",
-          validDrag && "ring-2 ring-gb-accent-purple/60 shadow-[0_0_12px_var(--gb-accent-purple)]",
-          validDrag && isOver && "ring-gb-accent-green shadow-[0_0_16px_var(--gb-accent-green)]",
-        )}
-      >
-        <BoardCard
-          card={topCard}
-          cardDb={cardDb}
-          empty={!topCard}
-          label="TRASH"
-          count={trash.length > 1 ? trash.length : undefined}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
-        />
-      </div>
+    <div
+      ref={ref}
+      className="relative flex items-center justify-center"
+      style={{ ...style, width: BOARD_CARD_W, height: BOARD_CARD_H }}
+    >
+      <DropOverlay active={validDrag} hovered={isOver && validDrag} color="red" />
+      <BoardCard
+        card={topCard}
+        cardDb={cardDb}
+        empty={!topCard}
+        label="TRASH"
+        count={trash.length > 1 ? trash.length : undefined}
+        width={BOARD_CARD_W}
+        height={BOARD_CARD_H}
+        onClick={onClickTrash}
+        className="relative z-[1]"
+      />
     </div>
   );
 });

@@ -96,6 +96,8 @@ export interface PlayerInitData {
   userId: string;
   deck: DeckCardData[];
   leader: DeckCardData;
+  sleeveUrl?: string | null;
+  donArtUrl?: string | null;
   /** Dev-only: move all cards with SEARCH_DECK effects to the top of the deck before dealing */
   debug?: { searchersFirst?: boolean };
 }

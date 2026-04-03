@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui";
+import { Spinner } from "@/components/ui/spinner";
+import { GameButton } from "./game-button";
 import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
@@ -22,12 +30,13 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   if (!session.gameState || !session.cardDbReady) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gb-board">
-        <div className="text-center">
-          <div className="text-sm text-gb-text-bright font-bold mb-2">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner className="size-6 text-gb-text-bright" />
+          <div className="text-sm text-gb-text-bright font-bold">
             {session.connectionStatus === "connecting"
               ? "Connecting\u2026"
               : !session.gameState
-                ? "Waiting for game state\u2026"
+                ? "Loading game\u2026"
                 : "Loading card data\u2026"}
           </div>
           {session.lastError && (
@@ -46,23 +55,27 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   {session.fallbackError}
                 </div>
               )}
-              <button
+              <GameButton
+                variant="danger"
+                size="sm"
                 onClick={session.handleFallbackConcede}
                 disabled={session.fallbackSubmitting}
-                className="px-2 py-1 bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red cursor-pointer rounded text-xs font-mono hover:border-gb-accent-red/50"
+                className="font-mono"
               >
                 {session.fallbackSubmitting
                   ? "Conceding\u2026"
                   : "Concede Match"}
-              </button>
+              </GameButton>
             </div>
           )}
-          <button
+          <GameButton
+            variant="ghost"
+            size="sm"
             onClick={session.handleBackToLobbies}
-            className="mt-4 px-3 py-1 text-xs text-gb-text-subtle border border-gb-border-strong rounded-md hover:text-gb-text-bright transition-colors cursor-pointer"
+            className="mt-4"
           >
             &larr; Back to Lobbies
-          </button>
+          </GameButton>
         </div>
       </div>
     );
@@ -114,6 +127,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         isMyTurn={session.isMyTurn}
         battlePhase={session.battlePhase}
         connectionStatus={session.connectionStatus}
+        eventLog={session.gameState.eventLog}
         activePrompt={activePrompt}
         onAction={(action) => {
           if (
@@ -132,12 +146,14 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
       {process.env.NODE_ENV === "development" && session.me && (
         <div className="fixed bottom-4 right-4 z-[300] flex items-center gap-2">
           {devPrompt && (
-            <button
+            <GameButton
+              variant="danger"
+              size="sm"
               onClick={() => setDevPrompt(null)}
-              className="px-2 py-1 text-xs font-mono bg-gb-surface-raised border border-gb-accent-red/30 text-gb-accent-red rounded cursor-pointer"
+              className="font-mono"
             >
               clear
-            </button>
+            </GameButton>
           )}
           <select
             defaultValue=""
@@ -234,41 +250,38 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
       />
 
       {/* Match ended overlay */}
-      {session.matchClosed && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="match-end-title"
+      <Dialog open={session.matchClosed}>
+        <DialogContent
+          showCloseButton={false}
+          className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] text-center"
+          onInteractOutside={(e) => e.preventDefault()}
         >
-          <div className="max-w-[400px] w-full bg-gb-surface border border-gb-border-strong rounded-lg p-6 text-center mx-4">
-            <p
-              id="match-end-title"
-              className="text-xs font-semibold text-gb-text-subtle tracking-widest mb-2"
-            >
+          <DialogHeader className="items-center">
+            <DialogTitle className="text-xs font-semibold text-gb-text-subtle tracking-widest">
               MATCH COMPLETE
-            </p>
-            <p
-              className={cn(
-                "text-3xl font-extrabold mb-3",
-                session.endColorClass,
-              )}
-            >
-              {session.endTitle}
-            </p>
-            <p className="text-sm text-gb-text leading-relaxed mb-6">
-              {session.endReason}
-            </p>
-            <button
-              type="button"
-              onClick={session.handleBackToLobbies}
-              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-base font-bold cursor-pointer hover:bg-navy-700 transition-colors"
-            >
-              Back to Lobbies
-            </button>
-          </div>
-        </div>
-      )}
+            </DialogTitle>
+          </DialogHeader>
+          <p
+            className={cn(
+              "text-3xl font-extrabold",
+              session.endColorClass,
+            )}
+          >
+            {session.endTitle}
+          </p>
+          <p className="text-sm text-gb-text leading-relaxed">
+            {session.endReason}
+          </p>
+          <GameButton
+            variant="primary"
+            size="lg"
+            onClick={session.handleBackToLobbies}
+            className="w-full"
+          >
+            Back to Lobbies
+          </GameButton>
+        </DialogContent>
+      </Dialog>
     </GameErrorBoundary>
   );
 }

@@ -46,6 +46,8 @@ export interface DeckBuilderState {
   format: string;
   leader: DeckLeaderEntry | null;
   cards: Map<string, DeckCardEntry>;
+  sleeveUrl: string | null;
+  donArtUrl: string | null;
   isDirty: boolean;
   isSaving: boolean;
   lastSavedAt: Date | null;
@@ -68,7 +70,9 @@ export type DeckBuilderAction =
   | { type: "SAVE_START" }
   | { type: "SAVE_SUCCESS"; id: string }
   | { type: "SAVE_ERROR" }
-  | { type: "MARK_CLEAN" };
+  | { type: "MARK_CLEAN" }
+  | { type: "SET_SLEEVE"; sleeveUrl: string }
+  | { type: "SET_DON_ART"; donArtUrl: string };
 
 export function createInitialState(): DeckBuilderState {
   return {
@@ -77,6 +81,8 @@ export function createInitialState(): DeckBuilderState {
     format: "Standard",
     leader: null,
     cards: new Map(),
+    sleeveUrl: null,
+    donArtUrl: null,
     isDirty: false,
     isSaving: false,
     lastSavedAt: null,
@@ -186,6 +192,8 @@ export function deckBuilderReducer(
         ...state,
         leader: null,
         cards: new Map(),
+        sleeveUrl: state.sleeveUrl,
+        donArtUrl: state.donArtUrl,
         isDirty: true,
       };
 
@@ -241,6 +249,12 @@ export function deckBuilderReducer(
 
     case "MARK_CLEAN":
       return { ...state, isDirty: false };
+
+    case "SET_SLEEVE":
+      return { ...state, sleeveUrl: action.sleeveUrl, isDirty: true };
+
+    case "SET_DON_ART":
+      return { ...state, donArtUrl: action.donArtUrl, isDirty: true };
 
     default:
       return state;

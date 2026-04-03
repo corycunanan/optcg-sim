@@ -1,59 +1,87 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   CardDb,
-  CardInstance,
   GameAction,
+  GameEvent,
   PlayerState,
   PromptOptions,
   PromptType,
   TurnState,
 } from "@shared/game-types";
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "motion/react";
+import { cardRest, cardActivate, cardHover } from "@/lib/motion";
+import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
+import {
+  TooltipProvider,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui";
 import { BoardCard } from "../board-card";
 import {
   NAVBAR_H,
   SQUARE,
   HAND_CARD_W,
   HAND_CARD_H,
-  MID_ZONE_H,
-  CHAR_ROW_GAP,
-  ZONE_GAP,
-  ROW_GAP,
-  LEADER_GAP,
   SIDE_ZONE_GAP,
-  CHAR_ROW_W,
   FIELD_W,
-  FIELD_H,
   BOARD_CONTENT_H,
-  MIN_HAND_BOARD_GAP,
-  PLAYER_HAND_VIEWPORT_MARGIN,
   BOARD_CARD_W,
   BOARD_CARD_H,
-  CARD_OFFSET_X,
   getViewportSize,
-  type DragPayload,
 } from "./constants";
+import {
+  zone2Left,
+  zone2Right,
+  oppTop,
+  oppLeaderTop,
+  oppCharTop,
+  midTop,
+  playerTop,
+  playerCharTop,
+  playerLeaderTop,
+  charSlotCenters,
+  leaderLeft,
+  stgDonWidth,
+  sideCardOffsetX,
+  computeBoardScaling,
+} from "./board-geometry";
+import { useBoardDnd } from "./use-board-dnd";
+import { useBattleState } from "./use-battle-state";
+import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
 import { DonCard, DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
-import { DroppableCharSlot, PlayerFieldCard, OpponentFieldCard } from "./field-card";
-import { MidZone, type BattleInfo } from "./mid-zone";
-import { ArrangeTopCardsModal } from "../arrange-top-cards-modal";
-import { SelectTargetModal } from "../select-target-modal";
-import { PlayerChoiceModal } from "../player-choice-modal";
-import { OptionalEffectModal } from "../optional-effect-modal";
-import { RevealTriggerModal } from "../reveal-trigger-modal";
+import { DroppableCharSlot, DroppableStageZone, PlayerFieldCard, OpponentFieldCard } from "./field-card";
+import { MidZone } from "./mid-zone";
 import { DroppableTrashZone } from "./trash-zone";
+import { CardAnimationLayer } from "./card-animation-layer";
+import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
+import { useCardTransitions } from "@/hooks/use-card-transitions";
+import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
+
+/** Registers a DOM element as a zone position anchor. */
+function ZoneRef({ zoneKey, children, style, className }: {
+  zoneKey: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  className?: string;
+}) {
+  const zonePos = useZonePosition();
+  const ref = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) zonePos.register(zoneKey, node);
+      else zonePos.unregister(zoneKey);
+    },
+    [zoneKey, zonePos],
+  );
+  return <div ref={ref} style={style} className={className}>{children}</div>;
+}
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -64,6 +92,7 @@ export interface BoardLayoutProps {
   isMyTurn: boolean;
   battlePhase: string | null;
   connectionStatus: string;
+  eventLog: GameEvent[];
   activePrompt: {
     promptType: PromptType;
     options: PromptOptions;
@@ -82,71 +111,52 @@ function NavMenu({
   onConcede: () => void;
   matchClosed: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const close = useCallback(() => setOpen(false), []);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        close();
-      }
-    }
-    document.addEventListener("pointerdown", handleClick);
-    return () => document.removeEventListener("pointerdown", handleClick);
-  }, [open, close]);
-
   return (
-    <div ref={menuRef} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-md transition-colors cursor-pointer",
-          open
-            ? "bg-gb-surface-raised text-gb-text-bright"
-            : "text-gb-text-subtle hover:text-gb-text-bright",
-        )}
-        aria-label="Game menu"
-        aria-expanded={open}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-md transition-colors cursor-pointer text-gb-text-subtle hover:text-gb-text-bright data-[state=open]:bg-gb-surface-raised data-[state=open]:text-gb-text-bright"
+          aria-label="Game menu"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor" />
+            <rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor" />
+            <rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor" />
+          </svg>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-48 bg-gb-surface border-gb-border-strong"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <rect x="2" y="3" width="12" height="1.5" rx="0.75" fill="currentColor" />
-          <rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor" />
-          <rect x="2" y="11.5" width="12" height="1.5" rx="0.75" fill="currentColor" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 rounded-md border border-gb-border-strong bg-gb-surface py-1 shadow-lg z-50">
-          <button
-            onClick={() => {
-              close();
-              onLeave();
-            }}
-            className="w-full text-left px-3 py-2 text-xs text-gb-text hover:bg-gb-surface-raised transition-colors cursor-pointer"
+        <DropdownMenuItem
+          onClick={onLeave}
+          className="text-xs text-gb-text focus:bg-gb-surface-raised"
+        >
+          &larr; Back to Lobbies
+        </DropdownMenuItem>
+        {!matchClosed && (
+          <DropdownMenuItem
+            onClick={onConcede}
+            className="text-xs text-gb-accent-red focus:bg-gb-surface-raised focus:text-gb-accent-red"
           >
-            &larr; Back to Lobbies
-          </button>
-          {!matchClosed && (
-            <button
-              onClick={() => {
-                close();
-                onConcede();
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-gb-accent-red hover:bg-gb-surface-raised transition-colors cursor-pointer"
-            >
-              Concede
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+            Concede
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-export function BoardLayout({
+export function BoardLayout(props: BoardLayoutProps) {
+  return (
+    <ZonePositionProvider>
+      <BoardLayoutInner {...props} />
+    </ZonePositionProvider>
+  );
+}
+
+function BoardLayoutInner({
   me,
   opp,
   myIndex,
@@ -155,15 +165,21 @@ export function BoardLayout({
   isMyTurn,
   battlePhase,
   connectionStatus,
+  eventLog,
   activePrompt,
   onAction,
   onLeave,
   matchClosed,
 }: BoardLayoutProps) {
+  const zoneRegistry = useZonePosition();
   const [viewport, setViewport] = useState(getViewportSize);
   const [isPromptHidden, setIsPromptHidden] = useState(false);
+  const [zonePreview, setZonePreview] = useState<
+    | { type: "deck"; owner: "me" | "opp" }
+    | { type: "trash"; owner: "me" | "opp" }
+    | null
+  >(null);
 
-  // Reset hidden state whenever a new prompt arrives
   useEffect(() => {
     setIsPromptHidden(false);
   }, [activePrompt?.promptType]);
@@ -181,155 +197,21 @@ export function BoardLayout({
     };
   }, []);
 
-  /* ── Derived geometry ──────────────────────────────────────────── */
+  /* ── Derived state from extracted hooks ───────────────────────────── */
 
-  const zone2Left = SQUARE + ZONE_GAP;
-  const zone2Right = zone2Left + CHAR_ROW_W;
+  const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
 
-  const oppTop = 0;
-  const oppLeaderTop = oppTop;
-  const oppCharTop = oppTop + SQUARE + ROW_GAP;
-  const midTop = oppTop + FIELD_H;
-  const playerTop = midTop + MID_ZONE_H;
-  const playerCharTop = playerTop;
-  const playerLeaderTop = playerTop + SQUARE + ROW_GAP;
+  const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
 
-  const charSlotCenters = Array.from({ length: 5 }, (_, i) => ({
-    left: zone2Left + i * (SQUARE + CHAR_ROW_GAP) + CARD_OFFSET_X,
-  }));
+  const {
+    activeDrag,
+    activeDragType,
+    sensors,
+    handleDragStart,
+    handleDragEnd,
+  } = useBoardDnd(cardDb, bs.battle, onAction);
 
-  const leaderLeft = zone2Left + (CHAR_ROW_W - SQUARE) / 2 + CARD_OFFSET_X;
-  const stgDonWidth = (CHAR_ROW_W - SQUARE - 2 * LEADER_GAP) / 2;
-
-  /* ── Scale ─────────────────────────────────────────────────────── */
-
-  const boardScale = Math.max(
-    0,
-    Math.min(
-      1,
-      viewport.width / FIELD_W,
-      (viewport.height -
-        PLAYER_HAND_VIEWPORT_MARGIN -
-        2 * MIN_HAND_BOARD_GAP) /
-        (BOARD_CONTENT_H + 2 * HAND_CARD_H),
-    ),
-  );
-
-  const scaledBoardH = BOARD_CONTENT_H * boardScale;
-  const scaledHandH = HAND_CARD_H * boardScale;
-  const boardBottom =
-    viewport.height -
-    PLAYER_HAND_VIEWPORT_MARGIN -
-    scaledHandH -
-    MIN_HAND_BOARD_GAP;
-  const boardTop = boardBottom - scaledBoardH;
-  const playerHandTop = boardBottom + MIN_HAND_BOARD_GAP;
-
-  /* ── Phase / battle state ──────────────────────────────────────── */
-
-  const phase = turn?.phase ?? "";
-  const inBattle = !!battlePhase;
-  const canEndPhase = !matchClosed && isMyTurn && !inBattle && phase === "MAIN";
-
-  /* ── Battle interaction state ─────────────────────────────────────── */
-
-  const isDefender = !isMyTurn && myIndex !== null && turn?.activePlayerIndex !== myIndex;
-  const canPass = !matchClosed && isDefender && battlePhase === "COUNTER_STEP";
-  const canDragCounter = !matchClosed && isDefender && battlePhase === "COUNTER_STEP";
-  const inBlockStep = !matchClosed && isDefender && battlePhase === "BLOCK_STEP";
-  const battle = turn?.battle ?? null;
-
-  const [selectedBlockerId, setSelectedBlockerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedBlockerId(null);
-  }, [battlePhase]);
-
-  const battleInfo: BattleInfo | null = useMemo(() => {
-    if (!battle || !me || !opp) return null;
-    const allCards: (CardInstance | null)[] = [
-      me.leader, opp.leader,
-      ...me.characters, ...opp.characters,
-    ];
-    const attackerCard = allCards.find((c) => c?.instanceId === battle.attackerInstanceId);
-    const defenderCard = allCards.find((c) => c?.instanceId === battle.targetInstanceId);
-    return {
-      attackerName: attackerCard ? cardDb[attackerCard.cardId]?.name ?? "?" : "?",
-      attackerPower: battle.attackerPower,
-      defenderName: defenderCard ? cardDb[defenderCard.cardId]?.name ?? "?" : "?",
-      defenderPower: battle.defenderPower,
-      counterPowerAdded: battle.counterPowerAdded,
-      battleSubPhase: battlePhase ?? "",
-    };
-  }, [battle, me, opp, cardDb, battlePhase]);
-
-  /* ── Drag & drop ─────────────────────────────────────────────────── */
-
-  const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
-  const activeDragType = activeDrag?.type ?? null;
-  const canInteract = isMyTurn && phase === "MAIN" && !inBattle && !matchClosed;
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  );
-
-  function handleDragStart(event: DragStartEvent) {
-    setActiveDrag(event.active.data.current as DragPayload);
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    setActiveDrag(null);
-    if (!over) return;
-
-    const dragData = active.data.current as DragPayload;
-    const dropData = over.data.current as Record<string, unknown>;
-
-    if (dragData.type === "hand-card" && dropData.type === "character-slot") {
-      onAction({
-        type: "PLAY_CARD",
-        cardInstanceId: dragData.card.instanceId,
-        position: dropData.slotIndex as number,
-      });
-    } else if (
-      dragData.type === "active-don" &&
-      dropData.type === "don-target"
-    ) {
-      onAction({
-        type: "ATTACH_DON",
-        targetInstanceId: dropData.targetInstanceId as string,
-        count: 1,
-      });
-    } else if (
-      dragData.type === "attacker" &&
-      dropData.type === "attack-target"
-    ) {
-      onAction({
-        type: "DECLARE_ATTACK",
-        attackerInstanceId: dragData.card.instanceId,
-        targetInstanceId: dropData.targetInstanceId as string,
-      });
-    } else if (
-      dragData.type === "hand-card" &&
-      dropData.type === "counter-trash" &&
-      battle
-    ) {
-      const cardData = cardDb[dragData.card.cardId];
-      if (cardData?.type === "Character" && cardData.counter != null && cardData.counter > 0) {
-        onAction({
-          type: "USE_COUNTER",
-          cardInstanceId: dragData.card.instanceId,
-          counterTargetInstanceId: battle.targetInstanceId,
-        });
-      } else if (cardData?.type === "Event" && cardData.effectText?.includes("[Counter]")) {
-        onAction({
-          type: "USE_COUNTER_EVENT",
-          cardInstanceId: dragData.card.instanceId,
-          counterTargetInstanceId: battle.targetInstanceId,
-        });
-      }
-    }
-  }
+  const dragTilt = useDragTilt();
 
   /* ── Status indicator ──────────────────────────────────────────── */
 
@@ -340,13 +222,47 @@ export function BoardLayout({
         ? "bg-gb-accent-amber"
         : "bg-gb-accent-red";
 
-  const sideCardOffsetX = CARD_OFFSET_X;
+  /* ── Card flight animations ──────────────────────────────────── */
+
+  const { transitions: cardAnimations, removeTransition } = useCardTransitions(
+    eventLog,
+    myIndex,
+    activeDrag !== null,
+    zoneRegistry,
+  );
+
+  const playerHandAnim = useHandAnimationState(cardAnimations, me?.hand ?? [], "p-hand");
+  const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
+
+  /* ── Sleeve/DON URLs per player index ────────────────────────── */
+
+  const sleeveUrls: [string | null, string | null] = myIndex === 0
+    ? [me?.sleeveUrl ?? null, opp?.sleeveUrl ?? null]
+    : [opp?.sleeveUrl ?? null, me?.sleeveUrl ?? null];
+
+  /* ── Refresh phase stagger detection ────────────────────────── */
+
+  const reducedMotion = useReducedMotion();
+  const prevPhaseRef = useRef(turn?.phase);
+  const [refreshWave, setRefreshWave] = useState(false);
+
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = turn?.phase;
+    if (!reducedMotion && prevPhase === "REFRESH" && turn?.phase === "DRAW") {
+      setRefreshWave(true);
+      const timer = setTimeout(() => setRefreshWave(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [turn?.phase, reducedMotion]);
 
   return (
+    <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
       sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+      onDragStart={(e) => { handleDragStart(e); dragTilt.handleDragStart(e); }}
+      onDragMove={dragTilt.handleDragMove}
+      onDragEnd={(e) => { handleDragEnd(e); dragTilt.handleDragEnd(e); }}
     >
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
@@ -358,7 +274,6 @@ export function BoardLayout({
           OPTCG SIM
         </span>
 
-        {/* Center: turn info */}
         <div className="flex-1 flex items-center justify-center gap-2">
           <span className="text-xs text-gb-text-bright font-bold">
             Turn {turn?.number ?? "—"}
@@ -379,10 +294,10 @@ export function BoardLayout({
           </span>
           <span className="text-xs text-gb-accent-blue font-bold">
             {battlePhase === "BLOCK_STEP"
-              ? isDefender ? "You are blocking" : "Opponent is blocking"
+              ? bs.isDefender ? "You are blocking" : "Opponent is blocking"
               : battlePhase === "COUNTER_STEP"
-                ? isDefender ? "You are countering" : "Opponent is countering"
-                : phase}
+                ? bs.isDefender ? "You are countering" : "Opponent is countering"
+                : bs.phase}
           </span>
         </div>
 
@@ -417,7 +332,7 @@ export function BoardLayout({
             transformOrigin: "top center",
           }}
         >
-          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} />
+          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={opp?.sleeveUrl} />
         </div>
       </div>
 
@@ -438,67 +353,85 @@ export function BoardLayout({
           {/* ═══════════ OPPONENT FIELD ═══════════════════════════════ */}
 
           {/* Zone 3 (left): Trash + Deck */}
-          <BoardCard
-            card={opp && opp.trash.length > 0 ? opp.trash[0] : undefined}
-            cardDb={cardDb}
-            empty={!opp || opp.trash.length === 0}
-            label="TRASH"
-            count={opp && opp.trash.length > 1 ? opp.trash.length : undefined}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}
-          />
-          <BoardCard
-            cardDb={cardDb}
-            sleeve
-            label="DECK"
-            count={opp?.deck.length}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}
-          />
+          <ZoneRef zoneKey="o-trash" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}>
+            <BoardCard
+              card={opp && opp.trash.length > 0 ? opp.trash[0] : undefined}
+              cardDb={cardDb}
+              empty={!opp || opp.trash.length === 0}
+              label="TRASH"
+              count={opp && opp.trash.length > 1 ? opp.trash.length : undefined}
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              onClick={() => opp && opp.trash.length > 0 && setZonePreview({ type: "trash", owner: "opp" })}
+            />
+          </ZoneRef>
+          <ZoneRef zoneKey="o-deck" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}>
+            <BoardCard
+              cardDb={cardDb}
+              sleeve
+              sleeveUrl={opp?.sleeveUrl}
+              label="DECK"
+              count={opp?.deck.length}
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              onClick={() => opp && setZonePreview({ type: "deck", owner: "opp" })}
+            />
+          </ZoneRef>
 
           {/* Zone 2: Leader row — STG / LDR / DON */}
-          {opp?.stage ? (
-            <BoardCard
-              card={opp.stage}
-              cardDb={cardDb}
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
-              style={{ position: "absolute", left: zone2Left + (stgDonWidth - BOARD_CARD_W) / 2, top: oppLeaderTop }}
-            />
-          ) : (
-            <BoardCard
-              cardDb={cardDb}
-              empty
-              label="STG"
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
-              style={{ position: "absolute", left: zone2Left + (stgDonWidth - BOARD_CARD_W) / 2, top: oppLeaderTop }}
-            />
-          )}
+          <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
+            {opp?.stage ? (
+              <motion.div
+                animate={{
+                  rotate: opp.stage.state === "RESTED" ? 90 : 0,
+                  filter: opp.stage.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+                }}
+                transition={{
+                  ...(opp.stage.state === "RESTED" ? cardRest : cardActivate),
+                  delay: refreshWave ? 0.18 : 0,
+                }}
+                whileHover={cardHover}
+              >
+                <BoardCard
+                  card={opp.stage}
+                  cardDb={cardDb}
+                  width={BOARD_CARD_W}
+                  height={BOARD_CARD_H}
+                />
+              </motion.div>
+            ) : (
+              <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
+                STG
+              </span>
+            )}
+          </ZoneRef>
 
           {opp?.leader ? (
             <OpponentFieldCard
               card={opp.leader}
               cardDb={cardDb}
               activeDragType={activeDragType}
+              zoneKey="o-leader"
               style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
+              animationDelay={refreshWave ? 0 : undefined}
             />
           ) : (
             <BoardCard
               cardDb={cardDb}
               empty
               label="LDR"
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
+              width={SQUARE}
+              height={SQUARE}
               style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
             />
           )}
 
           <DonZone
             player={opp}
+            zoneKey="o-don"
+            donArtUrl={opp?.donArtUrl}
             style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
+            animationDelay={refreshWave ? 0.2 : undefined}
           />
 
           {/* Zone 2: Character row */}
@@ -510,7 +443,9 @@ export function BoardLayout({
                 card={char}
                 cardDb={cardDb}
                 activeDragType={activeDragType}
+                zoneKey={`o-char-${i}`}
                 style={{ position: "absolute", left: pos.left, top: oppCharTop }}
+                animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
               />
             ) : (
               <BoardCard
@@ -518,8 +453,8 @@ export function BoardLayout({
                 cardDb={cardDb}
                 empty
                 label={`C${i + 1}`}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
+                width={SQUARE}
+                height={SQUARE}
                 style={{ position: "absolute", left: pos.left, top: oppCharTop }}
               />
             );
@@ -529,6 +464,8 @@ export function BoardLayout({
           <LifeZone
             life={opp?.life ?? []}
             cardDb={cardDb}
+            zoneKey="o-life"
+            sleeveUrl={opp?.sleeveUrl}
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: oppTop }}
           />
 
@@ -536,18 +473,18 @@ export function BoardLayout({
           <MidZone
             top={midTop}
             isMyTurn={isMyTurn}
-            phase={phase}
-            canEndPhase={canEndPhase}
-            canPass={canPass}
-            inBattle={inBattle}
+            phase={bs.phase}
+            canEndPhase={bs.canEndPhase}
+            canPass={bs.canPass}
+            inBattle={bs.inBattle}
             activePrompt={activePrompt}
-            battleInfo={battleInfo}
-            blockerMode={inBlockStep ? {
-              selectedBlockerId,
+            battleInfo={bs.battleInfo}
+            blockerMode={bs.inBlockStep ? {
+              selectedBlockerId: bs.selectedBlockerId,
               onBlock: () => {
-                if (selectedBlockerId) {
-                  onAction({ type: "DECLARE_BLOCKER", blockerInstanceId: selectedBlockerId });
-                  setSelectedBlockerId(null);
+                if (bs.selectedBlockerId) {
+                  onAction({ type: "DECLARE_BLOCKER", blockerInstanceId: bs.selectedBlockerId });
+                  bs.setSelectedBlockerId(null);
                 }
               },
             } : undefined}
@@ -562,6 +499,8 @@ export function BoardLayout({
           <LifeZone
             life={me?.life ?? []}
             cardDb={cardDb}
+            zoneKey="p-life"
+            sleeveUrl={me?.sleeveUrl}
             style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
           />
 
@@ -576,23 +515,26 @@ export function BoardLayout({
                   label={`C${i + 1}`}
                   cardDb={cardDb}
                   activeDragType={activeDragType}
+                  zoneKey={`p-char-${i}`}
                   style={{ position: "absolute", left: pos.left, top: playerCharTop }}
                 />
               );
             }
             const charData = cardDb[char.cardId];
-            const isBlockerEligible = inBlockStep && char.state === "ACTIVE" && !!charData?.keywords?.blocker;
+            const isBlockerEligible = bs.inBlockStep && char.state === "ACTIVE" && !!charData?.keywords?.blocker;
             return (
               <PlayerFieldCard
                 key={`plr-c${i}`}
                 card={char}
                 cardDb={cardDb}
                 activeDragType={activeDragType}
-                canAttack={canInteract && char.state === "ACTIVE"}
+                canAttack={bs.canInteract && char.state === "ACTIVE"}
                 blockerSelectable={isBlockerEligible}
-                selected={selectedBlockerId === char.instanceId}
-                onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
+                selected={bs.selectedBlockerId === char.instanceId}
+                onSelect={isBlockerEligible ? () => bs.setSelectedBlockerId(char.instanceId) : undefined}
                 onAction={onAction}
+                zoneKey={`p-char-${i}`}
+                animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />
             );
@@ -601,8 +543,11 @@ export function BoardLayout({
           {/* Zone 2: Leader row — DON / LDR / STG */}
           <DonZone
             player={me}
-            enableDrag={canInteract}
+            enableDrag={bs.canInteract}
+            zoneKey="p-don"
+            donArtUrl={me?.donArtUrl}
             style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
+            animationDelay={refreshWave ? 0.2 : undefined}
           />
 
           {me?.leader ? (
@@ -610,55 +555,53 @@ export function BoardLayout({
               card={me.leader}
               cardDb={cardDb}
               activeDragType={activeDragType}
-              canAttack={canInteract && me.leader.state === "ACTIVE"}
+              canAttack={bs.canInteract && me.leader.state === "ACTIVE"}
               onAction={onAction}
+              zoneKey="p-leader"
               style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
+              animationDelay={refreshWave ? 0 : undefined}
             />
           ) : (
             <BoardCard
               cardDb={cardDb}
               empty
               label="LDR"
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
+              width={SQUARE}
+              height={SQUARE}
               style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
             />
           )}
 
-          {me?.stage ? (
-            <BoardCard
-              card={me.stage}
-              cardDb={cardDb}
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
-              style={{ position: "absolute", left: zone2Right - stgDonWidth + (stgDonWidth - BOARD_CARD_W) / 2, top: playerLeaderTop }}
-            />
-          ) : (
-            <BoardCard
-              cardDb={cardDb}
-              empty
-              label="STG"
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
-              style={{ position: "absolute", left: zone2Right - stgDonWidth + (stgDonWidth - BOARD_CARD_W) / 2, top: playerLeaderTop }}
-            />
-          )}
+          <DroppableStageZone
+            card={me?.stage ?? null}
+            cardDb={cardDb}
+            activeDragType={activeDragType}
+            onAction={onAction}
+            zoneKey="p-stage"
+            style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
+            animationDelay={refreshWave ? 0.18 : undefined}
+          />
 
           {/* Zone 3 (right): Deck + Trash */}
-          <BoardCard
-            cardDb={cardDb}
-            sleeve
-            label="DECK"
-            count={me?.deck.length}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-            style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}
-          />
+          <ZoneRef zoneKey="p-deck" style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}>
+            <BoardCard
+              cardDb={cardDb}
+              sleeve
+              sleeveUrl={me?.sleeveUrl}
+              label="DECK"
+              count={me?.deck.length}
+              width={BOARD_CARD_W}
+              height={BOARD_CARD_H}
+              onClick={() => me && setZonePreview({ type: "deck", owner: "me" })}
+            />
+          </ZoneRef>
           <DroppableTrashZone
             trash={me?.trash ?? []}
             cardDb={cardDb}
             activeDrag={activeDrag}
             battleSubPhase={turn?.battleSubPhase ?? null}
+            onClickTrash={() => me && me.trash.length > 0 && setZonePreview({ type: "trash", owner: "me" })}
+            zoneKey="p-trash"
             style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
           />
         </div>
@@ -681,110 +624,69 @@ export function BoardLayout({
           <HandLayer
             cards={me?.hand ?? []}
             cardDb={cardDb}
-            enableDrag={canInteract || canDragCounter}
-            counterMode={canDragCounter}
+            enableDrag={bs.canInteract || bs.canDragCounter}
+            counterMode={bs.canDragCounter}
+            zoneKey="p-hand"
+            inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
+            sleeveUrl={me?.sleeveUrl}
           />
         </div>
       </div>
 
-      {/* ── Interruption Modals ─────────────────────────────────────── */}
-      {activePrompt?.promptType === "ARRANGE_TOP_CARDS" &&
-        activePrompt.options.cards &&
-        activePrompt.options.cards.length > 0 && (
-          <ArrangeTopCardsModal
-            cards={activePrompt.options.cards}
-            effectDescription={activePrompt.options.effectDescription ?? "Look at the top cards of your deck"}
-            canSendToBottom={activePrompt.options.canSendToBottom ?? true}
-            validTargets={activePrompt.options.validTargets}
-            cardDb={cardDb}
-            isHidden={isPromptHidden}
-            onHide={() => setIsPromptHidden(true)}
-            onAction={onAction}
-          />
-        )}
-
-      {activePrompt?.promptType === "SELECT_TARGET" &&
-        activePrompt.options.cards &&
-        activePrompt.options.cards.length > 0 && (
-          <SelectTargetModal
-            cards={activePrompt.options.cards}
-            validTargets={activePrompt.options.validTargets ?? activePrompt.options.cards.map((c) => c.instanceId)}
-            effectDescription={activePrompt.options.effectDescription ?? "Select a target"}
-            countMin={activePrompt.options.countMin ?? 1}
-            countMax={activePrompt.options.countMax ?? 1}
-            ctaLabel={activePrompt.options.ctaLabel ?? "Confirm Selection"}
-            cardDb={cardDb}
-            isHidden={isPromptHidden}
-            onHide={() => setIsPromptHidden(true)}
-            onAction={onAction}
-          />
-        )}
-
-      {activePrompt?.promptType === "PLAYER_CHOICE" &&
-        activePrompt.options.choices &&
-        activePrompt.options.choices.length > 0 && (
-          <PlayerChoiceModal
-            effectDescription={activePrompt.options.effectDescription ?? "Choose an effect"}
-            choices={activePrompt.options.choices}
-            isHidden={isPromptHidden}
-            onHide={() => setIsPromptHidden(true)}
-            onAction={onAction}
-          />
-        )}
-
-      {activePrompt?.promptType === "OPTIONAL_EFFECT" && (
-        <OptionalEffectModal
-          effectDescription={activePrompt.options.effectDescription ?? "You may activate this effect"}
-          card={activePrompt.options.cards?.[0]}
-          cardDb={cardDb}
-          isHidden={isPromptHidden}
-          onHide={() => setIsPromptHidden(true)}
-          onAction={onAction}
-        />
-      )}
-
-      {activePrompt?.promptType === "REVEAL_TRIGGER" &&
-        activePrompt.options.cards &&
-        activePrompt.options.cards.length > 0 && (
-          <RevealTriggerModal
-            cards={activePrompt.options.cards}
-            effectDescription={activePrompt.options.effectDescription ?? "You may reveal this Trigger card to activate its effect"}
-            cardDb={cardDb}
-            isHidden={isPromptHidden}
-            onHide={() => setIsPromptHidden(true)}
-            onAction={onAction}
-          />
-        )}
+      <BoardModals
+        activePrompt={activePrompt}
+        isPromptHidden={isPromptHidden}
+        onHide={() => setIsPromptHidden(true)}
+        cardDb={cardDb}
+        onAction={onAction}
+        zonePreview={zonePreview}
+        onCloseZonePreview={() => setZonePreview(null)}
+        me={me}
+        opp={opp}
+      />
     </div>
 
     <DragOverlay dropAnimation={null}>
-      {activeDrag?.type === "hand-card" && (
-        <BoardCard
-          card={activeDrag.card}
-          cardDb={cardDb}
-          width={HAND_CARD_W * boardScale}
-          height={HAND_CARD_H * boardScale}
-        />
-      )}
-      {activeDrag?.type === "active-don" && (
-        <div
-          style={{
-            transform: `scale(${boardScale})`,
-            transformOrigin: "top left",
-          }}
-        >
-          <DonCard />
-        </div>
-      )}
-      {activeDrag?.type === "attacker" && (
-        <BoardCard
-          card={activeDrag.card}
-          cardDb={cardDb}
-          width={BOARD_CARD_W * boardScale}
-          height={BOARD_CARD_H * boardScale}
-        />
+      {activeDrag && (
+        <motion.div style={{ rotate: dragTilt.tilt }}>
+          {activeDrag.type === "hand-card" && (
+            <BoardCard
+              card={activeDrag.card}
+              cardDb={cardDb}
+              width={HAND_CARD_W * boardScale}
+              height={HAND_CARD_H * boardScale}
+            />
+          )}
+          {activeDrag.type === "active-don" && (
+            <div
+              style={{
+                transform: `scale(${boardScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <DonCard donArtUrl={me?.donArtUrl} />
+            </div>
+          )}
+          {activeDrag.type === "attacker" && (
+            <BoardCard
+              card={activeDrag.card}
+              cardDb={cardDb}
+              width={BOARD_CARD_W * boardScale}
+              height={BOARD_CARD_H * boardScale}
+            />
+          )}
+        </motion.div>
       )}
     </DragOverlay>
+
+    <CardAnimationLayer
+      transitions={cardAnimations}
+      cardDb={cardDb}
+      onComplete={removeTransition}
+      sleeveUrls={sleeveUrls}
+    />
+
     </DndContext>
+    </TooltipProvider>
   );
 }

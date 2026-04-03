@@ -1,24 +1,67 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
+import { useZonePosition } from "@/contexts/zone-position-context";
+import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
-import { BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
-import { CardActionMenu } from "../card-action-menu";
+import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
+import { CardActionMenuContent } from "../card-action-menu";
+
+/** Colored overlay that sits behind the card in a zone during drag. */
+export function DropOverlay({
+  active,
+  hovered,
+  color,
+}: {
+  active: boolean;
+  hovered: boolean;
+  color: "blue" | "amber" | "red" | "green";
+}) {
+  if (!active) return null;
+
+  const colorMap = {
+    blue: "bg-gb-accent-blue/25",
+    amber: "bg-gb-accent-amber/25",
+    red: "bg-gb-accent-red/25",
+    green: "bg-gb-accent-green/25",
+  };
+
+  const hoveredColorMap = {
+    blue: "bg-gb-accent-blue/50",
+    amber: "bg-gb-accent-amber/50",
+    red: "bg-gb-accent-red/50",
+    green: "bg-gb-accent-green/50",
+  };
+
+  return (
+    <div
+      className={cn(
+        "absolute inset-0 z-0 rounded-md transition-colors",
+        hovered ? hoveredColorMap[color] : colorMap[color],
+        hovered && "animate-pulse",
+      )}
+    />
+  );
+}
 
 export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   slotIndex,
   label,
   cardDb,
   activeDragType,
+  zoneKey,
   style,
 }: {
   slotIndex: number;
   label: string;
   cardDb: CardDb;
   activeDragType: string | null;
+  zoneKey?: string;
   style: React.CSSProperties;
 }) {
   const accepts = activeDragType === "hand-card";
@@ -27,23 +70,122 @@ export const DroppableCharSlot = React.memo(function DroppableCharSlot({
     data: { type: "character-slot", slotIndex },
   });
 
+  const zonePos = useZonePosition();
+  const slotRef = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (zoneKey) {
+        if (node) zonePos.register(zoneKey, node);
+        else zonePos.unregister(zoneKey);
+      }
+    },
+    [setNodeRef, zoneKey, zonePos],
+  );
+
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "rounded-md transition-shadow",
-        accepts && "ring-2 ring-gb-accent-blue/30",
-        isOver && accepts && "ring-2 ring-gb-accent-green",
-      )}
+      ref={slotRef}
+      style={{ ...style, width: SQUARE, height: SQUARE }}
+      className="relative flex items-center justify-center rounded-md border border-gb-border-strong/30"
     >
-      <BoardCard
-        cardDb={cardDb}
-        empty
-        label={label}
-        width={BOARD_CARD_W}
-        height={BOARD_CARD_H}
-      />
+      <DropOverlay active={accepts} hovered={isOver && accepts} color="blue" />
+      <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none relative z-[1]">
+        {label}
+      </span>
+    </div>
+  );
+});
+
+export const DroppableStageZone = React.memo(function DroppableStageZone({
+  card,
+  cardDb,
+  activeDragType,
+  onAction,
+  zoneKey,
+  style,
+  animationDelay,
+}: {
+  card: CardInstance | null;
+  cardDb: CardDb;
+  activeDragType: string | null;
+  onAction?: (action: GameAction) => void;
+  zoneKey: string;
+  style: React.CSSProperties;
+  animationDelay?: number;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const zonePos = useZonePosition();
+  const accepts = activeDragType === "hand-card";
+  const { setNodeRef, isOver } = useDroppable({
+    id: `stage-zone-${zoneKey}`,
+    data: { type: "stage-zone" },
+  });
+
+  const mergedRef = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (node) zonePos.register(zoneKey, node);
+      else zonePos.unregister(zoneKey);
+    },
+    [setNodeRef, zoneKey, zonePos],
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMenuOpen(true);
+    },
+    [],
+  );
+
+  return (
+    <div
+      ref={mergedRef}
+      style={style}
+      className="absolute flex items-center justify-center rounded-md border border-gb-border-strong/30"
+    >
+      <DropOverlay active={accepts} hovered={isOver && accepts} color="green" />
+      {card ? (
+        <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
+          <DropdownMenuTrigger asChild>
+            <motion.div
+              onContextMenu={handleContextMenu}
+              animate={{
+                rotate: card.state === "RESTED" ? 90 : 0,
+                filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+              }}
+              transition={{
+                ...(card.state === "RESTED" ? cardRest : cardActivate),
+                delay: animationDelay ?? 0,
+              }}
+              whileHover={reducedMotion ? undefined : cardHover}
+              whileTap={reducedMotion ? undefined : cardTap}
+              className="relative z-[1]"
+            >
+              <BoardCard
+                card={card}
+                cardDb={cardDb}
+                width={BOARD_CARD_W}
+                height={BOARD_CARD_H}
+              />
+            </motion.div>
+          </DropdownMenuTrigger>
+          {onAction && (
+            <CardActionMenuContent
+              card={card}
+              cardDb={cardDb}
+              onAction={onAction}
+              onClose={() => setMenuOpen(false)}
+            />
+          )}
+        </DropdownMenu>
+      ) : (
+        <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
+          STG
+        </span>
+      )}
     </div>
   );
 });
@@ -57,7 +199,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected,
   onSelect,
   onAction,
+  zoneKey,
   style,
+  animationDelay,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -67,9 +211,13 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected?: boolean;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
+  zoneKey?: string;
   style: React.CSSProperties;
+  animationDelay?: number;
 }) {
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const zonePos = useZonePosition();
 
   const {
     attributes,
@@ -92,63 +240,88 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     (node: HTMLElement | null) => {
       setDragRef(node);
       setDropRef(node);
+      if (zoneKey) {
+        if (node) {
+          zonePos.register(zoneKey, node);
+          zonePos.registerCard(card.instanceId, zoneKey);
+        } else {
+          zonePos.unregister(zoneKey);
+          zonePos.unregisterCard(card.instanceId);
+        }
+      }
     },
-    [setDragRef, setDropRef],
+    [setDragRef, setDropRef, zoneKey, zonePos, card.instanceId],
   );
+
+  // Keep card→zone mapping up to date if instanceId changes while mounted
+  useEffect(() => {
+    if (zoneKey) zonePos.registerCard(card.instanceId, zoneKey);
+    return () => { zonePos.unregisterCard(card.instanceId); };
+  }, [card.instanceId, zoneKey, zonePos]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY });
+      setMenuOpen(true);
     },
     [],
   );
 
-  const handleCloseMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
+  const skipMotion = reducedMotion || isDragging;
 
   return (
-    <>
-      <div
-        ref={mergedRef}
-        {...attributes}
-        {...listeners}
-        onClick={onSelect}
-        onContextMenu={handleContextMenu}
-        style={{
-          ...style,
-          opacity: isDragging ? 0.3 : 1,
-          cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
-        }}
-        className={cn(
-          "rounded-md transition-shadow",
-          acceptsDon && "ring-2 ring-gb-accent-amber/30",
-          isOver && acceptsDon && "ring-2 ring-gb-accent-amber",
-          selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
-          blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
-        )}
-      >
-        <BoardCard
-          card={card}
-          cardDb={cardDb}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
-        />
-      </div>
+    <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
+      <DropdownMenuTrigger asChild>
+        <motion.div
+          ref={mergedRef}
+          {...attributes}
+          {...listeners}
+          onClick={onSelect}
+          onContextMenu={handleContextMenu}
+          animate={{
+            rotate: card.state === "RESTED" ? 90 : 0,
+            opacity: isDragging ? 0.3 : 1,
+            filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+          }}
+          transition={{
+            ...(card.state === "RESTED" ? cardRest : cardActivate),
+            delay: animationDelay ?? 0,
+          }}
+          whileHover={skipMotion ? undefined : cardHover}
+          whileTap={skipMotion ? undefined : cardTap}
+          style={{
+            ...style,
+            width: SQUARE,
+            height: SQUARE,
+            cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
+          }}
+          className={cn(
+            "relative flex items-center justify-center rounded-md transition-shadow",
+            selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
+            blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
+          )}
+        >
+          <DropOverlay active={acceptsDon} hovered={isOver && acceptsDon} color="amber" />
+          <BoardCard
+            card={card}
+            cardDb={cardDb}
+            width={BOARD_CARD_W}
+            height={BOARD_CARD_H}
+            className="relative z-[1]"
+          />
+        </motion.div>
+      </DropdownMenuTrigger>
 
-      {contextMenu && onAction && (
-        <CardActionMenu
+      {onAction && (
+        <CardActionMenuContent
           card={card}
           cardDb={cardDb}
-          anchorX={contextMenu.x}
-          anchorY={contextMenu.y}
           onAction={onAction}
-          onClose={handleCloseMenu}
+          onClose={() => setMenuOpen(false)}
         />
       )}
-    </>
+    </DropdownMenu>
   );
 });
 
@@ -156,35 +329,70 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card,
   cardDb,
   activeDragType,
+  zoneKey,
   style,
+  animationDelay,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
+  zoneKey?: string;
   style: React.CSSProperties;
+  animationDelay?: number;
 }) {
+  const reducedMotion = useReducedMotion();
+  const zonePos = useZonePosition();
   const accepts = activeDragType === "attacker";
   const { setNodeRef, isOver } = useDroppable({
     id: `attack-target-${card.instanceId}`,
     data: { type: "attack-target", targetInstanceId: card.instanceId },
   });
 
+  const ref = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (zoneKey) {
+        if (node) {
+          zonePos.register(zoneKey, node);
+          zonePos.registerCard(card.instanceId, zoneKey);
+        } else {
+          zonePos.unregister(zoneKey);
+          zonePos.unregisterCard(card.instanceId);
+        }
+      }
+    },
+    [setNodeRef, zoneKey, zonePos, card.instanceId],
+  );
+
+  // Keep card→zone mapping up to date if instanceId changes while mounted
+  useEffect(() => {
+    if (zoneKey) zonePos.registerCard(card.instanceId, zoneKey);
+    return () => { zonePos.unregisterCard(card.instanceId); };
+  }, [card.instanceId, zoneKey, zonePos]);
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "rounded-md",
-        accepts && "ring-2 ring-gb-accent-red/30",
-        isOver && accepts && "ring-2 ring-gb-accent-red",
-      )}
+    <motion.div
+      ref={ref}
+      animate={{
+        rotate: card.state === "RESTED" ? 90 : 0,
+        filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+      }}
+      transition={{
+        ...(card.state === "RESTED" ? cardRest : cardActivate),
+        delay: animationDelay ?? 0,
+      }}
+      whileHover={reducedMotion ? undefined : cardHover}
+      style={{ ...style, width: SQUARE, height: SQUARE }}
+      className="relative flex items-center justify-center rounded-md"
     >
+      <DropOverlay active={accepts} hovered={isOver && accepts} color="red" />
       <BoardCard
         card={card}
         cardDb={cardDb}
         width={BOARD_CARD_W}
         height={BOARD_CARD_H}
+        className="relative z-[1]"
       />
-    </div>
+    </motion.div>
   );
 });

@@ -33,6 +33,7 @@ interface CardInfo {
 interface DeckCard {
   id: string;
   quantity: number;
+  selectedArtUrl: string | null;
   card: CardInfo;
 }
 
@@ -40,6 +41,7 @@ interface DeckData {
   id: string;
   name: string;
   leaderId: string;
+  leaderArtUrl: string | null;
   leader: CardInfo | null;
   cards: DeckCard[];
 }
@@ -52,6 +54,7 @@ interface DeckPreviewModalProps {
 
 interface CardGroup {
   card: CardInfo;
+  imageUrl: string;
   count: number;
 }
 
@@ -65,15 +68,23 @@ function cardRotation(cardId: string, index: number): number {
 }
 
 /** Group cards by cardId, preserving order. Leader is its own group. */
-function groupCards(leader: DeckData["leader"], cards: DeckCard[]): CardGroup[] {
+function groupCards(deck: DeckData): CardGroup[] {
   const groups: CardGroup[] = [];
 
-  if (leader) {
-    groups.push({ card: leader, count: 1 });
+  if (deck.leader) {
+    groups.push({
+      card: deck.leader,
+      imageUrl: deck.leaderArtUrl ?? deck.leader.imageUrl,
+      count: 1,
+    });
   }
 
-  for (const dc of cards) {
-    groups.push({ card: dc.card, count: dc.quantity });
+  for (const dc of deck.cards) {
+    groups.push({
+      card: dc.card,
+      imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
+      count: dc.quantity,
+    });
   }
 
   return groups;
@@ -205,7 +216,7 @@ export function DeckPreviewModal({
     };
   }, [open, deckId]);
 
-  const groups = deck ? groupCards(deck.leader, deck.cards) : [];
+  const groups = deck ? groupCards(deck) : [];
   const totalCards = groups.reduce((sum, g) => sum + g.count, 0);
 
   return (
@@ -296,7 +307,7 @@ export function DeckPreviewModal({
                           >
                             <div className="w-[100px] overflow-hidden rounded border border-border shadow-sm aspect-[600/838]">
                               <img
-                                src={group.card.imageUrl}
+                                src={group.imageUrl}
                                 alt={group.card.name}
                                 className={cn(
                                   "h-full w-full object-cover",

@@ -77,7 +77,7 @@ export function DeckBuilderHeader({
                 setEditing(false);
               }
             }}
-            className="h-auto border-border-focus px-2 py-1 font-display text-xl font-bold leading-tight tracking-tight ring-2 ring-navy-900/10"
+            className="h-auto border-border-focus px-2 py-1 text-lg font-semibold leading-tight ring-2 ring-navy-900/10"
           />
         ) : (
           <button
@@ -86,7 +86,7 @@ export function DeckBuilderHeader({
               setEditing(true);
             }}
             aria-label={`Edit deck name: ${name}`}
-            className="group flex items-center gap-2 rounded px-2 py-1 font-display text-xl font-bold leading-tight tracking-tight text-content-primary transition-colors hover:bg-surface-2"
+            className="group flex items-center gap-2 rounded px-2 py-1 text-lg font-semibold leading-tight text-content-primary transition-colors hover:bg-surface-2"
           >
             {name}
             <svg

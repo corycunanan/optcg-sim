@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import React from "react";
 import type { CardData, CardDb, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { TooltipRoot, TooltipTrigger, TooltipContent } from "@/components/ui";
 import { TooltipStat } from "./game-ui";
 
-const SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
+const DEFAULT_SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
 
 interface BoardCardProps {
   card?: CardInstance | null;
@@ -14,6 +14,7 @@ interface BoardCardProps {
   cardDb: CardDb;
   faceDown?: boolean;
   sleeve?: boolean;
+  sleeveUrl?: string | null;
   empty?: boolean;
   label?: string;
   count?: number;
@@ -31,6 +32,7 @@ export const BoardCard = React.memo(function BoardCard({
   cardDb,
   faceDown,
   sleeve,
+  sleeveUrl,
   empty,
   label,
   count,
@@ -43,49 +45,16 @@ export const BoardCard = React.memo(function BoardCard({
 }: BoardCardProps) {
   const resolvedCardId = card?.cardId ?? cardIdOverride;
   const data = resolvedCardId ? cardDb[resolvedCardId] : null;
-  const isRested = card?.state === "RESTED";
   const donCount = card?.attachedDon.length ?? 0;
-
-  const cardRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const [hovered, setHovered] = useState(false);
-  const showTooltip = hovered && data !== null;
-
-  useLayoutEffect(() => {
-    if (!showTooltip || !tooltipRef.current || !cardRef.current) return;
-
-    const trigger = cardRef.current.getBoundingClientRect();
-    const tt = tooltipRef.current;
-    const gap = 8;
-    const pad = 8;
-    const ttW = tt.offsetWidth;
-    const ttH = tt.offsetHeight;
-
-    let left: number;
-    if (trigger.right + gap + ttW <= window.innerWidth - pad) {
-      left = trigger.right + gap;
-    } else if (trigger.left - gap - ttW >= pad) {
-      left = trigger.left - gap - ttW;
-    } else {
-      left = Math.max(pad, window.innerWidth - ttW - pad);
-    }
-
-    const top = Math.max(
-      pad,
-      Math.min(trigger.top, window.innerHeight - ttH - pad),
-    );
-
-    tt.style.left = `${left}px`;
-    tt.style.top = `${top}px`;
-    tt.style.opacity = "1";
-  }, [showTooltip]);
 
   if (empty) {
     return (
       <div
+        onClick={onClick}
         className={cn(
           "rounded border border-dashed flex items-center justify-center",
           "border-gb-border-strong/30 bg-gb-board/50",
+          onClick && "cursor-pointer",
           className,
         )}
         style={{ width, height, ...style }}
@@ -102,9 +71,11 @@ export const BoardCard = React.memo(function BoardCard({
   if (faceDown || sleeve) {
     return (
       <div
+        onClick={onClick}
         className={cn(
           "rounded border border-gb-border-strong relative overflow-hidden",
           sleeve ? "bg-gb-board-dark" : "bg-gb-surface-inset",
+          onClick && "cursor-pointer",
           className,
         )}
         style={{ width, height, ...style }}
@@ -112,7 +83,7 @@ export const BoardCard = React.memo(function BoardCard({
         {sleeve ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={SLEEVE_IMG}
+            src={sleeveUrl || DEFAULT_SLEEVE_IMG}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
             draggable={false}
@@ -143,100 +114,89 @@ export const BoardCard = React.memo(function BoardCard({
 
   const imageUrl = data?.imageUrl ?? null;
 
-  return (
-    <>
+  const cardElement = (
+    <div
+      className={cn("relative", className)}
+      style={{ width, height, ...style }}
+    >
       <div
-        className={cn("relative", isRested && "opacity-60", className)}
-        style={{ width, height, ...style }}
+        onClick={onClick}
+        className={cn(
+          "rounded border relative overflow-hidden",
+          highlight
+            ? "border-gb-accent-green ring-1 ring-gb-accent-green/30"
+            : "border-gb-border-strong",
+          onClick && "cursor-pointer hover:border-gb-text-muted",
+          !imageUrl && "flex flex-col bg-gb-surface-raised",
+        )}
+        style={{ width, height }}
       >
-        <div
-          ref={cardRef}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onClick={onClick}
-          className={cn(
-            "rounded border relative overflow-hidden",
-            highlight
-              ? "border-gb-accent-green ring-1 ring-gb-accent-green/30"
-              : "border-gb-border-strong",
-            onClick && "cursor-pointer hover:border-gb-text-muted",
-            !imageUrl && "flex flex-col bg-gb-surface-raised",
-          )}
-          style={{
-            width,
-            height,
-            ...(isRested ? { transform: "rotate(90deg)" } : undefined),
-          }}
-        >
-          {imageUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageUrl}
-                alt={data?.name ?? ""}
-                className="absolute inset-0 h-full w-full object-cover"
-                draggable={false}
-              />
-            </>
-          ) : (
-            <>
-              <div className="px-1 pt-1 text-xs leading-tight text-gb-text-bright font-bold line-clamp-2">
-                {data?.name ?? label ?? "?"}
-              </div>
-              {data?.type && (
-                <div className="px-1">
-                  <span className="text-xs text-gb-text-dim">{data.type}</span>
-                </div>
-              )}
-              <div className="flex-1" />
-              <div className="px-1 pb-1 flex items-end justify-between">
-                {data?.power != null && (
-                  <span className="text-xs font-bold text-gb-accent-green leading-none">
-                    {data.power >= 1000
-                      ? `${(data.power / 1000).toFixed(0)}K`
-                      : data.power}
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-
-          {count != null && count > 0 && (
-            <div className="absolute top-1 right-1 bg-gb-board-dark/80 text-gb-text-bright text-xs font-bold px-1 rounded text-center">
-              {count}
+        {imageUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={data?.name ?? ""}
+              className="absolute inset-0 h-full w-full object-cover"
+              draggable={false}
+            />
+          </>
+        ) : (
+          <>
+            <div className="px-1 pt-1 text-xs leading-tight text-gb-text-bright font-bold line-clamp-2">
+              {data?.name ?? label ?? "?"}
             </div>
-          )}
-        </div>
+            {data?.type && (
+              <div className="px-1">
+                <span className="text-xs text-gb-text-dim">{data.type}</span>
+              </div>
+            )}
+            <div className="flex-1" />
+            <div className="px-1 pb-1 flex items-end justify-between">
+              {data?.power != null && (
+                <span className="text-xs font-bold text-gb-accent-green leading-none">
+                  {data.power >= 1000
+                    ? `${(data.power / 1000).toFixed(0)}K`
+                    : data.power}
+                </span>
+              )}
+            </div>
+          </>
+        )}
 
-        {donCount > 0 && (
-          <div
-            className="absolute z-10 text-center bg-gb-board-dark/75 py-1"
-            style={{
-              bottom: isRested ? (height - width) / 2 : 0,
-              left: isRested ? -(height - width) / 2 : 0,
-              width: isRested ? height : width,
-            }}
-          >
-            <span className="text-xs font-extrabold text-white leading-none">
-              +{donCount} DON
-            </span>
+        {count != null && count > 0 && (
+          <div className="absolute top-1 right-1 bg-gb-board-dark/80 text-gb-text-bright text-xs font-bold px-1 rounded text-center">
+            {count}
           </div>
         )}
       </div>
 
-      {showTooltip &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={tooltipRef}
-            className="fixed z-[100] pointer-events-none bg-gb-surface border border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg"
-            style={{ opacity: 0 }}
-          >
-            <CardTooltipContent data={data} cardId={resolvedCardId} card={card} />
-          </div>,
-          document.body,
-        )}
-    </>
+      {donCount > 0 && (
+        <div
+          className="absolute z-10 text-center bg-gb-board-dark/75 py-1"
+          style={{ bottom: 0, left: 0, width }}
+        >
+          <span className="text-xs font-extrabold text-white leading-none">
+            +{donCount} DON
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!data) return cardElement;
+
+  return (
+    <TooltipRoot delayDuration={0}>
+      <TooltipTrigger asChild>{cardElement}</TooltipTrigger>
+      <TooltipContent
+        side="right"
+        sideOffset={8}
+        className="bg-gb-surface border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg text-gb-text"
+      >
+        <CardTooltipContent data={data} cardId={resolvedCardId} card={card} />
+      </TooltipContent>
+    </TooltipRoot>
   );
 });
 

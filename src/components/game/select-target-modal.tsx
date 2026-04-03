@@ -3,7 +3,15 @@
 import React, { useState } from "react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-import { useCardTooltip } from "./use-card-tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui";
+import { GameButton } from "./game-button";
+import { CardTooltip } from "./use-card-tooltip";
 
 const CARD_W = 80;
 const CARD_H = 112;
@@ -22,14 +30,11 @@ function TargetCard({
   onToggle: () => void;
 }) {
   const data = cardDb[card.cardId] ?? null;
-  const { triggerRef, hoverHandlers, portal } = useCardTooltip(data, card.cardId, card);
 
   return (
-    <>
+    <CardTooltip data={data} cardId={card.cardId} card={card}>
       <div
-        ref={triggerRef}
         onClick={invalid ? undefined : onToggle}
-        {...hoverHandlers}
         className={cn(
           "relative rounded-md overflow-hidden border-2 transition-colors select-none shrink-0",
           invalid
@@ -66,8 +71,7 @@ function TargetCard({
           </div>
         )}
       </div>
-      {portal}
-    </>
+    </CardTooltip>
   );
 }
 
@@ -98,8 +102,6 @@ export function SelectTargetModal({
 }: SelectTargetModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  if (isHidden) return null;
-
   const validSet = new Set(validTargets);
 
   function toggleCard(instanceId: string) {
@@ -129,25 +131,20 @@ export function SelectTargetModal({
         : `Select ${countMin}–${countMax}`;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div
-        className="bg-gb-surface border border-gb-border-strong rounded-lg flex flex-col"
-        style={{ width: 520, maxWidth: "calc(100vw - 32px)" }}
+    <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gb-border">
-          <span className="text-sm font-bold text-gb-text-bright">
+        <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
+          <DialogTitle className="text-sm font-bold text-gb-text-bright">
             {effectDescription}
-          </span>
-          <button
-            onClick={onHide}
-            className="text-xs text-gb-text-dim hover:text-gb-text px-2 py-1 rounded-md hover:bg-gb-surface-raised transition-colors cursor-pointer"
-          >
+          </DialogTitle>
+          <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
-          </button>
-        </div>
+          </GameButton>
+        </DialogHeader>
 
-        {/* Body — scrollable */}
         <div className="px-4 py-4 overflow-y-auto" style={{ maxHeight: 300 }}>
           <div
             className={cn("flex flex-wrap gap-2", cards.length <= 5 ? "justify-center" : "justify-start")}
@@ -166,8 +163,7 @@ export function SelectTargetModal({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gb-border">
+        <DialogFooter className="flex-row items-center justify-between px-4 py-3 border-t border-gb-border pt-3">
           <span className="text-xs text-gb-text-dim">
             {countLabel}
             {selectedIds.size > 0 && (
@@ -176,20 +172,16 @@ export function SelectTargetModal({
               </span>
             )}
           </span>
-          <button
+          <GameButton
+            variant={canConfirm ? "amber" : "secondary"}
+            size="sm"
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className={cn(
-              "px-3 py-2 text-xs font-bold rounded-md border transition-colors",
-              canConfirm
-                ? "bg-gb-accent-amber/15 text-gb-accent-amber border-gb-accent-amber/30 hover:border-gb-accent-amber/60 cursor-pointer"
-                : "opacity-40 cursor-not-allowed bg-gb-surface-raised text-gb-text border-gb-border-strong",
-            )}
           >
             {ctaLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </GameButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

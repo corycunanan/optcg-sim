@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { GameButton } from "./game-button";
 
 interface Props {
   children: React.ReactNode;
@@ -25,32 +27,37 @@ export class GameErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="flex h-full w-full items-center justify-center bg-gb-board">
-          <div className="max-w-[400px] w-full bg-gb-surface border border-gb-border-strong rounded-lg p-6 text-center mx-4">
-            <p className="text-xs font-semibold text-gb-text-subtle tracking-widest mb-2">
-              RENDERING ERROR
-            </p>
-            <p className="text-xl font-extrabold text-gb-accent-red mb-3">
-              Something went wrong
-            </p>
-            <p className="text-sm text-gb-text leading-relaxed mb-4">
-              The game board encountered an error. Your game is still running on
-              the server — returning to lobbies will not forfeit the match.
-            </p>
-            {this.state.error && (
-              <p className="text-xs text-gb-text-dim font-mono mb-4 break-all">
-                {this.state.error.message}
+          <Card className="max-w-[400px] w-full bg-gb-surface border-gb-border-strong text-center mx-4">
+            <CardHeader>
+              <CardTitle className="text-xs font-semibold text-gb-text-subtle tracking-widest">
+                RENDERING ERROR
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="text-xl font-extrabold text-gb-accent-red">
+                Something went wrong
               </p>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = "/lobbies";
-              }}
-              className="w-full py-3 px-4 rounded-md border-none bg-navy-800 text-gb-text-bright text-base font-bold cursor-pointer hover:bg-navy-700 transition-colors"
-            >
-              Return to Lobbies
-            </button>
-          </div>
+              <p className="text-sm text-gb-text leading-relaxed">
+                The game board encountered an error. Your game is still running on
+                the server — returning to lobbies will not forfeit the match.
+              </p>
+              {this.state.error && (
+                <p className="text-xs text-gb-text-dim font-mono break-all">
+                  {this.state.error.message}
+                </p>
+              )}
+              <GameButton
+                variant="primary"
+                size="lg"
+                onClick={() => {
+                  window.location.href = "/lobbies";
+                }}
+                className="w-full"
+              >
+                Return to Lobbies
+              </GameButton>
+            </CardContent>
+          </Card>
         </div>
       );
     }

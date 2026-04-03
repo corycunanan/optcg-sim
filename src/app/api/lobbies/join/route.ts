@@ -151,21 +151,45 @@ export async function POST(request: NextRequest) {
       format: lobby.format,
       player1: {
         userId: lobby.hostUserId,
-        leader: { cardId: hostLeader.id, quantity: 1, cardData: toCardData(hostLeader) },
+        sleeveUrl: lobby.hostDeck.sleeveUrl ?? null,
+        donArtUrl: lobby.hostDeck.donArtUrl ?? null,
+        leader: {
+          cardId: hostLeader.id,
+          quantity: 1,
+          cardData: {
+            ...toCardData(hostLeader),
+            imageUrl: lobby.hostDeck.leaderArtUrl ?? hostLeader.imageUrl,
+          },
+        },
         deck: lobby.hostDeck.cards.map((dc) => ({
           cardId: dc.card.id,
           quantity: dc.quantity,
-          cardData: toCardData(dc.card),
+          cardData: {
+            ...toCardData(dc.card),
+            imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
+          },
         })),
         ...(devDebug && { debug: devDebug }),
       },
       player2: {
         userId,
-        leader: { cardId: guestLeader.id, quantity: 1, cardData: toCardData(guestLeader) },
+        sleeveUrl: guestDeck.sleeveUrl ?? null,
+        donArtUrl: guestDeck.donArtUrl ?? null,
+        leader: {
+          cardId: guestLeader.id,
+          quantity: 1,
+          cardData: {
+            ...toCardData(guestLeader),
+            imageUrl: guestDeck.leaderArtUrl ?? guestLeader.imageUrl,
+          },
+        },
         deck: guestDeck.cards.map((dc) => ({
           cardId: dc.card.id,
           quantity: dc.quantity,
-          cardData: toCardData(dc.card),
+          cardData: {
+            ...toCardData(dc.card),
+            imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
+          },
         })),
         ...(devDebug && { debug: devDebug }),
       },

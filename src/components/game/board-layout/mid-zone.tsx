@@ -4,6 +4,8 @@ import React from "react";
 import type { GameAction, PromptOptions, PromptType } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { FIELD_W, MID_ZONE_H } from "./constants";
+import { GameButton } from "../game-button";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface BattleInfo {
   attackerName: string;
@@ -12,34 +14,6 @@ export interface BattleInfo {
   defenderPower: number;
   counterPowerAdded: number;
   battleSubPhase: string;
-}
-
-function MidZoneBtn({
-  children,
-  onClick,
-  accent,
-  danger,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  accent?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-2 py-1 text-xs font-bold rounded cursor-pointer border transition-colors duration-100",
-        accent
-          ? "bg-gb-accent-green/15 text-gb-accent-green border-gb-accent-green/30 hover:border-gb-accent-green/50"
-          : danger
-            ? "text-gb-accent-red border-transparent hover:border-gb-accent-red/30"
-            : "bg-gb-surface-raised text-gb-text border-gb-border-strong hover:border-gb-text-muted",
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 function formatPower(power: number): string {
@@ -108,9 +82,9 @@ export interface BlockerMode {
 
 function MidZoneDisabledBtn({ children }: { children: React.ReactNode }) {
   return (
-    <span className="px-2 py-1 text-xs font-bold rounded border border-gb-border-strong/50 text-gb-text-dim/50 select-none">
+    <GameButton variant="secondary" size="sm" disabled>
       {children}
-    </span>
+    </GameButton>
   );
 }
 
@@ -160,9 +134,9 @@ export const MidZone = React.memo(function MidZone({
           <span className="text-xs text-gb-accent-amber font-bold">
             &#x26A1; ACTION REQUIRED
           </span>
-          <MidZoneBtn accent onClick={onShowPrompt ?? (() => {})}>
+          <GameButton variant="green" size="sm" onClick={onShowPrompt ?? (() => {})}>
             Show Prompt
-          </MidZoneBtn>
+          </GameButton>
         </div>
       )}
 
@@ -175,67 +149,70 @@ export const MidZone = React.memo(function MidZone({
           {activePrompt.promptType === "REVEAL_TRIGGER" &&
             !activePrompt.options.cards?.length && (
             <>
-              <MidZoneBtn
+              <GameButton
+                variant="secondary"
+                size="sm"
                 onClick={() =>
                   onAction({ type: "REVEAL_TRIGGER", reveal: true })
                 }
               >
                 Reveal
-              </MidZoneBtn>
-              <MidZoneBtn
+              </GameButton>
+              <GameButton
+                variant="secondary"
+                size="sm"
                 onClick={() =>
                   onAction({ type: "REVEAL_TRIGGER", reveal: false })
                 }
               >
                 Add to Hand
-              </MidZoneBtn>
+              </GameButton>
             </>
           )}
           {activePrompt.options.optional &&
             activePrompt.promptType !== "OPTIONAL_EFFECT" && (
-            <MidZoneBtn onClick={() => onAction({ type: "PASS" })}>
+            <GameButton variant="secondary" size="sm" onClick={() => onAction({ type: "PASS" })}>
               Skip
-            </MidZoneBtn>
+            </GameButton>
           )}
         </div>
       )}
 
       {/* Phase actions */}
       {canEndPhase && (
-        <MidZoneBtn
-          accent
+        <GameButton
+          variant="green"
+          size="sm"
           onClick={() => onAction({ type: "ADVANCE_PHASE" })}
         >
           End {phase} &rarr;
-        </MidZoneBtn>
+        </GameButton>
       )}
 
       {/* Blocker selection: Block + Skip */}
       {blockerMode ? (
         <>
           {blockerMode.selectedBlockerId ? (
-            <MidZoneBtn accent onClick={blockerMode.onBlock}>
+            <GameButton variant="green" size="sm" onClick={blockerMode.onBlock}>
               Block
-            </MidZoneBtn>
+            </GameButton>
           ) : (
             <MidZoneDisabledBtn>Block</MidZoneDisabledBtn>
           )}
-          <MidZoneBtn onClick={() => onAction({ type: "PASS" })}>
+          <GameButton variant="secondary" size="sm" onClick={() => onAction({ type: "PASS" })}>
             Skip
-          </MidZoneBtn>
+          </GameButton>
         </>
       ) : (
         canPass && (
-          <MidZoneBtn onClick={() => onAction({ type: "PASS" })}>
+          <GameButton variant="secondary" size="sm" onClick={() => onAction({ type: "PASS" })}>
             Pass
-          </MidZoneBtn>
+          </GameButton>
         )
       )}
 
       {!isMyTurn && !inBattle && (
-        <span className="text-xs text-gb-text-dim italic">
-          Waiting&hellip;
-        </span>
+        <Spinner className="size-4 text-gb-text-dim" />
       )}
     </div>
   );
