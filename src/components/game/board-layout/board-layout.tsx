@@ -326,7 +326,7 @@ function BoardLayoutInner({
             transformOrigin: "top center",
           }}
         >
-          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightCardIds={oppHandAnim.inFlightByZone["o-hand"]} />
+          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} />
         </div>
       </div>
 
@@ -613,7 +613,7 @@ function BoardLayoutInner({
             enableDrag={bs.canInteract || bs.canDragCounter}
             counterMode={bs.canDragCounter}
             zoneKey="p-hand"
-            inFlightCardIds={playerHandAnim.inFlightByZone["p-hand"]}
+            inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
           />
         </div>
       </div>
