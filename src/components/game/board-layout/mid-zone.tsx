@@ -5,6 +5,7 @@ import type { GameAction, PromptOptions, PromptType } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { FIELD_W, MID_ZONE_H } from "./constants";
 import { GameButton } from "../game-button";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface BattleInfo {
   attackerName: string;
@@ -211,9 +212,7 @@ export const MidZone = React.memo(function MidZone({
       )}
 
       {!isMyTurn && !inBattle && (
-        <span className="text-xs text-gb-text-dim italic">
-          Waiting&hellip;
-        </span>
+        <Spinner className="size-4 text-gb-text-dim" />
       )}
     </div>
   );

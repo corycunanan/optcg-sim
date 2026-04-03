@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
+import { Spinner } from "@/components/ui/spinner";
 import { GameButton } from "./game-button";
 import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
@@ -29,12 +30,13 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   if (!session.gameState || !session.cardDbReady) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gb-board">
-        <div className="text-center">
-          <div className="text-sm text-gb-text-bright font-bold mb-2">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner className="size-6 text-gb-text-bright" />
+          <div className="text-sm text-gb-text-bright font-bold">
             {session.connectionStatus === "connecting"
               ? "Connecting\u2026"
               : !session.gameState
-                ? "Waiting for game state\u2026"
+                ? "Loading game\u2026"
                 : "Loading card data\u2026"}
           </div>
           {session.lastError && (
