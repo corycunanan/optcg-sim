@@ -6,7 +6,6 @@ import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
-import { useCardTilt } from "@/hooks/use-card-tilt";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
@@ -101,6 +100,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   card,
   cardDb,
   activeDragType,
+  onAction,
   zoneKey,
   style,
   animationDelay,
@@ -108,10 +108,13 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   card: CardInstance | null;
   cardDb: CardDb;
   activeDragType: string | null;
+  onAction?: (action: GameAction) => void;
   zoneKey: string;
   style: React.CSSProperties;
   animationDelay?: number;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
   const zonePos = useZonePosition();
   const accepts = activeDragType === "hand-card";
   const { setNodeRef, isOver } = useDroppable({
@@ -128,6 +131,15 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     [setNodeRef, zoneKey, zonePos],
   );
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMenuOpen(true);
+    },
+    [],
+  );
+
   return (
     <div
       ref={mergedRef}
@@ -136,24 +148,39 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="green" />
       {card ? (
-        <motion.div
-          animate={{
-            rotate: card.state === "RESTED" ? 90 : 0,
-            filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
-          }}
-          transition={{
-            ...(card.state === "RESTED" ? cardRest : cardActivate),
-            delay: animationDelay ?? 0,
-          }}
-          className="relative z-[1]"
-        >
-          <BoardCard
-            card={card}
-            cardDb={cardDb}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
-          />
-        </motion.div>
+        <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
+          <DropdownMenuTrigger asChild>
+            <motion.div
+              onContextMenu={handleContextMenu}
+              animate={{
+                rotate: card.state === "RESTED" ? 90 : 0,
+                filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
+              }}
+              transition={{
+                ...(card.state === "RESTED" ? cardRest : cardActivate),
+                delay: animationDelay ?? 0,
+              }}
+              whileHover={reducedMotion ? undefined : cardHover}
+              whileTap={reducedMotion ? undefined : cardTap}
+              className="relative z-[1]"
+            >
+              <BoardCard
+                card={card}
+                cardDb={cardDb}
+                width={BOARD_CARD_W}
+                height={BOARD_CARD_H}
+              />
+            </motion.div>
+          </DropdownMenuTrigger>
+          {onAction && (
+            <CardActionMenuContent
+              card={card}
+              cardDb={cardDb}
+              onAction={onAction}
+              onClose={() => setMenuOpen(false)}
+            />
+          )}
+        </DropdownMenu>
       ) : (
         <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
           STG
@@ -209,13 +236,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     data: { type: "don-target", targetInstanceId: card.instanceId },
   });
 
-  const tilt = useCardTilt({ enabled: !reducedMotion && !isDragging });
-
   const mergedRef = useCallback(
     (node: HTMLElement | null) => {
       setDragRef(node);
       setDropRef(node);
-      tilt.ref.current = node;
       if (zoneKey) {
         if (node) {
           zonePos.register(zoneKey, node);
@@ -226,7 +250,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
         }
       }
     },
-    [setDragRef, setDropRef, tilt.ref, zoneKey, zonePos, card.instanceId],
+    [setDragRef, setDropRef, zoneKey, zonePos, card.instanceId],
   );
 
   // Keep card→zone mapping up to date if instanceId changes while mounted
@@ -253,7 +277,6 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           ref={mergedRef}
           {...attributes}
           {...listeners}
-          {...tilt.handlers}
           onClick={onSelect}
           onContextMenu={handleContextMenu}
           animate={{
@@ -269,7 +292,6 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           whileTap={skipMotion ? undefined : cardTap}
           style={{
             ...style,
-            ...tilt.style,
             width: SQUARE,
             height: SQUARE,
             cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
@@ -326,12 +348,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     data: { type: "attack-target", targetInstanceId: card.instanceId },
   });
 
-  const tilt = useCardTilt({ enabled: !reducedMotion });
-
   const ref = useCallback(
     (node: HTMLElement | null) => {
       setNodeRef(node);
-      tilt.ref.current = node;
       if (zoneKey) {
         if (node) {
           zonePos.register(zoneKey, node);
@@ -342,7 +361,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         }
       }
     },
-    [setNodeRef, tilt.ref, zoneKey, zonePos, card.instanceId],
+    [setNodeRef, zoneKey, zonePos, card.instanceId],
   );
 
   // Keep card→zone mapping up to date if instanceId changes while mounted
@@ -354,7 +373,6 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   return (
     <motion.div
       ref={ref}
-      {...tilt.handlers}
       animate={{
         rotate: card.state === "RESTED" ? 90 : 0,
         filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
@@ -364,7 +382,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         delay: animationDelay ?? 0,
       }}
       whileHover={reducedMotion ? undefined : cardHover}
-      style={{ ...style, ...tilt.style, width: SQUARE, height: SQUARE }}
+      style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="red" />

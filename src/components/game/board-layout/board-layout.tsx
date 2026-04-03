@@ -12,7 +12,7 @@ import type {
 } from "@shared/game-types";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
-import { cardRest, cardActivate } from "@/lib/motion";
+import { cardRest, cardActivate, cardHover } from "@/lib/motion";
 import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
 import {
@@ -383,6 +383,7 @@ function BoardLayoutInner({
                   ...(opp.stage.state === "RESTED" ? cardRest : cardActivate),
                   delay: refreshWave ? 0.18 : 0,
                 }}
+                whileHover={cardHover}
               >
                 <BoardCard
                   card={opp.stage}
@@ -564,6 +565,7 @@ function BoardLayoutInner({
             card={me?.stage ?? null}
             cardDb={cardDb}
             activeDragType={activeDragType}
+            onAction={onAction}
             zoneKey="p-stage"
             style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
             animationDelay={refreshWave ? 0.18 : undefined}
