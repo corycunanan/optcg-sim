@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import type { CardDb, CardInstance } from "@shared/game-types";
+import type { CardDb, DeckListEntry } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import {
   Badge,
@@ -17,7 +17,7 @@ import { VisuallyHidden } from "radix-ui";
 import { CardTooltipContent } from "./board-card";
 
 interface GameDeckPreviewModalProps {
-  deck: CardInstance[];
+  deckList: DeckListEntry[];
   cardDb: CardDb;
   title: string;
   open: boolean;
@@ -30,7 +30,6 @@ interface CardGroup {
   cost: number | null;
   type: string;
   count: number;
-  instances: CardInstance[];
 }
 
 /** Deterministic pseudo-random rotation for a card instance. */
@@ -42,45 +41,36 @@ function cardRotation(cardId: string, index: number): number {
   return ((hash % 100) / 100) * 3 - 1.5;
 }
 
-/** Group deck cards by cardId, preserving first-seen order. */
-function groupDeck(deck: CardInstance[], cardDb: CardDb): CardGroup[] {
-  const map = new Map<string, CardGroup>();
-
-  for (const card of deck) {
-    const existing = map.get(card.cardId);
-    if (existing) {
-      existing.count++;
-      existing.instances.push(card);
-    } else {
-      const data = cardDb[card.cardId];
-      map.set(card.cardId, {
-        cardId: card.cardId,
-        name: data?.name ?? card.cardId,
+/** Build card groups from the original deck list. */
+function groupDeck(deckList: DeckListEntry[], cardDb: CardDb): CardGroup[] {
+  return deckList
+    .map((entry) => {
+      const data = cardDb[entry.cardId];
+      return {
+        cardId: entry.cardId,
+        name: data?.name ?? entry.cardId,
         cost: data?.cost ?? null,
         type: data?.type ?? "Unknown",
-        count: 1,
-        instances: [card],
-      });
-    }
-  }
-
-  return Array.from(map.values()).sort((a, b) => {
-    const costA = a.cost ?? -1;
-    const costB = b.cost ?? -1;
-    if (costA !== costB) return costA - costB;
-    return a.name.localeCompare(b.name);
-  });
+        count: entry.count,
+      };
+    })
+    .sort((a, b) => {
+      const costA = a.cost ?? -1;
+      const costB = b.cost ?? -1;
+      if (costA !== costB) return costA - costB;
+      return a.name.localeCompare(b.name);
+    });
 }
 
 export function GameDeckPreviewModal({
-  deck,
+  deckList,
   cardDb,
   title,
   open,
   onOpenChange,
 }: GameDeckPreviewModalProps) {
-  const groups = useMemo(() => groupDeck(deck, cardDb), [deck, cardDb]);
-  const totalCards = deck.length;
+  const groups = useMemo(() => groupDeck(deckList, cardDb), [deckList, cardDb]);
+  const totalCards = deckList.reduce((sum, e) => sum + e.count, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,7 +178,6 @@ export function GameDeckPreviewModal({
                         <CardTooltipContent
                           data={data}
                           cardId={group.cardId}
-                          card={group.instances[0]}
                         />
                       )}
                     </TooltipContent>

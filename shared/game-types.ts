@@ -98,11 +98,17 @@ export interface PlayerState {
   donDeck: DonInstance[];
   life: LifeCard[];              // ordered; index 0 = top (first removed on damage)
   removedFromGame: CardInstance[];
+  deckList: DeckListEntry[];     // original deck composition (static, never changes)
   connected: boolean;
   awayReason: "LEFT" | "DISCONNECTED" | null;
   rejoinDeadlineAt: number | null;
   sleeveUrl: string | null;
   donArtUrl: string | null;
+}
+
+export interface DeckListEntry {
+  cardId: string;
+  count: number;
 }
 
 // ─── Effect / Modifier stubs (populated in M4) ────────────────────────────────
