@@ -118,31 +118,32 @@ export async function POST(request: NextRequest) {
       imageUrl: card.imageUrl,
     });
 
-    // Create LobbyGuest, GameSession, and mark lobby IN_GAME.
-    // Uses sequential writes instead of an interactive $transaction to avoid
-    // connection-pool exhaustion (Neon PgBouncer with connection_limit=1).
-    await prisma.lobbyGuest.create({
-      data: { lobbyId: lobby.id, userId, deckId },
-    });
-
-    const gameSession = await prisma.gameSession.upsert({
-      where: { lobbyId: lobby.id },
-      create: {
-        lobbyId: lobby.id,
-        player1Id: lobby.hostUserId,
-        player2Id: userId,
-        player1DeckId: lobby.hostDeckId,
-        player2DeckId: deckId,
-        format: lobby.format,
-        status: "IN_PROGRESS",
-      },
-      update: { status: "IN_PROGRESS" },
-    });
-
-    await prisma.lobby.update({
-      where: { id: lobby.id },
-      data: { status: "IN_GAME" },
-    });
+    // Atomically create LobbyGuest + GameSession + mark lobby IN_GAME.
+    // Uses array-based $transaction (single round-trip, PgBouncer-safe)
+    // so a concurrent join attempt fails on the unique lobbyId constraint
+    // instead of creating orphaned records.
+    const [, gameSession] = await prisma.$transaction([
+      prisma.lobbyGuest.create({
+        data: { lobbyId: lobby.id, userId, deckId },
+      }),
+      prisma.gameSession.upsert({
+        where: { lobbyId: lobby.id },
+        create: {
+          lobbyId: lobby.id,
+          player1Id: lobby.hostUserId,
+          player2Id: userId,
+          player1DeckId: lobby.hostDeckId,
+          player2DeckId: deckId,
+          format: lobby.format,
+          status: "IN_PROGRESS",
+        },
+        update: { status: "IN_PROGRESS" },
+      }),
+      prisma.lobby.update({
+        where: { id: lobby.id },
+        data: { status: "IN_GAME" },
+      }),
+    ]);
 
     // Build init payload for the Durable Object
     const devDebug = process.env.NODE_ENV === "development" ? { searchersFirst: true } : undefined;
@@ -208,9 +209,12 @@ export async function POST(request: NextRequest) {
     if (!workerRes.ok) {
       const workerErr = await workerRes.text().catch(() => "unknown");
       console.error("Worker init failed:", workerRes.status, workerErr);
-      // Roll back the game session — lobby stays IN_GAME to prevent re-join races,
-      // but the host can cancel/recreate.
-      await prisma.gameSession.delete({ where: { id: gameSession.id } }).catch(() => {});
+      // Roll back all 3 records so the lobby returns to WAITING and can be re-joined.
+      await prisma.$transaction([
+        prisma.gameSession.delete({ where: { id: gameSession.id } }),
+        prisma.lobbyGuest.delete({ where: { lobbyId: lobby.id } }),
+        prisma.lobby.update({ where: { id: lobby.id }, data: { status: "WAITING" } }),
+      ]).catch((e) => console.error("Rollback failed:", e));
       return NextResponse.json(
         { error: "Failed to initialize game server" },
         { status: 502 },
