@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { type Prisma } from "@prisma/client";
 import { cardIdToOriginSet } from "@/lib/utils";
@@ -24,8 +25,8 @@ export async function GET(request: NextRequest) {
   const ban = searchParams.get("ban");
   const traits = searchParams.get("traits");
   const attribute = searchParams.get("attribute");
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "40"), 100);
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+  const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "40") || 40), 100);
   const sort = searchParams.get("sort") || "id";
   const order = searchParams.get("order") || "asc";
 
@@ -46,14 +47,18 @@ export async function GET(request: NextRequest) {
 
   if (costMin || costMax) {
     where.cost = {};
-    if (costMin) where.cost.gte = parseInt(costMin);
-    if (costMax) where.cost.lte = parseInt(costMax);
+    const parsedCostMin = parseInt(costMin || "");
+    const parsedCostMax = parseInt(costMax || "");
+    if (!isNaN(parsedCostMin)) where.cost.gte = parsedCostMin;
+    if (!isNaN(parsedCostMax)) where.cost.lte = parsedCostMax;
   }
 
   if (powerMin || powerMax) {
     where.power = {};
-    if (powerMin) where.power.gte = parseInt(powerMin);
-    if (powerMax) where.power.lte = parseInt(powerMax);
+    const parsedPowerMin = parseInt(powerMin || "");
+    const parsedPowerMax = parseInt(powerMax || "");
+    if (!isNaN(parsedPowerMin)) where.power.gte = parsedPowerMin;
+    if (!isNaN(parsedPowerMax)) where.power.lte = parsedPowerMax;
   }
 
   if (set) {
@@ -129,6 +134,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
 

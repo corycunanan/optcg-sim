@@ -29,6 +29,16 @@ export async function GET() {
       },
     });
 
+    // Batch unread counts in a single query instead of N+1 per-conversation counts
+    const unreadCounts = await prisma.message.groupBy({
+      by: ["fromUserId"],
+      where: { toUserId: userId, read: false },
+      _count: true,
+    });
+    const unreadMap = new Map(
+      unreadCounts.map((row) => [row.fromUserId, row._count]),
+    );
+
     // Group into conversations keyed by the other user's ID
     const seen = new Set<string>();
     const conversations: {
@@ -44,15 +54,10 @@ export async function GET() {
 
       const otherUser = msg.fromUserId === userId ? msg.toUser : msg.fromUser;
 
-      // Count unread messages from this person
-      const unreadCount = await prisma.message.count({
-        where: { fromUserId: otherId, toUserId: userId, read: false },
-      });
-
       conversations.push({
         user: otherUser,
         lastMessage: { body: msg.body, createdAt: msg.createdAt, fromUserId: msg.fromUserId },
-        unreadCount,
+        unreadCount: unreadMap.get(otherId) ?? 0,
       });
     }
 
