@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { UpdateCardSchema } from "@/lib/validators/cards";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function GET(
   _request: NextRequest,
@@ -51,33 +53,13 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    const body = await request.json();
+    const parsed = await parseBody(request, UpdateCardSchema);
+    if (isErrorResponse(parsed)) return parsed;
 
-    // Allow updating all card fields (except id and originSet which are derived)
-    const allowedFields = [
-      "name",
-      "type",
-      "color",
-      "cost",
-      "power",
-      "counter",
-      "life",
-      "attribute",
-      "traits",
-      "rarity",
-      "effectText",
-      "triggerText",
-      "imageUrl",
-      "blockNumber",
-      "banStatus",
-      "isReprint",
-    ];
-
+    // Only include fields that were explicitly provided
     const updateData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (field in body) {
-        updateData[field] = body[field];
-      }
+    for (const [key, value] of Object.entries(parsed)) {
+      if (value !== undefined) updateData[key] = value;
     }
 
     const card = await prisma.card.update({

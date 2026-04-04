@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { GameActionSchema } from "@/lib/validators/game";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
@@ -75,22 +77,14 @@ export async function POST(
   const userId = session.user.id;
   const { id } = await params;
 
-  let body: { action?: string; winnerId?: string | null; winReason?: string | null };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await parseBody(request, GameActionSchema);
+  if (isErrorResponse(parsed)) return parsed;
+
+  if (parsed.action === "FINALIZE") {
+    return handleFinalize(id, userId, parsed);
   }
 
-  if (body.action === "FINALIZE") {
-    return handleFinalize(id, userId, body);
-  }
-
-  if (body.action === "CONCEDE") {
-    return handleConcede(id, userId);
-  }
-
-  return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+  return handleConcede(id, userId);
 }
 
 /**

@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { UpdateLobbyDeckSchema } from "@/lib/validators/lobbies";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -99,11 +101,9 @@ export async function PATCH(
 
   const userId = session.user.id;
   const { id } = await params;
-  const { deckId } = (await request.json()) as { deckId?: string };
-
-  if (!deckId) {
-    return NextResponse.json({ error: "deckId is required" }, { status: 400 });
-  }
+  const parsed = await parseBody(request, UpdateLobbyDeckSchema);
+  if (isErrorResponse(parsed)) return parsed;
+  const { deckId } = parsed;
 
   const lobby = await prisma.lobby.findFirst({
     where: { id, hostUserId: userId, status: "WAITING" },

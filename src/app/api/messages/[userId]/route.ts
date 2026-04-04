@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { SendMessageSchema } from "@/lib/validators/messages";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function GET(
   request: NextRequest,
@@ -93,11 +95,9 @@ export async function POST(
   const { userId: toUserId } = await params;
 
   try {
-    const { body } = await request.json() as { body: string };
-
-    if (!body?.trim()) {
-      return NextResponse.json({ error: "Message body is required" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, SendMessageSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { body } = parsed;
     if (toUserId === fromUserId) {
       return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 });
     }

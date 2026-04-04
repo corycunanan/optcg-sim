@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { generateLobbyCode } from "@/lib/lobbies";
+import { CreateLobbySchema } from "@/lib/validators/lobbies";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -17,14 +19,9 @@ export async function POST(request: NextRequest) {
   const userId = session.user.id;
 
   try {
-    const { deckId, format } = (await request.json()) as {
-      deckId: string;
-      format?: string;
-    };
-
-    if (!deckId) {
-      return NextResponse.json({ error: "deckId is required" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, CreateLobbySchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { deckId, format } = parsed;
 
     const deck = await prisma.deck.findFirst({
       where: { id: deckId, userId },

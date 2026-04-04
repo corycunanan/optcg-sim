@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { UpdateDeckSchema } from "@/lib/validators/decks";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { prisma } from "@/lib/db";
 
 const CARD_SELECT = {
@@ -90,16 +92,9 @@ export async function PUT(
       return NextResponse.json({ error: "Deck not found" }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, format, cards } = body as {
-      name?: string;
-      leaderId?: string;
-      leaderArtUrl?: string | null;
-      sleeveUrl?: string | null;
-      donArtUrl?: string | null;
-      format?: string;
-      cards?: { cardId: string; quantity: number; selectedArtUrl?: string | null }[];
-    };
+    const parsed = await parseBody(request, UpdateDeckSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, format, cards } = parsed;
 
     // If changing leader, validate it
     if (leaderId && leaderId !== existing.leaderId) {

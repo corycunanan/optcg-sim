@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { CreateDeckSchema } from "@/lib/validators/decks";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function GET() {
   const session = await auth();
@@ -68,23 +70,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, format, cards } = body as {
-      name: string;
-      leaderId: string;
-      leaderArtUrl?: string | null;
-      sleeveUrl?: string | null;
-      donArtUrl?: string | null;
-      format?: string;
-      cards?: { cardId: string; quantity: number; selectedArtUrl?: string | null }[];
-    };
-
-    if (!name || !leaderId) {
-      return NextResponse.json(
-        { error: "Name and leaderId are required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(request, CreateDeckSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, format, cards } = parsed;
 
     // Verify leader exists and is a Leader type
     const leader = await prisma.card.findUnique({ where: { id: leaderId } });

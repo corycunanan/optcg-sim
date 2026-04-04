@@ -8,6 +8,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { type Prisma } from "@prisma/client";
 import { cardIdToOriginSet } from "@/lib/utils";
+import { CreateCardSchema } from "@/lib/validators/cards";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -140,19 +142,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-
-    // Validate required fields
-    const { id, name, type, color, blockNumber } = body;
-    if (!id || !name || !type || !color?.length || blockNumber == null) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing required fields: id, name, type, color, blockNumber",
-        },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(request, CreateCardSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { id, name, type, color, blockNumber } = parsed;
+    const body = parsed;
 
     // Check for duplicate
     const existing = await prisma.card.findUnique({ where: { id } });

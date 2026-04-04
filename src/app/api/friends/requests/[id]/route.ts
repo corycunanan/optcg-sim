@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { FriendRequestActionSchema } from "@/lib/validators/friends";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function PUT(
   request: NextRequest,
@@ -19,11 +21,9 @@ export async function PUT(
   const { id } = await params;
 
   try {
-    const { action } = await request.json() as { action: "accept" | "decline" };
-
-    if (action !== "accept" && action !== "decline") {
-      return NextResponse.json({ error: "action must be 'accept' or 'decline'" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, FriendRequestActionSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { action } = parsed;
 
     const req = await prisma.friendRequest.findFirst({
       where: { id, toUserId: userId, status: "PENDING" },

@@ -5,31 +5,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { RegisterSchema } from "@/lib/validators/auth";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, username, password } = (await request.json()) as {
-      email: string;
-      username: string;
-      password: string;
-    };
-
-    // Validate
-    if (!email || !username || !password) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
-    }
-    if (username.length < 3 || username.length > 20) {
-      return NextResponse.json({ error: "Username must be 3–20 characters" }, { status: 400 });
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      return NextResponse.json({ error: "Username may only contain letters, numbers, and underscores" }, { status: 400 });
-    }
-    if (password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, RegisterSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { email, username, password } = parsed;
 
     // Uniqueness checks
     const [existingEmail, existingUsername] = await Promise.all([

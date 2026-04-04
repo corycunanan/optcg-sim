@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { SetUsernameSchema } from "@/lib/validators/user";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -14,35 +16,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { username } = body;
-
-    // Validate
-    if (!username || typeof username !== "string") {
-      return NextResponse.json(
-        { error: "Username is required" },
-        { status: 400 }
-      );
-    }
-
-    const trimmed = username.trim();
-
-    if (trimmed.length < 3 || trimmed.length > 20) {
-      return NextResponse.json(
-        { error: "Username must be 3–20 characters" },
-        { status: 400 }
-      );
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-      return NextResponse.json(
-        {
-          error:
-            "Username can only contain letters, numbers, hyphens, and underscores",
-        },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(request, SetUsernameSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const trimmed = parsed.username;
 
     // Check uniqueness
     const existing = await prisma.user.findUnique({

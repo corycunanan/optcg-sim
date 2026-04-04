@@ -16,6 +16,8 @@ import { prisma } from "@/lib/db";
 import { normalizeLobbyCode } from "@/lib/lobbies";
 import { extractKeywords } from "@/lib/game/keywords";
 import type { Card } from "@prisma/client";
+import { JoinLobbySchema } from "@/lib/validators/lobbies";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
@@ -34,17 +36,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { code, deckId } = (await request.json()) as {
-      code: string;
-      deckId: string;
-    };
-
-    if (!code || !deckId) {
-      return NextResponse.json(
-        { error: "code and deckId are required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await parseBody(request, JoinLobbySchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { code, deckId } = parsed;
 
     const normalizedCode = normalizeLobbyCode(code);
     if (normalizedCode.length < 4) {

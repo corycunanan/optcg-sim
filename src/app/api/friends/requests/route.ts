@@ -4,6 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { SendFriendRequestSchema } from "@/lib/validators/friends";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
@@ -51,11 +53,9 @@ export async function POST(request: NextRequest) {
   const userId = session.user.id;
 
   try {
-    const { toUserId } = await request.json() as { toUserId: string };
-
-    if (!toUserId) {
-      return NextResponse.json({ error: "toUserId is required" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, SendFriendRequestSchema);
+    if (isErrorResponse(parsed)) return parsed;
+    const { toUserId } = parsed;
     if (toUserId === userId) {
       return NextResponse.json({ error: "Cannot send request to yourself" }, { status: 400 });
     }

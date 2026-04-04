@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { ImportDeckSchema } from "@/lib/validators/decks";
+import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
 interface ParsedLine {
   line: number;
@@ -103,15 +105,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { text } = body as { text: string };
-
-    if (!text || typeof text !== "string") {
-      return NextResponse.json(
-        { error: "Text field is required" },
-        { status: 400 },
-      );
-    }
+    const validated = await parseBody(request, ImportDeckSchema);
+    if (isErrorResponse(validated)) return validated;
+    const { text } = validated;
 
     const parsed = parseDeckList(text);
     const cardIds = [
