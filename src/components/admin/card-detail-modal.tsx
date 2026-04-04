@@ -117,8 +117,8 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
     setCard(null);
     fetch(`/api/cards/${cardId}`)
       .then((r) => r.json())
-      .then((data) => {
-        setCard(data);
+      .then((json) => {
+        setCard(json.data);
         setLoading(false);
       })
       .catch(() => setLoading(false));

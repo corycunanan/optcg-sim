@@ -75,8 +75,8 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       setFriends(data.data || []);
     }
     if (requestsRes.ok) {
-      const data = await requestsRes.json();
-      setIncoming(data.incoming || []);
+      const json = await requestsRes.json();
+      setIncoming(json.data?.incoming || []);
     }
   }, []);
 

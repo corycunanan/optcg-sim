@@ -45,7 +45,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           router.push("/decks");
           return;
         }
-        const data = await res.json();
+        const { data } = await res.json();
 
         const cardsMap = new Map<string, DeckCardEntry>();
         for (const dc of data.cards) {
@@ -132,7 +132,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
       if (!res.ok) throw new Error("Save failed");
 
-      const data = await res.json();
+      const { data } = await res.json();
       dispatch({ type: "SAVE_SUCCESS", id: data.id });
 
       if (!state.id) {

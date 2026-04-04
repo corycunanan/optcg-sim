@@ -65,7 +65,7 @@ export async function GET(
       select: CARD_SELECT,
     });
 
-    return NextResponse.json({ ...deck, leader });
+    return NextResponse.json({ data: { ...deck, leader } });
   } catch (error) {
     console.error("Deck fetch error:", error);
     return NextResponse.json({ error: "Failed to fetch deck" }, { status: 500 });
@@ -144,7 +144,7 @@ export async function PUT(
       select: CARD_SELECT,
     });
 
-    return NextResponse.json({ ...deck, leader });
+    return NextResponse.json({ data: { ...deck, leader } });
   } catch (error) {
     console.error("Deck update error:", error);
     return NextResponse.json({ error: "Failed to update deck" }, { status: 500 });

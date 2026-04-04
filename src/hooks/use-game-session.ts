@@ -82,9 +82,9 @@ export function useGameSession(
   const getToken = useCallback(async () => {
     const r = await fetch("/api/game/token");
     if (!r.ok) throw new Error(`Token fetch: ${r.status}`);
-    const d = (await r.json()) as { token?: string };
-    if (!d.token) throw new Error("No token");
-    return d.token;
+    const d = (await r.json()) as { data?: { token?: string } };
+    if (!d.data?.token) throw new Error("No token");
+    return d.data.token;
   }, []);
 
   const {
@@ -193,11 +193,11 @@ export function useGameSession(
       }).catch(() => null);
       if (!response?.ok || cancelled) return;
 
-      const data = (await response.json().catch(() => null)) as {
-        game?: RemoteGameStatus;
+      const json = (await response.json().catch(() => null)) as {
+        data?: RemoteGameStatus;
       } | null;
-      if (!cancelled && data?.game) {
-        setRemoteGameStatus(data.game);
+      if (!cancelled && json?.data) {
+        setRemoteGameStatus(json.data);
       }
     };
 
@@ -290,15 +290,15 @@ export function useGameSession(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "CONCEDE" }),
       });
-      const data = (await response.json().catch(() => null)) as {
+      const json = (await response.json().catch(() => null)) as {
         error?: string;
-        game?: RemoteGameStatus;
+        data?: RemoteGameStatus;
       } | null;
-      if (!response.ok || !data?.game) {
-        throw new Error(data?.error ?? "Failed to concede");
+      if (!response.ok || !json?.data) {
+        throw new Error(json?.error ?? "Failed to concede");
       }
 
-      setRemoteGameStatus(data.game);
+      setRemoteGameStatus(json.data);
       window.location.href = "/lobbies";
     } catch (error) {
       setFallbackError(

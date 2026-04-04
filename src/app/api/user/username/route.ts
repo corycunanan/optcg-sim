@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       data: { username: trimmed },
     });
 
-    return NextResponse.json({ username: user.username });
+    return NextResponse.json({ data: { username: user.username } });
   } catch (error) {
     console.error("Username update error:", error);
     return NextResponse.json(

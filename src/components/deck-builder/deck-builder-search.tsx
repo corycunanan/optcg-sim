@@ -91,9 +91,9 @@ export function DeckBuilderSearch({
 
       try {
         const res = await fetch(`/api/cards?${params.toString()}`);
-        const data = await res.json();
-        setResults(data.data || []);
-        setTotal(data.total || 0);
+        const json = await res.json();
+        setResults(json.data || []);
+        setTotal(json.pagination?.total || 0);
       } catch {
         setResults([]);
         setTotal(0);

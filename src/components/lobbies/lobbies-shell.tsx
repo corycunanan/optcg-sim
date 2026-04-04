@@ -119,8 +119,8 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
     try {
       const res = await fetch("/api/game/active");
       if (!res.ok) return;
-      const data = await res.json();
-      setActiveGameId(data.game?.id ?? null);
+      const json = await res.json();
+      setActiveGameId(json.data?.id ?? null);
     } catch {
       /* network error */
     }
@@ -185,7 +185,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
           setActiveLobby(null);
           return;
         }
-        const data = await res.json();
+        const { data } = await res.json();
 
         if (data.gameId) {
           router.push(`/game/${data.gameId}`);
@@ -236,14 +236,14 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ deckId, format: "Standard" }),
         });
-        const data = await res.json();
+        const json = await res.json();
         if (res.ok) {
           // Find the selected deck to populate hostDeck info
           const deck = userDecks.find((d) => d.id === deckId);
           setActiveLobby({
-            id: data.lobbyId,
+            id: json.data.lobbyId,
             status: "WAITING",
-            joinCode: data.joinCode,
+            joinCode: json.data.joinCode,
             format: "Standard",
             gameId: null,
             host: null,
@@ -298,11 +298,11 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: joinCode, deckId: selectedDeckId }),
       });
-      const data = await res.json();
+      const json = await res.json();
       if (res.ok) {
-        router.push(`/game/${data.gameId}`);
+        router.push(`/game/${json.data.gameId}`);
       } else {
-        setJoinError(data.error ?? "Failed to join lobby");
+        setJoinError(json.error ?? "Failed to join lobby");
       }
     } catch {
       setJoinError("Network error");

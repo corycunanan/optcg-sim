@@ -28,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: "Card not found" }, { status: 404 });
     }
 
-    return NextResponse.json(card);
+    return NextResponse.json({ data: card });
   } catch (error) {
     console.error("Card fetch error:", error);
     return NextResponse.json(
@@ -71,7 +71,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(card);
+    return NextResponse.json({ data: card });
   } catch (error) {
     console.error("Card update error:", error);
     return NextResponse.json(

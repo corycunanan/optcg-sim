@@ -101,13 +101,12 @@ export default function NewCardPage() {
         }),
       });
 
+      const json = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create card");
+        throw new Error(json.error || "Failed to create card");
       }
 
-      const card = await res.json();
-      router.push(`/admin/cards/${card.id}`);
+      router.push(`/admin/cards/${json.data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {

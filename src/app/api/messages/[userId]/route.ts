@@ -115,7 +115,7 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(message, { status: 201 });
+    return NextResponse.json({ data: message }, { status: 201 });
   } catch (error) {
     console.error("Message send error:", error);
     return NextResponse.json({ error: "Failed to send message" }, { status: 500 });

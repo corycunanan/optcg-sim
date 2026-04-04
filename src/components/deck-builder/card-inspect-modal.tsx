@@ -97,9 +97,9 @@ export function CardInspectModal({
       try {
         const res = await fetch(`/api/cards/${cardId}`);
         if (!res.ok) return;
-        const data = await res.json();
-        setCard(data);
-        if (!displayImage) setDisplayImage(selectedArtUrl || data.imageUrl);
+        const json = await res.json();
+        setCard(json.data);
+        if (!displayImage) setDisplayImage(selectedArtUrl || json.data.imageUrl);
       } catch {
         // noop
       } finally {

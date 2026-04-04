@@ -17,7 +17,7 @@ export async function GET() {
       orderBy: { packId: "asc" },
     });
 
-    return NextResponse.json(sets);
+    return NextResponse.json({ data: sets });
   } catch (error) {
     console.error("Sets fetch error:", error);
     return NextResponse.json(

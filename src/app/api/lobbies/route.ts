@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { lobbyId: lobby.id, joinCode: lobby.joinCode },
+      { data: { lobbyId: lobby.id, joinCode: lobby.joinCode } },
       { status: 201 },
     );
   } catch (error) {

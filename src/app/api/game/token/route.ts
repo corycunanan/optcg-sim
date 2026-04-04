@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   const token = await mintGameToken(session.user.id, GAME_WORKER_SECRET);
-  return NextResponse.json({ token });
+  return NextResponse.json({ data: { token } });
 }
 
 async function mintGameToken(userId: string, secret: string): Promise<string> {

@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(deck, { status: 201 });
+    return NextResponse.json({ data: deck }, { status: 201 });
   } catch (error) {
     console.error("Deck create error:", error);
     return NextResponse.json({ error: "Failed to create deck" }, { status: 500 });

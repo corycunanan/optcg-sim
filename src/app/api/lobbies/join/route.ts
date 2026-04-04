@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (!hostLeader || !guestLeader) {
-      return NextResponse.json({ error: "Leader card not found" }, { status: 422 });
+      return NextResponse.json({ error: "Leader card not found" }, { status: 404 });
     }
 
     const toCardData = (card: Card) => ({
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ gameId: gameSession.id });
+    return NextResponse.json({ data: { gameId: gameSession.id } });
   } catch (error) {
     console.error("Lobby join error:", error);
     return NextResponse.json({ error: "Failed to join lobby" }, { status: 500 });

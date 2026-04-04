@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest) {
       data: { read: true },
     });
 
-    return NextResponse.json({ read: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Mark read error:", error);
     return NextResponse.json({ error: "Failed to mark message as read" }, { status: 500 });

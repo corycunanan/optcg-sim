@@ -42,11 +42,11 @@ export async function PUT(
         prisma.friendRequest.delete({ where: { id } }),
       ]);
 
-      return NextResponse.json({ accepted: true });
+      return NextResponse.json({ success: true });
     } else {
       // Decline — delete the request
       await prisma.friendRequest.delete({ where: { id } });
-      return NextResponse.json({ declined: true });
+      return NextResponse.json({ success: true });
     }
   } catch (error) {
     console.error("Friend request action error:", error);

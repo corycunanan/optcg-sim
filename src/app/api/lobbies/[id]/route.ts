@@ -60,7 +60,7 @@ export async function GET(
     ? leaderMap.get(lobby.guest.deck.leaderId)
     : null;
 
-  return NextResponse.json({
+  return NextResponse.json({ data: {
     id: lobby.id,
     status: lobby.status,
     joinCode: lobby.joinCode,
@@ -85,7 +85,7 @@ export async function GET(
         }
       : null,
     gameId: lobby.gameSession?.id ?? null,
-  }, {
+  } }, {
     headers: { "Cache-Control": "no-store" },
   });
 }
@@ -126,7 +126,7 @@ export async function PATCH(
     data: { hostDeckId: deckId },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ success: true });
 }
 
 export async function DELETE(
@@ -154,5 +154,5 @@ export async function DELETE(
     data: { status: "CLOSED" },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ success: true });
 }

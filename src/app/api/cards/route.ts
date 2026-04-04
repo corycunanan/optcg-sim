@@ -121,10 +121,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: cards,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error("Card search error:", error);
@@ -186,7 +188,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(card, { status: 201 });
+    return NextResponse.json({ data: card }, { status: 201 });
   } catch (error) {
     console.error("Card create error:", error);
     return NextResponse.json(

@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ game: null });
+    return NextResponse.json({ data: null });
   }
 
   const userId = session.user.id;
@@ -24,7 +24,7 @@ export async function GET() {
     orderBy: { startedAt: "desc" },
   });
 
-  return NextResponse.json({ game: game ?? null }, {
+  return NextResponse.json({ data: game ?? null }, {
     headers: { "Cache-Control": "no-store" },
   });
 }

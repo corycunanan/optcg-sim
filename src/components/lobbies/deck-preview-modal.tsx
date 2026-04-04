@@ -204,8 +204,8 @@ export function DeckPreviewModal({
 
     fetch(`/api/decks/${deckId}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled && data) setDeck(data);
+      .then((json) => {
+        if (!cancelled && json) setDeck(json.data);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

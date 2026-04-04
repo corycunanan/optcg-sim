@@ -51,7 +51,7 @@ export async function GET(
   }
 
   return NextResponse.json({
-    game: {
+    data: {
       id: game.id,
       status: game.status,
       winnerId: game.winnerId,
@@ -113,7 +113,7 @@ async function handleFinalize(
   // Already resolved — return success without modifying
   if (game.status !== "IN_PROGRESS") {
     return NextResponse.json({
-      game: { id: game.id, status: game.status, finalized: false },
+      data: { id: game.id, status: game.status, finalized: false },
     });
   }
 
@@ -135,7 +135,7 @@ async function handleFinalize(
   });
 
   return NextResponse.json({
-    game: {
+    data: {
       id: updated.id,
       status: updated.status,
       winnerId: updated.winnerId,
@@ -188,7 +188,7 @@ async function handleConcede(gameId: string, userId: string) {
   }
 
   return NextResponse.json({
-    game: {
+    data: {
       id: updated.id,
       status: updated.status,
       winnerId: updated.winnerId,

@@ -35,7 +35,7 @@ export async function GET() {
       }),
     ]);
 
-    return NextResponse.json({ incoming, outgoing }, {
+    return NextResponse.json({ data: { incoming, outgoing } }, {
       headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" },
     });
   } catch (error) {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(req, { status: 201 });
+    return NextResponse.json({ data: req }, { status: 201 });
   } catch (error) {
     console.error("Friend request create error:", error);
     return NextResponse.json({ error: "Failed to send request" }, { status: 500 });

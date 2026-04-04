@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Game result update error:", error);
     return NextResponse.json({ error: "Failed to update game result" }, { status: 500 });

@@ -34,7 +34,7 @@ export async function DELETE(
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
 
-    return NextResponse.json({ removed: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Remove friend error:", error);
     return NextResponse.json({ error: "Failed to remove friend" }, { status: 500 });

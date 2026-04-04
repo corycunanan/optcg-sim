@@ -93,8 +93,8 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
           body: JSON.stringify({ body: body.trim() }),
         });
         if (res.ok) {
-          const msg = await res.json();
-          setMessages((prev) => [...prev, msg]);
+          const json = await res.json();
+          setMessages((prev) => [...prev, json.data]);
           setBody("");
         }
       } finally {
