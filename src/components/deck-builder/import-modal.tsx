@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { apiPost } from "@/lib/api-client";
 import type { DeckCardEntry, DeckLeaderEntry } from "@/lib/deck-builder/state";
 import {
   Dialog,
@@ -41,15 +42,8 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
     setPreview(null);
 
     try {
-      const res = await fetch("/api/decks/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) throw new Error("Parse failed");
-
-      const data = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await apiPost<any>("/api/decks/import", { text });
       setErrors(data.errors || []);
       setPreview({
         leader: data.leader ? { cardId: data.leader.cardId, card: data.leader.card } : null,

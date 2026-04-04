@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { X, Minus, ChevronUp } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
@@ -44,10 +45,9 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/messages/${user.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setMessages(data.data || []);
+    apiGet<{ data: Message[] }>(`/api/messages/${user.id}`)
+      .then((json) => {
+        setMessages(json.data || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -61,11 +61,9 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       const lastMsg = current[current.length - 1];
       const after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
       try {
-        const res = await fetch(`/api/messages/${user.id}?after=${encodeURIComponent(after)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.data?.length > 0) {
-          setMessages((prev) => [...prev, ...data.data]);
+        const json = await apiGet<{ data: Message[] }>(`/api/messages/${user.id}?after=${encodeURIComponent(after)}`);
+        if (json.data?.length > 0) {
+          setMessages((prev) => [...prev, ...json.data]);
         }
       } catch {
         // ignore poll errors silently
@@ -87,16 +85,9 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       if (!body.trim() || sending) return;
       setSending(true);
       try {
-        const res = await fetch(`/api/messages/${user.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: body.trim() }),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          setMessages((prev) => [...prev, json.data]);
-          setBody("");
-        }
+        const json = await apiPost<{ data: Message }>(`/api/messages/${user.id}`, { body: body.trim() });
+        setMessages((prev) => [...prev, json.data]);
+        setBody("");
       } finally {
         setSending(false);
       }

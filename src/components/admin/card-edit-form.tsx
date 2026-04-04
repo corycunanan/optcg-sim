@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { apiPatch, ApiError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -98,37 +99,28 @@ export function CardEditForm({ card }: { card: Card }) {
     }
 
     try {
-      const res = await fetch(`/api/cards/${card.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          type: form.type,
-          color: form.color,
-          cost: form.cost ? parseInt(form.cost) : null,
-          power: form.power ? parseInt(form.power) : null,
-          counter: form.counter ? parseInt(form.counter) : null,
-          life: form.life ? parseInt(form.life) : null,
-          attribute: form.attribute
-            ? form.attribute.split(",").map((a) => a.trim()).filter(Boolean)
-            : [],
-          traits: form.traits
-            ? form.traits.split(",").map((t) => t.trim()).filter(Boolean)
-            : [],
-          rarity: form.rarity || "Unknown",
-          effectText: form.effectText,
-          triggerText: form.triggerText || null,
-          imageUrl: form.imageUrl || "",
-          blockNumber: parseInt(form.blockNumber),
-          banStatus: form.banStatus,
-          isReprint: form.isReprint,
-        }),
+      await apiPatch(`/api/cards/${card.id}`, {
+        name: form.name.trim(),
+        type: form.type,
+        color: form.color,
+        cost: form.cost ? parseInt(form.cost) : null,
+        power: form.power ? parseInt(form.power) : null,
+        counter: form.counter ? parseInt(form.counter) : null,
+        life: form.life ? parseInt(form.life) : null,
+        attribute: form.attribute
+          ? form.attribute.split(",").map((a) => a.trim()).filter(Boolean)
+          : [],
+        traits: form.traits
+          ? form.traits.split(",").map((t) => t.trim()).filter(Boolean)
+          : [],
+        rarity: form.rarity || "Unknown",
+        effectText: form.effectText,
+        triggerText: form.triggerText || null,
+        imageUrl: form.imageUrl || "",
+        blockNumber: parseInt(form.blockNumber),
+        banStatus: form.banStatus,
+        isReprint: form.isReprint,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
-      }
 
       setSuccess(true);
       setTimeout(() => {

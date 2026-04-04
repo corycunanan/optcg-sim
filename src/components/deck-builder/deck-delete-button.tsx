@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiDelete } from "@/lib/api-client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,10 +27,8 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/decks/${deckId}`, { method: "DELETE" });
-      if (res.ok) {
-        router.refresh();
-      }
+      await apiDelete(`/api/decks/${deckId}`);
+      router.refresh();
     } catch {
       // noop
     } finally {

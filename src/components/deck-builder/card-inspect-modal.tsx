@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiGet } from "@/lib/api-client";
 import {
   Dialog,
   DialogContent,
@@ -95,11 +96,9 @@ export function CardInspectModal({
 
     async function fetchCard() {
       try {
-        const res = await fetch(`/api/cards/${cardId}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        setCard(json.data);
-        if (!displayImage) setDisplayImage(selectedArtUrl || json.data.imageUrl);
+        const { data } = await apiGet<{ data: CardInspectData }>(`/api/cards/${cardId}`);
+        setCard(data);
+        if (!displayImage) setDisplayImage(selectedArtUrl || data.imageUrl);
       } catch {
         // noop
       } finally {

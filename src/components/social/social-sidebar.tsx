@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { UserPlus, Check, X, MoreHorizontal, ChevronsUpDown, LogOut, Search } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,18 +67,12 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const [pendingSent, setPendingSent] = useState<Set<string>>(new Set());
 
   const fetchFriendsData = useCallback(async () => {
-    const [friendsRes, requestsRes] = await Promise.all([
-      fetch("/api/friends"),
-      fetch("/api/friends/requests"),
+    const [friendsJson, requestsJson] = await Promise.all([
+      apiGet<{ data: FriendEntry[] }>("/api/friends").catch(() => null),
+      apiGet<{ data: { incoming: FriendRequest[] } }>("/api/friends/requests").catch(() => null),
     ]);
-    if (friendsRes.ok) {
-      const data = await friendsRes.json();
-      setFriends(data.data || []);
-    }
-    if (requestsRes.ok) {
-      const json = await requestsRes.json();
-      setIncoming(json.data?.incoming || []);
-    }
+    if (friendsJson) setFriends(friendsJson.data || []);
+    if (requestsJson) setIncoming(requestsJson.data?.incoming || []);
   }, []);
 
   useEffect(() => {
@@ -89,32 +84,23 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const search = useCallback(async (q: string) => {
     setSearchQ(q);
     if (q.length < 2) { setSearchResults([]); return; }
-    const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    setSearchResults(data.data || []);
+    const json = await apiGet<{ data: SidebarUser[] }>(`/api/users/search?q=${encodeURIComponent(q)}`);
+    setSearchResults(json.data || []);
   }, []);
 
   const removeFriend = useCallback(async (userId: string) => {
-    await fetch(`/api/friends/${userId}`, { method: "DELETE" });
+    await apiDelete(`/api/friends/${userId}`);
     setFriends((prev) => prev.filter((f) => f.user.id !== userId));
   }, []);
 
   const sendRequest = useCallback(async (toUserId: string) => {
     setPendingSent((p) => new Set(p).add(toUserId));
-    await fetch("/api/friends/requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toUserId }),
-    });
+    await apiPost("/api/friends/requests", { toUserId });
   }, []);
 
   const handleFriendRequest = useCallback(
     async (id: string, action: "accept" | "decline") => {
-      await fetch(`/api/friends/requests/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+      await apiPut(`/api/friends/requests/${id}`, { action });
       setIncoming((prev) => prev.filter((r) => r.id !== id));
       if (action === "accept") fetchFriendsData();
     },

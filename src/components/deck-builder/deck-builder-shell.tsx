@@ -20,6 +20,7 @@ import { DonPicker } from "./don-picker";
 import { ImportModal } from "./import-modal";
 import { ExportModal } from "./export-modal";
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 
 interface DeckBuilderShellProps {
   deckId: string | null;
@@ -40,12 +41,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     async function loadDeck() {
       try {
-        const res = await fetch(`/api/decks/${deckId}`);
-        if (!res.ok) {
-          router.push("/decks");
-          return;
-        }
-        const { data } = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await apiGet<{ data: any }>(`/api/decks/${deckId}`);
 
         const cardsMap = new Map<string, DeckCardEntry>();
         for (const dc of data.cards) {
@@ -115,24 +112,10 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     };
 
     try {
-      let res: Response;
-      if (state.id) {
-        res = await fetch(`/api/decks/${state.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetch("/api/decks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
+      const { data } = state.id
+        ? await apiPut<{ data: { id: string } }>(`/api/decks/${state.id}`, payload)
+        : await apiPost<{ data: { id: string } }>("/api/decks", payload);
 
-      if (!res.ok) throw new Error("Save failed");
-
-      const { data } = await res.json();
       dispatch({ type: "SAVE_SUCCESS", id: data.id });
 
       if (!state.id) {

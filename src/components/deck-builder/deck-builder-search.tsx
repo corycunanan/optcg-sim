@@ -5,6 +5,7 @@ import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import { Input } from "@/components/ui/input";
 import { CardDetailModal } from "@/components/admin/card-detail-modal";
 import { cn } from "@/lib/utils";
+import { apiGet } from "@/lib/api-client";
 
 interface CardSearchResult {
   id: string;
@@ -90,8 +91,7 @@ export function DeckBuilderSearch({
       params.set("order", "asc");
 
       try {
-        const res = await fetch(`/api/cards?${params.toString()}`);
-        const json = await res.json();
+        const json = await apiGet<{ data: CardSearchResult[]; pagination?: { total: number } }>(`/api/cards?${params.toString()}`);
         setResults(json.data || []);
         setTotal(json.pagination?.total || 0);
       } catch {
