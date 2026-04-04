@@ -189,6 +189,11 @@ function buildPlayerDeck(
     }
   }
 
+  const deckList = playerData.deck.map((entry) => ({
+    cardId: entry.cardId,
+    count: entry.quantity,
+  }));
+
   const partialState: PartialPlayerState = {
     playerId: playerData.userId,
     leader,
@@ -197,6 +202,7 @@ function buildPlayerDeck(
     donCostArea: [],
     trash: [],
     removedFromGame: [],
+    deckList,
     connected: false,
     awayReason: null,
     rejoinDeadlineAt: null,

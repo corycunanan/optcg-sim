@@ -22,7 +22,7 @@ export function validate(
       return validateAdvancePhase(state);
 
     case "PLAY_CARD":
-      return validatePlayCard(state, action.cardInstanceId, cardDb);
+      return validatePlayCard(state, action.cardInstanceId, cardDb, action.position);
 
     case "ATTACH_DON":
       return validateAttachDon(state, action.targetInstanceId, action.count);
@@ -79,6 +79,7 @@ function validatePlayCard(
   state: GameState,
   cardInstanceId: string,
   cardDb: Map<string, CardData>,
+  position?: number,
 ): string | null {
   if (state.turn.phase !== "MAIN") return "Cards can only be played during the Main Phase";
   if (state.turn.battleSubPhase !== null) return "Cannot play cards during battle";
@@ -95,8 +96,14 @@ function validatePlayCard(
     return "This Event cannot be played during the Main Phase";
   }
 
-  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);
+  // Character field overflow: must specify which slot to replace
   const player = getActivePlayer(state);
+  if (cardData.type === "Character" && player.characters.length >= 5) {
+    if (position == null) return "Character area is full — choose a character to replace";
+    if (position < 0 || position >= player.characters.length) return `Invalid position ${position}`;
+  }
+
+  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);
   const activeDon = player.donCostArea.filter((d) => d.state === "ACTIVE" && !d.attachedTo).length;
 
   if (activeDon < cost) {

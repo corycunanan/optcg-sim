@@ -119,7 +119,7 @@ export function BoardModals({
       {/* ── Zone preview modals ─────────────────────────────────────── */}
       {zonePreview?.type === "deck" && (
         <GameDeckPreviewModal
-          deck={zonePreview.owner === "me" ? (me?.deck ?? []) : (opp?.deck ?? [])}
+          deckList={zonePreview.owner === "me" ? (me?.deckList ?? []) : (opp?.deckList ?? [])}
           cardDb={cardDb}
           title={zonePreview.owner === "me" ? "Your Deck" : "Opponent\u2019s Deck"}
           open
