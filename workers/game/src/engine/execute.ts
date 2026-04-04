@@ -70,7 +70,7 @@ export function execute(
 function executePlayCard(
   state: GameState,
   cardInstanceId: string,
-  _position: number | undefined,
+  position: number | undefined,
   cardDb: Map<string, CardData>,
 ): ExecuteResult {
   const events: PendingEvent[] = [];
@@ -87,12 +87,11 @@ function executePlayCard(
   nextState = consumeOneTimeModifiers(nextState, cardData, pi);
 
   if (cardData.type === "Character") {
-    // Handle 5-card overflow: if character area already has 5, discard oldest.
-    // Full overflow prompt is handled at the WebSocket layer before the action is sent.
-    if (nextState.players[pi].characters.length >= 5) {
-      const oldest = nextState.players[pi].characters[0];
-      nextState = moveCard(nextState, oldest.instanceId, "TRASH");
-      events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: oldest.cardId, reason: "overflow" } });
+    // Handle 5-card overflow: trash the character at the specified position
+    if (nextState.players[pi].characters.length >= 5 && position != null) {
+      const replaced = nextState.players[pi].characters[position];
+      nextState = moveCard(nextState, replaced.instanceId, "TRASH");
+      events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: replaced.cardId, reason: "overflow" } });
     }
 
     nextState = moveCard(nextState, cardInstanceId, "CHARACTER");

@@ -5,6 +5,13 @@ import type { CardData, CardDb, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { TooltipRoot, TooltipTrigger, TooltipContent } from "@/components/ui";
 import { TooltipStat } from "./game-ui";
+import {
+  useActiveEffects,
+  getPowerModDirection,
+  getCostModDirection,
+  computeEffectivePower,
+  computeEffectiveCost,
+} from "@/contexts/active-effects-context";
 
 const DEFAULT_SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
 
@@ -209,12 +216,28 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   cardId: string | undefined;
   card?: CardInstance | null;
 }) {
+  const activeEffects = useActiveEffects();
+
   if (!data) return <span className="text-gb-text-muted text-xs">Unknown card</span>;
   const isFieldCard = data.type === "Leader" || data.type === "Character";
   const donCount = card?.attachedDon.length ?? 0;
   const basePower = data.power ?? 0;
-  const effectivePower = basePower + donCount * 1000;
-  const powerBoosted = donCount > 0;
+  const instanceId = card?.instanceId ?? "";
+
+  // Compute power including effect modifications and DON bonus
+  const effectivePower = instanceId
+    ? computeEffectivePower(activeEffects, instanceId, basePower, donCount)
+    : basePower + donCount * 1000;
+
+  // Compute effective cost including effect modifications
+  const baseCost = data.cost ?? 0;
+  const effectiveCost = instanceId
+    ? computeEffectiveCost(activeEffects, instanceId, baseCost)
+    : baseCost;
+
+  // Detect effect-based modifications (separate from DON bonus)
+  const powerMod = instanceId ? getPowerModDirection(activeEffects, instanceId, basePower) : null;
+  const costMod = instanceId ? getCostModDirection(activeEffects, instanceId) : null;
 
   return (
     <>
@@ -231,25 +254,23 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
             <TooltipStat
               label="Life"
               value={data.life ?? data.cost ?? 0}
-              color="var(--gb-accent-rose)"
             />
           ) : (
             <TooltipStat
               label="Cost"
-              value={data.cost ?? 0}
-              color="var(--gb-accent-amber)"
+              value={effectiveCost}
+              modified={costMod}
             />
           )}
           <TooltipStat
             label="Power"
             value={effectivePower.toLocaleString()}
-            color="var(--gb-accent-green)"
+            modified={powerMod}
           />
           {data.type !== "Leader" && (
             <TooltipStat
               label="Counter"
               value={data.counter != null ? `+${data.counter}` : "—"}
-              color="var(--gb-accent-purple)"
             />
           )}
         </div>
@@ -259,14 +280,12 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
             <TooltipStat
               label="Cost"
               value={data.cost}
-              color="var(--gb-accent-amber)"
             />
           )}
           {data.life != null && (
             <TooltipStat
               label="Life"
               value={data.life}
-              color="var(--gb-accent-rose)"
             />
           )}
         </div>

@@ -128,6 +128,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         battlePhase={session.battlePhase}
         connectionStatus={session.connectionStatus}
         eventLog={session.gameState.eventLog}
+        activeEffects={session.gameState.activeEffects}
         activePrompt={activePrompt}
         onAction={(action) => {
           if (

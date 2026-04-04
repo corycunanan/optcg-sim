@@ -200,6 +200,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   onSelect,
   onAction,
   zoneKey,
+  slotIndex,
+  boardFull,
   style,
   animationDelay,
 }: {
@@ -212,6 +214,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
   zoneKey?: string;
+  slotIndex?: number;
+  boardFull?: boolean;
   style: React.CSSProperties;
   animationDelay?: number;
 }) {
@@ -231,9 +235,12 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   });
 
   const acceptsDon = activeDragType === "active-don";
+  const acceptsHandCard = !!boardFull && activeDragType === "hand-card";
   const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `don-target-${card.instanceId}`,
-    data: { type: "don-target", targetInstanceId: card.instanceId },
+    id: acceptsHandCard ? `char-slot-${slotIndex}` : `don-target-${card.instanceId}`,
+    data: acceptsHandCard
+      ? { type: "character-slot", slotIndex }
+      : { type: "don-target", targetInstanceId: card.instanceId },
   });
 
   const mergedRef = useCallback(
@@ -302,7 +309,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
           )}
         >
-          <DropOverlay active={acceptsDon} hovered={isOver && acceptsDon} color="amber" />
+          <DropOverlay active={acceptsDon || acceptsHandCard} hovered={isOver && (acceptsDon || acceptsHandCard)} color={acceptsHandCard ? "red" : "amber"} />
           <BoardCard
             card={card}
             cardDb={cardDb}

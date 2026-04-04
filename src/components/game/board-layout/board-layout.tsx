@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
+  ActiveEffect,
   CardDb,
   GameAction,
   GameEvent,
@@ -62,6 +63,7 @@ import { MidZone } from "./mid-zone";
 import { DroppableTrashZone } from "./trash-zone";
 import { CardAnimationLayer } from "./card-animation-layer";
 import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
+import { ActiveEffectsProvider } from "@/contexts/active-effects-context";
 import { useCardTransitions } from "@/hooks/use-card-transitions";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 
@@ -93,6 +95,7 @@ export interface BoardLayoutProps {
   battlePhase: string | null;
   connectionStatus: string;
   eventLog: GameEvent[];
+  activeEffects: ActiveEffect[];
   activePrompt: {
     promptType: PromptType;
     options: PromptOptions;
@@ -151,7 +154,9 @@ function NavMenu({
 export function BoardLayout(props: BoardLayoutProps) {
   return (
     <ZonePositionProvider>
-      <BoardLayoutInner {...props} />
+      <ActiveEffectsProvider value={props.activeEffects}>
+        <BoardLayoutInner {...props} />
+      </ActiveEffectsProvider>
     </ZonePositionProvider>
   );
 }
@@ -534,6 +539,8 @@ function BoardLayoutInner({
                 onSelect={isBlockerEligible ? () => bs.setSelectedBlockerId(char.instanceId) : undefined}
                 onAction={onAction}
                 zoneKey={`p-char-${i}`}
+                slotIndex={i}
+                boardFull={(me?.characters.length ?? 0) >= 5}
                 animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />

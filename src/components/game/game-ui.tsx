@@ -1,16 +1,28 @@
 export function TooltipStat({
   label,
   value,
-  color,
+  modified,
 }: {
   label: string;
   value: unknown;
-  color: string;
+  modified?: "up" | "down" | null;
 }) {
+  const colorClass = modified === "up"
+    ? "text-gb-accent-green"
+    : modified === "down"
+      ? "text-gb-accent-red"
+      : "text-gb-text-bright";
+
   return (
     <div className="text-center px-2">
-      <div className="font-bold text-sm" style={{ color }}>
-        {String(value)}
+      <div className={`flex items-center justify-center gap-1 font-bold text-sm ${colorClass}`}>
+        <span>{String(value)}</span>
+        {modified === "up" && (
+          <span className="text-xs leading-none">&#x25B2;</span>
+        )}
+        {modified === "down" && (
+          <span className="text-xs leading-none">&#x25BC;</span>
+        )}
       </div>
       <div className="text-xs text-gb-text-muted uppercase tracking-wide">
         {label}
