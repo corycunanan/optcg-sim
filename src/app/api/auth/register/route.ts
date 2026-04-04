@@ -7,8 +7,15 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { RegisterSchema } from "@/lib/validators/auth";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { authLimiter } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const { limited } = authLimiter.check(`register:${ip}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   try {
     const parsed = await parseBody(request, RegisterSchema);
     if (isErrorResponse(parsed)) return parsed;

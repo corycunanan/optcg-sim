@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SendFriendRequestSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { socialLimiter } from "@/lib/rate-limit";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
@@ -51,6 +52,10 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id;
+  const { limited } = socialLimiter.check(`friend-req:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
 
   try {
     const parsed = await parseBody(request, SendFriendRequestSchema);

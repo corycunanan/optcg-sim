@@ -7,11 +7,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { searchLimiter } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = searchLimiter.check(`user-search:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const q = request.nextUrl.searchParams.get("q")?.trim() || "";

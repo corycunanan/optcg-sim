@@ -10,8 +10,15 @@ import { type Prisma } from "@prisma/client";
 import { cardIdToOriginSet } from "@/lib/utils";
 import { CreateCardSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { searchLimiter } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const { limited } = searchLimiter.check(`card-search:${ip}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
 
   const q = searchParams.get("q") || "";

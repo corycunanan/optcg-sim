@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { SendMessageSchema } from "@/lib/validators/messages";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { socialLimiter } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
@@ -93,6 +94,11 @@ export async function POST(
 
   const fromUserId = session.user.id;
   const { userId: toUserId } = await params;
+
+  const { limited } = socialLimiter.check(`msg:${fromUserId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
 
   try {
     const parsed = await parseBody(request, SendMessageSchema);
