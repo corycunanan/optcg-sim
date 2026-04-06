@@ -349,7 +349,12 @@ export class GameSession implements DurableObject {
         await this.resumeFromPrompt(ws, playerIndex, action);
         return;
       }
-      if (action.type !== "CONCEDE") {
+      // REVEAL_TRIGGER is a "fire-through" prompt — clear it and let the
+      // action proceed through the normal pipeline so executeRevealTrigger runs.
+      if (action.type === "REVEAL_TRIGGER") {
+        this.gameState = { ...this.gameState, pendingPrompt: null };
+        // Fall through to pipeline processing below
+      } else if (action.type !== "CONCEDE") {
         this.send(ws, { type: "game:error", message: "Waiting for player to respond to prompt" });
         return;
       }
@@ -392,6 +397,10 @@ export class GameSession implements DurableObject {
     }
 
     this.gameState = result.state;
+
+    // Surface REVEAL_TRIGGER as a durable prompt before persisting
+    this.surfaceRevealTriggerIfNeeded();
+
     await this.persist();
 
     // Persist result to Postgres before any broadcast that lets clients leave for /lobbies;
@@ -495,6 +504,9 @@ export class GameSession implements DurableObject {
       this.gameState = this.runStartOfTurnAutoPhases(this.gameState);
     }
 
+    // Surface REVEAL_TRIGGER as a durable prompt before persisting
+    this.surfaceRevealTriggerIfNeeded();
+
     await this.persist();
     this.broadcast({ type: "game:update", action, state: this.gameState });
 
@@ -577,6 +589,53 @@ export class GameSession implements DurableObject {
         });
       }
     }
+  }
+
+  /**
+   * If the effect stack is empty and no prompt is pending, check whether the
+   * battle has a pendingTriggerLifeCard that needs a REVEAL_TRIGGER prompt.
+   * Surfacing it as a durable pendingPrompt on the game state makes it survive
+   * reconnections and prevents a race between game:update (clears activePrompt)
+   * and game:prompt (sets it again).
+   */
+  private surfaceRevealTriggerIfNeeded(): void {
+    if (!this.gameState || !this.cardDb) return;
+    if (this.gameState.pendingPrompt) return;
+    if (this.gameState.effectStack.length > 0) return;
+
+    const { battleSubPhase, battle } = this.gameState.turn;
+    if (battleSubPhase !== "DAMAGE_STEP" || !battle) return;
+
+    const triggerLifeCard = (battle as any).pendingTriggerLifeCard;
+    if (!triggerLifeCard) return;
+
+    const inactiveIdx = (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0) as 0 | 1;
+    const triggerCardData = this.cardDb.get(triggerLifeCard.cardId);
+
+    const cards = [{
+      instanceId: triggerLifeCard.instanceId,
+      cardId: triggerLifeCard.cardId,
+      zone: "LIFE" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [] as any[],
+      turnPlayed: null,
+      controller: inactiveIdx,
+      owner: inactiveIdx,
+    }];
+
+    const effectDescription = triggerCardData?.triggerText
+      ?? triggerCardData?.effectText
+      ?? "You may reveal this Trigger card to activate its effect";
+
+    this.gameState = {
+      ...this.gameState,
+      pendingPrompt: {
+        promptType: "REVEAL_TRIGGER" as const,
+        options: { cards, effectDescription, optional: false, timeoutMs: 30_000 },
+        respondingPlayer: inactiveIdx,
+        resumeContext: null as any,
+      },
+    };
   }
 
   // ─── Token validation ──────────────────────────────────────────────────────

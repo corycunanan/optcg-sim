@@ -107,7 +107,14 @@ export function useGameWs(
           break;
         case "game:update":
           setGameState(msg.state);
-          setActivePrompt(null);
+          if (msg.state.pendingPrompt) {
+            setActivePrompt({
+              promptType: msg.state.pendingPrompt.promptType,
+              options: msg.state.pendingPrompt.options,
+            });
+          } else {
+            setActivePrompt(null);
+          }
           if (msg.state.status !== "IN_PROGRESS") {
             setGameOver({
               winner: msg.state.winner,

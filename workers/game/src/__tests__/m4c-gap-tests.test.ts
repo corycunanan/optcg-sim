@@ -22,7 +22,7 @@ import { setupGame, createTestCardDb, createBattleReadyState, CARDS } from "./he
 import { runPipeline } from "../engine/pipeline.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
-import { resolveEffect } from "../engine/effect-resolver/index.js";
+import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
 import { computeAllValidTargets, validateTargetConstraints, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../engine/effect-resolver/target-resolver.js";
 import type { EffectResult } from "../engine/effect-types.js";
@@ -1575,5 +1575,212 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       expect(slot1.countMin).toBe(0);
       expect(slot1.countMax).toBe(1);
     });
+  });
+});
+
+// =============================================================================
+// OP05-098 Enel — LIFE_COUNT_BECOMES_ZERO + Trigger life card
+// =============================================================================
+
+describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
+  function buildEnelScenario(cardDb: Map<string, CardData>) {
+    // Enel leader with LIFE_COUNT_BECOMES_ZERO trigger
+    const enelLeader = makeCard("ENEL-LEADER", {
+      type: "Leader",
+      cost: null,
+      power: 5000,
+      life: 5,
+      color: ["Yellow"],
+      effectSchema: {
+        card_id: "OP05-098",
+        card_name: "Enel",
+        card_type: "Leader",
+        effects: [{
+          id: "life_zero_restore",
+          category: "auto",
+          trigger: {
+            event: "LIFE_COUNT_BECOMES_ZERO",
+            filter: { controller: "SELF" },
+            turn_restriction: "OPPONENT_TURN",
+            once_per_turn: true,
+          },
+          actions: [
+            { type: "ADD_TO_LIFE_FROM_DECK", params: { amount: 1, position: "TOP", face: "DOWN" } },
+            { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
+          ],
+        }],
+      } as EffectSchema,
+    });
+    cardDb.set(enelLeader.id, enelLeader);
+
+    // Attacker character with 6000 power
+    const attacker = makeCard("RYUMA-ATK", { power: 6000 });
+    cardDb.set(attacker.id, attacker);
+
+    // Trigger card for life zone (has [Trigger] keyword)
+    const triggerLifeCard = makeCard("TRIGGER-LIFE", {
+      cost: 1,
+      power: 2000,
+      keywords: { ...noKeywords(), trigger: true },
+      triggerText: "[Trigger] Play this card.",
+      effectSchema: {
+        effects: [{
+          id: "trigger-play",
+          category: "auto",
+          trigger: { keyword: "TRIGGER" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      } as EffectSchema,
+    });
+    cardDb.set(triggerLifeCard.id, triggerLifeCard);
+
+    let state = buildMinimalState();
+
+    // P0 = attacker (active turn), P1 = Enel (defender)
+    state.players[0].leader = makeInstance(CARDS.LEADER.id, "LEADER", 0, { instanceId: "leader-0" });
+    state.players[1].leader = makeInstance(enelLeader.id, "LEADER", 1, { instanceId: "leader-1" });
+
+    // Attacker character on P0's field
+    const atkChar = makeInstance(attacker.id, "CHARACTER", 0, {
+      instanceId: "atk-ryuma",
+      state: "ACTIVE",
+    });
+    state.players[0].characters = [atkChar];
+
+    // P1 (Enel) has exactly 1 life card — a trigger card
+    state.players[1].life = [
+      { instanceId: "life-trigger-0", cardId: triggerLifeCard.id, face: "DOWN" as const },
+    ];
+
+    // P1 has 3 cards in hand (so TRASH_FROM_HAND will need a prompt)
+    state.players[1].hand = [
+      makeInstance(CARDS.VANILLA.id, "HAND", 1, { instanceId: "hand-1-0" }),
+      makeInstance(CARDS.VANILLA.id, "HAND", 1, { instanceId: "hand-1-1" }),
+      makeInstance(CARDS.VANILLA.id, "HAND", 1, { instanceId: "hand-1-2" }),
+    ];
+
+    // Register Enel's trigger
+    state = registerTriggersForCard(state, state.players[1].leader, enelLeader);
+
+    return { state, enelLeader, attacker, triggerLifeCard };
+  }
+
+  it("Enel trigger fires and TRASH_FROM_HAND prompt surfaces during damage step", () => {
+    const cardDb = createTestCardDb();
+    const { state } = buildEnelScenario(cardDb);
+
+    // Declare attack → pass block → pass counter (triggers damage step)
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: "atk-ryuma",
+      targetInstanceId: "leader-1",
+    }, cardDb, 0);
+    expect(result.valid).toBe(true);
+
+    // Pass block
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    expect(result.valid).toBe(true);
+
+    // Pass counter → damage step fires → Enel's trigger fires
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    expect(result.valid).toBe(true);
+
+    // The pipeline should pause with a SELECT_TARGET prompt for TRASH_FROM_HAND
+    expect(result.pendingPrompt).toBeTruthy();
+    expect(result.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    expect(result.pendingPrompt!.respondingPlayer).toBe(1);
+
+    // Enel's ADD_TO_LIFE_FROM_DECK should have already executed
+    expect(result.state.players[1].life.length).toBe(1);
+
+    // The battle should still be active with pendingTriggerLifeCard
+    expect(result.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
+    expect(result.state.turn.battle).toBeTruthy();
+    expect((result.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
+  });
+
+  it("after TRASH_FROM_HAND resolves, battle still has pendingTriggerLifeCard for REVEAL_TRIGGER", () => {
+    const cardDb = createTestCardDb();
+    const { state } = buildEnelScenario(cardDb);
+
+    // Full attack flow → get TRASH_FROM_HAND prompt
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: "atk-ryuma",
+      targetInstanceId: "leader-1",
+    }, cardDb, 0);
+
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+
+    // Should have TRASH_FROM_HAND prompt
+    expect(result.pendingPrompt).toBeTruthy();
+    expect(result.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+
+    // Resolve the prompt: select the first hand card to trash
+    const resumeResult = resumeFromStack(
+      { ...result.state, pendingPrompt: null },
+      { type: "SELECT_TARGET", selectedInstanceIds: ["hand-1-0"] },
+      cardDb,
+    );
+
+    // Effect should be resolved
+    expect(resumeResult.resolved).toBe(true);
+
+    // The battle should STILL be active with pendingTriggerLifeCard
+    expect(resumeResult.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
+    expect(resumeResult.state.turn.battle).toBeTruthy();
+    expect((resumeResult.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
+
+    // Effect stack should be empty
+    expect(resumeResult.state.effectStack.length).toBe(0);
+
+    // The trashed card should be in trash
+    expect(resumeResult.state.players[1].hand.length).toBe(2);
+    expect(resumeResult.state.players[1].trash.some(c => c.instanceId === "hand-1-0")).toBe(true);
+  });
+
+  it("REVEAL_TRIGGER action resolves correctly and ends the battle", () => {
+    const cardDb = createTestCardDb();
+    const { state } = buildEnelScenario(cardDb);
+
+    // Full attack → damage step → Enel trigger → auto-select (1 hand card)
+    // For this test, give P1 exactly 1 hand card so TRASH auto-selects
+    const oneHandState = {
+      ...state,
+      players: [
+        state.players[0],
+        {
+          ...state.players[1],
+          hand: [makeInstance(CARDS.VANILLA.id, "HAND", 1, { instanceId: "hand-1-only" })],
+        },
+      ] as [PlayerState, PlayerState],
+    };
+
+    let result = runPipeline(oneHandState, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: "atk-ryuma",
+      targetInstanceId: "leader-1",
+    }, cardDb, 0);
+
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+
+    // With 1 hand card, TRASH_FROM_HAND auto-selects (no prompt needed)
+    // But there should be a pending trigger life card
+    expect(result.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
+    expect((result.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
+
+    // Now send REVEAL_TRIGGER to decline (add to hand)
+    const revealResult = runPipeline(result.state, {
+      type: "REVEAL_TRIGGER",
+      reveal: false,
+    }, cardDb, 1); // P1 (defender) sends this action
+
+    expect(revealResult.valid).toBe(true);
+
+    // Battle should now be ended
+    expect(revealResult.state.turn.battle).toBeNull();
+    expect(revealResult.state.turn.battleSubPhase).toBeNull();
   });
 });
