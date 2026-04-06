@@ -37,6 +37,10 @@ export function executeDraw(
     events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
   }
 
+  if (drawCount > 0) {
+    events.push({ type: "DRAW_OUTSIDE_DRAW_PHASE", playerIndex: controller, payload: { count: drawCount } });
+  }
+
   return {
     state: { ...state, players: newPlayers },
     events,

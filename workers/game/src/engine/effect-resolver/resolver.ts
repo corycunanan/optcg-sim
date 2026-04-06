@@ -4,6 +4,7 @@
 
 import type {
   Action,
+  CostResult,
   EffectBlock,
   EffectResult,
 } from "../effect-types.js";
@@ -201,6 +202,7 @@ export function resolveEffect(
   }
 
   // Step 3: Pay costs (with player selection support)
+  let costResult: CostResult | undefined;
   if (block.costs && block.costs.length > 0) {
     const costPayResult = payCostsWithSelection(
       state, block.costs, 0, controller, cardDb, sourceCardInstanceId, block,
@@ -213,6 +215,7 @@ export function resolveEffect(
 
     state = costPayResult.state;
     events.push(...costPayResult.events);
+    costResult = costPayResult.costResult;
 
     if (costPayResult.pendingPrompt) {
       return { state, events, resolved: false, pendingPrompt: costPayResult.pendingPrompt };
@@ -232,7 +235,7 @@ export function resolveEffect(
       sourceCardInstanceId,
       controller,
       cardDb,
-      undefined,
+      costResultToRefs(costResult),
       blockDescription,
     );
     state = chainResult.state;
@@ -357,6 +360,26 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+function costResultToRefs(
+  costResult: CostResult | undefined,
+): Map<string, EffectResult> | undefined {
+  if (!costResult) return undefined;
+  const hasValues =
+    costResult.donRestedCount > 0 ||
+    costResult.cardsTrashedCount > 0 ||
+    costResult.cardsReturnedCount > 0 ||
+    costResult.cardsPlacedToDeckCount > 0 ||
+    costResult.charactersKoCount > 0;
+  if (!hasValues) return undefined;
+  const refs = new Map<string, EffectResult>();
+  refs.set("__cost_don_rested", { targetInstanceIds: [], count: costResult.donRestedCount });
+  refs.set("__cost_cards_trashed", { targetInstanceIds: [], count: costResult.cardsTrashedCount });
+  refs.set("__cost_cards_returned", { targetInstanceIds: [], count: costResult.cardsReturnedCount });
+  refs.set("__cost_cards_placed_to_deck", { targetInstanceIds: [], count: costResult.cardsPlacedToDeckCount });
+  refs.set("__cost_characters_ko", { targetInstanceIds: [], count: costResult.charactersKoCount });
+  return refs;
 }
 
 // ─── Single Action Dispatcher ─────────────────────────────────────────────────

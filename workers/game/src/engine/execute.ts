@@ -110,13 +110,13 @@ function executePlayCard(
       nextState = { ...nextState, players: newPlayers };
     }
 
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER", source: "FROM_HAND" } });
 
   } else if (cardData.type === "Event") {
     // Trash the event, then resolve its MAIN_EVENT effect block directly
     nextState = moveCard(nextState, cardInstanceId, "TRASH");
     const newEventInstance = nextState.players[pi].trash[0]; // trash is LIFO, newest at [0]
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH", source: "FROM_HAND" } });
 
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
     const schema = cardData.effectSchema as EffectSchema | null;
@@ -143,7 +143,7 @@ function executePlayCard(
     }
     nextState = moveCard(nextState, cardInstanceId, "STAGE");
     const newStageInstance = nextState.players[pi].stage!;
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newStageInstance.instanceId, zone: "STAGE" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newStageInstance.instanceId, zone: "STAGE", source: "FROM_HAND" } });
   }
 
   return { state: nextState, events };

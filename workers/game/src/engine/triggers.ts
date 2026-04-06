@@ -16,6 +16,7 @@ import type {
   CompoundTrigger,
   KeywordTriggerType,
   CustomEventType,
+  EventFilter,
   EffectBlock,
   EffectSchema,
   EffectZone,
@@ -31,6 +32,7 @@ import type {
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
 import { findCardInstance } from "./state.js";
+import { matchesFilter } from "./conditions.js";
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -315,7 +317,7 @@ function matchesCustomTrigger(
 
   // Event filter
   if (trigger.filter) {
-    if (!matchesEventFilter(trigger.filter, event, sourceCard.controller)) return false;
+    if (!matchesEventFilter(trigger.filter, event, sourceCard.controller, state, _cardDb)) return false;
   }
 
   // Quantity threshold
@@ -384,25 +386,101 @@ function customEventToGameEvent(event: CustomEventType): GameEventType | null {
     CARD_ADDED_TO_HAND_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
     CHARACTER_BECOMES_RESTED: "CARD_STATE_CHANGED",
     CHARACTER_RETURNED_TO_HAND: "CARD_RETURNED_TO_HAND",
+    COMBAT_VICTORY: "COMBAT_VICTORY",
+    CHARACTER_BATTLES: "CHARACTER_BATTLES",
+    LIFE_COUNT_BECOMES_ZERO: "LIFE_COUNT_BECOMES_ZERO",
+    DRAW_OUTSIDE_DRAW_PHASE: "DRAW_OUTSIDE_DRAW_PHASE",
   };
   return map[event] ?? null;
 }
 
 function matchesEventFilter(
-  filter: any,
+  filter: EventFilter,
   event: GameEvent,
   sourceController: 0 | 1,
+  state: GameState,
+  cardDb: Map<string, CardData>,
 ): boolean {
   if (filter.controller) {
     const eventPlayerIndex = event.playerIndex;
     if (filter.controller === "SELF" && eventPlayerIndex !== sourceController) return false;
     if (filter.controller === "OPPONENT" && eventPlayerIndex === sourceController) return false;
-    // EITHER matches both
   }
 
   if (filter.cause) {
     const eventCause = event.payload?.cause as string | undefined;
     if (filter.cause !== "ANY" && eventCause !== filter.cause) return false;
+  }
+
+  if (filter.target_filter) {
+    const targetId = (event.payload?.cardInstanceId ?? event.payload?.targetInstanceId) as string | undefined;
+    if (targetId) {
+      const card = findCardInstance(state, targetId);
+      if (card && !matchesFilter(card, filter.target_filter, cardDb, state)) return false;
+    }
+  }
+
+  if (filter.source_zone) {
+    const cardId = event.payload?.cardInstanceId as string | undefined;
+    if (cardId) {
+      const card = findCardInstance(state, cardId);
+      if (card && card.zone !== filter.source_zone) return false;
+    }
+  }
+
+  if (filter.includes_trigger_keyword !== undefined) {
+    const cardId = event.payload?.cardInstanceId as string | undefined;
+    if (cardId) {
+      const card = findCardInstance(state, cardId);
+      if (card) {
+        const data = cardDb.get(card.cardId);
+        const hasTrigger = data?.keywords?.trigger ?? false;
+        if (filter.includes_trigger_keyword !== hasTrigger) return false;
+      }
+    }
+  }
+
+  if (filter.includes_blocker_keyword !== undefined) {
+    const cardId = event.payload?.cardInstanceId as string | undefined;
+    if (cardId) {
+      const card = findCardInstance(state, cardId);
+      if (card) {
+        const data = cardDb.get(card.cardId);
+        const hasBlocker = data?.keywords?.blocker ?? false;
+        if (filter.includes_blocker_keyword !== hasBlocker) return false;
+      }
+    }
+  }
+
+  if (filter.attribute) {
+    const cardId = event.payload?.cardInstanceId as string | undefined;
+    if (cardId) {
+      const card = findCardInstance(state, cardId);
+      if (card) {
+        const data = cardDb.get(card.cardId);
+        if (!data?.attribute?.includes(filter.attribute)) return false;
+      }
+    }
+  }
+
+  if (filter.battle_target_type) {
+    const battle = state.turn.battle;
+    if (battle) {
+      const target = findCardInstance(state, battle.targetInstanceId);
+      if (target && target.zone !== filter.battle_target_type) return false;
+    }
+  }
+
+  if (filter.no_base_effect !== undefined) {
+    const cardId = event.payload?.cardInstanceId as string | undefined;
+    if (cardId) {
+      const card = findCardInstance(state, cardId);
+      if (card) {
+        const data = cardDb.get(card.cardId);
+        const hasNoEffect = !data?.effectText || data.effectText.trim() === "";
+        if (filter.no_base_effect !== hasNoEffect) return false;
+      }
+    }
   }
 
   return true;

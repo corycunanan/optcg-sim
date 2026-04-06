@@ -183,7 +183,11 @@ export type GameEventType =
   | "EXTRA_TURN_GRANTED"
   | "EVENT_ACTIVATED"
   | "LIFE_CARD_TURNED_FACE_UP"
-  | "LIFE_CARD_TURNED_FACE_DOWN";
+  | "LIFE_CARD_TURNED_FACE_DOWN"
+  | "COMBAT_VICTORY"
+  | "CHARACTER_BATTLES"
+  | "LIFE_COUNT_BECOMES_ZERO"
+  | "DRAW_OUTSIDE_DRAW_PHASE";
 
 export interface GameEvent {
   type: GameEventType;

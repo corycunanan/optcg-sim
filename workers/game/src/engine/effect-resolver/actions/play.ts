@@ -66,7 +66,7 @@ export function executePlayCard(
       events.push({
         type: "CARD_PLAYED",
         playerIndex: controller,
-        payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER" },
+        payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "BY_EFFECT" },
       });
     } else if (data.type.toUpperCase() === "STAGE") {
       const p = removeFromSourceZone(nextState.players[controller]);
@@ -89,6 +89,11 @@ export function executePlayCard(
       newPlayers[controller] = { ...p, stage: newStage, trash: newTrash };
       nextState = { ...nextState, players: newPlayers };
       playedIds.push(newStage.instanceId);
+      events.push({
+        type: "CARD_PLAYED",
+        playerIndex: controller,
+        payload: { cardInstanceId: newStage.instanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT" },
+      });
     }
   }
 

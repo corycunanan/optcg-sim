@@ -49,4 +49,5 @@ export interface CostSelectionResult {
   events: PendingEvent[];
   cannotPay?: boolean;
   pendingPrompt?: PendingPromptState;
+  costResult?: import("../effect-types.js").CostResult;
 }

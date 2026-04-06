@@ -34,6 +34,7 @@ export function executeDeclareAttack(
 
   // Rest the attacker
   let nextState = setCardState(state, pi, attackerInstanceId, "RESTED");
+  events.push({ type: "CARD_STATE_CHANGED", playerIndex: pi, payload: { cardInstanceId: attackerInstanceId, newState: "RESTED" } });
 
   const attackerFound = findCardInState(nextState, attackerInstanceId)!;
   const attackerData = cardDb.get(attackerFound.card.cardId)!;
@@ -64,6 +65,11 @@ export function executeDeclareAttack(
     payload: { attackerInstanceId, targetInstanceId, attackerPower },
   });
 
+  // Emit CHARACTER_BATTLES when attacker is a character (not leader)
+  if (attackerFound.card.zone === "CHARACTER") {
+    events.push({ type: "CHARACTER_BATTLES", playerIndex: pi, payload: { cardInstanceId: attackerInstanceId, targetInstanceId } });
+  }
+
   // [When Attacking] and [On Your Opponent's Attack] fire here in M4
 
   // Advance to BLOCK_STEP
@@ -85,6 +91,7 @@ export function executeDeclareBlocker(
 
   // Rest the blocker
   let nextState = setCardState(state, inactiveIdx, blockerInstanceId, "RESTED");
+  events.push({ type: "CARD_STATE_CHANGED", playerIndex: inactiveIdx, payload: { cardInstanceId: blockerInstanceId, newState: "RESTED" } });
 
   // Replace the target in BattleContext
   const battle = nextState.turn.battle!;
@@ -381,7 +388,7 @@ function executeDamageStep(
           // §7-1-4-1-1-1: If 0 life at the point damage would be dealt → defeat
           if (nextState.players[inactiveIdx].life.length === 0) {
             damagedPlayerIndex = inactiveIdx;
-            events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { target: "leader", amount: 1, lethal: true } });
+            events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { target: "leader", amount: 1, lethal: true, attackerInstanceId: battle.attackerInstanceId, attackerType: attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER" } });
             break;
           }
 
@@ -392,7 +399,12 @@ function executeDamageStep(
           const { lifeCard, state: stateAfterRemoval } = result;
           nextState = stateAfterRemoval;
 
-          events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { amount: 1 } });
+          events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { amount: 1, attackerInstanceId: battle.attackerInstanceId, attackerType: attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER" } });
+
+          // Emit when life just hit zero (trigger for cards like OP05)
+          if (nextState.players[inactiveIdx].life.length === 0) {
+            events.push({ type: "LIFE_COUNT_BECOMES_ZERO", playerIndex: inactiveIdx, payload: {} });
+          }
 
           if (isBanish) {
             // Banish: life card goes to trash, no Trigger (rules §10-1-3-1)
@@ -446,6 +458,9 @@ function executeDamageStep(
           }
         }
       } else if (targetFound.card.zone === "CHARACTER") {
+        // Emit COMBAT_VICTORY — attacker won against a character
+        events.push({ type: "COMBAT_VICTORY", playerIndex: pi, payload: { cardInstanceId: battle.attackerInstanceId, targetInstanceId } });
+
         // Check for replacement effects before KO
         const replacement = checkReplacementForKO(nextState, targetInstanceId, "battle", pi as 0 | 1, cardDb);
         if (replacement.pendingPrompt) {

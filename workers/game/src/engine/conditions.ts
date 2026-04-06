@@ -192,6 +192,10 @@ function evaluateSimple(
       if ("name" in prop) {
         return data.name === prop.name;
       }
+      if ("multicolored" in prop) {
+        const isMulti = data.color.length > 1;
+        return prop.multicolored ? isMulti : !isMulti;
+      }
       return false;
     }
 
@@ -350,10 +354,37 @@ function evaluateSimple(
       return compareNum(playerTurnCount, cond.operator, cond.value);
     }
 
-    case "PLAY_METHOD":
-    case "SOURCE_PROPERTY":
-      // These require event context not available in static evaluation
+    case "PLAY_METHOD": {
+      const playEvent = [...state.eventLog].reverse().find(
+        (e) => e.type === "CARD_PLAYED" && e.payload?.cardInstanceId === ctx.sourceCardInstanceId,
+      );
+      if (!playEvent) return true;
+      const source = playEvent.payload?.source as string | undefined;
+      if (cond.method === "FROM_HAND") return source === "FROM_HAND";
+      if (cond.method === "BY_EFFECT") return source === "BY_EFFECT" || source === "PLAY_SELF";
+      if (cond.method === "BY_CHARACTER_EFFECT" || cond.method === "BY_EVENT_EFFECT") return source === "BY_EFFECT";
       return true;
+    }
+
+    case "SOURCE_PROPERTY": {
+      const contextMap: Record<string, string> = {
+        KO_BY_EFFECT: "CARD_KO",
+        KO_IN_BATTLE: "CARD_KO",
+        REMOVAL_BY_EFFECT: "CARD_RETURNED_TO_HAND",
+        REST_BY_EFFECT: "CARD_STATE_CHANGED",
+      };
+      const eventType = contextMap[cond.context];
+      if (!eventType) return true;
+      const sourceEvent = [...state.eventLog].reverse().find(
+        (e) => e.type === eventType && e.payload?.cardInstanceId === ctx.sourceCardInstanceId,
+      );
+      if (!sourceEvent) return true;
+      const causeCardId = sourceEvent.payload?.causeCardInstanceId as string | undefined;
+      if (!causeCardId) return true;
+      const causeCard = findInstanceById(state, causeCardId);
+      if (!causeCard) return true;
+      return matchesFilter(causeCard, cond.source_filter, ctx.cardDb, state);
+    }
 
     case "REVEALED_CARD_PROPERTY": {
       if (!ctx.resultRefs) return false;

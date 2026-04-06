@@ -481,6 +481,13 @@ export function payCostsWithSelection(
 ): CostSelectionResult {
   const events: PendingEvent[] = [];
   let nextState = state;
+  const costResult: CostResult = {
+    donRestedCount: 0,
+    cardsTrashedCount: 0,
+    cardsReturnedCount: 0,
+    cardsPlacedToDeckCount: 0,
+    charactersKoCount: 0,
+  };
 
   for (let i = startIndex; i < costs.length; i++) {
     const cost = costs[i];
@@ -581,9 +588,14 @@ export function payCostsWithSelection(
     }
     nextState = singleResult.state;
     events.push(...singleResult.events);
+    costResult.donRestedCount += singleResult.costResult.donRestedCount;
+    costResult.cardsTrashedCount += singleResult.costResult.cardsTrashedCount;
+    costResult.cardsReturnedCount += singleResult.costResult.cardsReturnedCount;
+    costResult.cardsPlacedToDeckCount += singleResult.costResult.cardsPlacedToDeckCount;
+    costResult.charactersKoCount += singleResult.costResult.charactersKoCount;
   }
 
-  return { state: nextState, events };
+  return { state: nextState, events, costResult };
 }
 
 // ─── Cost helpers ─────────────────────────────────────────────────────────────

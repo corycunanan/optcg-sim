@@ -149,6 +149,8 @@ export function executeHandWheel(
     for (const card of drawn) {
       events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
     }
+
+    events.push({ type: "DRAW_OUTSIDE_DRAW_PHASE", playerIndex: controller, payload: { count: actualDraw } });
   }
 
   return {

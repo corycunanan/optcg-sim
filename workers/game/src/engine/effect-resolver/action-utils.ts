@@ -3,10 +3,23 @@
  */
 
 import type { Action, Duration, DynamicValue, EffectResult, EffectBlock } from "../effect-types.js";
-import type { CardData, GameState } from "../../types.js";
+import type { CardData, CardInstance, GameState } from "../../types.js";
+import { findCardInstance } from "../state.js";
 import type { ExpiryTiming } from "../effect-types.js";
 
 export { getActionParams } from "../effect-types.js";
+
+function findCardInstanceForDV(state: GameState, instanceId: string): CardInstance | null {
+  return findCardInstance(state, instanceId);
+}
+
+const THIS_WAY_TO_COST_REF: Record<string, string> = {
+  DON_RESTED_THIS_WAY: "__cost_don_rested",
+  CARDS_TRASHED_THIS_WAY: "__cost_cards_trashed",
+  CHARACTERS_RETURNED_THIS_WAY: "__cost_cards_returned",
+  CHARACTERS_KO_THIS_WAY: "__cost_characters_ko",
+  CARDS_PLACED_TO_DECK_THIS_WAY: "__cost_cards_placed_to_deck",
+};
 
 // ─── Shuffle ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +92,37 @@ export function resolveAmount(
   if (dv.type === "FIXED") return dv.value ?? 0;
 
   if (dv.type === "PER_COUNT" && state != null && controller != null) {
-    const count = resolvePerCountSource(state, controller, dv.source as string, cardDb);
+    const source = dv.source as string;
+    const costRefKey = THIS_WAY_TO_COST_REF[source];
+    if (costRefKey) {
+      const costRef = resultRefs.get(costRefKey);
+      if (costRef) {
+        return Math.floor(costRef.count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
+      }
+    }
+    if (source === "REVEALED_CARD_COST" && (dv as any).ref && cardDb) {
+      const refResult = resultRefs.get((dv as any).ref as string);
+      if (refResult?.targetInstanceIds?.length) {
+        const targetCard = findCardInstanceForDV(state, refResult.targetInstanceIds[0]);
+        if (targetCard) {
+          const data = cardDb.get(targetCard.cardId);
+          return Math.floor((data?.cost ?? 0) / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
+        }
+      }
+    }
+    if (source === "DON_GIVEN_TO_TARGET" && (dv as any).ref) {
+      const refResult = resultRefs.get((dv as any).ref as string);
+      if (refResult?.targetInstanceIds?.length) {
+        const targetCard = findCardInstanceForDV(state, refResult.targetInstanceIds[0]);
+        if (targetCard) {
+          return Math.floor(targetCard.attachedDon.length / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
+        }
+      }
+      if (refResult) {
+        return Math.floor(refResult.count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
+      }
+    }
+    const count = resolvePerCountSource(state, controller, source, cardDb);
     return Math.floor(count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
   }
 
