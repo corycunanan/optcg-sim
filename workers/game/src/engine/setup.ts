@@ -39,31 +39,15 @@ export function buildInitialState(payload: GameInitPayload): {
   const [p0State, p0Deck] = buildPlayerDeck(payload.player1, 0 as const, cardDb);
   const [p1State, p1Deck] = buildPlayerDeck(payload.player2, 1 as const, cardDb);
 
-  // Shuffle decks; in dev (searchersFirst) move SEARCH_DECK cards to the front
-  const searcherIds0 = payload.player1.debug?.searchersFirst ? getSearchDeckCardIds(cardDb) : undefined;
-  const searcherIds1 = payload.player2.debug?.searchersFirst ? getSearchDeckCardIds(cardDb) : undefined;
-  const shuffled0 = prioritizeDeck(shuffleDeck(p0Deck), searcherIds0);
-  const shuffled1 = prioritizeDeck(shuffleDeck(p1Deck), searcherIds1);
-
-  // Deal opening hands (5 cards each)
-  const [hand0, remainingDeck0] = drawN(shuffled0, 5);
-  const [hand1, remainingDeck1] = drawN(shuffled1, 5);
-
-  // Place life cards (from top of deck, placed bottom-up per rules §5-2-1-7)
-  // Fallback chain: life → cost (vegapull stores leader life in cost) → 5
+  // Resolve leader life values
   const leader0Data = cardDb.get(payload.player1.leader.cardId);
   const leader1Data = cardDb.get(payload.player2.leader.cardId);
   const leaderLife0 = leader0Data?.life ?? leader0Data?.cost ?? 5;
   const leaderLife1 = leader1Data?.life ?? leader1Data?.cost ?? 5;
 
-  const [lifeCards0, deckAfterLife0] = drawN(remainingDeck0, leaderLife0);
-  const [lifeCards1, deckAfterLife1] = drawN(remainingDeck1, leaderLife1);
-
-  // §5-2-1-7: Top-of-deck card placed at bottom of Life area (removed last).
-  // drawN takes from deck[0] (top), so reverse so deck-top ends up at the end of the array.
-  // removeTopLifeCard() takes life[0], so life[0] = deepest card = last drawn = removed first.
-  const lifeArea0: LifeCard[] = lifeCards0.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const })).reverse();
-  const lifeArea1: LifeCard[] = lifeCards1.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const })).reverse();
+  // Deal cards: use test order if configured, otherwise shuffle normally
+  const deal0 = dealCards(p0Deck, leaderLife0, payload.player1.testOrder);
+  const deal1 = dealCards(p1Deck, leaderLife1, payload.player2.testOrder);
 
   // Build 10 DON!! cards per player
   const donDeck0 = buildDonDeck(0 as const);
@@ -71,17 +55,17 @@ export function buildInitialState(payload: GameInitPayload): {
 
   const player0 = {
     ...p0State,
-    hand: hand0,
-    deck: deckAfterLife0,
-    life: lifeArea0,
+    hand: deal0.hand,
+    deck: deal0.deck,
+    life: deal0.life,
     donDeck: donDeck0,
   };
 
   const player1 = {
     ...p1State,
-    hand: hand1,
-    deck: deckAfterLife1,
-    life: lifeArea1,
+    hand: deal1.hand,
+    deck: deal1.deck,
+    life: deal1.life,
     donDeck: donDeck1,
   };
 
@@ -223,42 +207,89 @@ function buildDonDeck(owner: 0 | 1): DonInstance[] {
 }
 
 /**
- * Returns the set of cardIds in the given cardDb that have at least one SEARCH_DECK action.
- * Used in dev mode to put searcher cards at the top of the deck.
+ * Deal cards for a player: either apply a test order (fixed life + hand) or shuffle normally.
+ * Falls back to normal shuffle if testOrder is invalid.
  */
-function getSearchDeckCardIds(cardDb: Map<string, CardData>): Set<string> {
-  const ids = new Set<string>();
-  for (const [cardId, data] of cardDb.entries()) {
-    const schema = data.effectSchema as import("./effect-types.js").EffectSchema | null;
-    if (schema?.effects.some((b) => b.actions?.some((a) => a.type === "SEARCH_DECK"))) {
-      ids.add(cardId);
-    }
+function dealCards(
+  expandedDeck: CardInstance[],
+  leaderLife: number,
+  testOrder?: { life: string[]; hand: string[] } | null,
+): { hand: CardInstance[]; life: LifeCard[]; deck: CardInstance[] } {
+  if (testOrder) {
+    const result = applyTestOrder(expandedDeck, testOrder, leaderLife);
+    if (result) return result;
+    // Invalid test order — fall back to normal shuffle
+    console.warn("Invalid testOrder, falling back to normal shuffle");
   }
-  return ids;
+  return normalDeal(expandedDeck, leaderLife);
+}
+
+/** Standard shuffle → hand → life pipeline. */
+function normalDeal(
+  expandedDeck: CardInstance[],
+  leaderLife: number,
+): { hand: CardInstance[]; life: LifeCard[]; deck: CardInstance[] } {
+  const shuffled = shuffleDeck(expandedDeck);
+  const [hand, remaining] = drawN(shuffled, 5);
+  const [lifeCards, deck] = drawN(remaining, leaderLife);
+  const life: LifeCard[] = lifeCards
+    .map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }))
+    .reverse();
+  return { hand, life, deck };
 }
 
 /**
- * Move cards whose cardId is in priorityIds to the front of the deck (one copy each),
- * leaving all other cards in their shuffled positions after them.
- * Used in dev mode to guarantee searcher cards appear in the opening hand.
+ * Apply a fixed test order: consume specified cards for life and hand from the expanded deck.
+ * Remaining cards are shuffled. Returns null if the order is invalid.
  */
-function prioritizeDeck(deck: CardInstance[], priorityIds?: Set<string>): CardInstance[] {
-  if (!priorityIds || priorityIds.size === 0) return deck;
+function applyTestOrder(
+  expandedDeck: CardInstance[],
+  testOrder: { life: string[]; hand: string[] },
+  leaderLife: number,
+): { hand: CardInstance[]; life: LifeCard[]; deck: CardInstance[] } | null {
+  if (testOrder.life.length !== leaderLife || testOrder.hand.length !== 5) return null;
 
-  const priority: CardInstance[] = [];
-  const rest: CardInstance[] = [];
-  const seen = new Set<string>(); // track which cardIds we've already placed (one copy each)
-
-  for (const card of deck) {
-    if (priorityIds.has(card.cardId) && !seen.has(card.cardId)) {
-      seen.add(card.cardId);
-      priority.push(card);
-    } else {
-      rest.push(card);
-    }
+  // Build consumption pool: Map<cardId, CardInstance[]>
+  const pool = new Map<string, CardInstance[]>();
+  for (const card of expandedDeck) {
+    const arr = pool.get(card.cardId) ?? [];
+    arr.push(card);
+    pool.set(card.cardId, arr);
   }
 
-  return [...priority, ...rest];
+  const consume = (cardId: string): CardInstance | null => {
+    const arr = pool.get(cardId);
+    if (!arr || arr.length === 0) return null;
+    return arr.pop()!;
+  };
+
+  // Consume life cards
+  const lifeInstances: CardInstance[] = [];
+  for (const cardId of testOrder.life) {
+    const instance = consume(cardId);
+    if (!instance) return null;
+    lifeInstances.push(instance);
+  }
+
+  // Consume hand cards
+  const handInstances: CardInstance[] = [];
+  for (const cardId of testOrder.hand) {
+    const instance = consume(cardId);
+    if (!instance) return null;
+    handInstances.push({ ...instance, zone: "HAND" as const });
+  }
+
+  // Remaining cards → shuffle for deck
+  const remaining: CardInstance[] = [];
+  for (const arr of pool.values()) remaining.push(...arr);
+  const deck = shuffleDeck(remaining);
+
+  // Life area: reverse per §5-2-1-7 (same as normal deal)
+  const life: LifeCard[] = lifeInstances
+    .map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }))
+    .reverse();
+
+  return { hand: handInstances, life, deck };
 }
 
 function shuffleDeck(cards: CardInstance[]): CardInstance[] {

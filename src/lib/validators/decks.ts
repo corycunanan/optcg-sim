@@ -6,12 +6,21 @@ const DeckCardSchema = z.object({
   selectedArtUrl: z.string().nullable().optional(),
 });
 
+const TestDeckOrderSchema = z
+  .object({
+    life: z.array(z.string().min(1)),
+    hand: z.array(z.string().min(1)).length(5),
+  })
+  .nullable()
+  .optional();
+
 export const CreateDeckSchema = z.object({
   name: z.string().min(1, "Name is required"),
   leaderId: z.string().min(1, "leaderId is required"),
   leaderArtUrl: z.string().nullable().optional(),
   sleeveUrl: z.string().nullable().optional(),
   donArtUrl: z.string().nullable().optional(),
+  testOrder: TestDeckOrderSchema,
   format: z.string().optional(),
   cards: z.array(DeckCardSchema).optional(),
 });
@@ -24,6 +33,7 @@ export const UpdateDeckSchema = z.object({
   leaderArtUrl: z.string().nullable().optional(),
   sleeveUrl: z.string().nullable().optional(),
   donArtUrl: z.string().nullable().optional(),
+  testOrder: TestDeckOrderSchema,
   format: z.string().optional(),
   cards: z.array(DeckCardSchema).optional(),
 });

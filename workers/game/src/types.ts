@@ -98,8 +98,8 @@ export interface PlayerInitData {
   leader: DeckCardData;
   sleeveUrl?: string | null;
   donArtUrl?: string | null;
-  /** Dev-only: move all cards with SEARCH_DECK effects to the top of the deck before dealing */
-  debug?: { searchersFirst?: boolean };
+  /** Fixed card order for testing: life and hand card assignments */
+  testOrder?: { life: string[]; hand: string[] } | null;
 }
 
 export interface DeckCardData {

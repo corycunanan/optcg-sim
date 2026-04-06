@@ -2,6 +2,11 @@
  * Deck Builder State Types
  */
 
+export interface TestDeckOrder {
+  life: string[]; // cardIds, length = leader's life value
+  hand: string[]; // cardIds, length = 5
+}
+
 export interface DeckCardEntry {
   cardId: string;
   quantity: number;
@@ -48,6 +53,7 @@ export interface DeckBuilderState {
   cards: Map<string, DeckCardEntry>;
   sleeveUrl: string | null;
   donArtUrl: string | null;
+  testOrder: TestDeckOrder | null;
   isDirty: boolean;
   isSaving: boolean;
   lastSavedAt: Date | null;
@@ -72,7 +78,8 @@ export type DeckBuilderAction =
   | { type: "SAVE_ERROR" }
   | { type: "MARK_CLEAN" }
   | { type: "SET_SLEEVE"; sleeveUrl: string }
-  | { type: "SET_DON_ART"; donArtUrl: string };
+  | { type: "SET_DON_ART"; donArtUrl: string }
+  | { type: "SET_TEST_ORDER"; testOrder: TestDeckOrder | null };
 
 export function createInitialState(): DeckBuilderState {
   return {
@@ -83,10 +90,16 @@ export function createInitialState(): DeckBuilderState {
     cards: new Map(),
     sleeveUrl: null,
     donArtUrl: null,
+    testOrder: null,
     isDirty: false,
     isSaving: false,
     lastSavedAt: null,
   };
+}
+
+/** Clear testOrder when deck composition changes (returns partial state update or empty object) */
+function clearTestOrder(state: DeckBuilderState): { testOrder: null } | Record<string, never> {
+  return state.testOrder !== null ? { testOrder: null } : {};
 }
 
 export function deckBuilderReducer(
@@ -101,10 +114,10 @@ export function deckBuilderReducer(
       return { ...state, format: action.format, isDirty: true };
 
     case "SET_LEADER":
-      return { ...state, leader: action.leader, isDirty: true };
+      return { ...state, leader: action.leader, ...clearTestOrder(state), isDirty: true };
 
     case "REMOVE_LEADER":
-      return { ...state, leader: null, isDirty: true };
+      return { ...state, leader: null, ...clearTestOrder(state), isDirty: true };
 
     case "ADD_CARD": {
       const newCards = new Map(state.cards);
@@ -125,13 +138,13 @@ export function deckBuilderReducer(
           card: action.card,
         });
       }
-      return { ...state, cards: newCards, isDirty: true };
+      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
     }
 
     case "REMOVE_CARD": {
       const newCards = new Map(state.cards);
       newCards.delete(action.cardId);
-      return { ...state, cards: newCards, isDirty: true };
+      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
     }
 
     case "SET_QUANTITY": {
@@ -147,7 +160,7 @@ export function deckBuilderReducer(
           });
         }
       }
-      return { ...state, cards: newCards, isDirty: true };
+      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
     }
 
     case "INCREMENT_CARD": {
@@ -156,7 +169,7 @@ export function deckBuilderReducer(
       if (entry && entry.quantity < 4) {
         newCards.set(action.cardId, { ...entry, quantity: entry.quantity + 1 });
       }
-      return { ...state, cards: newCards, isDirty: true };
+      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
     }
 
     case "DECREMENT_CARD": {
@@ -172,7 +185,7 @@ export function deckBuilderReducer(
           });
         }
       }
-      return { ...state, cards: newCards, isDirty: true };
+      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
     }
 
     case "SET_ART_VARIANT": {
@@ -194,6 +207,7 @@ export function deckBuilderReducer(
         cards: new Map(),
         sleeveUrl: state.sleeveUrl,
         donArtUrl: state.donArtUrl,
+        testOrder: null,
         isDirty: true,
       };
 
@@ -228,6 +242,7 @@ export function deckBuilderReducer(
         ...state,
         leader: action.leader ?? state.leader,
         cards: newCards,
+        ...clearTestOrder(state),
         isDirty: true,
       };
     }
@@ -255,6 +270,9 @@ export function deckBuilderReducer(
 
     case "SET_DON_ART":
       return { ...state, donArtUrl: action.donArtUrl, isDirty: true };
+
+    case "SET_TEST_ORDER":
+      return { ...state, testOrder: action.testOrder, isDirty: true };
 
     default:
       return state;

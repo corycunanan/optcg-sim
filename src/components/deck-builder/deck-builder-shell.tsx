@@ -19,6 +19,7 @@ import { SleevePicker } from "./sleeve-picker";
 import { DonPicker } from "./don-picker";
 import { ImportModal } from "./import-modal";
 import { ExportModal } from "./export-modal";
+import { TestOrderEditor } from "./test-order-editor";
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 
@@ -64,6 +65,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             cards: cardsMap,
             sleeveUrl: data.sleeveUrl ?? null,
             donArtUrl: data.donArtUrl ?? null,
+            testOrder: data.testOrder ?? null,
             lastSavedAt: new Date(data.updatedAt),
           },
         });
@@ -103,6 +105,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       leaderArtUrl: leaderSelectedArtUrl ?? null,
       sleeveUrl: state.sleeveUrl ?? null,
       donArtUrl: state.donArtUrl ?? null,
+      testOrder: state.testOrder ?? null,
       format: state.format,
       cards: Array.from(state.cards.values()).map((c) => ({
         cardId: c.cardId,
@@ -229,6 +232,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
                 <TabsTrigger value="cards">Cards</TabsTrigger>
                 <TabsTrigger value="backs">Backs</TabsTrigger>
                 <TabsTrigger value="don">DON</TabsTrigger>
+                <TabsTrigger value="test-order">Test Order</TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
                 <button
@@ -289,6 +293,20 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             {/* DON tab */}
             <TabsContent value="don" className="flex min-h-0 flex-1">
               <DeckBuilderDon donArtUrl={state.donArtUrl} />
+            </TabsContent>
+
+            {/* Test Order tab */}
+            <TabsContent value="test-order" className="flex min-h-0 flex-1">
+              <div className="flex-1 overflow-y-auto p-5">
+                <TestOrderEditor
+                  leader={state.leader}
+                  cards={state.cards}
+                  testOrder={state.testOrder}
+                  onChangeTestOrder={(testOrder) =>
+                    dispatch({ type: "SET_TEST_ORDER", testOrder })
+                  }
+                />
+              </div>
             </TabsContent>
           </TabsRoot>
         </div>

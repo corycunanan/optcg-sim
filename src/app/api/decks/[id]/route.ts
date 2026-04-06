@@ -94,7 +94,7 @@ export async function PUT(
 
     const parsed = await parseBody(request, UpdateDeckSchema);
     if (isErrorResponse(parsed)) return parsed;
-    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, format, cards } = parsed;
+    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, testOrder, format, cards } = parsed;
 
     // If changing leader, validate it
     if (leaderId && leaderId !== existing.leaderId) {
@@ -111,6 +111,7 @@ export async function PUT(
     if (leaderArtUrl !== undefined) updateData.leaderArtUrl = leaderArtUrl;
     if (sleeveUrl !== undefined) updateData.sleeveUrl = sleeveUrl;
     if (donArtUrl !== undefined) updateData.donArtUrl = donArtUrl;
+    if (testOrder !== undefined) updateData.testOrder = testOrder;
     if (format !== undefined) updateData.format = format;
 
     // If cards are provided, replace all deck cards

@@ -140,7 +140,8 @@ export async function POST(request: NextRequest) {
     ]);
 
     // Build init payload for the Durable Object
-    const devDebug = process.env.NODE_ENV === "development" ? { searchersFirst: true } : undefined;
+    const hostTestOrder = lobby.hostDeck.testOrder as { life: string[]; hand: string[] } | null;
+    const guestTestOrder = guestDeck.testOrder as { life: string[]; hand: string[] } | null;
     const payload = {
       gameId: gameSession.id,
       format: lobby.format,
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
         userId: lobby.hostUserId,
         sleeveUrl: lobby.hostDeck.sleeveUrl ?? null,
         donArtUrl: lobby.hostDeck.donArtUrl ?? null,
+        testOrder: hostTestOrder ?? undefined,
         leader: {
           cardId: hostLeader.id,
           quantity: 1,
@@ -164,12 +166,12 @@ export async function POST(request: NextRequest) {
             imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
           },
         })),
-        ...(devDebug && { debug: devDebug }),
       },
       player2: {
         userId,
         sleeveUrl: guestDeck.sleeveUrl ?? null,
         donArtUrl: guestDeck.donArtUrl ?? null,
+        testOrder: guestTestOrder ?? undefined,
         leader: {
           cardId: guestLeader.id,
           quantity: 1,
@@ -186,7 +188,6 @@ export async function POST(request: NextRequest) {
             imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
           },
         })),
-        ...(devDebug && { debug: devDebug }),
       },
     };
 

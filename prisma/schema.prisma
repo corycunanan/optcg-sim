@@ -198,6 +198,7 @@ model Deck {
   leaderArtUrl String?  // Selected art variant URL for leader (null = base art)
   sleeveUrl    String?  // Selected card sleeve design URL (null = default)
   donArtUrl    String?  // Selected DON card art URL (null = default)
+  testOrder    Json?    // Fixed card order for testing: { life: string[], hand: string[] }
   format       String   @default("Standard")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
