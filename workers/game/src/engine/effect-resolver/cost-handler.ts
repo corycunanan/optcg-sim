@@ -662,11 +662,36 @@ export function computeCostTargets(
       return player.life.map((l) => l.instanceId);
     }
 
-    case "REST_CARDS":
-    case "REST_NAMED_CARD": {
+    case "REST_CARDS": {
       return player.characters
         .filter((c) => c.state === "ACTIVE")
         .map((c) => c.instanceId);
+    }
+
+    case "REST_NAMED_CARD": {
+      const candidates: string[] = [];
+      const nameFilter = cost.filter?.name;
+      // Include matching active characters
+      for (const c of player.characters) {
+        if (c.state !== "ACTIVE") continue;
+        if (nameFilter) {
+          const data = cardDb.get(c.cardId);
+          if (!data || data.name !== nameFilter) continue;
+        }
+        candidates.push(c.instanceId);
+      }
+      // Include leader if active and matches name filter
+      if (player.leader.state === "ACTIVE") {
+        if (nameFilter) {
+          const leaderData = cardDb.get(player.leader.cardId);
+          if (leaderData && leaderData.name === nameFilter) {
+            candidates.push(player.leader.instanceId);
+          }
+        } else {
+          candidates.push(player.leader.instanceId);
+        }
+      }
+      return candidates;
     }
 
     default:
@@ -726,8 +751,13 @@ export function getCostCards(
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "REST_CARDS":
-    case "REST_NAMED_CARD":
-      return player.characters.filter((c) => targetSet.has(c.instanceId));
+    case "REST_NAMED_CARD": {
+      const cards = player.characters.filter((c) => targetSet.has(c.instanceId));
+      if (targetSet.has(player.leader.instanceId)) {
+        cards.push(player.leader);
+      }
+      return cards;
+    }
 
     case "TRASH_FROM_LIFE":
       // Life cards aren't CardInstance, return empty for now
@@ -841,8 +871,11 @@ export function applyCostSelection(
       const newChars = p.characters.map((c) =>
         selectedSet.has(c.instanceId) ? { ...c, state: "RESTED" as const } : c,
       );
+      const newLeader = selectedSet.has(p.leader.instanceId)
+        ? { ...p.leader, state: "RESTED" as const }
+        : p.leader;
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, characters: newChars };
+      newPlayers[controller] = { ...p, leader: newLeader, characters: newChars };
       return { ...state, players: newPlayers };
     }
 
