@@ -24,7 +24,7 @@ import { evaluateCondition, matchesFilter, type ConditionContext } from "../engi
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
-import { computeAllValidTargets } from "../engine/effect-resolver/target-resolver.js";
+import { computeAllValidTargets, validateTargetConstraints, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../engine/effect-resolver/target-resolver.js";
 import type { EffectResult } from "../engine/effect-types.js";
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
@@ -1184,6 +1184,396 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       expect(validIds).toContain("hand-green");
       expect(validIds).not.toContain("hand-red");
       expect(validIds).toHaveLength(2);
+    });
+  });
+
+  // ── Batch 3: Target Constraints ─────────────────────────────────────────────
+
+  describe("aggregate_constraint", () => {
+    it("accepts selection where total power is within limit", () => {
+      const state = buildMinimalState();
+      const char1 = makeInstance("char-a", "CHARACTER", 1, { instanceId: "opp-char-1" });
+      const char2 = makeInstance("char-b", "CHARACTER", 1, { instanceId: "opp-char-2" });
+      state.players[1].characters = [char1, char2];
+
+      const cardDb = new Map<string, CardData>([
+        [CARDS.LEADER.id, CARDS.LEADER],
+        [CARDS.VANILLA.id, CARDS.VANILLA],
+        ["char-a", makeCard("char-a", { name: "Pirate A", power: 2000 })],
+        ["char-b", makeCard("char-b", { name: "Pirate B", power: 1000 })],
+      ]);
+
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        count: { up_to: 2 } as const,
+        aggregate_constraint: { property: "power" as const, operator: "<=" as const, value: 4000 },
+      };
+
+      // Both selected: total 3000 ≤ 4000 → valid
+      expect(validateTargetConstraints(["opp-char-1", "opp-char-2"], target, state, cardDb)).toBe(true);
+    });
+
+    it("rejects selection where total power exceeds limit", () => {
+      const state = buildMinimalState();
+      const char1 = makeInstance("char-c", "CHARACTER", 1, { instanceId: "opp-char-3" });
+      const char2 = makeInstance("char-d", "CHARACTER", 1, { instanceId: "opp-char-4" });
+      state.players[1].characters = [char1, char2];
+
+      const cardDb = new Map<string, CardData>([
+        [CARDS.LEADER.id, CARDS.LEADER],
+        [CARDS.VANILLA.id, CARDS.VANILLA],
+        ["char-c", makeCard("char-c", { name: "Pirate C", power: 3000 })],
+        ["char-d", makeCard("char-d", { name: "Pirate D", power: 2000 })],
+      ]);
+
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        count: { up_to: 2 } as const,
+        aggregate_constraint: { property: "power" as const, operator: "<=" as const, value: 4000 },
+      };
+
+      // Both selected: total 5000 > 4000 → invalid
+      expect(validateTargetConstraints(["opp-char-3", "opp-char-4"], target, state, cardDb)).toBe(false);
+      // Single card: 3000 ≤ 4000 → valid
+      expect(validateTargetConstraints(["opp-char-3"], target, state, cardDb)).toBe(true);
+    });
+
+    it("accepts empty selection", () => {
+      const state = buildMinimalState();
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        count: { up_to: 2 } as const,
+        aggregate_constraint: { property: "power" as const, operator: "<=" as const, value: 4000 },
+      };
+
+      expect(validateTargetConstraints([], target, state, new Map())).toBe(true);
+    });
+  });
+
+  describe("uniqueness_constraint", () => {
+    it("accepts selection with all different names", () => {
+      const state = buildMinimalState();
+      const inst1 = makeInstance("germa-1", "TRASH", 0, { instanceId: "trash-1" });
+      const inst2 = makeInstance("germa-2", "TRASH", 0, { instanceId: "trash-2" });
+      const inst3 = makeInstance("germa-3", "TRASH", 0, { instanceId: "trash-3" });
+      state.players[0].trash = [inst1, inst2, inst3];
+
+      const cardDb = new Map<string, CardData>([
+        [CARDS.LEADER.id, CARDS.LEADER],
+        [CARDS.VANILLA.id, CARDS.VANILLA],
+        ["germa-1", makeCard("germa-1", { name: "Reiju", types: ["GERMA 66"] })],
+        ["germa-2", makeCard("germa-2", { name: "Ichiji", types: ["GERMA 66"] })],
+        ["germa-3", makeCard("germa-3", { name: "Niji", types: ["GERMA 66"] })],
+      ]);
+
+      const target = {
+        type: "CHARACTER_CARD" as const,
+        controller: "SELF" as const,
+        source_zone: "TRASH" as const,
+        count: { up_to: 4 } as const,
+        uniqueness_constraint: { field: "name" as const },
+      };
+
+      expect(validateTargetConstraints(["trash-1", "trash-2", "trash-3"], target, state, cardDb)).toBe(true);
+    });
+
+    it("rejects selection with duplicate names", () => {
+      const state = buildMinimalState();
+      const inst1 = makeInstance("germa-a", "TRASH", 0, { instanceId: "trash-a" });
+      const inst2 = makeInstance("germa-b", "TRASH", 0, { instanceId: "trash-b" });
+      state.players[0].trash = [inst1, inst2];
+
+      const cardDb = new Map<string, CardData>([
+        [CARDS.LEADER.id, CARDS.LEADER],
+        [CARDS.VANILLA.id, CARDS.VANILLA],
+        ["germa-a", makeCard("germa-a", { name: "Reiju", types: ["GERMA 66"] })],
+        ["germa-b", makeCard("germa-b", { name: "Reiju", types: ["GERMA 66"] })],
+      ]);
+
+      const target = {
+        type: "CHARACTER_CARD" as const,
+        controller: "SELF" as const,
+        source_zone: "TRASH" as const,
+        count: { up_to: 4 } as const,
+        uniqueness_constraint: { field: "name" as const },
+      };
+
+      // Two cards with same name "Reiju" → invalid
+      expect(validateTargetConstraints(["trash-a", "trash-b"], target, state, cardDb)).toBe(false);
+      // Single card → valid
+      expect(validateTargetConstraints(["trash-a"], target, state, cardDb)).toBe(true);
+    });
+  });
+
+  describe("named_distribution", () => {
+    it("accepts at most 1 of each named card", () => {
+      const state = buildMinimalState();
+      const inst1 = makeInstance("sabo-card", "HAND", 0, { instanceId: "hand-sabo" });
+      const inst2 = makeInstance("ace-card", "HAND", 0, { instanceId: "hand-ace" });
+      const inst3 = makeInstance("luffy-card", "HAND", 0, { instanceId: "hand-luffy" });
+      state.players[0].hand = [inst1, inst2, inst3];
+
+      const cardDb = new Map<string, CardData>([
+        [CARDS.LEADER.id, CARDS.LEADER],
+        [CARDS.VANILLA.id, CARDS.VANILLA],
+        ["sabo-card", makeCard("sabo-card", { name: "Sabo", cost: 2 })],
+        ["ace-card", makeCard("ace-card", { name: "Portgas.D.Ace", cost: 2 })],
+        ["luffy-card", makeCard("luffy-card", { name: "Monkey.D.Luffy", cost: 2 })],
+      ]);
+
+      const target = {
+        type: "CARD_IN_HAND" as const,
+        controller: "SELF" as const,
+        count: { up_to: 3 } as const,
+        named_distribution: { names: ["Sabo", "Portgas.D.Ace", "Monkey.D.Luffy"] },
+      };
+
+      // One of each → valid
+      expect(validateTargetConstraints(["hand-sabo", "hand-ace", "hand-luffy"], target, state, cardDb)).toBe(true);
+      // Two of the three → valid
+      expect(validateTargetConstraints(["hand-sabo", "hand-ace"], target, state, cardDb)).toBe(true);
+    });
+
+    it("rejects more than 1 of the same named card", () => {
+      const state = buildMinimalState();
+      const inst1 = makeInstance("sabo-1", "HAND", 0, { instanceId: "hand-sabo-1" });
+      const inst2 = makeInstance("sabo-2", "HAND", 0, { instanceId: "hand-sabo-2" });
+      state.players[0].hand = [inst1, inst2];
+
+      const cardDb = new Map<string, CardData>([
+        [CARDS.LEADER.id, CARDS.LEADER],
+        [CARDS.VANILLA.id, CARDS.VANILLA],
+        ["sabo-1", makeCard("sabo-1", { name: "Sabo", cost: 2 })],
+        ["sabo-2", makeCard("sabo-2", { name: "Sabo", cost: 2 })],
+      ]);
+
+      const target = {
+        type: "CARD_IN_HAND" as const,
+        controller: "SELF" as const,
+        count: { up_to: 3 } as const,
+        named_distribution: { names: ["Sabo", "Portgas.D.Ace", "Monkey.D.Luffy"] },
+      };
+
+      // Two Sabos → invalid
+      expect(validateTargetConstraints(["hand-sabo-1", "hand-sabo-2"], target, state, cardDb)).toBe(false);
+      // Single Sabo → valid
+      expect(validateTargetConstraints(["hand-sabo-1"], target, state, cardDb)).toBe(true);
+    });
+  });
+
+  describe("needsPlayerTargetSelection with constraints", () => {
+    it("requires player selection when aggregate_constraint present", () => {
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        count: { up_to: 2 } as const,
+        aggregate_constraint: { property: "power" as const, operator: "<=" as const, value: 4000 },
+      };
+
+      expect(needsPlayerTargetSelection(target, ["a", "b"])).toBe(true);
+      // Even with 1 candidate, still needs selection (player can select 0)
+      expect(needsPlayerTargetSelection(target, ["a"])).toBe(true);
+      // No candidates → no selection needed
+      expect(needsPlayerTargetSelection(target, [])).toBe(false);
+    });
+  });
+
+  // ─── Batch 3: dual_targets ────────────────────────────────────────────────
+
+  describe("dual_targets", () => {
+    // Shared setup: opponent has 3 characters with different costs
+    function buildDualTargetState() {
+      const cost1Char = makeInstance("cost1-char", "CHARACTER", 1, { instanceId: "opp-char-cost1" });
+      const cost3Char = makeInstance("cost3-char", "CHARACTER", 1, { instanceId: "opp-char-cost3" });
+      const cost5Char = makeInstance("cost5-char", "CHARACTER", 1, { instanceId: "opp-char-cost5" });
+
+      const cardDb = new Map<string, CardData>();
+      cardDb.set("cost1-char", makeCard("cost1-char", { name: "Cost1", cost: 1, power: 2000 }));
+      cardDb.set("cost3-char", makeCard("cost3-char", { name: "Cost3", cost: 3, power: 4000 }));
+      cardDb.set("cost5-char", makeCard("cost5-char", { name: "Cost5", cost: 5, power: 6000 }));
+      cardDb.set(CARDS.LEADER.id, CARDS.LEADER);
+      cardDb.set(CARDS.VANILLA.id, CARDS.VANILLA);
+
+      const state = buildMinimalState();
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[1] = { ...newPlayers[1], characters: [cost1Char, cost3Char, cost5Char] };
+      return { state: { ...state, players: newPlayers }, cardDb };
+    }
+
+    it("computeAllValidTargets returns union of dual_target pools, excluding cards that match no slot", () => {
+      const { state, cardDb } = buildDualTargetState();
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: { cost_max: 4 }, count: { up_to: 1 } as const },
+          { filter: { cost_max: 2 }, count: { up_to: 1 } as const },
+        ],
+      };
+      const resultRefs = new Map<string, EffectResult>();
+      const validIds = computeAllValidTargets(state, target, 0, cardDb, "leader-0", resultRefs);
+
+      // cost1 matches both slots, cost3 matches slot 0 only, cost5 matches neither
+      expect(validIds).toContain("opp-char-cost1");
+      expect(validIds).toContain("opp-char-cost3");
+      expect(validIds).not.toContain("opp-char-cost5");
+      expect(validIds).toHaveLength(2);
+    });
+
+    it("needsPlayerTargetSelection returns true for dual_targets with valid targets", () => {
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: { cost_max: 4 }, count: { up_to: 1 } as const },
+          { filter: { cost_max: 2 }, count: { up_to: 1 } as const },
+        ],
+      };
+
+      expect(needsPlayerTargetSelection(target, ["a", "b"])).toBe(true);
+      expect(needsPlayerTargetSelection(target, ["a"])).toBe(true);
+      expect(needsPlayerTargetSelection(target, [])).toBe(false);
+    });
+
+    it("validateTargetConstraints accepts valid dual_target assignment (overlapping pools)", () => {
+      const { state, cardDb } = buildDualTargetState();
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: { cost_max: 4 }, count: { up_to: 1 } as const },
+          { filter: { cost_max: 2 }, count: { up_to: 1 } as const },
+        ],
+      };
+
+      // cost3 → slot 0, cost1 → slot 1 (or slot 0, leaving slot 1 empty — both work)
+      expect(validateTargetConstraints(["opp-char-cost3", "opp-char-cost1"], target, state, cardDb)).toBe(true);
+    });
+
+    it("validateTargetConstraints rejects invalid dual_target assignment (both only fit one slot)", () => {
+      // Two cost-3 characters — both only fit slot 0 (cost_max: 4), but slot 0 is up_to: 1
+      const cost3A = makeInstance("cost3a", "CHARACTER", 1, { instanceId: "opp-char-cost3a" });
+      const cost3B = makeInstance("cost3b", "CHARACTER", 1, { instanceId: "opp-char-cost3b" });
+
+      const cardDb = new Map<string, CardData>();
+      cardDb.set("cost3a", makeCard("cost3a", { name: "Cost3A", cost: 3 }));
+      cardDb.set("cost3b", makeCard("cost3b", { name: "Cost3B", cost: 3 }));
+      cardDb.set(CARDS.LEADER.id, CARDS.LEADER);
+      cardDb.set(CARDS.VANILLA.id, CARDS.VANILLA);
+
+      const state = buildMinimalState();
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[1] = { ...newPlayers[1], characters: [cost3A, cost3B] };
+      const finalState = { ...state, players: newPlayers };
+
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: { cost_max: 4 }, count: { up_to: 1 } as const },
+          { filter: { cost_max: 2 }, count: { up_to: 1 } as const },
+        ],
+      };
+
+      // Both cost-3 cards only fit slot 0 (cost_max: 4), but slot 0 allows up_to: 1
+      expect(validateTargetConstraints(["opp-char-cost3a", "opp-char-cost3b"], target, finalState, cardDb)).toBe(false);
+    });
+
+    it("validateTargetConstraints accepts partial selection (one slot empty, up_to)", () => {
+      const { state, cardDb } = buildDualTargetState();
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: { cost_max: 4 }, count: { up_to: 1 } as const },
+          { filter: { cost_max: 2 }, count: { up_to: 1 } as const },
+        ],
+      };
+
+      // Only select cost1 — fits either slot, other slot gets 0 (valid for up_to)
+      expect(validateTargetConstraints(["opp-char-cost1"], target, state, cardDb)).toBe(true);
+    });
+
+    it("validateTargetConstraints rejects partial selection when exact count required", () => {
+      const { state, cardDb } = buildDualTargetState();
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: { cost_max: 4 }, count: { exact: 1 } as const },
+          { filter: { cost_max: 2 }, count: { exact: 1 } as const },
+        ],
+      };
+
+      // Only 1 card selected but both slots require exact 1
+      expect(validateTargetConstraints(["opp-char-cost1"], target, state, cardDb)).toBe(false);
+      // Empty selection also invalid
+      expect(validateTargetConstraints([], target, state, cardDb)).toBe(false);
+    });
+
+    it("validateTargetConstraints handles empty filter slots (OP08 pattern)", () => {
+      const { state, cardDb } = buildDualTargetState();
+      const target = {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        dual_targets: [
+          { filter: {}, count: { up_to: 1 } as const },
+          { filter: {}, count: { up_to: 1 } as const },
+        ],
+      };
+
+      // Any 2 characters should be valid — empty filter means all candidates match
+      expect(validateTargetConstraints(["opp-char-cost1", "opp-char-cost3"], target, state, cardDb)).toBe(true);
+      expect(validateTargetConstraints(["opp-char-cost1", "opp-char-cost5"], target, state, cardDb)).toBe(true);
+    });
+
+    it("buildSelectTargetPrompt includes dualTargets metadata with per-slot validIds", () => {
+      const { state, cardDb } = buildDualTargetState();
+      const action = {
+        type: "RETURN_TO_DECK" as const,
+        target: {
+          type: "CHARACTER" as const,
+          controller: "OPPONENT" as const,
+          dual_targets: [
+            { filter: { cost_max: 4 }, count: { up_to: 1 } as const },
+            { filter: { cost_max: 2 }, count: { up_to: 1 } as const },
+          ],
+        },
+        params: { position: "BOTTOM" },
+      };
+      const resultRefs = new Map<string, EffectResult>();
+      const allValidIds = computeAllValidTargets(state, action.target, 0, cardDb, "leader-0", resultRefs);
+
+      const result = buildSelectTargetPrompt(state, action, allValidIds, "leader-0", 0, cardDb, resultRefs);
+
+      expect(result.pendingPrompt).toBeDefined();
+      const opts = result.pendingPrompt!.options;
+
+      // Overall count bounds
+      expect(opts.countMin).toBe(0); // both up_to → min 0
+      expect(opts.countMax).toBe(2); // 1 + 1
+
+      // dualTargets metadata
+      expect(opts.dualTargets).toBeDefined();
+      expect(opts.dualTargets!.slots).toHaveLength(2);
+
+      // Slot 0: cost_max 4 → cost1 and cost3
+      const slot0 = opts.dualTargets!.slots[0];
+      expect(slot0.validIds).toContain("opp-char-cost1");
+      expect(slot0.validIds).toContain("opp-char-cost3");
+      expect(slot0.validIds).not.toContain("opp-char-cost5");
+      expect(slot0.countMin).toBe(0);
+      expect(slot0.countMax).toBe(1);
+
+      // Slot 1: cost_max 2 → only cost1
+      const slot1 = opts.dualTargets!.slots[1];
+      expect(slot1.validIds).toContain("opp-char-cost1");
+      expect(slot1.validIds).not.toContain("opp-char-cost3");
+      expect(slot1.countMin).toBe(0);
+      expect(slot1.countMax).toBe(1);
     });
   });
 });

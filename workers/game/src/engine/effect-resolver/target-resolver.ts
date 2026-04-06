@@ -4,9 +4,14 @@
 
 import type {
   Action,
+  AggregateConstraint,
+  CountMode,
+  DualTarget,
   EffectResult,
+  NamedCardDistribution,
   Target,
   TargetFilter,
+  UniquenessConstraint,
 } from "../effect-types.js";
 import type {
   CardData,
@@ -16,6 +21,7 @@ import type {
   ResumeContext,
 } from "../../types.js";
 import { matchesFilter as matchesFilterImpl } from "../conditions.js";
+import { getEffectivePower, getEffectiveCost } from "../modifiers.js";
 import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
 
@@ -31,6 +37,174 @@ export function matchesFilterForTarget(
   return matchesFilterImpl(card, filter, cardDb, state, resultRefs);
 }
 
+// ─── validateTargetConstraints ───────────────────────────────────────────────
+
+/**
+ * Validates a set of selected instance IDs against target constraints.
+ * Returns true if the selection satisfies all constraints.
+ */
+export function validateTargetConstraints(
+  selectedIds: string[],
+  target: Target,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+  resultRefs?: Map<string, EffectResult>,
+): boolean {
+  if (selectedIds.length === 0) {
+    // Empty selection is invalid if dual_targets has exact-count slots
+    if (target.dual_targets && target.dual_targets.length > 0) {
+      return target.dual_targets.every(dt => !("exact" in dt.count));
+    }
+    return true;
+  }
+
+  if (target.aggregate_constraint) {
+    if (!validateAggregateConstraint(selectedIds, target.aggregate_constraint, state, cardDb)) return false;
+  }
+  if (target.uniqueness_constraint) {
+    if (!validateUniquenessConstraint(selectedIds, target.uniqueness_constraint, state, cardDb)) return false;
+  }
+  if (target.named_distribution) {
+    if (!validateNamedDistribution(selectedIds, target.named_distribution, state, cardDb)) return false;
+  }
+  if (target.dual_targets && target.dual_targets.length > 0) {
+    if (!validateDualTargetConstraints(selectedIds, target.dual_targets, state, cardDb, resultRefs)) return false;
+  }
+
+  return true;
+}
+
+function resolveCardProperty(instanceId: string, property: "power" | "cost", state: GameState, cardDb: Map<string, CardData>): number {
+  const card = findCardInstance(state, instanceId);
+  if (!card) return 0;
+  const data = cardDb.get(card.cardId);
+  if (!data) return 0;
+  if (property === "power") return getEffectivePower(card, data, state);
+  return getEffectiveCost(data, state, instanceId, cardDb);
+}
+
+function validateAggregateConstraint(
+  selectedIds: string[],
+  constraint: AggregateConstraint,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const sum = selectedIds.reduce((acc, id) => acc + resolveCardProperty(id, constraint.property, state, cardDb), 0);
+  const threshold = typeof constraint.value === "number" ? constraint.value : 0;
+  switch (constraint.operator) {
+    case "<=": return sum <= threshold;
+    case ">=": return sum >= threshold;
+    case "==": return sum === threshold;
+    default: return true;
+  }
+}
+
+function resolveCardFieldValue(instanceId: string, field: "name" | "color", state: GameState, cardDb: Map<string, CardData>): string {
+  const card = findCardInstance(state, instanceId);
+  if (!card) return "";
+  const data = cardDb.get(card.cardId);
+  if (!data) return "";
+  if (field === "name") return data.name;
+  // For color, join sorted array to create a unique key
+  return Array.isArray(data.color) ? [...data.color].sort().join(",") : String(data.color);
+}
+
+function validateUniquenessConstraint(
+  selectedIds: string[],
+  constraint: UniquenessConstraint,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const seen = new Set<string>();
+  for (const id of selectedIds) {
+    const value = resolveCardFieldValue(id, constraint.field, state, cardDb);
+    if (seen.has(value)) return false;
+    seen.add(value);
+  }
+  return true;
+}
+
+function validateNamedDistribution(
+  selectedIds: string[],
+  distribution: NamedCardDistribution,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const nameCounts = new Map<string, number>();
+  for (const id of selectedIds) {
+    const card = findCardInstance(state, id);
+    if (!card) continue;
+    const data = cardDb.get(card.cardId);
+    if (!data) continue;
+    const count = nameCounts.get(data.name) ?? 0;
+    if (count >= 1) return false; // More than 1 of the same name
+    nameCounts.set(data.name, count + 1);
+  }
+  return true;
+}
+
+// ─── Dual target helpers ────────────────────────────────────────────────────
+
+function resolveCountMin(count: CountMode): number {
+  if ("exact" in count) return count.exact;
+  return 0;
+}
+
+function resolveCountMax(count: CountMode, poolSize: number): number {
+  if ("exact" in count) return count.exact;
+  if ("up_to" in count) return count.up_to;
+  return poolSize;
+}
+
+function isEmptyFilter(filter: TargetFilter | undefined): boolean {
+  return !filter || Object.keys(filter).length === 0;
+}
+
+function validateDualTargetConstraints(
+  selectedIds: string[],
+  dualTargets: DualTarget[],
+  state: GameState,
+  cardDb: Map<string, CardData>,
+  resultRefs?: Map<string, EffectResult>,
+): boolean {
+  // Pre-compute which slots each selected ID can go into
+  const perSlotValidSets: Set<string>[] = dualTargets.map((dt) => {
+    const valid = new Set<string>();
+    for (const id of selectedIds) {
+      if (isEmptyFilter(dt.filter)) {
+        valid.add(id);
+      } else {
+        const card = findCardInstance(state, id);
+        if (card && matchesFilterForTarget(card, dt.filter, cardDb, state, resultRefs)) {
+          valid.add(id);
+        }
+      }
+    }
+    return valid;
+  });
+
+  const slotMaxes = dualTargets.map((dt, i) => resolveCountMax(dt.count, perSlotValidSets[i].size));
+  const slotMins = dualTargets.map((dt) => resolveCountMin(dt.count));
+  const assignments: string[][] = dualTargets.map(() => []);
+
+  function backtrack(idx: number): boolean {
+    if (idx === selectedIds.length) {
+      return assignments.every((a, i) => a.length >= slotMins[i]);
+    }
+    const id = selectedIds[idx];
+    for (let s = 0; s < dualTargets.length; s++) {
+      if (perSlotValidSets[s].has(id) && assignments[s].length < slotMaxes[s]) {
+        assignments[s].push(id);
+        if (backtrack(idx + 1)) return true;
+        assignments[s].pop();
+      }
+    }
+    return false;
+  }
+
+  return backtrack(0);
+}
+
 // ─── computeAllValidTargets ──────────────────────────────────────────────────
 
 export function computeAllValidTargets(
@@ -44,6 +218,26 @@ export function computeAllValidTargets(
   if (!target) return [];
   const targetType = target.type;
   if (!targetType) return [];
+
+  // Dual targets: get base candidates (no filter/count), then union per-slot filtered IDs
+  if (target.dual_targets && target.dual_targets.length > 0) {
+    const baseTarget: Target = { ...target, filter: undefined, count: undefined, dual_targets: undefined };
+    const allCandidateIds = computeAllValidTargets(state, baseTarget, controller, cardDb, sourceCardInstanceId, _resultRefs);
+    const unionSet = new Set<string>();
+    for (const dt of target.dual_targets) {
+      for (const id of allCandidateIds) {
+        if (isEmptyFilter(dt.filter)) {
+          unionSet.add(id);
+        } else {
+          const card = findCardInstance(state, id);
+          if (card && matchesFilterForTarget(card, dt.filter, cardDb, state, _resultRefs)) {
+            unionSet.add(id);
+          }
+        }
+      }
+    }
+    return [...unionSet];
+  }
 
   switch (targetType) {
     case "SELF": return [sourceCardInstanceId];
@@ -210,6 +404,14 @@ export function needsPlayerTargetSelection(
   const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS"];
   if (auto.includes(target.type)) return false;
   if (target.self_ref) return false;
+  // Dual targets always require player selection — assignment is combinatorial
+  if (target.dual_targets && target.dual_targets.length > 0) {
+    return allValidIds.length > 0;
+  }
+  // Constraints require player selection — auto-select can't validate combinatorial choices
+  if (target.aggregate_constraint || target.uniqueness_constraint || target.named_distribution) {
+    return allValidIds.length > 0;
+  }
   const count = target.count;
   if (!count) return allValidIds.length > 1;
   if ("all" in count || "any_number" in count) return false;
@@ -232,12 +434,40 @@ export function buildSelectTargetPrompt(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
 ): ActionResult {
-  const count = action.target?.count;
-  const countMin = (count && "exact" in count) ? count.exact : 0;
-  const countMax = !count ? 1
-    : "exact" in count ? count.exact
-    : "up_to" in count ? count.up_to
-    : allValidIds.length;
+  const target = action.target;
+
+  // Compute dual_targets metadata for the prompt
+  const dualTargetsMetadata = target?.dual_targets?.length
+    ? {
+        slots: target.dual_targets.map((dt) => {
+          const slotValidIds = allValidIds.filter((id) => {
+            if (isEmptyFilter(dt.filter)) return true;
+            const card = findCardInstance(state, id);
+            return card ? matchesFilterForTarget(card, dt.filter, cardDb, state, resultRefs) : false;
+          });
+          return {
+            validIds: slotValidIds,
+            countMin: resolveCountMin(dt.count),
+            countMax: resolveCountMax(dt.count, slotValidIds.length),
+          };
+        }),
+      }
+    : undefined;
+
+  // Compute countMin/countMax — use summed slot bounds for dual_targets
+  let countMin: number;
+  let countMax: number;
+  if (dualTargetsMetadata) {
+    countMin = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMin, 0);
+    countMax = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMax, 0);
+  } else {
+    const count = target?.count;
+    countMin = (count && "exact" in count) ? count.exact : 0;
+    countMax = !count ? 1
+      : "exact" in count ? count.exact
+      : "up_to" in count ? count.up_to
+      : allValidIds.length;
+  }
 
   const cards: CardInstance[] = [];
   for (const id of allValidIds) {
@@ -258,9 +488,18 @@ export function buildSelectTargetPrompt(
     validTargets: allValidIds,
   };
 
+  // Build constraint metadata for UI-side validation
+  const aggregateConstraint = target?.aggregate_constraint
+    ? { property: target.aggregate_constraint.property, operator: target.aggregate_constraint.operator, value: typeof target.aggregate_constraint.value === "number" ? target.aggregate_constraint.value : 0 }
+    : undefined;
+  const uniquenessConstraint = target?.uniqueness_constraint ?? undefined;
+  const namedDistribution = target?.named_distribution
+    ? { names: target.named_distribution.names }
+    : undefined;
+
   const pendingPrompt: PendingPromptState = {
     promptType: "SELECT_TARGET",
-    options: { cards, validTargets: allValidIds, effectDescription, countMin, countMax, ctaLabel: "Confirm" },
+    options: { cards, validTargets: allValidIds, effectDescription, countMin, countMax, ctaLabel: "Confirm", aggregateConstraint, uniquenessConstraint, namedDistribution, dualTargets: dualTargetsMetadata },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
   };

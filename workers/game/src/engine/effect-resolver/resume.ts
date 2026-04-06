@@ -25,6 +25,7 @@ import type { EffectResolverResult } from "./types.js";
 import { markOncePerTurnUsed, shuffleArray } from "./action-utils.js";
 import { payCostsWithSelection, applyCostSelection } from "./cost-handler.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "./resolver.js";
+import { validateTargetConstraints } from "./target-resolver.js";
 import { nanoid } from "../../util/nanoid.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../trigger-ordering.js";
 
@@ -267,6 +268,10 @@ export function resumeEffectChain(
     const selected = action.selectedInstanceIds ?? [];
     // Validate — all selected ids must be in validTargets
     if (selected.some((id) => !validTargets.includes(id))) {
+      return { state, events, resolved: false };
+    }
+    // Validate target constraints (aggregate sum, uniqueness, named distribution, dual_targets)
+    if (pausedAction.target && !validateTargetConstraints(selected, pausedAction.target, nextState, cardDb, resultRefs)) {
       return { state, events, resolved: false };
     }
 

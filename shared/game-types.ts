@@ -370,6 +370,18 @@ export interface PromptOptions {
   countMax?: number;
   ctaLabel?: string;
   blindSelection?: boolean; // true when selecting from hidden cards (opponent's hand)
+  // Target constraints (SELECT_TARGET) — sent to UI for client-side enforcement
+  aggregateConstraint?: { property: "power" | "cost"; operator: "<=" | ">=" | "=="; value: number };
+  uniquenessConstraint?: { field: "name" | "color" };
+  namedDistribution?: { names: string[] };
+  // Dual targets (SELECT_TARGET) — per-slot valid IDs and count bounds for client-side feasibility check
+  dualTargets?: {
+    slots: Array<{
+      validIds: string[];
+      countMin: number;
+      countMax: number;
+    }>;
+  };
   // PLAYER_CHOICE
   choices?: { id: string; label: string }[];
   restDestination?: string;
