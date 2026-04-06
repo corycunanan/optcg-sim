@@ -9,6 +9,7 @@ import {
   CARDS,
 } from "./helpers.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
+import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 
 // ─── Phase Cycle ──────────────────────────────────────────────────────────────
 
@@ -1192,5 +1193,329 @@ describe("ON_KO triggers", () => {
     // (it should decrease by 1 from the event card being played, and the trash target is from field)
     const p0HandAfter = result.state.players[0].hand.length;
     expect(p0HandAfter).toBe(p0HandBefore - 1); // Only lost the event card from hand
+  });
+});
+
+// ─── ON_KO Effect Stack Resume Flow ─────────────────────────────────────────
+
+describe("ON_KO effect stack resume flow", () => {
+  const noKw = { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false };
+
+  /** Marco-style ON_KO card: optional, TRASH_FROM_HAND cost, DRAW action */
+  function makeMarcoStyleCard(cardDb: Map<string, CardData>): CardData {
+    const card: CardData = {
+      id: "CHAR-MARCO-STYLE",
+      name: "Marco-Style ON_KO",
+      type: "Character",
+      color: ["Blue"],
+      cost: 5,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: ["Whitebeard Pirates"],
+      effectText: "[On K.O.] You may trash 1 card from your hand: Draw 2 cards.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-MARCO-STYLE",
+        effects: [{
+          id: "onko_cost_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO" },
+          costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+          flags: { optional: true },
+          actions: [{ type: "DRAW", params: { amount: 2 } }],
+        }],
+      },
+    };
+    cardDb.set(card.id, card);
+    return card;
+  }
+
+  /** Set up battle KO and return the state paused at OPTIONAL_EFFECT prompt */
+  function setupMarcoKO(cardDb: Map<string, CardData>, marcoCard: CardData) {
+    let state = createBattleReadyState(cardDb);
+
+    const strongCard: CardData = { ...CARDS.VANILLA, id: "STRONG-ATK-2", power: 6000 };
+    cardDb.set(strongCard.id, strongCard);
+
+    const attacker: CardInstance = {
+      instanceId: "atk-marco-test",
+      cardId: strongCard.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const target: CardInstance = {
+      instanceId: "marco-target",
+      cardId: marcoCard.id,
+      zone: "CHARACTER",
+      state: "RESTED",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 1,
+      owner: 1,
+    };
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
+    newPlayers[1] = { ...newPlayers[1], characters: [target] };
+    state = { ...state, players: newPlayers };
+    state = registerTriggersForCard(state, target, marcoCard);
+
+    // Attack → pass blocker → pass counter → damage KOs the character
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: target.instanceId,
+    }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+
+    return result;
+  }
+
+  it("optional ON_KO with cost: prompts for optional acceptance first", () => {
+    const cardDb = createTestCardDb();
+    const marcoCard = makeMarcoStyleCard(cardDb);
+    const result = setupMarcoKO(cardDb, marcoCard);
+
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt!.respondingPlayer).toBe(1);
+    // Card should already be in trash
+    expect(result.state.players[1].trash.some(c => c.cardId === marcoCard.id)).toBe(true);
+  });
+
+  it("declining optional ON_KO skips cost and actions", () => {
+    const cardDb = createTestCardDb();
+    const marcoCard = makeMarcoStyleCard(cardDb);
+    const koResult = setupMarcoKO(cardDb, marcoCard);
+
+    const p1HandBefore = koResult.state.players[1].hand.length;
+
+    // Clear pendingPrompt and resume with PASS (decline)
+    let state = { ...koResult.state, pendingPrompt: null };
+    const resumeResult = resumeFromStack(state, { type: "PASS" }, cardDb);
+
+    // No draw should have happened, no cards trashed from hand
+    expect(resumeResult.state.players[1].hand.length).toBe(p1HandBefore);
+  });
+
+  it("accepting optional ON_KO with cost prompts for cost selection", () => {
+    const cardDb = createTestCardDb();
+    const marcoCard = makeMarcoStyleCard(cardDb);
+    const koResult = setupMarcoKO(cardDb, marcoCard);
+
+    // Clear pendingPrompt and resume with acceptance (PLAYER_CHOICE accept)
+    let state = { ...koResult.state, pendingPrompt: null };
+    const resumeResult = resumeFromStack(
+      state,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      cardDb,
+    );
+
+    // Should now prompt for cost selection (TRASH_FROM_HAND → SELECT_TARGET)
+    expect(resumeResult.pendingPrompt).toBeDefined();
+    expect(resumeResult.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    expect(resumeResult.pendingPrompt!.respondingPlayer).toBe(1);
+    // Valid targets should be hand cards
+    const validTargets = resumeResult.pendingPrompt!.options?.validTargets;
+    expect(validTargets).toBeDefined();
+    expect(validTargets!.length).toBeGreaterThan(0);
+  });
+
+  it("paying cost then executes actions (full flow: accept → pay cost → draw)", () => {
+    const cardDb = createTestCardDb();
+    const marcoCard = makeMarcoStyleCard(cardDb);
+    const koResult = setupMarcoKO(cardDb, marcoCard);
+
+    // Step 1: Accept optional effect
+    let state = { ...koResult.state, pendingPrompt: null };
+    const acceptResult = resumeFromStack(
+      state,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      cardDb,
+    );
+    expect(acceptResult.pendingPrompt?.promptType).toBe("SELECT_TARGET");
+
+    // Step 2: Select a card from hand to trash as cost
+    const p1Hand = acceptResult.state.players[1].hand;
+    expect(p1Hand.length).toBeGreaterThan(0);
+    const cardToTrash = p1Hand[0];
+    const p1HandBefore = p1Hand.length;
+    const p1DeckBefore = acceptResult.state.players[1].deck.length;
+
+    state = { ...acceptResult.state, pendingPrompt: null };
+    const costResult = resumeFromStack(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [cardToTrash.instanceId] },
+      cardDb,
+    );
+
+    // No more prompts — actions should have executed
+    expect(costResult.pendingPrompt).toBeUndefined();
+
+    // Cost paid: 1 card trashed from hand
+    // Actions: drew 2 cards
+    // Net hand change: -1 (cost) + 2 (draw) = +1
+    const p1HandAfter = costResult.state.players[1].hand.length;
+    expect(p1HandAfter).toBe(p1HandBefore + 1);
+
+    // Deck should have 2 fewer cards
+    const p1DeckAfter = costResult.state.players[1].deck.length;
+    expect(p1DeckAfter).toBe(p1DeckBefore - 2);
+  });
+
+  it("cannot pay cost with empty hand: effect fails gracefully", () => {
+    const cardDb = createTestCardDb();
+    const marcoCard = makeMarcoStyleCard(cardDb);
+    let state = createBattleReadyState(cardDb);
+
+    const strongCard: CardData = { ...CARDS.VANILLA, id: "STRONG-ATK-3", power: 6000 };
+    cardDb.set(strongCard.id, strongCard);
+
+    const attacker: CardInstance = {
+      instanceId: "atk-empty-hand",
+      cardId: strongCard.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const target: CardInstance = {
+      instanceId: "marco-empty-hand",
+      cardId: marcoCard.id,
+      zone: "CHARACTER",
+      state: "RESTED",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 1,
+      owner: 1,
+    };
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
+    // Empty P1's hand so cost can't be paid
+    newPlayers[1] = { ...newPlayers[1], characters: [target], hand: [] };
+    state = { ...state, players: newPlayers };
+    state = registerTriggersForCard(state, target, marcoCard);
+
+    // KO the character
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: target.instanceId,
+    }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+
+    // Should still get optional prompt
+    expect(result.pendingPrompt?.promptType).toBe("OPTIONAL_EFFECT");
+
+    // Accept the optional effect
+    let resumeState = { ...result.state, pendingPrompt: null };
+    const acceptResult = resumeFromStack(
+      resumeState,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      cardDb,
+    );
+
+    // Cannot pay cost (empty hand) — effect should fail, no further prompt
+    expect(acceptResult.pendingPrompt).toBeUndefined();
+    // P1 hand should still be empty (no draw happened)
+    expect(acceptResult.state.players[1].hand.length).toBe(0);
+  });
+
+  it("ON_KO with condition that fails: trigger does not fire", () => {
+    const cardDb = createTestCardDb();
+    const conditionCard: CardData = {
+      id: "CHAR-ONKO-COND",
+      name: "ON_KO with Life Condition",
+      type: "Character",
+      color: ["Blue"],
+      cost: 5,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] If you have 0 Life cards: Draw 2 cards.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-COND",
+        effects: [{
+          id: "onko_cond_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO" },
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "==",
+            value: 0,
+          },
+          actions: [{ type: "DRAW", params: { amount: 2 } }],
+        }],
+      },
+    };
+    cardDb.set(conditionCard.id, conditionCard);
+
+    let state = createBattleReadyState(cardDb);
+    const strongCard: CardData = { ...CARDS.VANILLA, id: "STRONG-ATK-4", power: 6000 };
+    cardDb.set(strongCard.id, strongCard);
+
+    const attacker: CardInstance = {
+      instanceId: "atk-cond-test",
+      cardId: strongCard.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const target: CardInstance = {
+      instanceId: "onko-cond-target",
+      cardId: conditionCard.id,
+      zone: "CHARACTER",
+      state: "RESTED",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 1,
+      owner: 1,
+    };
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
+    newPlayers[1] = { ...newPlayers[1], characters: [target] };
+    state = { ...state, players: newPlayers };
+    state = registerTriggersForCard(state, target, conditionCard);
+
+    const p1HandBefore = state.players[1].hand.length;
+
+    // P1 has 5 life cards — condition (life == 0) will fail
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: target.instanceId,
+    }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+
+    // No prompt — condition failed, trigger didn't fire
+    expect(result.pendingPrompt).toBeUndefined();
+    // No draw happened
+    expect(result.state.players[1].hand.length).toBe(p1HandBefore);
+    // Card is still in trash
+    expect(result.state.players[1].trash.some(c => c.cardId === conditionCard.id)).toBe(true);
   });
 });
