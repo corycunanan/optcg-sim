@@ -26,8 +26,9 @@ export function matchesFilterForTarget(
   filter: TargetFilter,
   cardDb: Map<string, CardData>,
   state: GameState,
+  resultRefs?: Map<string, EffectResult>,
 ): boolean {
-  return matchesFilterImpl(card, filter, cardDb, state);
+  return matchesFilterImpl(card, filter, cardDb, state, resultRefs);
 }
 
 // ─── computeAllValidTargets ──────────────────────────────────────────────────
@@ -72,7 +73,7 @@ export function computeAllValidTargets(
       if (target.filter) {
         candidates = candidates.filter((c) => {
           if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
-          return matchesFilterForTarget(c, target.filter!, cardDb, state);
+          return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
         });
       }
       if (target.self_ref) return candidates.filter((c) => c.instanceId === sourceCardInstanceId).map((c) => c.instanceId);
@@ -111,21 +112,21 @@ export function computeAllValidTargets(
           return data && data.type?.toUpperCase() === "STAGE";
         });
       }
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       return candidates.map((c) => c.instanceId);
     }
     case "CARD_IN_TRASH": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates = state.players[pi].trash;
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       return candidates.map((c) => c.instanceId);
     }
     case "CARD_IN_DECK": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates = state.players[pi].deck;
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       return candidates.map((c) => c.instanceId);
     }
     case "DON_IN_COST_AREA": {
@@ -146,7 +147,7 @@ export function computeAllValidTargets(
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       const stage = state.players[pi].stage;
       if (!stage) return [];
-      if (target.filter && !matchesFilterForTarget(stage, target.filter, cardDb, state)) return [];
+      if (target.filter && !matchesFilterForTarget(stage, target.filter, cardDb, state, _resultRefs)) return [];
       return [stage.instanceId];
     }
     case "OPPONENT_LIFE": {
@@ -328,7 +329,7 @@ export function resolveTargetInstances(
       if (target.filter) {
         candidates = candidates.filter((c) => {
           if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
-          return matchesFilterForTarget(c, target.filter!, cardDb, state);
+          return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
         });
       }
 
@@ -371,7 +372,7 @@ export function resolveTargetInstances(
         candidates = candidates.filter((c) => { const d = cardDb.get(c.cardId); return d && d.type?.toUpperCase() === "STAGE"; });
       }
       if (target.filter) {
-        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       }
       const count = target.count;
       if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
@@ -385,7 +386,7 @@ export function resolveTargetInstances(
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates = state.players[pi].trash;
       if (target.filter) {
-        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       }
       const count = target.count;
       if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
@@ -400,7 +401,7 @@ export function resolveTargetInstances(
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates = state.players[pi].deck;
       if (target.filter) {
-        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state));
+        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       }
       const count = target.count;
       if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
@@ -432,7 +433,7 @@ export function resolveTargetInstances(
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       const stage = state.players[pi].stage;
       if (!stage) return [];
-      if (target.filter && !matchesFilterForTarget(stage, target.filter, cardDb, state)) return [];
+      if (target.filter && !matchesFilterForTarget(stage, target.filter, cardDb, state, _resultRefs)) return [];
       return [stage.instanceId];
     }
 

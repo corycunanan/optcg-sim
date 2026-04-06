@@ -24,6 +24,7 @@ import { evaluateCondition, matchesFilter, type ConditionContext } from "../engi
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
+import { computeAllValidTargets } from "../engine/effect-resolver/target-resolver.js";
 import type { EffectResult } from "../engine/effect-types.js";
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
@@ -1072,6 +1073,117 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
         timestamp: Date.now(),
       };
       expect(matchTriggersForEvent(state, event, cardDb).length).toBe(1);
+    });
+  });
+
+  // ─── Batch 3: color_not_matching_ref ────────────────────────────────────────
+
+  describe("color_not_matching_ref TargetFilter", () => {
+    it("excludes cards matching the referenced card's color", () => {
+      const cardDb = new Map<string, CardData>();
+      cardDb.set("red-char", makeCard("red-char", { color: ["Red"] }));
+      cardDb.set("blue-char", makeCard("blue-char", { color: ["Blue"] }));
+      cardDb.set("red-char-2", makeCard("red-char-2", { color: ["Red"] }));
+
+      const redInst = makeInstance("red-char", "HAND", 0, { instanceId: "inst-red" });
+      const blueInst = makeInstance("blue-char", "HAND", 0, { instanceId: "inst-blue" });
+      const red2Inst = makeInstance("red-char-2", "HAND", 0, { instanceId: "inst-red2" });
+
+      const state = buildMinimalState();
+      const resultRefs = new Map<string, EffectResult>([
+        ["returned_char", { targetInstanceIds: ["inst-red"], count: 1 }],
+      ]);
+
+      // Place the ref'd card somewhere the engine can find it (characters)
+      state.players[0].characters = [redInst];
+
+      // Red card should be excluded (matches ref color)
+      expect(matchesFilter(red2Inst, { color_not_matching_ref: "returned_char" }, cardDb, state, resultRefs)).toBe(false);
+      // Blue card should pass (different color)
+      expect(matchesFilter(blueInst, { color_not_matching_ref: "returned_char" }, cardDb, state, resultRefs)).toBe(true);
+    });
+
+    it("excludes cards sharing any color with a multi-color ref", () => {
+      const cardDb = new Map<string, CardData>();
+      cardDb.set("red-blue", makeCard("red-blue", { color: ["Red", "Blue"] }));
+      cardDb.set("red-char", makeCard("red-char", { color: ["Red"] }));
+      cardDb.set("blue-char", makeCard("blue-char", { color: ["Blue"] }));
+      cardDb.set("green-char", makeCard("green-char", { color: ["Green"] }));
+
+      const refInst = makeInstance("red-blue", "CHARACTER", 0, { instanceId: "inst-rb" });
+      const redInst = makeInstance("red-char", "HAND", 0, { instanceId: "inst-red" });
+      const blueInst = makeInstance("blue-char", "HAND", 0, { instanceId: "inst-blue" });
+      const greenInst = makeInstance("green-char", "HAND", 0, { instanceId: "inst-green" });
+
+      const state = buildMinimalState();
+      state.players[0].characters = [refInst];
+
+      const resultRefs = new Map<string, EffectResult>([
+        ["returned_char", { targetInstanceIds: ["inst-rb"], count: 1 }],
+      ]);
+
+      const filter = { color_not_matching_ref: "returned_char" };
+      // Red overlaps with Red/Blue ref → excluded
+      expect(matchesFilter(redInst, filter, cardDb, state, resultRefs)).toBe(false);
+      // Blue overlaps with Red/Blue ref → excluded
+      expect(matchesFilter(blueInst, filter, cardDb, state, resultRefs)).toBe(false);
+      // Green has no overlap → passes
+      expect(matchesFilter(greenInst, filter, cardDb, state, resultRefs)).toBe(true);
+    });
+
+    it("passes all cards when resultRefs is missing (graceful fallback)", () => {
+      const cardDb = new Map<string, CardData>();
+      cardDb.set("red-char", makeCard("red-char", { color: ["Red"] }));
+      const inst = makeInstance("red-char", "HAND", 0);
+
+      const state = buildMinimalState();
+
+      // No resultRefs provided — filter should be a no-op (not crash)
+      expect(matchesFilter(inst, { color_not_matching_ref: "returned_char" }, cardDb, state)).toBe(true);
+      // Empty resultRefs — ref not found, should pass
+      expect(matchesFilter(inst, { color_not_matching_ref: "returned_char" }, cardDb, state, new Map())).toBe(true);
+    });
+
+    it("filters candidates in computeAllValidTargets with color_not_matching_ref", () => {
+      const cardDb = new Map<string, CardData>();
+      cardDb.set(CARDS.LEADER.id, makeCard(CARDS.LEADER.id, { type: "Leader", color: ["Red"] }));
+      cardDb.set("red-char", makeCard("red-char", { type: "Character", color: ["Red"], cost: 3 }));
+      cardDb.set("blue-char", makeCard("blue-char", { type: "Character", color: ["Blue"], cost: 3 }));
+      cardDb.set("green-char", makeCard("green-char", { type: "Character", color: ["Green"], cost: 3 }));
+
+      const state = buildMinimalState();
+      const redInHand = makeInstance("red-char", "HAND", 0, { instanceId: "hand-red" });
+      const blueInHand = makeInstance("blue-char", "HAND", 0, { instanceId: "hand-blue" });
+      const greenInHand = makeInstance("green-char", "HAND", 0, { instanceId: "hand-green" });
+      state.players[0].hand = [redInHand, blueInHand, greenInHand];
+
+      // The returned character is Red
+      const returnedChar = makeInstance("red-char", "CHARACTER", 0, { instanceId: "returned-inst" });
+      state.players[0].characters = [returnedChar];
+
+      const resultRefs = new Map<string, EffectResult>([
+        ["returned_char", { targetInstanceIds: ["returned-inst"], count: 1 }],
+      ]);
+
+      const validIds = computeAllValidTargets(
+        state,
+        {
+          type: "CARD_IN_HAND",
+          controller: "SELF",
+          count: { up_to: 1 },
+          filter: { card_type: "CHARACTER", cost_max: 5, color_not_matching_ref: "returned_char" },
+        },
+        0,
+        cardDb,
+        "returned-inst",
+        resultRefs,
+      );
+
+      // Red card excluded, blue and green pass
+      expect(validIds).toContain("hand-blue");
+      expect(validIds).toContain("hand-green");
+      expect(validIds).not.toContain("hand-red");
+      expect(validIds).toHaveLength(2);
     });
   });
 });

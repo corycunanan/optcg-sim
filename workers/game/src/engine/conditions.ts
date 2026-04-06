@@ -498,6 +498,7 @@ export function matchesFilter(
   filter: TargetFilter,
   cardDb: Map<string, CardData>,
   state: GameState,
+  resultRefs?: Map<string, EffectResult>,
 ): boolean {
   const data = cardDb.get(card.cardId);
   if (!data) return false;
@@ -506,9 +507,9 @@ export function matchesFilter(
   if (filter.any_of) {
     const baseFilter = { ...filter, any_of: undefined };
     const baseOk = Object.keys(baseFilter).filter((k) => baseFilter[k as keyof TargetFilter] !== undefined).length === 0
-      || matchesFilter(card, baseFilter, cardDb, state);
+      || matchesFilter(card, baseFilter, cardDb, state, resultRefs);
     if (!baseOk) return false;
-    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state));
+    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state, resultRefs));
   }
 
   // Cost filters
@@ -536,6 +537,19 @@ export function matchesFilter(
   const colors = data.color.map((c) => c.toUpperCase());
   if (filter.color && !colors.includes(filter.color)) return false;
   if (filter.color_includes && !filter.color_includes.some((c) => colors.includes(c))) return false;
+  if (filter.color_not_matching_ref && resultRefs) {
+    const refResult = resultRefs.get(filter.color_not_matching_ref);
+    if (refResult && refResult.targetInstanceIds.length > 0) {
+      const refCard = findInstanceById(state, refResult.targetInstanceIds[0]);
+      if (refCard) {
+        const refData = cardDb.get(refCard.cardId);
+        if (refData) {
+          const refColors = refData.color.map((c) => c.toUpperCase());
+          if (colors.some((c) => refColors.includes(c))) return false;
+        }
+      }
+    }
+  }
 
   // Trait filters
   const traits = data.types ?? [];

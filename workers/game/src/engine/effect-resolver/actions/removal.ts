@@ -232,7 +232,7 @@ export function executeTrashFromHand(
 
   let candidates = [...p.hand];
   if (action.target?.filter) {
-    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state));
+    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state, resultRefs));
   }
 
   if (candidates.length === 0) return { state, events, succeeded: false };
