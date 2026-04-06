@@ -172,7 +172,16 @@ export function matchTriggersForEvent(
     // Check if the source card is still in a valid zone
     const sourceCard = findCardInstance(state, reg.sourceCardInstanceId);
     if (!sourceCard) continue;
-    if (!isCardInValidZone(sourceCard, reg.zone)) continue;
+
+    // ON_KO exception (Rule 10-2-17): self-referencing ON_KO triggers activate
+    // on field but resolve from trash. Skip zone validation when the KO'd card
+    // IS the trigger source — the card is expected to be in trash.
+    const isOnKOSelfTrigger =
+      event.type === "CARD_KO" &&
+      event.payload?.cardInstanceId === reg.sourceCardInstanceId &&
+      isOnKOTrigger(reg.trigger);
+
+    if (!isOnKOSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
 
     // Check once-per-turn
     if (reg.effectBlock.flags?.once_per_turn) {
@@ -275,9 +284,14 @@ function matchesKeywordTrigger(
     if (trigger.turn_restriction === "OPPONENT_TURN" && isOwnersTurn) return false;
   }
 
-  // DON!! requirement
+  // DON!! requirement — for ON_KO, use pre-KO snapshot from event payload
+  // (DON is returned to cost area during KO, so sourceCard.attachedDon is empty)
   if (trigger.don_requirement) {
-    if (sourceCard.attachedDon.length < trigger.don_requirement) return false;
+    const donCount =
+      trigger.keyword === "ON_KO" && event.payload?.preKO_donCount !== undefined
+        ? (event.payload.preKO_donCount as number)
+        : sourceCard.attachedDon.length;
+    if (donCount < trigger.don_requirement) return false;
   }
 
   // KO cause (ON_KO only)
@@ -368,6 +382,17 @@ function isSelfReferencingTrigger(keyword: KeywordTriggerType): boolean {
     "ON_KO",
     "ON_BLOCK",
   ].includes(keyword);
+}
+
+/** Check if a trigger contains ON_KO (direct keyword or inside compound any_of). */
+function isOnKOTrigger(trigger: Trigger): boolean {
+  if ("keyword" in trigger && (trigger as KeywordTrigger).keyword === "ON_KO") return true;
+  if ("any_of" in trigger) {
+    return (trigger as CompoundTrigger).any_of.some(
+      (t) => "keyword" in t && (t as KeywordTrigger).keyword === "ON_KO",
+    );
+  }
+  return false;
 }
 
 function customEventToGameEvent(event: CustomEventType): GameEventType | null {

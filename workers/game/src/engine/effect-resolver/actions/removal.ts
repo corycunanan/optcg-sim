@@ -6,7 +6,7 @@ import type { Action, EffectResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { resolveAmount } from "../action-utils.js";
-import { koCharacter, returnToHand, returnToDeck } from "../card-mutations.js";
+import { koCharacter, trashCharacter, returnToHand, returnToDeck } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt, matchesFilterForTarget } from "../target-resolver.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
 import { findCardInstance } from "../../state.js";
@@ -178,9 +178,9 @@ export function executeTrashCard(
     const found = findCardInstance(nextState, id);
     if (!found) continue;
 
-    // For characters on field, use KO-like logic (return DON!!)
+    // For characters on field, trash (return DON!!) — NOT a KO per Rule 10-2-1-3
     if (found.zone === "CHARACTER") {
-      const result = koCharacter(nextState, id, controller);
+      const result = trashCharacter(nextState, id, controller);
       if (result) {
         nextState = result.state;
         events.push(...result.events);

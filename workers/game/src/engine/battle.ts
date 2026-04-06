@@ -18,6 +18,7 @@ import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./m
 import { hasDoubleAttack, hasBanish, hasTrigger } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
 import { resolveEffect } from "./effect-resolver/index.js";
+import { koCharacter } from "./effect-resolver/card-mutations.js";
 import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
 
@@ -218,10 +219,9 @@ export function executeUseCounterEvent(
   events.push({
     type: "COUNTER_USED",
     playerIndex: inactiveIdx,
-    payload: { cardId: cardData.id, type: "event" },
+    payload: { cardId: cardData.id, cardInstanceId, type: "event" },
   });
 
-  // Counter event effect is manual in M3 (MANUAL_EFFECT to follow if needed)
   return { state: nextState, events };
 }
 
@@ -471,9 +471,18 @@ function executeDamageStep(
           nextState = replacement.state;
           events.push(...replacement.events);
         } else {
-          // KO the character
-          nextState = moveCard(nextState, targetInstanceId, "TRASH");
-          events.push({ type: "CARD_KO", playerIndex: pi, payload: { cardInstanceId: targetInstanceId, cause: "battle" } });
+          // KO the character — use koCharacter() to preserve instanceId for ON_KO triggers
+          const preKODonCount = targetFound.card.attachedDon.length;
+          const koResult = koCharacter(nextState, targetInstanceId, pi as 0 | 1);
+          if (koResult) {
+            nextState = koResult.state;
+            for (const ev of koResult.events) {
+              if (ev.type === "CARD_KO") {
+                ev.payload = { ...ev.payload, cause: "BATTLE", preKO_donCount: preKODonCount };
+              }
+              events.push(ev);
+            }
+          }
         }
       }
     }

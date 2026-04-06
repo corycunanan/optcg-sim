@@ -45,6 +45,56 @@ export function koCharacter(
           cardId: char.cardId,
           cause: isOpponentEffect ? "OPPONENT_EFFECT" : "EFFECT",
           causingController,
+          preKO_donCount: char.attachedDon.length,
+        },
+      }],
+    };
+  }
+  return null;
+}
+
+/**
+ * Trash a character from the field (NOT a KO — does not trigger [On K.O.] per Rule 10-2-1-3).
+ * Returns attached DON!! to cost area, emits CARD_TRASHED.
+ */
+export function trashCharacter(
+  state: GameState,
+  instanceId: string,
+  causingController: 0 | 1,
+): { state: GameState; events: PendingEvent[] } | null {
+  for (const [pi, player] of state.players.entries()) {
+    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    if (charIdx === -1) continue;
+
+    const char = player.characters[charIdx];
+    const newChars = player.characters.filter((_, i) => i !== charIdx);
+
+    // Return attached DON!! to cost area
+    const returnedDon = char.attachedDon.map((d) => ({
+      ...d,
+      state: "RESTED" as const,
+      attachedTo: null,
+    }));
+
+    const newTrash = [{ ...char, zone: "TRASH" as const, attachedDon: [], state: "ACTIVE" as const }, ...player.trash];
+
+    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+    newPlayers[pi] = {
+      ...player,
+      characters: newChars,
+      trash: newTrash,
+      donCostArea: [...player.donCostArea, ...returnedDon],
+    };
+
+    return {
+      state: { ...state, players: newPlayers },
+      events: [{
+        type: "CARD_TRASHED",
+        playerIndex: pi as 0 | 1,
+        payload: {
+          cardInstanceId: instanceId,
+          cardId: char.cardId,
+          reason: "effect",
         },
       }],
     };

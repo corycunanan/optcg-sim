@@ -142,6 +142,28 @@ function fireEventsAndTriggers(
       timestamp: Date.now(),
     };
 
+    // Counter event cards go hand → trash and are never registered in the
+    // trigger registry. Inject their COUNTER_EVENT effect blocks directly.
+    if (pendingEvent.type === "COUNTER_USED" && pendingEvent.payload?.type === "event") {
+      const cardId = pendingEvent.payload.cardId as string;
+      const cardInstanceId = pendingEvent.payload.cardInstanceId as string;
+      const controller = (pendingEvent.playerIndex ?? pi) as 0 | 1;
+      const counterCardData = cardDb.get(cardId);
+      if (counterCardData?.effectSchema) {
+        const schema = counterCardData.effectSchema as import("./effect-types.js").EffectSchema;
+        for (const block of schema.effects) {
+          if (block.category === "auto" && block.trigger && "keyword" in block.trigger && block.trigger.keyword === "COUNTER_EVENT") {
+            triggerQueue.push({
+              sourceCardInstanceId: cardInstanceId,
+              controller,
+              effectBlock: block,
+              triggeringEvent: pendingEvent,
+            });
+          }
+        }
+      }
+    }
+
     const matched = matchTriggersForEvent(state, gameEvent, cardDb);
     if (matched.length === 0) continue;
 

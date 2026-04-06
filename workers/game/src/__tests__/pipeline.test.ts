@@ -8,6 +8,7 @@ import {
   createBattleReadyState,
   CARDS,
 } from "./helpers.js";
+import { registerTriggersForCard } from "../engine/triggers.js";
 
 // ─── Phase Cycle ──────────────────────────────────────────────────────────────
 
@@ -343,6 +344,110 @@ describe("battle", () => {
     expect(result.state.turn.battle!.defenderPower).toBeGreaterThan(defPowerBefore);
     expect(result.state.turn.battle!.counterPowerAdded).toBe(2000);
   });
+
+  it("counter event with COUNTER_EVENT effect triggers optional prompt and cost payment", () => {
+    const cardDb = createTestCardDb();
+
+    // Add a counter event card with a COUNTER_EVENT effect schema (like OP06-115)
+    const counterEventCard: CardData = {
+      id: "TEST-COUNTER-EVENT",
+      name: "Test Counter Event",
+      type: "Event",
+      color: ["Purple"],
+      cost: 0,
+      power: null,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[Counter] You may trash 1 card from your hand: Up to 1 of your Leader or Character cards gains +3000 power during this battle.",
+      triggerText: null,
+      keywords: { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false },
+      imageUrl: null,
+      effectSchema: {
+        card_id: "TEST-COUNTER-EVENT",
+        card_name: "Test Counter Event",
+        card_type: "Event",
+        effects: [
+          {
+            id: "test-counter-event_effect_1",
+            category: "auto",
+            trigger: { keyword: "COUNTER_EVENT" },
+            costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+            flags: { optional: true },
+            actions: [
+              {
+                type: "MODIFY_POWER",
+                target: {
+                  type: "LEADER_OR_CHARACTER",
+                  controller: "SELF",
+                  count: { up_to: 1 },
+                },
+                params: { amount: 3000 },
+                duration: { type: "THIS_BATTLE" },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    cardDb.set(counterEventCard.id, counterEventCard);
+
+    let state = createBattleReadyState(cardDb);
+
+    // Put the counter event card in P1's hand along with an extra card to trash as cost
+    const counterEventInstance: CardInstance = {
+      instanceId: "counter-event-in-hand",
+      cardId: counterEventCard.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 1,
+      owner: 1,
+    };
+    const extraCard: CardInstance = {
+      instanceId: "extra-card-for-cost",
+      cardId: CARDS.VANILLA.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 1,
+      owner: 1,
+    };
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[1] = { ...newPlayers[1], hand: [...newPlayers[1].hand, counterEventInstance, extraCard] };
+    state = { ...state, players: newPlayers };
+
+    // Attack P1's leader
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: state.players[0].characters[0].instanceId,
+      targetInstanceId: state.players[1].leader.instanceId,
+    }, cardDb, 0);
+    expect(result.valid).toBe(true);
+
+    // Pass blocker
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    expect(result.state.turn.battleSubPhase).toBe("COUNTER_STEP");
+
+    // Use counter event
+    result = runPipeline(result.state, {
+      type: "USE_COUNTER_EVENT",
+      cardInstanceId: counterEventInstance.instanceId,
+      counterTargetInstanceId: state.players[1].leader.instanceId,
+    }, cardDb, 0);
+    expect(result.valid).toBe(true);
+
+    // The counter event card should be trashed
+    expect(result.state.players[1].trash.some(c => c.cardId === counterEventCard.id)).toBe(true);
+
+    // The effect should trigger — since it has optional: true, it should produce
+    // a pending prompt asking the player whether to activate the effect
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+  });
 });
 
 // ─── Keywords ─────────────────────────────────────────────────────────────────
@@ -624,5 +729,468 @@ describe("validation", () => {
       const result = runPipeline(state, { type: "PLAY_CARD", cardInstanceId: charInHand.instanceId }, cardDb, 0);
       expect(result.valid).toBe(false);
     }
+  });
+});
+
+// ─── ON_KO Triggers (Rule 10-2-17) ─────────────────────────────────────────
+
+describe("ON_KO triggers", () => {
+  const noKw = { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false };
+
+  /** Helper: set up a battle where P0's character attacks P1's ON_KO character and KOs it. */
+  function setupBattleKO(
+    cardDb: Map<string, CardData>,
+    onKOCard: CardData,
+    opts?: { donOnTarget?: number },
+  ) {
+    let state = createBattleReadyState(cardDb);
+
+    // Give P0 a strong attacker (6000 power)
+    const attacker: CardInstance = {
+      instanceId: "attacker-p0",
+      cardId: CARDS.VANILLA.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+
+    // Put the ON_KO character on P1's field (4000 power — will be KO'd by 6000 attacker)
+    const donAttachments = Array.from({ length: opts?.donOnTarget ?? 0 }, (_, i) => ({
+      instanceId: `don-attached-${i}`,
+      state: "ACTIVE" as const,
+      attachedTo: "onko-target",
+    }));
+    const target: CardInstance = {
+      instanceId: "onko-target",
+      cardId: onKOCard.id,
+      zone: "CHARACTER",
+      state: "RESTED",
+      attachedDon: donAttachments,
+      turnPlayed: 1,
+      controller: 1,
+      owner: 1,
+    };
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    // Override P0 attacker with higher power card
+    const strongCard: CardData = {
+      ...CARDS.VANILLA,
+      id: "STRONG-ATTACKER",
+      power: 6000,
+    };
+    cardDb.set(strongCard.id, strongCard);
+    attacker.cardId = strongCard.id;
+
+    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
+    newPlayers[1] = { ...newPlayers[1], characters: [target] };
+    state = { ...state, players: newPlayers };
+
+    // Register the ON_KO card's triggers (normally done via PLAY_CARD pipeline)
+    state = registerTriggersForCard(state, target, onKOCard);
+
+    // Attack the ON_KO character
+    let result = runPipeline(state, {
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: target.instanceId,
+    }, cardDb, 0);
+    expect(result.valid).toBe(true);
+
+    // Pass blocker
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    expect(result.state.turn.battleSubPhase).toBe("COUNTER_STEP");
+
+    // Pass counter → damage step KOs the character
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    return result;
+  }
+
+  it("unconditional ON_KO fires after battle KO", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-ONKO-DRAW",
+      name: "ON_KO Draw Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-DRAW",
+        effects: [{
+          id: "onko_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    const result = setupBattleKO(cardDb, onKOCard);
+
+    // Card should be in P1's trash
+    expect(result.state.players[1].trash.some(c => c.cardId === onKOCard.id)).toBe(true);
+
+    // ON_KO effect should have fired — P1 drew a card
+    // P1 starts with 5 hand cards in createBattleReadyState
+    const p1HandSize = result.state.players[1].hand.length;
+    const initialHandSize = createBattleReadyState(cardDb).players[1].hand.length;
+    expect(p1HandSize).toBe(initialHandSize + 1);
+  });
+
+  it("ON_KO with DON requirement matches using pre-KO snapshot", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-ONKO-DON2",
+      name: "ON_KO DON2 Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-DON2",
+        effects: [{
+          id: "onko_don2_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO", don_requirement: 2 },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    // Attach 2 DON to the target — should pass DON requirement
+    const result = setupBattleKO(cardDb, onKOCard, { donOnTarget: 2 });
+
+    expect(result.state.players[1].trash.some(c => c.cardId === onKOCard.id)).toBe(true);
+    const p1HandSize = result.state.players[1].hand.length;
+    const initialHandSize = createBattleReadyState(cardDb).players[1].hand.length;
+    expect(p1HandSize).toBe(initialHandSize + 1);
+  });
+
+  it("ON_KO with DON requirement fails when insufficient pre-KO DON", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-ONKO-DON2-FAIL",
+      name: "ON_KO DON2 Fail Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-DON2-FAIL",
+        effects: [{
+          id: "onko_don2_draw_fail",
+          category: "auto",
+          trigger: { keyword: "ON_KO", don_requirement: 2 },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    // Only 1 DON attached — should fail DON requirement
+    const result = setupBattleKO(cardDb, onKOCard, { donOnTarget: 1 });
+
+    expect(result.state.players[1].trash.some(c => c.cardId === onKOCard.id)).toBe(true);
+    // No draw should have happened
+    const p1HandSize = result.state.players[1].hand.length;
+    const initialHandSize = createBattleReadyState(cardDb).players[1].hand.length;
+    expect(p1HandSize).toBe(initialHandSize);
+  });
+
+  it("ON_KO with cause: BATTLE restriction matches battle KO", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-ONKO-BATTLE",
+      name: "ON_KO Battle Only Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-BATTLE",
+        effects: [{
+          id: "onko_battle_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO", cause: "BATTLE" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    const result = setupBattleKO(cardDb, onKOCard);
+
+    expect(result.state.players[1].trash.some(c => c.cardId === onKOCard.id)).toBe(true);
+    const p1HandSize = result.state.players[1].hand.length;
+    const initialHandSize = createBattleReadyState(cardDb).players[1].hand.length;
+    expect(p1HandSize).toBe(initialHandSize + 1);
+  });
+
+  it("compound trigger any_of [ON_PLAY, ON_KO] fires ON_KO from trash", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-COMPOUND-ONKO",
+      name: "Compound ON_PLAY/ON_KO Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On Play] [On K.O.] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-COMPOUND-ONKO",
+        effects: [{
+          id: "compound_play_ko_draw",
+          category: "auto",
+          trigger: { any_of: [{ keyword: "ON_PLAY" }, { keyword: "ON_KO" }] },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    const result = setupBattleKO(cardDb, onKOCard);
+
+    expect(result.state.players[1].trash.some(c => c.cardId === onKOCard.id)).toBe(true);
+    const p1HandSize = result.state.players[1].hand.length;
+    const initialHandSize = createBattleReadyState(cardDb).players[1].hand.length;
+    expect(p1HandSize).toBe(initialHandSize + 1);
+  });
+
+  it("ON_KO with optional flag produces OPTIONAL_EFFECT prompt", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-ONKO-OPTIONAL",
+      name: "ON_KO Optional Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] You may draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-OPTIONAL",
+        effects: [{
+          id: "onko_optional_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO" },
+          flags: { optional: true },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    const result = setupBattleKO(cardDb, onKOCard);
+
+    // Should pause with an optional effect prompt
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+  });
+
+  it("non-ON_KO triggers still fail zone check (regression guard)", () => {
+    const cardDb = createTestCardDb();
+    // A card with ON_PLAY trigger that gets KO'd — ON_PLAY should NOT re-fire
+    const onPlayCard: CardData = {
+      id: "CHAR-ONPLAY-ONLY",
+      name: "ON_PLAY Only Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On Play] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONPLAY-ONLY",
+        effects: [{
+          id: "onplay_draw",
+          category: "auto",
+          trigger: { keyword: "ON_PLAY" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onPlayCard.id, onPlayCard);
+
+    const result = setupBattleKO(cardDb, onPlayCard);
+
+    // Card should be in trash (KO'd), but ON_PLAY should NOT have fired during KO
+    expect(result.state.players[1].trash.some(c => c.cardId === onPlayCard.id)).toBe(true);
+    const p1HandSize = result.state.players[1].hand.length;
+    const initialHandSize = createBattleReadyState(cardDb).players[1].hand.length;
+    expect(p1HandSize).toBe(initialHandSize);
+  });
+
+  it("TRASH_CARD action on field character does NOT trigger ON_KO (Rule 10-2-1-3)", () => {
+    const cardDb = createTestCardDb();
+    const onKOCard: CardData = {
+      id: "CHAR-ONKO-TRASH-TEST",
+      name: "ON_KO Trash Test Character",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 4000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[On K.O.] Draw 1 card.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "CHAR-ONKO-TRASH-TEST",
+        effects: [{
+          id: "onko_trash_test_draw",
+          category: "auto",
+          trigger: { keyword: "ON_KO" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        }],
+      },
+    };
+    cardDb.set(onKOCard.id, onKOCard);
+
+    let state = createBattleReadyState(cardDb);
+
+    // Put the ON_KO character on P0's field
+    const target: CardInstance = {
+      instanceId: "onko-trash-target",
+      cardId: onKOCard.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+
+    // Create an event card that trashes a character (simulating OP09-009 style effect)
+    const trashEvent: CardData = {
+      id: "EVENT-TRASH-CHAR",
+      name: "Trash Character Event",
+      type: "Event",
+      color: ["Red"],
+      cost: 0,
+      power: null,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[Main] Trash 1 of your Characters.",
+      triggerText: null,
+      keywords: noKw,
+      imageUrl: null,
+      effectSchema: {
+        card_id: "EVENT-TRASH-CHAR",
+        effects: [{
+          id: "trash_char_effect",
+          category: "auto",
+          trigger: { keyword: "MAIN_EVENT" },
+          actions: [{
+            type: "TRASH_CARD",
+            target: {
+              type: "CHARACTER",
+              controller: "SELF",
+              count: { exact: 1 },
+            },
+          }],
+        }],
+      },
+    };
+    cardDb.set(trashEvent.id, trashEvent);
+
+    const eventInHand: CardInstance = {
+      instanceId: "trash-event-hand",
+      cardId: trashEvent.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 0,
+      owner: 0,
+    };
+
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    // Only the ON_KO character on field — ensures auto-selection targets it
+    newPlayers[0] = {
+      ...newPlayers[0],
+      characters: [target],
+      hand: [...newPlayers[0].hand, eventInHand],
+    };
+    state = { ...state, players: newPlayers };
+
+    // Register the ON_KO card's triggers
+    state = registerTriggersForCard(state, target, onKOCard);
+
+    const p0HandBefore = state.players[0].hand.length;
+
+    // Play the trash event — trashes the character (NOT a KO)
+    const result = runPipeline(state, {
+      type: "PLAY_CARD",
+      cardInstanceId: eventInHand.instanceId,
+    }, cardDb, 0);
+
+    // The ON_KO character should be in trash (via CARD_TRASHED, not CARD_KO)
+    expect(result.state.players[0].trash.some(c => c.cardId === onKOCard.id)).toBe(true);
+
+    // ON_KO should NOT have triggered — hand size should not have increased from a draw
+    // (it should decrease by 1 from the event card being played, and the trash target is from field)
+    const p0HandAfter = result.state.players[0].hand.length;
+    expect(p0HandAfter).toBe(p0HandBefore - 1); // Only lost the event card from hand
   });
 });
