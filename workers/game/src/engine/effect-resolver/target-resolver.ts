@@ -383,6 +383,8 @@ export function autoSelectTargets(
   allValidIds: string[],
 ): string[] {
   if (!target || allValidIds.length === 0) return [];
+  // dual_targets: return all provided IDs — they've already been validated by feasibility check
+  if (target.dual_targets && target.dual_targets.length > 0) return allValidIds;
   const count = target.count;
   if (!count) return allValidIds.slice(0, 1);
   if ("all" in count) return allValidIds;
