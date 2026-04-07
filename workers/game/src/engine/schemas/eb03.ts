@@ -1089,7 +1089,7 @@ export const EB03_026_BOA_HANCOCK: EffectSchema = {
               { filter: { card_type: "CHARACTER" }, count: { exact: 1 } },
             ],
           },
-          params: { amount_per_target: 1 },
+          params: { amount_per_target: 1, don_state: "RESTED" },
         },
       ],
       flags: { once_per_turn: true, optional: true },

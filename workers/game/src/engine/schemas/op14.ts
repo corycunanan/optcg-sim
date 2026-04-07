@@ -4021,7 +4021,7 @@ export const OP14_105_GORGON_SISTERS: EffectSchema = {
             controller: "SELF",
             count: { all: true },
           },
-          params: { amount_per_target: 1 },
+          params: { amount_per_target: 1, don_state: "RESTED" },
         },
       ],
     },

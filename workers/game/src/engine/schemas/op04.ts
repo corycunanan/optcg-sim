@@ -149,7 +149,7 @@ export const OP04_004_KAROO: EffectSchema = {
             count: { all: true },
             filter: { traits: ["Alabasta"] },
           },
-          params: { amount_per_target: 1 },
+          params: { amount_per_target: 1, don_state: "RESTED" },
         },
       ],
       flags: { optional: true },

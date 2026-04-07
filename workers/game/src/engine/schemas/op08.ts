@@ -38,7 +38,7 @@ export const OP08_001_TONY_TONY_CHOPPER: EffectSchema = {
             count: { up_to: 3 },
             filter: { traits_any_of: ["Animal", "Drum Kingdom"] },
           },
-          params: { amount_per_target: 1 },
+          params: { amount_per_target: 1, don_state: "RESTED" },
         },
       ],
     },
