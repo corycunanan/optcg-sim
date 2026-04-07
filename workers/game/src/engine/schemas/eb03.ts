@@ -546,7 +546,7 @@ export const EB03_014_KUINA: EffectSchema = {
         {
           type: "GIVE_DON",
           target: { type: "YOUR_LEADER" },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
       flags: { optional: true },
@@ -576,7 +576,7 @@ export const EB03_015_CAMIE: EffectSchema = {
             count: { exact: 1 },
             filter: { traits_any_of: ["Fish-Man", "Merfolk"] },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
         {
           type: "SET_REST",
@@ -631,7 +631,7 @@ export const EB03_016_KOUZUKI_HIYORI: EffectSchema = {
             type: "YOUR_LEADER",
             filter: { traits: ["Land of Wano"] },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
       flags: { optional: true },
@@ -1778,7 +1778,7 @@ export const EB03_045_PERONA: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
         {
           type: "PLAY_CARD",
@@ -1951,23 +1951,13 @@ export const EB03_049_I_KNEW_YOU_PEOPLE_WERE_BEHIND_THIS: EffectSchema = {
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
-            count: { up_to: 1 },
             source_zone: ["HAND", "TRASH"],
-            filter: { traits: ["Thriller Bark Pirates"], cost_max: 6 },
+            dual_targets: [
+              { filter: { traits: ["Thriller Bark Pirates"], cost_max: 6 }, count: { up_to: 1 } },
+              { filter: { traits: ["Thriller Bark Pirates"], cost_max: 4 }, count: { up_to: 1 } },
+            ],
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
-        },
-        {
-          type: "PLAY_CARD",
-          target: {
-            type: "CHARACTER_CARD",
-            controller: "SELF",
-            count: { up_to: 1 },
-            source_zone: ["HAND", "TRASH"],
-            filter: { traits: ["Thriller Bark Pirates"], cost_max: 4 },
-          },
-          params: { source_zone: "HAND", cost_override: "FREE" },
-          chain: "AND",
         },
       ],
       flags: { optional: true },
@@ -2116,7 +2106,7 @@ export const EB03_053_NAMI: EffectSchema = {
         {
           type: "GIVE_DON",
           target: { type: "YOUR_LEADER" },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
         {
           type: "LIFE_TO_HAND",
@@ -2283,7 +2273,7 @@ export const EB03_057_YAMATO: EffectSchema = {
             type: "YOUR_LEADER",
             filter: { traits: ["Land of Wano"] },
           },
-          params: { amount: 3 },
+          params: { amount: 3, don_state: "RESTED" },
         },
       ],
     },

@@ -331,7 +331,7 @@ export const OP05_008_CHAKA: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
       flags: { once_per_turn: true },
@@ -3449,19 +3449,11 @@ export const OP05_093_ROB_LUCCI: EffectSchema = {
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { cost_max: 2 },
+            dual_targets: [
+              { filter: { cost_max: 2 }, count: { up_to: 1 } },
+              { filter: { cost_max: 1 }, count: { up_to: 1 } },
+            ],
           },
-        },
-        {
-          type: "KO",
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { cost_max: 1 },
-          },
-          chain: "AND",
         },
       ],
       flags: { optional: true },

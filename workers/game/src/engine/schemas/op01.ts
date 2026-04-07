@@ -318,7 +318,7 @@ export const OP01_013_SANJI: EffectSchema = {
         {
           type: "GIVE_DON",
           target: { type: "SELF" },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
           chain: "THEN",
         },
       ],
@@ -601,7 +601,7 @@ export const OP01_024_LUFFY: EffectSchema = {
         {
           type: "GIVE_DON",
           target: { type: "SELF" },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
       flags: { once_per_turn: true },
@@ -2536,12 +2536,14 @@ export const OP01_096_KING: EffectSchema = {
       actions: [
         {
           type: "KO",
-          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 }, filter: { cost_max: 3 } },
-        },
-        {
-          type: "KO",
-          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 }, filter: { cost_max: 2 } },
-          chain: "AND",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            dual_targets: [
+              { filter: { cost_max: 3 }, count: { up_to: 1 } },
+              { filter: { cost_max: 2 }, count: { up_to: 1 } },
+            ],
+          },
         },
       ],
       flags: { optional: true },

@@ -1521,19 +1521,11 @@ export const OP04_044_KAIDO: EffectSchema = {
           target: {
             type: "CHARACTER",
             controller: "EITHER",
-            count: { up_to: 1 },
-            filter: { cost_max: 8 },
+            dual_targets: [
+              { filter: { cost_max: 8 }, count: { up_to: 1 } },
+              { filter: { cost_max: 3 }, count: { up_to: 1 } },
+            ],
           },
-        },
-        {
-          type: "RETURN_TO_HAND",
-          target: {
-            type: "CHARACTER",
-            controller: "EITHER",
-            count: { up_to: 1 },
-            filter: { cost_max: 3 },
-          },
-          chain: "AND",
         },
       ],
     },

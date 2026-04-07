@@ -265,7 +265,7 @@ export const OP03_009_HARUTA: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
     },
@@ -615,19 +615,11 @@ export const OP03_018_FIRE_FIST: EffectSchema = {
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { power_max: 5000 },
+            dual_targets: [
+              { filter: { power_max: 5000 }, count: { up_to: 1 } },
+              { filter: { power_max: 4000 }, count: { up_to: 1 } },
+            ],
           },
-        },
-        {
-          type: "KO",
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { power_max: 4000 },
-          },
-          chain: "AND",
         },
       ],
       flags: { optional: true },
