@@ -67,6 +67,7 @@ export function BoardModals({
         activePrompt.options.cards &&
         activePrompt.options.cards.length > 0 && (
           <SelectTargetModal
+            key={activePrompt.options.validTargets?.join(",") ?? ""}
             cards={activePrompt.options.cards}
             validTargets={activePrompt.options.validTargets ?? activePrompt.options.cards.map((c: CardInstance) => c.instanceId)}
             effectDescription={activePrompt.options.effectDescription ?? "Select a target"}
