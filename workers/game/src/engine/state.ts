@@ -8,6 +8,7 @@
 import type {
   CardInstance,
   DonInstance,
+  GameEvent,
   GameState,
   LifeCard,
   PendingEvent,
@@ -516,6 +517,66 @@ export function findCardInstance(
     if (trash) return trash;
   }
   return null;
+}
+
+// ─── Visibility filtering (§8-4-5) ───────────────────────────────────────────
+
+/** Event types where the payload may contain card identities from secret zones. */
+const SECRET_CARD_EVENTS = new Set([
+  "CARD_DRAWN",
+  "CARD_RETURNED_TO_HAND",
+  "CARD_ADDED_TO_HAND_FROM_LIFE",
+  "DRAW_OUTSIDE_DRAW_PHASE",
+]);
+
+/**
+ * Create a player-specific view of the game state that hides secret zone data
+ * from the opponent. The receiving player sees their own zones in full; the
+ * opponent's hand, deck, and face-down life cards are obfuscated.
+ *
+ * Also filters the event log so opponent's draw/search events don't leak cardIds.
+ *
+ * Obfuscated cards keep their `instanceId`, `zone`, `controller`, and `owner`
+ * (so the client can count cards and animate placeholders) but strip `cardId`
+ * to prevent identity leaks.
+ */
+export function filterStateForPlayer(
+  state: GameState,
+  receivingPlayer: 0 | 1,
+): GameState {
+  const opponentIndex = receivingPlayer === 0 ? 1 : 0;
+  const opponent = state.players[opponentIndex];
+
+  const obfuscateCard = (card: CardInstance): CardInstance => ({
+    ...card,
+    cardId: "hidden",
+    attachedDon: [],
+  });
+
+  const filteredOpponent: PlayerState = {
+    ...opponent,
+    hand: opponent.hand.map(obfuscateCard),
+    deck: opponent.deck.map(obfuscateCard),
+    life: opponent.life.map((lc) =>
+      lc.face === "DOWN"
+        ? { ...lc, cardId: "hidden" }
+        : lc,
+    ),
+  };
+
+  const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
+  newPlayers[opponentIndex] = filteredOpponent;
+
+  // Filter event log: strip cardId from opponent's secret-zone events
+  const filteredEventLog = state.eventLog.map((event) => {
+    if (event.playerIndex === opponentIndex && SECRET_CARD_EVENTS.has(event.type) && event.payload?.cardId) {
+      const { cardId, ...restPayload } = event.payload;
+      return { ...event, payload: restPayload };
+    }
+    return event;
+  });
+
+  return { ...state, players: newPlayers, eventLog: filteredEventLog };
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────

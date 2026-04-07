@@ -20,7 +20,7 @@ import type {
 import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
 import { resumeReplacement, type ReplacementResumeContext } from "./engine/replacements.js";
-import { setPlayerConnected } from "./engine/state.js";
+import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
@@ -136,7 +136,7 @@ export class GameSession implements DurableObject {
     await this.persist();
 
     this.broadcast({ type: "game:over", winner: winnerIndex as 0 | 1, reason });
-    this.broadcast({ type: "game:state", state: this.gameState });
+    this.broadcastFilteredState((s) => ({ type: "game:state", state: s }));
     await this.writeResultToDb();
 
     return new Response(JSON.stringify({ ok: true }), {
@@ -206,7 +206,7 @@ export class GameSession implements DurableObject {
     // This is the only reliable way to keep the `connected` flags in sync on both clients.
     // If we only send game:state to the connecting player, the opponent's client will never
     // learn that this player's connected flag changed to true.
-    this.broadcast({ type: "game:state", state: this.gameState! });
+    this.broadcastFilteredState((s) => ({ type: "game:state", state: s }));
     this.broadcast({ type: "game:player_reconnected", playerIndex });
 
     // Re-send pending prompt to the reconnecting player if they need to respond
@@ -407,7 +407,7 @@ export class GameSession implements DurableObject {
     // otherwise GET /api/game/active can still see IN_PROGRESS and block new games.
     if (result.gameOver) {
       await this.writeResultToDb();
-      this.broadcast({ type: "game:update", action, state: this.gameState });
+      this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
       this.broadcast({
         type: "game:over",
         winner: result.gameOver.winner,
@@ -416,7 +416,7 @@ export class GameSession implements DurableObject {
       return;
     }
 
-    this.broadcast({ type: "game:update", action, state: this.gameState });
+    this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
 
     // Send prompts if a player input is required
     if (this.gameState.pendingPrompt) {
@@ -508,7 +508,7 @@ export class GameSession implements DurableObject {
     this.surfaceRevealTriggerIfNeeded();
 
     await this.persist();
-    this.broadcast({ type: "game:update", action, state: this.gameState });
+    this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
 
     if (this.gameState.pendingPrompt) {
       this.sendEffectPrompt(this.gameState.pendingPrompt);
@@ -713,6 +713,23 @@ export class GameSession implements DurableObject {
     }
   }
 
+  /**
+   * Send a state-bearing message to each player with their secret zones filtered.
+   * Each player receives their own zones in full; the opponent's hand, deck, and
+   * face-down life cards are obfuscated (§8-4-5).
+   */
+  private broadcastFilteredState(
+    build: (filteredState: GameState) => ServerMessage,
+    exclude?: WebSocket,
+  ): void {
+    for (const playerIndex of [0, 1] as const) {
+      const ws = this.getWebSocketForPlayer(playerIndex);
+      if (!ws || ws === exclude) continue;
+      const filtered = filterStateForPlayer(this.gameState!, playerIndex);
+      this.send(ws, build(filtered));
+    }
+  }
+
   private broadcastExcept(exclude: WebSocket, msg: ServerMessage): void {
     const sockets = this.state.getWebSockets();
     const payload = JSON.stringify(msg);
@@ -767,12 +784,12 @@ export class GameSession implements DurableObject {
     await this.syncAlarm();
 
     if (excludeWs) {
-      this.broadcastExcept(excludeWs, { type: "game:state", state: this.gameState });
+      this.broadcastFilteredState((s) => ({ type: "game:state", state: s }), excludeWs);
       this.broadcastExcept(excludeWs, { type: "game:player_disconnected", playerIndex });
       return;
     }
 
-    this.broadcast({ type: "game:state", state: this.gameState });
+    this.broadcastFilteredState((s) => ({ type: "game:state", state: s }));
     this.broadcast({ type: "game:player_disconnected", playerIndex });
   }
 
