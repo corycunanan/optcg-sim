@@ -277,6 +277,15 @@ function matchesKeywordTrigger(
     if (state.turn.activePlayerIndex === sourceCard.controller) return false;
   }
 
+  // END_OF_YOUR_TURN: only fires when the card owner's turn ends
+  // END_OF_OPPONENT_TURN: only fires when the opponent's turn ends
+  if (trigger.keyword === "END_OF_YOUR_TURN") {
+    if (event.playerIndex !== sourceCard.controller) return false;
+  }
+  if (trigger.keyword === "END_OF_OPPONENT_TURN") {
+    if (event.playerIndex === sourceCard.controller) return false;
+  }
+
   // Turn restriction
   if (trigger.turn_restriction) {
     const isOwnersTurn = state.turn.activePlayerIndex === sourceCard.controller;
