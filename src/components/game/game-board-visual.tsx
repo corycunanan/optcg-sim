@@ -141,6 +141,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         }}
         onLeave={session.handleBackToLobbies}
         matchClosed={session.matchClosed}
+        canUndo={session.canUndo}
       />
 
       {/* ── Dev: modal test panel ── only in development ──────────────── */}

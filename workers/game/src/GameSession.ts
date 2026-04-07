@@ -33,6 +33,7 @@ interface StoredSession {
   state: GameState;
   cardDb: Record<string, CardData>; // serialized as plain object
   mulliganDone: [boolean, boolean];
+  undoHistory?: GameState[]; // snapshot stack for undo (v1: max depth 1)
 }
 
 export class GameSession implements DurableObject {
@@ -43,6 +44,7 @@ export class GameSession implements DurableObject {
   private gameState: GameState | null = null;
   private cardDb: Map<string, CardData> | null = null;
   private mulliganDone: [boolean, boolean] = [false, false];
+  private undoHistory: GameState[] = [];
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -328,6 +330,21 @@ export class GameSession implements DurableObject {
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
 
+    // ── Undo: bypass pipeline entirely ──────────────────────────────────────
+    if (action.type === "UNDO") {
+      if (!this.canUndo(playerIndex)) {
+        this.send(ws, { type: "game:error", message: "Cannot undo right now" });
+        return;
+      }
+      this.gameState = this.undoHistory.pop()!;
+      await this.persist();
+      this.broadcastFilteredState((s) => ({
+        type: "game:state", state: s, canUndo: this.canUndo(playerIndex),
+      }));
+      this.broadcast({ type: "game:undo", playerIndex, canUndo: this.canUndo(playerIndex) });
+      return;
+    }
+
     const pauseReason = this.getPauseReason(playerIndex);
     if (pauseReason && action.type !== "CONCEDE") {
       this.send(ws, { type: "game:error", message: pauseReason });
@@ -382,9 +399,23 @@ export class GameSession implements DurableObject {
       }
     }
 
+    // ── Undo history: snapshot before undoable main-phase actions ────────────
+    const undoableActions = new Set([
+      "PLAY_CARD", "ATTACH_DON", "ACTIVATE_EFFECT", "ADVANCE_PHASE",
+    ]);
+    if (undoableActions.has(action.type)) {
+      // Keep max 1 snapshot for v1
+      this.undoHistory = [this.gameState];
+    } else {
+      // Non-undoable actions (battle, concede, etc.) invalidate the undo stack
+      this.undoHistory = [];
+    }
+
     let result = runPipeline(this.gameState, action, this.cardDb, playerIndex);
 
     if (!result.valid) {
+      // Restore undo history — pipeline rejected the action, nothing changed
+      this.undoHistory = [];
       this.send(ws, { type: "game:error", message: result.error ?? "Invalid action" });
       return;
     }
@@ -398,6 +429,12 @@ export class GameSession implements DurableObject {
 
     this.gameState = result.state;
 
+    // Clear undo if the action resulted in a pending prompt (effect needs player input)
+    // or if the turn changed (ADVANCE_PHASE past END triggers turn change)
+    if (this.gameState.pendingPrompt || this.gameState.effectStack.length > 0) {
+      this.undoHistory = [];
+    }
+
     // Surface REVEAL_TRIGGER as a durable prompt before persisting
     this.surfaceRevealTriggerIfNeeded();
 
@@ -406,8 +443,9 @@ export class GameSession implements DurableObject {
     // Persist result to Postgres before any broadcast that lets clients leave for /lobbies;
     // otherwise GET /api/game/active can still see IN_PROGRESS and block new games.
     if (result.gameOver) {
+      this.undoHistory = [];
       await this.writeResultToDb();
-      this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
+      this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s, canUndo: false }));
       this.broadcast({
         type: "game:over",
         winner: result.gameOver.winner,
@@ -416,7 +454,11 @@ export class GameSession implements DurableObject {
       return;
     }
 
-    this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
+    const canUndoNow = this.undoHistory.length > 0
+      && !this.gameState.pendingPrompt
+      && this.gameState.effectStack.length === 0
+      && !this.gameState.turn.battleSubPhase;
+    this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s, canUndo: canUndoNow }));
 
     // Send prompts if a player input is required
     if (this.gameState.pendingPrompt) {
@@ -453,6 +495,9 @@ export class GameSession implements DurableObject {
     action: GameAction,
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
+
+    // Effect resolution means game state has progressed — undo no longer valid
+    this.undoHistory = [];
 
     const prompt = this.gameState.pendingPrompt!;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
@@ -658,6 +703,7 @@ export class GameSession implements DurableObject {
       state: this.gameState,
       cardDb: Object.fromEntries(this.cardDb),
       mulliganDone: this.mulliganDone,
+      undoHistory: this.undoHistory,
     };
     await this.state.storage.put("session", stored);
   }
@@ -669,6 +715,7 @@ export class GameSession implements DurableObject {
     this.gameState = stored.state;
     this.cardDb = new Map(Object.entries(stored.cardDb));
     this.mulliganDone = stored.mulliganDone;
+    this.undoHistory = stored.undoHistory ?? [];
     return true;
   }
 
@@ -808,6 +855,19 @@ export class GameSession implements DurableObject {
     }
 
     await this.state.storage.setAlarm(nextDeadline);
+  }
+
+  // ─── Undo eligibility ───────────────────────────────────────────────────
+
+  private canUndo(playerIndex: 0 | 1): boolean {
+    if (!this.gameState) return false;
+    if (this.undoHistory.length === 0) return false;
+    if (this.gameState.status !== "IN_PROGRESS") return false;
+    if (playerIndex !== this.gameState.turn.activePlayerIndex) return false;
+    if (this.gameState.pendingPrompt) return false;
+    if (this.gameState.effectStack.length > 0) return false;
+    if (this.gameState.turn.battleSubPhase) return false;
+    return true;
   }
 
   private getPauseReason(playerIndex: 0 | 1): string | null {

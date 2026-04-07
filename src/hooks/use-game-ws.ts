@@ -17,6 +17,7 @@ export interface UseGameWsReturn {
   lastError: string | null;
   activePrompt: { promptType: PromptType; options: PromptOptions } | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
+  canUndo: boolean;
   sendAction: (action: GameAction) => void;
   leaveGame: () => Promise<void>;
 }
@@ -39,6 +40,7 @@ export function useGameWs(
   const [lastError, setLastError] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<{ promptType: PromptType; options: PromptOptions } | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: 0 | 1 | null; reason: string } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,6 +94,7 @@ export function useGameWs(
       switch (msg.type) {
         case "game:state":
           setGameState(msg.state);
+          setCanUndo(msg.canUndo ?? false);
           if (msg.state.pendingPrompt) {
             setActivePrompt({
               promptType: msg.state.pendingPrompt.promptType,
@@ -107,6 +110,7 @@ export function useGameWs(
           break;
         case "game:update":
           setGameState(msg.state);
+          setCanUndo(msg.canUndo ?? false);
           if (msg.state.pendingPrompt) {
             setActivePrompt({
               promptType: msg.state.pendingPrompt.promptType,
@@ -121,6 +125,9 @@ export function useGameWs(
               reason: msg.state.winReason ?? "Game over",
             });
           }
+          break;
+        case "game:undo":
+          setCanUndo(msg.canUndo);
           break;
         case "game:prompt":
           setActivePrompt({ promptType: msg.promptType, options: msg.options });
@@ -196,5 +203,5 @@ export function useGameWs(
     setConnectionStatus("disconnected");
   }, []);
 
-  return { gameState, connectionStatus, lastError, activePrompt, gameOver, sendAction, leaveGame };
+  return { gameState, connectionStatus, lastError, activePrompt, gameOver, canUndo, sendAction, leaveGame };
 }

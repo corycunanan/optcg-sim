@@ -42,6 +42,7 @@ export interface UseGameSessionReturn {
   battlePhase: string | null;
   inBattle: boolean;
   matchClosed: boolean;
+  canUndo: boolean;
 
   opponentAway: boolean;
   opponentAwayText: string;
@@ -93,6 +94,7 @@ export function useGameSession(
     lastError,
     activePrompt,
     gameOver,
+    canUndo,
     sendAction,
     leaveGame,
   } = useGameWs(gameId, workerUrl, getToken);
@@ -360,6 +362,7 @@ export function useGameSession(
     battlePhase,
     inBattle,
     matchClosed,
+    canUndo,
 
     opponentAway,
     opponentAwayText,

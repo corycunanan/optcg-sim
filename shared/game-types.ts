@@ -326,19 +326,21 @@ export type GameAction =
   | { type: "PLAYER_CHOICE"; choiceId: string }
   | { type: "PASS" }
   | { type: "CONCEDE" }
-  | { type: "MANUAL_EFFECT"; description: string };
+  | { type: "MANUAL_EFFECT"; description: string }
+  | { type: "UNDO" };
 
 // ─── WebSocket messages ───────────────────────────────────────────────────────
 
 // Server → Client
 export type ServerMessage =
-  | { type: "game:state"; state: GameState }
-  | { type: "game:update"; action: GameAction; state: GameState }
+  | { type: "game:state"; state: GameState; canUndo?: boolean }
+  | { type: "game:update"; action: GameAction; state: GameState; canUndo?: boolean }
   | { type: "game:prompt"; promptType: PromptType; options: PromptOptions }
   | { type: "game:error"; message: string }
   | { type: "game:over"; winner: 0 | 1 | null; reason: string }
   | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
-  | { type: "game:player_reconnected"; playerIndex: 0 | 1 };
+  | { type: "game:player_reconnected"; playerIndex: 0 | 1 }
+  | { type: "game:undo"; playerIndex: 0 | 1; canUndo: boolean };
 
 // Client → Server
 export type ClientMessage =

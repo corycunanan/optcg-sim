@@ -100,6 +100,7 @@ export const MidZone = React.memo(function MidZone({
   blockerMode,
   isPromptHidden,
   onShowPrompt,
+  canUndo,
   onAction,
 }: {
   top: number;
@@ -113,6 +114,7 @@ export const MidZone = React.memo(function MidZone({
   blockerMode?: BlockerMode;
   isPromptHidden?: boolean;
   onShowPrompt?: () => void;
+  canUndo?: boolean;
   onAction: (action: GameAction) => void;
 }) {
   return (
@@ -176,6 +178,17 @@ export const MidZone = React.memo(function MidZone({
             </GameButton>
           )}
         </div>
+      )}
+
+      {/* Undo */}
+      {canUndo && (
+        <GameButton
+          variant="secondary"
+          size="sm"
+          onClick={() => onAction({ type: "UNDO" })}
+        >
+          Undo
+        </GameButton>
       )}
 
       {/* Phase actions */}

@@ -103,6 +103,7 @@ export interface BoardLayoutProps {
   onAction: (action: GameAction) => void;
   onLeave: () => void;
   matchClosed: boolean;
+  canUndo: boolean;
 }
 
 function NavMenu({
@@ -175,6 +176,7 @@ function BoardLayoutInner({
   onAction,
   onLeave,
   matchClosed,
+  canUndo,
 }: BoardLayoutProps) {
   const zoneRegistry = useZonePosition();
   const [viewport, setViewport] = useState(getViewportSize);
@@ -495,6 +497,7 @@ function BoardLayoutInner({
             } : undefined}
             isPromptHidden={isPromptHidden}
             onShowPrompt={() => setIsPromptHidden(false)}
+            canUndo={canUndo}
             onAction={onAction}
           />
 
