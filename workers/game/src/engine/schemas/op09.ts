@@ -2293,7 +2293,7 @@ export const OP09_070_NAMI: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
     },

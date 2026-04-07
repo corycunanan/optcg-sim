@@ -512,7 +512,7 @@ export const OP11_016_RORONOA_ZORO: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
     },
@@ -2960,7 +2960,7 @@ export const OP11_095_MONKEY_D_GARP: EffectSchema = {
         {
           type: "GIVE_DON",
           target: { type: "YOUR_LEADER" },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
         {
           type: "KO",
@@ -3816,7 +3816,7 @@ export const OP11_118_MONKEY_D_LUFFY: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
           chain: "THEN",
         },
       ],

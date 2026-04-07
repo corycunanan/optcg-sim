@@ -92,7 +92,7 @@ export const EB02_003_TONY_TONY_CHOPPER: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
     },
@@ -172,7 +172,7 @@ export const EB02_006_YAMATO: EffectSchema = {
           target: {
             type: "YOUR_LEADER",
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
         {
           type: "GRANT_KEYWORD",
@@ -391,7 +391,7 @@ export const EB02_011_ARLONG: EffectSchema = {
           target: {
             type: "YOUR_LEADER",
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -1791,7 +1791,7 @@ export const EB02_049_MONKEY_D_GARP: EffectSchema = {
           target: {
             type: "YOUR_LEADER",
           },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
     },

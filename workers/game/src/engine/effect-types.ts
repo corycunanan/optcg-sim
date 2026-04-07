@@ -611,7 +611,7 @@ export interface ActionParamsMap {
   // Simple amount
   DRAW: { amount: number | DynamicValue };
   MILL: { amount?: number };
-  GIVE_DON: { amount?: number };
+  GIVE_DON: { amount?: number; don_state?: "ACTIVE" | "RESTED" };
   ADD_DON_FROM_DECK: { amount?: number; target_state?: "ACTIVE" | "RESTED" };
   FORCE_OPPONENT_DON_RETURN: { amount?: number };
   SET_DON_ACTIVE: { amount?: number };

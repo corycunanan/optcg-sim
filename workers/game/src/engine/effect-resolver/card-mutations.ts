@@ -190,13 +190,14 @@ export function attachDonToCard(
   state: GameState,
   controller: 0 | 1,
   targetInstanceId: string,
+  donState: "ACTIVE" | "RESTED" = "ACTIVE",
 ): GameState | null {
   const p = state.players[controller];
-  const activeDon = p.donCostArea.find((d) => d.state === "ACTIVE");
-  if (!activeDon) return null;
+  const don = p.donCostArea.find((d) => d.state === donState && !d.attachedTo);
+  if (!don) return null;
 
-  const newDonCostArea = p.donCostArea.filter((d) => d.instanceId !== activeDon.instanceId);
-  const attachedDon = { ...activeDon, attachedTo: targetInstanceId };
+  const newDonCostArea = p.donCostArea.filter((d) => d.instanceId !== don.instanceId);
+  const attachedDon = { ...don, attachedTo: targetInstanceId };
 
   // Find the target card and attach
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];

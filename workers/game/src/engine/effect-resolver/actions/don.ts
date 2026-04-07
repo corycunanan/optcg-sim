@@ -22,6 +22,7 @@ export function executeGiveDon(
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
   const amount = (params.amount as number) ?? 1;
+  const donState = (params.don_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
@@ -32,7 +33,7 @@ export function executeGiveDon(
   let nextState = state;
   for (const targetId of targetIds) {
     for (let i = 0; i < amount; i++) {
-      const result = attachDonToCard(nextState, controller, targetId);
+      const result = attachDonToCard(nextState, controller, targetId, donState);
       if (!result) break;
       nextState = result;
     }

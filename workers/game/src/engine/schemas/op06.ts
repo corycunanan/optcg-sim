@@ -773,7 +773,7 @@ export const OP06_022_YAMATO: EffectSchema = {
             controller: "SELF",
             count: { exact: 1 },
           },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
     },

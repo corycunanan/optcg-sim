@@ -450,7 +450,7 @@ export const OP07_015_MONKEY_D_DRAGON: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 2 },
+          params: { amount: 2, don_state: "RESTED" },
         },
       ],
     },

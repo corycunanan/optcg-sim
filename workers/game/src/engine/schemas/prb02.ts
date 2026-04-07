@@ -570,7 +570,7 @@ export const PRB02_013_GECKO_MORIA: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
           chain: "THEN",
         },
       ],

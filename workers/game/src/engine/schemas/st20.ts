@@ -38,7 +38,7 @@ export const ST20_001_CHARLOTTE_KATAKURI: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
       flags: { once_per_turn: true, optional: true },

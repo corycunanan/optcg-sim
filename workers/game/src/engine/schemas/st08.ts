@@ -29,7 +29,7 @@ export const ST08_001_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "GIVE_DON",
           target: { type: "SELF" },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
     },

@@ -235,7 +235,7 @@ export const ST22_007_SQUARD: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",

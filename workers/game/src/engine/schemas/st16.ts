@@ -37,7 +37,7 @@ export const ST16_001_UTA: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, don_state: "RESTED" },
         },
       ],
       flags: { once_per_turn: true, optional: true },
