@@ -4182,19 +4182,11 @@ export const OP07_118_SABO: EffectSchema = {
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { cost_max: 5 },
+            dual_targets: [
+              { filter: { cost_max: 5 }, count: { up_to: 1 } },
+              { filter: { cost_max: 3 }, count: { up_to: 1 } },
+            ],
           },
-        },
-        {
-          type: "KO",
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { cost_max: 3 },
-          },
-          chain: "AND",
         },
       ],
     },
