@@ -149,6 +149,15 @@ export function resolveEffect(
   cardDb: Map<string, CardData>,
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
+
+  // Guard: reject once-per-turn effects already used this turn
+  if (block.flags?.once_per_turn) {
+    const usedSet = state.turn.oncePerTurnUsed[block.id];
+    if (usedSet?.includes(sourceCardInstanceId)) {
+      return { state, events, resolved: false };
+    }
+  }
+
   const condCtx: ConditionContext = {
     sourceCardInstanceId,
     controller,

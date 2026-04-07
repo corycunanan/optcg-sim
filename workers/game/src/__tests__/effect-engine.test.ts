@@ -1074,6 +1074,101 @@ describe("ACTIVATE_EFFECT via pipeline", () => {
     expect(result.state.players[0].deck.length).toBe(state.players[0].deck.length - 1);
   });
 
+  it("blocks once-per-turn ACTIVATE_EFFECT from activating twice", () => {
+    const oncePerTurnCard: CardData = {
+      id: "TEST-OPT",
+      name: "Test Once Per Turn",
+      type: "Character",
+      color: ["Red"],
+      cost: 2,
+      power: 3000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[Activate: Main] [Once Per Turn] Draw 1 card.",
+      triggerText: null,
+      keywords: { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false },
+      effectSchema: {
+        card_id: "TEST-OPT",
+        card_name: "Test Once Per Turn",
+        card_type: "Character",
+        effects: [
+          {
+            id: "activate_opt_draw",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            actions: [
+              { type: "DRAW", params: { amount: 1 } },
+            ],
+            flags: { once_per_turn: true },
+          },
+        ],
+      },
+      imageUrl: null,
+    };
+
+    const { state: baseState, cardDb } = setupGame();
+    cardDb.set("TEST-OPT", oncePerTurnCard);
+
+    const charInstance: CardInstance = {
+      instanceId: "test-opt-char",
+      cardId: "TEST-OPT",
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+
+    const players = [...baseState.players] as [typeof baseState.players[0], typeof baseState.players[1]];
+    players[0] = {
+      ...players[0],
+      characters: [...players[0].characters, charInstance],
+    };
+
+    const state: GameState = {
+      ...baseState,
+      players,
+      turn: {
+        ...baseState.turn,
+        number: 2,
+        activePlayerIndex: 0,
+        phase: "MAIN",
+        battleSubPhase: null,
+        battle: null,
+      },
+    };
+
+    const handBefore = state.players[0].hand.length;
+    const deckBefore = state.players[0].deck.length;
+
+    // First activation should succeed
+    const result1 = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: "test-opt-char", effectId: "activate_opt_draw" },
+      cardDb,
+      0,
+    );
+
+    expect(result1.valid).toBe(true);
+    expect(result1.state.players[0].hand.length).toBe(handBefore + 1);
+    expect(result1.state.players[0].deck.length).toBe(deckBefore - 1);
+
+    // Second activation on the same turn should be blocked
+    const result2 = runPipeline(
+      result1.state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: "test-opt-char", effectId: "activate_opt_draw" },
+      cardDb,
+      0,
+    );
+
+    // Hand and deck should not change on second activation
+    expect(result2.state.players[0].hand.length).toBe(handBefore + 1);
+    expect(result2.state.players[0].deck.length).toBe(deckBefore - 1);
+  });
+
   it("rejects ACTIVATE_EFFECT outside of MAIN phase", () => {
     const { state: baseState, cardDb } = setupGame();
 

@@ -231,6 +231,14 @@ function executeActivateEffect(
     return { state, events };
   }
 
+  // Check once-per-turn restriction
+  if (block.flags?.once_per_turn) {
+    const usedSet = state.turn.oncePerTurnUsed[block.id];
+    if (usedSet?.includes(cardInstanceId)) {
+      return { state, events };
+    }
+  }
+
   // Resolve the effect through the effect resolver
   const result = resolveEffect(state, block, cardInstanceId, actingPlayerIndex, cardDb);
 
