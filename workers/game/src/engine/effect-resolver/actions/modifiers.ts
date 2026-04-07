@@ -313,17 +313,27 @@ export function executeCopyPower(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const sourceTarget = params.source_target as import("../../effect-types.js").Target | undefined;
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
-  // Resolve source target (the card whose power we copy)
-  if (!sourceTarget) return { state, events, succeeded: false };
+  // Resolve source target (the card whose power we copy).
+  // Schemas use either an explicit `source_target` object or a `source` string
+  // shorthand ("OPPONENT_LEADER", "ATTACKING_CARD") that we convert here.
+  let sourceIds: string[];
+  const resolvedSource = resolveSourceTarget(params, state);
 
-  const sourceValidIds = preselectedTargets ?? computeAllValidTargets(state, sourceTarget, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(sourceTarget, sourceValidIds)) {
-    return buildSelectTargetPrompt(state, action, sourceValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  if (resolvedSource?.directIds) {
+    // String shorthand resolved to specific instance IDs — skip target resolver
+    sourceIds = resolvedSource.directIds;
+  } else if (resolvedSource?.target) {
+    const sourceTarget = resolvedSource.target;
+    const sourceValidIds = preselectedTargets ?? computeAllValidTargets(state, sourceTarget, controller, cardDb, sourceCardInstanceId, resultRefs);
+    if (!preselectedTargets && needsPlayerTargetSelection(sourceTarget, sourceValidIds)) {
+      return buildSelectTargetPrompt(state, action, sourceValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    }
+    sourceIds = autoSelectTargets(sourceTarget, sourceValidIds);
+  } else {
+    return { state, events, succeeded: false };
   }
-  const sourceIds = autoSelectTargets(sourceTarget, sourceValidIds);
   if (sourceIds.length === 0) return { state, events, succeeded: false };
 
   const sourceCard = findCardInstance(state, sourceIds[0]);
@@ -360,6 +370,46 @@ export function executeCopyPower(
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
   };
+}
+
+type SourceResolution =
+  | { directIds: string[]; target?: undefined }
+  | { target: import("../../effect-types.js").Target; directIds?: undefined };
+
+/**
+ * Convert COPY_POWER `params.source` / `params.source_target` to either
+ * direct instance IDs or a Target for the resolver. String shorthands
+ * ("OPPONENT_LEADER", "ATTACKING_CARD") are handled here.
+ */
+function resolveSourceTarget(
+  params: Record<string, unknown>,
+  state: GameState,
+): SourceResolution | undefined {
+  // Explicit target object takes priority
+  if (params.source_target) {
+    return { target: params.source_target as import("../../effect-types.js").Target };
+  }
+
+  const source = params.source as string | Record<string, unknown> | undefined;
+  if (!source) return undefined;
+
+  // If source is already a target object (has a `type` key), use it directly
+  if (typeof source === "object" && "type" in source) {
+    return { target: source as import("../../effect-types.js").Target };
+  }
+
+  // String shorthands
+  switch (source) {
+    case "OPPONENT_LEADER":
+      return { target: { type: "OPPONENT_LEADER" } as any };
+    case "ATTACKING_CARD": {
+      const battle = state.turn.battle;
+      if (!battle) return undefined;
+      return { directIds: [battle.attackerInstanceId] };
+    }
+    default:
+      return undefined;
+  }
 }
 
 // ─── SWAP_BASE_POWER ─────────────────────────────────────────────────────────
