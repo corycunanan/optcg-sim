@@ -53,7 +53,8 @@ export const LifeZone = React.memo(function LifeZone({
         <BoardCard
           key={card.instanceId}
           cardDb={cardDb}
-          sleeve
+          cardId={card.face === "UP" ? card.cardId : undefined}
+          sleeve={card.face === "DOWN"}
           sleeveUrl={sleeveUrl}
           count={i === 0 ? count : undefined}
           width={BOARD_CARD_W}
