@@ -15,7 +15,7 @@ import { expireEndOfTurnEffects, expireBattleEffects, expireSourceLeftZone, proc
 import { getEffectivePower, hasGrantedKeyword } from "../engine/modifiers.js";
 import type { GameState, CardData, CardInstance, GameEvent } from "../types.js";
 import type { RuntimeActiveEffect, EffectSchema, EffectBlock, RuntimeProhibition, RuntimeRegisteredTrigger, ExpiryTiming } from "../engine/effect-types.js";
-import { setupGame, CARDS } from "./helpers.js";
+import { setupGame, CARDS, padChars } from "./helpers.js";
 import { runPipeline } from "../engine/pipeline.js";
 
 // ─── Test Fixtures ────────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ describe("Condition Evaluator", () => {
       controller: 0,
       owner: 0,
     };
-    state.players[0].characters = [char];
+    state.players[0].characters = padChars([char]);
 
     const cardDb = makeCardDb(LUFFY_CARD);
     const ctx = makeCondCtx("leader-p1", 0, cardDb);
@@ -428,7 +428,7 @@ describe("Effect Resolver", () => {
       controller: 0,
       owner: 0,
     };
-    state.players[0].characters = [char];
+    state.players[0].characters = padChars([char]);
 
     const cardDb = makeCardDb(LUFFY_CARD);
 
@@ -464,7 +464,7 @@ describe("Effect Resolver", () => {
       controller: 1,
       owner: 1,
     };
-    state.players[1].characters = [oppChar];
+    state.players[1].characters = padChars([oppChar]);
 
     const cardDb = makeCardDb(NAMI_CARD);
 
@@ -479,7 +479,7 @@ describe("Effect Resolver", () => {
 
     const result = resolveEffect(state, block, "leader-p1", 0, cardDb);
     expect(result.resolved).toBe(true);
-    expect(result.state.players[1].characters.length).toBe(0);
+    expect(result.state.players[1].characters.filter(Boolean).length).toBe(0);
     expect(result.state.players[1].trash.length).toBeGreaterThan(0);
   });
 });
@@ -730,7 +730,7 @@ describe("Trigger System", () => {
       controller: 0,
       owner: 0,
     };
-    state.players[0].characters = [luffyInstance];
+    state.players[0].characters = padChars([luffyInstance]);
 
     const effectBlock: EffectBlock = {
       id: "on-play-draw",
@@ -792,7 +792,7 @@ describe("Replacement Effects", () => {
       controller: 0,
       owner: 0,
     };
-    state.players[0].characters = [char];
+    state.players[0].characters = padChars([char]);
     // Give player 0 a card in hand so they can pay the cost
     state.players[0].hand = [{
       instanceId: "hand-1",
@@ -834,7 +834,7 @@ describe("Replacement Effects", () => {
 
     expect(result.replaced).toBe(true);
     // Character should still be on field (KO was prevented)
-    expect(result.state.players[0].characters.length).toBe(1);
+    expect(result.state.players[0].characters.filter(Boolean).length).toBe(1);
     // Hand card was trashed as cost
     expect(result.state.players[0].hand.length).toBe(0);
     expect(result.state.players[0].trash.length).toBe(1);
@@ -852,7 +852,7 @@ describe("Replacement Effects", () => {
       controller: 1,
       owner: 1,
     };
-    state.players[1].characters = [char];
+    state.players[1].characters = padChars([char]);
 
     const effect: RuntimeActiveEffect = {
       id: "repl-1",
@@ -896,7 +896,7 @@ describe("Replacement Effects", () => {
       controller: 0,
       owner: 0,
     };
-    state.players[0].characters = [char];
+    state.players[0].characters = padChars([char]);
     state.players[0].hand = [{
       instanceId: "hand-1",
       cardId: NAMI_CARD.id,
@@ -954,7 +954,7 @@ describe("Replacement Effects", () => {
       controller: 0,
       owner: 0,
     };
-    state.players[0].characters = [char];
+    state.players[0].characters = padChars([char]);
     state.players[0].hand = []; // Empty hand — cannot pay cost
 
     const effect: RuntimeActiveEffect = {
@@ -1044,7 +1044,7 @@ describe("ACTIVATE_EFFECT via pipeline", () => {
     const players = [...baseState.players] as [typeof baseState.players[0], typeof baseState.players[1]];
     players[0] = {
       ...players[0],
-      characters: [...players[0].characters, charInstance],
+      characters: padChars([...players[0].characters.filter(Boolean) as CardInstance[], charInstance]),
     };
 
     const state: GameState = {
@@ -1125,7 +1125,7 @@ describe("ACTIVATE_EFFECT via pipeline", () => {
     const players = [...baseState.players] as [typeof baseState.players[0], typeof baseState.players[1]];
     players[0] = {
       ...players[0],
-      characters: [...players[0].characters, charInstance],
+      characters: padChars([...players[0].characters.filter(Boolean) as CardInstance[], charInstance]),
     };
 
     const state: GameState = {

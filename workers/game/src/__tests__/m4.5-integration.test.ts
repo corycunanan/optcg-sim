@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../types.js";
-import { setupGame, createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
+import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
 import { getEffectiveCost, getEffectivePower, consumeOneTimeModifiers } from "../engine/modifiers.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "../engine/effect-resolver/resolver.js";
@@ -72,7 +72,7 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
   const makePlayer = (idx: 0 | 1): PlayerState => ({
     userId: `user-${idx}`,
     leader: makeInstance(CARDS.LEADER.id, "LEADER", idx, { instanceId: `leader-${idx}` }),
-    characters: [],
+    characters: [null, null, null, null, null],
     stage: null,
     hand: [],
     deck: Array.from({ length: 20 }, (_, i) =>
@@ -221,7 +221,7 @@ describe("1. Hand-Zone Cost Modifiers", () => {
 
     const state = buildMinimalState();
     const crocInstance = makeInstance(crocodileCard.id, "CHARACTER", 0, { instanceId: "croc-inst" });
-    state.players[0].characters = [crocInstance];
+    state.players[0].characters = padChars([crocInstance]);
 
     const handEvent = makeInstance(blueEvent.id, "HAND", 0, { instanceId: "hand-event" });
     const handRedChar = makeInstance(redChar.id, "HAND", 0, { instanceId: "hand-red" });
@@ -728,7 +728,7 @@ describe("6. Dynamic Values", () => {
 
     // Place a character on the field to target
     const char = makeInstance(CARDS.VANILLA.id, "CHARACTER", 0, { instanceId: "char-target" });
-    state.players[0].characters = [char];
+    state.players[0].characters = padChars([char]);
 
     // SET_BASE_POWER with dynamic value = LEADER_BASE_POWER (5000)
     const action = {
@@ -749,7 +749,7 @@ describe("6. Dynamic Values", () => {
     expect(effect.modifiers[0].params.value).toBe(5000);
 
     // Verify effective power uses the set value
-    const updatedChar = result.state.players[0].characters[0];
+    const updatedChar = result.state.players[0].characters[0]!;
     const power = getEffectivePower(updatedChar, CARDS.VANILLA, result.state);
     // It's player 0's turn so DON bonus applies (0 DON attached = 0 bonus)
     expect(power).toBe(5000); // SET_POWER overrides base 4000
@@ -820,7 +820,7 @@ describe("8. Condition Evaluator Edge Cases", () => {
         { instanceId: "don-a2", state: "ACTIVE" as const, attachedTo: "char-don" },
       ],
     });
-    state.players[0].characters = [charWithDon];
+    state.players[0].characters = padChars([charWithDon]);
 
     const ctx: ConditionContext = {
       sourceCardInstanceId: "char-don",

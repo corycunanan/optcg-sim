@@ -89,7 +89,7 @@ export interface TurnState {
 export interface PlayerState {
   playerId: string;
   leader: CardInstance;
-  characters: CardInstance[];    // max 5
+  characters: (CardInstance | null)[];  // fixed 5 slots; null = empty
   stage: CardInstance | null;    // max 1
   donCostArea: DonInstance[];
   hand: CardInstance[];

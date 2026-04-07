@@ -159,8 +159,9 @@ function evaluateSimple(
 
     case "FIELD_PURITY": {
       const p = getPlayerByController(state, cond.controller, ctx.controller);
-      if (p.characters.length === 0) return true; // vacuously true
-      return p.characters.every((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
+      const chars = p.characters.filter(Boolean) as CardInstance[];
+      if (chars.length === 0) return true; // vacuously true
+      return chars.every((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
     }
 
     case "LEADER_PROPERTY": {
@@ -303,7 +304,7 @@ function evaluateSimple(
     }
 
     case "BOARD_WIDE_EXISTENCE": {
-      const allChars = [...state.players[0].characters, ...state.players[1].characters];
+      const allChars = [...state.players[0].characters.filter(Boolean) as CardInstance[], ...state.players[1].characters.filter(Boolean) as CardInstance[]];
       const matching = allChars.filter((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
       if (cond.count) {
         return compareNum(matching.length, cond.count.operator, cond.count.value);
@@ -315,7 +316,7 @@ function evaluateSimple(
       const p = getPlayerByController(state, cond.controller, ctx.controller);
       let count = 0;
       if (p.leader.state === "RESTED") count++;
-      count += p.characters.filter((c) => c.state === "RESTED").length;
+      count += p.characters.filter((c) => c !== null && c.state === "RESTED").length;
       if (p.stage?.state === "RESTED") count++;
       count += p.donCostArea.filter((d) => d.state === "RESTED").length;
       return compareNum(count, cond.operator, cond.value);
@@ -324,7 +325,7 @@ function evaluateSimple(
     case "DON_GIVEN": {
       const p = getPlayerByController(state, cond.controller, ctx.controller);
       if (cond.mode === "ANY_CARD_HAS_DON") {
-        const allCards = [p.leader, ...p.characters];
+        const allCards = [p.leader, ...p.characters.filter(Boolean) as CardInstance[]];
         return allCards.some((c) => c.attachedDon.length > 0);
       }
       // SPECIFIC_CARD mode — check if the source card has DON attached
@@ -434,12 +435,12 @@ function getPlayerByController(
 function getDonFieldCount(p: PlayerState): number {
   let count = p.donCostArea.length;
   count += p.leader.attachedDon.length;
-  for (const c of p.characters) count += c.attachedDon.length;
+  for (const c of p.characters) if (c) count += c.attachedDon.length;
   return count;
 }
 
 function getFieldCards(p: PlayerState): CardInstance[] {
-  const cards: CardInstance[] = [p.leader, ...p.characters];
+  const cards: CardInstance[] = [p.leader, ...p.characters.filter(Boolean) as CardInstance[]];
   if (p.stage) cards.push(p.stage);
   return cards;
 }
@@ -447,7 +448,7 @@ function getFieldCards(p: PlayerState): CardInstance[] {
 function findInstanceById(state: GameState, instanceId: string): CardInstance | null {
   for (const player of state.players) {
     if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
+    const char = player.characters.find((c) => c?.instanceId === instanceId);
     if (char) return char;
     if (player.stage?.instanceId === instanceId) return player.stage;
     const hand = player.hand.find((c) => c.instanceId === instanceId);
@@ -466,7 +467,7 @@ function getMetricValue(p: PlayerState, metric: string): number {
   switch (metric) {
     case "LIFE_COUNT": return p.life.length;
     case "DON_FIELD_COUNT": return getDonFieldCount(p);
-    case "CHARACTER_COUNT": return p.characters.length;
+    case "CHARACTER_COUNT": return p.characters.filter(Boolean).length;
     default: return 0;
   }
 }

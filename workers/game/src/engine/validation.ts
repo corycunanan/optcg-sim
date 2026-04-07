@@ -98,9 +98,10 @@ function validatePlayCard(
 
   // Character field overflow: must specify which slot to replace
   const player = getActivePlayer(state);
-  if (cardData.type === "Character" && player.characters.length >= 5) {
+  const charCount = player.characters.filter(Boolean).length;
+  if (cardData.type === "Character" && charCount >= 5) {
     if (position == null) return "Character area is full — choose a character to replace";
-    if (position < 0 || position >= player.characters.length) return `Invalid position ${position}`;
+    if (position < 0 || position >= player.characters.length || player.characters[position] === null) return `Invalid position ${position}`;
   }
 
   const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);

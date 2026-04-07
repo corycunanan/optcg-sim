@@ -48,7 +48,7 @@ export function payCosts(
         const allFieldDon = [
           ...player.donCostArea,
           ...player.leader.attachedDon,
-          ...player.characters.flatMap((c) => c.attachedDon),
+          ...player.characters.filter(Boolean).flatMap((c) => c!.attachedDon),
         ];
         if (allFieldDon.length < amount) return null;
 
@@ -122,11 +122,12 @@ export function payCosts(
         for (let pIdx = 0; pIdx < 2; pIdx++) {
           const player = nextState.players[pIdx as 0 | 1];
           const charIdx = player.characters.findIndex(
-            (c) => c.instanceId === sourceCardInstanceId,
+            (c) => c?.instanceId === sourceCardInstanceId,
           );
           if (charIdx !== -1) {
-            const card = player.characters[charIdx];
-            const newChars = player.characters.filter((_, i) => i !== charIdx);
+            const card = player.characters[charIdx]!;
+            const newChars = [...player.characters] as (typeof player.characters);
+            newChars[charIdx] = null;
             const newTrash = [{ ...card, zone: "TRASH" as const, attachedDon: [] as typeof card.attachedDon }, ...player.trash];
             const returnedDon = card.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
             const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
@@ -372,14 +373,14 @@ export function payCosts(
         for (let pIdx = 0; pIdx < 2 && !found; pIdx++) {
           const player = nextState.players[pIdx as 0 | 1];
           // Check characters
-          const charIdx = player.characters.findIndex((c) => c.instanceId === sourceCardInstanceId);
+          const charIdx = player.characters.findIndex((c) => c?.instanceId === sourceCardInstanceId);
           if (charIdx !== -1) {
-            const char = player.characters[charIdx];
+            const char = player.characters[charIdx]!;
             const detachCount = Math.min(amount, char.attachedDon.length);
             if (detachCount === 0) return null;
             const detached = char.attachedDon.slice(0, detachCount).map((d: any) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
             const remainingDon = char.attachedDon.slice(detachCount);
-            const newChars = [...player.characters];
+            const newChars = [...player.characters] as (typeof player.characters);
             newChars[charIdx] = { ...char, attachedDon: remainingDon };
             const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
             newPlayers[pIdx as 0 | 1] = { ...player, characters: newChars, donCostArea: [...player.donCostArea, ...detached] };
@@ -409,10 +410,11 @@ export function payCosts(
         // Move source card + specified hand cards to deck bottom
         // For auto-pay, just move the source card
         let found = false;
-        const charIdx = p.characters.findIndex((c) => c.instanceId === sourceCardInstanceId);
+        const charIdx = p.characters.findIndex((c) => c?.instanceId === sourceCardInstanceId);
         if (charIdx !== -1) {
-          const card = p.characters[charIdx];
-          const newChars = p.characters.filter((_, i) => i !== charIdx);
+          const card = p.characters[charIdx]!;
+          const newChars = [...p.characters] as (typeof p.characters);
+          newChars[charIdx] = null;
           const newDeck = [...p.deck, { ...card, zone: "DECK" as const }];
           const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
           newPlayers[controller] = { ...p, characters: newChars, deck: newDeck };
@@ -637,7 +639,7 @@ export function computeCostTargets(
     case "TRASH_OWN_CHARACTER":
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK": {
-      let candidates = player.characters;
+      let candidates = player.characters.filter(Boolean) as CardInstance[];
       if (cost.filter) {
         candidates = candidates.filter((c) => {
           const data = cardDb.get(c.cardId);
@@ -664,7 +666,7 @@ export function computeCostTargets(
 
     case "REST_CARDS": {
       return player.characters
-        .filter((c) => c.state === "ACTIVE")
+        .filter((c): c is CardInstance => c !== null && c.state === "ACTIVE")
         .map((c) => c.instanceId);
     }
 
@@ -673,7 +675,7 @@ export function computeCostTargets(
       const nameFilter = cost.filter?.name;
       // Include matching active characters
       for (const c of player.characters) {
-        if (c.state !== "ACTIVE") continue;
+        if (!c || c.state !== "ACTIVE") continue;
         if (nameFilter) {
           const data = cardDb.get(c.cardId);
           if (!data || data.name !== nameFilter) continue;
@@ -752,7 +754,7 @@ export function getCostCards(
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "REST_CARDS":
     case "REST_NAMED_CARD": {
-      const cards = player.characters.filter((c) => targetSet.has(c.instanceId));
+      const cards = player.characters.filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
       if (targetSet.has(player.leader.instanceId)) {
         cards.push(player.leader);
       }
@@ -801,8 +803,8 @@ export function applyCostSelection(
 
     case "KO_OWN_CHARACTER":
     case "TRASH_OWN_CHARACTER": {
-      const toRemove = p.characters.filter((c) => selectedSet.has(c.instanceId));
-      const newChars = p.characters.filter((c) => !selectedSet.has(c.instanceId));
+      const toRemove = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
+      const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
       const newTrash = [
         ...toRemove.map((c) => ({ ...c, zone: "TRASH" as const, attachedDon: [] as typeof c.attachedDon })),
         ...p.trash,
@@ -820,8 +822,8 @@ export function applyCostSelection(
     }
 
     case "RETURN_OWN_CHARACTER_TO_HAND": {
-      const toReturn = p.characters.filter((c) => selectedSet.has(c.instanceId));
-      const newChars = p.characters.filter((c) => !selectedSet.has(c.instanceId));
+      const toReturn = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
+      const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
       const newHand = [
         ...p.hand,
         ...toReturn.map((c) => ({ ...c, zone: "HAND" as const, attachedDon: [] as typeof c.attachedDon })),
@@ -849,8 +851,8 @@ export function applyCostSelection(
         newPlayers[controller] = { ...p, hand: newHand, deck: newDeck };
         return { ...state, players: newPlayers };
       } else {
-        const toPlace = p.characters.filter((c) => selectedSet.has(c.instanceId));
-        const newChars = p.characters.filter((c) => !selectedSet.has(c.instanceId));
+        const toPlace = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
+        const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
         const returnedDon = toPlace.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
         const position = cost.position ?? "BOTTOM";
         const deckCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const, attachedDon: [] as typeof c.attachedDon }));
@@ -869,7 +871,7 @@ export function applyCostSelection(
     case "REST_CARDS":
     case "REST_NAMED_CARD": {
       const newChars = p.characters.map((c) =>
-        selectedSet.has(c.instanceId) ? { ...c, state: "RESTED" as const } : c,
+        c !== null && selectedSet.has(c.instanceId) ? { ...c, state: "RESTED" as const } : c,
       );
       const newLeader = selectedSet.has(p.leader.instanceId)
         ? { ...p.leader, state: "RESTED" as const }

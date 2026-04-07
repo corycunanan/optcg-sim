@@ -223,7 +223,7 @@ function findCardInHand(state: GameState, instanceId: string): CardInstance | nu
 function findCardOnField(state: GameState, instanceId: string): CardInstance | null {
   for (const player of state.players) {
     if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
+    const char = player.characters.find((c) => c?.instanceId === instanceId);
     if (char) return char;
     if (player.stage?.instanceId === instanceId) return player.stage;
   }

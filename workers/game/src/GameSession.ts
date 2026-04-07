@@ -593,7 +593,7 @@ export class GameSession implements DurableObject {
       const inactiveWs = this.getWebSocketForPlayer(inactiveIdx);
       if (inactiveWs) {
         const blockers = this.gameState.players[inactiveIdx].characters
-          .filter((c) => c.state === "ACTIVE")
+          .filter((c): c is import("./types.js").CardInstance => c !== null && c.state === "ACTIVE")
           .map((c) => c.instanceId);
         this.send(inactiveWs, {
           type: "game:prompt",

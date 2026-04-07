@@ -18,7 +18,7 @@ import type {
   PlayerState,
 } from "../types.js";
 import type { EffectSchema, EffectBlock } from "../engine/effect-types.js";
-import { setupGame, createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
+import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
@@ -77,7 +77,7 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
   const makePlayer = (idx: 0 | 1): PlayerState => ({
     userId: `user-${idx}`,
     leader: makeInstance(CARDS.LEADER.id, "LEADER", idx, { instanceId: `leader-${idx}` }),
-    characters: [],
+    characters: [null, null, null, null, null],
     stage: null,
     hand: [],
     deck: Array.from({ length: 20 }, (_, i) =>
@@ -182,7 +182,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
         controller: 1,
         owner: 1,
       });
-      newPlayers[1] = { ...newPlayers[1], characters: [weakChar] };
+      newPlayers[1] = { ...newPlayers[1], characters: padChars([weakChar]) };
       // Give P0 leader DON for overkill
       const leaderDon: DonInstance = { instanceId: "don-atk-0", state: "ACTIVE", attachedTo: "leader-0" };
       newPlayers[0] = {
@@ -204,7 +204,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
 
       const afterBattle = runFullAttack(
         state,
-        state.players[0].characters[0].instanceId,
+        state.players[0].characters[0]!.instanceId,
         state.players[1].leader.instanceId,
         cardDb,
       );
@@ -222,7 +222,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       const state = createBattleReadyState(cardDb);
 
       // Character attacks leader
-      const charAttacker = state.players[0].characters[0];
+      const charAttacker = state.players[0].characters[0]!;
       const result = runPipeline(state, {
         type: "DECLARE_ATTACK",
         attackerInstanceId: charAttacker.instanceId,
@@ -258,7 +258,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       const cardDb = createTestCardDb();
       const state = createBattleReadyState(cardDb);
 
-      const attacker = state.players[0].characters[0];
+      const attacker = state.players[0].characters[0]!;
       const result = runPipeline(state, {
         type: "DECLARE_ATTACK",
         attackerInstanceId: attacker.instanceId,
@@ -277,7 +277,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       const cardDb = createTestCardDb();
       const state = createBattleReadyState(cardDb);
 
-      const attacker = state.players[0].characters[0];
+      const attacker = state.players[0].characters[0]!;
       let result = runPipeline(state, {
         type: "DECLARE_ATTACK",
         attackerInstanceId: attacker.instanceId,
@@ -285,8 +285,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       }, cardDb, 0);
       expect(result.valid).toBe(true);
 
-      const blocker = result.state.players[1].characters.find(
-        (c) => c.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
+      const blocker = result.state.players[1].characters.find((c) => c?.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
       )!;
       result = runPipeline(result.state, {
         type: "DECLARE_BLOCKER",
@@ -331,7 +330,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       let state = createBattleReadyState(cardDb);
 
       // Give the character enough DON to beat the 5000-power leader
-      const charAttacker = state.players[0].characters[0]; // VANILLA, power 4000
+      const charAttacker = state.players[0].characters[0]!; // VANILLA, power 4000
       const donAttached: DonInstance[] = Array.from({ length: 3 }, (_, i) => ({
         instanceId: `don-char-atk-${i}`,
         state: "ACTIVE" as const,
@@ -341,7 +340,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       newPlayers[0] = {
         ...newPlayers[0],
         characters: newPlayers[0].characters.map((c) =>
-          c.instanceId === charAttacker.instanceId
+          c?.instanceId === charAttacker.instanceId
             ? { ...c, attachedDon: donAttached }
             : c,
         ),
@@ -646,10 +645,10 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       let state = buildMinimalState();
       const sourceCard = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "trigger-src" });
-      state.players[0].characters = [sourceCard];
+      state.players[0].characters = padChars([sourceCard]);
       const highCostInstance = makeInstance(highCostChar.id, "CHARACTER", 1, { instanceId: "high-cost-inst" });
       const lowCostInstance = makeInstance(lowCostChar.id, "CHARACTER", 1, { instanceId: "low-cost-inst" });
-      state.players[1].characters = [highCostInstance, lowCostInstance];
+      state.players[1].characters = padChars([highCostInstance, lowCostInstance]);
 
       // Register triggers
       state = registerTriggersForCard(state, sourceCard, triggerCard);
@@ -695,7 +694,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       let state = buildMinimalState();
       const sourceCard = makeInstance(triggerCard.id, "CHARACTER", 1, { instanceId: "trigger-src-bt" });
-      state.players[1].characters = [sourceCard];
+      state.players[1].characters = padChars([sourceCard]);
       state = registerTriggersForCard(state, sourceCard, triggerCard);
 
       // Set up a battle with CHARACTER target
@@ -770,7 +769,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const watcher = makeInstance(watcherCard.id, "CHARACTER", 0, { instanceId: "watcher-inst" });
       const triggerChar = makeInstance(triggerCharData.id, "CHARACTER", 0, { instanceId: "trig-char-inst" });
       const noTriggerChar = makeInstance(noTriggerCharData.id, "CHARACTER", 0, { instanceId: "no-trig-inst" });
-      state.players[0].characters = [watcher, triggerChar, noTriggerChar];
+      state.players[0].characters = padChars([watcher, triggerChar, noTriggerChar]);
       state = registerTriggersForCard(state, watcher, watcherCard);
 
       // Play event for card WITH [Trigger] → should match
@@ -820,7 +819,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const watcher = makeInstance(watcherCard.id, "CHARACTER", 0, { instanceId: "attr-watcher" });
       const strike = makeInstance(strikeChar.id, "CHARACTER", 0, { instanceId: "strike-inst" });
       const ranged = makeInstance(rangedChar.id, "CHARACTER", 0, { instanceId: "ranged-inst" });
-      state.players[0].characters = [watcher, strike, ranged];
+      state.players[0].characters = padChars([watcher, strike, ranged]);
       state = registerTriggersForCard(state, watcher, watcherCard);
 
       // Strike play → matches
@@ -864,7 +863,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const watcher = makeInstance(watcherCard.id, "CHARACTER", 0, { instanceId: "noeff-watcher" });
       const vanilla = makeInstance(vanillaChar.id, "CHARACTER", 0, { instanceId: "vanilla-inst" });
       const withEffect = makeInstance(effectChar.id, "CHARACTER", 0, { instanceId: "effect-inst" });
-      state.players[0].characters = [watcher, vanilla, withEffect];
+      state.players[0].characters = padChars([watcher, vanilla, withEffect]);
       state = registerTriggersForCard(state, watcher, watcherCard);
 
       // Vanilla (no effect text) → matches
@@ -979,7 +978,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       let state = buildMinimalState();
       const src = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "cv-src" });
-      state.players[0].characters = [src];
+      state.players[0].characters = padChars([src]);
       state = registerTriggersForCard(state, src, triggerCard);
 
       const event: GameEvent = {
@@ -1007,7 +1006,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       let state = buildMinimalState();
       const src = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "cb-src" });
-      state.players[0].characters = [src];
+      state.players[0].characters = padChars([src]);
       state = registerTriggersForCard(state, src, triggerCard);
 
       const event: GameEvent = {
@@ -1035,7 +1034,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       let state = buildMinimalState();
       const src = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "lz-src" });
-      state.players[0].characters = [src];
+      state.players[0].characters = padChars([src]);
       state = registerTriggersForCard(state, src, triggerCard);
 
       const event: GameEvent = {
@@ -1063,7 +1062,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       let state = buildMinimalState();
       const src = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "dodp-src" });
-      state.players[0].characters = [src];
+      state.players[0].characters = padChars([src]);
       state = registerTriggersForCard(state, src, triggerCard);
 
       const event: GameEvent = {
@@ -1095,7 +1094,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       ]);
 
       // Place the ref'd card somewhere the engine can find it (characters)
-      state.players[0].characters = [redInst];
+      state.players[0].characters = padChars([redInst]);
 
       // Red card should be excluded (matches ref color)
       expect(matchesFilter(red2Inst, { color_not_matching_ref: "returned_char" }, cardDb, state, resultRefs)).toBe(false);
@@ -1116,7 +1115,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const greenInst = makeInstance("green-char", "HAND", 0, { instanceId: "inst-green" });
 
       const state = buildMinimalState();
-      state.players[0].characters = [refInst];
+      state.players[0].characters = padChars([refInst]);
 
       const resultRefs = new Map<string, EffectResult>([
         ["returned_char", { targetInstanceIds: ["inst-rb"], count: 1 }],
@@ -1159,7 +1158,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       // The returned character is Red
       const returnedChar = makeInstance("red-char", "CHARACTER", 0, { instanceId: "returned-inst" });
-      state.players[0].characters = [returnedChar];
+      state.players[0].characters = padChars([returnedChar]);
 
       const resultRefs = new Map<string, EffectResult>([
         ["returned_char", { targetInstanceIds: ["returned-inst"], count: 1 }],
@@ -1194,7 +1193,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const state = buildMinimalState();
       const char1 = makeInstance("char-a", "CHARACTER", 1, { instanceId: "opp-char-1" });
       const char2 = makeInstance("char-b", "CHARACTER", 1, { instanceId: "opp-char-2" });
-      state.players[1].characters = [char1, char2];
+      state.players[1].characters = padChars([char1, char2]);
 
       const cardDb = new Map<string, CardData>([
         [CARDS.LEADER.id, CARDS.LEADER],
@@ -1218,7 +1217,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const state = buildMinimalState();
       const char1 = makeInstance("char-c", "CHARACTER", 1, { instanceId: "opp-char-3" });
       const char2 = makeInstance("char-d", "CHARACTER", 1, { instanceId: "opp-char-4" });
-      state.players[1].characters = [char1, char2];
+      state.players[1].characters = padChars([char1, char2]);
 
       const cardDb = new Map<string, CardData>([
         [CARDS.LEADER.id, CARDS.LEADER],
@@ -1399,7 +1398,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       const state = buildMinimalState();
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[1] = { ...newPlayers[1], characters: [cost1Char, cost3Char, cost5Char] };
+      newPlayers[1] = { ...newPlayers[1], characters: padChars([cost1Char, cost3Char, cost5Char]) };
       return { state: { ...state, players: newPlayers }, cardDb };
     }
 
@@ -1466,7 +1465,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       const state = buildMinimalState();
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[1] = { ...newPlayers[1], characters: [cost3A, cost3B] };
+      newPlayers[1] = { ...newPlayers[1], characters: padChars([cost3A, cost3B]) };
       const finalState = { ...state, players: newPlayers };
 
       const target = {
@@ -1645,7 +1644,7 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
       instanceId: "atk-ryuma",
       state: "ACTIVE",
     });
-    state.players[0].characters = [atkChar];
+    state.players[0].characters = padChars([atkChar]);
 
     // P1 (Enel) has exactly 1 life card — a trigger card
     state.players[1].life = [

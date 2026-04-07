@@ -168,7 +168,7 @@ export function resumeEffectChain(
     const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
 
     // Play kept card to field (CHARACTER or STAGE zone)
-    let newCharacters = [...p.characters];
+    let newCharacters = [...p.characters] as (typeof p.characters);
     let newStage = p.stage;
     let newTrash = [...p.trash];
     if (keptId) {
@@ -186,7 +186,8 @@ export function resumeEffectChain(
             controller,
             owner: controller,
           };
-          newCharacters = [...newCharacters, newChar];
+          const charSlot = newCharacters.indexOf(null);
+          if (charSlot !== -1) newCharacters[charSlot] = newChar;
           events.push({
             type: "CARD_PLAYED",
             playerIndex: controller,

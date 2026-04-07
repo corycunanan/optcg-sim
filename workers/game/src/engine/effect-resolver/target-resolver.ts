@@ -247,10 +247,10 @@ export function computeAllValidTargets(
       return [state.players[opp].leader.instanceId];
     }
     case "ALL_YOUR_CHARACTERS":
-      return state.players[controller].characters.map((c) => c.instanceId);
+      return state.players[controller].characters.filter(Boolean).map((c) => c!.instanceId);
     case "ALL_OPPONENT_CHARACTERS": {
       const opp = controller === 0 ? 1 : 0;
-      return state.players[opp].characters.map((c) => c.instanceId);
+      return state.players[opp].characters.filter(Boolean).map((c) => c!.instanceId);
     }
     case "CHARACTER":
     case "LEADER_OR_CHARACTER": {
@@ -258,10 +258,10 @@ export function computeAllValidTargets(
       const pi = ctrl === "SELF" ? controller : ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : -1;
       let candidates: CardInstance[] = [];
       if (pi === -1) {
-        candidates = [...state.players[0].characters, ...state.players[1].characters];
+        candidates = [...state.players[0].characters.filter(Boolean) as CardInstance[], ...state.players[1].characters.filter(Boolean) as CardInstance[]];
         if (targetType === "LEADER_OR_CHARACTER") candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
       } else {
-        candidates = [...state.players[pi].characters];
+        candidates = state.players[pi].characters.filter(Boolean) as CardInstance[];
         if (targetType === "LEADER_OR_CHARACTER") candidates = [state.players[pi].leader, ...candidates];
       }
       if (target.filter) {
@@ -537,11 +537,11 @@ export function resolveTargetInstances(
     }
 
     case "ALL_YOUR_CHARACTERS":
-      return state.players[controller].characters.map((c) => c.instanceId);
+      return state.players[controller].characters.filter(Boolean).map((c) => c!.instanceId);
 
     case "ALL_OPPONENT_CHARACTERS": {
       const opp = controller === 0 ? 1 : 0;
-      return state.players[opp].characters.map((c) => c.instanceId);
+      return state.players[opp].characters.filter(Boolean).map((c) => c!.instanceId);
     }
 
     case "CHARACTER":
@@ -553,14 +553,14 @@ export function resolveTargetInstances(
       if (pi === -1) {
         // EITHER — both players
         candidates = [
-          ...state.players[0].characters,
-          ...state.players[1].characters,
+          ...state.players[0].characters.filter(Boolean) as CardInstance[],
+          ...state.players[1].characters.filter(Boolean) as CardInstance[],
         ];
         if (targetType === "LEADER_OR_CHARACTER") {
           candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
         }
       } else {
-        candidates = [...state.players[pi].characters];
+        candidates = state.players[pi].characters.filter(Boolean) as CardInstance[];
         if (targetType === "LEADER_OR_CHARACTER") {
           candidates = [state.players[pi].leader, ...candidates];
         }

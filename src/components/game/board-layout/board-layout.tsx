@@ -543,7 +543,7 @@ function BoardLayoutInner({
                 onAction={onAction}
                 zoneKey={`p-char-${i}`}
                 slotIndex={i}
-                boardFull={(me?.characters.length ?? 0) >= 5}
+                boardFull={(me?.characters.filter(Boolean).length ?? 0) >= 5}
                 animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
                 style={{ position: "absolute", left: pos.left, top: playerCharTop }}
               />

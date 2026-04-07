@@ -322,11 +322,12 @@ export function executeAddToLifeFromField(
     if (!card || card.zone !== "CHARACTER") continue;
 
     for (const [pi, player] of nextState.players.entries()) {
-      const charIdx = player.characters.findIndex((c) => c.instanceId === id);
+      const charIdx = player.characters.findIndex((c) => c?.instanceId === id);
       if (charIdx === -1) continue;
 
-      const char = player.characters[charIdx];
-      const newChars = player.characters.filter((_, i) => i !== charIdx);
+      const char = player.characters[charIdx]!;
+      const newChars = [...player.characters] as (typeof player.characters);
+      newChars[charIdx] = null;
       const returnedDon = char.attachedDon.map((d) => ({
         ...d, state: "RESTED" as const, attachedTo: null,
       }));
@@ -380,11 +381,16 @@ export function executePlayFromLife(
       owner: controller,
     };
 
+    const charSlotIdx = p.characters.indexOf(null);
+    const newChars = charSlotIdx !== -1
+      ? (() => { const nc = [...p.characters] as (typeof p.characters); nc[charSlotIdx] = newChar; return nc; })()
+      : p.characters;
+
     const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
     newPlayers[controller] = {
       ...p,
       life: newLife,
-      characters: [...p.characters, newChar],
+      characters: newChars,
     };
 
     events.push({

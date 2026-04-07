@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import type { GameState, CardData, CardInstance, DonInstance } from "../types.js";
 import type { EffectBlock } from "../engine/effect-types.js";
-import { setupGame, CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";
+import { setupGame, CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 import { evaluateWhileConditions } from "../engine/duration-tracker.js";
 
 // ─── Test Helpers ──────────────────────────────────────────────────────────────
@@ -57,10 +57,10 @@ describe("RETURN_TO_DECK action", () => {
       ...state,
       players: [
         state.players[0],
-        { ...state.players[1], characters: [state.players[1].characters[0]] },
+        { ...state.players[1], characters: padChars([state.players[1].characters[0]!]) },
       ] as [typeof state.players[0], typeof state.players[1]],
     };
-    const targetId = modState.players[1].characters[0].instanceId;
+    const targetId = modState.players[1].characters[0]!.instanceId;
     const origDeckLen = modState.players[1].deck.length;
 
     const block = makeEffectBlock({
@@ -80,7 +80,7 @@ describe("RETURN_TO_DECK action", () => {
     expect(result.resolved).toBe(true);
 
     // Character removed from opponent's field
-    expect(result.state.players[1].characters.length).toBe(0);
+    expect(result.state.players[1].characters.filter(Boolean).length).toBe(0);
 
     // Deck grew by 1
     expect(result.state.players[1].deck.length).toBe(origDeckLen + 1);
@@ -95,10 +95,10 @@ describe("RETURN_TO_DECK action", () => {
       ...state,
       players: [
         state.players[0],
-        { ...state.players[1], characters: [state.players[1].characters[0]] },
+        { ...state.players[1], characters: padChars([state.players[1].characters[0]!]) },
       ] as [typeof state.players[0], typeof state.players[1]],
     };
-    const targetCardId = modState.players[1].characters[0].cardId;
+    const targetCardId = modState.players[1].characters[0]!.cardId;
 
     const block = makeEffectBlock({
       actions: [{
@@ -165,7 +165,7 @@ describe("PLAY_CARD action", () => {
         state.players[1],
       ] as [typeof state.players[0], typeof state.players[1]],
     };
-    const origCharCount = modState.players[0].characters.length;
+    const origCharCount = modState.players[0].characters.filter(Boolean).length;
 
     const block = makeEffectBlock({
       actions: [{
@@ -186,7 +186,7 @@ describe("PLAY_CARD action", () => {
     // Hand emptied
     expect(result.state.players[0].hand.length).toBe(0);
     // Characters grew
-    expect(result.state.players[0].characters.length).toBe(origCharCount + 1);
+    expect(result.state.players[0].characters.filter(Boolean).length).toBe(origCharCount + 1);
   });
 });
 
@@ -412,7 +412,7 @@ describe("NEGATE_EFFECTS action", () => {
       ...buffResult.state,
       players: [
         buffResult.state.players[0],
-        { ...buffResult.state.players[1], characters: [buffResult.state.players[1].characters[0]] },
+        { ...buffResult.state.players[1], characters: padChars([buffResult.state.players[1].characters[0]!]) },
       ] as [typeof buffResult.state.players[0], typeof buffResult.state.players[1]],
     };
 
@@ -654,7 +654,7 @@ describe("TRASH_CARD action", () => {
       ...state,
       players: [
         state.players[0],
-        { ...state.players[1], characters: [state.players[1].characters[0]] },
+        { ...state.players[1], characters: padChars([state.players[1].characters[0]!]) },
       ] as [typeof state.players[0], typeof state.players[1]],
     };
     const origTrashLen = modState.players[1].trash.length;
@@ -672,7 +672,7 @@ describe("TRASH_CARD action", () => {
 
     const result = resolveEffect(modState, block, "char-0-v1", 0, cardDb);
     expect(result.resolved).toBe(true);
-    expect(result.state.players[1].characters.length).toBe(0);
+    expect(result.state.players[1].characters.filter(Boolean).length).toBe(0);
     expect(result.state.players[1].trash.length).toBe(origTrashLen + 1);
   });
 });
@@ -730,7 +730,7 @@ describe("Action chain integration", () => {
       ...state,
       players: [
         state.players[0],
-        { ...state.players[1], characters: [state.players[1].characters[0]] },
+        { ...state.players[1], characters: padChars([state.players[1].characters[0]!]) },
       ] as [typeof state.players[0], typeof state.players[1]],
     };
 
@@ -1029,7 +1029,7 @@ describe("PLAY_SELF action", () => {
 
     // Use a hand card as the source
     const handCard = state.players[0].hand[0];
-    const origCharCount = state.players[0].characters.length;
+    const origCharCount = state.players[0].characters.filter(Boolean).length;
     const origHandLen = state.players[0].hand.length;
 
     const block = makeEffectBlock({
@@ -1042,7 +1042,7 @@ describe("PLAY_SELF action", () => {
 
     // Card moved from hand to characters
     expect(result.state.players[0].hand.length).toBe(origHandLen - 1);
-    expect(result.state.players[0].characters.length).toBe(origCharCount + 1);
+    expect(result.state.players[0].characters.filter(Boolean).length).toBe(origCharCount + 1);
 
     // CARD_PLAYED event emitted
     expect(result.events.some((e) => e.type === "CARD_PLAYED")).toBe(true);
@@ -1070,7 +1070,7 @@ describe("PLAY_SELF action", () => {
         state.players[1],
       ] as [typeof state.players[0], typeof state.players[1]],
     };
-    const origCharCount = modState.players[0].characters.length;
+    const origCharCount = modState.players[0].characters.filter(Boolean).length;
 
     const block = makeEffectBlock({
       trigger: { keyword: "TRIGGER" },
@@ -1079,7 +1079,7 @@ describe("PLAY_SELF action", () => {
 
     const result = resolveEffect(modState, block, "play-self-trash", 0, cardDb);
     expect(result.resolved).toBe(true);
-    expect(result.state.players[0].characters.length).toBe(origCharCount + 1);
+    expect(result.state.players[0].characters.filter(Boolean).length).toBe(origCharCount + 1);
     // Trash shrunk
     expect(result.state.players[0].trash.length).toBe(modState.players[0].trash.length - 1);
   });

@@ -6,8 +6,7 @@ import {
   createTestCardDb,
   advanceToPhase,
   createBattleReadyState,
-  CARDS,
-} from "./helpers.js";
+  CARDS, padChars } from "./helpers.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 
@@ -93,14 +92,14 @@ describe("play card", () => {
 
     const cost = cardDb.get(charInHand.cardId)!.cost!;
     const activeDonBefore = state.players[0].donCostArea.filter((d) => d.state === "ACTIVE").length;
-    const charsBefore = state.players[0].characters.length;
+    const charsBefore = state.players[0].characters.filter(Boolean).length;
 
     const result = runPipeline(state, { type: "PLAY_CARD", cardInstanceId: charInHand.instanceId }, cardDb, 0);
     expect(result.valid).toBe(true);
 
     const activeDonAfter = result.state.players[0].donCostArea.filter((d) => d.state === "ACTIVE").length;
     expect(activeDonAfter).toBe(activeDonBefore - cost);
-    expect(result.state.players[0].characters.length).toBe(charsBefore + 1);
+    expect(result.state.players[0].characters.filter(Boolean).length).toBe(charsBefore + 1);
     expect(result.state.players[0].hand.find((c) => c.instanceId === charInHand.instanceId)).toBeUndefined();
   });
 
@@ -132,7 +131,7 @@ describe("attach DON!!", () => {
   it("attaches DON!! from cost area to a character", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
-    const target = state.players[0].characters[0];
+    const target = state.players[0].characters[0]!;
 
     const activeDonBefore = state.players[0].donCostArea.filter((d) => d.state === "ACTIVE").length;
 
@@ -143,7 +142,7 @@ describe("attach DON!!", () => {
     const activeDonAfter = p0.donCostArea.filter((d) => d.state === "ACTIVE").length;
     expect(activeDonAfter).toBe(activeDonBefore - 1);
 
-    const updatedChar = p0.characters.find((c) => c.cardId === target.cardId);
+    const updatedChar = p0.characters.find((c) => c?.cardId === target.cardId);
     expect(updatedChar?.attachedDon.length).toBe(1);
   });
 });
@@ -201,14 +200,14 @@ describe("battle", () => {
     newPlayers[1] = {
       ...newPlayers[1],
       characters: newPlayers[1].characters.map((c, i) =>
-        i === 0 ? { ...c, state: "RESTED" as const } : c,
+        i === 0 && c ? { ...c, state: "RESTED" as const } : c,
       ),
     };
     state = { ...state, players: newPlayers };
 
     const attacker = state.players[0].leader; // 5000 + 3000 DON = 8000
-    const target = state.players[1].characters[0]; // VANILLA = 4000, RESTED
-    const charsBefore = state.players[1].characters.length;
+    const target = state.players[1].characters[0]!; // VANILLA = 4000, RESTED
+    const charsBefore = state.players[1].characters.filter(Boolean).length;
 
     let result = runPipeline(state, {
       type: "DECLARE_ATTACK",
@@ -222,7 +221,7 @@ describe("battle", () => {
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
     expect(result.valid).toBe(true);
 
-    expect(result.state.players[1].characters.length).toBe(charsBefore - 1);
+    expect(result.state.players[1].characters.filter(Boolean).length).toBe(charsBefore - 1);
     expect(result.state.players[1].trash.some((c) => c.cardId === CARDS.VANILLA.id)).toBe(true);
   });
 
@@ -230,7 +229,7 @@ describe("battle", () => {
     const cardDb = createTestCardDb();
     let state = createBattleReadyState(cardDb);
 
-    const attacker = state.players[0].characters[0];
+    const attacker = state.players[0].characters[0]!;
     const originalTarget = state.players[1].leader;
 
     let result = runPipeline(state, {
@@ -242,8 +241,7 @@ describe("battle", () => {
     expect(result.state.turn.battleSubPhase).toBe("BLOCK_STEP");
 
     // Declare blocker
-    const blocker = result.state.players[1].characters.find(
-      (c) => c.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
+    const blocker = result.state.players[1].characters.find((c) => c?.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
     )!;
     result = runPipeline(result.state, { type: "DECLARE_BLOCKER", blockerInstanceId: blocker.instanceId }, cardDb, 0);
     expect(result.valid).toBe(true);
@@ -256,7 +254,7 @@ describe("battle", () => {
     const cardDb = createTestCardDb();
     let state = createBattleReadyState(cardDb);
 
-    const attacker = state.players[0].characters[0];
+    const attacker = state.players[0].characters[0]!;
     const originalTarget = state.players[1].leader;
 
     let result = runPipeline(state, {
@@ -268,8 +266,7 @@ describe("battle", () => {
     expect(result.state.turn.battleSubPhase).toBe("BLOCK_STEP");
 
     // Declare first blocker
-    const blocker1 = result.state.players[1].characters.find(
-      (c) => c.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
+    const blocker1 = result.state.players[1].characters.find((c) => c?.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
     )!;
     result = runPipeline(result.state, { type: "DECLARE_BLOCKER", blockerInstanceId: blocker1.instanceId }, cardDb, 0);
     expect(result.valid).toBe(true);
@@ -294,7 +291,7 @@ describe("battle", () => {
       owner: 1,
     };
     const newPlayers = [...forcedState.players] as [PlayerState, PlayerState];
-    newPlayers[1] = { ...newPlayers[1], characters: [...newPlayers[1].characters, blocker2] };
+    newPlayers[1] = { ...newPlayers[1], characters: padChars([...newPlayers[1].characters.filter(Boolean) as CardInstance[], blocker2]) };
     const stateWith2ndBlocker: GameState = { ...forcedState, players: newPlayers };
 
     // Second blocker should be rejected
@@ -325,7 +322,7 @@ describe("battle", () => {
     // Attack P1's leader
     let result = runPipeline(state, {
       type: "DECLARE_ATTACK",
-      attackerInstanceId: state.players[0].characters[0].instanceId,
+      attackerInstanceId: state.players[0].characters[0]!.instanceId,
       targetInstanceId: state.players[1].leader.instanceId,
     }, cardDb, 0);
 
@@ -424,7 +421,7 @@ describe("battle", () => {
     // Attack P1's leader
     let result = runPipeline(state, {
       type: "DECLARE_ATTACK",
-      attackerInstanceId: state.players[0].characters[0].instanceId,
+      attackerInstanceId: state.players[0].characters[0]!.instanceId,
       targetInstanceId: state.players[1].leader.instanceId,
     }, cardDb, 0);
     expect(result.valid).toBe(true);
@@ -470,7 +467,7 @@ describe("keywords", () => {
       owner: 0,
     };
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [...newPlayers[0].characters, rushChar] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], rushChar]) };
     state = { ...state, players: newPlayers };
 
     const result = runPipeline(state, {
@@ -497,7 +494,7 @@ describe("keywords", () => {
       owner: 0,
     };
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [...newPlayers[0].characters, newChar] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], newChar]) };
     state = { ...state, players: newPlayers };
 
     const result = runPipeline(state, {
@@ -523,7 +520,7 @@ describe("keywords", () => {
       owner: 0,
     };
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [...newPlayers[0].characters, rushCharChar] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], rushCharChar]) };
     state = { ...state, players: newPlayers };
 
     // Should fail: Rush:Character can only target Characters on turn played
@@ -550,7 +547,7 @@ describe("keywords", () => {
       owner: 0,
     };
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [...newPlayers[0].characters, unblockableChar] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], unblockableChar]) };
     state = { ...state, players: newPlayers };
 
     let result = runPipeline(state, {
@@ -560,8 +557,7 @@ describe("keywords", () => {
     }, cardDb, 0);
     expect(result.valid).toBe(true);
 
-    const blockerTarget = result.state.players[1].characters.find(
-      (c) => c.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
+    const blockerTarget = result.state.players[1].characters.find((c) => c?.cardId === CARDS.BLOCKER.id && c.state === "ACTIVE",
     );
     if (blockerTarget) {
       result = runPipeline(result.state, { type: "DECLARE_BLOCKER", blockerInstanceId: blockerTarget.instanceId }, cardDb, 0);
@@ -678,7 +674,7 @@ describe("defeat conditions", () => {
       owner: 0,
     };
     let newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [...newPlayers[0].characters, datkChar] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], datkChar]) };
     // Give player 1 exactly 1 life card
     newPlayers[1] = { ...newPlayers[1], life: [newPlayers[1].life[0]] };
     state = { ...state, players: newPlayers };
@@ -785,8 +781,8 @@ describe("ON_KO triggers", () => {
     cardDb.set(strongCard.id, strongCard);
     attacker.cardId = strongCard.id;
 
-    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
-    newPlayers[1] = { ...newPlayers[1], characters: [target] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([attacker]) };
+    newPlayers[1] = { ...newPlayers[1], characters: padChars([target]) };
     state = { ...state, players: newPlayers };
 
     // Register the ON_KO card's triggers (normally done via PLAY_CARD pipeline)
@@ -1170,7 +1166,7 @@ describe("ON_KO triggers", () => {
     // Only the ON_KO character on field — ensures auto-selection targets it
     newPlayers[0] = {
       ...newPlayers[0],
-      characters: [target],
+      characters: padChars([target]),
       hand: [...newPlayers[0].hand, eventInHand],
     };
     state = { ...state, players: newPlayers };
@@ -1263,8 +1259,8 @@ describe("ON_KO effect stack resume flow", () => {
     };
 
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
-    newPlayers[1] = { ...newPlayers[1], characters: [target] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([attacker]) };
+    newPlayers[1] = { ...newPlayers[1], characters: padChars([target]) };
     state = { ...state, players: newPlayers };
     state = registerTriggersForCard(state, target, marcoCard);
 
@@ -1402,9 +1398,9 @@ describe("ON_KO effect stack resume flow", () => {
     };
 
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([attacker]) };
     // Empty P1's hand so cost can't be paid
-    newPlayers[1] = { ...newPlayers[1], characters: [target], hand: [] };
+    newPlayers[1] = { ...newPlayers[1], characters: padChars([target]), hand: [] };
     state = { ...state, players: newPlayers };
     state = registerTriggersForCard(state, target, marcoCard);
 
@@ -1495,8 +1491,8 @@ describe("ON_KO effect stack resume flow", () => {
     };
 
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [attacker] };
-    newPlayers[1] = { ...newPlayers[1], characters: [target] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([attacker]) };
+    newPlayers[1] = { ...newPlayers[1], characters: padChars([target]) };
     state = { ...state, players: newPlayers };
     state = registerTriggersForCard(state, target, conditionCard);
 

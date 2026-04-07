@@ -181,7 +181,7 @@ function buildPlayerDeck(
   const partialState: PartialPlayerState = {
     playerId: playerData.userId,
     leader,
-    characters: [],
+    characters: [null, null, null, null, null],
     stage: null,
     donCostArea: [],
     trash: [],

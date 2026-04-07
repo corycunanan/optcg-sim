@@ -511,7 +511,7 @@ function setCardState(
   newPlayers[playerIndex] = {
     ...player,
     leader: update(player.leader) as typeof player.leader,
-    characters: player.characters.map((c) => update(c) as typeof c),
+    characters: player.characters.map((c) => c ? update(c) as typeof c : null),
   };
   return { ...state, players: newPlayers };
 }

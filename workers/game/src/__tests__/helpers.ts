@@ -89,6 +89,13 @@ export function createTestPayload(): GameInitPayload {
   };
 }
 
+/** Pad a character list to 5 fixed slots (null = empty). */
+export function padChars(chars: CardInstance[]): (CardInstance | null)[] {
+  const slots: (CardInstance | null)[] = [null, null, null, null, null];
+  for (let i = 0; i < Math.min(chars.length, 5); i++) slots[i] = chars[i];
+  return slots;
+}
+
 export function setupGame(): { state: GameState; cardDb: Map<string, CardData> } {
   const payload = createTestPayload();
   return buildInitialState(payload);
@@ -186,13 +193,13 @@ export function createBattleReadyState(cardDb: Map<string, CardData>): GameState
     ...newPlayers[0],
     donCostArea: p0DonCostArea,
     donDeck: newPlayers[0].donDeck.slice(0, 2),
-    characters: p0Chars,
+    characters: padChars(p0Chars),
   };
   newPlayers[1] = {
     ...newPlayers[1],
     donCostArea: p1DonCostArea,
     donDeck: newPlayers[1].donDeck.slice(0, 4),
-    characters: p1Chars,
+    characters: padChars(p1Chars),
   };
 
   return { ...state, players: newPlayers };

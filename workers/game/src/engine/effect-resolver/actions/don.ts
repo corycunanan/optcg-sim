@@ -383,10 +383,10 @@ export function executeGiveOpponentDonToOpponent(
 
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
       const targetPlayer = newPlayers[opp];
-      const charIdx = targetPlayer.characters.findIndex((c) => c.instanceId === targetId);
+      const charIdx = targetPlayer.characters.findIndex((c) => c?.instanceId === targetId);
       if (charIdx !== -1) {
-        const char = targetPlayer.characters[charIdx];
-        const newChars = [...targetPlayer.characters];
+        const char = targetPlayer.characters[charIdx]!;
+        const newChars = [...targetPlayer.characters] as (typeof targetPlayer.characters);
         newChars[charIdx] = { ...char, attachedDon: [...char.attachedDon, attachedDon] };
         newPlayers[opp] = { ...targetPlayer, characters: newChars, donCostArea: newDonCostArea };
       } else if (targetPlayer.leader?.instanceId === targetId) {

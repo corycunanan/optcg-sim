@@ -10,11 +10,12 @@ export function koCharacter(
   causingController: 0 | 1,
 ): { state: GameState; events: PendingEvent[] } | null {
   for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
     if (charIdx === -1) continue;
 
-    const char = player.characters[charIdx];
-    const newChars = player.characters.filter((_, i) => i !== charIdx);
+    const char = player.characters[charIdx]!;
+    const newChars = [...player.characters] as (typeof player.characters);
+    newChars[charIdx] = null;
 
     // Return attached DON!! to cost area
     const returnedDon = char.attachedDon.map((d) => ({
@@ -63,11 +64,12 @@ export function trashCharacter(
   causingController: 0 | 1,
 ): { state: GameState; events: PendingEvent[] } | null {
   for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
     if (charIdx === -1) continue;
 
-    const char = player.characters[charIdx];
-    const newChars = player.characters.filter((_, i) => i !== charIdx);
+    const char = player.characters[charIdx]!;
+    const newChars = [...player.characters] as (typeof player.characters);
+    newChars[charIdx] = null;
 
     // Return attached DON!! to cost area
     const returnedDon = char.attachedDon.map((d) => ({
@@ -108,10 +110,11 @@ export function returnToHand(
 ): { state: GameState; events: PendingEvent[] } | null {
   for (const [pi, player] of state.players.entries()) {
     // Check characters first
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
     if (charIdx !== -1) {
-      const char = player.characters[charIdx];
-      const newChars = player.characters.filter((_, i) => i !== charIdx);
+      const char = player.characters[charIdx]!;
+      const newChars = [...player.characters] as (typeof player.characters);
+      newChars[charIdx] = null;
 
       // Return attached DON!! to cost area
       const returnedDon = char.attachedDon.map((d) => ({
@@ -174,10 +177,10 @@ export function setCardState(state: GameState, instanceId: string, newState: "AC
       newPlayers[pi] = { ...player, leader: { ...player.leader, state: newState } };
       return { ...state, players: newPlayers };
     }
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
     if (charIdx !== -1) {
-      const newChars = [...player.characters];
-      newChars[charIdx] = { ...newChars[charIdx], state: newState };
+      const newChars = [...player.characters] as (typeof player.characters);
+      newChars[charIdx] = { ...newChars[charIdx]!, state: newState };
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[pi] = { ...player, characters: newChars };
       return { ...state, players: newPlayers };
@@ -206,10 +209,10 @@ export function attachDonToCard(
   if (pp.leader.instanceId === targetInstanceId) {
     pp = { ...pp, leader: { ...pp.leader, attachedDon: [...pp.leader.attachedDon, attachedDon] } };
   } else {
-    const charIdx = pp.characters.findIndex((c) => c.instanceId === targetInstanceId);
+    const charIdx = pp.characters.findIndex((c) => c?.instanceId === targetInstanceId);
     if (charIdx !== -1) {
-      const newChars = [...pp.characters];
-      newChars[charIdx] = { ...newChars[charIdx], attachedDon: [...newChars[charIdx].attachedDon, attachedDon] };
+      const newChars = [...pp.characters] as (typeof pp.characters);
+      newChars[charIdx] = { ...newChars[charIdx]!, attachedDon: [...newChars[charIdx]!.attachedDon, attachedDon] };
       pp = { ...pp, characters: newChars };
     }
   }
@@ -224,11 +227,12 @@ export function returnToDeck(
   position: "TOP" | "BOTTOM" = "BOTTOM",
 ): { state: GameState; events: PendingEvent[] } | null {
   for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c.instanceId === instanceId);
+    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
     if (charIdx === -1) continue;
 
-    const char = player.characters[charIdx];
-    const newChars = player.characters.filter((_, i) => i !== charIdx);
+    const char = player.characters[charIdx]!;
+    const newChars = [...player.characters] as (typeof player.characters);
+    newChars[charIdx] = null;
 
     // Return attached DON!! to cost area
     const returnedDon = char.attachedDon.map((d) => ({

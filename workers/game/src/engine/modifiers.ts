@@ -191,7 +191,7 @@ function getFieldToHandCostModifier(
     // Check leader, characters, and stage for field-to-hand modifiers
     const fieldCards: CardInstance[] = [
       player.leader,
-      ...player.characters,
+      ...player.characters.filter(Boolean) as CardInstance[],
       ...(player.stage ? [player.stage] : []),
     ];
 

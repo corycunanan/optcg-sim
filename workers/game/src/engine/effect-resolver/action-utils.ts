@@ -168,12 +168,12 @@ function resolvePerCountSource(
     }
     case "CHARACTERS_ON_FIELD":
     case "MATCHING_CHARACTERS_ON_FIELD":
-      return p.characters.length;
+      return p.characters.filter(Boolean).length;
     case "DON_FIELD_COUNT":
       return p.donCostArea.length + p.leader.attachedDon.length +
-        p.characters.reduce((sum, c) => sum + c.attachedDon.length, 0);
+        p.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);
     case "OPPONENT_CHARACTERS_ON_FIELD":
-      return opp.characters.length;
+      return opp.characters.filter(Boolean).length;
     case "DON_RESTED_THIS_WAY":
     case "CARDS_TRASHED_THIS_WAY":
     case "CHARACTERS_RETURNED_THIS_WAY":
@@ -201,14 +201,14 @@ function resolveGameStateSource(
     case "COMBINED_LIFE_COUNT": return p.life.length + opp.life.length;
     case "DON_FIELD_COUNT":
       return p.donCostArea.length + p.leader.attachedDon.length +
-        p.characters.reduce((sum, c) => sum + c.attachedDon.length, 0);
+        p.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);
     case "OPPONENT_DON_FIELD_COUNT":
       return opp.donCostArea.length + opp.leader.attachedDon.length +
-        opp.characters.reduce((sum, c) => sum + c.attachedDon.length, 0);
+        opp.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);
     case "HAND_COUNT": return p.hand.length;
     case "DECK_COUNT": return p.deck.length;
     case "RESTED_CARD_COUNT":
-      return p.characters.filter((c) => c.state === "RESTED").length;
+      return p.characters.filter((c) => c !== null && c.state === "RESTED").length;
     case "LEADER_BASE_POWER": {
       const leaderData = cardDb?.get(p.leader.cardId);
       return leaderData?.power ?? 0;

@@ -198,7 +198,7 @@ function computeProhibitionExpiry(
 function findCardOnField(state: GameState, instanceId: string): boolean {
   for (const player of state.players) {
     if (player.leader.instanceId === instanceId) return true;
-    if (player.characters.some((c) => c.instanceId === instanceId)) return true;
+    if (player.characters.some((c) => c?.instanceId === instanceId)) return true;
     if (player.stage?.instanceId === instanceId) return true;
   }
   return false;

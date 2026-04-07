@@ -476,7 +476,7 @@ function findNewlyPlayedCard(
 ): import("../types.js").CardInstance | null {
   for (const player of state.players) {
     // Check characters (most common for CARD_PLAYED)
-    const char = player.characters.find((c) => c.cardId === cardId);
+    const char = player.characters.find((c) => c?.cardId === cardId);
     if (char) return char;
     // Check stage
     if (player.stage?.cardId === cardId) return player.stage;

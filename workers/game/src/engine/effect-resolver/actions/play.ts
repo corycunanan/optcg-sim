@@ -60,7 +60,11 @@ export function executePlayCard(
         owner: controller,
       };
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[controller] = { ...p, characters: [...p.characters, newChar] };
+      const slotIdx = p.characters.indexOf(null);
+      if (slotIdx === -1) break; // board full
+      const newChars = [...p.characters] as (typeof p.characters);
+      newChars[slotIdx] = newChar;
+      newPlayers[controller] = { ...p, characters: newChars };
       nextState = { ...nextState, players: newPlayers };
       playedIds.push(newChar.instanceId);
       events.push({
@@ -155,7 +159,12 @@ export function executePlaySelf(
       owner: pi as 0 | 1,
     };
 
-    updatedPlayer = { ...updatedPlayer, characters: [...updatedPlayer.characters, newChar] };
+    const slotIdx = updatedPlayer.characters.indexOf(null);
+    if (slotIdx !== -1) {
+      const newChars = [...updatedPlayer.characters] as (typeof updatedPlayer.characters);
+      newChars[slotIdx] = newChar;
+      updatedPlayer = { ...updatedPlayer, characters: newChars };
+    }
 
     const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
     newPlayers[pi] = updatedPlayer;

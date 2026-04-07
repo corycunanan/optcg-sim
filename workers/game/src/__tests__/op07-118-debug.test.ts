@@ -53,7 +53,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
     const makePlayer = (idx: 0 | 1): PlayerState => ({
       userId: `user-${idx}`, playerId: `user-${idx}`,
       leader: makeInstance("LEADER-T", "LEADER", idx, { instanceId: `leader-${idx}` }),
-      characters: idx === 0 ? [sabo] : [oppCost2, oppCost5],
+      characters: (() => { const c: (CardInstance | null)[] = [null,null,null,null,null]; const arr = idx === 0 ? [sabo] : [oppCost2, oppCost5]; arr.forEach((x,i) => c[i] = x); return c; })(),
       stage: null,
       hand: idx === 0 ? [hand0card1, hand0card2] : [],
       deck: Array.from({ length: 20 }, (_, i) =>
@@ -138,8 +138,8 @@ describe("OP07-118 Sabo dual-target KO", () => {
 
     // Verify both characters were KO'd
     const opp = step4.state.players[1];
-    expect(opp.characters.find(c => c.instanceId === oppCost2.instanceId)).toBeUndefined();
-    expect(opp.characters.find(c => c.instanceId === oppCost5.instanceId)).toBeUndefined();
+    expect(opp.characters.find(c => c?.instanceId === oppCost2.instanceId)).toBeFalsy();
+    expect(opp.characters.find(c => c?.instanceId === oppCost5.instanceId)).toBeFalsy();
     expect(opp.trash.length).toBe(2);
   });
 });
