@@ -88,23 +88,28 @@ function executePlayCard(
 
   if (cardData.type === "Character") {
     // Handle 5-card overflow: trash the character at the specified position
-    if (nextState.players[pi].characters.length >= 5 && position != null) {
+    const charCount = nextState.players[pi].characters.filter(Boolean).length;
+    if (charCount >= 5 && position != null) {
       const replaced = nextState.players[pi].characters[position];
-      nextState = moveCard(nextState, replaced.instanceId, "TRASH");
-      events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: replaced.cardId, reason: "overflow" } });
+      if (replaced) {
+        nextState = moveCard(nextState, replaced.instanceId, "TRASH");
+        events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: replaced.cardId, reason: "overflow" } });
+      }
     }
 
-    nextState = moveCard(nextState, cardInstanceId, "CHARACTER");
+    nextState = moveCard(nextState, cardInstanceId, "CHARACTER", { slotIndex: position });
     // moveCard assigns a new instanceId — capture it for trigger matching
-    const newCharInstance = nextState.players[pi].characters[nextState.players[pi].characters.length - 1];
-    const charNewInstanceId = newCharInstance.instanceId;
+    const newCharInstance = nextState.players[pi].characters.find(
+      (c) => c !== null && c.cardId === found.card.cardId && c.turnPlayed === null,
+    );
+    const charNewInstanceId = newCharInstance!.instanceId;
     // Record turn played for Rush/summoning sickness
     const charIdx = nextState.players[pi].characters.findIndex(
-      (c) => c.cardId === found.card.cardId && c.turnPlayed === null,
+      (c) => c?.cardId === found.card.cardId && c?.turnPlayed === null,
     );
     if (charIdx !== -1) {
-      const chars = [...nextState.players[pi].characters];
-      chars[charIdx] = { ...chars[charIdx], turnPlayed: nextState.turn.number };
+      const chars = [...nextState.players[pi].characters] as (typeof nextState.players[0]["characters"]);
+      chars[charIdx] = { ...chars[charIdx]!, turnPlayed: nextState.turn.number };
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
       newPlayers[pi] = { ...newPlayers[pi], characters: chars };
       nextState = { ...nextState, players: newPlayers };

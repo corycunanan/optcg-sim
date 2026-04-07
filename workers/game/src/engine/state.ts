@@ -49,7 +49,7 @@ export function findCardInState(
     const idx = pi as 0 | 1;
     const allCards = [
       player.leader,
-      ...player.characters,
+      ...player.characters.filter(Boolean) as CardInstance[],
       ...(player.stage ? [player.stage] : []),
       ...player.hand,
       ...player.deck,
@@ -94,7 +94,7 @@ export function moveCard(
   state: GameState,
   instanceId: string,
   destination: Zone,
-  options: { toFront?: boolean } = {},
+  options: { toFront?: boolean; slotIndex?: number } = {},
 ): GameState {
   const found = findCardInState(state, instanceId);
   if (!found) return state; // impossible action → silent no-op (rules §1-3-2)
@@ -146,8 +146,13 @@ function removeCardFromZone(player: PlayerState, card: CardInstance): PlayerStat
   switch (card.zone) {
     case "LEADER":
       return player; // Leader cannot be removed (rules §3-6-3)
-    case "CHARACTER":
-      return { ...player, characters: remove(player.characters) };
+    case "CHARACTER": {
+      const charIdx = player.characters.findIndex((c) => c?.instanceId === card.instanceId);
+      if (charIdx === -1) return player;
+      const newChars = [...player.characters] as (typeof player.characters);
+      newChars[charIdx] = null;
+      return { ...player, characters: newChars };
+    }
     case "STAGE":
       return { ...player, stage: null };
     case "HAND":
@@ -169,11 +174,18 @@ function removeCardFromZone(player: PlayerState, card: CardInstance): PlayerStat
 function addCardToZone(
   player: PlayerState,
   card: CardInstance,
-  options: { toFront?: boolean },
+  options: { toFront?: boolean; slotIndex?: number },
 ): PlayerState {
   switch (card.zone) {
-    case "CHARACTER":
-      return { ...player, characters: [...player.characters, card] };
+    case "CHARACTER": {
+      const targetSlot = options.slotIndex != null && player.characters[options.slotIndex] === null
+        ? options.slotIndex
+        : player.characters.indexOf(null);
+      if (targetSlot === -1) return player; // board full
+      const newChars = [...player.characters] as (typeof player.characters);
+      newChars[targetSlot] = card;
+      return { ...player, characters: newChars };
+    }
     case "STAGE":
       return { ...player, stage: card };
     case "HAND":
@@ -330,10 +342,10 @@ function attachDonToCard(
   if (player.leader.instanceId === targetInstanceId) {
     return { ...player, leader: { ...player.leader, attachedDon: [...player.leader.attachedDon, don] } };
   }
-  const charIdx = player.characters.findIndex((c) => c.instanceId === targetInstanceId);
+  const charIdx = player.characters.findIndex((c) => c?.instanceId === targetInstanceId);
   if (charIdx !== -1) {
-    const updated = [...player.characters];
-    updated[charIdx] = { ...updated[charIdx], attachedDon: [...updated[charIdx].attachedDon, don] };
+    const updated = [...player.characters] as (typeof player.characters);
+    updated[charIdx] = { ...updated[charIdx]!, attachedDon: [...updated[charIdx]!.attachedDon, don] };
     return { ...player, characters: updated };
   }
   return null;
@@ -358,7 +370,7 @@ export function returnAttachedDonToCostArea(
   };
 
   const newLeader = detachFrom(player.leader);
-  const newCharacters = player.characters.map(detachFrom);
+  const newCharacters = player.characters.map((c) => c ? detachFrom(c) : null);
 
   const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
   newPlayers[playerIndex] = {
@@ -386,7 +398,7 @@ export function activateAllRested(
   newPlayers[playerIndex] = {
     ...player,
     leader: activate(player.leader),
-    characters: player.characters.map(activate),
+    characters: player.characters.map((c) => c ? activate(c) : null),
     stage: player.stage ? activate(player.stage) : null,
     donCostArea: player.donCostArea.map((d) => ({ ...d, state: "ACTIVE" as const })),
   };
@@ -508,7 +520,7 @@ export function findCardInstance(
 ): CardInstance | null {
   for (const player of state.players) {
     if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c.instanceId === instanceId);
+    const char = player.characters.find((c) => c?.instanceId === instanceId);
     if (char) return char;
     if (player.stage?.instanceId === instanceId) return player.stage;
     const hand = player.hand.find((c) => c.instanceId === instanceId);

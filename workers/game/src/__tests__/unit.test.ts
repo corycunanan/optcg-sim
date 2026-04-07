@@ -8,7 +8,7 @@ import {
   isOnField, isOpenArea, isSecretArea,
 } from "../engine/state.js";
 import { canAttackThisTurn, canAttackLeader } from "../engine/keywords.js";
-import { setupGame, createTestCardDb, CARDS } from "./helpers.js";
+import { setupGame, createTestCardDb, CARDS, padChars } from "./helpers.js";
 
 // ─── Modifiers ────────────────────────────────────────────────────────────────
 
@@ -74,8 +74,7 @@ describe("moveCard", () => {
     const oldId = card.instanceId;
 
     const newState = moveCard(state, oldId, "CHARACTER");
-    const movedCard = newState.players[0].characters.find(
-      (c) => c.cardId === card.cardId,
+    const movedCard = newState.players[0].characters.find((c) => c?.cardId === card.cardId,
     );
     expect(movedCard).toBeTruthy();
     expect(movedCard!.instanceId).not.toBe(oldId);
@@ -98,7 +97,7 @@ describe("moveCard", () => {
     };
 
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
-    newPlayers[0] = { ...newPlayers[0], characters: [charWithDon] };
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([charWithDon]) };
     const modifiedState = { ...state, players: newPlayers };
 
     const afterMove = moveCard(modifiedState, "char-with-don", "TRASH");
@@ -118,6 +117,43 @@ describe("moveCard", () => {
 
     const newState = moveCard(state, card.instanceId, "TRASH");
     expect(newState.players[0].hand.find((c) => c.instanceId === card.instanceId)).toBeUndefined();
+  });
+
+  it("places character at specified slotIndex", () => {
+    const { state } = setupGame();
+    const card = state.players[0].hand[0];
+
+    // All 5 slots are empty — place at slot 3 instead of default slot 0
+    const newState = moveCard(state, card.instanceId, "CHARACTER", { slotIndex: 3 });
+    expect(newState.players[0].characters[3]).not.toBeNull();
+    expect(newState.players[0].characters[3]!.cardId).toBe(card.cardId);
+    // Slots 0-2 should remain empty
+    expect(newState.players[0].characters[0]).toBeNull();
+    expect(newState.players[0].characters[1]).toBeNull();
+    expect(newState.players[0].characters[2]).toBeNull();
+  });
+
+  it("falls back to first empty slot when slotIndex is occupied", () => {
+    const { state } = setupGame();
+    // Place a character at slot 0
+    const firstCard = state.players[0].hand[0];
+    const stateWithChar = moveCard(state, firstCard.instanceId, "CHARACTER", { slotIndex: 0 });
+
+    // Try to place another card at slot 0 (occupied) — should fall back to slot 1
+    const secondCard = stateWithChar.players[0].hand[0];
+    const finalState = moveCard(stateWithChar, secondCard.instanceId, "CHARACTER", { slotIndex: 0 });
+    expect(finalState.players[0].characters[0]!.cardId).toBe(firstCard.cardId);
+    expect(finalState.players[0].characters[1]).not.toBeNull();
+    expect(finalState.players[0].characters[1]!.cardId).toBe(secondCard.cardId);
+  });
+
+  it("uses first empty slot when no slotIndex provided", () => {
+    const { state } = setupGame();
+    const card = state.players[0].hand[0];
+
+    const newState = moveCard(state, card.instanceId, "CHARACTER");
+    expect(newState.players[0].characters[0]).not.toBeNull();
+    expect(newState.players[0].characters[0]!.cardId).toBe(card.cardId);
   });
 });
 
