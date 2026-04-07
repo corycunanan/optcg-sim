@@ -512,7 +512,14 @@ function matchesEventFilter(
 }
 
 function getCardFromEvent(event: GameEvent): string | null {
-  return (event.payload?.cardInstanceId as string) ?? null;
+  const p = event.payload as Record<string, unknown> | undefined;
+  if (!p) return null;
+  return (
+    (p.cardInstanceId as string) ??
+    (p.attackerInstanceId as string) ??
+    (p.blockerInstanceId as string) ??
+    null
+  );
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
