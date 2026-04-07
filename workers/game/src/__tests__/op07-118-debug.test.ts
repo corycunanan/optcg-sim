@@ -1,5 +1,6 @@
 /**
- * Debug test for OP07-118 Sabo — dual-target KO with optional + TRASH_FROM_HAND cost.
+ * Regression test for OP07-118 Sabo — dual-target KO with optional + TRASH_FROM_HAND cost.
+ * Verifies the engine produces correct dual_targets prompt after cost payment.
  */
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
