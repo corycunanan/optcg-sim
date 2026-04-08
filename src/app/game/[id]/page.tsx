@@ -1,14 +1,6 @@
-import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-
-const GameBoardVisual = dynamic(
-  () =>
-    import("@/components/game/game-board-visual").then(
-      (mod) => mod.GameBoardVisual
-    ),
-  { ssr: false }
-);
+import { GameBoardLoader } from "./game-board-loader";
 
 export const metadata = {
   title: "Game — OPTCG Simulator",
@@ -30,5 +22,5 @@ export default async function GamePage({
   }
 
   const { id } = await params;
-  return <GameBoardVisual gameId={id} workerUrl={GAME_WORKER_URL} />;
+  return <GameBoardLoader gameId={id} workerUrl={GAME_WORKER_URL} />;
 }
