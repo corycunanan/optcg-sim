@@ -69,17 +69,10 @@ export interface GameSessionEndState {
   endReason: string;
 }
 
-export interface UseGameSessionReturn {
-  game: GameSessionGame;
-  opponent: GameSessionOpponent;
-  navigation: GameSessionNavigation;
-  endState: GameSessionEndState;
-}
-
 export function useGameSession(
   gameId: string,
   workerUrl: string,
-): UseGameSessionReturn {
+) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
 

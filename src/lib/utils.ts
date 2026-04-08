@@ -32,44 +32,6 @@ export function stripVariantSuffix(vegapullId: string): string {
 }
 
 /**
- * Detect variant type from a vegapull card ID.
- * Returns "base", "parallel", or "reprint".
- */
-export function detectVariantType(
-  vegapullId: string
-): "base" | "parallel" | "reprint" {
-  if (/_p\d+$/.test(vegapullId)) return "parallel";
-  if (/_r\d+$/.test(vegapullId)) return "reprint";
-  return "base";
-}
-
-/**
- * Decode HTML entities in a string.
- */
-export function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, "/");
-}
-
-/**
- * Sanitize card effect text: decode HTML entities, convert <br> to newlines, strip tags.
- */
-export function sanitizeEffectText(text: string): string {
-  if (!text || text === "-") return "";
-  return decodeHtmlEntities(text)
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-/**
  * Deterministic pseudo-random rotation for a card instance.
  * Used in deck preview grids to fan stacked copies naturally.
  * Range: -1.5° to +1.5°

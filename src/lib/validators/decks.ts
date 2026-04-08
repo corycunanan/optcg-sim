@@ -25,8 +25,6 @@ export const CreateDeckSchema = z.object({
   cards: z.array(DeckCardSchema).optional(),
 });
 
-export type CreateDeckInput = z.infer<typeof CreateDeckSchema>;
-
 export const UpdateDeckSchema = z.object({
   name: z.string().min(1).optional(),
   leaderId: z.string().min(1).optional(),
@@ -38,10 +36,7 @@ export const UpdateDeckSchema = z.object({
   cards: z.array(DeckCardSchema).optional(),
 });
 
-export type UpdateDeckInput = z.infer<typeof UpdateDeckSchema>;
-
 export const ImportDeckSchema = z.object({
   text: z.string().min(1, "Text field is required"),
 });
 
-export type ImportDeckInput = z.infer<typeof ImportDeckSchema>;
