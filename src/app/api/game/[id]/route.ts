@@ -111,23 +111,38 @@ async function handleFinalize(
     return apiError("Invalid winnerId", 400);
   }
 
-  const updated = await prisma.gameSession.update({
-    where: { id: game.id },
+  // Optimistic locking: only update if still IN_PROGRESS (first writer wins)
+  const result = await prisma.gameSession.updateMany({
+    where: { id: game.id, status: "IN_PROGRESS" },
     data: {
       status: "FINISHED",
       winnerId: winnerId ?? null,
       winReason: winReason ?? "Game ended",
       endedAt: new Date(),
     },
+  });
+
+  if (result.count === 0) {
+    // Another request already finalized this game
+    const current = await prisma.gameSession.findUnique({
+      where: { id: game.id },
+      select: { id: true, status: true },
+    });
+    return apiSuccess({ id: game.id, status: current?.status ?? "FINISHED", finalized: false });
+  }
+
+  // Re-read to get the full updated record for the response
+  const updated = await prisma.gameSession.findUnique({
+    where: { id: game.id },
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
 
   return apiSuccess({
-    id: updated.id,
-    status: updated.status,
-    winnerId: updated.winnerId,
-    winReason: updated.winReason,
-    winnerPerspective: getWinnerPerspective(updated.winnerId, userId),
+    id: updated!.id,
+    status: updated!.status,
+    winnerId: updated!.winnerId,
+    winReason: updated!.winReason,
+    winnerPerspective: getWinnerPerspective(updated!.winnerId, userId),
     finalized: true,
   });
 }
@@ -147,14 +162,24 @@ async function handleConcede(gameId: string, userId: string) {
   }
 
   const winnerId = game.player1Id === userId ? game.player2Id : game.player1Id;
-  const updated = await prisma.gameSession.update({
-    where: { id: game.id },
+
+  // Optimistic locking: only update if still IN_PROGRESS
+  const result = await prisma.gameSession.updateMany({
+    where: { id: game.id, status: "IN_PROGRESS" },
     data: {
       status: "FINISHED",
       winnerId,
       winReason: "Player conceded while disconnected",
       endedAt: new Date(),
     },
+  });
+
+  if (result.count === 0) {
+    return apiError("Game has already ended", 409);
+  }
+
+  const updated = await prisma.gameSession.findUniqueOrThrow({
+    where: { id: game.id },
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
 

@@ -3,6 +3,7 @@
  */
 
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
@@ -49,6 +50,19 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(user, 201);
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const target = error.meta?.target as string[] | undefined;
+      if (target?.includes("email")) {
+        return apiError("An account with this email already exists", 409);
+      }
+      if (target?.includes("username")) {
+        return apiError("This username is already taken", 409);
+      }
+      return apiError("An account with these details already exists", 409);
+    }
     console.error("Register error:", error);
     return apiError("Registration failed", 500);
   }
