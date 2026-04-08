@@ -22,6 +22,7 @@ import type {
 import { popFrame, peekFrame, updateTopFrame } from "../effect-stack.js";
 import { emitEvent } from "../events.js";
 import type { EffectResolverResult } from "./types.js";
+import { costResultToEntries, costResultRefsFromEntries } from "./types.js";
 import { markOncePerTurnUsed, shuffleArray } from "./action-utils.js";
 import { payCostsWithSelection, applyCostSelection } from "./cost-handler.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "./resolver.js";
@@ -347,6 +348,7 @@ export function resumeFromStack(
       }
 
       const block = topFrame.effectBlock as EffectBlock;
+      let costRefs: Map<string, EffectResult> | undefined;
       if (topFrame.costs.length > 0) {
         const costResult = payCostsWithSelection(
           nextState, topFrame.costs as Cost[], 0, controller, cardDb,
@@ -363,6 +365,10 @@ export function resumeFromStack(
 
         nextState = costResult.state;
         events.push(...costResult.events);
+
+        if (costResult.costResult) {
+          costRefs = costResultRefsFromEntries(costResultToEntries(costResult.costResult));
+        }
 
         if (costResult.pendingPrompt) {
           const newTop = peekFrame(nextState) as EffectStackFrame;
@@ -386,6 +392,7 @@ export function resumeFromStack(
           sourceCardInstanceId,
           controller,
           cardDb,
+          costRefs,
         );
         nextState = chainResult.state;
         events.push(...chainResult.events);
@@ -416,6 +423,11 @@ export function resumeFromStack(
     case "AWAITING_COST_SELECTION": {
       const cost = topFrame.costs[topFrame.currentCostIndex] as Cost;
 
+      // Reconstruct accumulated cost refs from the frame
+      const accumulatedCostRefs = new Map<string, EffectResult>(
+        (topFrame.costResultRefs ?? []) as [string, EffectResult][],
+      );
+
       // LIFE_TO_HAND with TOP_OR_BOTTOM — player chose a position
       if (action.type === "PLAYER_CHOICE" && cost.type === "LIFE_TO_HAND") {
         const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
@@ -445,6 +457,28 @@ export function resumeFromStack(
       } else if (action.type === "SELECT_TARGET") {
         const selected = action.selectedInstanceIds ?? [];
         nextState = applyCostSelection(nextState, cost, selected, controller);
+
+        // Track selected card IDs as cost result refs based on cost type
+        if (cost.type === "TRASH_FROM_HAND" || cost.type === "TRASH_SELF" || cost.type === "TRASH_OWN_CHARACTER") {
+          const existing = accumulatedCostRefs.get("__cost_cards_trashed") ?? { targetInstanceIds: [], count: 0 };
+          accumulatedCostRefs.set("__cost_cards_trashed", {
+            targetInstanceIds: [...existing.targetInstanceIds, ...selected],
+            count: existing.count + selected.length,
+          });
+        } else if (cost.type === "RETURN_OWN_CHARACTER_TO_HAND" || cost.type === "PLACE_OWN_CHARACTER_TO_DECK") {
+          const existing = accumulatedCostRefs.get("__cost_cards_returned") ?? { targetInstanceIds: [], count: 0 };
+          accumulatedCostRefs.set("__cost_cards_returned", {
+            targetInstanceIds: [...existing.targetInstanceIds, ...selected],
+            count: existing.count + selected.length,
+          });
+        } else if (cost.type === "KO_OWN_CHARACTER") {
+          const existing = accumulatedCostRefs.get("__cost_characters_ko") ?? { targetInstanceIds: [], count: 0 };
+          accumulatedCostRefs.set("__cost_characters_ko", {
+            targetInstanceIds: [...existing.targetInstanceIds, ...selected],
+            count: existing.count + selected.length,
+          });
+        }
+
         events.push({
           type: "CARD_TRASHED",
           playerIndex: controller,
@@ -472,7 +506,32 @@ export function resumeFromStack(
         events.push(...remainingCostResult.events);
 
         if (remainingCostResult.pendingPrompt) {
+          // Persist accumulated cost refs into the new frame
+          const newTop = peekFrame(nextState) as EffectStackFrame;
+          if (newTop) {
+            nextState = updateTopFrame(nextState, {
+              costResultRefs: [...accumulatedCostRefs.entries()].map(([k, v]) => [k, v as any]),
+            });
+          }
           return { state: nextState, events, resolved: false, pendingPrompt: remainingCostResult.pendingPrompt };
+        }
+
+        // Merge remaining cost results into accumulated refs
+        if (remainingCostResult.costResult) {
+          const remainingRefs = costResultRefsFromEntries(costResultToEntries(remainingCostResult.costResult));
+          if (remainingRefs) {
+            for (const [key, val] of remainingRefs) {
+              const existing = accumulatedCostRefs.get(key);
+              if (existing) {
+                accumulatedCostRefs.set(key, {
+                  targetInstanceIds: [...existing.targetInstanceIds, ...val.targetInstanceIds],
+                  count: existing.count + val.count,
+                });
+              } else {
+                accumulatedCostRefs.set(key, val);
+              }
+            }
+          }
         }
       }
 
@@ -482,6 +541,10 @@ export function resumeFromStack(
         nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
       }
 
+      // Build cost refs to pass to action chain
+      const hasRefs = [...accumulatedCostRefs.values()].some((v) => v.count > 0);
+      const costRefsForActions = hasRefs ? accumulatedCostRefs : undefined;
+
       if (topFrame.remainingActions.length > 0) {
         const chainResult = executeActionChain(
           nextState,
@@ -489,6 +552,7 @@ export function resumeFromStack(
           sourceCardInstanceId,
           controller,
           cardDb,
+          costRefsForActions,
         );
         nextState = chainResult.state;
         events.push(...chainResult.events);

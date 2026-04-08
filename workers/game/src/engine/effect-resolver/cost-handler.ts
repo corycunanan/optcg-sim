@@ -18,6 +18,7 @@ import type {
 import { generateFrameId, pushFrame } from "../effect-stack.js";
 import type { CostPaymentResult, CostSelectionResult } from "./types.js";
 import { setCardState } from "./card-mutations.js";
+import { costResultToEntries } from "./types.js";
 
 // ─── payCosts (auto-payable) ─────────────────────────────────────────────────
 
@@ -35,6 +36,9 @@ export function payCosts(
     cardsReturnedCount: 0,
     cardsPlacedToDeckCount: 0,
     charactersKoCount: 0,
+    cardsTrashedInstanceIds: [],
+    cardsReturnedInstanceIds: [],
+    charactersKoInstanceIds: [],
   };
 
   let nextState = state;
@@ -140,6 +144,7 @@ export function payCosts(
             nextState = { ...nextState, players: newPlayers };
             events.push({ type: "CARD_TRASHED", playerIndex: pIdx as 0 | 1, payload: { cardInstanceId: card.instanceId, cardId: card.cardId, reason: "cost" } });
             costResult.cardsTrashedCount = 1;
+            costResult.cardsTrashedInstanceIds.push(card.instanceId);
             found = true;
             break;
           }
@@ -151,6 +156,7 @@ export function payCosts(
             nextState = { ...nextState, players: newPlayers };
             events.push({ type: "CARD_TRASHED", playerIndex: pIdx as 0 | 1, payload: { cardInstanceId: card.instanceId, cardId: card.cardId, reason: "cost" } });
             costResult.cardsTrashedCount = 1;
+            costResult.cardsTrashedInstanceIds.push(card.instanceId);
             found = true;
             break;
           }
@@ -193,6 +199,7 @@ export function payCosts(
         newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
         nextState = { ...nextState, players: newPlayers };
         costResult.cardsTrashedCount = amount;
+        costResult.cardsTrashedInstanceIds.push(...toTrash.map((c) => c.instanceId));
         events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: amount, reason: "cost" } });
         break;
       }
@@ -489,6 +496,9 @@ export function payCostsWithSelection(
     cardsReturnedCount: 0,
     cardsPlacedToDeckCount: 0,
     charactersKoCount: 0,
+    cardsTrashedInstanceIds: [],
+    cardsReturnedInstanceIds: [],
+    charactersKoInstanceIds: [],
   };
 
   for (let i = startIndex; i < costs.length; i++) {
@@ -516,6 +526,7 @@ export function payCostsWithSelection(
           currentCostIndex: i,
           costsPaid: false,
           oncePerTurnMarked: false,
+          costResultRefs: [...costResultToEntries(costResult)],
           pendingTriggers: [],
           simultaneousTriggers: [],
           accumulatedEvents: events,
@@ -560,6 +571,7 @@ export function payCostsWithSelection(
         currentCostIndex: i,
         costsPaid: false,
         oncePerTurnMarked: false,
+        costResultRefs: [...costResultToEntries(costResult)],
         pendingTriggers: [],
         simultaneousTriggers: [],
         accumulatedEvents: events,
@@ -595,6 +607,9 @@ export function payCostsWithSelection(
     costResult.cardsReturnedCount += singleResult.costResult.cardsReturnedCount;
     costResult.cardsPlacedToDeckCount += singleResult.costResult.cardsPlacedToDeckCount;
     costResult.charactersKoCount += singleResult.costResult.charactersKoCount;
+    costResult.cardsTrashedInstanceIds.push(...singleResult.costResult.cardsTrashedInstanceIds);
+    costResult.cardsReturnedInstanceIds.push(...singleResult.costResult.cardsReturnedInstanceIds);
+    costResult.charactersKoInstanceIds.push(...singleResult.costResult.charactersKoInstanceIds);
   }
 
   return { state: nextState, events, costResult };

@@ -226,6 +226,7 @@ export interface EffectStackFrame {
   currentCostIndex: number;
   costsPaid: boolean;
   oncePerTurnMarked: boolean;
+  costResultRefs: [string, { targetInstanceIds: string[]; count: number }][];
 
   // Queued triggers waiting to resolve after this frame
   pendingTriggers: QueuedTrigger[];

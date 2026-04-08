@@ -569,6 +569,16 @@ export function matchesFilter(
   if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
   if (filter.name_includes && !data.name.includes(filter.name_includes)) return false;
   if (filter.exclude_name && data.name === filter.exclude_name) return false;
+  if (filter.name_matching_ref && resultRefs) {
+    const refResult = resultRefs.get(filter.name_matching_ref);
+    if (refResult && refResult.targetInstanceIds.length > 0) {
+      const refCard = findInstanceById(state, refResult.targetInstanceIds[0]);
+      if (refCard) {
+        const refData = cardDb.get(refCard.cardId);
+        if (refData && data.name !== refData.name) return false;
+      }
+    }
+  }
 
   // Keyword / ability filters
   if (filter.keywords) {
