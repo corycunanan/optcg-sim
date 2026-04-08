@@ -14,8 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { normalizeLobbyCode } from "@/lib/lobbies";
-import { extractKeywords } from "@/lib/game/keywords";
-import type { Card } from "@prisma/client";
+import { toCardData } from "@/lib/game/card-data";
 import { JoinLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
@@ -93,24 +92,6 @@ export async function POST(request: NextRequest) {
     if (!hostLeader || !guestLeader) {
       return NextResponse.json({ error: "Leader card not found" }, { status: 404 });
     }
-
-    const toCardData = (card: Card) => ({
-      id: card.id,
-      name: card.name,
-      type: card.type as "Leader" | "Character" | "Event" | "Stage",
-      color: card.color,
-      cost: card.cost,
-      power: card.power,
-      counter: card.counter,
-      life: card.life,
-      attribute: card.attribute,
-      types: card.traits,
-      effectText: card.effectText,
-      triggerText: card.triggerText ?? null,
-      keywords: extractKeywords(card.effectText, card.triggerText ?? null),
-      effectSchema: card.effectSchema ?? null,
-      imageUrl: card.imageUrl,
-    });
 
     // Atomically create LobbyGuest + GameSession + mark lobby IN_GAME.
     // Uses array-based $transaction (single round-trip, PgBouncer-safe)
