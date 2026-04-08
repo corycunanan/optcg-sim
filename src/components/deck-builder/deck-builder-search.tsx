@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import { Input } from "@/components/ui/input";
-import { CardDetailModal } from "@/components/admin/card-detail-modal";
+import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 
@@ -297,24 +297,22 @@ export function DeckBuilderSearch({
       </div>
 
       {inspectCard && (
-        <CardDetailModal
+        <DeckBuilderCardModal
           cardId={inspectCard.id}
-          onClose={() => setInspectCard(null)}
-          deckActions={{
-            quantityInDeck: inspectCard.type === "Leader" ? 0 : deckCards.get(inspectCard.id)?.quantity || 0,
-            selectedArtUrl: deckCards.get(inspectCard.id)?.selectedArtUrl ?? pendingArtVariants.get(inspectCard.id) ?? null,
-            isLeader: inspectCard.type === "Leader",
-            onAdd: () => {
-              onAddCard(inspectCard);
-              const pendingArt = pendingArtVariants.get(inspectCard.id);
-              if (pendingArt) onSetArtVariant(inspectCard.id, pendingArt);
-            },
-            onRemove: () => onRemoveCard(inspectCard.id),
-            onSetArtVariant: (artUrl) => {
-              setPendingArtVariants((prev) => new Map(prev).set(inspectCard.id, artUrl));
-              if (deckCards.has(inspectCard.id)) onSetArtVariant(inspectCard.id, artUrl);
-            },
+          isLeader={inspectCard.type === "Leader"}
+          quantityInDeck={inspectCard.type === "Leader" ? 0 : deckCards.get(inspectCard.id)?.quantity || 0}
+          selectedArtUrl={deckCards.get(inspectCard.id)?.selectedArtUrl ?? pendingArtVariants.get(inspectCard.id) ?? null}
+          onAdd={() => {
+            onAddCard(inspectCard);
+            const pendingArt = pendingArtVariants.get(inspectCard.id);
+            if (pendingArt) onSetArtVariant(inspectCard.id, pendingArt);
           }}
+          onRemove={() => onRemoveCard(inspectCard.id)}
+          onSetArtVariant={(artUrl) => {
+            setPendingArtVariants((prev) => new Map(prev).set(inspectCard.id, artUrl));
+            if (deckCards.has(inspectCard.id)) onSetArtVariant(inspectCard.id, artUrl);
+          }}
+          onClose={() => setInspectCard(null)}
         />
       )}
     </>
