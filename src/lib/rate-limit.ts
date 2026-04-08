@@ -1,41 +1,40 @@
 /**
- * In-memory sliding window rate limiter for Next.js API routes.
+ * Distributed rate limiting via @upstash/ratelimit (Redis-backed).
+ *
+ * Falls back to an in-memory limiter when UPSTASH_REDIS_REST_URL is not set
+ * (local development).
  *
  * Usage:
- *   const limiter = createRateLimiter({ interval: 60_000, limit: 10 });
- *   // In route handler:
- *   const { limited } = limiter.check(identifier);
+ *   import { authLimiter, apiLimiter } from "@/lib/rate-limit";
+ *   const { limited } = await authLimiter.check(identifier);
  *   if (limited) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
- *
- * Notes:
- * - Memory is per-instance and resets on cold start — acceptable for Vercel
- *   serverless. For persistent limits, swap to @upstash/ratelimit.
- * - Stale entries are cleaned up lazily on each check() call.
  */
 
-interface RateLimiterConfig {
-  /** Window size in milliseconds. */
-  interval: number;
-  /** Max requests per window. */
-  limit: number;
-}
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
-interface RateLimitResult {
-  limited: boolean;
-  remaining: number;
-  reset: number;
-}
+// ---------------------------------------------------------------------------
+// Upstash Redis client (undefined when env vars are missing → local dev)
+// ---------------------------------------------------------------------------
+const redis =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : null;
 
+// ---------------------------------------------------------------------------
+// In-memory fallback for local development
+// ---------------------------------------------------------------------------
 interface Entry {
   count: number;
   start: number;
 }
 
-export function createRateLimiter(config: RateLimiterConfig) {
-  const { interval, limit } = config;
+function createInMemoryLimiter(interval: number, limit: number) {
   const store = new Map<string, Entry>();
 
-  // Lazy cleanup: remove entries older than 2x the interval
   function cleanup() {
     const cutoff = Date.now() - interval * 2;
     for (const [key, entry] of store) {
@@ -43,45 +42,78 @@ export function createRateLimiter(config: RateLimiterConfig) {
     }
   }
 
-  function check(identifier: string): RateLimitResult {
-    const now = Date.now();
-    const entry = store.get(identifier);
+  return {
+    async check(identifier: string) {
+      const now = Date.now();
+      const entry = store.get(identifier);
 
-    // New window or expired window
-    if (!entry || now - entry.start >= interval) {
-      store.set(identifier, { count: 1, start: now });
-      if (store.size > 10_000) cleanup();
-      return { limited: false, remaining: limit - 1, reset: now + interval };
-    }
+      if (!entry || now - entry.start >= interval) {
+        store.set(identifier, { count: 1, start: now });
+        if (store.size > 10_000) cleanup();
+        return { limited: false, remaining: limit - 1 };
+      }
 
-    // Within current window
-    entry.count += 1;
-    const reset = entry.start + interval;
-
-    if (entry.count > limit) {
-      return { limited: true, remaining: 0, reset };
-    }
-
-    return { limited: false, remaining: limit - entry.count, reset };
-  }
-
-  return { check };
+      entry.count += 1;
+      if (entry.count > limit) {
+        return { limited: true, remaining: 0 };
+      }
+      return { limited: false, remaining: limit - entry.count };
+    },
+  };
 }
 
-/**
- * Pre-configured rate limiters for different endpoint categories.
- */
-export const authLimiter = createRateLimiter({
-  interval: 60_000 * 15, // 15 minutes
-  limit: 10,             // 10 attempts per 15 minutes
-});
+// ---------------------------------------------------------------------------
+// Limiter factory
+// ---------------------------------------------------------------------------
+interface RateLimitResult {
+  limited: boolean;
+  remaining: number;
+}
 
-export const socialLimiter = createRateLimiter({
-  interval: 60_000,      // 1 minute
-  limit: 30,             // 30 requests per minute
-});
+interface Limiter {
+  check(identifier: string): Promise<RateLimitResult>;
+}
 
-export const searchLimiter = createRateLimiter({
-  interval: 60_000,      // 1 minute
-  limit: 60,             // 60 searches per minute
-});
+function createLimiter(
+  prefix: string,
+  windowMs: number,
+  limit: number,
+): Limiter {
+  if (!redis) {
+    return createInMemoryLimiter(windowMs, limit);
+  }
+
+  const windowSec = Math.ceil(windowMs / 1000);
+  // Use a combined "seconds + window" string for the duration
+  const rl = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(limit, `${windowSec} s`),
+    prefix: `ratelimit:${prefix}`,
+  });
+
+  return {
+    async check(identifier: string): Promise<RateLimitResult> {
+      const result = await rl.limit(identifier);
+      return {
+        limited: !result.success,
+        remaining: result.remaining,
+      };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pre-configured limiters
+// ---------------------------------------------------------------------------
+
+/** Auth endpoints (register, login) — 10 requests per 15 minutes. */
+export const authLimiter = createLimiter("auth", 60_000 * 15, 10);
+
+/** Social endpoints (friend requests, messages) — 30 requests per minute. */
+export const socialLimiter = createLimiter("social", 60_000, 30);
+
+/** Search / read-heavy endpoints — 60 requests per minute. */
+export const searchLimiter = createLimiter("search", 60_000, 60);
+
+/** General mutating endpoints (POST/PUT/DELETE) — 30 requests per minute. */
+export const apiLimiter = createLimiter("api", 60_000, 30);

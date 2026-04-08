@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { generateLobbyCode } from "@/lib/lobbies";
 import { CreateLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -17,6 +18,11 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  const { limited } = await apiLimiter.check(`lobby-create:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
 
   try {
     const parsed = await parseBody(request, CreateLobbySchema);

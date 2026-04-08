@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { UpdateCardSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 export async function GET(
   _request: NextRequest,
@@ -48,6 +49,11 @@ export async function PATCH(
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = await apiLimiter.check(`card-update:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const { id } = await params;

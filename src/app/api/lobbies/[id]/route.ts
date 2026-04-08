@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { UpdateLobbyDeckSchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -100,6 +101,12 @@ export async function PATCH(
   }
 
   const userId = session.user.id;
+
+  const { limited } = await apiLimiter.check(`lobby-update:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const { id } = await params;
   const parsed = await parseBody(request, UpdateLobbyDeckSchema);
   if (isErrorResponse(parsed)) return parsed;
@@ -139,6 +146,12 @@ export async function DELETE(
   }
 
   const userId = session.user.id;
+
+  const { limited } = await apiLimiter.check(`lobby-delete:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const { id } = await params;
 
   const lobby = await prisma.lobby.findFirst({

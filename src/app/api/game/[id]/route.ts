@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { GameActionSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
@@ -75,6 +76,12 @@ export async function POST(
   }
 
   const userId = session.user.id;
+
+  const { limited } = await apiLimiter.check(`game-action:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const { id } = await params;
 
   const parsed = await parseBody(request, GameActionSchema);

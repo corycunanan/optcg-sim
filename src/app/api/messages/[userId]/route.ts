@@ -95,7 +95,7 @@ export async function POST(
   const fromUserId = session.user.id;
   const { userId: toUserId } = await params;
 
-  const { limited } = socialLimiter.check(`msg:${fromUserId}`);
+  const { limited } = await socialLimiter.check(`msg:${fromUserId}`);
   if (limited) {
     return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }

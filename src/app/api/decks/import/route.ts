@@ -10,6 +10,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { ImportDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 import { parseDeckList } from "@/lib/deck-builder/parser";
 
@@ -17,6 +18,11 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = await apiLimiter.check(`deck-import:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   try {
