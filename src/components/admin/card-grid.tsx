@@ -26,7 +26,7 @@ function CardGridItem({
       className="group relative overflow-hidden rounded-lg bg-surface-1 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       {/* Card image */}
-      <div className="relative aspect-[600/838] w-full overflow-hidden">
+      <div className="relative aspect-card w-full overflow-hidden">
         {!loaded && <Skeleton className="absolute inset-0 rounded-none" />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -82,7 +82,7 @@ export function CardGridSkeleton({ count = 20 }: { count?: number }) {
     <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="overflow-hidden rounded-lg bg-surface-1">
-          <Skeleton className="aspect-[600/838] w-full rounded-none" />
+          <Skeleton className="aspect-card w-full rounded-none" />
         </div>
       ))}
     </div>

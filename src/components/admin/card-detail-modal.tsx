@@ -190,7 +190,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
           {/* Left: image gallery */}
           <div className="w-2/5 shrink-0 overflow-y-auto p-6 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {loading || !card ? (
-              <Skeleton className="aspect-[600/838] w-full rounded-lg" />
+              <Skeleton className="aspect-card w-full rounded-lg" />
             ) : (
               <CardImageGallery
                 cardName={card.name}

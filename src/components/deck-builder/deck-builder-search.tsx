@@ -241,7 +241,7 @@ export function DeckBuilderSearch({
                     !isLeaderColor && "opacity-40"
                   )}
                 >
-                  <div className="relative aspect-[600/838] w-full overflow-hidden">
+                  <div className="relative aspect-card w-full overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={card.imageUrl}

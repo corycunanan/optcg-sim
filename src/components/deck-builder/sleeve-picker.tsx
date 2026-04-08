@@ -20,7 +20,7 @@ export function SleevePicker({ selectedUrl, onSelect }: SleevePickerProps) {
             key={option.imageUrl}
             onClick={() => onSelect(option.imageUrl)}
             className={cn(
-              "overflow-hidden rounded-md border-2 transition-all aspect-[600/838]",
+              "overflow-hidden rounded-md border-2 transition-all aspect-card",
               selectedUrl === option.imageUrl
                 ? "border-navy-900 ring-2 ring-navy-900"
                 : "border-border hover:border-content-tertiary",

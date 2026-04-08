@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   Badge,
+  CardFanStack,
   Dialog,
   DialogContent,
   DialogTitle,
-} from "@/components/ui";
-import {
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
@@ -56,15 +55,6 @@ interface CardGroup {
   card: CardInfo;
   imageUrl: string;
   count: number;
-}
-
-/** Deterministic pseudo-random rotation for a card instance. */
-function cardRotation(cardId: string, index: number): number {
-  let hash = index * 31;
-  for (let i = 0; i < cardId.length; i++) {
-    hash = (hash * 37 + cardId.charCodeAt(i)) & 0xffff;
-  }
-  return ((hash % 100) / 100) * 3 - 1.5; // -1.5° to +1.5°
 }
 
 /** Group cards by cardId, preserving order. Leader is its own group. */
@@ -290,35 +280,24 @@ export function DeckPreviewModal({
                 {groups.map((group) => (
                   <HoverCard key={group.card.id} openDelay={200} closeDelay={0}>
                     <HoverCardTrigger asChild>
-                      <div className="flex cursor-pointer">
-                        {Array.from({ length: group.count }, (_, i) => (
-                          <div
-                            key={`${group.card.id}-${i}`}
-                            className={cn(
-                              "relative flex-shrink-0 transition-transform duration-150 hover:-translate-y-2 hover:z-10",
-                              i > 0 && "-ml-16",
-                            )}
-                            style={{
-                              zIndex: group.count - i,
-                              ...(i > 0 && {
-                                rotate: `${cardRotation(group.card.id, i)}deg`,
-                              }),
-                            }}
-                          >
-                            <div className="w-[100px] overflow-hidden rounded border border-border shadow-sm aspect-[600/838]">
-                              <img
-                                src={group.imageUrl}
-                                alt={group.card.name}
-                                className={cn(
-                                  "h-full w-full object-cover",
-                                  group.count > 1 && i > 0 && "brightness-90",
-                                )}
-                                loading="lazy"
-                              />
-                            </div>
+                      <CardFanStack
+                        cardId={group.card.id}
+                        count={group.count}
+                        className="cursor-pointer"
+                        renderCard={(i) => (
+                          <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card hover:-translate-y-2 hover:z-10 transition-transform duration-150">
+                            <img
+                              src={group.imageUrl}
+                              alt={group.card.name}
+                              className={cn(
+                                "h-full w-full object-cover",
+                                group.count > 1 && i > 0 && "brightness-90",
+                              )}
+                              loading="lazy"
+                            />
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      />
                     </HoverCardTrigger>
                     <HoverCardContent side="top" className="w-72">
                       <CardTooltip card={group.card} />
