@@ -569,12 +569,61 @@ export function executeDrainLifeToThreshold(
 
 export function executeReorderAllLife(
   state: GameState,
-  _action: Action,
-  _sourceCardInstanceId: string,
-  _controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
 ): ActionResult {
-  // This requires player input to reorder — for now, just acknowledge
-  return { state, events: [], succeeded: true };
+  const events: PendingEvent[] = [];
+
+  // Determine target player — OPPONENT_LIFE target means opponent
+  const targetController = (action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT")
+    ? (controller === 0 ? 1 : 0) as 0 | 1
+    : controller;
+
+  const p = state.players[targetController];
+  if (p.life.length <= 1) {
+    // Nothing to reorder with 0 or 1 life cards
+    return { state, events, succeeded: true };
+  }
+
+  // Build life cards as CardInstance objects for the prompt
+  const lifeCards: CardInstance[] = p.life.map((l) => ({
+    instanceId: l.instanceId,
+    cardId: l.cardId,
+    zone: "LIFE" as const,
+    state: "ACTIVE" as const,
+    attachedDon: [],
+    turnPlayed: null,
+    controller: targetController,
+    owner: targetController,
+  }));
+
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const effectDescription = sourceData?.effectText ?? "Rearrange your Life cards in any order.";
+
+  const resumeCtx: import("../../../types.js").ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [],
+    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    validTargets: lifeCards.map((c) => c.instanceId),
+  };
+
+  const pendingPrompt: import("../../../types.js").PendingPromptState = {
+    promptType: "ARRANGE_TOP_CARDS",
+    options: {
+      cards: lifeCards,
+      effectDescription,
+      canSendToBottom: false,
+      validTargets: lifeCards.map((c) => c.instanceId),
+    },
+    respondingPlayer: controller, // The effect controller chooses the order
+    resumeContext: resumeCtx,
+  };
+
+  return { state, events, succeeded: false, pendingPrompt };
 }

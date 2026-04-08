@@ -102,6 +102,17 @@ function matchesProhibition(
         if (!matchesFilter(card, scope.filter as TargetFilter, cardDb, state)) return null;
       }
 
+      // Check cost_filter on scope
+      if (scope.cost_filter) {
+        const cardCost = data.cost ?? 0;
+        if (!compareScopeNum(cardCost, scope.cost_filter.operator, scope.cost_filter.value)) return null;
+      }
+
+      // Check card_type_filter on scope
+      if (scope.card_type_filter) {
+        if (data.type.toUpperCase() !== scope.card_type_filter.toUpperCase()) return null;
+      }
+
       // Check controller
       if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
 
@@ -218,6 +229,18 @@ function findCardInHand(state: GameState, instanceId: string): CardInstance | nu
     if (card) return card;
   }
   return null;
+}
+
+function compareScopeNum(a: number, op: string, b: number): boolean {
+  switch (op) {
+    case "==": return a === b;
+    case "!=": return a !== b;
+    case "<": return a < b;
+    case "<=": return a <= b;
+    case ">": return a > b;
+    case ">=": return a >= b;
+    default: return false;
+  }
 }
 
 function findCardOnField(state: GameState, instanceId: string): CardInstance | null {

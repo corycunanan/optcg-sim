@@ -596,8 +596,22 @@ export function matchesFilter(
   if (filter.attribute && !(data.attribute ?? []).includes(filter.attribute)) return false;
   if (filter.attribute_not && (data.attribute ?? []).includes(filter.attribute_not)) return false;
 
+  if (filter.has_effect === true) {
+    if (!data.effectText || data.effectText.trim() === "") return false;
+  }
+  if (filter.has_effect === false) {
+    if (data.effectText && data.effectText.trim() !== "") return false;
+  }
+
   if (filter.no_base_effect === true) {
     if (data.effectText && data.effectText.trim() !== "") return false;
+  }
+
+  if (filter.has_counter === true) {
+    if (data.counter === null || data.counter === undefined) return false;
+  }
+  if (filter.has_counter === false) {
+    if (data.counter !== null && data.counter !== undefined) return false;
   }
 
   if (filter.lacks_effect_type) {
@@ -618,6 +632,12 @@ export function matchesFilter(
   if (filter.is_rested === true && card.state !== "RESTED") return false;
   if (filter.is_active === true && card.state !== "ACTIVE") return false;
   if (filter.state && card.state !== filter.state) return false;
+
+  // Ref-based exclusion filter
+  if (filter.exclude_ref && resultRefs) {
+    const refResult = resultRefs.get(filter.exclude_ref);
+    if (refResult && refResult.targetInstanceIds.includes(card.instanceId)) return false;
+  }
 
   // DON-given filters
   if (filter.don_given_count) {
