@@ -28,7 +28,13 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 | M4.5 | Schema QA | [M4.5-SCHEMA-QA.md](./milestones/M4.5-SCHEMA-QA.md) |
 | M4.5 P4 | Integration Testing | [M4.5-PHASE4-INTEGRATION-TESTING.md](./milestones/M4.5-PHASE4-INTEGRATION-TESTING.md) |
 | M5 | Polish & Scale | [M5-POLISH-AND-SCALE.md](./milestones/M5-POLISH-AND-SCALE.md) |
-| M6 | Effect Showcase | [M6-EFFECT-SHOWCASE.md](./milestones/M6-EFFECT-SHOWCASE.md) |
+| M5.1 | UI Foundation | [M5.1-FOUNDATION.md](./milestones/M5.1-FOUNDATION.md) |
+| M5.2 | Component Library | [M5.2-COMPONENT-LIBRARY.md](./milestones/M5.2-COMPONENT-LIBRARY.md) |
+| M5.3 | Game Board | [M5.3-GAME-BOARD.md](./milestones/M5.3-GAME-BOARD.md) |
+| M5.4 | Game Board Motion | [M5.4-GAME-BOARD-MOTION.md](./milestones/M5.4-GAME-BOARD-MOTION.md) |
+| M5.5 | Art Variants | [M5.5-ART-VARIANTS.md](./milestones/M5.5-ART-VARIANTS.md) |
+| M6 | Scale & Features | [M6-SCALE-AND-FEATURES.md](./milestones/M6-SCALE-AND-FEATURES.md) |
+| M7 | Effect Showcase | [M7-EFFECT-SHOWCASE.md](./milestones/M7-EFFECT-SHOWCASE.md) |
 
 ## Game Engine
 
@@ -42,9 +48,11 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ## Design
 
+- [Branding Guidelines](./design/BRANDING-GUIDELINES.md) — comprehensive design brief: tokens, typography, motion language, component patterns
 - [Design Audit](./design/DESIGN-AUDIT.md) — interface quality audit across accessibility, performance, and theming
 - [Design Critique](./design/DESIGN-CRITIQUE.md) — UX evaluation with actionable feedback
-- [Game Board Layout Reference](./design/GAME-BOARD-LAYOUT-REFERENCE.md) — wireframe proportions, zone geometry, and responsive scaling rules for the gameplay environment foundation
+- [Game Board Layout Reference](./design/GAME-BOARD-LAYOUT-REFERENCE.md) — wireframe proportions, zone geometry, and responsive scaling rules
+- [Interruption Modals](./design/INTERRUPTION-MODALS.md) — game board modal patterns for effects, triggers, and player choices
 
 ## Project Management
 
@@ -63,7 +71,10 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 - [Git Practices](./research/GIT-PRACTICES.md) — git conventions for AI-assisted development at this project's scale
 - [Rive Investigation](./research/RIVE-INVESTIGATION.md) — Rive vs React + Framer Motion evaluation for game board UI
+- [Card Game UX Research](./research/CARD-GAME-UX-RESEARCH.md) — UX patterns from other digital card games
+- [Semantic Schema Linter](./research/semantic-schema-linter.md) — automated card schema validation approach
+- [First Play Session Notes](./research/First%20play%20session%20notes.md) — observations from initial playtesting
 
 ---
 
-_Last updated: 2026-03-30_
+_Last updated: 2026-04-08_

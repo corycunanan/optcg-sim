@@ -105,19 +105,21 @@ Handles all non-realtime CRUD operations:
 - **Messages** — send/receive, conversation history
 - **Lobbies** — create, join, list, invite
 
-Deployed as Next.js API routes (Vercel) or a standalone Node/Fastify server (Railway/Fly.io) depending on performance needs.
+Deployed as Next.js API routes on Vercel.
 
-### Game Server
+### Game Server — Cloudflare Workers + Durable Objects
 
-A dedicated long-running process that manages active game sessions:
+Stateful game sessions running on Cloudflare's edge network:
 
-- Maintains in-memory `GameState` for each active game
+- Each `GameSession` is a Durable Object with its own WebSocket connections and SQLite persistence
+- Full game rules engine: 7-step action pipeline, effect resolver with 50+ action handlers, trigger system, modifier layers
+- 51 card schema sets loaded via `schema-registry.ts` for automated effect resolution
 - Validates every player action against the rules engine before applying
-- Broadcasts state updates to both players via WebSocket
-- Handles reconnection (state held server-side; client re-syncs)
-- Logs all actions for potential replay
+- Broadcasts state updates to both players via native WebSocket
+- Handles reconnection (Durable Object holds state; client re-syncs)
+- Hibernation support — idle sessions release compute while retaining state
 
-**This cannot run on Vercel** (serverless functions have execution time limits). It runs on Railway or Fly.io as a persistent process.
+**Config:** `workers/game/wrangler.toml` — compatibility date 2024-01-01, nodejs_compat
 
 ### Data Pipeline
 
@@ -193,20 +195,22 @@ If offline → message stored; delivered on next connect
 ## Deployment Topology
 
 ```
-┌─────────────────────┐     ┌──────────────────────┐
-│   Vercel             │     │   Railway / Fly.io    │
-│                      │     │                       │
-│   Next.js Frontend   │     │   Game Server          │
-│   + API Routes       │────▶│   (WebSocket, long-    │
-│                      │     │    running process)     │
-└──────────┬───────────┘     └───────────┬────────────┘
+┌─────────────────────┐     ┌──────────────────────────┐
+│   Vercel             │     │   Cloudflare Workers      │
+│                      │     │                           │
+│   Next.js Frontend   │     │   Game Server (DO)        │
+│   + API Routes       │────▶│   (WebSocket, stateful    │
+│                      │     │    Durable Objects)        │
+└──────────┬───────────┘     │                           │
+           │                 │   Image CDN Worker         │
+           │                 │   (R2 → CORS delivery)     │
+           │                 └───────────┬────────────────┘
            │                             │
            │         ┌───────────────────┘
            │         │
 ┌──────────▼─────────▼────────┐   ┌────────────────────┐
-│   Supabase / Neon            │   │   Cloudflare R2     │
-│   (PostgreSQL)               │   │   + CDN             │
-│                              │   │   (Card images)     │
+│   Supabase                   │   │   Cloudflare R2     │
+│   (PostgreSQL)               │   │   (Card images)     │
 └──────────────────────────────┘   └────────────────────┘
 
 ┌──────────────────────────────┐
@@ -219,9 +223,9 @@ If offline → message stored; delivered on next connect
 
 | Environment | Purpose | Infrastructure |
 |------------|---------|---------------|
-| Development | Local dev | Next.js dev server, local/Supabase DB, mock WebSocket |
-| Staging | Pre-release testing | Vercel preview deploys, staging DB, staging game server |
-| Production | Live | Vercel production, production DB, production game server |
+| Development | Local dev | Next.js dev server, local PostgreSQL, `wrangler dev` for game worker |
+| Staging | Pre-release testing | Vercel preview deploys, staging DB, staging Cloudflare Workers |
+| Production | Live | Vercel production, Supabase PostgreSQL, Cloudflare Workers (game + images) |
 
 ---
 
@@ -229,7 +233,7 @@ If offline → message stored; delivered on next connect
 
 | Decision | Rationale |
 |----------|-----------|
-| Separate game server from API | Game sessions are stateful and long-running; serverless functions can't hold WebSocket connections or in-memory game state |
+| Cloudflare Durable Objects for game server | Game sessions are stateful and long-running; Durable Objects provide persistent WebSocket connections, in-memory state, and SQLite persistence without managing servers |
 | PostgreSQL over NoSQL | Card data is highly relational (cards ↔ sets, decks ↔ cards, users ↔ friends); SQL queries power the deck builder filters efficiently |
 | Prisma as ORM | Type-safe database access, migration management, good Next.js ecosystem fit |
 | WebSocket over SSE for games | Bidirectional communication needed — both players send actions and receive state |
@@ -244,4 +248,4 @@ If offline → message stored; delivered on next connect
 
 ---
 
-_Last updated: 2026-03-18_
+_Last updated: 2026-04-08_

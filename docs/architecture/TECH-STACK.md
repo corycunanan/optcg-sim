@@ -9,20 +9,24 @@
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Frontend | Next.js (React) + TypeScript | UI application shell, SSR/SSG for card pages |
-| Styling | Tailwind CSS | Utility-first CSS, rapid UI development |
-| Backend API | Next.js API Routes (primary) / Fastify (fallback) | REST endpoints for CRUD operations |
-| Realtime | WebSocket (Socket.io or native `ws`) | Game state sync, messaging, lobby updates |
-| Auth | NextAuth.js v5 (Auth.js) via Google OAuth 2.0 | Authentication, session management |
-| Database | PostgreSQL (via Supabase or Neon) | Primary data store |
+| Styling | Tailwind CSS v4 | Utility-first CSS, design tokens via CSS custom properties |
+| UI Components | shadcn/ui + Radix UI | Accessible, composable component primitives |
+| Backend API | Next.js API Routes | REST endpoints for CRUD operations |
+| Realtime | WebSocket (native) | Game state sync via Cloudflare Durable Objects |
+| Auth | NextAuth.js v5 (Auth.js) — Google OAuth + Email/Password | Authentication, session management |
+| Database | PostgreSQL (via Supabase) | Primary data store |
 | ORM | Prisma | Type-safe DB access, migrations |
 | Object Storage | Cloudflare R2 | Card images, raw data snapshots |
-| CDN | Cloudflare CDN | Image delivery, static asset caching |
+| CDN | Cloudflare Workers | Image delivery with CORS |
+| Game Server | Cloudflare Workers + Durable Objects | Stateful game sessions with WebSocket |
+| Animation | motion (v12) + @dnd-kit | Card animations, drag-and-drop |
+| Validation | Zod | Runtime schema validation for API + game payloads |
 | Data Sourcing | vegapull v1.2.0 (Rust CLI) | Card data scraping from official OPTCG site |
 | Data Pipeline | TypeScript (tsx) | JSON transform, Prisma import, image download |
 | LLM Integration | Claude API | Effect text → schema translation (M4+) |
 | CI/CD | GitHub Actions | Pipeline automation, deploy triggers |
 | Hosting (Frontend) | Vercel | Next.js hosting, preview deploys |
-| Hosting (Game Server) | Railway or Fly.io | Long-running WebSocket server |
+| Hosting (Workers) | Cloudflare | Game server (Durable Objects), image CDN |
 
 ---
 
@@ -30,53 +34,55 @@
 
 ### Next.js + React + TypeScript
 
-- **Version target:** Next.js 14+ (App Router)
+- **Version:** Next.js 16, React 19, TypeScript 5
 - **Why Next.js:** Server-side rendering for card detail pages (SEO for card database), API routes co-located with frontend, strong TypeScript support, Vercel deployment integration
 - **Why TypeScript:** Game state, card data, and effect schemas are complex typed structures — TypeScript catches shape mismatches at compile time rather than runtime
-- **Key libraries (planned):**
-  - `zustand` or `jotai` — lightweight client state management for deck builder and game board
-  - `react-query` / `@tanstack/react-query` — server state caching, pagination, optimistic updates
-  - `react-dnd` or `@dnd-kit/core` — drag-and-drop for deck builder card management
-  - `framer-motion` — card animations in game board (stretch goal)
+- **Key libraries:**
+  - `@dnd-kit/core` — drag-and-drop for deck builder and game board
+  - `motion` (v12) — card animations, game board transitions, micro-interactions
+  - `next-themes` — light/dark mode support
+  - `cmdk` — command palette UI
 
-### Tailwind CSS
+### Tailwind CSS v4
 
-- **Version target:** Tailwind CSS v3.4+
+- **Version:** Tailwind CSS v4 with `@tailwindcss/postcss`
 - **Why:** Rapid prototyping, consistent design tokens, responsive utilities built-in, no CSS module management overhead
-- **Customization:** Custom color palette matching OPTCG card colors (Red, Blue, Green, Purple, Black, Yellow), custom card component sizing
+- **Customization:** Design tokens defined as CSS custom properties in `globals.css`. Custom color palette matching OPTCG card colors (Red, Blue, Green, Purple, Black, Yellow), brand colors (navy, gold, warm-white)
+
+### shadcn/ui + Radix UI
+
+- **Config:** radix-nova style, RSC enabled
+- **Components:** Dialog, DropdownMenu, Select, Tabs, Toast, Tooltip, Command, Input OTP
+- **Why:** Accessible primitives with full styling control via Tailwind. No vendor lock-in — components are copied into the project
 
 ---
 
 ## Backend
 
-### API Layer
+### API Layer — Next.js API Routes
 
-**Primary: Next.js API Routes**
 - Co-located with the frontend; simplifies deployment on Vercel
-- Sufficient for CRUD operations (cards, decks, friends, messages, lobbies)
+- 24 route files across 8 domains (auth, cards, decks, game, lobbies, friends, messages, users)
 - Serverless execution model — scales automatically for read-heavy workloads (card search)
+- Zod validation on all request payloads (`src/lib/validators/`)
+- Rate limiting via `src/lib/rate-limit.ts`
 
-**Fallback: Fastify (standalone)**
-- If API route cold starts or execution limits become a problem, migrate to a standalone Fastify server on Railway/Fly.io
-- Fastify chosen over Express for performance (schema-based serialization, lower overhead)
+### Game Server — Cloudflare Workers + Durable Objects
 
-### Game Server (Dedicated)
-
-- **Runtime:** Node.js (same language as frontend — shared types)
-- **WebSocket:** `ws` (lightweight, no Socket.io overhead) or Socket.io (if reconnection/room management is worth the bundle)
-- **Hosting:** Railway or Fly.io — must be a persistent process, not serverless
-- **Why separate:** Game sessions hold in-memory state for the duration of a match (5–30 minutes). Serverless functions time out. WebSocket connections require persistent TCP.
-- **Scaling consideration:** Each game server instance can handle many concurrent games (game state is lightweight). Horizontal scaling via sticky sessions if needed.
+- **Runtime:** Cloudflare Workers (V8 isolates)
+- **State:** Durable Objects — each `GameSession` is a stateful object with SQLite persistence
+- **WebSocket:** Native WebSocket via Durable Object `webSocketMessage` handler
+- **Why Durable Objects:** Stateful game sessions (5–30 min) need persistent WebSocket connections and in-memory state. Durable Objects provide this without managing servers, with built-in hibernation for idle sessions
+- **Engine:** Full game rules engine with 7-step action pipeline, effect resolver, trigger system, modifier layers, and 51 card schema sets
+- **Config:** `workers/game/wrangler.toml` — compatibility date 2024-01-01, nodejs_compat
 
 ### Auth — NextAuth.js v5 (Auth.js)
 
-- **Provider:** Google OAuth 2.0
-- **Why NextAuth.js over Supabase Auth:**
-  - Works directly with existing local PostgreSQL + Prisma — no external auth service required
-  - Most popular Next.js auth solution with mature ecosystem
-  - Database adapter (Prisma) stores sessions, accounts, and users in our own DB
-  - No vendor lock-in — all auth data in our PostgreSQL
-- **Session management:** Database sessions via Prisma adapter; `auth()` helper for server components
+- **Providers:**
+  1. Google OAuth 2.0
+  2. Credentials (email/password with bcrypt)
+- **Why NextAuth.js:** Works directly with existing PostgreSQL + Prisma — no external auth service required
+- **Session management:** JWT strategy with custom `username` field; `auth()` helper for server components
 - **Profile enrichment:** On first login, user redirected to `/onboarding` to set a unique username
 - **Route protection:** Next.js 16 proxy (`proxy.ts`) protects `/admin/*` routes, redirects to `/login`
 
@@ -84,30 +90,27 @@
 
 ## Data Layer
 
-### PostgreSQL (via Supabase or Neon)
+### PostgreSQL (via Supabase)
 
 - **Why PostgreSQL:**
   - Card data is relational: cards belong to sets, decks contain cards, users have friends, games have players
   - Rich query capabilities for deck builder filters (color, cost range, power range, type, traits, format legality)
   - JSON columns available for `effectSchema` storage while keeping relational structure for everything else
-  - Full-text search for card name queries (via `tsvector` or Supabase full-text search)
-- **Supabase vs Neon:**
-  - Supabase preferred (auth + DB + realtime in one platform)
-  - Neon as fallback if Supabase's free tier or performance is limiting
+- **Models:** User, Account, Session, VerificationToken, Card, Set, Deck, DeckCard, DeckCustomization, GameSession, Lobby, Friend, FriendRequest, Message
 
 ### Prisma ORM
 
+- **Version:** Prisma 6
 - **Why Prisma:**
   - Type-safe client generated from schema — eliminates SQL injection risk and type mismatches
-  - Migration system tracks schema changes across environments
+  - Migration system tracks schema changes across environments (11 migrations as of 2026-04-08)
   - Good integration with Next.js and TypeScript
-- **Key schema entities:** `User`, `Card`, `ArtVariant`, `Errata`, `Deck`, `DeckCard`, `Friend`, `Message`, `Lobby`, `GameSession`, `GameAction`
 
-### Cloudflare R2 + CDN
+### Cloudflare R2 + Workers CDN
 
 - **R2 for storage:** S3-compatible, no egress fees (critical for image-heavy card database)
-- **CDN for delivery:** Card images served globally with low latency
-- **Image pipeline:** Data pipeline uploads images to R2; CDN serves them via `https://cards.optcgsim.com` (or similar)
+- **Workers for delivery:** `workers/images/` serves card images globally with CORS headers
+- **Image pipeline:** Data pipeline uploads images to R2; CDN Worker serves them
 - **Raw HTML snapshots:** Also stored in R2 for re-parsing if schema changes
 
 ---
@@ -123,7 +126,7 @@
 - **Capabilities:** 51 packs, 4,346 card entries, card images, block_number field, 7 languages
 - **Usage:** Per-pack CLI invocations (`vega pull -o <dir> cards <pack_id>`)
 
-**Import pipeline: TypeScript**
+**Import pipeline: TypeScript (8 stages)**
 - **Why TypeScript (not Python):** Same language as the app; no scraping needed since vegapull produces JSON. Eliminates Python runtime dependency.
 - **Pipeline stages:**
   1. **Load** — Read vegapull JSON output (packs.json + per-pack card files)
@@ -132,7 +135,8 @@
   4. **Classify** — `_p` suffixes → ArtVariant records; `_r` suffixes → CardSet entries
   5. **Build set membership** — Card ↔ Set many-to-many from cross-pack appearances
   6. **Write** — Upsert to PostgreSQL via Prisma
-  7. **Download images** — Fetch card images from official URLs → local/R2
+  7. **Download images** — Fetch card images from official URLs → R2
+  8. **Verify** — Validate imported data integrity
 - **Scheduling:** GitHub Actions cron (on set release dates) or manual trigger
 - **Dependencies:** `tsx` (TypeScript runner), Prisma client, `node-html-parser` (HTML entity decode)
 
@@ -141,7 +145,6 @@
 - **Purpose:** Translate card effect text into `effectSchema` JSON
 - **Approach:** Few-shot prompting with the schema spec and hand-authored examples as context
 - **Human review:** LLM outputs flagged for manual verification; low-confidence results queued for hand-correction
-- **Version:** Claude 3.5 Sonnet or newer (best balance of accuracy and cost for structured output)
 
 ---
 
@@ -152,14 +155,15 @@
 | Service | What it hosts | Why |
 |---------|--------------|-----|
 | Vercel | Next.js frontend + API routes | Native Next.js support, preview deploys on PR, global edge network |
-| Railway or Fly.io | Game server (WebSocket) | Persistent processes, WebSocket support, affordable for small-scale |
-| Supabase | PostgreSQL + Auth | Managed Postgres, built-in auth, realtime subscriptions |
-| Cloudflare | R2 (images) + CDN | Zero egress fees, global CDN, S3-compatible |
+| Cloudflare Workers | Game server (Durable Objects) | Stateful WebSocket sessions, hibernation, zero cold starts, global edge |
+| Cloudflare Workers | Image CDN (`workers/images/`) | Card image serving with CORS, R2 integration |
+| Supabase | PostgreSQL | Managed Postgres with connection pooling |
+| Cloudflare R2 | Card image storage | S3-compatible, zero egress fees |
 
 ### CI/CD — GitHub Actions
 
 - **On PR:** Lint, type-check, unit tests, Vercel preview deploy
-- **On merge to main:** Production deploy (Vercel + game server), DB migrations
+- **On merge to main:** Production deploy (Vercel + Workers), DB migrations
 - **Cron:** Data pipeline runs (card data sync on new set releases)
 - **Secrets managed via:** GitHub Actions secrets (API keys, DB URLs)
 
@@ -175,9 +179,9 @@
 
 | Technology | Target Version | Actual Version | Notes |
 |-----------|---------------|----------------|-------|
-| Node.js | 20 LTS | 22.22.1 | Runtime for Next.js and game server |
+| Node.js | 20 LTS | 22.22.1 | Runtime for Next.js and data pipeline |
 | Next.js | 14.x+ | 16.1.6 | App Router (latest via create-next-app) |
-| React | 18.x+ | 19.2.3 | Concurrent features |
+| React | 18.x+ | 19.2.3 | Server Components, concurrent features |
 | TypeScript | 5.x | 5.9.3 | Strict mode enabled |
 | Tailwind CSS | 3.4+ | 4.2.1 | v4 with @tailwindcss/postcss |
 | Prisma | 5.x+ | 6.19.2 | Prisma 7 deferred (new config format) |
@@ -187,4 +191,4 @@
 
 ---
 
-_Last updated: 2026-03-16_
+_Last updated: 2026-04-08_

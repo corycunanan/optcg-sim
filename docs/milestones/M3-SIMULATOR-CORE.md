@@ -12,22 +12,22 @@ The engine is built from the start with automation in mind: all game mutations f
 
 ### Deliverables
 
-- [ ] Game state machine with full turn phase enforcement (corrected phase sequence, see §5.1)
-- [ ] Battle system as a Main Phase sub-state (corrected sequence: Attack → Block → Counter → Damage → End)
-- [ ] Game setup (shuffle, life placement, opening hands, mulligan)
-- [ ] All Main Phase actions: play card, activate effect (manual), give DON!!, battle, end phase
-- [ ] DON!! phase (1 on turn 1 for first player, up to 2 otherwise)
-- [ ] Keyword automation: Rush, Rush:Character, Double Attack, Banish, Blocker, Trigger, Unblockable
-- [ ] Win/lose condition detection (life-out, deck-out, concession)
-- [ ] 7-step action pipeline (validate → prohibitions → replacements → execute → fire triggers → recalculate → rule processing)
-- [ ] Event bus (typed events emitted on every action — M4 subscribes to these)
-- [ ] Modifier layer system (DON!! power bonus + stub for M4 effect modifiers)
-- [ ] Immutable state snapshots (every mutation produces a new GameState)
-- [ ] WebSocket sync between two clients (real-time game state)
-- [ ] Reconnection handling (server holds state, client re-syncs)
-- [ ] Game log (action history visible to both players)
-- [ ] Forfeit/concede option
-- [ ] `MANUAL_EFFECT` escape hatch for card effects not yet automated
+- [x] Game state machine with full turn phase enforcement (corrected phase sequence, see §5.1)
+- [x] Battle system as a Main Phase sub-state (corrected sequence: Attack → Block → Counter → Damage → End)
+- [x] Game setup (shuffle, life placement, opening hands, mulligan)
+- [x] All Main Phase actions: play card, activate effect (manual), give DON!!, battle, end phase
+- [x] DON!! phase (1 on turn 1 for first player, up to 2 otherwise)
+- [x] Keyword automation: Rush, Rush:Character, Double Attack, Banish, Blocker, Trigger, Unblockable
+- [x] Win/lose condition detection (life-out, deck-out, concession)
+- [x] 7-step action pipeline (validate → prohibitions → replacements → execute → fire triggers → recalculate → rule processing)
+- [x] Event bus (typed events emitted on every action — M4 subscribes to these)
+- [x] Modifier layer system (DON!! power bonus + stub for M4 effect modifiers)
+- [x] Immutable state snapshots (every mutation produces a new GameState)
+- [x] WebSocket sync between two clients (real-time game state)
+- [x] Reconnection handling (server holds state, client re-syncs)
+- [x] Game log (action history visible to both players)
+- [x] Forfeit/concede option
+- [x] `MANUAL_EFFECT` escape hatch for card effects not yet automated
 
 ---
 
@@ -688,29 +688,29 @@ enum GameStatus {
 
 ## Acceptance Criteria
 
-- [ ] Two players can play a full OPTCG game from start to finish
-- [ ] Phase sequence is Refresh → Draw → DON → Main → End (no separate Attack phase)
-- [ ] Battles are declared as Main Phase actions, not a separate phase
-- [ ] Battle sequence is Attack Step → Block Step → Counter Step → Damage Step → End of Battle
-- [ ] First player: Refresh Phase runs (no-op), no draw on turn 1, only 1 DON!! placed, cannot battle on turn 1
-- [ ] DON!! returns during Refresh Phase (not End Phase)
-- [ ] DON!! power bonus (+1000/DON!!) applies only during the owner's turn
-- [ ] Playing a card correctly validates and rests DON!! equal to card cost
-- [ ] Characters cannot attack the turn they are played (unless [Rush])
-- [ ] [Rush] characters can attack immediately; [Rush: Character] only vs opponent's Characters
-- [ ] [Blocker] correctly rests a character to intercept an attack during Block Step
-- [ ] [Double Attack] removes 2 life cards, each with its own [Trigger] check
-- [ ] [Banish] sends life card to trash, no [Trigger] activation
-- [ ] [Trigger] correctly prompts the defending player: reveal and activate, or add to hand
-- [ ] [Unblockable] prevents the opponent from activating [Blocker]
-- [ ] [On K.O.] two-phase: activates on field, resolves in trash
-- [ ] Defeat check: life-out + damage, deck-out, simultaneous draw
-- [ ] Concede immediately ends the game
-- [ ] 5-card Character area overflow: rule-processing trash (no [On K.O.])
-- [ ] Game state syncs correctly between both clients in real time
-- [ ] Disconnected player can reconnect and resume the game
-- [ ] Game log accurately records all actions
-- [ ] Game result is persisted to the database
+- [x] Two players can play a full OPTCG game from start to finish
+- [x] Phase sequence is Refresh → Draw → DON → Main → End (no separate Attack phase)
+- [x] Battles are declared as Main Phase actions, not a separate phase
+- [x] Battle sequence is Attack Step → Block Step → Counter Step → Damage Step → End of Battle
+- [x] First player: Refresh Phase runs (no-op), no draw on turn 1, only 1 DON!! placed, cannot battle on turn 1
+- [x] DON!! returns during Refresh Phase (not End Phase)
+- [x] DON!! power bonus (+1000/DON!!) applies only during the owner's turn
+- [x] Playing a card correctly validates and rests DON!! equal to card cost
+- [x] Characters cannot attack the turn they are played (unless [Rush])
+- [x] [Rush] characters can attack immediately; [Rush: Character] only vs opponent's Characters
+- [x] [Blocker] correctly rests a character to intercept an attack during Block Step
+- [x] [Double Attack] removes 2 life cards, each with its own [Trigger] check
+- [x] [Banish] sends life card to trash, no [Trigger] activation
+- [x] [Trigger] correctly prompts the defending player: reveal and activate, or add to hand
+- [x] [Unblockable] prevents the opponent from activating [Blocker]
+- [x] [On K.O.] two-phase: activates on field, resolves in trash
+- [x] Defeat check: life-out + damage, deck-out, simultaneous draw
+- [x] Concede immediately ends the game
+- [x] 5-card Character area overflow: rule-processing trash (no [On K.O.])
+- [x] Game state syncs correctly between both clients in real time
+- [x] Disconnected player can reconnect and resume the game
+- [x] Game log accurately records all actions
+- [x] Game result is persisted to the database
 
 ---
 
