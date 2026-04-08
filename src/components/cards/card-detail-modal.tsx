@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -15,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardImageGallery } from "./card-image-gallery";
 
-interface ArtVariant {
+export interface ArtVariant {
   id: string;
   variantId: string;
   label: string;
@@ -24,14 +23,14 @@ interface ArtVariant {
   set: string;
 }
 
-interface CardSet {
+export interface CardSet {
   id: string;
   setLabel: string;
   setName: string;
   isOrigin: boolean;
 }
 
-interface CardDetail {
+export interface CardDetail {
   id: string;
   name: string;
   color: string[];
@@ -51,29 +50,6 @@ interface CardDetail {
   imageUrl: string;
   artVariants: ArtVariant[];
   cardSets: CardSet[];
-}
-
-interface DeckActions {
-  quantityInDeck: number;
-  selectedArtUrl: string | null;
-  isLeader?: boolean;
-  onAdd: () => void;
-  onRemove: () => void;
-  onSetArtVariant: (url: string | null) => void;
-}
-
-interface CardDetailModalProps {
-  cardId: string;
-  onClose: () => void;
-  // Admin navigation — omit for deck-builder mode
-  cardIds?: string[];
-  isFirstPage?: boolean;
-  isLastPage?: boolean;
-  onNavigate?: (cardId: string) => void;
-  onPrevPage?: () => void;
-  onNextPage?: () => void;
-  // Deck-builder mode
-  deckActions?: DeckActions;
 }
 
 const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
@@ -107,11 +83,18 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastPage, onNavigate, onPrevPage, onNextPage, deckActions }: CardDetailModalProps) {
+interface CardDetailModalProps {
+  cardId: string;
+  onClose: () => void;
+  footer?: (card: CardDetail | null) => React.ReactNode;
+  controlledImage?: string;
+  onImageSelect?: (imageUrl: string, isBase: boolean) => void;
+}
+
+export function CardDetailModal({ cardId, onClose, footer, controlledImage, onImageSelect }: CardDetailModalProps) {
   const [card, setCard] = useState<CardDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch card data
   useEffect(() => {
     setLoading(true);
     setCard(null);
@@ -124,38 +107,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
       .catch(() => setLoading(false));
   }, [cardId]);
 
-  const currentIndex = cardIds ? cardIds.indexOf(cardId) : -1;
-  const hasPrev = cardIds ? (currentIndex > 0 || !isFirstPage) : false;
-  const hasNext = cardIds ? (currentIndex < cardIds.length - 1 || !isLastPage) : false;
-
-  const goToPrev = useCallback(() => {
-    if (!cardIds) return;
-    if (currentIndex > 0) {
-      onNavigate?.(cardIds[currentIndex - 1]);
-    } else if (!isFirstPage) {
-      onPrevPage?.();
-    }
-  }, [currentIndex, isFirstPage, cardIds, onNavigate, onPrevPage]);
-
-  const goToNext = useCallback(() => {
-    if (!cardIds) return;
-    if (currentIndex < cardIds.length - 1) {
-      onNavigate?.(cardIds[currentIndex + 1]);
-    } else if (!isLastPage) {
-      onNextPage?.();
-    }
-  }, [currentIndex, isLastPage, cardIds, onNavigate, onNextPage]);
-
-  // Arrow key navigation (admin mode only)
-  useEffect(() => {
-    if (!cardIds) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft") goToPrev();
-      if (e.key === "ArrowRight") goToNext();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [cardIds, goToPrev, goToNext]);
+  const footerContent = footer?.(card);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -185,7 +137,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
           </DialogClose>
         </div>
 
-        {/* Body — two independently scrollable columns */}
+        {/* Body */}
         <div className="flex flex-1 min-h-0">
           {/* Left: image gallery */}
           <div className="w-2/5 shrink-0 overflow-y-auto p-6 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -196,8 +148,8 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                 cardName={card.name}
                 baseImageUrl={card.imageUrl}
                 artVariants={card.artVariants}
-                controlledImage={deckActions ? (deckActions.selectedArtUrl ?? card.imageUrl) : undefined}
-                onImageSelect={deckActions ? (url, isBase) => deckActions.onSetArtVariant(isBase ? null : url) : undefined}
+                controlledImage={controlledImage}
+                onImageSelect={onImageSelect}
               />
             )}
           </div>
@@ -212,7 +164,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {/* 1. Colors */}
+                {/* Colors */}
                 <Row className="pt-0">
                   <div className="flex flex-wrap gap-2">
                     {card.color.map((c) => (
@@ -232,7 +184,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                   </div>
                 </Row>
 
-                {/* 2. Cost, Power, Counter */}
+                {/* Cost, Power, Counter */}
                 <Row>
                   <div className={cn("grid gap-4", card.life !== null ? "grid-cols-4" : "grid-cols-3")}>
                     <Stat label="Cost" value={card.cost !== null ? String(card.cost) : "0"} />
@@ -242,7 +194,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                   </div>
                 </Row>
 
-                {/* 3. Traits + Attributes */}
+                {/* Traits + Attributes */}
                 <Row>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
@@ -268,7 +220,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                   </div>
                 </Row>
 
-                {/* 5. Effect */}
+                {/* Effect */}
                 <Row label="Effect">
                   {card.effectText ? (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
@@ -279,7 +231,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                   )}
                 </Row>
 
-                {/* 6. Trigger Effect */}
+                {/* Trigger Effect */}
                 <Row label="Trigger Effect">
                   {card.triggerText ? (
                     <p className="text-sm leading-relaxed text-content-secondary">{card.triggerText}</p>
@@ -288,7 +240,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                   )}
                 </Row>
 
-                {/* 7. Set, Block */}
+                {/* Set, Block */}
                 <Row>
                   <div className="grid grid-cols-2 gap-4">
                     <Stat label="Set" value={card.originSet} />
@@ -296,7 +248,7 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
                   </div>
                 </Row>
 
-                {/* 8. Appears In */}
+                {/* Appears In */}
                 <Row label="Appears In">
                   {card.cardSets.length > 0 ? (
                     <div className="flex flex-col gap-2">
@@ -322,78 +274,12 @@ export function CardDetailModal({ cardId, onClose, cardIds, isFirstPage, isLastP
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex shrink-0 items-center justify-between border-t border-border bg-surface-1 px-6 py-3">
-          {deckActions ? (
-            /* Deck builder footer — quantity controls */
-            <div className="flex items-center gap-3">
-              {deckActions.quantityInDeck > 0 ? (
-                <>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="secondary"
-                      size="icon-sm"
-                      onClick={deckActions.onRemove}
-                      aria-label="Remove one"
-                    >
-                      −
-                    </Button>
-                    <span className="w-8 text-center text-lg font-bold tabular-nums text-content-primary">
-                      {deckActions.quantityInDeck}
-                    </span>
-                    <Button
-                      variant="secondary"
-                      size="icon-sm"
-                      onClick={deckActions.onAdd}
-                      disabled={deckActions.quantityInDeck >= 4}
-                      aria-label="Add one"
-                    >
-                      +
-                    </Button>
-                  </div>
-                  <span className="text-xs text-content-tertiary">
-                    {deckActions.isLeader ? "Leader" : `${deckActions.quantityInDeck}/4 in deck`}
-                  </span>
-                </>
-              ) : (
-                <Button onClick={deckActions.onAdd}>
-                  {deckActions.isLeader || card?.type === "Leader" ? "Set as Leader" : "+ Add to Deck"}
-                </Button>
-              )}
-            </div>
-          ) : (
-            /* Admin footer — prev/next + edit */
-            <>
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={goToPrev}
-                  disabled={!hasPrev}
-                >
-                  <ChevronLeft data-icon="inline-start" />
-                  Previous
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={goToNext}
-                  disabled={!hasNext}
-                >
-                  Next
-                  <ChevronRight data-icon="inline-end" />
-                </Button>
-              </div>
-              {card && (
-                <Button asChild>
-                  <Link href={`/admin/cards/${card.id}/edit`}>
-                    Edit Card
-                  </Link>
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+        {/* Footer — provided by consumer */}
+        {footerContent && (
+          <div className="flex shrink-0 items-center justify-between border-t border-border bg-surface-1 px-6 py-3">
+            {footerContent}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

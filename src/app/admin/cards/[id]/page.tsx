@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CardImageGallery } from "@/components/admin/card-image-gallery";
+import { CardImageGallery } from "@/components/cards/card-image-gallery";
 
 export const dynamic = "force-dynamic";
 

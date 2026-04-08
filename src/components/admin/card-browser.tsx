@@ -2,13 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Filter } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CardDetailModal } from "@/components/cards/card-detail-modal";
 import { CardGrid } from "./card-grid";
 import { Pagination } from "./pagination";
-import { CardDetailModal } from "./card-detail-modal";
 import {
   PageHeader,
   PageHeaderContent,
@@ -188,11 +189,11 @@ export function CardBrowser({
 
       {/* Card detail modal */}
       {modalCardId && (
-        <CardDetailModal
+        <AdminCardDetailModal
           cardId={modalCardId}
           cardIds={cardIds}
-          isFirstPage={page === 1}
-          isLastPage={page === totalPages}
+          page={page}
+          totalPages={totalPages}
           onNavigate={setModalCardId}
           onPrevPage={() => {
             pendingEdgeRef.current = "last";
@@ -206,5 +207,97 @@ export function CardBrowser({
         />
       )}
     </div>
+  );
+}
+
+/* ── Admin wrapper — adds prev/next navigation + edit link ─────────── */
+
+function AdminCardDetailModal({
+  cardId,
+  cardIds,
+  page,
+  totalPages,
+  onNavigate,
+  onPrevPage,
+  onNextPage,
+  onClose,
+}: {
+  cardId: string;
+  cardIds: string[];
+  page: number;
+  totalPages: number;
+  onNavigate: (cardId: string) => void;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+  onClose: () => void;
+}) {
+  const currentIndex = cardIds.indexOf(cardId);
+  const isFirstPage = page === 1;
+  const isLastPage = page === totalPages;
+  const hasPrev = currentIndex > 0 || !isFirstPage;
+  const hasNext = currentIndex < cardIds.length - 1 || !isLastPage;
+
+  const goToPrev = useCallback(() => {
+    if (currentIndex > 0) {
+      onNavigate(cardIds[currentIndex - 1]);
+    } else if (!isFirstPage) {
+      onPrevPage();
+    }
+  }, [currentIndex, isFirstPage, cardIds, onNavigate, onPrevPage]);
+
+  const goToNext = useCallback(() => {
+    if (currentIndex < cardIds.length - 1) {
+      onNavigate(cardIds[currentIndex + 1]);
+    } else if (!isLastPage) {
+      onNextPage();
+    }
+  }, [currentIndex, isLastPage, cardIds, onNavigate, onNextPage]);
+
+  // Arrow key navigation
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") goToPrev();
+      if (e.key === "ArrowRight") goToNext();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [goToPrev, goToNext]);
+
+  return (
+    <CardDetailModal
+      cardId={cardId}
+      onClose={onClose}
+      footer={(card) => (
+        <>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={goToPrev}
+              disabled={!hasPrev}
+            >
+              <ChevronLeft data-icon="inline-start" />
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={goToNext}
+              disabled={!hasNext}
+            >
+              Next
+              <ChevronRight data-icon="inline-end" />
+            </Button>
+          </div>
+          {card && (
+            <Button asChild>
+              <Link href={`/admin/cards/${card.id}/edit`}>
+                Edit Card
+              </Link>
+            </Button>
+          )}
+        </>
+      )}
+    />
   );
 }

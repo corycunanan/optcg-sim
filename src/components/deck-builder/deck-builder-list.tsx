@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import type { DeckLeaderEntry } from "@/lib/deck-builder/state";
-import { CardDetailModal } from "@/components/admin/card-detail-modal";
+import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import {
   CardFanStack,
   TooltipProvider,
@@ -292,38 +292,35 @@ export function DeckBuilderList({
 
       {/* Inspect modal for deck cards */}
       {inspectEntry && !inspectIsLeader && (
-        <CardDetailModal
+        <DeckBuilderCardModal
           cardId={inspectEntry.cardId}
           onClose={() => {
             setInspectCardId(null);
             setInspectIsLeader(false);
           }}
-          deckActions={{
-            quantityInDeck: inspectEntry.quantity,
-            selectedArtUrl: inspectEntry.selectedArtUrl,
-            onAdd: () => onAddCard(inspectEntry.card),
-            onRemove: () => onDecrement(inspectEntry.cardId),
-            onSetArtVariant: (artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl),
-          }}
+          isLeader={false}
+          quantityInDeck={inspectEntry.quantity}
+          selectedArtUrl={inspectEntry.selectedArtUrl}
+          onAdd={() => onAddCard(inspectEntry.card)}
+          onRemove={() => onDecrement(inspectEntry.cardId)}
+          onSetArtVariant={(artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl)}
         />
       )}
 
       {/* Inspect modal for leader */}
       {inspectIsLeader && leader && (
-        <CardDetailModal
+        <DeckBuilderCardModal
           cardId={leader.id}
           onClose={() => {
             setInspectCardId(null);
             setInspectIsLeader(false);
           }}
-          deckActions={{
-            quantityInDeck: 0,
-            selectedArtUrl: leaderArtUrl,
-            isLeader: true,
-            onAdd: () => {},
-            onRemove: () => {},
-            onSetArtVariant: (artUrl) => onSetLeaderArt(artUrl),
-          }}
+          isLeader={true}
+          quantityInDeck={0}
+          selectedArtUrl={leaderArtUrl}
+          onAdd={() => {}}
+          onRemove={() => {}}
+          onSetArtVariant={(artUrl) => onSetLeaderArt(artUrl)}
         />
       )}
     </>
