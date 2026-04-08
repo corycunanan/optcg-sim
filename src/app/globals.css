@@ -372,3 +372,13 @@ textarea:focus-visible,
 [cmdk-input]:focus-visible {
   outline: none;
 }
+
+/* ─── Card Utilities ────────────────────────────────────────── */
+
+@utility aspect-card {
+  aspect-ratio: 600 / 838;
+}
+
+@utility w-card-thumb {
+  width: 100px;
+}

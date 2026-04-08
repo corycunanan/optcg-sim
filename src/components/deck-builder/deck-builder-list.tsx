@@ -6,6 +6,7 @@ import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import type { DeckLeaderEntry } from "@/lib/deck-builder/state";
 import { CardDetailModal } from "@/components/admin/card-detail-modal";
 import {
+  CardFanStack,
   TooltipProvider,
   TooltipRoot,
   TooltipTrigger,
@@ -39,15 +40,6 @@ interface CardGroup {
   traits: string[];
   count: number;
   isLeader: boolean;
-}
-
-/** Deterministic pseudo-random rotation for a card instance. */
-function cardRotation(cardId: string, index: number): number {
-  let hash = index * 31;
-  for (let i = 0; i < cardId.length; i++) {
-    hash = (hash * 37 + cardId.charCodeAt(i)) & 0xffff;
-  }
-  return ((hash % 100) / 100) * 3 - 1.5;
 }
 
 function buildGroups(
@@ -239,41 +231,30 @@ export function DeckBuilderList({
             <TooltipTrigger asChild>
               <div className="group/stack flex w-min flex-col items-center">
                 {/* Card stack */}
-                <div
-                  className="relative flex cursor-pointer"
-                  onClick={() => {
-                    setInspectCardId(group.cardId);
-                    setInspectIsLeader(group.isLeader);
-                  }}
-                >
-                  {Array.from({ length: group.count }, (_, i) => (
-                    <div
-                      key={`${group.cardId}-${i}`}
-                      className={cn(
-                        "relative flex-shrink-0 transition-transform duration-150 group-hover/stack:-translate-y-2",
-                        i > 0 && "-ml-16",
-                      )}
-                      style={{
-                        zIndex: group.count - i,
-                        ...(i > 0 && {
-                          rotate: `${cardRotation(group.cardId, i)}deg`,
-                        }),
-                      }}
-                    >
-                      <div className="w-[100px] overflow-hidden rounded border border-border shadow-sm aspect-[600/838]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={group.imageUrl}
-                          alt={group.name}
-                          className={cn(
-                            "h-full w-full object-cover",
-                            group.count > 1 && i > 0 && "brightness-90",
-                          )}
-                          loading="lazy"
-                        />
-                      </div>
+                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+                <div onClick={() => {
+                  setInspectCardId(group.cardId);
+                  setInspectIsLeader(group.isLeader);
+                }}>
+                <CardFanStack
+                  cardId={group.cardId}
+                  count={group.count}
+                  className="relative cursor-pointer"
+                  renderCard={(i) => (
+                    <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card group-hover/stack:-translate-y-2 transition-transform duration-150">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={group.imageUrl}
+                        alt={group.name}
+                        className={cn(
+                          "h-full w-full object-cover",
+                          group.count > 1 && i > 0 && "brightness-90",
+                        )}
+                        loading="lazy"
+                      />
                     </div>
-                  ))}
+                  )}
+                />
                 </div>
 
                 {/* Quantity controls — below the stack */}

@@ -5,6 +5,7 @@ import type { CardDb, DeckListEntry } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import {
   Badge,
+  CardFanStack,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -30,15 +31,6 @@ interface CardGroup {
   cost: number | null;
   type: string;
   count: number;
-}
-
-/** Deterministic pseudo-random rotation for a card instance. */
-function cardRotation(cardId: string, index: number): number {
-  let hash = index * 31;
-  for (let i = 0; i < cardId.length; i++) {
-    hash = (hash * 37 + cardId.charCodeAt(i)) & 0xffff;
-  }
-  return ((hash % 100) / 100) * 3 - 1.5;
 }
 
 /** Build card groups from the original deck list. */
@@ -129,45 +121,32 @@ export function GameDeckPreviewModal({
                 return (
                   <TooltipRoot key={group.cardId}>
                     <TooltipTrigger asChild>
-                      <div className="flex cursor-pointer">
-                        {Array.from({ length: group.count }, (_, i) => (
-                          <div
-                            key={`${group.cardId}-${i}`}
-                            className={cn(
-                              "relative flex-shrink-0 transition-transform duration-150 hover:-translate-y-2 hover:z-10",
-                              i > 0 && "-ml-16",
+                      <CardFanStack
+                        cardId={group.cardId}
+                        count={group.count}
+                        className="cursor-pointer"
+                        renderCard={(i) => (
+                          <div className={cn("w-card-thumb overflow-hidden rounded-md border border-gb-border-strong shadow-sm aspect-card hover:-translate-y-2 hover:z-10 transition-transform duration-150")}>
+                            {data?.imageUrl ? (
+                              <img
+                                src={data.imageUrl}
+                                alt={data.name}
+                                className={cn(
+                                  "h-full w-full object-cover",
+                                  group.count > 1 && i > 0 && "brightness-90",
+                                )}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="h-full w-full bg-gb-surface-raised flex items-center justify-center p-2">
+                                <span className="text-xs text-gb-text-dim text-center">
+                                  {group.name}
+                                </span>
+                              </div>
                             )}
-                            style={{
-                              zIndex: group.count - i,
-                              ...(i > 0 && {
-                                rotate: `${cardRotation(group.cardId, i)}deg`,
-                              }),
-                            }}
-                          >
-                            <div className="w-[100px] overflow-hidden rounded-md border border-gb-border-strong shadow-sm aspect-[600/838]">
-                              {data?.imageUrl ? (
-                                <img
-                                  src={data.imageUrl}
-                                  alt={data.name}
-                                  className={cn(
-                                    "h-full w-full object-cover",
-                                    group.count > 1 &&
-                                      i > 0 &&
-                                      "brightness-90",
-                                  )}
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="h-full w-full bg-gb-surface-raised flex items-center justify-center p-2">
-                                  <span className="text-xs text-gb-text-dim text-center">
-                                    {group.name}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      />
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"

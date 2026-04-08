@@ -25,7 +25,7 @@ export default function AdminCardsLoading() {
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
         {Array.from({ length: 20 }).map((_, i) => (
           <div key={i} className="overflow-hidden rounded-lg bg-surface-1">
-            <Skeleton className="aspect-[600/838] w-full rounded-none" />
+            <Skeleton className="aspect-card w-full rounded-none" />
           </div>
         ))}
       </div>

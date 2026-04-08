@@ -83,6 +83,9 @@ export {
   SelectScrollDownButton,
 } from "./select";
 
+// Card Fan Stack
+export { CardFanStack } from "./card-fan-stack";
+
 // Layout
 export { Separator } from "./separator";
 export { Avatar, AvatarImage, AvatarFallback, AvatarBadge } from "./avatar";

@@ -68,3 +68,16 @@ export function sanitizeEffectText(text: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+/**
+ * Deterministic pseudo-random rotation for a card instance.
+ * Used in deck preview grids to fan stacked copies naturally.
+ * Range: -1.5° to +1.5°
+ */
+export function cardRotation(cardId: string, index: number): number {
+  let hash = index * 31;
+  for (let i = 0; i < cardId.length; i++) {
+    hash = (hash * 37 + cardId.charCodeAt(i)) & 0xffff;
+  }
+  return ((hash % 100) / 100) * 3 - 1.5;
+}
