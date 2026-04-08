@@ -114,30 +114,32 @@ export async function PUT(
     if (testOrder !== undefined) updateData.testOrder = testOrder;
     if (format !== undefined) updateData.format = format;
 
-    // If cards are provided, replace all deck cards
-    if (cards !== undefined) {
-      await prisma.deckCard.deleteMany({ where: { deckId: id } });
-      if (cards.length > 0) {
-        await prisma.deckCard.createMany({
-          data: cards.map((c) => ({
-            deckId: id,
-            cardId: c.cardId,
-            quantity: c.quantity,
-            selectedArtUrl: c.selectedArtUrl ?? null,
-          })),
-        });
+    // Wrap delete + create + update in a transaction to prevent data loss
+    const deck = await prisma.$transaction(async (tx) => {
+      if (cards !== undefined) {
+        await tx.deckCard.deleteMany({ where: { deckId: id } });
+        if (cards.length > 0) {
+          await tx.deckCard.createMany({
+            data: cards.map((c) => ({
+              deckId: id,
+              cardId: c.cardId,
+              quantity: c.quantity,
+              selectedArtUrl: c.selectedArtUrl ?? null,
+            })),
+          });
+        }
       }
-    }
 
-    const deck = await prisma.deck.update({
-      where: { id },
-      data: updateData,
-      include: {
-        cards: {
-          include: { card: { select: CARD_SELECT } },
-          orderBy: { card: { cost: "asc" } },
+      return tx.deck.update({
+        where: { id },
+        data: updateData,
+        include: {
+          cards: {
+            include: { card: { select: CARD_SELECT } },
+            orderBy: { card: { cost: "asc" } },
+          },
         },
-      },
+      });
     });
 
     const leader = await prisma.card.findUnique({

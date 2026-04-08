@@ -1,10 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { SocialSidebar, type SidebarUser } from "./social-sidebar";
-import { ChatWidget } from "./chat-widget";
+import type { SidebarUser } from "./social-sidebar";
+
+const SocialSidebar = dynamic(
+  () => import("./social-sidebar").then((mod) => mod.SocialSidebar),
+  { ssr: false }
+);
+const ChatWidget = dynamic(
+  () => import("./chat-widget").then((mod) => mod.ChatWidget),
+  { ssr: false }
+);
 
 export function SocialShell() {
   const { data: session } = useSession();

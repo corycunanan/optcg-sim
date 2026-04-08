@@ -1,6 +1,14 @@
+import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { DeckBuilderShell } from "@/components/deck-builder/deck-builder-shell";
+
+const DeckBuilderShell = dynamic(
+  () =>
+    import("@/components/deck-builder/deck-builder-shell").then(
+      (mod) => mod.DeckBuilderShell
+    ),
+  { ssr: false }
+);
 
 export const metadata = {
   title: "Deck Builder — OPTCG Simulator",

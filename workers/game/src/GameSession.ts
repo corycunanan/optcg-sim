@@ -9,6 +9,7 @@
 import type {
   CardData,
   ClientMessage,
+  DonInstance,
   Env,
   GameAction,
   GameInitPayload,
@@ -22,11 +23,11 @@ import { runPipeline } from "./engine/pipeline.js";
 import { resumeReplacement, type ReplacementResumeContext } from "./engine/replacements.js";
 import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
+import { validateGameInitPayload, validateClientMessage } from "./util/validate.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
 import { recalculateBattlePowers } from "./engine/battle.js";
 import { isEffectConditionMet } from "./engine/modifiers.js";
-import type { RuntimeActiveEffect } from "./engine/effect-types.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -82,7 +83,15 @@ export class GameSession implements DurableObject {
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   private async handleInit(request: Request): Promise<Response> {
-    const payload = await request.json() as GameInitPayload;
+    let payload: GameInitPayload;
+    try {
+      payload = validateGameInitPayload(await request.json());
+    } catch (err) {
+      return new Response(
+        JSON.stringify({ ok: false, error: err instanceof Error ? err.message : "Invalid payload" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
     const { state, cardDb } = buildInitialState(payload);
 
     this.cardDb = cardDb;
@@ -242,7 +251,8 @@ export class GameSession implements DurableObject {
 
     let clientMsg: ClientMessage;
     try {
-      clientMsg = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
+      const raw = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
+      clientMsg = validateClientMessage(raw);
     } catch {
       this.send(ws, { type: "game:error", message: "Invalid message format" });
       return;
@@ -606,7 +616,7 @@ export class GameSession implements DurableObject {
     } else if (battleSubPhase === "DAMAGE_STEP" && battle && "pendingTriggerLifeCard" in battle) {
       const inactiveWs = this.getWebSocketForPlayer(inactiveIdx);
       if (inactiveWs) {
-        const triggerLifeCard = (battle as any).pendingTriggerLifeCard;
+        const triggerLifeCard = battle.pendingTriggerLifeCard;
         const triggerCardData = triggerLifeCard && this.cardDb
           ? this.cardDb.get(triggerLifeCard.cardId)
           : undefined;
@@ -616,7 +626,7 @@ export class GameSession implements DurableObject {
           cardId: triggerLifeCard.cardId,
           zone: "LIFE" as const,
           state: "ACTIVE" as const,
-          attachedDon: [] as any[],
+          attachedDon: [] as DonInstance[],
           turnPlayed: null,
           controller: inactiveIdx as 0 | 1,
           owner: inactiveIdx as 0 | 1,
@@ -653,7 +663,7 @@ export class GameSession implements DurableObject {
     const { battleSubPhase, battle } = this.gameState.turn;
     if (battleSubPhase !== "DAMAGE_STEP" || !battle) return;
 
-    const triggerLifeCard = (battle as any).pendingTriggerLifeCard;
+    const triggerLifeCard = battle.pendingTriggerLifeCard;
     if (!triggerLifeCard) return;
 
     const inactiveIdx = (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0) as 0 | 1;
@@ -664,7 +674,7 @@ export class GameSession implements DurableObject {
       cardId: triggerLifeCard.cardId,
       zone: "LIFE" as const,
       state: "ACTIVE" as const,
-      attachedDon: [] as any[],
+      attachedDon: [] as DonInstance[],
       turnPlayed: null,
       controller: inactiveIdx,
       owner: inactiveIdx,
@@ -680,7 +690,7 @@ export class GameSession implements DurableObject {
         promptType: "REVEAL_TRIGGER" as const,
         options: { cards, effectDescription, optional: false, timeoutMs: 30_000 },
         respondingPlayer: inactiveIdx,
-        resumeContext: null as any,
+        resumeContext: null,
       },
     };
   }
@@ -789,10 +799,9 @@ export class GameSession implements DurableObject {
    */
   private stripInactiveEffects(state: GameState): GameState {
     if (!this.cardDb) return state;
-    const effects = state.activeEffects as RuntimeActiveEffect[];
-    const active = effects.filter((e) => isEffectConditionMet(e, state, this.cardDb!));
-    if (active.length === effects.length) return state;
-    return { ...state, activeEffects: active as any };
+    const active = state.activeEffects.filter((e) => isEffectConditionMet(e, state, this.cardDb!));
+    if (active.length === state.activeEffects.length) return state;
+    return { ...state, activeEffects: active };
   }
 
   private broadcastExcept(exclude: WebSocket, msg: ServerMessage): void {

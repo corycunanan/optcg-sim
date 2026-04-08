@@ -17,49 +17,69 @@ export async function GET() {
   const userId = session.user.id;
 
   try {
-    // Get all messages involving this user, pick the most recent per conversation
-    const messages = await prisma.message.findMany({
-      where: {
-        OR: [{ fromUserId: userId }, { toUserId: userId }],
+    // Fetch only the latest message per conversation partner using a
+    // DISTINCT ON subquery, avoiding unbounded full-table scan (OPT-128).
+    const rows = await prisma.$queryRaw<
+      {
+        id: string;
+        body: string;
+        createdAt: Date;
+        fromUserId: string;
+        toUserId: string;
+        otherId: string;
+        otherUsername: string | null;
+        otherName: string | null;
+        otherImage: string | null;
+        unreadCount: bigint;
+      }[]
+    >`
+      SELECT
+        m.id,
+        m.body,
+        m."createdAt",
+        m."fromUserId",
+        m."toUserId",
+        m.other_id AS "otherId",
+        u.username AS "otherUsername",
+        u.name     AS "otherName",
+        u.image    AS "otherImage",
+        COALESCE(unread.cnt, 0) AS "unreadCount"
+      FROM (
+        SELECT DISTINCT ON (
+          CASE WHEN "fromUserId" = ${userId} THEN "toUserId" ELSE "fromUserId" END
+        )
+          *,
+          CASE WHEN "fromUserId" = ${userId} THEN "toUserId" ELSE "fromUserId" END AS other_id
+        FROM messages
+        WHERE "fromUserId" = ${userId} OR "toUserId" = ${userId}
+        ORDER BY
+          CASE WHEN "fromUserId" = ${userId} THEN "toUserId" ELSE "fromUserId" END,
+          "createdAt" DESC
+      ) m
+      JOIN users u ON u.id = m.other_id
+      LEFT JOIN (
+        SELECT "fromUserId", COUNT(*)::bigint AS cnt
+        FROM messages
+        WHERE "toUserId" = ${userId} AND read = false
+        GROUP BY "fromUserId"
+      ) unread ON unread."fromUserId" = m.other_id
+      ORDER BY m."createdAt" DESC
+    `;
+
+    const conversations = rows.map((row) => ({
+      user: {
+        id: row.otherId,
+        username: row.otherUsername,
+        name: row.otherName,
+        image: row.otherImage,
       },
-      orderBy: { createdAt: "desc" },
-      include: {
-        fromUser: { select: { id: true, username: true, name: true, image: true } },
-        toUser: { select: { id: true, username: true, name: true, image: true } },
+      lastMessage: {
+        body: row.body,
+        createdAt: row.createdAt,
+        fromUserId: row.fromUserId,
       },
-    });
-
-    // Batch unread counts in a single query instead of N+1 per-conversation counts
-    const unreadCounts = await prisma.message.groupBy({
-      by: ["fromUserId"],
-      where: { toUserId: userId, read: false },
-      _count: true,
-    });
-    const unreadMap = new Map(
-      unreadCounts.map((row) => [row.fromUserId, row._count]),
-    );
-
-    // Group into conversations keyed by the other user's ID
-    const seen = new Set<string>();
-    const conversations: {
-      user: { id: string; username: string | null; name: string | null; image: string | null };
-      lastMessage: { body: string; createdAt: Date; fromUserId: string };
-      unreadCount: number;
-    }[] = [];
-
-    for (const msg of messages) {
-      const otherId = msg.fromUserId === userId ? msg.toUserId : msg.fromUserId;
-      if (seen.has(otherId)) continue;
-      seen.add(otherId);
-
-      const otherUser = msg.fromUserId === userId ? msg.toUser : msg.fromUser;
-
-      conversations.push({
-        user: otherUser,
-        lastMessage: { body: msg.body, createdAt: msg.createdAt, fromUserId: msg.fromUserId },
-        unreadCount: unreadMap.get(otherId) ?? 0,
-      });
-    }
+      unreadCount: Number(row.unreadCount),
+    }));
 
     return NextResponse.json({ data: conversations });
   } catch (error) {
