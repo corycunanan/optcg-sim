@@ -3,7 +3,8 @@
  *
  * Each test targets a specific gap found in the audit:
  *   Batch 1 (OPT-108): Event emission fixes
- *   Batch 2 (OPT-107): Stub completions
+ *   Batch 2 (OPT-107): Stub completions (incl. SOURCE_PROPERTY, source_zone, DON_GIVEN_TO_TARGET)
+ *   Batch 3 (OPT-107): Real features (dual_targets, constraints, color_not_matching_ref)
  *
  * Pattern: build state → execute action → assert events emitted + state correct.
  */
@@ -956,6 +957,240 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
         cardDb,
       );
       expect(amount).toBe(5);
+    });
+  });
+
+  // ─── 4b. DON_GIVEN_TO_TARGET DynamicValue ─────────────────────────────────
+
+  describe("DON_GIVEN_TO_TARGET DynamicValue", () => {
+    it("resolves from target card's attachedDon count", () => {
+      let state = buildMinimalState();
+      // Target card with 3 attached DON
+      const target = makeInstance("TARGET-CARD", "CHARACTER", 0, {
+        instanceId: "target-inst",
+        attachedDon: [
+          { instanceId: "don-1", state: "ACTIVE", zone: "CHARACTER" },
+          { instanceId: "don-2", state: "ACTIVE", zone: "CHARACTER" },
+          { instanceId: "don-3", state: "ACTIVE", zone: "CHARACTER" },
+        ] as DonInstance[],
+      });
+      state.players[0].characters = padChars([target]);
+
+      const resultRefs = new Map<string, EffectResult>();
+      resultRefs.set("give_don_ref", { targetInstanceIds: ["target-inst"], count: 3 });
+
+      const amount = resolveAmount(
+        { type: "PER_COUNT", source: "DON_GIVEN_TO_TARGET", ref: "give_don_ref", multiplier: 1000 } as any,
+        resultRefs,
+        state,
+        0,
+      );
+      expect(amount).toBe(3000); // 3 DON * 1000
+    });
+
+    it("falls back to refResult.count when target not found", () => {
+      const state = buildMinimalState();
+      const resultRefs = new Map<string, EffectResult>();
+      resultRefs.set("give_don_ref", { targetInstanceIds: ["nonexistent"], count: 2 });
+
+      const amount = resolveAmount(
+        { type: "PER_COUNT", source: "DON_GIVEN_TO_TARGET", ref: "give_don_ref", multiplier: 1000 } as any,
+        resultRefs,
+        state,
+        0,
+      );
+      expect(amount).toBe(2000); // fallback to count
+    });
+  });
+
+  // ─── 4c. source_zone EventFilter field ────────────────────────────────────
+
+  describe("source_zone EventFilter field", () => {
+    it("trigger fires when card is in the matching zone", () => {
+      const charCard = makeCard("ZONE-CHAR", { cost: 3, power: 3000 });
+      const cardDb = new Map<string, CardData>([
+        [charCard.id, charCard],
+        [CARDS.LEADER.id, CARDS.LEADER],
+      ]);
+
+      // Use CHARACTER_BECOMES_RESTED which maps to CARD_STATE_CHANGED
+      const triggerCard = makeCard("TRIGGER-SOURCE-ZONE", {
+        effectSchema: {
+          effects: [{
+            id: "t-source-zone",
+            category: "auto",
+            trigger: {
+              event: "CHARACTER_BECOMES_RESTED",
+              filter: { source_zone: "CHARACTER" },
+            },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          }],
+        } as EffectSchema,
+      });
+      cardDb.set(triggerCard.id, triggerCard);
+
+      let state = buildMinimalState();
+      const sourceCard = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "trigger-src" });
+      const charInstance = makeInstance(charCard.id, "CHARACTER", 0, { instanceId: "char-inst" });
+      state.players[0].characters = padChars([sourceCard, charInstance]);
+
+      state = registerTriggersForCard(state, sourceCard, triggerCard);
+
+      // Event from CHARACTER zone → should match
+      const matchEvent: GameEvent = {
+        type: "CARD_STATE_CHANGED",
+        playerIndex: 0,
+        payload: { cardInstanceId: "char-inst" },
+        timestamp: Date.now(),
+      };
+      expect(matchTriggersForEvent(state, matchEvent, cardDb).length).toBe(1);
+    });
+
+    it("trigger does NOT fire when card is in a different zone", () => {
+      const charCard = makeCard("ZONE-CHAR-2", { cost: 3, power: 3000, type: "Stage" });
+      const cardDb = new Map<string, CardData>([
+        [charCard.id, charCard],
+        [CARDS.LEADER.id, CARDS.LEADER],
+      ]);
+
+      const triggerCard = makeCard("TRIGGER-SOURCE-ZONE-2", {
+        effectSchema: {
+          effects: [{
+            id: "t-source-zone-2",
+            category: "auto",
+            trigger: {
+              event: "CHARACTER_BECOMES_RESTED",
+              filter: { source_zone: "CHARACTER" },
+            },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          }],
+        } as EffectSchema,
+      });
+      cardDb.set(triggerCard.id, triggerCard);
+
+      let state = buildMinimalState();
+      const sourceCard = makeInstance(triggerCard.id, "CHARACTER", 0, { instanceId: "trigger-src-2" });
+      state.players[0].characters = padChars([sourceCard]);
+      // Card in STAGE zone, not CHARACTER
+      const stageInstance = makeInstance(charCard.id, "STAGE", 0, { instanceId: "stage-inst" });
+      state.players[0].stage = stageInstance;
+
+      state = registerTriggersForCard(state, sourceCard, triggerCard);
+
+      const noMatchEvent: GameEvent = {
+        type: "CARD_STATE_CHANGED",
+        playerIndex: 0,
+        payload: { cardInstanceId: "stage-inst" },
+        timestamp: Date.now(),
+      };
+      expect(matchTriggersForEvent(state, noMatchEvent, cardDb).length).toBe(0);
+    });
+  });
+
+  // ─── 4d. SOURCE_PROPERTY condition ────────────────────────────────────────
+
+  describe("SOURCE_PROPERTY condition", () => {
+    it("returns true when cause card matches source_filter", () => {
+      const causeCard = makeCard("CAUSE-CHAR", { cost: 5, power: 5000, types: ["Straw Hat Crew"] });
+      const targetCard = makeCard("TARGET-CHAR", { cost: 3, power: 3000 });
+      const cardDb = new Map<string, CardData>([
+        [causeCard.id, causeCard],
+        [targetCard.id, targetCard],
+        [CARDS.LEADER.id, CARDS.LEADER],
+      ]);
+
+      let state = buildMinimalState();
+      const causeInstance = makeInstance(causeCard.id, "CHARACTER", 0, { instanceId: "cause-inst" });
+      const targetInstance = makeInstance(targetCard.id, "TRASH", 1, { instanceId: "target-inst" });
+      state.players[0].characters = padChars([causeInstance]);
+      state.players[1].trash = [targetInstance];
+
+      // Add a CARD_KO event with causeCardInstanceId
+      state.eventLog.push({
+        type: "CARD_KO",
+        playerIndex: 1,
+        payload: { cardInstanceId: "target-inst", causeCardInstanceId: "cause-inst", cause: "effect" },
+        timestamp: Date.now(),
+      } as GameEvent);
+
+      const ctx: ConditionContext = {
+        controller: 1,
+        sourceCardInstanceId: "target-inst",
+        cardDb,
+      };
+
+      const result = evaluateCondition(
+        state,
+        {
+          type: "SOURCE_PROPERTY",
+          context: "KO_BY_EFFECT",
+          source_filter: { traits: ["Straw Hat Crew"] },
+        } as any,
+        ctx,
+      );
+      expect(result).toBe(true);
+    });
+
+    it("returns false when cause card does NOT match source_filter", () => {
+      const causeCard = makeCard("CAUSE-OTHER", { cost: 5, power: 5000, types: ["Navy"] });
+      const targetCard = makeCard("TARGET-OTHER", { cost: 3, power: 3000 });
+      const cardDb = new Map<string, CardData>([
+        [causeCard.id, causeCard],
+        [targetCard.id, targetCard],
+        [CARDS.LEADER.id, CARDS.LEADER],
+      ]);
+
+      let state = buildMinimalState();
+      const causeInstance = makeInstance(causeCard.id, "CHARACTER", 0, { instanceId: "cause-inst-2" });
+      const targetInstance = makeInstance(targetCard.id, "TRASH", 1, { instanceId: "target-inst-2" });
+      state.players[0].characters = padChars([causeInstance]);
+      state.players[1].trash = [targetInstance];
+
+      state.eventLog.push({
+        type: "CARD_KO",
+        playerIndex: 1,
+        payload: { cardInstanceId: "target-inst-2", causeCardInstanceId: "cause-inst-2", cause: "effect" },
+        timestamp: Date.now(),
+      } as GameEvent);
+
+      const ctx: ConditionContext = {
+        controller: 1,
+        sourceCardInstanceId: "target-inst-2",
+        cardDb,
+      };
+
+      const result = evaluateCondition(
+        state,
+        {
+          type: "SOURCE_PROPERTY",
+          context: "KO_BY_EFFECT",
+          source_filter: { traits: ["Straw Hat Crew"] },
+        } as any,
+        ctx,
+      );
+      expect(result).toBe(false);
+    });
+
+    it("returns true (graceful) when no matching event in eventLog", () => {
+      const cardDb = createTestCardDb();
+      const state = buildMinimalState();
+
+      const ctx: ConditionContext = {
+        controller: 0,
+        sourceCardInstanceId: "nonexistent",
+        cardDb,
+      };
+
+      const result = evaluateCondition(
+        state,
+        {
+          type: "SOURCE_PROPERTY",
+          context: "KO_BY_EFFECT",
+          source_filter: { traits: ["Anything"] },
+        } as any,
+        ctx,
+      );
+      expect(result).toBe(true); // No event found → graceful pass
     });
   });
 
