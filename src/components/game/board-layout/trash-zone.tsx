@@ -6,7 +6,7 @@ import type { BattleSubPhase, CardDb, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { BoardCard } from "../board-card";
 import { BOARD_CARD_W, BOARD_CARD_H, type DragPayload } from "./constants";
-import { DropOverlay } from "./field-card";
+import { DropOverlay } from "./drop-zones";
 
 function isValidCounterDrag(drag: DragPayload | null, cardDb: CardDb): boolean {
   if (!drag || drag.type !== "hand-card") return false;

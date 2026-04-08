@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,38 +40,7 @@ import {
   PageHeaderActions,
 } from "@/components/ui/page-header";
 import { DeckPreviewModal } from "./deck-preview-modal";
-
-interface Deck {
-  id: string;
-  name: string;
-  leaderId: string;
-  leaderName: string | null;
-  leaderImageUrl: string | null;
-}
-
-interface LobbyState {
-  id: string;
-  status: "WAITING" | "IN_GAME" | "CLOSED";
-  joinCode: string;
-  format: string;
-  gameId: string | null;
-  host: { username: string | null; name: string | null; image: string | null } | null;
-  hostDeck: {
-    id: string;
-    name: string;
-    leaderName: string | null;
-    leaderImageUrl: string | null;
-  };
-  guest: {
-    user: { username: string | null; name: string | null; image: string | null };
-    deck: {
-      id: string;
-      name: string;
-      leaderName: string | null;
-      leaderImageUrl: string | null;
-    } | null;
-  } | null;
-}
+import { useLobbySession } from "@/hooks/use-lobby-session";
 
 interface LobbiesShellProps {
   user: {
@@ -83,302 +51,11 @@ interface LobbiesShellProps {
 
 export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
-
-  const [userDecks, setUserDecks] = useState<Deck[]>([]);
-  const [selectedDeckId, setSelectedDeckId] = useState("");
-  const [activeLobby, setActiveLobby] = useState<LobbyState | null>(null);
-
-  // Active game guard
-  const [activeGameId, setActiveGameId] = useState<string | null>(null);
-  const [activeGameLoading, setActiveGameLoading] = useState(true);
-  const [conceding, setConceding] = useState(false);
-  const [concedeError, setConcedeError] = useState<string | null>(null);
-
-  // Lobby creation
-  const [creating, setCreating] = useState(false);
-  const lobbyCreatedRef = useRef(false);
-
-  // Join popover
-  const [joinOpen, setJoinOpen] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
-
-  // Clipboard
-  const [copied, setCopied] = useState(false);
-
-  // Deck preview
-  const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
-
-  // Polling ref
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ─── Active game: load on mount, re-sync on focus ─────────────────────────
-
-  const syncActiveGameFromServer = useCallback(async () => {
-    try {
-      const res = await fetch("/api/game/active");
-      if (!res.ok) return;
-      const json = await res.json();
-      setActiveGameId(json.data?.id ?? null);
-    } catch {
-      /* network error */
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        await syncActiveGameFromServer();
-      } finally {
-        if (!cancelled) setActiveGameLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [syncActiveGameFromServer]);
-
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void syncActiveGameFromServer();
-    };
-    const onFocus = () => void syncActiveGameFromServer();
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [syncActiveGameFromServer]);
-
-  // ─── Load decks on mount ──────────────────────────────────────────────────
-
-  const fetchDecks = useCallback(async () => {
-    const res = await fetch("/api/decks");
-    if (!res.ok) return;
-    const data = await res.json();
-    const decks: Deck[] = (data.data ?? []).map(
-      (d: { id: string; name: string; leaderId: string; leaderName: string | null; leaderImageUrl: string | null }) => ({
-        id: d.id,
-        name: d.name,
-        leaderId: d.leaderId,
-        leaderName: d.leaderName,
-        leaderImageUrl: d.leaderImageUrl,
-      }),
-    );
-    setUserDecks(decks);
-    if (decks.length > 0 && !selectedDeckId) setSelectedDeckId(decks[0].id);
-    return decks;
-  }, [selectedDeckId]);
-
-  useEffect(() => {
-    fetchDecks();
-  }, [fetchDecks]);
-
-  // ─── Poll lobby status when host is waiting ──────────────────────────────
-
-  const pollLobby = useCallback(
-    async (lobbyId: string) => {
-      try {
-        const res = await fetch(`/api/lobbies/${lobbyId}`);
-        if (!res.ok) {
-          setActiveLobby(null);
-          return;
-        }
-        const { data } = await res.json();
-
-        if (data.gameId) {
-          router.push(`/game/${data.gameId}`);
-          return;
-        }
-
-        if (data.status === "CLOSED") {
-          setActiveLobby(null);
-          lobbyCreatedRef.current = false;
-          return;
-        }
-
-        setActiveLobby(data);
-      } catch {
-        /* network blip */
-      }
-    },
-    [router],
-  );
-
-  useEffect(() => {
-    if (!activeLobby || activeLobby.status !== "WAITING") {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      return;
-    }
-
-    pollRef.current = setInterval(() => pollLobby(activeLobby.id), 2000);
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [activeLobby, pollLobby]);
-
-  // ─── Auto-create lobby ────────────────────────────────────────────────────
-
-  const createLobby = useCallback(
-    async (deckId: string) => {
-      if (!deckId || creating) return;
-      setCreating(true);
-      try {
-        const res = await fetch("/api/lobbies", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deckId, format: "Standard" }),
-        });
-        const json = await res.json();
-        if (res.ok) {
-          // Find the selected deck to populate hostDeck info
-          const deck = userDecks.find((d) => d.id === deckId);
-          setActiveLobby({
-            id: json.data.lobbyId,
-            status: "WAITING",
-            joinCode: json.data.joinCode,
-            format: "Standard",
-            gameId: null,
-            host: null,
-            hostDeck: {
-              id: deckId,
-              name: deck?.name ?? "Deck",
-              leaderName: deck?.leaderName ?? null,
-              leaderImageUrl: deck?.leaderImageUrl ?? null,
-            },
-            guest: null,
-          });
-          lobbyCreatedRef.current = true;
-        }
-      } catch {
-        /* network error */
-      } finally {
-        setCreating(false);
-      }
-    },
-    [creating, userDecks],
-  );
-
-  useEffect(() => {
-    if (
-      !activeGameLoading &&
-      !activeGameId &&
-      !activeLobby &&
-      !lobbyCreatedRef.current &&
-      selectedDeckId &&
-      userDecks.length > 0
-    ) {
-      createLobby(selectedDeckId);
-    }
-  }, [activeGameLoading, activeGameId, activeLobby, selectedDeckId, userDecks, createLobby]);
-
-  // ─── Actions ──────────────────────────────────────────────────────────────
-
-  const cancelLobby = async () => {
-    if (!activeLobby) return;
-    await fetch(`/api/lobbies/${activeLobby.id}`, { method: "DELETE" });
-    setActiveLobby(null);
-    lobbyCreatedRef.current = false;
-  };
-
-  const joinLobby = async () => {
-    if (!selectedDeckId || joinCode.length < 6) return;
-    setJoining(true);
-    setJoinError(null);
-    try {
-      const res = await fetch("/api/lobbies/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: joinCode, deckId: selectedDeckId }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        router.push(`/game/${json.data.gameId}`);
-      } else {
-        setJoinError(json.error ?? "Failed to join lobby");
-      }
-    } catch {
-      setJoinError("Network error");
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  const copyCode = async () => {
-    if (!activeLobby?.joinCode) return;
-    try {
-      await navigator.clipboard.writeText(activeLobby.joinCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard not available */
-    }
-  };
-
-  const concedeGame = async () => {
-    if (!activeGameId) return;
-    setConceding(true);
-    setConcedeError(null);
-    try {
-      const res = await fetch(`/api/game/${activeGameId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "CONCEDE" }),
-      });
-      if (res.ok) {
-        setActiveGameId(null);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setConcedeError(data.error ?? "Failed to concede");
-      }
-    } catch {
-      setConcedeError("Network error");
-    } finally {
-      setConceding(false);
-    }
-  };
-
-  const handleDeckChange = async (deckId: string) => {
-    setSelectedDeckId(deckId);
-    if (activeLobby) {
-      const deck = userDecks.find((d) => d.id === deckId);
-      await fetch(`/api/lobbies/${activeLobby.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deckId }),
-      });
-      setActiveLobby((prev) =>
-        prev
-          ? {
-              ...prev,
-              hostDeck: {
-                id: deckId,
-                name: deck?.name ?? "Deck",
-                leaderName: deck?.leaderName ?? null,
-                leaderImageUrl: deck?.leaderImageUrl ?? null,
-              },
-            }
-          : null,
-      );
-    }
-  };
-
-  // ─── Derived state ────────────────────────────────────────────────────────
-
-  const hasDecks = userDecks.length > 0;
-  const isWaiting = activeLobby?.status === "WAITING";
-  const selectedDeck = userDecks.find((d) => d.id === selectedDeckId);
+  const lobby = useLobbySession();
 
   // ─── Loading state ────────────────────────────────────────────────────────
 
-  if (activeGameLoading) {
+  if (lobby.activeGameLoading) {
     return (
       <div className="flex-1 overflow-y-auto bg-surface-base">
         <div className="mx-auto max-w-xl px-6 py-10">
@@ -400,16 +77,16 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
         <PageHeaderContent>
           <PageHeaderTitle>Play</PageHeaderTitle>
           <PageHeaderDescription>
-            {activeGameId
+            {lobby.activeGameId
               ? "You have a game in progress."
-              : isWaiting
+              : lobby.isWaiting
                 ? "Waiting for an opponent to join your lobby."
                 : "Setting up your lobby..."}
           </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
-          {!activeGameId && (
-            <Popover open={joinOpen} onOpenChange={setJoinOpen}>
+          {!lobby.activeGameId && (
+            <Popover open={lobby.joinOpen} onOpenChange={lobby.setJoinOpen}>
               <PopoverTrigger asChild>
                 <Button variant="secondary">Join Lobby</Button>
               </PopoverTrigger>
@@ -420,8 +97,8 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                   </p>
                   <InputOTP
                     maxLength={6}
-                    value={joinCode}
-                    onChange={(value) => setJoinCode(value.toUpperCase())}
+                    value={lobby.joinCode}
+                    onChange={(value) => lobby.setJoinCode(value.toUpperCase())}
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
@@ -432,15 +109,15 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                       <InputOTPSlot index={5} />
                     </InputOTPGroup>
                   </InputOTP>
-                  {joinError && (
-                    <p className="text-xs text-error">{joinError}</p>
+                  {lobby.joinError && (
+                    <p className="text-xs text-error">{lobby.joinError}</p>
                   )}
                   <Button
-                    onClick={joinLobby}
-                    disabled={joining || joinCode.length < 6 || !selectedDeckId}
+                    onClick={lobby.joinLobby}
+                    disabled={lobby.joining || lobby.joinCode.length < 6 || !lobby.selectedDeckId}
                     className="w-full"
                   >
-                    {joining ? "Joining..." : "Join"}
+                    {lobby.joining ? "Joining..." : "Join"}
                   </Button>
                 </div>
               </PopoverContent>
@@ -452,7 +129,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
       {/* Main content */}
       <div className="mx-auto max-w-5xl px-6 py-10">
         {/* Active game guard */}
-        {activeGameId && (
+        {lobby.activeGameId && (
           <div className="rounded-lg border border-gold-500/30 bg-gold-100 p-6">
             <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
               Game In Progress
@@ -462,7 +139,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
               start a new one.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Button onClick={() => router.push(`/game/${activeGameId}`)}>
+              <Button onClick={() => router.push(`/game/${lobby.activeGameId}`)}>
                 Rejoin Game
               </Button>
               <AlertDialog>
@@ -478,28 +155,28 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={conceding}>
+                    <AlertDialogCancel disabled={lobby.conceding}>
                       Cancel
                     </AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
-                      onClick={concedeGame}
-                      disabled={conceding}
+                      onClick={lobby.concedeGame}
+                      disabled={lobby.conceding}
                     >
-                      {conceding ? "Conceding..." : "Yes, Concede"}
+                      {lobby.conceding ? "Conceding..." : "Yes, Concede"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-            {concedeError && (
-              <p className="mt-3 text-sm text-error">{concedeError}</p>
+            {lobby.concedeError && (
+              <p className="mt-3 text-sm text-error">{lobby.concedeError}</p>
             )}
           </div>
         )}
 
         {/* No decks state */}
-        {!activeGameId && !hasDecks && (
+        {!lobby.activeGameId && !lobby.hasDecks && (
           <div className="rounded-lg border border-border bg-surface-1 p-6 text-center">
             <p className="text-sm text-text-secondary">
               You need to build a deck before you can play.
@@ -514,20 +191,20 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
         )}
 
         {/* Lobby layout */}
-        {!activeGameId && hasDecks && (
+        {!lobby.activeGameId && lobby.hasDecks && (
           <div className="flex flex-col gap-6">
             {/* Players row */}
             <div className="flex justify-center gap-6">
               {/* Player */}
               <div className="flex min-h-[420px] min-w-60 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-surface-1 p-6">
-                {selectedDeck?.leaderImageUrl ? (
+                {lobby.selectedDeck?.leaderImageUrl ? (
                   <button
-                    onClick={() => setPreviewDeckId(selectedDeckId)}
+                    onClick={() => lobby.setPreviewDeckId(lobby.selectedDeckId)}
                     className="cursor-pointer transition-transform hover:scale-105"
                   >
                     <img
-                      src={selectedDeck.leaderImageUrl}
-                      alt={selectedDeck.leaderName ?? "Leader"}
+                      src={lobby.selectedDeck.leaderImageUrl}
+                      alt={lobby.selectedDeck.leaderName ?? "Leader"}
                       className="w-48 rounded-lg shadow-[var(--shadow-md)]"
                     />
                   </button>
@@ -540,22 +217,22 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                 )}
                 <div className="text-center">
                   <p className="text-lg font-semibold text-text-primary">
-                    {selectedDeck?.name ?? "No deck selected"}
+                    {lobby.selectedDeck?.name ?? "No deck selected"}
                   </p>
                   <p className="mt-1 text-sm text-text-secondary">
                     {user.name}
                   </p>
                 </div>
-                {userDecks.length > 1 && (
+                {lobby.userDecks.length > 1 && (
                   <Select
-                    value={selectedDeckId}
-                    onValueChange={handleDeckChange}
+                    value={lobby.selectedDeckId}
+                    onValueChange={lobby.handleDeckChange}
                   >
                     <SelectTrigger className="w-full max-w-48">
                       <SelectValue placeholder="Select a deck" />
                     </SelectTrigger>
                     <SelectContent>
-                      {userDecks.map((d) => (
+                      {lobby.userDecks.map((d) => (
                         <SelectItem key={d.id} value={d.id}>
                           {d.name}
                         </SelectItem>
@@ -567,19 +244,19 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
 
               {/* Opponent */}
               <div className="flex min-h-[420px] min-w-60 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-surface-1 p-6">
-                {activeLobby?.guest ? (
+                {lobby.activeLobby?.guest ? (
                   <>
-                    {activeLobby.guest.deck?.leaderImageUrl ? (
+                    {lobby.activeLobby.guest.deck?.leaderImageUrl ? (
                       <button
                         onClick={() => {
-                          if (activeLobby.guest?.deck?.id)
-                            setPreviewDeckId(activeLobby.guest.deck.id);
+                          if (lobby.activeLobby?.guest?.deck?.id)
+                            lobby.setPreviewDeckId(lobby.activeLobby.guest.deck.id);
                         }}
                         className="cursor-pointer transition-transform hover:scale-105"
                       >
                         <img
-                          src={activeLobby.guest.deck.leaderImageUrl}
-                          alt={activeLobby.guest.deck.leaderName ?? "Leader"}
+                          src={lobby.activeLobby.guest.deck.leaderImageUrl}
+                          alt={lobby.activeLobby.guest.deck.leaderName ?? "Leader"}
                           className="w-48 rounded-lg shadow-[var(--shadow-md)]"
                         />
                       </button>
@@ -592,11 +269,11 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                     )}
                     <div className="text-center">
                       <p className="text-lg font-semibold text-text-primary">
-                        {activeLobby.guest.deck?.name ?? "Deck"}
+                        {lobby.activeLobby.guest.deck?.name ?? "Deck"}
                       </p>
                       <p className="mt-1 text-sm text-text-secondary">
-                        {activeLobby.guest.user.username ??
-                          activeLobby.guest.user.name ??
+                        {lobby.activeLobby.guest.user.username ??
+                          lobby.activeLobby.guest.user.name ??
                           "Opponent"}
                       </p>
                     </div>
@@ -609,7 +286,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                       "text-text-tertiary transition-colors",
                       "hover:border-navy-500 hover:text-navy-500",
                     )}
-                    onClick={() => setJoinOpen(true)}
+                    onClick={() => lobby.setJoinOpen(true)}
                     aria-label="Invite opponent"
                   >
                     <Plus className="h-6 w-6" />
@@ -619,17 +296,17 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
             </div>
 
             {/* Lobby info */}
-            {isWaiting && activeLobby && (
+            {lobby.isWaiting && lobby.activeLobby && (
               <div className="flex flex-col items-center gap-3">
                 <code className="rounded-md bg-surface-1 border border-border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em] text-text-primary">
-                  {activeLobby.joinCode}
+                  {lobby.activeLobby.joinCode}
                 </code>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={copyCode}
+                  onClick={lobby.copyCode}
                 >
-                  {copied ? (
+                  {lobby.copied ? (
                     <>
                       <Check className="mr-2 h-4 w-4" />
                       Copied
@@ -644,7 +321,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
               </div>
             )}
 
-            {creating && !isWaiting && (
+            {lobby.creating && !lobby.isWaiting && (
               <div className="flex items-center justify-center gap-2 text-sm text-text-secondary">
                 <div className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
                 Creating lobby...
@@ -655,10 +332,10 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
       </div>
 
       <DeckPreviewModal
-        deckId={previewDeckId}
-        open={previewDeckId !== null}
+        deckId={lobby.previewDeckId}
+        open={lobby.previewDeckId !== null}
         onOpenChange={(open) => {
-          if (!open) setPreviewDeckId(null);
+          if (!open) lobby.setPreviewDeckId(null);
         }}
       />
     </div>
