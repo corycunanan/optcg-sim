@@ -3122,7 +3122,7 @@ export const OP06_085_KUMACY: EffectSchema = {
               divisor: 5,
             },
           },
-          duration: { type: "WHILE_CONDITION", condition: { type: "SELF_STATE", required_state: "ACTIVE" } },
+          duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
         },
       ],
     },

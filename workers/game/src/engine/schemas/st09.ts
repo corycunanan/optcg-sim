@@ -45,6 +45,7 @@ export const ST09_001_YAMATO: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

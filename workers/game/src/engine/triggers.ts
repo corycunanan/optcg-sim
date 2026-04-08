@@ -92,6 +92,77 @@ export function deregisterTriggersForCard(
   return { ...state, triggerRegistry: filtered };
 }
 
+// ─── Permanent Effect Registration ───────────────────────────────────────────
+
+/**
+ * Register permanent effect blocks (with modifiers) as RuntimeActiveEffects
+ * when a card enters the field. These provide continuous power buffs, keyword
+ * grants, etc. that are re-evaluated each step via evaluateWhileConditions.
+ */
+export function registerPermanentEffectsForCard(
+  state: GameState,
+  cardInstance: CardInstance,
+  cardData: CardData,
+): GameState {
+  const schema = cardData.effectSchema as EffectSchema | null;
+  if (!schema?.effects) return state;
+
+  const newEffects: RuntimeActiveEffect[] = [];
+
+  for (const block of schema.effects) {
+    if (block.category !== "permanent") continue;
+    if (!block.modifiers || block.modifiers.length === 0) continue;
+
+    const zone: EffectZone = block.zone ?? "FIELD";
+    if (!isCardInValidZone(cardInstance, zone)) continue;
+
+    // Determine expiry from duration
+    const duration = block.duration ?? { type: "PERMANENT" as const };
+    const expiresAt: import("./effect-types.js").ExpiryTiming =
+      duration.type === "WHILE_CONDITION"
+        ? { wave: "CONDITION_FALSE" }
+        : { wave: "SOURCE_LEAVES_ZONE" };
+
+    // Resolve appliesTo from modifier targets
+    const appliesTo: string[] = [];
+    for (const mod of block.modifiers) {
+      if (!mod.target || mod.target.type === "SELF") {
+        if (!appliesTo.includes(cardInstance.instanceId)) {
+          appliesTo.push(cardInstance.instanceId);
+        }
+      }
+      // Other target types (ALL_YOUR_CHARACTERS, etc.) are resolved dynamically
+      // during power calculation, so we still need the source card in appliesTo
+      // for the effect to be findable
+      if (mod.target && mod.target.type !== "SELF") {
+        if (!appliesTo.includes(cardInstance.instanceId)) {
+          appliesTo.push(cardInstance.instanceId);
+        }
+      }
+    }
+
+    newEffects.push({
+      id: nanoid(),
+      sourceCardInstanceId: cardInstance.instanceId,
+      sourceEffectBlockId: block.id,
+      category: "permanent",
+      modifiers: block.modifiers,
+      duration,
+      expiresAt,
+      controller: cardInstance.controller,
+      appliesTo,
+      timestamp: Date.now(),
+    });
+  }
+
+  if (newEffects.length === 0) return state;
+
+  return {
+    ...state,
+    activeEffects: [...state.activeEffects, ...newEffects as any],
+  };
+}
+
 // ─── Replacement Registration ─────────────────────────────────────────────────
 
 /**

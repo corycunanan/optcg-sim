@@ -63,6 +63,7 @@ export const ST21_002_USOPP: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -219,6 +220,7 @@ export const ST21_011_FRANKY: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

@@ -293,6 +293,7 @@ export const ST02_014_X_DRAKE: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };

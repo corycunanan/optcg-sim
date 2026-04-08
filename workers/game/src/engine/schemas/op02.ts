@@ -731,13 +731,13 @@ export const OP02_024_MOBY_DICK: EffectSchema = {
           params: { amount: 2000 },
           duration: {
             type: "WHILE_CONDITION",
-            condition: { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 1 },
+            condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 1 }] },
           },
         },
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 1 },
+        condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 1 }] },
       },
     },
     {

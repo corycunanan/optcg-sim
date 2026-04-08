@@ -201,6 +201,7 @@ export const P_006_MONKEY_D_LUFFY: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -637,6 +638,7 @@ export const P_027_GENERAL_FRANKY: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -762,6 +764,7 @@ export const P_032_SENGOKU: EffectSchema = {
           params: { amount: -2 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -823,6 +826,7 @@ export const P_034_SANJI: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -1195,6 +1199,7 @@ export const P_050_SANJI: EffectSchema = {
           params: { amount: 4000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -2319,6 +2324,7 @@ export const P_092_KOBY: EffectSchema = {
           params: { amount: -3000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "when_attacking_set_leader_power",
@@ -2868,6 +2874,7 @@ export const P_113_JEWELRY_BONNEY: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "trigger_ko",

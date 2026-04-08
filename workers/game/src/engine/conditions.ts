@@ -355,6 +355,11 @@ function evaluateSimple(
       return compareNum(playerTurnCount, cond.operator, cond.value);
     }
 
+    case "IS_MY_TURN": {
+      const pi = resolveController(cond.controller, ctx.controller);
+      return state.turn.activePlayerIndex === pi;
+    }
+
     case "PLAY_METHOD": {
       const playEvent = [...state.eventLog].reverse().find(
         (e) => e.type === "CARD_PLAYED" && e.payload?.cardInstanceId === ctx.sourceCardInstanceId,

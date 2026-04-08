@@ -2472,6 +2472,7 @@ export const OP07_071_FOXY: EffectSchema = {
           params: { amount: -1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "OP07-071_effect_2",
@@ -2887,6 +2888,7 @@ export const OP07_081_KALIFA: EffectSchema = {
           params: { amount: -1 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -3069,6 +3071,7 @@ export const OP07_087_BASKERVILLE: EffectSchema = {
           params: { amount: 3000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };

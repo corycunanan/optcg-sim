@@ -60,9 +60,14 @@ export function expireRefreshPhaseEffects(state: GameState): GameState {
  */
 export function expireSourceLeftZone(state: GameState, instanceId: string): GameState {
   const effects = state.activeEffects as RuntimeActiveEffect[];
-  const remaining = effects.filter((e) =>
-    !(e.expiresAt.wave === "SOURCE_LEAVES_ZONE" && e.sourceCardInstanceId === instanceId),
-  );
+  const remaining = effects.filter((e) => {
+    if (e.sourceCardInstanceId !== instanceId) return true;
+    // Always remove SOURCE_LEAVES_ZONE effects
+    if (e.expiresAt.wave === "SOURCE_LEAVES_ZONE") return false;
+    // Also remove permanent-category effects (their source left the field)
+    if (e.category === "permanent") return false;
+    return true;
+  });
 
   if (remaining.length === effects.length) return state;
   return { ...state, activeEffects: remaining as any };
@@ -122,9 +127,15 @@ export function expireProhibitions(
 
 /**
  * Re-evaluate all WHILE_CONDITION effects.
- * Effects whose condition is no longer true are removed.
- * Effects whose condition becomes true again are NOT re-added — they must be
- * re-registered through the trigger system. This function only handles removal.
+ *
+ * Permanent-category effects are never removed here — their condition is
+ * checked at modifier-application time (getEffectivePower, hasGrantedKeyword,
+ * etc.) so they toggle on/off each turn without being destroyed.
+ * They are cleaned up only when their source card leaves the field
+ * (via expireSourceLeftZone).
+ *
+ * Non-permanent WHILE_CONDITION effects (e.g., from resolved actions) are
+ * still removed when their condition becomes false.
  */
 export function evaluateWhileConditions(
   state: GameState,
@@ -133,6 +144,10 @@ export function evaluateWhileConditions(
   const effects = state.activeEffects as RuntimeActiveEffect[];
   const remaining = effects.filter((e) => {
     if (e.expiresAt.wave !== "CONDITION_FALSE") return true;
+
+    // Permanent effects are never removed by condition evaluation —
+    // their condition is checked inline when modifiers are applied.
+    if (e.category === "permanent") return true;
 
     // Extract the condition from the duration
     const duration = e.duration as { type: string; condition?: Condition };

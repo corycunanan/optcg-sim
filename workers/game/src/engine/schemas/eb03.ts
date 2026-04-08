@@ -152,6 +152,7 @@ export const EB03_004_CARINA: EffectSchema = {
           params: { amount: 4000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       flags: { once_per_turn: false },
       zone: "FIELD",
     },
@@ -707,6 +708,7 @@ export const EB03_018_TASHIGI: EffectSchema = {
           params: { keyword: "BLOCKER" },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       zone: "FIELD",
     },
     {
@@ -1585,6 +1587,7 @@ export const EB03_041_KUJYAKU: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       zone: "FIELD",
     },
     {

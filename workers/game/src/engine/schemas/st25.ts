@@ -98,6 +98,7 @@ export const ST25_002_CABAJI: EffectSchema = {
           params: { amount: 5000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

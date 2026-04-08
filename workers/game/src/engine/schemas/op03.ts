@@ -1585,6 +1585,7 @@ export const OP03_045_CARNE: EffectSchema = {
             type: "WHILE_CONDITION",
             condition: {
               all_of: [
+                { type: "IS_MY_TURN", controller: "OPPONENT" },
                 { type: "DECK_COUNT", controller: "SELF", operator: "<=", value: 20 },
               ],
             },
@@ -1595,6 +1596,7 @@ export const OP03_045_CARNE: EffectSchema = {
         type: "WHILE_CONDITION",
         condition: {
           all_of: [
+            { type: "IS_MY_TURN", controller: "OPPONENT" },
             { type: "DECK_COUNT", controller: "SELF", operator: "<=", value: 20 },
           ],
         },
@@ -2678,6 +2680,7 @@ export const OP03_078_ISSHO: EffectSchema = {
             type: "WHILE_CONDITION",
             condition: {
               all_of: [
+                { type: "IS_MY_TURN", controller: "SELF" },
                 {
                   type: "DON_FIELD_COUNT",
                   controller: "SELF",
@@ -2692,10 +2695,15 @@ export const OP03_078_ISSHO: EffectSchema = {
       duration: {
         type: "WHILE_CONDITION",
         condition: {
-          type: "DON_FIELD_COUNT",
-          controller: "SELF",
-          operator: ">=",
-          value: 1,
+          all_of: [
+            { type: "IS_MY_TURN", controller: "SELF" },
+            {
+              type: "DON_FIELD_COUNT",
+              controller: "SELF",
+              operator: ">=",
+              value: 1,
+            },
+          ],
         },
       },
     },

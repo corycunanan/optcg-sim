@@ -113,6 +113,7 @@ export const ST10_003_EUSTASS_CAPTAIN_KID: EffectSchema = {
           params: { amount: -1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "when_attacking_power_boost",

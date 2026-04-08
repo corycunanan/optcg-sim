@@ -2463,6 +2463,7 @@ export const OP05_066_JINBE: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -3122,6 +3123,7 @@ export const OP05_084_SAINT_CHARLOS: EffectSchema = {
           params: { amount: -4 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -3422,6 +3424,7 @@ export const OP05_092_SAINT_ROSWARD: EffectSchema = {
           params: { amount: -6 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -3718,6 +3721,7 @@ export const OP05_097_MARY_GEOISE: EffectSchema = {
           params: { amount: -1 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };

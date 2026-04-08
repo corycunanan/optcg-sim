@@ -3577,7 +3577,7 @@ export const OP11_112_MEGALO: EffectSchema = {
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
-      duration: { type: "WHILE_CONDITION", condition: { type: "SELF_STATE", required_state: "ACTIVE" } },
+      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
       modifiers: [
         {
           type: "MODIFY_POWER",

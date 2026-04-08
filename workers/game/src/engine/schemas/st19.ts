@@ -147,6 +147,7 @@ export const ST19_004_HINA: EffectSchema = {
           params: { amount: 4 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "activate_give_don",

@@ -217,7 +217,7 @@ export const OP08_006_CHESSMARIMO: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
-      duration: { type: "WHILE_CONDITION", condition: { type: "SELF_STATE", required_state: "ACTIVE" } },
+      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
     },
   ],
 };
@@ -730,6 +730,7 @@ export const OP08_020_DRUM_KINGDOM: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -2906,6 +2907,7 @@ export const OP08_083_SHEEPSHEAD: EffectSchema = {
           params: { amount: -1 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };

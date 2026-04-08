@@ -120,6 +120,7 @@ export const ST28_004_KOUZUKI_MOMONOSUKE: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "activate_rush_power",
@@ -174,6 +175,7 @@ export const ST28_005_YAMATO: EffectSchema = {
           params: { amount: 3000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "on_play_search",

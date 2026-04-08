@@ -330,6 +330,7 @@ export const ST14_009_FRANKY: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

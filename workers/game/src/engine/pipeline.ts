@@ -25,6 +25,7 @@ import {
   orderMatchedTriggers,
   registerTriggersForCard,
   registerReplacementsForCard,
+  registerPermanentEffectsForCard,
   deregisterTriggersForCard,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver/index.js";
@@ -304,6 +305,7 @@ function registerNewCardTriggers(
       if (instance) {
         state = registerTriggersForCard(state, instance, cardData);
         state = registerReplacementsForCard(state, instance, cardData);
+        state = registerPermanentEffectsForCard(state, instance, cardData);
       }
     }
   }

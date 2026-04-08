@@ -516,6 +516,7 @@ export const EB01_014_SANJI: EffectSchema = {
           },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -2042,6 +2043,7 @@ export const EB01_058_MONT_BLANC_CRICKET: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };

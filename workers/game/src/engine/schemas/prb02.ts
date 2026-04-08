@@ -41,6 +41,7 @@ export const PRB02_001_KOBY: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "when_attacking_ko_draw",

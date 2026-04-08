@@ -40,7 +40,7 @@ export const OP15_001_KRIEG: EffectSchema = {
           params: { amount: -2000 },
           duration: {
             type: "WHILE_CONDITION",
-            condition: { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
+            condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 }] },
           },
         },
       ],
@@ -471,6 +471,7 @@ export const OP15_011_PEARL: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "OP15-011_on_ko",
@@ -1030,6 +1031,7 @@ export const OP15_024_USOPP: EffectSchema = {
           params: { keyword: "BLOCKER" },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "OP15-024_on_ko",
@@ -1964,6 +1966,7 @@ export const OP15_051_MONKEY_D_LUFFY: EffectSchema = {
           params: { amount: 3000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -2772,6 +2775,7 @@ export const OP15_070_FUZA: EffectSchema = {
           params: { amount: 6000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -2827,6 +2831,7 @@ export const OP15_071_HOLLY: EffectSchema = {
           params: { amount: 6000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

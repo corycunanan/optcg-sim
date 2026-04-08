@@ -1849,13 +1849,13 @@ export const OP01_068_GECKO_MORIA: EffectSchema = {
           params: { keyword: "DOUBLE_ATTACK" },
           duration: {
             type: "WHILE_CONDITION",
-            condition: { type: "HAND_COUNT", controller: "SELF", operator: ">=", value: 5 },
+            condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "HAND_COUNT", controller: "SELF", operator: ">=", value: 5 }] },
           },
         },
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: { type: "HAND_COUNT", controller: "SELF", operator: ">=", value: 5 },
+        condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "HAND_COUNT", controller: "SELF", operator: ">=", value: 5 }] },
       },
     },
   ],
@@ -2428,13 +2428,13 @@ export const OP01_091_KING: EffectSchema = {
           params: { amount: -1000 },
           duration: {
             type: "WHILE_CONDITION",
-            condition: { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 10 },
+            condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 10 }] },
           },
         },
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 10 },
+        condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 10 }] },
       },
     },
   ],

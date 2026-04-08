@@ -3056,6 +3056,7 @@ export const OP13_084_ST_SHEPHERD_JU_PETER: EffectSchema = {
           params: { value: 7000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
@@ -3547,6 +3548,7 @@ export const OP13_099_THE_EMPTY_THRONE: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "OP13-099_activate_main",

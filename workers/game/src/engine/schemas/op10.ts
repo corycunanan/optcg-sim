@@ -29,7 +29,7 @@ export const OP10_001_SMOKER: EffectSchema = {
     {
       id: "opponent_turn_power_buff",
       category: "permanent",
-      duration: { type: "WHILE_CONDITION", condition: { type: "TURN_COUNT", controller: "OPPONENT", operator: ">=", value: 0 } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       modifiers: [
         {
           type: "MODIFY_POWER",
@@ -196,7 +196,7 @@ export const OP10_005_SANJI: EffectSchema = {
         },
       ],
       zone: "FIELD",
-      duration: { type: "WHILE_CONDITION", condition: { type: "TURN_COUNT", controller: "SELF", operator: ">=", value: 0 } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "on_ko_draw",
@@ -412,7 +412,7 @@ export const OP10_011_TONY_TONY_CHOPPER: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
-      duration: { type: "WHILE_CONDITION", condition: { type: "TURN_COUNT", controller: "OPPONENT", operator: ">=", value: 0 } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -1323,7 +1323,7 @@ export const OP10_038_RORONOA_ZORO: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
-      duration: { type: "WHILE_CONDITION", condition: { type: "TURN_COUNT", controller: "OPPONENT", operator: ">=", value: 0 } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -2960,7 +2960,7 @@ export const OP10_086_SHIRYU: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
-      duration: { type: "WHILE_CONDITION", condition: { type: "TURN_COUNT", controller: "OPPONENT", operator: ">=", value: 0 } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "activate_ko",

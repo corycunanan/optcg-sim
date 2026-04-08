@@ -211,6 +211,7 @@ export type SimpleCondition =
   | RestedCardCountCondition
   | DonGivenCondition
   | TurnCountCondition
+  | IsMyTurnCondition
   | SourcePropertyCondition
   | RevealedCardPropertyCondition;
 
@@ -432,6 +433,11 @@ export interface TurnCountCondition {
   controller: Controller;
   operator: NumericOperator;
   value: number;
+}
+
+export interface IsMyTurnCondition {
+  type: "IS_MY_TURN";
+  controller: Controller;
 }
 
 export interface SourcePropertyCondition {

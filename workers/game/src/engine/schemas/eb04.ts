@@ -42,7 +42,7 @@ export const EB04_001_JEWELRY_BONNEY: EffectSchema = {
         value: 1,
       },
       zone: "FIELD",
-      duration: { type: "WHILE_CONDITION", condition: { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 1 } },
+      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 1 }] } },
       flags: { once_per_turn: false },
     },
     {
@@ -136,7 +136,7 @@ export const EB04_003_SMOKER_AND_TASHIGI: EffectSchema = {
         },
       ],
       zone: "FIELD",
-      duration: { type: "WHILE_CONDITION", condition: { type: "SELF_STATE", required_state: "ACTIVE" } },
+      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
     },
   ],
 };
@@ -414,6 +414,7 @@ export const EB04_010_LULUCIA_KINGDOM: EffectSchema = {
           params: { amount: 5000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       zone: "FIELD",
     },
     {
@@ -720,6 +721,7 @@ export const EB04_017_MYSTOMS: EffectSchema = {
           params: { amount: -1 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
       zone: "FIELD",
     },
     {
@@ -2111,6 +2113,7 @@ export const EB04_046_DOLL: EffectSchema = {
           params: { amount: 2 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       zone: "FIELD",
     },
   ],

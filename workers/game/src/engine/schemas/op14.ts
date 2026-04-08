@@ -917,6 +917,7 @@ export const OP14_026_KOUZUKI_ODEN: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -967,6 +968,7 @@ export const OP14_027_SHANKS: EffectSchema = {
           params: { amount: -1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -1215,6 +1217,7 @@ export const OP14_034_MONKEY_D_LUFFY: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "OP14-034_replacement",
@@ -2017,6 +2020,7 @@ export const OP14_053_VISTA: EffectSchema = {
           params: { value: { type: "GAME_STATE", source: "LEADER_BASE_POWER" } },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

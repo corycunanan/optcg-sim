@@ -74,6 +74,7 @@ export const EB02_003_TONY_TONY_CHOPPER: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "on_play_give_don",
