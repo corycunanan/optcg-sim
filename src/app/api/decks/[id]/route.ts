@@ -4,8 +4,8 @@
  * DELETE /api/decks/[id] — Delete a deck
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiAction, apiError } from "@/lib/api-response";
 import { UpdateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { prisma } from "@/lib/db";
@@ -47,17 +47,16 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
 
   try {
-    const deck = await getDeckForUser(id, session.user.id);
+    const deck = await getDeckForUser(id, userId);
     if (!deck) {
-      return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      return apiError("Deck not found", 404);
     }
 
     // Also fetch the leader card details
@@ -66,10 +65,10 @@ export async function GET(
       select: CARD_SELECT,
     });
 
-    return NextResponse.json({ data: { ...deck, leader } });
+    return apiSuccess({ ...deck, leader });
   } catch (error) {
     console.error("Deck fetch error:", error);
-    return NextResponse.json({ error: "Failed to fetch deck" }, { status: 500 });
+    return apiError("Failed to fetch deck", 500);
   }
 }
 
@@ -77,14 +76,13 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`deck-update:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`deck-update:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
@@ -92,10 +90,10 @@ export async function PUT(
   try {
     // Verify ownership
     const existing = await prisma.deck.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId },
     });
     if (!existing) {
-      return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      return apiError("Deck not found", 404);
     }
 
     const parsed = await parseBody(request, UpdateDeckSchema);
@@ -106,7 +104,7 @@ export async function PUT(
     if (leaderId && leaderId !== existing.leaderId) {
       const leader = await prisma.card.findUnique({ where: { id: leaderId } });
       if (!leader || leader.type !== "Leader") {
-        return NextResponse.json({ error: "Invalid leader card" }, { status: 400 });
+        return apiError("Invalid leader card", 400);
       }
     }
 
@@ -153,10 +151,10 @@ export async function PUT(
       select: CARD_SELECT,
     });
 
-    return NextResponse.json({ data: { ...deck, leader } });
+    return apiSuccess({ ...deck, leader });
   } catch (error) {
     console.error("Deck update error:", error);
-    return NextResponse.json({ error: "Failed to update deck" }, { status: 500 });
+    return apiError("Failed to update deck", 500);
   }
 }
 
@@ -164,31 +162,30 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`deck-delete:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`deck-delete:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
 
   try {
     const existing = await prisma.deck.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId },
     });
     if (!existing) {
-      return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      return apiError("Deck not found", 404);
     }
 
     await prisma.deck.delete({ where: { id } });
 
-    return NextResponse.json({ success: true });
+    return apiAction();
   } catch (error) {
     console.error("Deck delete error:", error);
-    return NextResponse.json({ error: "Failed to delete deck" }, { status: 500 });
+    return apiError("Failed to delete deck", 500);
   }
 }

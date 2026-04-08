@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 
 /**
  * Standardized API response helpers.
@@ -9,8 +10,23 @@ import { NextResponse } from "next/server";
  * Error:    { error: string }                         — all error responses
  */
 
-export function apiSuccess<T>(data: T, status = 200) {
-  return NextResponse.json({ data }, { status });
+/**
+ * Auth guard for API routes. Returns session + userId or a 401 response.
+ * Usage:
+ *   const authResult = await requireAuth();
+ *   if (authResult instanceof Response) return authResult;
+ *   const { session, userId } = authResult;
+ */
+export async function requireAuth() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return apiError("Unauthorized", 401);
+  }
+  return { session, userId: session.user.id };
+}
+
+export function apiSuccess<T>(data: T, status = 200, headers?: HeadersInit) {
+  return NextResponse.json({ data }, { status, headers });
 }
 
 export function apiList<T>(data: T[], pagination?: {
@@ -18,8 +34,8 @@ export function apiList<T>(data: T[], pagination?: {
   page: number;
   limit: number;
   totalPages: number;
-}) {
-  return NextResponse.json(pagination ? { data, pagination } : { data });
+}, headers?: HeadersInit) {
+  return NextResponse.json(pagination ? { data, pagination } : { data }, { headers });
 }
 
 export function apiAction() {

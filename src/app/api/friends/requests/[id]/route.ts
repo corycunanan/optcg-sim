@@ -2,8 +2,8 @@
  * PUT /api/friends/requests/[id] — Accept or decline a friend request
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { FriendRequestActionSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -13,16 +13,13 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await socialLimiter.check(`friend-action:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
@@ -37,7 +34,7 @@ export async function PUT(
     });
 
     if (!req) {
-      return NextResponse.json({ error: "Request not found" }, { status: 404 });
+      return apiError("Request not found", 404);
     }
 
     if (action === "accept") {
@@ -49,14 +46,14 @@ export async function PUT(
         prisma.friendRequest.delete({ where: { id } }),
       ]);
 
-      return NextResponse.json({ success: true });
+      return apiAction();
     } else {
       // Decline — delete the request
       await prisma.friendRequest.delete({ where: { id } });
-      return NextResponse.json({ success: true });
+      return apiAction();
     }
   } catch (error) {
     console.error("Friend request action error:", error);
-    return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
+    return apiError("Failed to process request", 500);
   }
 }

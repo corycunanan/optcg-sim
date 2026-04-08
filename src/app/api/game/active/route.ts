@@ -3,17 +3,13 @@
  * Used to show a "Rejoin" button when a player navigates away from an ongoing game.
  */
 
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireAuth, apiSuccess } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ data: null });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const game = await prisma.gameSession.findFirst({
     where: {
@@ -24,7 +20,5 @@ export async function GET() {
     orderBy: { startedAt: "desc" },
   });
 
-  return NextResponse.json({ data: game ?? null }, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return apiSuccess(game ?? null, 200, { "Cache-Control": "no-store" });
 }

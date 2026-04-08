@@ -2,8 +2,8 @@
  * DELETE /api/friends/[userId] — Remove a friend
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { socialLimiter } from "@/lib/rate-limit";
 
@@ -11,16 +11,13 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await socialLimiter.check(`unfriend:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { userId: friendId } = await params;
@@ -36,14 +33,14 @@ export async function DELETE(
     });
 
     if (!friendship) {
-      return NextResponse.json({ error: "Friendship not found" }, { status: 404 });
+      return apiError("Friendship not found", 404);
     }
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
 
-    return NextResponse.json({ success: true });
+    return apiAction();
   } catch (error) {
     console.error("Remove friend error:", error);
-    return NextResponse.json({ error: "Failed to remove friend" }, { status: 500 });
+    return apiError("Failed to remove friend", 500);
   }
 }

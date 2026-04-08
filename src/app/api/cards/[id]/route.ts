@@ -2,8 +2,8 @@
  * GET /api/cards/[id] — Get a single card with all relations
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { UpdateCardSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -26,16 +26,13 @@ export async function GET(
     });
 
     if (!card) {
-      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+      return apiError("Card not found", 404);
     }
 
-    return NextResponse.json({ data: card });
+    return apiSuccess(card);
   } catch (error) {
     console.error("Card fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch card" },
-      { status: 500 }
-    );
+    return apiError("Failed to fetch card", 500);
   }
 }
 
@@ -46,14 +43,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`card-update:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`card-update:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
@@ -77,12 +73,9 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ data: card });
+    return apiSuccess(card);
   } catch (error) {
     console.error("Card update error:", error);
-    return NextResponse.json(
-      { error: "Failed to update card" },
-      { status: 500 }
-    );
+    return apiError("Failed to update card", 500);
   }
 }

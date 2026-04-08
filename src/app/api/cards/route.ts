@@ -3,8 +3,8 @@
  * POST /api/cards — Create a new card (admin)
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiList, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { cardIdToOriginSet } from "@/lib/utils";
 import { CreateCardSchema } from "@/lib/validators/cards";
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   const { limited } = await searchLimiter.check(`card-search:${ip}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const sp = request.nextUrl.searchParams;
@@ -64,33 +64,26 @@ export async function GET(request: NextRequest) {
       prisma.card.count({ where }),
     ]);
 
-    return NextResponse.json({
-      data: cards,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+    return apiList(cards, {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error("Card search error:", error);
-    return NextResponse.json(
-      { error: "Failed to search cards" },
-      { status: 500 },
-    );
+    return apiError("Failed to search cards", 500);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`card-create:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`card-create:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -102,10 +95,7 @@ export async function POST(request: NextRequest) {
     // Check for duplicate
     const existing = await prisma.card.findUnique({ where: { id } });
     if (existing) {
-      return NextResponse.json(
-        { error: `Card with ID "${id}" already exists` },
-        { status: 409 },
-      );
+      return apiError(`Card with ID "${id}" already exists`, 409);
     }
 
     // Derive origin set from card ID
@@ -138,12 +128,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ data: card }, { status: 201 });
+    return apiSuccess(card, 201);
   } catch (error) {
     console.error("Card create error:", error);
-    return NextResponse.json(
-      { error: "Failed to create card" },
-      { status: 500 },
-    );
+    return apiError("Failed to create card", 500);
   }
 }

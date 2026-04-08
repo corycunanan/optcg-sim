@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api-client";
 
 interface Deck {
   id: string;
@@ -102,12 +103,10 @@ export function useLobbySession(): UseLobbySessionReturn {
 
   const syncActiveGameFromServer = useCallback(async () => {
     try {
-      const res = await fetch("/api/game/active");
-      if (!res.ok) return;
-      const json = await res.json();
+      const json = await apiGet<{ data: { id: string } | null }>("/api/game/active");
       setActiveGameId(json.data?.id ?? null);
     } catch {
-      /* network error */
+      /* network error or 401 */
     }
   }, []);
 
@@ -139,21 +138,23 @@ export function useLobbySession(): UseLobbySessionReturn {
   // ─── Load decks on mount ──────────────────────────────────────────────────
 
   const fetchDecks = useCallback(async () => {
-    const res = await fetch("/api/decks");
-    if (!res.ok) return;
-    const data = await res.json();
-    const decks: Deck[] = (data.data ?? []).map(
-      (d: { id: string; name: string; leaderId: string; leaderName: string | null; leaderImageUrl: string | null }) => ({
-        id: d.id,
-        name: d.name,
-        leaderId: d.leaderId,
-        leaderName: d.leaderName,
-        leaderImageUrl: d.leaderImageUrl,
-      }),
-    );
-    setUserDecks(decks);
-    if (decks.length > 0 && !selectedDeckId) setSelectedDeckId(decks[0].id);
-    return decks;
+    try {
+      const json = await apiGet<{ data: Deck[] }>("/api/decks");
+      const decks: Deck[] = (json.data ?? []).map(
+        (d) => ({
+          id: d.id,
+          name: d.name,
+          leaderId: d.leaderId,
+          leaderName: d.leaderName,
+          leaderImageUrl: d.leaderImageUrl,
+        }),
+      );
+      setUserDecks(decks);
+      if (decks.length > 0 && !selectedDeckId) setSelectedDeckId(decks[0].id);
+      return decks;
+    } catch {
+      /* network error */
+    }
   }, [selectedDeckId]);
 
   useEffect(() => {
@@ -165,12 +166,8 @@ export function useLobbySession(): UseLobbySessionReturn {
   const pollLobby = useCallback(
     async (lobbyId: string) => {
       try {
-        const res = await fetch(`/api/lobbies/${lobbyId}`);
-        if (!res.ok) {
-          setActiveLobby(null);
-          return;
-        }
-        const { data } = await res.json();
+        const json = await apiGet<{ data: LobbyState }>(`/api/lobbies/${lobbyId}`);
+        const data = json.data;
 
         if (data.gameId) {
           router.push(`/game/${data.gameId}`);
@@ -185,7 +182,7 @@ export function useLobbySession(): UseLobbySessionReturn {
 
         setActiveLobby(data);
       } catch {
-        /* network blip */
+        setActiveLobby(null);
       }
     },
     [router],
@@ -216,31 +213,24 @@ export function useLobbySession(): UseLobbySessionReturn {
       if (!deckId || creating) return;
       setCreating(true);
       try {
-        const res = await fetch("/api/lobbies", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deckId, format: "Standard" }),
+        const json = await apiPost<{ data: { lobbyId: string; joinCode: string } }>("/api/lobbies", { deckId, format: "Standard" });
+        const deck = userDecks.find((d) => d.id === deckId);
+        setActiveLobby({
+          id: json.data.lobbyId,
+          status: "WAITING",
+          joinCode: json.data.joinCode,
+          format: "Standard",
+          gameId: null,
+          host: null,
+          hostDeck: {
+            id: deckId,
+            name: deck?.name ?? "Deck",
+            leaderName: deck?.leaderName ?? null,
+            leaderImageUrl: deck?.leaderImageUrl ?? null,
+          },
+          guest: null,
         });
-        const json = await res.json();
-        if (res.ok) {
-          const deck = userDecks.find((d) => d.id === deckId);
-          setActiveLobby({
-            id: json.data.lobbyId,
-            status: "WAITING",
-            joinCode: json.data.joinCode,
-            format: "Standard",
-            gameId: null,
-            host: null,
-            hostDeck: {
-              id: deckId,
-              name: deck?.name ?? "Deck",
-              leaderName: deck?.leaderName ?? null,
-              leaderImageUrl: deck?.leaderImageUrl ?? null,
-            },
-            guest: null,
-          });
-          lobbyCreatedRef.current = true;
-        }
+        lobbyCreatedRef.current = true;
       } catch {
         /* network error */
       } finally {
@@ -267,7 +257,11 @@ export function useLobbySession(): UseLobbySessionReturn {
 
   const cancelLobby = async () => {
     if (!activeLobby) return;
-    await fetch(`/api/lobbies/${activeLobby.id}`, { method: "DELETE" });
+    try {
+      await apiDelete(`/api/lobbies/${activeLobby.id}`);
+    } catch {
+      /* ignore */
+    }
     setActiveLobby(null);
     lobbyCreatedRef.current = false;
   };
@@ -277,19 +271,14 @@ export function useLobbySession(): UseLobbySessionReturn {
     setJoining(true);
     setJoinError(null);
     try {
-      const res = await fetch("/api/lobbies/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: joinCode, deckId: selectedDeckId }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        router.push(`/game/${json.data.gameId}`);
+      const json = await apiPost<{ data: { gameId: string } }>("/api/lobbies/join", { code: joinCode, deckId: selectedDeckId });
+      router.push(`/game/${json.data.gameId}`);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setJoinError(error.message);
       } else {
-        setJoinError(json.error ?? "Failed to join lobby");
+        setJoinError("Network error");
       }
-    } catch {
-      setJoinError("Network error");
     } finally {
       setJoining(false);
     }
@@ -311,19 +300,14 @@ export function useLobbySession(): UseLobbySessionReturn {
     setConceding(true);
     setConcedeError(null);
     try {
-      const res = await fetch(`/api/game/${activeGameId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "CONCEDE" }),
-      });
-      if (res.ok) {
-        setActiveGameId(null);
+      await apiPost(`/api/game/${activeGameId}`, { action: "CONCEDE" });
+      setActiveGameId(null);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setConcedeError(error.message);
       } else {
-        const data = await res.json().catch(() => ({}));
-        setConcedeError(data.error ?? "Failed to concede");
+        setConcedeError("Network error");
       }
-    } catch {
-      setConcedeError("Network error");
     } finally {
       setConceding(false);
     }
@@ -333,11 +317,11 @@ export function useLobbySession(): UseLobbySessionReturn {
     setSelectedDeckId(deckId);
     if (activeLobby) {
       const deck = userDecks.find((d) => d.id === deckId);
-      await fetch(`/api/lobbies/${activeLobby.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deckId }),
-      });
+      try {
+        await apiPatch(`/api/lobbies/${activeLobby.id}`, { deckId });
+      } catch {
+        /* ignore */
+      }
       setActiveLobby((prev) =>
         prev
           ? {

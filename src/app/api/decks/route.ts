@@ -3,23 +3,22 @@
  * POST /api/decks — Create a new deck
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { CreateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   try {
     const decks = await prisma.deck.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       orderBy: { updatedAt: "desc" },
       include: {
         cards: {
@@ -58,22 +57,21 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ data });
+    return apiSuccess(data);
   } catch (error) {
     console.error("Deck list error:", error);
-    return NextResponse.json({ error: "Failed to list decks" }, { status: 500 });
+    return apiError("Failed to list decks", 500);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`deck-create:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`deck-create:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -84,10 +82,10 @@ export async function POST(request: NextRequest) {
     // Verify leader exists and is a Leader type
     const leader = await prisma.card.findUnique({ where: { id: leaderId } });
     if (!leader) {
-      return NextResponse.json({ error: "Leader card not found" }, { status: 404 });
+      return apiError("Leader card not found", 404);
     }
     if (leader.type !== "Leader") {
-      return NextResponse.json({ error: "Selected card is not a Leader" }, { status: 400 });
+      return apiError("Selected card is not a Leader", 400);
     }
 
     const deck = await prisma.deck.create({
@@ -99,7 +97,7 @@ export async function POST(request: NextRequest) {
         donArtUrl: donArtUrl ?? null,
         testOrder: testOrder ?? Prisma.JsonNull,
         format: format || "Standard",
-        userId: session.user.id,
+        userId,
         cards: cards?.length
           ? {
               createMany: {
@@ -139,9 +137,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ data: deck }, { status: 201 });
+    return apiSuccess(deck, 201);
   } catch (error) {
     console.error("Deck create error:", error);
-    return NextResponse.json({ error: "Failed to create deck" }, { status: 500 });
+    return apiError("Failed to create deck", 500);
   }
 }

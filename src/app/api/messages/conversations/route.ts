@@ -4,17 +4,13 @@
  * with the last message and unread count.
  */
 
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   try {
     // Fetch only the latest message per conversation partner using a
@@ -81,9 +77,9 @@ export async function GET() {
       unreadCount: Number(row.unreadCount),
     }));
 
-    return NextResponse.json({ data: conversations });
+    return apiSuccess(conversations);
   } catch (error) {
     console.error("Conversations list error:", error);
-    return NextResponse.json({ error: "Failed to list conversations" }, { status: 500 });
+    return apiError("Failed to list conversations", 500);
   }
 }

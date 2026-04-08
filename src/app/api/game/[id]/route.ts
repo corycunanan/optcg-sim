@@ -3,8 +3,8 @@
  * POST /api/game/[id] — Resolve a stuck game when websocket recovery fails
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { GameActionSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -24,12 +24,10 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const userId = session.user.id;
   const { id } = await params;
 
   const game = await prisma.gameSession.findFirst({
@@ -48,38 +46,31 @@ export async function GET(
   });
 
   if (!game) {
-    return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    return apiError("Game not found", 404);
   }
 
-  return NextResponse.json({
-    data: {
-      id: game.id,
-      status: game.status,
-      winnerId: game.winnerId,
-      winReason: game.winReason,
-      winnerPerspective: getWinnerPerspective(game.winnerId, userId),
-      canFallbackConcede: game.status === "IN_PROGRESS",
-      playerIndex: game.player1Id === userId ? 0 : 1,
-    },
-  }, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return apiSuccess({
+    id: game.id,
+    status: game.status,
+    winnerId: game.winnerId,
+    winReason: game.winReason,
+    winnerPerspective: getWinnerPerspective(game.winnerId, userId),
+    canFallbackConcede: game.status === "IN_PROGRESS",
+    playerIndex: game.player1Id === userId ? 0 : 1,
+  }, 200, { "Cache-Control": "no-store" });
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await apiLimiter.check(`game-action:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
@@ -94,12 +85,6 @@ export async function POST(
   return handleConcede(id, userId);
 }
 
-/**
- * FINALIZE — Client-driven game end notification.
- * The game board calls this when it receives game:over from the websocket,
- * serving as a reliable backup for the worker→Next.js callback which can
- * fail in local dev (Miniflare can't reach localhost:3000).
- */
 async function handleFinalize(
   gameId: string,
   userId: string,
@@ -114,20 +99,16 @@ async function handleFinalize(
   });
 
   if (!game) {
-    return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    return apiError("Game not found", 404);
   }
 
-  // Already resolved — return success without modifying
   if (game.status !== "IN_PROGRESS") {
-    return NextResponse.json({
-      data: { id: game.id, status: game.status, finalized: false },
-    });
+    return apiSuccess({ id: game.id, status: game.status, finalized: false });
   }
 
-  // Validate winnerId is one of the two participants (or null for abandonment)
   const { winnerId, winReason } = body;
   if (winnerId != null && winnerId !== game.player1Id && winnerId !== game.player2Id) {
-    return NextResponse.json({ error: "Invalid winnerId" }, { status: 400 });
+    return apiError("Invalid winnerId", 400);
   }
 
   const updated = await prisma.gameSession.update({
@@ -141,15 +122,13 @@ async function handleFinalize(
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
 
-  return NextResponse.json({
-    data: {
-      id: updated.id,
-      status: updated.status,
-      winnerId: updated.winnerId,
-      winReason: updated.winReason,
-      winnerPerspective: getWinnerPerspective(updated.winnerId, userId),
-      finalized: true,
-    },
+  return apiSuccess({
+    id: updated.id,
+    status: updated.status,
+    winnerId: updated.winnerId,
+    winReason: updated.winReason,
+    winnerPerspective: getWinnerPerspective(updated.winnerId, userId),
+    finalized: true,
   });
 }
 
@@ -164,7 +143,7 @@ async function handleConcede(gameId: string, userId: string) {
   });
 
   if (!game) {
-    return NextResponse.json({ error: "Active game not found" }, { status: 404 });
+    return apiError("Active game not found", 404);
   }
 
   const winnerId = game.player1Id === userId ? game.player2Id : game.player1Id;
@@ -194,14 +173,12 @@ async function handleConcede(gameId: string, userId: string) {
     }).catch(() => {});
   }
 
-  return NextResponse.json({
-    data: {
-      id: updated.id,
-      status: updated.status,
-      winnerId: updated.winnerId,
-      winReason: updated.winReason,
-      winnerPerspective: getWinnerPerspective(updated.winnerId, userId),
-      canFallbackConcede: false,
-    },
+  return apiSuccess({
+    id: updated.id,
+    status: updated.status,
+    winnerId: updated.winnerId,
+    winReason: updated.winReason,
+    winnerPerspective: getWinnerPerspective(updated.winnerId, userId),
+    canFallbackConcede: false,
   });
 }

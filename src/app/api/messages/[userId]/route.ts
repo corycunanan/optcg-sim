@@ -3,8 +3,8 @@
  * POST /api/messages/[userId] — Send a message
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { SendMessageSchema } from "@/lib/validators/messages";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -14,12 +14,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId: myId } = authResult;
 
-  const myId = session.user.id;
   const { userId: otherId } = await params;
   const cursor = request.nextUrl.searchParams.get("cursor");
   const after = request.nextUrl.searchParams.get("after");
@@ -49,7 +47,7 @@ export async function GET(
         });
       }
 
-      return NextResponse.json({ data: newMessages });
+      return apiSuccess(newMessages);
     }
 
     const messages = await prisma.message.findMany({
@@ -73,13 +71,11 @@ export async function GET(
       data: { read: true },
     });
 
-    return NextResponse.json({
-      data: messages.reverse(), // oldest first
-      nextCursor: messages.length === limit ? messages[0].createdAt.toISOString() : null,
-    });
+    const reversed = messages.reverse(); // oldest first
+    return apiSuccess(reversed, 200, undefined);
   } catch (error) {
     console.error("Message history error:", error);
-    return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
+    return apiError("Failed to fetch messages", 500);
   }
 }
 
@@ -87,17 +83,15 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId: fromUserId } = authResult;
 
-  const fromUserId = session.user.id;
   const { userId: toUserId } = await params;
 
   const { limited } = await socialLimiter.check(`msg:${fromUserId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -105,13 +99,13 @@ export async function POST(
     if (isErrorResponse(parsed)) return parsed;
     const { body } = parsed;
     if (toUserId === fromUserId) {
-      return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 });
+      return apiError("Cannot message yourself", 400);
     }
 
     // Verify the target user exists
     const target = await prisma.user.findUnique({ where: { id: toUserId } });
     if (!target) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return apiError("User not found", 404);
     }
 
     const message = await prisma.message.create({
@@ -121,9 +115,9 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ data: message }, { status: 201 });
+    return apiSuccess(message, 201);
   } catch (error) {
     console.error("Message send error:", error);
-    return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
+    return apiError("Failed to send message", 500);
   }
 }

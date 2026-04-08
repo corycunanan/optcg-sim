@@ -2,7 +2,8 @@
  * POST /api/auth/register — Create a credentials account
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { RegisterSchema } from "@/lib/validators/auth";
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   const { limited } = await authLimiter.check(`register:${ip}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -28,10 +29,10 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (existingEmail) {
-      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
+      return apiError("An account with this email already exists", 409);
     }
     if (existingUsername) {
-      return NextResponse.json({ error: "This username is already taken" }, { status: 409 });
+      return apiError("This username is already taken", 409);
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -46,9 +47,9 @@ export async function POST(request: NextRequest) {
       select: { id: true, email: true, username: true },
     });
 
-    return NextResponse.json({ data: user }, { status: 201 });
+    return apiSuccess(user, 201);
   } catch (error) {
     console.error("Register error:", error);
-    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
+    return apiError("Registration failed", 500);
   }
 }

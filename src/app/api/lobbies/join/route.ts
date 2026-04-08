@@ -10,8 +10,8 @@
  * The host discovers the game started via polling GET /api/lobbies/[id].
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { normalizeLobbyCode } from "@/lib/lobbies";
 import { toCardData } from "@/lib/game/card-data";
@@ -23,21 +23,18 @@ const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await apiLimiter.check(`lobby-join:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
     console.error("GAME_WORKER_URL or GAME_WORKER_SECRET not configured");
-    return NextResponse.json({ error: "Game server not configured" }, { status: 503 });
+    return apiError("Game server not configured", 503);
   }
 
   try {
@@ -47,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const normalizedCode = normalizeLobbyCode(code);
     if (normalizedCode.length < 4) {
-      return NextResponse.json({ error: "Invalid lobby code" }, { status: 400 });
+      return apiError("Invalid lobby code", 400);
     }
 
     // Verify guest's deck belongs to them
@@ -56,7 +53,7 @@ export async function POST(request: NextRequest) {
       include: { cards: { include: { card: true } } },
     });
     if (!guestDeck) {
-      return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      return apiError("Deck not found", 404);
     }
 
     // Find the lobby by join code
@@ -69,24 +66,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (!lobby) {
-      return NextResponse.json(
-        { error: "Lobby not found or already started" },
-        { status: 404 },
-      );
+      return apiError("Lobby not found or already started", 404);
     }
 
     if (lobby.hostUserId === userId) {
-      return NextResponse.json(
-        { error: "You cannot join your own lobby" },
-        { status: 409 },
-      );
+      return apiError("You cannot join your own lobby", 409);
     }
 
     if (lobby.guest) {
-      return NextResponse.json(
-        { error: "Lobby already has a guest" },
-        { status: 409 },
-      );
+      return apiError("Lobby already has a guest", 409);
     }
 
     // Fetch leader cards (leaders are NOT in DeckCard)
@@ -96,7 +84,7 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (!hostLeader || !guestLeader) {
-      return NextResponse.json({ error: "Leader card not found" }, { status: 404 });
+      return apiError("Leader card not found", 404);
     }
 
     // Atomically create LobbyGuest + GameSession + mark lobby IN_GAME.
@@ -197,15 +185,12 @@ export async function POST(request: NextRequest) {
         prisma.lobbyGuest.delete({ where: { lobbyId: lobby.id } }),
         prisma.lobby.update({ where: { id: lobby.id }, data: { status: "WAITING" } }),
       ]).catch((e) => console.error("Rollback failed:", e));
-      return NextResponse.json(
-        { error: "Failed to initialize game server" },
-        { status: 502 },
-      );
+      return apiError("Failed to initialize game server", 502);
     }
 
-    return NextResponse.json({ data: { gameId: gameSession.id } });
+    return apiSuccess({ gameId: gameSession.id });
   } catch (error) {
     console.error("Lobby join error:", error);
-    return NextResponse.json({ error: "Failed to join lobby" }, { status: 500 });
+    return apiError("Failed to join lobby", 500);
   }
 }

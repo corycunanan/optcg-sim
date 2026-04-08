@@ -2,23 +2,21 @@
  * POST /api/user/username — Set username for authenticated user (onboarding)
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { SetUsernameSchema } from "@/lib/validators/user";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
-  const { limited } = await apiLimiter.check(`username:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`username:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -31,25 +29,19 @@ export async function POST(request: NextRequest) {
       where: { username: trimmed },
     });
 
-    if (existing && existing.id !== session.user.id) {
-      return NextResponse.json(
-        { error: "Username is already taken" },
-        { status: 409 }
-      );
+    if (existing && existing.id !== userId) {
+      return apiError("Username is already taken", 409);
     }
 
     // Update user
     const user = await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { username: trimmed },
     });
 
-    return NextResponse.json({ data: { username: user.username } });
+    return apiSuccess({ username: user.username });
   } catch (error) {
     console.error("Username update error:", error);
-    return NextResponse.json(
-      { error: "Failed to set username" },
-      { status: 500 }
-    );
+    return apiError("Failed to set username", 500);
   }
 }

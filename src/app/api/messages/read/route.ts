@@ -2,28 +2,25 @@
  * PUT /api/messages/read?messageId=... — Mark a message as read
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { socialLimiter } from "@/lib/rate-limit";
 
 export async function PUT(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await socialLimiter.check(`msg-read:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const messageId = request.nextUrl.searchParams.get("messageId");
 
   if (!messageId) {
-    return NextResponse.json({ error: "messageId required" }, { status: 400 });
+    return apiError("messageId required", 400);
   }
 
   try {
@@ -32,7 +29,7 @@ export async function PUT(request: NextRequest) {
     });
 
     if (!msg) {
-      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+      return apiError("Message not found", 404);
     }
 
     await prisma.message.update({
@@ -40,9 +37,9 @@ export async function PUT(request: NextRequest) {
       data: { read: true },
     });
 
-    return NextResponse.json({ success: true });
+    return apiAction();
   } catch (error) {
     console.error("Mark read error:", error);
-    return NextResponse.json({ error: "Failed to mark message as read" }, { status: 500 });
+    return apiError("Failed to mark message as read", 500);
   }
 }

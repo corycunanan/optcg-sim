@@ -3,8 +3,8 @@
  * DELETE /api/lobbies/[id] — Cancel lobby (host only)
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { UpdateLobbyDeckSchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -16,10 +16,8 @@ export async function GET(
   _request: NextRequest,
   { params }: RouteContext,
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
 
   const { id } = await params;
 
@@ -44,10 +42,9 @@ export async function GET(
   });
 
   if (!lobby) {
-    return NextResponse.json({ error: "Lobby not found" }, { status: 404 });
+    return apiError("Lobby not found", 404);
   }
 
-  // Resolve leader card images for host and guest decks
   const leaderIds = [lobby.hostDeck.leaderId];
   if (lobby.guest?.deck?.leaderId) leaderIds.push(lobby.guest.deck.leaderId);
   const leaderCards = await prisma.card.findMany({
@@ -61,7 +58,7 @@ export async function GET(
     ? leaderMap.get(lobby.guest.deck.leaderId)
     : null;
 
-  return NextResponse.json({ data: {
+  return apiSuccess({
     id: lobby.id,
     status: lobby.status,
     joinCode: lobby.joinCode,
@@ -86,25 +83,20 @@ export async function GET(
         }
       : null,
     gameId: lobby.gameSession?.id ?? null,
-  } }, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  }, 200, { "Cache-Control": "no-store" });
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: RouteContext,
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await apiLimiter.check(`lobby-update:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
@@ -117,7 +109,7 @@ export async function PATCH(
   });
 
   if (!lobby) {
-    return NextResponse.json({ error: "Lobby not found or already started" }, { status: 404 });
+    return apiError("Lobby not found or already started", 404);
   }
 
   const deck = await prisma.deck.findFirst({
@@ -125,7 +117,7 @@ export async function PATCH(
   });
 
   if (!deck) {
-    return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+    return apiError("Deck not found", 404);
   }
 
   await prisma.lobby.update({
@@ -133,23 +125,20 @@ export async function PATCH(
     data: { hostDeckId: deckId },
   });
 
-  return NextResponse.json({ success: true });
+  return apiAction();
 }
 
 export async function DELETE(
   _request: NextRequest,
   { params }: RouteContext,
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await apiLimiter.check(`lobby-delete:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const { id } = await params;
@@ -159,7 +148,7 @@ export async function DELETE(
   });
 
   if (!lobby) {
-    return NextResponse.json({ error: "Lobby not found or already started" }, { status: 404 });
+    return apiError("Lobby not found or already started", 404);
   }
 
   await prisma.lobby.update({
@@ -167,5 +156,5 @@ export async function DELETE(
     data: { status: "CLOSED" },
   });
 
-  return NextResponse.json({ success: true });
+  return apiAction();
 }
