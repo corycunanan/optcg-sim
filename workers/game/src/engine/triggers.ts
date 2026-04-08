@@ -131,9 +131,8 @@ export function registerPermanentEffectsForCard(
           appliesTo.push(cardInstance.instanceId);
         }
       }
-      // Other target types (ALL_YOUR_CHARACTERS, etc.) are resolved dynamically
-      // during power calculation, so we still need the source card in appliesTo
-      // for the effect to be findable
+      // Non-SELF targets (ALL_YOUR_CHARACTERS, etc.) are not yet dynamically
+      // resolved — see OPT-126. For now, store the source card in appliesTo.
       if (mod.target && mod.target.type !== "SELF") {
         if (!appliesTo.includes(cardInstance.instanceId)) {
           appliesTo.push(cardInstance.instanceId);

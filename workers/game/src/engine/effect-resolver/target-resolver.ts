@@ -79,7 +79,7 @@ function resolveCardProperty(instanceId: string, property: "power" | "cost", sta
   if (!card) return 0;
   const data = cardDb.get(card.cardId);
   if (!data) return 0;
-  if (property === "power") return getEffectivePower(card, data, state);
+  if (property === "power") return getEffectivePower(card, data, state, cardDb);
   return getEffectiveCost(data, state, instanceId, cardDb);
 }
 

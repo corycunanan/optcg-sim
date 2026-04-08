@@ -147,7 +147,7 @@ function evaluateSimple(
         const data = ctx.cardDb.get(c.cardId);
         if (!data || data.name !== cond.name) return false;
         if (cond.property.power) {
-          const power = getEffectivePower(c, data, state);
+          const power = getEffectivePower(c, data, state, ctx.cardDb);
           if (!matchesNumericRange(power, cond.property.power)) return false;
         }
         if (cond.property.cost) {
@@ -170,7 +170,7 @@ function evaluateSimple(
       if (!data) return false;
       const prop = cond.property;
       if ("power" in prop) {
-        const power = getEffectivePower(p.leader, data, state);
+        const power = getEffectivePower(p.leader, data, state, ctx.cardDb);
         return matchesNumericRange(power, prop.power);
       }
       if ("color_includes" in prop) {
@@ -205,7 +205,7 @@ function evaluateSimple(
       if (!card) return false;
       const data = ctx.cardDb.get(card.cardId);
       if (!data) return false;
-      return compareNum(getEffectivePower(card, data, state), cond.operator, cond.value);
+      return compareNum(getEffectivePower(card, data, state, ctx.cardDb), cond.operator, cond.value);
     }
 
     case "SELF_STATE": {
@@ -529,7 +529,7 @@ export function matchesFilter(
   if (filter.base_cost_max !== undefined && cost > filter.base_cost_max) return false;
 
   // Power filters
-  const effectivePower = getEffectivePower(card, data, state);
+  const effectivePower = getEffectivePower(card, data, state, cardDb);
   const basePower = data.power ?? 0;
   if (filter.power_exact !== undefined && !matchesDynamicNum(effectivePower, "==", filter.power_exact)) return false;
   if (filter.power_min !== undefined && !matchesDynamicNum(effectivePower, ">=", filter.power_min)) return false;

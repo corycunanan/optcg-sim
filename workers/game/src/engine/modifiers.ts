@@ -14,11 +14,35 @@ import type { CardInstance, CardData, GameState } from "../types.js";
 import type {
   RuntimeActiveEffect,
   RuntimeOneTimeModifier,
+  Condition,
   TargetFilter,
   EffectSchema,
 } from "./effect-types.js";
+import type { CardData as CardDataType } from "../types.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
 import { findCardInstance } from "./state.js";
+
+/**
+ * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
+ * Returns true for effects that have no WHILE_CONDITION duration (always active).
+ */
+function isEffectConditionMet(
+  effect: RuntimeActiveEffect,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>,
+): boolean {
+  const duration = effect.duration as { type: string; condition?: Condition } | undefined;
+  if (!duration || duration.type !== "WHILE_CONDITION" || !duration.condition) return true;
+  if (!cardDb) return true; // can't evaluate without cardDb — assume active
+
+  const condCtx: ConditionContext = {
+    sourceCardInstanceId: effect.sourceCardInstanceId,
+    controller: effect.controller,
+    cardDb,
+  };
+
+  return evaluateCondition(state, duration.condition, condCtx);
+}
 
 /**
  * Returns the effective power of a card in the current game state.
@@ -28,6 +52,7 @@ export function getEffectivePower(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
+  cardDb?: Map<string, CardDataType>,
 ): number {
   // Layer 0: base printed value
   let power = cardData.power ?? 0;
@@ -36,7 +61,8 @@ export function getEffectivePower(
   const effects = state.activeEffects as RuntimeActiveEffect[];
   const baseSetters = effects.filter((e) =>
     e.appliesTo?.includes(card.instanceId) &&
-    e.modifiers?.some((m) => m.type === "SET_POWER"),
+    e.modifiers?.some((m) => m.type === "SET_POWER") &&
+    isEffectConditionMet(e, state, cardDb),
   );
   if (baseSetters.length > 0) {
     // Last base-setter wins (timestamp order)
@@ -50,7 +76,8 @@ export function getEffectivePower(
   // Layer 2: additive/subtractive modifiers
   const additiveEffects = effects.filter((e) =>
     e.appliesTo?.includes(card.instanceId) &&
-    e.modifiers?.some((m) => m.type === "MODIFY_POWER"),
+    e.modifiers?.some((m) => m.type === "MODIFY_POWER") &&
+    isEffectConditionMet(e, state, cardDb),
   );
   for (const effect of additiveEffects) {
     for (const mod of effect.modifiers ?? []) {
@@ -281,13 +308,15 @@ export function hasGrantedKeyword(
   card: CardInstance,
   keyword: string,
   state: GameState,
+  cardDb?: Map<string, CardDataType>,
 ): boolean {
   const effects = state.activeEffects as RuntimeActiveEffect[];
   return effects.some((e) =>
     e.appliesTo?.includes(card.instanceId) &&
     e.modifiers?.some((m) =>
       m.type === "GRANT_KEYWORD" && m.params?.keyword === keyword,
-    ),
+    ) &&
+    isEffectConditionMet(e, state, cardDb),
   );
 }
 
@@ -298,13 +327,15 @@ export function hasRemovedKeyword(
   card: CardInstance,
   keyword: string,
   state: GameState,
+  cardDb?: Map<string, CardDataType>,
 ): boolean {
   const effects = state.activeEffects as RuntimeActiveEffect[];
   return effects.some((e) =>
     e.appliesTo?.includes(card.instanceId) &&
     e.modifiers?.some((m) =>
       m.type === "REMOVE_KEYWORD" && m.params?.keyword === keyword,
-    ),
+    ) &&
+    isEffectConditionMet(e, state, cardDb),
   );
 }
 
@@ -317,8 +348,9 @@ export function getBattleDefenderPower(
   defenderCardData: CardData,
   counterPowerAdded: number,
   state: GameState,
+  cardDb?: Map<string, CardDataType>,
 ): number {
-  return getEffectivePower(defenderCard, defenderCardData, state) + counterPowerAdded;
+  return getEffectivePower(defenderCard, defenderCardData, state, cardDb) + counterPowerAdded;
 }
 
 // ─── One-Time Modifiers ──────────────────────────────────────────────────────

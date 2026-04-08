@@ -923,11 +923,11 @@ describe("PER_COUNT dynamic value resolution", () => {
 // ─── WHILE_CONDITION Tests ───────────────────────────────────────────────────
 
 describe("WHILE_CONDITION effect evaluation", () => {
-  it("removes effect when condition becomes false", () => {
+  it("preserves permanent WHILE_CONDITION effects even when condition is false", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
 
-    // Create a WHILE_CONDITION effect: "if hand >= 5"
+    // Create a permanent WHILE_CONDITION effect: "if hand >= 5"
     const effect = {
       id: "test-while",
       sourceCardInstanceId: "char-0-v1",
@@ -956,7 +956,8 @@ describe("WHILE_CONDITION effect evaluation", () => {
     const result1 = evaluateWhileConditions(stateWithEffect, cardDb);
     expect(result1.activeEffects.length).toBe(1);
 
-    // Now reduce hand to 2 cards — condition should become false
+    // Now reduce hand to 2 cards — condition is false, but permanent effects
+    // are NOT removed. The condition is checked at modifier application time.
     const smallHandState = {
       ...stateWithEffect,
       players: [
@@ -966,7 +967,46 @@ describe("WHILE_CONDITION effect evaluation", () => {
     };
 
     const result2 = evaluateWhileConditions(smallHandState, cardDb);
-    expect(result2.activeEffects.length).toBe(0);
+    expect(result2.activeEffects.length).toBe(1); // preserved, not removed
+  });
+
+  it("removes non-permanent WHILE_CONDITION effects when condition is false", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+
+    // Create a non-permanent (auto) WHILE_CONDITION effect
+    const effect = {
+      id: "test-while-auto",
+      sourceCardInstanceId: "char-0-v1",
+      sourceEffectBlockId: "",
+      category: "auto",
+      modifiers: [{ type: "MODIFY_POWER", params: { amount: 1000 } }],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "HAND_COUNT", controller: "SELF", operator: ">=", value: 5 },
+      },
+      expiresAt: { wave: "CONDITION_FALSE" },
+      controller: 0,
+      appliesTo: ["char-0-v1"],
+      timestamp: Date.now(),
+    };
+
+    const stateWithEffect = {
+      ...state,
+      activeEffects: [effect as any],
+    };
+
+    // Reduce hand — non-permanent effects should still be removed
+    const smallHandState = {
+      ...stateWithEffect,
+      players: [
+        { ...stateWithEffect.players[0], hand: stateWithEffect.players[0].hand.slice(0, 2) },
+        stateWithEffect.players[1],
+      ] as [typeof stateWithEffect.players[0], typeof stateWithEffect.players[1]],
+    };
+
+    const result = evaluateWhileConditions(smallHandState, cardDb);
+    expect(result.activeEffects.length).toBe(0); // non-permanent → removed
   });
 });
 

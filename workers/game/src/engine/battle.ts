@@ -39,11 +39,11 @@ export function executeDeclareAttack(
 
   const attackerFound = findCardInState(nextState, attackerInstanceId)!;
   const attackerData = cardDb.get(attackerFound.card.cardId)!;
-  const attackerPower = getEffectivePower(attackerFound.card, attackerData, nextState);
+  const attackerPower = getEffectivePower(attackerFound.card, attackerData, nextState, cardDb);
 
   const defenderFound = findCardInState(nextState, targetInstanceId)!;
   const defenderData = cardDb.get(defenderFound.card.cardId)!;
-  const defenderPower = getEffectivePower(defenderFound.card, defenderData, nextState);
+  const defenderPower = getEffectivePower(defenderFound.card, defenderData, nextState, cardDb);
 
   const battle = {
     battleId: nanoid(),
@@ -101,7 +101,7 @@ export function executeDeclareBlocker(
   // Recalculate defender power with new target
   const blockerFound = findCardInState(nextState, blockerInstanceId)!;
   const blockerData = cardDb.get(blockerFound.card.cardId)!;
-  const blockerPower = getEffectivePower(blockerFound.card, blockerData, nextState);
+  const blockerPower = getEffectivePower(blockerFound.card, blockerData, nextState, cardDb);
 
   nextState = {
     ...nextState,
@@ -338,9 +338,9 @@ export function recalculateBattlePowers(
   const defenderData = cardDb.get(defenderFound.card.cardId);
   if (!attackerData || !defenderData) return state;
 
-  const newAttackerPower = getEffectivePower(attackerFound.card, attackerData, state);
+  const newAttackerPower = getEffectivePower(attackerFound.card, attackerData, state, cardDb);
   const newDefenderPower = getBattleDefenderPower(
-    defenderFound.card, defenderData, battle.counterPowerAdded, state,
+    defenderFound.card, defenderData, battle.counterPowerAdded, state, cardDb,
   );
 
   if (newAttackerPower === battle.attackerPower && newDefenderPower === battle.defenderPower) {

@@ -339,7 +339,7 @@ export function executeCopyPower(
   const sourceCard = findCardInstance(state, sourceIds[0]);
   const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   if (!sourceCard || !sourceData) return { state, events, succeeded: false };
-  const sourcePower = getEffectivePower(sourceCard, sourceData, state);
+  const sourcePower = getEffectivePower(sourceCard, sourceData, state, cardDb);
 
   // Apply copied power to self or action target
   const selfTarget = action.target ?? { type: "SELF" };
@@ -439,8 +439,8 @@ export function executeSwapBasePower(
   const dataB = cardB ? cardDb.get(cardB.cardId) : undefined;
   if (!cardA || !cardB || !dataA || !dataB) return { state, events, succeeded: false };
 
-  const powerA = getEffectivePower(cardA, dataA, state);
-  const powerB = getEffectivePower(cardB, dataB, state);
+  const powerA = getEffectivePower(cardA, dataA, state, cardDb);
+  const powerB = getEffectivePower(cardB, dataB, state, cardDb);
   const expiry = computeExpiry(duration, state);
 
   const effectA: RuntimeActiveEffect = {
