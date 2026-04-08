@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   GameState,
   GameAction,
-  PromptType,
   PromptOptions,
   ServerMessage,
 } from "@shared/game-types";
@@ -27,7 +26,7 @@ export function useGameWs(
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [lastError, setLastError] = useState<string | null>(null);
-  const [activePrompt, setActivePrompt] = useState<{ promptType: PromptType; options: PromptOptions } | null>(null);
+  const [activePrompt, setActivePrompt] = useState<PromptOptions | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: 0 | 1 | null; reason: string } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
 
@@ -85,10 +84,7 @@ export function useGameWs(
           setGameState(msg.state);
           setCanUndo(msg.canUndo ?? false);
           if (msg.state.pendingPrompt) {
-            setActivePrompt({
-              promptType: msg.state.pendingPrompt.promptType,
-              options: msg.state.pendingPrompt.options,
-            });
+            setActivePrompt(msg.state.pendingPrompt.options);
           }
           if (msg.state.status !== "IN_PROGRESS") {
             setGameOver({
@@ -101,10 +97,7 @@ export function useGameWs(
           setGameState(msg.state);
           setCanUndo(msg.canUndo ?? false);
           if (msg.state.pendingPrompt) {
-            setActivePrompt({
-              promptType: msg.state.pendingPrompt.promptType,
-              options: msg.state.pendingPrompt.options,
-            });
+            setActivePrompt(msg.state.pendingPrompt.options);
           } else {
             setActivePrompt(null);
           }
@@ -119,7 +112,7 @@ export function useGameWs(
           setCanUndo(msg.canUndo);
           break;
         case "game:prompt":
-          setActivePrompt({ promptType: msg.promptType, options: msg.options });
+          setActivePrompt(msg.options);
           break;
         case "game:error":
           setLastError(msg.message);

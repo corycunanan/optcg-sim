@@ -9,7 +9,6 @@ import type {
   GameState,
   PlayerState,
   PromptOptions,
-  PromptType,
   TurnState,
 } from "@shared/game-types";
 
@@ -29,7 +28,7 @@ export interface GameSessionGame {
   cardDbReady: boolean;
   connectionStatus: string;
   lastError: string | null;
-  activePrompt: { promptType: PromptType; options: PromptOptions } | null;
+  activePrompt: PromptOptions | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   sendAction: (action: GameAction) => void;
   myIndex: 0 | 1 | null;

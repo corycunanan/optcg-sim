@@ -39,8 +39,8 @@ export function executePlaceHandToDeck(
       validTargets,
     };
     const pendingPrompt: PendingPromptState = {
-      promptType: "SELECT_TARGET",
       options: {
+        promptType: "SELECT_TARGET",
         cards: [...p.hand],
         validTargets,
         countMin: Math.min(amount, p.hand.length),
@@ -280,8 +280,8 @@ export function executeRevealHand(
     };
 
     const pendingPrompt: PendingPromptState = {
-      promptType: "SELECT_TARGET",
       options: {
+        promptType: "SELECT_TARGET",
         validTargets,
         countMin: count,
         countMax: count,
@@ -395,8 +395,8 @@ export function executeSearchAndPlay(
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
-    promptType: "ARRANGE_TOP_CARDS",
     options: {
+      promptType: "ARRANGE_TOP_CARDS",
       cards: searchFullDeck ? matching : searchPool,
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",

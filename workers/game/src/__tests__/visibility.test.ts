@@ -152,7 +152,9 @@ describe("filterStateForPlayer", () => {
     );
 
     for (const event of opponentDrawEvents) {
-      expect(event.payload.cardId).toBeUndefined();
+      if (event.type === "CARD_DRAWN") {
+        expect(event.payload.cardId).toBeUndefined();
+      }
     }
   });
 
@@ -178,6 +180,8 @@ describe("filterStateForPlayer", () => {
 
     // Own events should keep cardId
     const lastDraw = myDrawEvents[myDrawEvents.length - 1];
-    expect(lastDraw.payload.cardId).toBe("MY-CARD");
+    if (lastDraw.type === "CARD_DRAWN") {
+      expect(lastDraw.payload.cardId).toBe("MY-CARD");
+    }
   });
 });

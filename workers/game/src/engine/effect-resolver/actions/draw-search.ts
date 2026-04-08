@@ -105,8 +105,8 @@ export function executeSearchDeck(
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
-    promptType: "ARRANGE_TOP_CARDS",
     options: {
+      promptType: "ARRANGE_TOP_CARDS",
       cards: topCards,
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
@@ -180,8 +180,8 @@ export function executeSearchTrashTheRest(
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
-    promptType: "ARRANGE_TOP_CARDS",
     options: {
+      promptType: "ARRANGE_TOP_CARDS",
       cards: topCards,
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
@@ -292,8 +292,8 @@ export function executeFullDeckSearch(
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
-    promptType: "ARRANGE_TOP_CARDS",
     options: {
+      promptType: "ARRANGE_TOP_CARDS",
       cards: matching,
       effectDescription,
       canSendToBottom: false,
@@ -336,8 +336,8 @@ export function executeDeckScry(
     validTargets: [],
   };
   const pendingPrompt: PendingPromptState = {
-    promptType: "ARRANGE_TOP_CARDS",
     options: {
+      promptType: "ARRANGE_TOP_CARDS",
       cards: topCards,
       effectDescription,
       canSendToBottom: true,

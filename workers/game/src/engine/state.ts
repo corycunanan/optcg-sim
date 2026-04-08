@@ -476,7 +476,7 @@ export function drawCards(
     events.push({
       type: "CARD_DRAWN",
       playerIndex,
-      payload: { cardInstanceId: handCard.instanceId },
+      payload: { cardId: handCard.cardId, cardInstanceId: handCard.instanceId },
     });
   }
 
@@ -581,9 +581,12 @@ export function filterStateForPlayer(
 
   // Filter event log: strip cardId from opponent's secret-zone events
   const filteredEventLog = state.eventLog.map((event) => {
-    if (event.playerIndex === opponentIndex && SECRET_CARD_EVENTS.has(event.type) && event.payload?.cardId) {
-      const { cardId, ...restPayload } = event.payload;
-      return { ...event, payload: restPayload };
+    if (event.playerIndex === opponentIndex && SECRET_CARD_EVENTS.has(event.type)) {
+      const payload = event.payload as Record<string, unknown>;
+      if (payload.cardId) {
+        const { cardId, ...restPayload } = payload;
+        return { ...event, payload: restPayload } as GameEvent;
+      }
     }
     return event;
   });

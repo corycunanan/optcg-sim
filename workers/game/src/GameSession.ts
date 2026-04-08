@@ -7,6 +7,7 @@
  */
 
 import type {
+  BattleContext,
   CardData,
   ClientMessage,
   DonInstance,
@@ -14,6 +15,7 @@ import type {
   GameAction,
   GameInitPayload,
   GameState,
+  LifeCard,
   ServerMessage,
   PendingPromptState,
   ResumeContext,
@@ -228,7 +230,6 @@ export class GameSession implements DurableObject {
       if (playerWs) {
         this.send(playerWs, {
           type: "game:prompt",
-          promptType: this.gameState!.pendingPrompt.promptType,
           options: this.gameState!.pendingPrompt.options,
         });
       }
@@ -579,7 +580,6 @@ export class GameSession implements DurableObject {
     if (playerWs) {
       this.send(playerWs, {
         type: "game:prompt",
-        promptType: prompt.promptType,
         options: prompt.options,
       });
     }
@@ -609,14 +609,13 @@ export class GameSession implements DurableObject {
           .map((c) => c.instanceId);
         this.send(inactiveWs, {
           type: "game:prompt",
-          promptType: "SELECT_BLOCKER",
-          options: { validTargets: blockers, optional: true, timeoutMs: 30_000 },
+          options: { promptType: "SELECT_BLOCKER" as const, validTargets: blockers, optional: true, timeoutMs: 30_000 },
         });
       }
     } else if (battleSubPhase === "DAMAGE_STEP" && battle && "pendingTriggerLifeCard" in battle) {
       const inactiveWs = this.getWebSocketForPlayer(inactiveIdx);
       if (inactiveWs) {
-        const triggerLifeCard = battle.pendingTriggerLifeCard;
+        const triggerLifeCard = (battle as BattleContext & { pendingTriggerLifeCard?: LifeCard }).pendingTriggerLifeCard;
         const triggerCardData = triggerLifeCard && this.cardDb
           ? this.cardDb.get(triggerLifeCard.cardId)
           : undefined;
@@ -636,8 +635,8 @@ export class GameSession implements DurableObject {
           ?? "You may reveal this Trigger card to activate its effect";
         this.send(inactiveWs, {
           type: "game:prompt",
-          promptType: "REVEAL_TRIGGER",
           options: {
+            promptType: "REVEAL_TRIGGER" as const,
             cards: triggerCards,
             effectDescription,
             optional: false,
@@ -663,7 +662,7 @@ export class GameSession implements DurableObject {
     const { battleSubPhase, battle } = this.gameState.turn;
     if (battleSubPhase !== "DAMAGE_STEP" || !battle) return;
 
-    const triggerLifeCard = battle.pendingTriggerLifeCard;
+    const triggerLifeCard = (battle as BattleContext & { pendingTriggerLifeCard?: LifeCard }).pendingTriggerLifeCard;
     if (!triggerLifeCard) return;
 
     const inactiveIdx = (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0) as 0 | 1;
@@ -687,8 +686,7 @@ export class GameSession implements DurableObject {
     this.gameState = {
       ...this.gameState,
       pendingPrompt: {
-        promptType: "REVEAL_TRIGGER" as const,
-        options: { cards, effectDescription, optional: false, timeoutMs: 30_000 },
+        options: { promptType: "REVEAL_TRIGGER" as const, cards, effectDescription, optional: false, timeoutMs: 30_000 },
         respondingPlayer: inactiveIdx,
         resumeContext: null,
       },

@@ -8,7 +8,6 @@ import type {
   GameEvent,
   PlayerState,
   PromptOptions,
-  PromptType,
   TurnState,
 } from "@shared/game-types";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
@@ -54,10 +53,7 @@ export interface BoardLayoutProps {
   connectionStatus: string;
   eventLog: GameEvent[];
   activeEffects: ActiveEffect[];
-  activePrompt: {
-    promptType: PromptType;
-    options: PromptOptions;
-  } | null;
+  activePrompt: PromptOptions | null;
   onAction: (action: GameAction) => void;
   onLeave: () => void;
   matchClosed: boolean;

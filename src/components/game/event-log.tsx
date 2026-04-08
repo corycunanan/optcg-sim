@@ -31,7 +31,7 @@ function formatEvent(
       return { icon: "🃏", text: `${who} played ${name}` };
     }
     case "CARD_DRAWN":
-      return { icon: "📥", text: `${who} drew ${event.payload.count ?? 1} card(s)` };
+      return { icon: "📥", text: `${who} drew a card` };
     case "CARD_KO": {
       const name = cardName(event.payload.cardId);
       return { icon: "💀", text: `${name} was K.O.'d`, accent: "text-gb-accent-red" };
@@ -48,13 +48,10 @@ function formatEvent(
       return { icon: "↩️", text: `${name} returned to hand` };
     }
     case "ATTACK_DECLARED": {
-      const atk = cardName(event.payload.attackerCardId);
-      const tgt = cardName(event.payload.targetCardId);
-      return { icon: "⚔️", text: `${who} attacked ${tgt} with ${atk}`, accent: "text-gb-accent-amber" };
+      return { icon: "⚔️", text: `${who} declared an attack`, accent: "text-gb-accent-amber" };
     }
     case "BLOCK_DECLARED": {
-      const name = cardName(event.payload.blockerCardId);
-      return { icon: "🛡️", text: `${who} blocked with ${name}`, accent: "text-gb-accent-blue" };
+      return { icon: "🛡️", text: `${who} declared a blocker`, accent: "text-gb-accent-blue" };
     }
     case "COUNTER_USED": {
       const name = cardName(event.payload.cardId);
@@ -67,17 +64,16 @@ function formatEvent(
       return { icon: "⚡", text: `Trigger: ${name}`, accent: "text-gb-accent-purple" };
     }
     case "DON_GIVEN_TO_CARD": {
-      const count = (event.payload.count as number) ?? 1;
+      const count = event.payload.count;
       return { icon: "🔴", text: `${who} attached ${count} DON!!` };
     }
     case "POWER_MODIFIED": {
-      const name = cardName(event.payload.cardId);
-      const amount = event.payload.amount as number;
+      const amount = event.payload.amount ?? event.payload.value ?? 0;
       const sign = amount > 0 ? "+" : "";
-      return { icon: "💪", text: `${name} ${sign}${amount} power`, accent: amount > 0 ? "text-gb-accent-green" : "text-gb-accent-red" };
+      return { icon: "💪", text: `Power ${sign}${amount}`, accent: amount > 0 ? "text-gb-accent-green" : "text-gb-accent-red" };
     }
     case "TURN_STARTED":
-      return { icon: "🔄", text: `Turn ${event.payload.turnNumber ?? "?"} — ${who}'s turn`, accent: "text-gb-text-bright" };
+      return { icon: "🔄", text: `${who}'s turn`, accent: "text-gb-text-bright" };
     case "GAME_OVER": {
       const reason = event.payload.reason;
       return { icon: "🏁", text: `Game over: ${reason}`, accent: "text-gb-accent-amber" };

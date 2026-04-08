@@ -444,7 +444,7 @@ describe("battle", () => {
     // The effect should trigger — since it has optional: true, it should produce
     // a pending prompt asking the player whether to activate the effect
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt!.options.promptType).toBe("OPTIONAL_EFFECT");
   });
 });
 
@@ -1031,7 +1031,7 @@ describe("ON_KO triggers", () => {
 
     // Should pause with an optional effect prompt
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt!.options.promptType).toBe("OPTIONAL_EFFECT");
   });
 
   it("non-ON_KO triggers still fail zone check (regression guard)", () => {
@@ -1282,7 +1282,7 @@ describe("ON_KO effect stack resume flow", () => {
     const result = setupMarcoKO(cardDb, marcoCard);
 
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt!.options.promptType).toBe("OPTIONAL_EFFECT");
     expect(result.pendingPrompt!.respondingPlayer).toBe(1);
     // Card should already be in trash
     expect(result.state.players[1].trash.some(c => c.cardId === marcoCard.id)).toBe(true);
@@ -1318,12 +1318,13 @@ describe("ON_KO effect stack resume flow", () => {
 
     // Should now prompt for cost selection (TRASH_FROM_HAND → SELECT_TARGET)
     expect(resumeResult.pendingPrompt).toBeDefined();
-    expect(resumeResult.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    expect(resumeResult.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
     expect(resumeResult.pendingPrompt!.respondingPlayer).toBe(1);
     // Valid targets should be hand cards
-    const validTargets = resumeResult.pendingPrompt!.options?.validTargets;
-    expect(validTargets).toBeDefined();
-    expect(validTargets!.length).toBeGreaterThan(0);
+    const pipeOpts = resumeResult.pendingPrompt!.options;
+    if (pipeOpts.promptType !== "SELECT_TARGET") throw new Error("unexpected prompt type");
+    expect(pipeOpts.validTargets).toBeDefined();
+    expect(pipeOpts.validTargets!.length).toBeGreaterThan(0);
   });
 
   it("paying cost then executes actions (full flow: accept → pay cost → draw)", () => {
@@ -1338,7 +1339,7 @@ describe("ON_KO effect stack resume flow", () => {
       { type: "PLAYER_CHOICE", choiceId: "accept" },
       cardDb,
     );
-    expect(acceptResult.pendingPrompt?.promptType).toBe("SELECT_TARGET");
+    expect(acceptResult.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     // Step 2: Select a card from hand to trash as cost
     const p1Hand = acceptResult.state.players[1].hand;
@@ -1414,7 +1415,7 @@ describe("ON_KO effect stack resume flow", () => {
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
 
     // Should still get optional prompt
-    expect(result.pendingPrompt?.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
 
     // Accept the optional effect
     let resumeState = { ...result.state, pendingPrompt: null };

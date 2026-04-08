@@ -538,8 +538,7 @@ export function buildSelectTargetPrompt(
     : undefined;
 
   const pendingPrompt: PendingPromptState = {
-    promptType: "SELECT_TARGET",
-    options: { cards, validTargets: allValidIds, effectDescription, countMin, countMax, ctaLabel: "Confirm", aggregateConstraint, uniquenessConstraint, namedDistribution, dualTargets: dualTargetsMetadata },
+    options: { promptType: "SELECT_TARGET", cards, validTargets: allValidIds, effectDescription, countMin, countMax, ctaLabel: "Confirm", aggregateConstraint, uniquenessConstraint, namedDistribution, dualTargets: dualTargetsMetadata },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
   };

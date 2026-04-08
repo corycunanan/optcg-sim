@@ -534,8 +534,8 @@ export function payCostsWithSelection(
         nextState = pushFrame(nextState, frame);
 
         const pendingPrompt: PendingPromptState = {
-          promptType: "PLAYER_CHOICE",
           options: {
+            promptType: "PLAYER_CHOICE",
             effectDescription: "Choose top or bottom of your Life cards to add to your hand",
             choices: [
               { id: "0", label: "Top" },
@@ -580,8 +580,8 @@ export function payCostsWithSelection(
 
       const costLabel = getCostLabel(cost);
       const pendingPrompt: PendingPromptState = {
-        promptType: "SELECT_TARGET",
         options: {
+          promptType: "SELECT_TARGET",
           validTargets,
           countMin: amount,
           countMax: amount,

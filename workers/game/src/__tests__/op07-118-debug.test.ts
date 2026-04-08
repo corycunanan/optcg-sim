@@ -96,7 +96,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
     // Step 1: resolveEffect → should prompt OPTIONAL_EFFECT
     const step1 = resolveEffect(state, block, sabo.instanceId, 0, cardDb);
     expect(step1.pendingPrompt).toBeDefined();
-    expect(step1.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(step1.pendingPrompt!.options.promptType).toBe("OPTIONAL_EFFECT");
     expect(step1.state.effectStack.length).toBe(1);
 
     // Step 2: Accept optional effect → should prompt for TRASH_FROM_HAND cost
@@ -106,11 +106,13 @@ describe("OP07-118 Sabo dual-target KO", () => {
       cardDb,
     );
     expect(step2.pendingPrompt).toBeDefined();
-    expect(step2.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    const opts2 = step2.pendingPrompt!.options;
+    expect(opts2.promptType).toBe("SELECT_TARGET");
+    if (opts2.promptType !== "SELECT_TARGET") throw new Error("unexpected prompt type");
     // This should be the cost selection prompt
-    expect(step2.pendingPrompt!.options.ctaLabel).toBe("Trash");
-    expect(step2.pendingPrompt!.options.countMin).toBe(1);
-    expect(step2.pendingPrompt!.options.countMax).toBe(1);
+    expect(opts2.ctaLabel).toBe("Trash");
+    expect(opts2.countMin).toBe(1);
+    expect(opts2.countMax).toBe(1);
 
     // Step 3: Select a card to trash → should now prompt for KO targets
     const step3 = resumeFromStack(
@@ -119,12 +121,14 @@ describe("OP07-118 Sabo dual-target KO", () => {
       cardDb,
     );
     expect(step3.pendingPrompt).toBeDefined();
-    expect(step3.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    const opts3 = step3.pendingPrompt!.options;
+    expect(opts3.promptType).toBe("SELECT_TARGET");
+    if (opts3.promptType !== "SELECT_TARGET") throw new Error("unexpected prompt type");
     // THIS is the KO target prompt — should allow 2 selections
-    expect(step3.pendingPrompt!.options.countMin).toBe(0);
-    expect(step3.pendingPrompt!.options.countMax).toBe(2);
-    expect(step3.pendingPrompt!.options.dualTargets).toBeDefined();
-    expect(step3.pendingPrompt!.options.dualTargets!.slots).toHaveLength(2);
+    expect(opts3.countMin).toBe(0);
+    expect(opts3.countMax).toBe(2);
+    expect(opts3.dualTargets).toBeDefined();
+    expect(opts3.dualTargets!.slots).toHaveLength(2);
 
     // Step 4: Select both targets → should KO them
     const step4 = resumeFromStack(

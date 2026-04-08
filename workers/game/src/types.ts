@@ -7,7 +7,7 @@ export type {
   Phase, PerformedAction, TurnState,
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
-  GameEventType, GameEvent,
+  GameEventType, GameEvent, GameEventPayloadMap, PendingGameEvent,
   GameState,
   CardData, KeywordSet,
   GameAction,
@@ -19,15 +19,12 @@ export type {
   QueuedTrigger as SharedQueuedTrigger,
 } from "../../../shared/game-types.js";
 
-import type { CardData, GameEventType, GameState, PendingPromptState } from "../../../shared/game-types.js";
+import type { CardData, GameState, PendingPromptState, PendingGameEvent } from "../../../shared/game-types.js";
 
 // ─── Engine-internal types ────────────────────────────────────────────────────
 
-export interface PendingEvent {
-  type: GameEventType;
-  playerIndex?: 0 | 1;
-  payload?: Record<string, unknown>;
-}
+/** Alias for the shared PendingGameEvent — used throughout the engine. */
+export type PendingEvent = PendingGameEvent;
 
 export interface ExecuteResult {
   state: GameState;
@@ -81,7 +78,7 @@ export interface QueuedTrigger {
   sourceCardInstanceId: string;
   controller: 0 | 1;
   effectBlock: import("./engine/effect-types.js").EffectBlock;
-  triggeringEvent: PendingEvent;
+  triggeringEvent: PendingGameEvent;
 }
 
 // ─── Init payload (Next.js → DO on game start) ────────────────────────────────

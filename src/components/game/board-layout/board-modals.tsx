@@ -2,11 +2,9 @@
 
 import type {
   CardDb,
-  CardInstance,
   GameAction,
   PlayerState,
   PromptOptions,
-  PromptType,
 } from "@shared/game-types";
 import { ArrangeTopCardsModal } from "../arrange-top-cards-modal";
 import { SelectTargetModal } from "../select-target-modal";
@@ -17,10 +15,7 @@ import { GameDeckPreviewModal } from "../deck-preview-modal";
 import { TrashPreviewModal } from "../trash-preview-modal";
 
 interface BoardModalsProps {
-  activePrompt: {
-    promptType: PromptType;
-    options: PromptOptions;
-  } | null;
+  activePrompt: PromptOptions | null;
   isPromptHidden: boolean;
   onHide: () => void;
   cardDb: CardDb;
@@ -49,13 +44,12 @@ export function BoardModals({
     <>
       {/* ── Interruption Modals ─────────────────────────────────────── */}
       {activePrompt?.promptType === "ARRANGE_TOP_CARDS" &&
-        activePrompt.options.cards &&
-        activePrompt.options.cards.length > 0 && (
+        activePrompt.cards.length > 0 && (
           <ArrangeTopCardsModal
-            cards={activePrompt.options.cards}
-            effectDescription={activePrompt.options.effectDescription ?? "Look at the top cards of your deck"}
-            canSendToBottom={activePrompt.options.canSendToBottom ?? true}
-            validTargets={activePrompt.options.validTargets}
+            cards={activePrompt.cards}
+            effectDescription={activePrompt.effectDescription}
+            canSendToBottom={activePrompt.canSendToBottom}
+            validTargets={activePrompt.validTargets}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}
@@ -64,16 +58,15 @@ export function BoardModals({
         )}
 
       {activePrompt?.promptType === "SELECT_TARGET" &&
-        activePrompt.options.cards &&
-        activePrompt.options.cards.length > 0 && (
+        activePrompt.cards.length > 0 && (
           <SelectTargetModal
-            key={activePrompt.options.validTargets?.join(",") ?? ""}
-            cards={activePrompt.options.cards}
-            validTargets={activePrompt.options.validTargets ?? activePrompt.options.cards.map((c: CardInstance) => c.instanceId)}
-            effectDescription={activePrompt.options.effectDescription ?? "Select a target"}
-            countMin={activePrompt.options.countMin ?? 1}
-            countMax={activePrompt.options.countMax ?? 1}
-            ctaLabel={activePrompt.options.ctaLabel ?? "Confirm Selection"}
+            key={activePrompt.validTargets.join(",")}
+            cards={activePrompt.cards}
+            validTargets={activePrompt.validTargets}
+            effectDescription={activePrompt.effectDescription}
+            countMin={activePrompt.countMin}
+            countMax={activePrompt.countMax}
+            ctaLabel={activePrompt.ctaLabel}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}
@@ -82,11 +75,10 @@ export function BoardModals({
         )}
 
       {activePrompt?.promptType === "PLAYER_CHOICE" &&
-        activePrompt.options.choices &&
-        activePrompt.options.choices.length > 0 && (
+        activePrompt.choices.length > 0 && (
           <PlayerChoiceModal
-            effectDescription={activePrompt.options.effectDescription ?? "Choose an effect"}
-            choices={activePrompt.options.choices}
+            effectDescription={activePrompt.effectDescription}
+            choices={activePrompt.choices}
             isHidden={isPromptHidden}
             onHide={onHide}
             onAction={onAction}
@@ -95,8 +87,8 @@ export function BoardModals({
 
       {activePrompt?.promptType === "OPTIONAL_EFFECT" && (
         <OptionalEffectModal
-          effectDescription={activePrompt.options.effectDescription ?? "You may activate this effect"}
-          card={activePrompt.options.cards?.[0]}
+          effectDescription={activePrompt.effectDescription}
+          card={activePrompt.cards?.[0]}
           cardDb={cardDb}
           isHidden={isPromptHidden}
           onHide={onHide}
@@ -105,11 +97,10 @@ export function BoardModals({
       )}
 
       {activePrompt?.promptType === "REVEAL_TRIGGER" &&
-        activePrompt.options.cards &&
-        activePrompt.options.cards.length > 0 && (
+        activePrompt.cards.length > 0 && (
           <RevealTriggerModal
-            cards={activePrompt.options.cards}
-            effectDescription={activePrompt.options.effectDescription ?? "You may reveal this Trigger card to activate its effect"}
+            cards={activePrompt.cards}
+            effectDescription={activePrompt.effectDescription}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}
