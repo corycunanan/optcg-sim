@@ -1,6 +1,14 @@
+import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { GameBoardVisual } from "@/components/game/game-board-visual";
+
+const GameBoardVisual = dynamic(
+  () =>
+    import("@/components/game/game-board-visual").then(
+      (mod) => mod.GameBoardVisual
+    ),
+  { ssr: false }
+);
 
 export const metadata = {
   title: "Game — OPTCG Simulator",
