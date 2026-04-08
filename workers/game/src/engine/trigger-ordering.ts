@@ -4,7 +4,7 @@
  * Extracted to avoid circular imports (pipeline → effect-resolver → resume → pipeline).
  */
 
-import type { CardData, GameState, PendingPromptState } from "../types.js";
+import type { CardData, GameState, PendingPromptState, PendingEvent } from "../types.js";
 import type { QueuedTrigger, EffectStackFrame } from "../types.js";
 import type { EffectBlock } from "./effect-types.js";
 import {
@@ -25,7 +25,7 @@ import { extractEffectDescription } from "./effect-resolver/action-utils.js";
  */
 export function scanEventsForTriggers(
   state: GameState,
-  events: { type: import("../types.js").GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[],
+  events: PendingEvent[],
   defaultController: 0 | 1,
   cardDb: Map<string, CardData>,
 ): { triggers: QueuedTrigger[]; state: GameState } {
@@ -35,8 +35,7 @@ export function scanEventsForTriggers(
   // Register triggers for newly played cards before matching
   for (const event of events) {
     if (event.type === "CARD_PLAYED") {
-      const cardId = event.payload?.cardId as string | undefined;
-      const cardInstanceId = event.payload?.cardInstanceId as string | undefined;
+      const { cardId, cardInstanceId } = event.payload ?? {};
       if (!cardId || !cardInstanceId) continue;
 
       const cardData = cardDb.get(cardId);
@@ -56,7 +55,7 @@ export function scanEventsForTriggers(
       playerIndex: event.playerIndex ?? defaultController,
       payload: event.payload ?? {},
       timestamp: Date.now(),
-    };
+    } as import("../types.js").GameEvent;
 
     const matched = matchTriggersForEvent(nextState, gameEvent, cardDb);
     if (matched.length === 0) continue;
@@ -131,8 +130,8 @@ export function buildTriggerSelectionPrompt(
   const nextState = pushFrame(state, frame);
 
   const pendingPrompt: PendingPromptState = {
-    promptType: "PLAYER_CHOICE",
     options: {
+      promptType: "PLAYER_CHOICE",
       effectDescription: "Choose which effect to activate first",
       choices,
     },

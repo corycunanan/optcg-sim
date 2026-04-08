@@ -15,7 +15,7 @@ import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
-import type { PromptOptions, PromptType } from "@shared/game-types";
+import type { PromptOptions } from "@shared/game-types";
 
 interface GameBoardVisualProps {
   gameId: string;
@@ -24,7 +24,7 @@ interface GameBoardVisualProps {
 
 export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   const { game, opponent, navigation, endState } = useGameSession(gameId, workerUrl);
-  const [devPrompt, setDevPrompt] = useState<{ promptType: PromptType; options: PromptOptions } | null>(null);
+  const [devPrompt, setDevPrompt] = useState<PromptOptions | null>(null);
   const activePrompt = devPrompt ?? game.activePrompt;
 
   if (!game.gameState || !game.cardDbReady) {
@@ -168,23 +168,19 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                 if (cards.length === 0) return;
                 setDevPrompt({
                   promptType: "ARRANGE_TOP_CARDS",
-                  options: {
-                    cards,
-                    effectDescription: "Look at the top 4 cards of your deck",
-                    canSendToBottom: true,
-                  },
+                  cards,
+                  effectDescription: "Look at the top 4 cards of your deck",
+                  canSendToBottom: true,
                 });
               } else if (val === "PLAYER_CHOICE") {
                 setDevPrompt({
                   promptType: "PLAYER_CHOICE",
-                  options: {
-                    effectDescription: "Choose an effect",
-                    choices: [
-                      { id: "draw_2", label: "Draw 2 cards" },
-                      { id: "give_don", label: "Give 1 DON!! to your Leader" },
-                      { id: "return_char", label: "Return 1 opponent's Character to hand" },
-                    ],
-                  },
+                  effectDescription: "Choose an effect",
+                  choices: [
+                    { id: "draw_2", label: "Draw 2 cards" },
+                    { id: "give_don", label: "Give 1 DON!! to your Leader" },
+                    { id: "return_char", label: "Return 1 opponent's Character to hand" },
+                  ],
                 });
               } else if (val === "SELECT_TARGET") {
                 const allCards = [
@@ -198,23 +194,19 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   .map((c) => c.instanceId);
                 setDevPrompt({
                   promptType: "SELECT_TARGET",
-                  options: {
-                    cards: allCards,
-                    validTargets,
-                    effectDescription: "Select up to 2 Characters with cost 3 or less",
-                    countMin: 1,
-                    countMax: 2,
-                    ctaLabel: "Confirm Selection",
-                  },
+                  cards: allCards,
+                  validTargets,
+                  effectDescription: "Select up to 2 Characters with cost 3 or less",
+                  countMin: 1,
+                  countMax: 2,
+                  ctaLabel: "Confirm Selection",
                 });
               } else if (val === "OPTIONAL_EFFECT") {
                 const card = game.me.hand[0] ?? game.me.characters.find(Boolean) ?? null;
                 setDevPrompt({
                   promptType: "OPTIONAL_EFFECT",
-                  options: {
-                    effectDescription: "You may give 1 DON!! card to your Leader or 1 of your Characters.",
-                    cards: card ? [card] : [],
-                  },
+                  effectDescription: "You may give 1 DON!! card to your Leader or 1 of your Characters.",
+                  cards: card ? [card] : [],
                 });
               } else if (val === "REVEAL_TRIGGER") {
                 const triggerCard = game.me.deck.find(
@@ -224,10 +216,10 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                 const triggerText = game.cardDb[triggerCard.cardId]?.triggerText ?? "[Trigger] Play this card.";
                 setDevPrompt({
                   promptType: "REVEAL_TRIGGER",
-                  options: {
-                    cards: [triggerCard],
-                    effectDescription: triggerText,
-                  },
+                  cards: [triggerCard],
+                  effectDescription: triggerText,
+                  optional: false,
+                  timeoutMs: 30_000,
                 });
               }
             }}

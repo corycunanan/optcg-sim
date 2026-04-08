@@ -12,11 +12,11 @@
  * 7. Rule Processing     (defeat checks)
  */
 
-import type { CardData, GameAction, GameState, ExecuteResult, PendingPromptState } from "../types.js";
+import type { CardData, GameAction, GameEvent, GameState, ExecuteResult, PendingPromptState } from "../types.js";
 import { validate } from "./validation.js";
 import { execute } from "./execute.js";
 import { recalculateBattlePowers } from "./battle.js";
-import { emitEvent } from "./events.js";
+import { emitEvent, emitPendingEvent } from "./events.js";
 import { checkDefeat } from "./defeat.js";
 import { checkProhibitions } from "./prohibitions.js";
 import { checkReplacements } from "./replacements.js";
@@ -77,12 +77,7 @@ export function runPipeline(
 
   // Emit replacement events
   for (const event of replacementResult.events) {
-    nextState = emitEvent(
-      nextState,
-      event.type,
-      event.playerIndex ?? actingPlayerIndex,
-      event.payload ?? {},
-    );
+    nextState = emitPendingEvent(nextState, event, actingPlayerIndex);
   }
 
   // If the action was fully replaced (no substitute), skip execution
@@ -126,7 +121,7 @@ function fireEventsAndTriggers(
 
   // Emit all events from execution
   for (const event of execResult.events) {
-    state = emitEvent(state, event.type, event.playerIndex ?? pi, event.payload ?? {});
+    state = emitPendingEvent(state, event, pi);
   }
 
   // Register triggers for newly played cards BEFORE matching
@@ -141,13 +136,12 @@ function fireEventsAndTriggers(
       playerIndex: pendingEvent.playerIndex ?? pi,
       payload: pendingEvent.payload ?? {},
       timestamp: Date.now(),
-    };
+    } as GameEvent;
 
     // Counter event cards go hand → trash and are never registered in the
     // trigger registry. Inject their COUNTER_EVENT effect blocks directly.
     if (pendingEvent.type === "COUNTER_USED" && pendingEvent.payload?.type === "event") {
-      const cardId = pendingEvent.payload.cardId as string;
-      const cardInstanceId = pendingEvent.payload.cardInstanceId as string;
+      const { cardId, cardInstanceId = "" } = pendingEvent.payload;
       const controller = (pendingEvent.playerIndex ?? pi) as 0 | 1;
       const counterCardData = cardDb.get(cardId);
       if (counterCardData?.effectSchema) {
@@ -244,12 +238,7 @@ function processTriggerQueuePipeline(
 
     // Emit events from this trigger's resolution
     for (const event of result.events) {
-      nextState = emitEvent(
-        nextState,
-        event.type,
-        event.playerIndex ?? next.controller,
-        event.payload ?? {},
-      );
+      nextState = emitPendingEvent(nextState, event, next.controller);
     }
 
     // LIFO: scan result events for new triggers and insert at front
@@ -292,8 +281,7 @@ function registerNewCardTriggers(
 ): GameState {
   for (const event of execResult.events) {
     if (event.type === "CARD_PLAYED") {
-      const cardId = event.payload?.cardId as string | undefined;
-      const cardInstanceId = event.payload?.cardInstanceId as string | undefined;
+      const { cardId, cardInstanceId } = event.payload ?? {};
       if (!cardId) continue;
 
       const cardData = cardDb.get(cardId);
@@ -319,7 +307,7 @@ function deregisterLeftFieldTriggers(
 ): GameState {
   for (const event of execResult.events) {
     if (event.type === "CARD_KO" || event.type === "CARD_RETURNED_TO_HAND") {
-      const instanceId = event.payload?.cardInstanceId as string | undefined;
+      const instanceId = event.payload?.cardInstanceId;
       if (!instanceId) continue;
 
       state = deregisterTriggersForCard(state, instanceId);
@@ -327,7 +315,7 @@ function deregisterLeftFieldTriggers(
     }
 
     if (event.type === "CARD_TRASHED") {
-      const cardId = event.payload?.cardId as string | undefined;
+      const cardId = event.payload?.cardId;
       if (cardId) {
         for (const player of state.players) {
           const trashed = player.trash.find((c) => c.cardId === cardId);

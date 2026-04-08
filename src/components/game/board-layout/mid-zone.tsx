@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { GameAction, PromptOptions, PromptType } from "@shared/game-types";
+import type { GameAction, PromptOptions } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { FIELD_W, MID_ZONE_H } from "./constants";
 import { GameButton } from "../game-button";
@@ -109,7 +109,7 @@ export const MidZone = React.memo(function MidZone({
   canEndPhase: boolean;
   canPass: boolean;
   inBattle: boolean;
-  activePrompt: { promptType: PromptType; options: PromptOptions } | null;
+  activePrompt: PromptOptions | null;
   battleInfo: BattleInfo | null;
   blockerMode?: BlockerMode;
   isPromptHidden?: boolean;
@@ -149,7 +149,7 @@ export const MidZone = React.memo(function MidZone({
             &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
           </span>
           {activePrompt.promptType === "REVEAL_TRIGGER" &&
-            !activePrompt.options.cards?.length && (
+            !activePrompt.cards?.length && (
             <>
               <GameButton
                 variant="secondary"
@@ -171,8 +171,8 @@ export const MidZone = React.memo(function MidZone({
               </GameButton>
             </>
           )}
-          {activePrompt.options.optional &&
-            activePrompt.promptType !== "OPTIONAL_EFFECT" && (
+          {"optional" in activePrompt && (activePrompt as { optional?: boolean }).optional &&
+            (activePrompt.promptType as string) !== "OPTIONAL_EFFECT" && (
             <GameButton variant="secondary" size="sm" onClick={() => onAction({ type: "PASS" })}>
               Skip
             </GameButton>

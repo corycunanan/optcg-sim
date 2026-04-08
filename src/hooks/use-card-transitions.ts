@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GameEvent, GameEventType } from "@shared/game-types";
+import type { GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 
 export interface CardTransition {
@@ -30,66 +30,83 @@ function eventToTransition(
   myIndex: 0 | 1 | null,
   zoneRegistry: ZonePositionRegistry | null,
 ): CardTransition | null {
-  const { type, playerIndex, payload } = event;
-  const cardId = (payload.cardId as string) ?? null;
-  const cardInstanceId = (payload.cardInstanceId as string) ?? null;
+  const { type, playerIndex } = event;
   const prefix = playerIndex === myIndex ? "p" : "o";
 
   let from: string | null = null;
   let to: string | null = null;
-
-  // Try to resolve the actual zone via the card→zone registry
-  const resolvedZone = cardInstanceId && zoneRegistry
-    ? zoneRegistry.getCardZone(cardInstanceId)
-    : null;
+  let cardId: string | null = null;
+  let cardInstanceId: string | null = null;
 
   switch (type) {
     case "CARD_PLAYED": {
-      if (!cardId) return null;
+      const p = event.payload;
+      cardId = p.cardId;
+      cardInstanceId = p.cardInstanceId;
       from = `${prefix}-hand`;
-      const zone = payload.zone as string | undefined;
-      if (zone === "STAGE") {
+      if (p.zone === "STAGE") {
         to = `${prefix}-stage`;
-      } else if (zone === "TRASH") {
+      } else if (p.zone === "TRASH") {
         to = `${prefix}-trash`;
       } else {
-        // Use resolved zone if available, otherwise fall back to center slot
+        const resolvedZone = cardInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(cardInstanceId)
+          : null;
         to = resolvedZone ?? `${prefix}-char-2`;
       }
       break;
     }
     case "CARD_KO": {
+      cardId = event.payload.cardId;
+      cardInstanceId = event.payload.cardInstanceId;
+      const resolvedZone = cardInstanceId && zoneRegistry
+        ? zoneRegistry.getCardZone(cardInstanceId)
+        : null;
       from = resolvedZone ?? `${prefix}-char-2`;
       to = `${prefix}-trash`;
       break;
     }
     case "CARD_TRASHED": {
-      if (!cardId && payload.count) return null;
-      const source = payload.from as string | undefined;
-      if (source === "HAND") {
+      const p = event.payload;
+      cardId = p.cardId ?? null;
+      cardInstanceId = p.cardInstanceId ?? null;
+      if (!cardId && p.count) return null;
+      if (p.from === "HAND") {
         from = `${prefix}-hand`;
       } else {
+        const resolvedZone = cardInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(cardInstanceId)
+          : null;
         from = resolvedZone ?? `${prefix}-char-2`;
       }
       to = `${prefix}-trash`;
       break;
     }
     case "CARD_DRAWN": {
+      cardId = event.payload.cardId;
+      cardInstanceId = event.payload.cardInstanceId ?? null;
       from = `${prefix}-deck`;
       to = `${prefix}-hand`;
       break;
     }
     case "CARD_RETURNED_TO_HAND": {
-      const source = payload.source as string | undefined;
-      if (source === "TRASH") {
+      const p = event.payload;
+      cardId = p.cardId;
+      cardInstanceId = p.cardInstanceId;
+      if (p.source === "TRASH") {
         from = `${prefix}-trash`;
       } else {
+        const resolvedZone = cardInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(cardInstanceId)
+          : null;
         from = resolvedZone ?? `${prefix}-char-2`;
       }
       to = `${prefix}-hand`;
       break;
     }
     case "CARD_ADDED_TO_HAND_FROM_LIFE": {
+      cardId = event.payload.cardId ?? null;
+      cardInstanceId = event.payload.cardInstanceId ?? null;
       from = `${prefix}-life`;
       to = `${prefix}-hand`;
       break;

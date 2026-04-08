@@ -346,7 +346,7 @@ function executeReplacementAction(
         events.push({
           type: "CARD_TRASHED",
           playerIndex: controller,
-          payload: { cardId: card.cardId, from: "HAND" },
+          payload: { cardId: card.cardId, from: "HAND", reason: "REPLACEMENT_EFFECT" },
         });
       }
 
@@ -388,8 +388,8 @@ function buildReplacementPrompt(
   const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
 
   const pendingPrompt: PendingPromptState = {
-    promptType: "OPTIONAL_EFFECT",
     options: {
+      promptType: "OPTIONAL_EFFECT",
       effectDescription,
       cards,
     },

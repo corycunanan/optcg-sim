@@ -477,10 +477,15 @@ function executeDamageStep(
           if (koResult) {
             nextState = koResult.state;
             for (const ev of koResult.events) {
-              if (ev.type === "CARD_KO") {
-                ev.payload = { ...ev.payload, cause: "BATTLE", preKO_donCount: preKODonCount };
+              if (ev.type === "CARD_KO" && ev.payload) {
+                events.push({
+                  type: "CARD_KO",
+                  playerIndex: ev.playerIndex,
+                  payload: { ...ev.payload, cause: "BATTLE", preKO_donCount: preKODonCount },
+                });
+              } else {
+                events.push(ev);
               }
-              events.push(ev);
             }
           }
         }

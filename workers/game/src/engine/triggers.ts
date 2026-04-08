@@ -367,15 +367,15 @@ function matchesKeywordTrigger(
   // (DON is returned to cost area during KO, so sourceCard.attachedDon is empty)
   if (trigger.don_requirement) {
     const donCount =
-      trigger.keyword === "ON_KO" && event.payload?.preKO_donCount !== undefined
-        ? (event.payload.preKO_donCount as number)
+      trigger.keyword === "ON_KO" && event.type === "CARD_KO"
+        ? event.payload.preKO_donCount
         : sourceCard.attachedDon.length;
     if (donCount < trigger.don_requirement) return false;
   }
 
   // KO cause (ON_KO only)
   if (trigger.cause && trigger.cause !== "ANY") {
-    const eventCause = event.payload?.cause as string | undefined;
+    const eventCause = event.type === "CARD_KO" ? event.payload.cause : undefined;
     if (trigger.cause === "BATTLE" && eventCause !== "BATTLE") return false;
     if (trigger.cause === "EFFECT" && eventCause !== "EFFECT" && eventCause !== "OPPONENT_EFFECT") return false;
     if (trigger.cause === "OPPONENT_EFFECT" && eventCause !== "OPPONENT_EFFECT") return false;
@@ -415,7 +415,7 @@ function matchesCustomTrigger(
 
   // Quantity threshold
   if (trigger.quantity_threshold) {
-    const count = (event.payload?.count as number) ?? 1;
+    const count = event.type === "DON_PLACED_ON_FIELD" ? event.payload.count : ("count" in event.payload ? (event.payload as { count?: number }).count ?? 1 : 1);
     if (count < trigger.quantity_threshold) return false;
   }
 
@@ -512,12 +512,16 @@ function matchesEventFilter(
   }
 
   if (filter.cause) {
-    const eventCause = event.payload?.cause as string | undefined;
+    const eventCause = event.type === "CARD_KO" ? event.payload.cause : undefined;
     if (filter.cause !== "ANY" && eventCause !== filter.cause) return false;
   }
 
   if (filter.target_filter) {
-    const targetId = (event.payload?.cardInstanceId ?? event.payload?.targetInstanceId) as string | undefined;
+    const targetId = (
+      "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined
+    ) ?? (
+      "targetInstanceId" in event.payload ? (event.payload as { targetInstanceId?: string }).targetInstanceId : undefined
+    );
     if (targetId) {
       const card = findCardInstance(state, targetId);
       if (card && !matchesFilter(card, filter.target_filter, cardDb, state)) return false;
@@ -525,7 +529,7 @@ function matchesEventFilter(
   }
 
   if (filter.source_zone) {
-    const cardId = event.payload?.cardInstanceId as string | undefined;
+    const cardId = "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined;
     if (cardId) {
       const card = findCardInstance(state, cardId);
       if (card && card.zone !== filter.source_zone) return false;
@@ -533,7 +537,7 @@ function matchesEventFilter(
   }
 
   if (filter.includes_trigger_keyword !== undefined) {
-    const cardId = event.payload?.cardInstanceId as string | undefined;
+    const cardId = "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined;
     if (cardId) {
       const card = findCardInstance(state, cardId);
       if (card) {
@@ -545,7 +549,7 @@ function matchesEventFilter(
   }
 
   if (filter.includes_blocker_keyword !== undefined) {
-    const cardId = event.payload?.cardInstanceId as string | undefined;
+    const cardId = "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined;
     if (cardId) {
       const card = findCardInstance(state, cardId);
       if (card) {
@@ -557,7 +561,7 @@ function matchesEventFilter(
   }
 
   if (filter.attribute) {
-    const cardId = event.payload?.cardInstanceId as string | undefined;
+    const cardId = "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined;
     if (cardId) {
       const card = findCardInstance(state, cardId);
       if (card) {
@@ -576,7 +580,7 @@ function matchesEventFilter(
   }
 
   if (filter.no_base_effect !== undefined) {
-    const cardId = event.payload?.cardInstanceId as string | undefined;
+    const cardId = "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined;
     if (cardId) {
       const card = findCardInstance(state, cardId);
       if (card) {

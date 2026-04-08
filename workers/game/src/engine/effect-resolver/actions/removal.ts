@@ -253,8 +253,8 @@ export function executeTrashFromHand(
         validTargets,
       };
       const pendingPrompt: import("../../../types.js").PendingPromptState = {
-        promptType: "SELECT_TARGET",
         options: {
+          promptType: "SELECT_TARGET",
           validTargets,
           countMin: amount,
           countMax: amount,

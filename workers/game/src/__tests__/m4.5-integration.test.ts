@@ -471,9 +471,12 @@ describe("3. SEARCH_TRASH_THE_REST Resume", () => {
 
     // Should produce a pending prompt
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt?.promptType).toBe("ARRANGE_TOP_CARDS");
-    expect(result.pendingPrompt?.options?.validTargets).toContain("search-hit");
-    expect(result.pendingPrompt?.options?.restDestination).toBe("TRASH");
+    const opts3a = result.pendingPrompt!.options;
+    expect(opts3a.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (opts3a.promptType === "ARRANGE_TOP_CARDS") {
+      expect(opts3a.validTargets).toContain("search-hit");
+      expect(opts3a.restDestination).toBe("TRASH");
+    }
   });
 
   it("3b. With rest_destination BOTTOM, prompt indicates bottom placement", () => {
@@ -498,8 +501,12 @@ describe("3. SEARCH_TRASH_THE_REST Resume", () => {
     );
 
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt?.options?.canSendToBottom).toBe(true);
-    expect(result.pendingPrompt?.options?.restDestination).toBe("BOTTOM");
+    const opts3b = result.pendingPrompt!.options;
+    expect(opts3b.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (opts3b.promptType === "ARRANGE_TOP_CARDS") {
+      expect(opts3b.canSendToBottom).toBe(true);
+      expect(opts3b.restDestination).toBe("BOTTOM");
+    }
   });
 });
 

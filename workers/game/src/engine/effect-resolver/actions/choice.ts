@@ -95,8 +95,8 @@ export function executePlayerChoice(
   };
 
   const pendingPrompt: PendingPromptState = {
-    promptType: "PLAYER_CHOICE",
     options: {
+      promptType: "PLAYER_CHOICE",
       effectDescription,
       choices,
     },

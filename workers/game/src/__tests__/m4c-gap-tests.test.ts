@@ -15,8 +15,10 @@ import type {
   CardInstance,
   DonInstance,
   GameEvent,
+  GameEventType,
   GameState,
   PlayerState,
+  Zone,
 } from "../types.js";
 import type { EffectSchema, EffectBlock } from "../engine/effect-types.js";
 import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
@@ -158,8 +160,8 @@ function runFullAttack(
 }
 
 /** Helper to find events of a given type in the eventLog */
-function findEvents(state: GameState, type: string): GameEvent[] {
-  return state.eventLog.filter((e) => e.type === type);
+function findEvents<T extends GameEventType>(state: GameState, type: T): Extract<GameEvent, { type: T }>[] {
+  return state.eventLog.filter((e): e is Extract<GameEvent, { type: T }> => e.type === type);
 }
 
 // =============================================================================
@@ -553,7 +555,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
           {
             type: "CARD_PLAYED",
             playerIndex: 0,
-            payload: { cardInstanceId: "test-card", source: "FROM_HAND" },
+            payload: { cardInstanceId: "test-card", cardId: "test-card", zone: "CHARACTER" as Zone, source: "FROM_HAND" },
             timestamp: Date.now(),
           },
         ],
@@ -659,7 +661,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const highKoEvent: GameEvent = {
         type: "CARD_KO",
         playerIndex: 0,
-        payload: { cardInstanceId: "high-cost-inst", cause: "battle" },
+        payload: { cardInstanceId: "high-cost-inst", cardId: "HIGH-COST-CHAR", cause: "battle", preKO_donCount: 0 },
         timestamp: Date.now(),
       };
       const highMatches = matchTriggersForEvent(state, highKoEvent, cardDb);
@@ -669,7 +671,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const lowKoEvent: GameEvent = {
         type: "CARD_KO",
         playerIndex: 0,
-        payload: { cardInstanceId: "low-cost-inst", cause: "battle" },
+        payload: { cardInstanceId: "low-cost-inst", cardId: "LOW-COST-CHAR", cause: "battle", preKO_donCount: 0 },
         timestamp: Date.now(),
       };
       const lowMatches = matchTriggersForEvent(state, lowKoEvent, cardDb);
@@ -778,7 +780,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const triggerPlayEvent: GameEvent = {
         type: "CARD_PLAYED",
         playerIndex: 0,
-        payload: { cardInstanceId: "trig-char-inst", zone: "CHARACTER" },
+        payload: { cardInstanceId: "trig-char-inst", cardId: "TRIGGER-KEYWORD-CHAR", zone: "CHARACTER" as Zone, source: "FROM_HAND" },
         timestamp: Date.now(),
       };
       expect(matchTriggersForEvent(state, triggerPlayEvent, cardDb).length).toBe(1);
@@ -787,7 +789,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const noTriggerPlayEvent: GameEvent = {
         type: "CARD_PLAYED",
         playerIndex: 0,
-        payload: { cardInstanceId: "no-trig-inst", zone: "CHARACTER" },
+        payload: { cardInstanceId: "no-trig-inst", cardId: "NO-TRIGGER-CHAR", zone: "CHARACTER" as Zone, source: "FROM_HAND" },
         timestamp: Date.now(),
       };
       expect(matchTriggersForEvent(state, noTriggerPlayEvent, cardDb).length).toBe(0);
@@ -827,13 +829,13 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       // Strike play → matches
       expect(matchTriggersForEvent(state, {
         type: "CARD_PLAYED", playerIndex: 0,
-        payload: { cardInstanceId: "strike-inst" }, timestamp: Date.now(),
+        payload: { cardInstanceId: "strike-inst", cardId: "STRIKE-CHAR", zone: "CHARACTER" as Zone, source: "FROM_HAND" }, timestamp: Date.now(),
       }, cardDb).length).toBe(1);
 
       // Ranged play → no match
       expect(matchTriggersForEvent(state, {
         type: "CARD_PLAYED", playerIndex: 0,
-        payload: { cardInstanceId: "ranged-inst" }, timestamp: Date.now(),
+        payload: { cardInstanceId: "ranged-inst", cardId: "RANGED-CHAR", zone: "CHARACTER" as Zone, source: "FROM_HAND" }, timestamp: Date.now(),
       }, cardDb).length).toBe(0);
     });
 
@@ -871,13 +873,13 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       // Vanilla (no effect text) → matches
       expect(matchTriggersForEvent(state, {
         type: "CARD_PLAYED", playerIndex: 0,
-        payload: { cardInstanceId: "vanilla-inst" }, timestamp: Date.now(),
+        payload: { cardInstanceId: "vanilla-inst", cardId: "VANILLA-EFF", zone: "CHARACTER" as Zone, source: "FROM_HAND" }, timestamp: Date.now(),
       }, cardDb).length).toBe(1);
 
       // Has effect text → no match
       expect(matchTriggersForEvent(state, {
         type: "CARD_PLAYED", playerIndex: 0,
-        payload: { cardInstanceId: "effect-inst" }, timestamp: Date.now(),
+        payload: { cardInstanceId: "effect-inst", cardId: "HAS-EFFECT", zone: "CHARACTER" as Zone, source: "FROM_HAND" }, timestamp: Date.now(),
       }, cardDb).length).toBe(0);
     });
   });
@@ -1786,6 +1788,8 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
       expect(result.pendingPrompt).toBeDefined();
       const opts = result.pendingPrompt!.options;
+      expect(opts.promptType).toBe("SELECT_TARGET");
+      if (opts.promptType !== "SELECT_TARGET") throw new Error("unexpected prompt type");
 
       // Overall count bounds
       expect(opts.countMin).toBe(0); // both up_to → min 0
@@ -1922,7 +1926,7 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
 
     // The pipeline should pause with a SELECT_TARGET prompt for TRASH_FROM_HAND
     expect(result.pendingPrompt).toBeTruthy();
-    expect(result.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    expect(result.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
     expect(result.pendingPrompt!.respondingPlayer).toBe(1);
 
     // Enel's ADD_TO_LIFE_FROM_DECK should have already executed
@@ -1950,7 +1954,7 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
 
     // Should have TRASH_FROM_HAND prompt
     expect(result.pendingPrompt).toBeTruthy();
-    expect(result.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    expect(result.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
 
     // Resolve the prompt: select the first hand card to trash
     const resumeResult = resumeFromStack(
@@ -2123,7 +2127,7 @@ describe("source_zone as array in target resolution", () => {
       count: { up_to: 5 } as const,
     };
 
-    const validIds = computeAllValidTargets(state, target, 0, cardDb, "src-1");
+    const validIds = computeAllValidTargets(state, target, 0, cardDb, "src-1", new Map());
     expect(validIds).toContain("hand-1");
     expect(validIds).toContain("trash-1");
     expect(validIds.length).toBe(2);
@@ -2196,8 +2200,10 @@ describe("REORDER_ALL_LIFE action", () => {
 
     // Should return a pending prompt since life has 5 cards
     expect(result.pendingPrompt).toBeTruthy();
-    expect(result.pendingPrompt!.promptType).toBe("ARRANGE_TOP_CARDS");
-    expect(result.pendingPrompt!.options.cards!.length).toBe(5);
+    const reorderOpts = result.pendingPrompt!.options;
+    expect(reorderOpts.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (reorderOpts.promptType !== "ARRANGE_TOP_CARDS") throw new Error("unexpected prompt type");
+    expect(reorderOpts.cards!.length).toBe(5);
     expect(result.pendingPrompt!.respondingPlayer).toBe(0);
     expect(result.succeeded).toBe(false);
   });
@@ -2230,7 +2236,9 @@ describe("REORDER_ALL_LIFE action", () => {
 
     expect(result.pendingPrompt).toBeTruthy();
     // Life cards should be from player 1 (opponent)
-    const lifeIds = result.pendingPrompt!.options.cards!.map((c: any) => c.instanceId);
+    const oppOpts = result.pendingPrompt!.options;
+    if (oppOpts.promptType !== "ARRANGE_TOP_CARDS") throw new Error("unexpected prompt type");
+    const lifeIds = oppOpts.cards!.map((c: any) => c.instanceId);
     expect(lifeIds[0]).toContain("life-1");
   });
 });

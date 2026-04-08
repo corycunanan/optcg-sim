@@ -752,7 +752,7 @@ describe("Trigger System", () => {
     const event: GameEvent = {
       type: "CARD_PLAYED",
       playerIndex: 0,
-      payload: { cardInstanceId: "luffy-1" },
+      payload: { cardInstanceId: "luffy-1", cardId: "test-card", zone: "CHARACTER" as const, source: "FROM_HAND" },
       timestamp: Date.now(),
     };
 
@@ -938,7 +938,7 @@ describe("Replacement Effects", () => {
     // Should not auto-replace — returns a prompt instead
     expect(result.replaced).toBe(false);
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt!.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.pendingPrompt!.options.promptType).toBe("OPTIONAL_EFFECT");
     expect(result.pendingPrompt!.respondingPlayer).toBe(0);
   });
 

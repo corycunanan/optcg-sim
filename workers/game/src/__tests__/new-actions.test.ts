@@ -140,7 +140,7 @@ describe("RETURN_TO_DECK action", () => {
     // Should pause for player selection
     expect(result.resolved).toBe(false);
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt!.promptType).toBe("SELECT_TARGET");
+    expect(result.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
   });
 });
 
@@ -1055,8 +1055,10 @@ describe("REVEAL_HAND action", () => {
     const result = resolveEffect(state, block, "char-0-v1", 0, cardDb);
     expect(result.resolved).toBe(false);
     expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt!.promptType).toBe("SELECT_TARGET");
-    expect(result.pendingPrompt!.options.blindSelection).toBe(true);
+    const blindOpts = result.pendingPrompt!.options;
+    expect(blindOpts.promptType).toBe("SELECT_TARGET");
+    if (blindOpts.promptType !== "SELECT_TARGET") throw new Error("unexpected prompt type");
+    expect(blindOpts.blindSelection).toBe(true);
   });
 });
 

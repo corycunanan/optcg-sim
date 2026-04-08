@@ -21,7 +21,7 @@ import type {
   DynamicValue,
   EffectResult,
 } from "./effect-types.js";
-import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
+import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
 import { getEffectivePower } from "./modifiers.js";
 import { findCardInstance } from "./state.js";
 
@@ -362,10 +362,11 @@ function evaluateSimple(
 
     case "PLAY_METHOD": {
       const playEvent = [...state.eventLog].reverse().find(
-        (e) => e.type === "CARD_PLAYED" && e.payload?.cardInstanceId === ctx.sourceCardInstanceId,
+        (e): e is Extract<GameEvent, { type: "CARD_PLAYED" }> =>
+          e.type === "CARD_PLAYED" && e.payload.cardInstanceId === ctx.sourceCardInstanceId,
       );
       if (!playEvent) return true;
-      const source = playEvent.payload?.source as string | undefined;
+      const source = playEvent.payload.source;
       if (cond.method === "FROM_HAND") return source === "FROM_HAND";
       if (cond.method === "BY_EFFECT") return source === "BY_EFFECT" || source === "PLAY_SELF";
       if (cond.method === "BY_CHARACTER_EFFECT" || cond.method === "BY_EVENT_EFFECT") return source === "BY_EFFECT";
@@ -373,7 +374,7 @@ function evaluateSimple(
     }
 
     case "SOURCE_PROPERTY": {
-      const contextMap: Record<string, string> = {
+      const contextMap: Record<string, GameEventType> = {
         KO_BY_EFFECT: "CARD_KO",
         KO_IN_BATTLE: "CARD_KO",
         REMOVAL_BY_EFFECT: "CARD_RETURNED_TO_HAND",
@@ -382,10 +383,12 @@ function evaluateSimple(
       const eventType = contextMap[cond.context];
       if (!eventType) return true;
       const sourceEvent = [...state.eventLog].reverse().find(
-        (e) => e.type === eventType && e.payload?.cardInstanceId === ctx.sourceCardInstanceId,
+        (e) => e.type === eventType && "cardInstanceId" in e.payload && e.payload.cardInstanceId === ctx.sourceCardInstanceId,
       );
       if (!sourceEvent) return true;
-      const causeCardId = sourceEvent.payload?.causeCardInstanceId as string | undefined;
+      const causeCardId = "causeCardInstanceId" in sourceEvent.payload
+        ? (sourceEvent.payload as { causeCardInstanceId?: string }).causeCardInstanceId
+        : undefined;
       if (!causeCardId) return true;
       const causeCard = findInstanceById(state, causeCardId);
       if (!causeCard) return true;

@@ -147,54 +147,78 @@ export interface RegisteredTrigger {
 
 // ─── Game Events (Event Bus) ──────────────────────────────────────────────────
 
-export type GameEventType =
-  | "PHASE_CHANGED"
-  | "TURN_STARTED"
-  | "TURN_ENDED"
-  | "CARD_PLAYED"
-  | "CARD_KO"
-  | "CARD_DRAWN"
-  | "CARD_TRASHED"
-  | "CARD_RETURNED_TO_HAND"
-  | "CARD_ADDED_TO_HAND_FROM_LIFE"
-  | "LIFE_CARD_FACE_CHANGED"
-  | "ATTACK_DECLARED"
-  | "BLOCK_DECLARED"
-  | "COUNTER_USED"
-  | "BATTLE_RESOLVED"
-  | "DAMAGE_DEALT"
-  | "TRIGGER_ACTIVATED"
-  | "DON_GIVEN_TO_CARD"
-  | "DON_DETACHED"
-  | "DON_PLACED_ON_FIELD"
-  | "DON_STATE_CHANGED"
-  | "CARD_STATE_CHANGED"
-  | "POWER_MODIFIED"
-  | "GAME_OVER"
-  | "CARD_RETURNED_TO_DECK"
-  | "DON_SET_ACTIVE"
-  | "DON_RESTED"
-  | "CARDS_REVEALED"
-  | "EFFECTS_NEGATED"
-  | "LIFE_CARD_TO_DECK"
-  | "LIFE_SCRIED"
-  | "ATTACK_REDIRECTED"
-  | "CARD_REMOVED_FROM_LIFE"
-  | "EXTRA_TURN_GRANTED"
-  | "EVENT_ACTIVATED"
-  | "LIFE_CARD_TURNED_FACE_UP"
-  | "LIFE_CARD_TURNED_FACE_DOWN"
-  | "COMBAT_VICTORY"
-  | "CHARACTER_BATTLES"
-  | "LIFE_COUNT_BECOMES_ZERO"
-  | "DRAW_OUTSIDE_DRAW_PHASE";
-
-export interface GameEvent {
-  type: GameEventType;
-  playerIndex: 0 | 1;
-  payload: Record<string, unknown>;
-  timestamp: number;
+/**
+ * Per-event-type payload map — single source of truth for all event payloads.
+ * GameEvent and PendingEvent are both derived from this map.
+ */
+export interface GameEventPayloadMap {
+  PHASE_CHANGED: { from: string; to: string };
+  TURN_STARTED: Record<string, never>;
+  TURN_ENDED: Record<string, never>;
+  CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string };
+  CARD_KO: { cardInstanceId: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number };
+  CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
+  CARD_TRASHED: { cardId?: string; cardInstanceId?: string; count?: number; reason: string; from?: string };
+  CARD_RETURNED_TO_HAND: { cardInstanceId: string; cardId: string; source?: string };
+  CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
+  LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
+  ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };
+  BLOCK_DECLARED: { blockerInstanceId: string };
+  COUNTER_USED: { cardId: string; counterValue?: number; counterTargetInstanceId?: string; cardInstanceId?: string; type?: string };
+  BATTLE_RESOLVED: Record<string, never>;
+  DAMAGE_DEALT: { amount: number; attackerInstanceId: string; attackerType: string; target?: string; lethal?: boolean };
+  TRIGGER_ACTIVATED: { cardId: string; activated?: boolean };
+  DON_GIVEN_TO_CARD: { targetInstanceId?: string; count: number };
+  DON_DETACHED: { count?: number };
+  DON_PLACED_ON_FIELD: { count: number };
+  DON_STATE_CHANGED: Record<string, never>;
+  CARD_STATE_CHANGED: { cardInstanceId?: string; targetInstanceId?: string; newState?: string; error?: string };
+  POWER_MODIFIED: { targetInstanceId: string; amount?: number; value?: number };
+  GAME_OVER: { winner?: 0 | 1 | null; reason: string };
+  CARD_RETURNED_TO_DECK: { cardInstanceId: string; cardId?: string; position?: string };
+  DON_SET_ACTIVE: { count: number };
+  DON_RESTED: { count: number };
+  CARDS_REVEALED: { cards: Array<{ instanceId: string; cardId: string }>; source?: string; visibility?: string };
+  EFFECTS_NEGATED: { targetInstanceIds: string[] };
+  LIFE_CARD_TO_DECK: { count: number };
+  LIFE_SCRIED: { cards: Array<{ instanceId: string; cardId: string }>; count: number };
+  ATTACK_REDIRECTED: { newTargetInstanceId: string };
+  CARD_REMOVED_FROM_LIFE: { cardInstanceId: string };
+  EXTRA_TURN_GRANTED: Record<string, never>;
+  EVENT_ACTIVATED: { cardId?: string; cardInstanceId: string; source?: string };
+  LIFE_CARD_TURNED_FACE_UP: { count: number };
+  LIFE_CARD_TURNED_FACE_DOWN: { count: number };
+  COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string };
+  CHARACTER_BATTLES: { cardInstanceId: string; targetInstanceId: string };
+  LIFE_COUNT_BECOMES_ZERO: Record<string, never>;
+  DRAW_OUTSIDE_DRAW_PHASE: { count: number };
 }
+
+/** Union of all event type strings. */
+export type GameEventType = keyof GameEventPayloadMap;
+
+/** Fully typed game event — discriminated union keyed by `type`. */
+export type GameEvent = {
+  [K in GameEventType]: {
+    type: K;
+    playerIndex: 0 | 1;
+    payload: GameEventPayloadMap[K];
+    timestamp: number;
+  };
+}[GameEventType];
+
+/**
+ * Pre-emission event shape used internally by the engine.
+ * Same payload typing as GameEvent but playerIndex/payload are optional
+ * (defaults applied by emitEvent).
+ */
+export type PendingGameEvent = {
+  [K in GameEventType]: {
+    type: K;
+    playerIndex?: 0 | 1;
+    payload?: GameEventPayloadMap[K];
+  };
+}[GameEventType];
 
 // ─── Effect Stack ────────────────────────────────────────────────────────────
 
@@ -235,7 +259,7 @@ export interface EffectStackFrame {
   simultaneousTriggers?: QueuedTrigger[];
 
   // Events accumulated during partial execution
-  accumulatedEvents: { type: GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> }[];
+  accumulatedEvents: PendingGameEvent[];
 }
 
 export interface QueuedTrigger {
@@ -243,13 +267,12 @@ export interface QueuedTrigger {
   controller: 0 | 1;
   /** EffectBlock — typed as unknown in shared layer, cast in worker */
   effectBlock: unknown;
-  triggeringEvent: { type: GameEventType; playerIndex?: 0 | 1; payload?: Record<string, unknown> };
+  triggeringEvent: PendingGameEvent;
 }
 
 // ─── Pending Prompt State ─────────────────────────────────────────────────────
 
 export interface PendingPromptState {
-  promptType: PromptType;
   options: PromptOptions;
   respondingPlayer: 0 | 1;
   resumeContext: unknown; // cast to ResumeContext in worker
@@ -336,7 +359,7 @@ export type GameAction =
 export type ServerMessage =
   | { type: "game:state"; state: GameState; canUndo?: boolean }
   | { type: "game:update"; action: GameAction; state: GameState; canUndo?: boolean }
-  | { type: "game:prompt"; promptType: PromptType; options: PromptOptions }
+  | { type: "game:prompt"; options: PromptOptions }
   | { type: "game:error"; message: string }
   | { type: "game:over"; winner: 0 | 1 | null; reason: string }
   | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
@@ -348,36 +371,80 @@ export type ClientMessage =
   | { type: "game:action"; action: GameAction }
   | { type: "game:leave" };
 
-export type PromptType =
-  | "SELECT_BLOCKER"
-  | "SELECT_COUNTER_TARGET"
-  | "SELECT_ATTACK_TARGET"
-  | "REVEAL_TRIGGER"
-  | "SELECT_CARD_TO_TRASH"   // e.g. 5-card overflow
-  | "ARRANGE_TOP_CARDS"
-  | "SELECT_TARGET"
-  | "PLAYER_CHOICE"
-  | "OPTIONAL_EFFECT";
+// ─── Prompt Options — discriminated union keyed by promptType ────────────────
 
-export interface PromptOptions {
-  validTargets?: string[];   // instanceIds
+export type PromptType = PromptOptions["promptType"];
+
+export type PromptOptions =
+  | SelectBlockerPrompt
+  | SelectCounterTargetPrompt
+  | SelectAttackTargetPrompt
+  | RevealTriggerPrompt
+  | SelectCardToTrashPrompt
+  | ArrangeTopCardsPrompt
+  | SelectTargetPrompt
+  | PlayerChoicePrompt
+  | OptionalEffectPrompt;
+
+export interface SelectBlockerPrompt {
+  promptType: "SELECT_BLOCKER";
+  validTargets: string[];
+  optional: boolean;
+  timeoutMs: number;
+}
+
+export interface SelectCounterTargetPrompt {
+  promptType: "SELECT_COUNTER_TARGET";
+  validTargets: string[];
   optional?: boolean;
   timeoutMs?: number;
-  // ARRANGE_TOP_CARDS
-  canSendToBottom?: boolean;
-  // Shared: ARRANGE_TOP_CARDS + SELECT_TARGET
-  cards?: CardInstance[];
+}
+
+export interface SelectAttackTargetPrompt {
+  promptType: "SELECT_ATTACK_TARGET";
+  validTargets: string[];
+  optional?: boolean;
+  timeoutMs?: number;
+}
+
+export interface RevealTriggerPrompt {
+  promptType: "REVEAL_TRIGGER";
+  cards: CardInstance[];
+  effectDescription: string;
+  optional: boolean;
+  timeoutMs: number;
+}
+
+export interface SelectCardToTrashPrompt {
+  promptType: "SELECT_CARD_TO_TRASH";
+  cards: CardInstance[];
+  validTargets: string[];
+  countMin: number;
+  countMax: number;
   effectDescription?: string;
-  // SELECT_TARGET
-  countMin?: number;
-  countMax?: number;
-  ctaLabel?: string;
-  blindSelection?: boolean; // true when selecting from hidden cards (opponent's hand)
-  // Target constraints (SELECT_TARGET) — sent to UI for client-side enforcement
+}
+
+export interface ArrangeTopCardsPrompt {
+  promptType: "ARRANGE_TOP_CARDS";
+  cards: CardInstance[];
+  effectDescription: string;
+  canSendToBottom: boolean;
+  validTargets?: string[];
+  restDestination?: string;
+}
+
+export interface SelectTargetPrompt {
+  promptType: "SELECT_TARGET";
+  cards: CardInstance[];
+  validTargets: string[];
+  effectDescription: string;
+  countMin: number;
+  countMax: number;
+  ctaLabel: string;
+  blindSelection?: boolean;
   aggregateConstraint?: { property: "power" | "cost"; operator: "<=" | ">=" | "=="; value: number };
   uniquenessConstraint?: { field: "name" | "color" };
   namedDistribution?: { names: string[] };
-  // Dual targets (SELECT_TARGET) — per-slot valid IDs and count bounds for client-side feasibility check
   dualTargets?: {
     slots: Array<{
       validIds: string[];
@@ -385,7 +452,16 @@ export interface PromptOptions {
       countMax: number;
     }>;
   };
-  // PLAYER_CHOICE
-  choices?: { id: string; label: string }[];
-  restDestination?: string;
+}
+
+export interface PlayerChoicePrompt {
+  promptType: "PLAYER_CHOICE";
+  choices: { id: string; label: string }[];
+  effectDescription: string;
+}
+
+export interface OptionalEffectPrompt {
+  promptType: "OPTIONAL_EFFECT";
+  effectDescription: string;
+  cards?: CardInstance[];
 }

@@ -614,8 +614,8 @@ export function executeReorderAllLife(
   };
 
   const pendingPrompt: import("../../../types.js").PendingPromptState = {
-    promptType: "ARRANGE_TOP_CARDS",
     options: {
+      promptType: "ARRANGE_TOP_CARDS",
       cards: lifeCards,
       effectDescription,
       canSendToBottom: false,

@@ -267,10 +267,10 @@ export function resumeEffectChain(
     nextState = { ...nextState, players: newPlayers };
 
     events.push({
-      type: "LIFE_REORDERED" as any,
+      type: "LIFE_REORDERED",
       playerIndex: targetController,
       payload: { orderedInstanceIds: ordered },
-    });
+    } as unknown as PendingEvent);
   }
 
   // Resume from PLAYER_CHOICE response

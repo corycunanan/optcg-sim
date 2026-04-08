@@ -203,8 +203,7 @@ export function resolveEffect(
     state = pushFrame(state, frame);
 
     const pendingPrompt: PendingPromptState = {
-      promptType: "OPTIONAL_EFFECT",
-      options: { effectDescription: blockDescription, cards },
+      options: { promptType: "OPTIONAL_EFFECT", effectDescription: blockDescription, cards },
       respondingPlayer: controller,
       resumeContext: frame.id,
     };
@@ -334,7 +333,7 @@ export function executeActionChain(
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
       const ctx = result.pendingPrompt.resumeContext as import("../../types.js").ResumeContext;
-      const phaseForPrompt = promptTypeToPhase(result.pendingPrompt.promptType);
+      const phaseForPrompt = promptTypeToPhase(result.pendingPrompt.options.promptType);
       const frame: EffectStackFrame = {
         id: generateFrameId(),
         sourceCardInstanceId,
@@ -359,7 +358,7 @@ export function executeActionChain(
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
       if (effectDescription && prompt.options) {
-        prompt.options = { ...prompt.options, effectDescription };
+        prompt.options = { ...prompt.options, effectDescription } as typeof prompt.options;
       }
       return { state: updatedState, events, pendingPrompt: prompt };
     }
