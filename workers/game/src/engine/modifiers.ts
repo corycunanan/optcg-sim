@@ -26,7 +26,7 @@ import { findCardInstance } from "./state.js";
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
  * Returns true for effects that have no WHILE_CONDITION duration (always active).
  */
-function isEffectConditionMet(
+export function isEffectConditionMet(
   effect: RuntimeActiveEffect,
   state: GameState,
   cardDb?: Map<string, CardDataType>,

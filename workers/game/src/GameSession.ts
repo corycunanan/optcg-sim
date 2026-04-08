@@ -25,6 +25,8 @@ import { verifyGameToken } from "./util/auth.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
 import { recalculateBattlePowers } from "./engine/battle.js";
+import { isEffectConditionMet } from "./engine/modifiers.js";
+import type { RuntimeActiveEffect } from "./engine/effect-types.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -769,12 +771,28 @@ export class GameSession implements DurableObject {
     build: (filteredState: GameState) => ServerMessage,
     exclude?: WebSocket,
   ): void {
+    // Pre-filter activeEffects to remove effects whose WHILE_CONDITION is not met
+    // (e.g., IS_MY_TURN). The client doesn't evaluate conditions — it applies
+    // all effects in activeEffects unconditionally for display purposes.
+    const baseState = this.stripInactiveEffects(this.gameState!);
     for (const playerIndex of [0, 1] as const) {
       const ws = this.getWebSocketForPlayer(playerIndex);
       if (!ws || ws === exclude) continue;
-      const filtered = filterStateForPlayer(this.gameState!, playerIndex);
+      const filtered = filterStateForPlayer(baseState, playerIndex);
       this.send(ws, build(filtered));
     }
+  }
+
+  /**
+   * Remove effects from activeEffects whose WHILE_CONDITION duration is currently
+   * not satisfied. This ensures the client only sees effects that are actually active.
+   */
+  private stripInactiveEffects(state: GameState): GameState {
+    if (!this.cardDb) return state;
+    const effects = state.activeEffects as RuntimeActiveEffect[];
+    const active = effects.filter((e) => isEffectConditionMet(e, state, this.cardDb!));
+    if (active.length === effects.length) return state;
+    return { ...state, activeEffects: active as any };
   }
 
   private broadcastExcept(exclude: WebSocket, msg: ServerMessage): void {
