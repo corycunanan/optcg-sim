@@ -3,8 +3,8 @@
  * Returns { lobbyId, joinCode } for the host to share.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { generateLobbyCode } from "@/lib/lobbies";
 import { CreateLobbySchema } from "@/lib/validators/lobbies";
@@ -12,16 +12,13 @@ import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   const { limited } = await apiLimiter.check(`lobby-create:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -33,7 +30,7 @@ export async function POST(request: NextRequest) {
       where: { id: deckId, userId },
     });
     if (!deck) {
-      return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      return apiError("Deck not found", 404);
     }
 
     // Close any existing WAITING lobby by this host
@@ -68,18 +65,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!lobby) {
-      return NextResponse.json(
-        { error: "Failed to generate unique lobby code" },
-        { status: 500 },
-      );
+      return apiError("Failed to generate unique lobby code", 500);
     }
 
-    return NextResponse.json(
-      { data: { lobbyId: lobby.id, joinCode: lobby.joinCode } },
-      { status: 201 },
-    );
+    return apiSuccess({ lobbyId: lobby.id, joinCode: lobby.joinCode }, 201);
   } catch (error) {
     console.error("Lobby create error:", error);
-    return NextResponse.json({ error: "Failed to create lobby" }, { status: 500 });
+    return apiError("Failed to create lobby", 500);
   }
 }

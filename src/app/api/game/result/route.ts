@@ -4,7 +4,8 @@
  * Protected by the GAME_WORKER_SECRET shared secret.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { GameResultSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
   // Auth: verify the request comes from our Cloudflare Worker
   const auth = request.headers.get("Authorization");
   if (!GAME_WORKER_SECRET || auth !== `Bearer ${GAME_WORKER_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const parsed = await parseBody(request, GameResultSchema);
@@ -33,9 +34,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return apiAction();
   } catch (error) {
     console.error("Game result update error:", error);
-    return NextResponse.json({ error: "Failed to update game result" }, { status: 500 });
+    return apiError("Failed to update game result", 500);
   }
 }

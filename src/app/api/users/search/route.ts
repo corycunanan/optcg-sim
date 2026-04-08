@@ -4,40 +4,39 @@
  * Returns up to 10 results, excluding the current user.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { searchLimiter } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await searchLimiter.check(`user-search:${session.user.id}`);
+  const { limited } = await searchLimiter.check(`user-search:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   const q = request.nextUrl.searchParams.get("q")?.trim() || "";
   if (q.length < 2) {
-    return NextResponse.json({ data: [] });
+    return apiSuccess([]);
   }
 
   try {
     const users = await prisma.user.findMany({
       where: {
         username: { contains: q, mode: "insensitive" },
-        id: { not: session.user.id },
+        id: { not: userId },
       },
       select: { id: true, username: true, name: true, image: true },
       take: 10,
     });
 
-    return NextResponse.json({ data: users });
+    return apiSuccess(users);
   } catch (error) {
     console.error("User search error:", error);
-    return NextResponse.json({ error: "Search failed" }, { status: 500 });
+    return apiError("Search failed", 500);
   }
 }

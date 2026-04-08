@@ -43,11 +43,12 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = await apiPost<any>("/api/decks/import", { text });
-      setErrors(data.errors || []);
+      const res = await apiPost<{ data: any }>("/api/decks/import", { text });
+      const result = res.data;
+      setErrors(result.errors || []);
       setPreview({
-        leader: data.leader ? { cardId: data.leader.cardId, card: data.leader.card } : null,
-        cards: data.cards || [],
+        leader: result.leader ? { cardId: result.leader.cardId, card: result.leader.card } : null,
+        cards: result.cards || [],
       });
     } catch {
       setErrors([{ line: 0, raw: "", error: "Failed to parse deck list" }]);

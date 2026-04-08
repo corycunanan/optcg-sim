@@ -2,7 +2,7 @@
  * GET /api/sets — List all unique sets
  */
 
-import { NextResponse } from "next/server";
+import { apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
@@ -17,12 +17,9 @@ export async function GET() {
       orderBy: { packId: "asc" },
     });
 
-    return NextResponse.json({ data: sets });
+    return apiSuccess(sets);
   } catch (error) {
     console.error("Sets fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch sets" },
-      { status: 500 }
-    );
+    return apiError("Failed to fetch sets", 500);
   }
 }

@@ -8,23 +8,21 @@
  * GAME_WORKER_SECRET — a shared secret both sides already have.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 
-export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET() {
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   if (!GAME_WORKER_SECRET) {
-    return NextResponse.json({ error: "Game server not configured" }, { status: 503 });
+    return apiError("Game server not configured", 503);
   }
 
-  const token = await mintGameToken(session.user.id, GAME_WORKER_SECRET);
-  return NextResponse.json({ data: { token } });
+  const token = await mintGameToken(userId, GAME_WORKER_SECRET);
+  return apiSuccess({ token });
 }
 
 async function mintGameToken(userId: string, secret: string): Promise<string> {

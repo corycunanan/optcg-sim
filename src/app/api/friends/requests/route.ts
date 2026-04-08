@@ -3,20 +3,17 @@
  * POST /api/friends/requests — Send a friend request
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { SendFriendRequestSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
   try {
     const [incoming, outgoing] = await Promise.all([
@@ -36,25 +33,21 @@ export async function GET() {
       }),
     ]);
 
-    return NextResponse.json({ data: { incoming, outgoing } }, {
-      headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" },
-    });
+    return apiSuccess({ incoming, outgoing }, 200, { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" });
   } catch (error) {
     console.error("Friend requests list error:", error);
-    return NextResponse.json({ error: "Failed to list requests" }, { status: 500 });
+    return apiError("Failed to list requests", 500);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const userId = session.user.id;
   const { limited } = await socialLimiter.check(`friend-req:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -62,16 +55,14 @@ export async function POST(request: NextRequest) {
     if (isErrorResponse(parsed)) return parsed;
     const { toUserId } = parsed;
     if (toUserId === userId) {
-      return NextResponse.json({ error: "Cannot send request to yourself" }, { status: 400 });
+      return apiError("Cannot send request to yourself", 400);
     }
 
-    // Check if target user exists
     const target = await prisma.user.findUnique({ where: { id: toUserId } });
     if (!target) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return apiError("User not found", 404);
     }
 
-    // Check if already friends (either direction)
     const friendship = await prisma.friendship.findFirst({
       where: {
         OR: [
@@ -81,10 +72,9 @@ export async function POST(request: NextRequest) {
       },
     });
     if (friendship) {
-      return NextResponse.json({ error: "Already friends" }, { status: 409 });
+      return apiError("Already friends", 409);
     }
 
-    // Check for existing pending request (either direction)
     const existing = await prisma.friendRequest.findFirst({
       where: {
         status: "PENDING",
@@ -95,7 +85,7 @@ export async function POST(request: NextRequest) {
       },
     });
     if (existing) {
-      return NextResponse.json({ error: "Request already pending" }, { status: 409 });
+      return apiError("Request already pending", 409);
     }
 
     const req = await prisma.friendRequest.create({
@@ -105,9 +95,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ data: req }, { status: 201 });
+    return apiSuccess(req, 201);
   } catch (error) {
     console.error("Friend request create error:", error);
-    return NextResponse.json({ error: "Failed to send request" }, { status: 500 });
+    return apiError("Failed to send request", 500);
   }
 }

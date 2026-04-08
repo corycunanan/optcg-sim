@@ -1,12 +1,12 @@
 /**
  * POST /api/decks/import — Parse a deck list and validate card IDs
- * 
+ *
  * Accepts: { text: string } — deck list in Nx CARDID format
  * Returns: parsed cards, leader, errors for invalid lines
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest } from "next/server";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { ImportDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -15,14 +15,13 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { parseDeckList } from "@/lib/deck-builder/parser";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if (authResult instanceof Response) return authResult;
+  const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`deck-import:${session.user.id}`);
+  const { limited } = await apiLimiter.check(`deck-import:${userId}`);
   if (limited) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    return apiError("Too many requests. Try again later.", 429);
   }
 
   try {
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
     );
     const errors = results.filter((r) => r.error);
 
-    return NextResponse.json({
+    return apiSuccess({
       leader: leader ? { cardId: leader.cardId, card: (leader as { card: unknown }).card } : null,
       cards: mainDeck.map((r) => ({
         cardId: r.cardId,
@@ -91,9 +90,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Deck import parse error:", error);
-    return NextResponse.json(
-      { error: "Failed to parse deck list" },
-      { status: 500 },
-    );
+    return apiError("Failed to parse deck list", 500);
   }
 }
