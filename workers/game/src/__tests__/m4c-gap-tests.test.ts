@@ -26,6 +26,7 @@ import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.
 import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
 import { computeAllValidTargets, validateTargetConstraints, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../engine/effect-resolver/target-resolver.js";
 import type { EffectResult } from "../engine/effect-types.js";
+import { executeReorderAllLife } from "../engine/effect-resolver/actions/life.js";
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
 
@@ -1781,5 +1782,220 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
     // Battle should now be ended
     expect(revealResult.state.turn.battle).toBeNull();
     expect(revealResult.state.turn.battleSubPhase).toBeNull();
+  });
+});
+
+// ─── OPT-107 Lower Priority — Edge Case Implementations ────────────────────
+
+describe("has_effect TargetFilter", () => {
+  it("matches cards with effect text", () => {
+    const cardWithEffect = makeCard("CHAR-EFF", { effectText: "Draw 1 card." });
+    const cardNoEffect = makeCard("CHAR-NOEFF", { effectText: "" });
+    const cardDb = new Map<string, CardData>([
+      [cardWithEffect.id, cardWithEffect],
+      [cardNoEffect.id, cardNoEffect],
+    ]);
+    const state = buildMinimalState();
+    const instWith = makeInstance(cardWithEffect.id, "FIELD", 0);
+    const instWithout = makeInstance(cardNoEffect.id, "FIELD", 0);
+
+    expect(matchesFilter(instWith, { has_effect: true }, cardDb, state)).toBe(true);
+    expect(matchesFilter(instWithout, { has_effect: true }, cardDb, state)).toBe(false);
+    expect(matchesFilter(instWith, { has_effect: false }, cardDb, state)).toBe(false);
+    expect(matchesFilter(instWithout, { has_effect: false }, cardDb, state)).toBe(true);
+  });
+});
+
+describe("has_counter TargetFilter", () => {
+  it("matches cards with counter value", () => {
+    const cardWithCounter = makeCard("CHAR-CTR", { counter: 1000 });
+    const cardNoCounter = makeCard("CHAR-NOCTR", { counter: null });
+    const cardDb = new Map<string, CardData>([
+      [cardWithCounter.id, cardWithCounter],
+      [cardNoCounter.id, cardNoCounter],
+    ]);
+    const state = buildMinimalState();
+    const instWith = makeInstance(cardWithCounter.id, "FIELD", 0);
+    const instWithout = makeInstance(cardNoCounter.id, "FIELD", 0);
+
+    expect(matchesFilter(instWith, { has_counter: true }, cardDb, state)).toBe(true);
+    expect(matchesFilter(instWithout, { has_counter: true }, cardDb, state)).toBe(false);
+    expect(matchesFilter(instWith, { has_counter: false }, cardDb, state)).toBe(false);
+    expect(matchesFilter(instWithout, { has_counter: false }, cardDb, state)).toBe(true);
+  });
+});
+
+describe("exclude_ref TargetFilter", () => {
+  it("excludes cards whose instanceId is in the result ref", () => {
+    const card = makeCard("CHAR-X", {});
+    const cardDb = new Map<string, CardData>([[card.id, card]]);
+    const state = buildMinimalState();
+    const inst1 = makeInstance(card.id, "FIELD", 0, { instanceId: "inst-1" });
+    const inst2 = makeInstance(card.id, "FIELD", 0, { instanceId: "inst-2" });
+
+    const resultRefs = new Map<string, EffectResult>([
+      ["step1", { targetInstanceIds: ["inst-1"], count: 1 }],
+    ]);
+
+    expect(matchesFilter(inst1, { exclude_ref: "step1" }, cardDb, state, resultRefs)).toBe(false);
+    expect(matchesFilter(inst2, { exclude_ref: "step1" }, cardDb, state, resultRefs)).toBe(true);
+  });
+});
+
+describe("unique_names target constraint", () => {
+  it("rejects selections with duplicate card names", () => {
+    const cardA = makeCard("CHAR-A", { name: "Luffy" });
+    const cardB = makeCard("CHAR-B", { name: "Luffy" }); // same name, different card ID
+    const cardC = makeCard("CHAR-C", { name: "Zoro" });
+    const cardDb = new Map<string, CardData>([
+      [cardA.id, cardA], [cardB.id, cardB], [cardC.id, cardC],
+    ]);
+    const state = buildMinimalState();
+    const instA = makeInstance(cardA.id, "FIELD", 0, { instanceId: "inst-a" });
+    const instB = makeInstance(cardB.id, "FIELD", 0, { instanceId: "inst-b" });
+    const instC = makeInstance(cardC.id, "FIELD", 0, { instanceId: "inst-c" });
+    state.players[0].characters = [instA, instB, instC, null, null];
+
+    const target = {
+      type: "CHARACTER" as const,
+      count: { exact: 2 } as const,
+      filter: { unique_names: true },
+    };
+
+    // Two cards with same name "Luffy" — should fail
+    expect(validateTargetConstraints(["inst-a", "inst-b"], target, state, cardDb)).toBe(false);
+    // Two cards with different names — should pass
+    expect(validateTargetConstraints(["inst-a", "inst-c"], target, state, cardDb)).toBe(true);
+  });
+});
+
+describe("source_zone as array in target resolution", () => {
+  it("unions candidates from multiple source zones", () => {
+    const char1 = makeCard("CHAR-H", { name: "HandChar" });
+    const char2 = makeCard("CHAR-T", { name: "TrashChar" });
+    const cardDb = new Map<string, CardData>([[char1.id, char1], [char2.id, char2]]);
+
+    const state = buildMinimalState();
+    const handInst = makeInstance(char1.id, "HAND", 0, { instanceId: "hand-1" });
+    const trashInst = makeInstance(char2.id, "TRASH", 0, { instanceId: "trash-1" });
+    state.players[0].hand = [handInst];
+    state.players[0].trash = [trashInst];
+
+    const target = {
+      type: "CHARACTER_CARD" as const,
+      controller: "SELF" as const,
+      source_zone: ["HAND", "TRASH"] as ("HAND" | "TRASH")[],
+      count: { up_to: 5 } as const,
+    };
+
+    const validIds = computeAllValidTargets(state, target, 0, cardDb, "src-1");
+    expect(validIds).toContain("hand-1");
+    expect(validIds).toContain("trash-1");
+    expect(validIds.length).toBe(2);
+  });
+});
+
+describe("ProhibitionScope cost_filter", () => {
+  it("blocks playing characters matching cost_filter", () => {
+    const cheap = makeCard("CHAR-CHEAP", { cost: 3 });
+    const expensive = makeCard("CHAR-EXP", { cost: 7, type: "Character" });
+    const cardDb = new Map<string, CardData>([[cheap.id, cheap], [expensive.id, expensive]]);
+
+    const state = buildMinimalState();
+    const cheapInst = makeInstance(cheap.id, "HAND", 0, { instanceId: "cheap-1" });
+    const expInst = makeInstance(expensive.id, "HAND", 0, { instanceId: "exp-1" });
+    state.players[0].hand = [cheapInst, expInst];
+
+    // Add prohibition: cannot play characters with cost >= 5
+    (state as any).prohibitions = [{
+      id: "test-prohib",
+      prohibitionType: "CANNOT_PLAY_CHARACTER",
+      controller: 0,
+      sourceCardInstanceId: "src-1",
+      appliesTo: [],
+      scope: { cost_filter: { operator: ">=", value: 5 } },
+      usesRemaining: null,
+      conditionalOverride: null,
+    }];
+
+    // Expensive card (cost 7) should be blocked
+    const blockedResult = runPipeline(state, {
+      type: "PLAY_CARD",
+      cardInstanceId: "exp-1",
+    }, cardDb, 0);
+    expect(blockedResult.valid).toBe(false);
+
+    // Cheap card (cost 3) should be allowed through prohibition check
+    // (may fail for other reasons like DON cost, but not prohibition)
+    const allowedResult = runPipeline(state, {
+      type: "PLAY_CARD",
+      cardInstanceId: "cheap-1",
+    }, cardDb, 0);
+    // If it fails, it shouldn't be due to prohibition
+    if (!allowedResult.valid) {
+      expect(allowedResult.error).not.toContain("prohibited");
+    }
+  });
+});
+
+describe("REORDER_ALL_LIFE action", () => {
+  it("returns ARRANGE_TOP_CARDS prompt with all life cards", () => {
+    const card = makeCard("CHAR-SRC", { effectText: "Rearrange life cards" });
+    const cardDb = new Map<string, CardData>([[card.id, card], [CARDS.VANILLA.id, CARDS.VANILLA]]);
+    const state = buildMinimalState();
+
+    const action = {
+      type: "REORDER_ALL_LIFE" as const,
+      params: {},
+    };
+
+
+    const result = executeReorderAllLife(
+      state,
+      action,
+      "leader-0",
+      0,
+      cardDb,
+      new Map(),
+    );
+
+    // Should return a pending prompt since life has 5 cards
+    expect(result.pendingPrompt).toBeTruthy();
+    expect(result.pendingPrompt!.promptType).toBe("ARRANGE_TOP_CARDS");
+    expect(result.pendingPrompt!.options.cards!.length).toBe(5);
+    expect(result.pendingPrompt!.respondingPlayer).toBe(0);
+    expect(result.succeeded).toBe(false);
+  });
+
+  it("succeeds immediately with 1 or fewer life cards", () => {
+    const cardDb = new Map<string, CardData>([[CARDS.VANILLA.id, CARDS.VANILLA]]);
+    const state = buildMinimalState();
+    state.players[0].life = [{ instanceId: "life-0-0", cardId: CARDS.VANILLA.id, face: "DOWN" as const }];
+
+    const action = { type: "REORDER_ALL_LIFE" as const, params: {} };
+
+    const result = executeReorderAllLife(state, action, "leader-0", 0, cardDb, new Map());
+
+    expect(result.succeeded).toBe(true);
+    expect(result.pendingPrompt).toBeUndefined();
+  });
+
+  it("targets opponent life when target type is OPPONENT_LIFE", () => {
+    const cardDb = new Map<string, CardData>([[CARDS.VANILLA.id, CARDS.VANILLA]]);
+    const state = buildMinimalState();
+
+    const action = {
+      type: "REORDER_ALL_LIFE" as const,
+      target: { type: "OPPONENT_LIFE" as const },
+      params: {},
+    };
+
+
+    const result = executeReorderAllLife(state, action, "leader-0", 0, cardDb, new Map());
+
+    expect(result.pendingPrompt).toBeTruthy();
+    // Life cards should be from player 1 (opponent)
+    const lifeIds = result.pendingPrompt!.options.cards!.map((c: any) => c.instanceId);
+    expect(lifeIds[0]).toContain("life-1");
   });
 });

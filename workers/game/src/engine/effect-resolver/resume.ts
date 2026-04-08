@@ -241,6 +241,38 @@ export function resumeEffectChain(
     nextState = { ...nextState, players: newPlayers };
   }
 
+  // Resume from ARRANGE_TOP_CARDS response (REORDER_ALL_LIFE — reorder life zone)
+  if (action.type === "ARRANGE_TOP_CARDS" && pausedAction !== null && pausedAction.type === "REORDER_ALL_LIFE") {
+    // Determine target player from the original action's target
+    const targetController = (pausedAction.target?.type === "OPPONENT_LIFE" || pausedAction.target?.controller === "OPPONENT")
+      ? (controller === 0 ? 1 : 0) as 0 | 1
+      : controller;
+
+    const p = nextState.players[targetController];
+    const ordered = action.orderedInstanceIds ?? [];
+
+    // Build new life array in the player's specified order
+    const lifeById = new Map(p.life.map((l) => [l.instanceId, l]));
+    const newLife = ordered
+      .map((id) => lifeById.get(id))
+      .filter(Boolean) as typeof p.life;
+
+    // Append any life cards not included in the ordered list (shouldn't happen, but safety)
+    for (const l of p.life) {
+      if (!ordered.includes(l.instanceId)) newLife.push(l);
+    }
+
+    const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+    newPlayers[targetController] = { ...p, life: newLife };
+    nextState = { ...nextState, players: newPlayers };
+
+    events.push({
+      type: "LIFE_REORDERED" as any,
+      playerIndex: targetController,
+      payload: { orderedInstanceIds: ordered },
+    });
+  }
+
   // Resume from PLAYER_CHOICE response
   if (action.type === "PLAYER_CHOICE" && pausedAction !== null &&
       (pausedAction.type === "PLAYER_CHOICE" || pausedAction.type === "OPPONENT_CHOICE")) {

@@ -9,6 +9,7 @@ import type {
   DualTarget,
   EffectResult,
   NamedCardDistribution,
+  SourceZone,
   Target,
   TargetFilter,
   UniquenessConstraint,
@@ -17,6 +18,7 @@ import type {
   CardData,
   CardInstance,
   GameState,
+  PlayerState,
   PendingPromptState,
   ResumeContext,
 } from "../../types.js";
@@ -24,6 +26,36 @@ import { matchesFilter as matchesFilterImpl } from "../conditions.js";
 import { getEffectivePower, getEffectiveCost } from "../modifiers.js";
 import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
+
+// ─── Source zone helpers ─────────────────────────────────────────────────────
+
+function getCandidatesFromSourceZones(
+  sourceZone: SourceZone | SourceZone[] | undefined,
+  player: PlayerState,
+): CardInstance[] {
+  if (!sourceZone) return player.hand;
+  const zones = Array.isArray(sourceZone) ? sourceZone : [sourceZone];
+  const candidates: CardInstance[] = [];
+  const seen = new Set<string>();
+  for (const zone of zones) {
+    let cards: CardInstance[];
+    switch (zone) {
+      case "TRASH": cards = player.trash; break;
+      case "DECK": cards = player.deck; break;
+      case "DECK_TOP": cards = player.deck.slice(0, 1); break;
+      case "FIELD": cards = [player.leader, ...(player.characters.filter(Boolean) as CardInstance[]), ...(player.stage ? [player.stage] : [])]; break;
+      case "LIFE": cards = player.life.map((l) => ({ instanceId: l.instanceId, cardId: l.cardId, zone: "LIFE" as any, state: "ACTIVE" as any, attachedDon: [], turnPlayed: null, controller: 0 as 0 | 1, owner: 0 as 0 | 1 })); break;
+      default: cards = player.hand; break;
+    }
+    for (const c of cards) {
+      if (!seen.has(c.instanceId)) {
+        seen.add(c.instanceId);
+        candidates.push(c);
+      }
+    }
+  }
+  return candidates;
+}
 
 // ─── matchesFilterForTarget ──────────────────────────────────────────────────
 
@@ -69,6 +101,19 @@ export function validateTargetConstraints(
   }
   if (target.dual_targets && target.dual_targets.length > 0) {
     if (!validateDualTargetConstraints(selectedIds, target.dual_targets, state, cardDb, resultRefs)) return false;
+  }
+
+  // unique_names on filter: all selected cards must have distinct names
+  if (target.filter?.unique_names) {
+    const names = new Set<string>();
+    for (const id of selectedIds) {
+      const card = findCardInstance(state, id);
+      if (!card) continue;
+      const data = cardDb.get(card.cardId);
+      if (!data) continue;
+      if (names.has(data.name)) return false;
+      names.add(data.name);
+    }
   }
 
   return true;
@@ -279,16 +324,9 @@ export function computeAllValidTargets(
     case "STAGE_CARD": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      // Determine source zone — CHARACTER_CARD/EVENT_CARD/STAGE_CARD may specify source_zone
-      const sourceZone = (target as any).source_zone as string | undefined;
+      // Determine source zone(s) — may be a single zone or array of zones
       let candidates: CardInstance[];
-      if (sourceZone === "TRASH") {
-        candidates = state.players[pi].trash;
-      } else if (sourceZone === "DECK") {
-        candidates = state.players[pi].deck;
-      } else {
-        candidates = state.players[pi].hand;
-      }
+      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi]);
       // Apply card_type filter for typed target types
       if (targetType === "CHARACTER_CARD") {
         candidates = candidates.filter((c) => {
@@ -596,15 +634,8 @@ export function resolveTargetInstances(
     case "STAGE_CARD": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      const sourceZone = (target as any).source_zone as string | undefined;
       let candidates: CardInstance[];
-      if (sourceZone === "TRASH") {
-        candidates = state.players[pi].trash;
-      } else if (sourceZone === "DECK") {
-        candidates = state.players[pi].deck;
-      } else {
-        candidates = state.players[pi].hand;
-      }
+      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi]);
       if (targetType === "CHARACTER_CARD") {
         candidates = candidates.filter((c) => { const d = cardDb.get(c.cardId); return d && d.type?.toUpperCase() === "CHARACTER"; });
       } else if (targetType === "EVENT_CARD") {
