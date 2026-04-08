@@ -122,6 +122,7 @@ export function buildTriggerSelectionPrompt(
     currentCostIndex: 0,
     costsPaid: true,
     oncePerTurnMarked: false,
+    costResultRefs: [],
     pendingTriggers: afterTriggers,
     simultaneousTriggers: triggers,
     accumulatedEvents: [],

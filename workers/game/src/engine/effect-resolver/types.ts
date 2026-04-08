@@ -51,3 +51,26 @@ export interface CostSelectionResult {
   pendingPrompt?: PendingPromptState;
   costResult?: import("../effect-types.js").CostResult;
 }
+
+/** Serialize CostResult into entries for EffectStackFrame.costResultRefs */
+export function costResultToEntries(
+  costResult: import("../effect-types.js").CostResult,
+): [string, { targetInstanceIds: string[]; count: number }][] {
+  return [
+    ["__cost_don_rested", { targetInstanceIds: [], count: costResult.donRestedCount }],
+    ["__cost_cards_trashed", { targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [], count: costResult.cardsTrashedCount }],
+    ["__cost_cards_returned", { targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [], count: costResult.cardsReturnedCount }],
+    ["__cost_cards_placed_to_deck", { targetInstanceIds: [], count: costResult.cardsPlacedToDeckCount }],
+    ["__cost_characters_ko", { targetInstanceIds: costResult.charactersKoInstanceIds ?? [], count: costResult.charactersKoCount }],
+  ];
+}
+
+/** Deserialize EffectStackFrame.costResultRefs back into a Map */
+export function costResultRefsFromEntries(
+  entries: [string, { targetInstanceIds: string[]; count: number }][],
+): Map<string, EffectResult> | undefined {
+  if (!entries || entries.length === 0) return undefined;
+  const hasValues = entries.some(([, v]) => v.count > 0);
+  if (!hasValues) return undefined;
+  return new Map(entries);
+}

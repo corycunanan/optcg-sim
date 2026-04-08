@@ -195,6 +195,7 @@ export function resolveEffect(
       currentCostIndex: 0,
       costsPaid: false,
       oncePerTurnMarked: false,
+      costResultRefs: [],
       pendingTriggers: [],
       simultaneousTriggers: [],
       accumulatedEvents: [],
@@ -348,6 +349,7 @@ export function executeActionChain(
         currentCostIndex: 0,
         costsPaid: true, // costs already paid before action chain
         oncePerTurnMarked: true,
+        costResultRefs: [],
         pendingTriggers: [],
         simultaneousTriggers: [],
         accumulatedEvents: events,
@@ -384,12 +386,13 @@ function costResultToRefs(
   if (!hasValues) return undefined;
   const refs = new Map<string, EffectResult>();
   refs.set("__cost_don_rested", { targetInstanceIds: [], count: costResult.donRestedCount });
-  refs.set("__cost_cards_trashed", { targetInstanceIds: [], count: costResult.cardsTrashedCount });
-  refs.set("__cost_cards_returned", { targetInstanceIds: [], count: costResult.cardsReturnedCount });
+  refs.set("__cost_cards_trashed", { targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [], count: costResult.cardsTrashedCount });
+  refs.set("__cost_cards_returned", { targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [], count: costResult.cardsReturnedCount });
   refs.set("__cost_cards_placed_to_deck", { targetInstanceIds: [], count: costResult.cardsPlacedToDeckCount });
-  refs.set("__cost_characters_ko", { targetInstanceIds: [], count: costResult.charactersKoCount });
+  refs.set("__cost_characters_ko", { targetInstanceIds: costResult.charactersKoInstanceIds ?? [], count: costResult.charactersKoCount });
   return refs;
 }
+
 
 // ─── Single Action Dispatcher ─────────────────────────────────────────────────
 

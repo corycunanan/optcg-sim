@@ -1184,4 +1184,7 @@ export interface CostResult {
   cardsReturnedCount: number;
   cardsPlacedToDeckCount: number;
   charactersKoCount: number;
+  cardsTrashedInstanceIds: string[];
+  cardsReturnedInstanceIds: string[];
+  charactersKoInstanceIds: string[];
 }
