@@ -17,6 +17,7 @@ import { normalizeLobbyCode } from "@/lib/lobbies";
 import { toCardData } from "@/lib/game/card-data";
 import { JoinLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
@@ -28,6 +29,11 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  const { limited } = await apiLimiter.check(`lobby-join:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
 
   if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
     console.error("GAME_WORKER_URL or GAME_WORKER_SECRET not configured");

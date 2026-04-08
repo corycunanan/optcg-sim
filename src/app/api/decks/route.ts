@@ -9,6 +9,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CreateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { apiLimiter } from "@/lib/rate-limit";
 
 export async function GET() {
   const session = await auth();
@@ -68,6 +69,11 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = await apiLimiter.check(`deck-create:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   try {

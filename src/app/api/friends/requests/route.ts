@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id;
-  const { limited } = socialLimiter.check(`friend-req:${userId}`);
+  const { limited } = await socialLimiter.check(`friend-req:${userId}`);
   if (limited) {
     return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }

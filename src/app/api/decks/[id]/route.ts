@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { UpdateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { prisma } from "@/lib/db";
+import { apiLimiter } from "@/lib/rate-limit";
 
 const CARD_SELECT = {
   id: true,
@@ -79,6 +80,11 @@ export async function PUT(
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = await apiLimiter.check(`deck-update:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const { id } = await params;
@@ -161,6 +167,11 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = await apiLimiter.check(`deck-delete:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   const { id } = await params;

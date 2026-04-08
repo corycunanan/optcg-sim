@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db";
 import { cardIdToOriginSet } from "@/lib/utils";
 import { CreateCardSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
-import { searchLimiter } from "@/lib/rate-limit";
+import { searchLimiter, apiLimiter } from "@/lib/rate-limit";
 import {
   buildCardWhereClause,
   buildCardOrderBy,
@@ -19,7 +19,7 @@ import {
 
 export async function GET(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-  const { limited } = searchLimiter.check(`card-search:${ip}`);
+  const { limited } = await searchLimiter.check(`card-search:${ip}`);
   if (limited) {
     return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
@@ -86,6 +86,11 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { limited } = await apiLimiter.check(`card-create:${session.user.id}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
 
   try {

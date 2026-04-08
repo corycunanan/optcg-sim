@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { socialLimiter } from "@/lib/rate-limit";
 
 export async function PUT(request: NextRequest) {
   const session = await auth();
@@ -13,6 +14,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  const { limited } = await socialLimiter.check(`msg-read:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const messageId = request.nextUrl.searchParams.get("messageId");
 
   if (!messageId) {

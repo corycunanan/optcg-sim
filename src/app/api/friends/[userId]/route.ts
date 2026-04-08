@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { socialLimiter } from "@/lib/rate-limit";
 
 export async function DELETE(
   _request: NextRequest,
@@ -16,6 +17,12 @@ export async function DELETE(
   }
 
   const userId = session.user.id;
+
+  const { limited } = await socialLimiter.check(`unfriend:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const { userId: friendId } = await params;
 
   try {

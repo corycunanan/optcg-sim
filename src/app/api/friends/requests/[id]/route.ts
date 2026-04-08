@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { FriendRequestActionSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
+import { socialLimiter } from "@/lib/rate-limit";
 
 export async function PUT(
   request: NextRequest,
@@ -18,6 +19,12 @@ export async function PUT(
   }
 
   const userId = session.user.id;
+
+  const { limited } = await socialLimiter.check(`friend-action:${userId}`);
+  if (limited) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
   const { id } = await params;
 
   try {

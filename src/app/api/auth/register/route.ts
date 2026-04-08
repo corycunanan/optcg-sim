@@ -11,7 +11,7 @@ import { authLimiter } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-  const { limited } = authLimiter.check(`register:${ip}`);
+  const { limited } = await authLimiter.check(`register:${ip}`);
   if (limited) {
     return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
   }
