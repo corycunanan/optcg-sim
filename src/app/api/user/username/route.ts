@@ -3,6 +3,7 @@
  */
 
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { SetUsernameSchema } from "@/lib/validators/user";
@@ -41,6 +42,12 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess({ username: user.username });
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return apiError("Username is already taken", 409);
+    }
     console.error("Username update error:", error);
     return apiError("Failed to set username", 500);
   }
