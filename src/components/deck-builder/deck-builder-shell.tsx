@@ -22,6 +22,8 @@ import { ExportModal } from "./export-modal";
 import { TestOrderEditor } from "./test-order-editor";
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { DeckDetailResponseSchema } from "@/lib/validators/cards";
+import type { TestDeckOrder } from "@/lib/deck-builder/state";
 
 interface DeckBuilderShellProps {
   deckId: string | null;
@@ -42,8 +44,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     async function loadDeck() {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data } = await apiGet<{ data: any }>(`/api/decks/${deckId}`);
+        const { data } = await apiGet(`/api/decks/${deckId}`, DeckDetailResponseSchema);
 
         const cardsMap = new Map<string, DeckCardEntry>();
         for (const dc of data.cards) {
@@ -60,12 +61,12 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           state: {
             id: data.id,
             name: data.name,
-            format: data.format,
+            format: data.format ?? "Standard",
             leader: data.leader,
             cards: cardsMap,
             sleeveUrl: data.sleeveUrl ?? null,
             donArtUrl: data.donArtUrl ?? null,
-            testOrder: data.testOrder ?? null,
+            testOrder: (data.testOrder as TestDeckOrder) ?? null,
             lastSavedAt: new Date(data.updatedAt),
           },
         });
