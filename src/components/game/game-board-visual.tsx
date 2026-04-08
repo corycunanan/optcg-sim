@@ -23,46 +23,46 @@ interface GameBoardVisualProps {
 }
 
 export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
-  const session = useGameSession(gameId, workerUrl);
+  const { game, opponent, navigation, endState } = useGameSession(gameId, workerUrl);
   const [devPrompt, setDevPrompt] = useState<{ promptType: PromptType; options: PromptOptions } | null>(null);
-  const activePrompt = devPrompt ?? session.activePrompt;
+  const activePrompt = devPrompt ?? game.activePrompt;
 
-  if (!session.gameState || !session.cardDbReady) {
+  if (!game.gameState || !game.cardDbReady) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gb-board">
         <div className="flex flex-col items-center gap-3">
           <Spinner className="size-6 text-gb-text-bright" />
           <div className="text-sm text-gb-text-bright font-bold">
-            {session.connectionStatus === "connecting"
+            {game.connectionStatus === "connecting"
               ? "Connecting\u2026"
-              : !session.gameState
+              : !game.gameState
                 ? "Loading game\u2026"
                 : "Loading card data\u2026"}
           </div>
-          {session.lastError && (
+          {game.lastError && (
             <div className="text-xs text-gb-accent-red">
-              {session.lastError}
+              {game.lastError}
             </div>
           )}
-          {session.fallbackConcedeAvailable && (
+          {navigation.fallbackConcedeAvailable && (
             <div className="mt-4 flex flex-col gap-3 items-center">
               <div className="text-gb-text-subtle text-xs max-w-[420px]">
                 Reconnect failed. You can still concede this match without
                 restoring the websocket session.
               </div>
-              {session.fallbackError && (
+              {navigation.fallbackError && (
                 <div className="text-gb-accent-red text-xs">
-                  {session.fallbackError}
+                  {navigation.fallbackError}
                 </div>
               )}
               <GameButton
                 variant="danger"
                 size="sm"
-                onClick={session.handleFallbackConcede}
-                disabled={session.fallbackSubmitting}
+                onClick={navigation.handleFallbackConcede}
+                disabled={navigation.fallbackSubmitting}
                 className="font-mono"
               >
-                {session.fallbackSubmitting
+                {navigation.fallbackSubmitting
                   ? "Conceding\u2026"
                   : "Concede Match"}
               </GameButton>
@@ -71,7 +71,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
           <GameButton
             variant="ghost"
             size="sm"
-            onClick={session.handleBackToLobbies}
+            onClick={navigation.handleBackToLobbies}
             className="mt-4"
           >
             &larr; Back to Lobbies
@@ -84,11 +84,11 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   return (
     <GameErrorBoundary>
       {/* Opponent away / disconnect banner */}
-      {!session.matchClosed && session.opponentAway && (
+      {!game.matchClosed && opponent.opponentAway && (
         <div
           className={cn(
             "fixed inset-x-0 top-0 z-[60] flex gap-3 items-center px-4 py-2 flex-wrap",
-            session.gamePausedForOpponent
+            opponent.gamePausedForOpponent
               ? "bg-gb-prompt-bg border-b border-gb-accent-amber/25"
               : "bg-gb-surface border-b border-gb-border-strong",
           )}
@@ -96,39 +96,39 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
           <span
             className={cn(
               "font-bold text-sm",
-              session.gamePausedForOpponent
+              opponent.gamePausedForOpponent
                 ? "text-gb-accent-amber"
                 : "text-gb-accent-blue",
             )}
           >
-            {session.gamePausedForOpponent ? "GAME PAUSED" : "OPPONENT AWAY"}
+            {opponent.gamePausedForOpponent ? "GAME PAUSED" : "OPPONENT AWAY"}
           </span>
           <span className="text-gb-text-dim text-xs">
-            {session.opponentAwayText}{" "}
-            {session.gamePausedForOpponent
+            {opponent.opponentAwayText}{" "}
+            {opponent.gamePausedForOpponent
               ? "The game will resume once they reconnect."
               : "You can keep making moves until their input is required."}
           </span>
-          {session.opponentDeadlineRemaining !== null && (
+          {opponent.opponentDeadlineRemaining !== null && (
             <span className="text-gb-accent-amber text-xs">
               Rejoin window:{" "}
-              {formatCountdown(session.opponentDeadlineRemaining)}
+              {formatCountdown(opponent.opponentDeadlineRemaining)}
             </span>
           )}
         </div>
       )}
 
       <BoardLayout
-        me={session.me}
-        opp={session.opp}
-        myIndex={session.myIndex}
-        turn={session.turn}
-        cardDb={session.cardDb}
-        isMyTurn={session.isMyTurn}
-        battlePhase={session.battlePhase}
-        connectionStatus={session.connectionStatus}
-        eventLog={session.gameState.eventLog}
-        activeEffects={session.gameState.activeEffects}
+        me={game.me}
+        opp={game.opp}
+        myIndex={game.myIndex}
+        turn={game.turn}
+        cardDb={game.cardDb}
+        isMyTurn={game.isMyTurn}
+        battlePhase={game.battlePhase}
+        connectionStatus={game.connectionStatus}
+        eventLog={game.gameState.eventLog}
+        activeEffects={game.gameState.activeEffects}
         activePrompt={activePrompt}
         onAction={(action) => {
           if (
@@ -137,15 +137,15 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
             action.type === "REVEAL_TRIGGER" ||
             action.type === "PASS"
           ) setDevPrompt(null);
-          session.sendAction(action);
+          game.sendAction(action);
         }}
-        onLeave={session.handleBackToLobbies}
-        matchClosed={session.matchClosed}
-        canUndo={session.canUndo}
+        onLeave={navigation.handleBackToLobbies}
+        matchClosed={game.matchClosed}
+        canUndo={game.canUndo}
       />
 
       {/* ── Dev: modal test panel ── only in development ──────────────── */}
-      {process.env.NODE_ENV === "development" && session.me && (
+      {process.env.NODE_ENV === "development" && game.me && (
         <div className="fixed bottom-4 right-4 z-[300] flex items-center gap-2">
           {devPrompt && (
             <GameButton
@@ -162,9 +162,9 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
             onChange={(e) => {
               const val = e.target.value;
               e.target.value = "";
-              if (!val || !session.me) return;
+              if (!val || !game.me) return;
               if (val === "ARRANGE_TOP_CARDS") {
-                const cards = session.me.deck.slice(0, 4);
+                const cards = game.me.deck.slice(0, 4);
                 if (cards.length === 0) return;
                 setDevPrompt({
                   promptType: "ARRANGE_TOP_CARDS",
@@ -188,12 +188,11 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                 });
               } else if (val === "SELECT_TARGET") {
                 const allCards = [
-                  ...session.me.characters.filter(Boolean),
-                  ...(session.opp?.characters.filter(Boolean) ?? []),
-                  ...session.me.hand.slice(0, 4),
-                ] as typeof session.me.characters;
+                  ...game.me.characters.filter((c): c is NonNullable<typeof c> => c !== null),
+                  ...(game.opp?.characters.filter((c): c is NonNullable<typeof c> => c !== null) ?? []),
+                  ...game.me.hand.slice(0, 4),
+                ];
                 if (allCards.length === 0) return;
-                // Mark roughly half as valid targets
                 const validTargets = allCards
                   .filter((_, i) => i % 2 === 0)
                   .map((c) => c.instanceId);
@@ -209,7 +208,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   },
                 });
               } else if (val === "OPTIONAL_EFFECT") {
-                const card = session.me.hand[0] ?? session.me.characters.find(Boolean) ?? null;
+                const card = game.me.hand[0] ?? game.me.characters.find(Boolean) ?? null;
                 setDevPrompt({
                   promptType: "OPTIONAL_EFFECT",
                   options: {
@@ -218,11 +217,11 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   },
                 });
               } else if (val === "REVEAL_TRIGGER") {
-                const triggerCard = session.me.deck.find(
-                  (c) => session.cardDb[c.cardId]?.triggerText
-                ) ?? session.me.deck[0] ?? null;
+                const triggerCard = game.me.deck.find(
+                  (c) => game.cardDb[c.cardId]?.triggerText
+                ) ?? game.me.deck[0] ?? null;
                 if (!triggerCard) return;
-                const triggerText = session.cardDb[triggerCard.cardId]?.triggerText ?? "[Trigger] Play this card.";
+                const triggerText = game.cardDb[triggerCard.cardId]?.triggerText ?? "[Trigger] Play this card.";
                 setDevPrompt({
                   promptType: "REVEAL_TRIGGER",
                   options: {
@@ -246,13 +245,13 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
 
       {/* Event Log — bottom left */}
       <EventLog
-        events={session.gameState.eventLog}
-        cardDb={session.cardDb}
-        myIndex={session.myIndex}
+        events={game.gameState.eventLog}
+        cardDb={game.cardDb}
+        myIndex={game.myIndex}
       />
 
       {/* Match ended overlay */}
-      <Dialog open={session.matchClosed}>
+      <Dialog open={game.matchClosed}>
         <DialogContent
           showCloseButton={false}
           className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] text-center"
@@ -266,18 +265,18 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
           <p
             className={cn(
               "text-3xl font-extrabold",
-              session.endColorClass,
+              endState.endColorClass,
             )}
           >
-            {session.endTitle}
+            {endState.endTitle}
           </p>
           <p className="text-sm text-gb-text leading-relaxed">
-            {session.endReason}
+            {endState.endReason}
           </p>
           <GameButton
             variant="primary"
             size="lg"
-            onClick={session.handleBackToLobbies}
+            onClick={navigation.handleBackToLobbies}
             className="w-full"
           >
             Back to Lobbies

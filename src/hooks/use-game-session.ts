@@ -23,7 +23,7 @@ interface RemoteGameStatus {
   playerIndex?: 0 | 1;
 }
 
-export interface UseGameSessionReturn {
+export interface GameSessionGame {
   gameState: GameState | null;
   cardDb: CardDb;
   cardDbReady: boolean;
@@ -32,7 +32,6 @@ export interface UseGameSessionReturn {
   activePrompt: { promptType: PromptType; options: PromptOptions } | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   sendAction: (action: GameAction) => void;
-
   myIndex: 0 | 1 | null;
   me: PlayerState | null;
   opp: PlayerState | null;
@@ -43,26 +42,38 @@ export interface UseGameSessionReturn {
   inBattle: boolean;
   matchClosed: boolean;
   canUndo: boolean;
+}
 
+export interface GameSessionOpponent {
   opponentAway: boolean;
   opponentAwayText: string;
   gamePausedForOpponent: boolean;
   opponentDeadlineRemaining: number | null;
+}
 
+export interface GameSessionNavigation {
   remoteGameStatus: RemoteGameStatus | null;
   fallbackConcedeAvailable: boolean;
   fallbackSubmitting: boolean;
   fallbackError: string | null;
   handleFallbackConcede: () => Promise<void>;
-
   leavingGame: boolean;
   leaveError: string | null;
   handleLeaveGame: () => Promise<void>;
   handleBackToLobbies: () => Promise<void>;
+}
 
+export interface GameSessionEndState {
   endTitle: string;
   endColorClass: string;
   endReason: string;
+}
+
+export interface UseGameSessionReturn {
+  game: GameSessionGame;
+  opponent: GameSessionOpponent;
+  navigation: GameSessionNavigation;
+  endState: GameSessionEndState;
 }
 
 export function useGameSession(
@@ -344,44 +355,47 @@ export function useGameSession(
   const cardDbReady = Object.keys(cardDb).length > 0;
 
   return {
-    gameState,
-    cardDb,
-    cardDbReady,
-    connectionStatus,
-    lastError,
-    activePrompt,
-    gameOver,
-    sendAction,
-
-    myIndex,
-    me,
-    opp,
-    turn,
-    isMyTurn,
-    phase,
-    battlePhase,
-    inBattle,
-    matchClosed,
-    canUndo,
-
-    opponentAway,
-    opponentAwayText,
-    gamePausedForOpponent,
-    opponentDeadlineRemaining,
-
-    remoteGameStatus,
-    fallbackConcedeAvailable,
-    fallbackSubmitting,
-    fallbackError,
-    handleFallbackConcede,
-
-    leavingGame,
-    leaveError,
-    handleLeaveGame,
-    handleBackToLobbies,
-
-    endTitle,
-    endColorClass,
-    endReason,
+    game: {
+      gameState,
+      cardDb,
+      cardDbReady,
+      connectionStatus,
+      lastError,
+      activePrompt,
+      gameOver,
+      sendAction,
+      myIndex,
+      me,
+      opp,
+      turn,
+      isMyTurn,
+      phase,
+      battlePhase,
+      inBattle,
+      matchClosed,
+      canUndo,
+    },
+    opponent: {
+      opponentAway,
+      opponentAwayText,
+      gamePausedForOpponent,
+      opponentDeadlineRemaining,
+    },
+    navigation: {
+      remoteGameStatus,
+      fallbackConcedeAvailable,
+      fallbackSubmitting,
+      fallbackError,
+      handleFallbackConcede,
+      leavingGame,
+      leaveError,
+      handleLeaveGame,
+      handleBackToLobbies,
+    },
+    endState: {
+      endTitle,
+      endColorClass,
+      endReason,
+    },
   };
 }
