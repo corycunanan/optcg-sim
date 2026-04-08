@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { apiPost } from "@/lib/api-client";
 import type { DeckCardEntry, DeckLeaderEntry } from "@/lib/deck-builder/state";
+import { DeckImportResponseSchema } from "@/lib/validators/cards";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,18 @@ interface ImportModalProps {
 interface ImportError {
   line: number;
   raw: string;
-  error: string;
+  error: string | null;
+}
+
+interface ImportCard {
+  id: string;
+  name: string;
+  type: string;
+  color: string[];
+  cost: number | null;
+  power: number | null;
+  imageUrl: string;
+  traits: string[];
 }
 
 export function ImportModal({ onImport, onClose }: ImportModalProps) {
@@ -30,8 +42,8 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errors, setErrors] = useState<ImportError[]>([]);
   const [preview, setPreview] = useState<{
-    leader: { cardId: string; card: DeckLeaderEntry } | null;
-    cards: { cardId: string; quantity: number; card: DeckCardEntry["card"] }[];
+    leader: { cardId: string; card: ImportCard } | null;
+    cards: { cardId: string; quantity: number; card: ImportCard }[];
   } | null>(null);
 
   const handleParse = useCallback(async () => {
@@ -42,9 +54,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
     setPreview(null);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await apiPost<{ data: any }>("/api/decks/import", { text });
-      const result = res.data;
+      const { data: result } = await apiPost("/api/decks/import", { text }, DeckImportResponseSchema);
       setErrors(result.errors || []);
       setPreview({
         leader: result.leader ? { cardId: result.leader.cardId, card: result.leader.card } : null,
@@ -79,7 +89,18 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
       cardId: c.cardId,
       quantity: c.quantity,
       selectedArtUrl: null,
-      card: c.card,
+      card: {
+        ...c.card,
+        counter: null,
+        life: null,
+        banStatus: "LEGAL",
+        blockNumber: 0,
+        attribute: [],
+        effectText: "",
+        triggerText: null,
+        rarity: "Unknown",
+        originSet: c.cardId.split("-")[0] ?? "",
+      },
     }));
 
     onImport(leader, cards);
