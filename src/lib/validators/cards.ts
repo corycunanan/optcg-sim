@@ -25,8 +25,6 @@ export const CardSearchParamsSchema = z.object({
   order: z.string().optional(),
 });
 
-export type CardSearchParamsInput = z.infer<typeof CardSearchParamsSchema>;
-
 // ─── Response schemas ───────────────────────────────────────
 
 /** Shape returned by CARD_SELECT in API routes. */
@@ -151,8 +149,6 @@ export const CreateCardSchema = z.object({
   banStatus: BanStatusEnum.optional().default("LEGAL"),
 });
 
-export type CreateCardInput = z.infer<typeof CreateCardSchema>;
-
 export const UpdateCardSchema = z.object({
   name: z.string().optional(),
   type: CardTypeEnum.optional(),
@@ -172,4 +168,3 @@ export const UpdateCardSchema = z.object({
   isReprint: z.boolean().optional(),
 });
 
-export type UpdateCardInput = z.infer<typeof UpdateCardSchema>;

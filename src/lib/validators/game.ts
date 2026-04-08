@@ -7,8 +7,6 @@ export const GameResultSchema = z.object({
   winReason: z.string().nullable(),
 });
 
-export type GameResultInput = z.infer<typeof GameResultSchema>;
-
 export const GameActionSchema = z.object({
   action: z.enum(["FINALIZE", "CONCEDE"], {
     error: "Unsupported action",
@@ -17,4 +15,3 @@ export const GameActionSchema = z.object({
   winReason: z.string().nullable().optional(),
 });
 
-export type GameActionInput = z.infer<typeof GameActionSchema>;

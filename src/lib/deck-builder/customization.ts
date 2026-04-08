@@ -3,7 +3,7 @@
  * No database needed — these are predefined image assets.
  */
 
-export interface CustomizationOption {
+interface CustomizationOption {
   imageUrl: string;
 }
 

@@ -9,5 +9,3 @@ export const RegisterSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/, "Username may only contain letters, numbers, and underscores"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
-
-export type RegisterInput = z.infer<typeof RegisterSchema>;

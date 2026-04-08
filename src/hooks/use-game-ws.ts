@@ -11,17 +11,6 @@ import type {
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
-export interface UseGameWsReturn {
-  gameState: GameState | null;
-  connectionStatus: ConnectionStatus;
-  lastError: string | null;
-  activePrompt: { promptType: PromptType; options: PromptOptions } | null;
-  gameOver: { winner: 0 | 1 | null; reason: string } | null;
-  canUndo: boolean;
-  sendAction: (action: GameAction) => void;
-  leaveGame: () => Promise<void>;
-}
-
 /**
  * useGameWs — manages the WebSocket connection to the Cloudflare game DO.
  *
@@ -34,7 +23,7 @@ export function useGameWs(
   gameId: string,
   workerUrl: string,
   getToken: () => Promise<string>,
-): UseGameWsReturn {
+) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [lastError, setLastError] = useState<string | null>(null);

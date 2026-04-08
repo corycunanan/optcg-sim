@@ -8,5 +8,3 @@ export const SendMessageSchema = z.object({
     .transform((s) => s.trim())
     .pipe(z.string().min(1, "Message body is required")),
 });
-
-export type SendMessageInput = z.infer<typeof SendMessageSchema>;
