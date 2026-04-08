@@ -19,7 +19,7 @@ By the end of M4, all cards in 1–2 initial sets have machine-readable effects,
 ### Deliverables
 
 - [x] Effect schema TypeScript types finalized (full vocabulary for all known OPTCG mechanics) — `effect-types.ts`, 1049 lines, 80+ action types
-- [ ] JSON schema validator for `effectSchema`
+- [x] JSON schema validator for `effectSchema`
 - [x] Trigger system: registers triggers from `effectSchema`, matches events, queues for resolution — `triggers.ts`
 - [x] Effect resolver: reads `effectSchema` action chains, pays costs, executes effects — `effect-resolver.ts`
 - [x] Target resolver: filters valid targets, auto-selects when only one option, prompts player — integrated into `effect-resolver.ts`
@@ -435,7 +435,7 @@ The visual game board supports all M4 effect interactions:
 - [x] Power modifications expire at the correct time (THIS_BATTLE, THIS_TURN, PERMANENT)
 - [x] Prohibitions correctly block prohibited actions
 - [x] Replacement effects correctly substitute actions and suppress original
-- [ ] "Cannot X" effects cannot be bypassed by simultaneous "do X" instructions — needs testing
+- [x] "Cannot X" effects cannot be bypassed by simultaneous "do X" instructions — needs testing
 - [ ] All cards in OP01 have authored `effectSchema` and function correctly in-game — 51/~120 done
 - [ ] `MANUAL_EFFECT` usage is near zero for OP01/OP02 cards after M4
 

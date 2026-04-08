@@ -10,12 +10,12 @@ M2 adds the social layer: users can find and friend each other, exchange direct 
 
 ### Deliverables
 
-- [ ] Friend search, request, accept/decline flow
-- [ ] Friend list with online/in-game status indicators
-- [ ] Real-time direct messaging between friends
-- [ ] Lobby creation (select deck, format, visibility)
-- [ ] Lobby browser (public lobbies) and invite system
-- [ ] WebSocket infrastructure for real-time features
+- [x] Friend search, request, accept/decline flow
+- [x] Friend list with online/in-game status indicators
+- [x] Real-time direct messaging between friends
+- [x] Lobby creation (select deck, format, visibility)
+- [x] Lobby browser (public lobbies) and invite system
+- [x] WebSocket infrastructure for real-time features
 
 ---
 
@@ -366,16 +366,16 @@ Server subscribes user to friend-update rooms
 
 ## Acceptance Criteria
 
-- [ ] User can search for another user by username and send a friend request
-- [ ] Friend requests can be accepted or declined; accepted requests appear in friend list
-- [ ] Friend list shows real-time online/in-game/offline status
-- [ ] Messages are delivered in real time to online friends
-- [ ] Offline messages are visible when the recipient loads the conversation
-- [ ] User can create a lobby, selecting from their saved decks
-- [ ] Public lobbies appear in the lobby browser
-- [ ] Invited friends receive a notification and can join the lobby
-- [ ] Both players in a lobby can ready up; host can start the game (game transition is a stub in M2 — actual game logic is M3)
-- [ ] WebSocket reconnection works (refresh page → still online, messages still arrive)
+- [x] User can search for another user by username and send a friend request
+- [x] Friend requests can be accepted or declined; accepted requests appear in friend list
+- [x] Friend list shows real-time online/in-game/offline status
+- [x] Messages are delivered in real time to online friends
+- [x] Offline messages are visible when the recipient loads the conversation
+- [x] User can create a lobby, selecting from their saved decks
+- [x] Public lobbies appear in the lobby browser
+- [x] Invited friends receive a notification and can join the lobby
+- [x] Both players in a lobby can ready up; host can start the game (game transition is a stub in M2 — actual game logic is M3)
+- [x] WebSocket reconnection works (refresh page → still online, messages still arrive)
 
 ---
 

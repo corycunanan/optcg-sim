@@ -10,13 +10,13 @@ M1 delivers a fully functional deck builder — the first real user-facing featu
 
 ### Deliverables
 
-- [ ] Card search API with filtering, sorting, and pagination
-- [ ] Card search UI with instant results and filter panel
-- [ ] Deck editor with real-time rule validation
-- [ ] Cost curve and color breakdown visualizations
-- [ ] Bulk import (paste `Nx CARDID` format) and bulk export
-- [ ] Deck save/load per user account (named, timestamped)
-- [ ] Mobile-responsive layout for deck builder
+- [x] Card search API with filtering, sorting, and pagination
+- [x] Card search UI with instant results and filter panel
+- [x] Deck editor with real-time rule validation
+- [x] Cost curve and color breakdown visualizations
+- [x] Bulk import (paste `Nx CARDID` format) and bulk export
+- [x] Deck save/load per user account (named, timestamped)
+- [x] Mobile-responsive layout for deck builder
 
 ---
 
@@ -253,14 +253,14 @@ M1 delivers a fully functional deck builder — the first real user-facing featu
 
 ## Acceptance Criteria
 
-- [ ] Card search returns accurate results for all filter combinations
-- [ ] Search response time < 200ms for typical queries
-- [ ] Deck validation catches all rule violations in real time
-- [ ] Bulk import correctly parses `Nx CARDID` format and reports invalid lines
-- [ ] Bulk export produces a format that can be re-imported without loss
-- [ ] Decks persist across sessions (save → close → reopen → same deck)
-- [ ] Deck editor works on mobile (responsive layout, touch-friendly)
-- [ ] User cannot access another user's decks
+- [x] Card search returns accurate results for all filter combinations
+- [x] Search response time < 200ms for typical queries
+- [x] Deck validation catches all rule violations in real time
+- [x] Bulk import correctly parses `Nx CARDID` format and reports invalid lines
+- [x] Bulk export produces a format that can be re-imported without loss
+- [x] Decks persist across sessions (save → close → reopen → same deck)
+- [x] Deck editor works on mobile (responsive layout, touch-friendly)
+- [x] User cannot access another user's decks
 
 ---
 

@@ -13,24 +13,31 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `src/app/` | Next.js App Router — pages and API routes |
 | `src/app/(auth)/` | Auth pages: `/login`, `/onboarding` |
 | `src/app/admin/` | Admin UI — card browser, editor, set management |
-| `src/app/api/` | REST API routes — 25 endpoints across 8 domains |
+| `src/app/api/` | REST API routes — 24 endpoints across 8 domains |
 | `src/app/decks/` | Deck builder pages |
-| `src/components/ui/` | Base UI primitives (Button, Input, Dialog, Badge, Tabs, Toast, Tooltip) |
-| `src/components/admin/` | Admin-specific components (card browser, filters, grid, edit form) |
-| `src/components/deck-builder/` | Deck builder components (search, list, header, stats, validation) |
-| `src/components/social/` | Social components (sidebar, chat widget, user avatar) |
+| `src/app/game/` | Game board pages (dynamic `[id]` route, scaffold, error boundary) |
+| `src/app/lobbies/` | Lobby browser and creation |
+| `src/components/ui/` | Base UI primitives (Button, Input, Dialog, Badge, Tabs, Toast, Tooltip) — 29 files |
+| `src/components/admin/` | Admin-specific components (card browser, filters, grid, edit form) — 9 files |
+| `src/components/deck-builder/` | Deck builder components (search, list, header, stats, validation) — 16 files |
+| `src/components/game/` | Game board components (board layout, zones, modals, hand, effects) — 30 files |
+| `src/components/social/` | Social components (sidebar, chat widget, user avatar) — 5 files |
+| `src/components/lobbies/` | Lobby UI components — 2 files |
 | `src/components/nav/` | Navigation (Navbar) |
-| `src/hooks/` | Custom React hooks — to be populated in M3+ |
+| `src/hooks/` | Custom React hooks — game session, WebSocket, animations, mobile detection (6 hooks) |
 | `src/lib/` | Shared utilities and business logic |
 | `src/lib/deck-builder/` | Deck builder state machine and validation engine |
+| `src/lib/game/` | Game-related utilities (card data helpers, keyword definitions) |
+| `src/lib/validators/` | Zod validation schemas for all API domains (9 files) |
 | `src/types/` | Global TypeScript types (supplements Prisma-generated types) |
-| `pipeline/` | Card data ETL: vegapull JSON → transform → PostgreSQL + R2 |
+| `pipeline/` | Card data ETL: vegapull JSON → transform → PostgreSQL + R2 (8 stages) |
+| `workers/game/` | Cloudflare Worker + Durable Object — game engine, effect resolver, 51 card schema sets |
 | `workers/images/` | Cloudflare Worker — CDN image serving with CORS |
 | `prisma/` | Database schema (`schema.prisma`) and migrations |
 | `docs/` | Project documentation (see `docs/README.md` for full index) |
 | `docs/architecture/` | System design — architecture, tech stack, data pipeline |
-| `docs/milestones/` | Phase docs M0–M5 — scope, plans, acceptance criteria |
-| `docs/game-engine/` | Game engine design — requirements, card analysis, effect examples |
+| `docs/milestones/` | Phase docs M0–M7, including M5.1–M5.5 sub-milestones |
+| `docs/game-engine/` | Game engine design — effect schema spec, rules-to-engine map, encoding guide |
 | `docs/design/` | UI/UX design — branding guidelines, audits, critiques, game board layout |
 | `docs/project/` | Project management — PRD, planning, workflows, learnings |
 | `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.0 |
@@ -50,6 +57,12 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `src/types/index.ts` | Shared types: `CardColor`, `CardRarity`, `CardSearchParams`, pipeline types |
 | `src/app/globals.css` | Design tokens (CSS custom properties) and global styles — source of truth for all tokens |
 | `prisma/schema.prisma` | Full database schema — source of truth for all data shapes |
+| `workers/game/src/engine/pipeline.ts` | 7-step action pipeline — entry point for every game state mutation |
+| `workers/game/src/engine/effect-resolver/resolver.ts` | Core effect resolver — 50+ action handlers for all game mechanics |
+| `workers/game/src/engine/triggers.ts` | Auto effect trigger registration, matching, and ordering |
+| `workers/game/src/engine/schema-registry.ts` | Loads card effect schemas from 51 set files at runtime |
+| `workers/game/src/GameSession.ts` | Durable Object — WebSocket session management, game lifecycle |
+| `workers/game/wrangler.toml` | Cloudflare Worker config for game server |
 
 ### Where Things Go
 
