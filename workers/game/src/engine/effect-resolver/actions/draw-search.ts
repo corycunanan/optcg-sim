@@ -2,12 +2,13 @@
  * Action handlers: DRAW, SEARCH_DECK, SEARCH_TRASH_THE_REST, FULL_DECK_SEARCH, DECK_SCRY, MILL
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
+import type { Action, EffectResult, TargetFilter } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
 import { resolveAmount, shuffleArray } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
+import { matchesFilter } from "../../conditions.js";
 
 export function executeDraw(
   state: GameState,
@@ -60,7 +61,7 @@ export function executeSearchDeck(
   const events: PendingEvent[] = [];
   const p_ = getActionParams(action, "SEARCH_DECK");
   const lookAt = (p_.look_at as number) ?? 5;
-  const filter = p_.filter ?? {};
+  const filter = (p_.filter ?? {}) as TargetFilter;
   const restDest = p_.rest_destination ?? "BOTTOM";
 
   const p = state.players[controller];
@@ -71,24 +72,7 @@ export function executeSearchDeck(
   }
 
   // Find matching cards (valid picks)
-  const matching = topCards.filter((c) => {
-    const data = cardDb.get(c.cardId);
-    if (!data) return false;
-    if (filter.traits) {
-      if (!filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
-    }
-    if (filter.traits_contains) {
-      const cardTraits = data.types ?? [];
-      if (!filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
-    }
-    if (filter.exclude_name && data.name === filter.exclude_name) return false;
-    if (filter.card_type) {
-      if (data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
-    }
-    if (filter.cost_min !== undefined && (data.cost ?? 0) < (filter.cost_min as number)) return false;
-    if (filter.cost_max !== undefined && (data.cost ?? 0) > (filter.cost_max as number)) return false;
-    return true;
-  });
+  const matching = topCards.filter((c) => matchesFilter(c, filter, cardDb, state, resultRefs));
 
   const validTargets = matching.map((c) => c.instanceId);
 
@@ -130,7 +114,7 @@ export function executeSearchTrashTheRest(
   const events: PendingEvent[] = [];
   const p_ = action.params ?? {};
   const lookAt = (p_.look_at as number) ?? 5;
-  const filter = (p_.filter ?? {}) as Record<string, any>;
+  const filter = (p_.filter ?? {}) as TargetFilter;
   const restDest = (p_.rest_destination as string) ?? "TRASH";
 
   const p = state.players[controller];
@@ -140,30 +124,8 @@ export function executeSearchTrashTheRest(
     return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };
   }
 
-  // Find matching cards (valid picks) — reuse same filter logic as SEARCH_DECK
-  const matching = topCards.filter((c) => {
-    const data = cardDb.get(c.cardId);
-    if (!data) return false;
-    if (filter.traits) {
-      if (!filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
-    }
-    if (filter.traits_contains) {
-      const cardTraits = data.types ?? [];
-      if (!filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
-    }
-    if (filter.card_type) {
-      if (data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
-    }
-    if (filter.cost_min !== undefined && (data.cost ?? 0) < (filter.cost_min as number)) return false;
-    if (filter.cost_max !== undefined && (data.cost ?? 0) > (filter.cost_max as number)) return false;
-    if (filter.power_min !== undefined && (data.power ?? 0) < (filter.power_min as number)) return false;
-    if (filter.power_max !== undefined && (data.power ?? 0) > (filter.power_max as number)) return false;
-    if (filter.color) {
-      const cardColors = data.color ?? [];
-      if (!cardColors.some((clr: string) => clr.toUpperCase() === (filter.color as string).toUpperCase())) return false;
-    }
-    return true;
-  });
+  // Find matching cards (valid picks)
+  const matching = topCards.filter((c) => matchesFilter(c, filter, cardDb, state, resultRefs));
 
   const validTargets = matching.map((c) => c.instanceId);
 
@@ -237,33 +199,14 @@ export function executeFullDeckSearch(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const fds = getActionParams(action, "FULL_DECK_SEARCH");
-  const filter = fds.filter ?? {};
+  const filter = (fds.filter ?? {}) as TargetFilter;
   const shuffleAfter = fds.shuffle_after ?? true;
 
   const p = state.players[controller];
   if (p.deck.length === 0) return { state, events, succeeded: false };
 
   // Find matching cards in entire deck
-  const matching = p.deck.filter((c) => {
-    const data = cardDb.get(c.cardId);
-    if (!data) return false;
-    if (filter.traits && !filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
-    if (filter.traits_contains) {
-      const cardTraits = data.types ?? [];
-      if (!filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
-    }
-    if (filter.exclude_name && data.name === filter.exclude_name) return false;
-    if (filter.name && data.name !== filter.name) return false;
-    if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
-    if (filter.card_type && data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
-    if (filter.cost_min !== undefined && (data.cost ?? 0) < (filter.cost_min as number)) return false;
-    if (filter.cost_max !== undefined && (data.cost ?? 0) > (filter.cost_max as number)) return false;
-    if (filter.color) {
-      const cardColors = data.color ?? [];
-      if (!cardColors.some((clr: string) => clr.toUpperCase() === (filter.color as string).toUpperCase())) return false;
-    }
-    return true;
-  });
+  const matching = p.deck.filter((c) => matchesFilter(c, filter, cardDb, state, resultRefs));
 
   const validTargets = matching.map((c) => c.instanceId);
 
