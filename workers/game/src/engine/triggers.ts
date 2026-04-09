@@ -22,6 +22,7 @@ import type {
   EffectZone,
   RuntimeActiveEffect,
   RuntimeRegisteredTrigger,
+  RuntimeProhibition,
 } from "./effect-types.js";
 import type {
   CardData,
@@ -95,9 +96,10 @@ export function deregisterTriggersForCard(
 // ─── Permanent Effect Registration ───────────────────────────────────────────
 
 /**
- * Register permanent effect blocks (with modifiers) as RuntimeActiveEffects
- * when a card enters the field. These provide continuous power buffs, keyword
- * grants, etc. that are re-evaluated each step via evaluateWhileConditions.
+ * Register permanent effect blocks (with modifiers and/or prohibitions) as
+ * RuntimeActiveEffects / RuntimeProhibitions when a card enters the field.
+ * Modifiers provide continuous power buffs, keyword grants, etc.
+ * Prohibitions forbid specific actions (e.g., "this Leader cannot attack").
  */
 export function registerPermanentEffectsForCard(
   state: GameState,
@@ -108,10 +110,14 @@ export function registerPermanentEffectsForCard(
   if (!schema?.effects) return state;
 
   const newEffects: RuntimeActiveEffect[] = [];
+  const newProhibitions: RuntimeProhibition[] = [];
 
   for (const block of schema.effects) {
     if (block.category !== "permanent") continue;
-    if (!block.modifiers || block.modifiers.length === 0) continue;
+
+    const hasModifiers = block.modifiers && block.modifiers.length > 0;
+    const hasProhibitions = block.prohibitions && block.prohibitions.length > 0;
+    if (!hasModifiers && !hasProhibitions) continue;
 
     const zone: EffectZone = block.zone ?? "FIELD";
     if (!isCardInValidZone(cardInstance, zone)) continue;
@@ -123,42 +129,77 @@ export function registerPermanentEffectsForCard(
         ? { wave: "CONDITION_FALSE" }
         : { wave: "SOURCE_LEAVES_ZONE" };
 
-    // Resolve appliesTo from modifier targets
-    const appliesTo: string[] = [];
-    for (const mod of block.modifiers) {
-      if (!mod.target || mod.target.type === "SELF") {
-        if (!appliesTo.includes(cardInstance.instanceId)) {
-          appliesTo.push(cardInstance.instanceId);
+    // Register modifiers as RuntimeActiveEffects
+    if (hasModifiers) {
+      const appliesTo: string[] = [];
+      for (const mod of block.modifiers!) {
+        if (!mod.target || mod.target.type === "SELF") {
+          if (!appliesTo.includes(cardInstance.instanceId)) {
+            appliesTo.push(cardInstance.instanceId);
+          }
+        }
+        // Non-SELF targets (ALL_YOUR_CHARACTERS, etc.) are not yet dynamically
+        // resolved — see OPT-126. For now, store the source card in appliesTo.
+        if (mod.target && mod.target.type !== "SELF") {
+          if (!appliesTo.includes(cardInstance.instanceId)) {
+            appliesTo.push(cardInstance.instanceId);
+          }
         }
       }
-      // Non-SELF targets (ALL_YOUR_CHARACTERS, etc.) are not yet dynamically
-      // resolved — see OPT-126. For now, store the source card in appliesTo.
-      if (mod.target && mod.target.type !== "SELF") {
-        if (!appliesTo.includes(cardInstance.instanceId)) {
-          appliesTo.push(cardInstance.instanceId);
-        }
-      }
+
+      newEffects.push({
+        id: nanoid(),
+        sourceCardInstanceId: cardInstance.instanceId,
+        sourceEffectBlockId: block.id,
+        category: "permanent",
+        modifiers: block.modifiers!,
+        duration,
+        expiresAt,
+        controller: cardInstance.controller,
+        appliesTo,
+        timestamp: Date.now(),
+      });
     }
 
-    newEffects.push({
-      id: nanoid(),
-      sourceCardInstanceId: cardInstance.instanceId,
-      sourceEffectBlockId: block.id,
-      category: "permanent",
-      modifiers: block.modifiers,
-      duration,
-      expiresAt,
-      controller: cardInstance.controller,
-      appliesTo,
-      timestamp: Date.now(),
-    });
+    // Register prohibitions as RuntimeProhibitions
+    if (hasProhibitions) {
+      for (const prohibition of block.prohibitions!) {
+        // Resolve appliesTo from prohibition target
+        const appliesTo: string[] = [];
+        if (!prohibition.target || prohibition.target.type === "SELF") {
+          appliesTo.push(cardInstance.instanceId);
+        }
+        // Non-SELF targets: store source card for now (same as modifiers)
+        if (prohibition.target && prohibition.target.type !== "SELF") {
+          appliesTo.push(cardInstance.instanceId);
+        }
+
+        newProhibitions.push({
+          id: nanoid(),
+          sourceCardInstanceId: cardInstance.instanceId,
+          sourceEffectBlockId: block.id,
+          prohibitionType: prohibition.type,
+          scope: prohibition.scope ?? {},
+          duration,
+          controller: cardInstance.controller,
+          appliesTo,
+          usesRemaining: null,
+          conditionalOverride: prohibition.conditional_override,
+        });
+      }
+    }
   }
 
-  if (newEffects.length === 0) return state;
+  if (newEffects.length === 0 && newProhibitions.length === 0) return state;
 
   return {
     ...state,
-    activeEffects: [...state.activeEffects, ...newEffects as any],
+    activeEffects: newEffects.length > 0
+      ? [...state.activeEffects, ...newEffects as any]
+      : state.activeEffects,
+    prohibitions: newProhibitions.length > 0
+      ? [...state.prohibitions, ...newProhibitions as any]
+      : state.prohibitions,
   };
 }
 
