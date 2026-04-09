@@ -7,7 +7,7 @@
  * - Expiry (wave-based processing at phase boundaries)
  */
 
-import type { RuntimeActiveEffect, ExpiryTiming, Condition } from "./effect-types.js";
+import type { RuntimeActiveEffect, RuntimeProhibition, ExpiryTiming, Condition } from "./effect-types.js";
 import type { GameState, CardData } from "../types.js";
 import { cleanupConsumedOneTimeModifiers, expireOneTimeModifiers } from "./modifiers.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
@@ -56,11 +56,11 @@ export function expireRefreshPhaseEffects(state: GameState): GameState {
 }
 
 /**
- * Expire effects whose source card has left the field.
+ * Expire effects and prohibitions whose source card has left the field.
  */
 export function expireSourceLeftZone(state: GameState, instanceId: string): GameState {
   const effects = state.activeEffects as RuntimeActiveEffect[];
-  const remaining = effects.filter((e) => {
+  const remainingEffects = effects.filter((e) => {
     if (e.sourceCardInstanceId !== instanceId) return true;
     // Always remove SOURCE_LEAVES_ZONE effects
     if (e.expiresAt.wave === "SOURCE_LEAVES_ZONE") return false;
@@ -69,8 +69,23 @@ export function expireSourceLeftZone(state: GameState, instanceId: string): Game
     return true;
   });
 
-  if (remaining.length === effects.length) return state;
-  return { ...state, activeEffects: remaining as any };
+  // Also remove permanent prohibitions whose source left the field
+  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const remainingProhibitions = prohibitions.filter((p) => {
+    if (p.sourceCardInstanceId !== instanceId) return true;
+    if (p.duration.type === "PERMANENT") return false;
+    return true;
+  });
+
+  const effectsChanged = remainingEffects.length !== effects.length;
+  const prohibitionsChanged = remainingProhibitions.length !== prohibitions.length;
+
+  if (!effectsChanged && !prohibitionsChanged) return state;
+  return {
+    ...state,
+    activeEffects: effectsChanged ? remainingEffects as any : state.activeEffects,
+    prohibitions: prohibitionsChanged ? remainingProhibitions as any : state.prohibitions,
+  };
 }
 
 /**
