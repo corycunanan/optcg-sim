@@ -13,6 +13,12 @@ import {
   moveCard,
   placeDonFromDeck,
 } from "./state.js";
+import {
+  expireEndOfTurnEffects,
+  expireProhibitions,
+  processScheduledActions,
+} from "./duration-tracker.js";
+import { resolveEffect } from "./effect-resolver/index.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
@@ -26,7 +32,7 @@ export function isStartOfTurnAutoPhase(_state: GameState): boolean {
   return phase === "REFRESH" || phase === "DRAW" || phase === "DON";
 }
 
-export function executeAdvancePhase(state: GameState, _cardDb: Map<string, CardData>): ExecuteResult {
+export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardData>): ExecuteResult {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
   const { phase, number: turnNumber } = state.turn;
@@ -85,7 +91,7 @@ export function executeAdvancePhase(state: GameState, _cardDb: Map<string, CardD
       nextState = { ...nextState, turn: { ...nextState.turn, phase: "END" } };
       events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "MAIN", to: "END" } });
       // Run end-phase sequence automatically
-      const endResult = runEndPhase(nextState, pi);
+      const endResult = runEndPhase(nextState, pi, cardDb);
       nextState = endResult.state;
       events.push(...endResult.events);
       break;
@@ -100,12 +106,27 @@ export function executeAdvancePhase(state: GameState, _cardDb: Map<string, CardD
   return { state: nextState, events };
 }
 
-function runEndPhase(state: GameState, pi: 0 | 1): ExecuteResult {
+function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>): ExecuteResult {
   const events: PendingEvent[] = [];
 
   // Steps 1 & 2: [End of Your Turn] / [End of Your Opponent's Turn] effects (M4)
 
-  // Steps 3-6: Expiry waves (M4 — no active effects in M3)
+  // Steps 3-6: Expire THIS_TURN effects and prohibitions before turn transition
+  state = expireEndOfTurnEffects(state);
+  state = expireProhibitions(state, "END_OF_TURN", { turn: state.turn.number });
+
+  // Process end-of-turn scheduled actions
+  const scheduled = processScheduledActions(state, "END_OF_THIS_TURN");
+  state = scheduled.state;
+  for (const entry of scheduled.actionsToRun) {
+    const fakeBlock = {
+      id: "scheduled_" + entry.sourceEffectId,
+      category: "auto" as const,
+      actions: [entry.action],
+    };
+    const result = resolveEffect(state, fakeBlock, entry.sourceEffectId, entry.controller, cardDb);
+    state = result.state;
+  }
 
   // Turn passes to opponent
   const nextPlayerIndex: 0 | 1 = pi === 0 ? 1 : 0;

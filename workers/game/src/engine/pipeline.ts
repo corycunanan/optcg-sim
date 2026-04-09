@@ -34,11 +34,8 @@ import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
 import {
-  expireEndOfTurnEffects,
   expireBattleEffects,
   expireSourceLeftZone,
-  expireProhibitions,
-  processScheduledActions,
   evaluateWhileConditions,
 } from "./duration-tracker.js";
 
@@ -347,26 +344,9 @@ function recalculateModifiers(
     state = expireBattleEffects(state, state.turn.battle.battleId);
   }
 
-  // Expire prohibitions at the same boundaries
-  if (state.turn.phase === "END") {
-    state = expireEndOfTurnEffects(state);
-    state = expireProhibitions(state, "END_OF_TURN", { turn: state.turn.number });
-
-    // Process end-of-turn scheduled actions
-    const scheduled = processScheduledActions(state, "END_OF_THIS_TURN");
-    state = scheduled.state;
-    for (const entry of scheduled.actionsToRun) {
-      // Resolve each scheduled action through the effect resolver
-      // (simplified — in full impl these would go through the pipeline)
-      const fakeBlock = {
-        id: "scheduled_" + entry.sourceEffectId,
-        category: "auto" as const,
-        actions: [entry.action],
-      };
-      const result = resolveEffect(state, fakeBlock, entry.sourceEffectId, entry.controller, cardDb);
-      state = result.state;
-    }
-  }
+  // End-of-turn expiry (THIS_TURN effects, prohibitions, scheduled actions) is now
+  // handled inside runEndPhase() before the turn transition, so it runs while
+  // state.turn.number still matches the expiring effects' turn.
 
   return state;
 }
