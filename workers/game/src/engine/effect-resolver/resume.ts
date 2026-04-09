@@ -70,24 +70,29 @@ export function resumeEffectChain(
     const keptId = action.keptCardInstanceId;
     const ordered = action.orderedInstanceIds ?? [];
 
-    const removedIds = new Set(ordered);
-    if (keptId) removedIds.add(keptId);
-    const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
+    // Validate kept card is in validTargets (if filter was applied)
+    const searchValid = validTargets ?? [];
+    const validatedKeptId = keptId && (searchValid.length === 0 || searchValid.includes(keptId))
+      ? keptId
+      : undefined;
 
     let newHand = [...p.hand];
-    if (keptId) {
-      const kept = p.deck.find((c) => c.instanceId === keptId);
+    if (validatedKeptId) {
+      const kept = p.deck.find((c) => c.instanceId === validatedKeptId);
       if (kept) {
         newHand = [...newHand, { ...kept, zone: "HAND" as const }];
         events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
       }
     }
 
+    const removedIds = new Set(ordered);
+    if (validatedKeptId) removedIds.add(validatedKeptId);
     const arrangedCards = ordered
       .map((id) => p.deck.find((c) => c.instanceId === id))
       .filter(Boolean) as CardInstance[];
 
     let newDeck: CardInstance[];
+    const restOfDeck = p.deck.filter((c) => !removedIds.has(c.instanceId));
     if ((action.destination ?? restDest.toLowerCase()) === "bottom") {
       newDeck = [...restOfDeck, ...arrangedCards];
     } else {
