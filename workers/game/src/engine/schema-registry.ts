@@ -140,7 +140,9 @@ export function injectSchemasIntoCardDb(
       console.warn(`[schema] Validation errors for ${cardId}:\n  ${errors.join("\n  ")}`);
     }
     const data = cardDb.get(cardId);
-    if (data && !data.effectSchema) {
+    if (data) {
+      // Always prefer authored schemas over DB-stored schemas — they are the
+      // most up-to-date and thoroughly tested versions.
       cardDb.set(cardId, { ...data, effectSchema: schema });
     }
   }
