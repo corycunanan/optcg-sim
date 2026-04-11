@@ -184,4 +184,41 @@ describe("filterStateForPlayer", () => {
       expect(lastDraw.payload.cardId).toBe("MY-CARD");
     }
   });
+
+  it("strips pendingPrompt for the non-responding player", () => {
+    const state = getMainPhaseState();
+
+    // Simulate a prompt directed at player 1 (e.g., opponent must trash from hand)
+    const stateWithPrompt = {
+      ...state,
+      pendingPrompt: {
+        options: {
+          promptType: "SELECT_TARGET" as const,
+          validTargets: ["inst-a", "inst-b"],
+          countMin: 1,
+          countMax: 1,
+          effectDescription: "Choose 1 card(s) to trash from hand",
+          ctaLabel: "Trash",
+          cards: state.players[1].hand.slice(0, 2), // opponent hand cards with real cardIds
+        },
+        respondingPlayer: 1 as const,
+        resumeContext: {},
+      },
+    };
+
+    // Player 0 (non-responding) should NOT see the prompt
+    const view0 = filterStateForPlayer(stateWithPrompt, 0);
+    expect(view0.pendingPrompt).toBeNull();
+
+    // Player 1 (responding) SHOULD see the prompt with their own cards
+    const view1 = filterStateForPlayer(stateWithPrompt, 1);
+    expect(view1.pendingPrompt).not.toBeNull();
+    expect(view1.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
+    if (view1.pendingPrompt!.options.promptType === "SELECT_TARGET") {
+      // Cards should have real cardIds since it's the responding player's own hand
+      for (const card of view1.pendingPrompt!.options.cards) {
+        expect(card.cardId).not.toBe("hidden");
+      }
+    }
+  });
 });

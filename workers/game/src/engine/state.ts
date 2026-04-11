@@ -591,7 +591,15 @@ export function filterStateForPlayer(
     return event;
   });
 
-  return { ...state, players: newPlayers, eventLog: filteredEventLog };
+  // Strip pendingPrompt for the player who is NOT the respondingPlayer.
+  // This prevents the non-responding player from seeing opponent hand cards
+  // leaked through the prompt's `cards` array (e.g. TRASH_FROM_HAND effects).
+  const filteredPrompt =
+    state.pendingPrompt && state.pendingPrompt.respondingPlayer !== receivingPlayer
+      ? null
+      : state.pendingPrompt;
+
+  return { ...state, players: newPlayers, eventLog: filteredEventLog, pendingPrompt: filteredPrompt };
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────
