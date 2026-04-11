@@ -42,13 +42,14 @@ function effectAppliesToCard(
   for (const mod of effect.modifiers ?? []) {
     if (!mod.target || mod.target.type === "SELF") continue;
 
-    // Controller check
-    const controller = mod.target.controller;
+    // Controller check — ALL_YOUR_CHARACTERS implies SELF controller
+    const targetType = mod.target.type?.toUpperCase();
+    const controller = mod.target.controller ??
+      (targetType === "ALL_YOUR_CHARACTERS" ? "SELF" : undefined);
     if (controller === "SELF" && card.controller !== effect.controller) continue;
     if (controller === "OPPONENT" && card.controller === effect.controller) continue;
 
     // Card type check
-    const targetType = mod.target.type?.toUpperCase();
     if (targetType === "CHARACTER" || targetType === "ALL_YOUR_CHARACTERS") {
       const data = cardDb.get(card.cardId);
       if (!data || data.type?.toUpperCase() !== "CHARACTER") continue;
@@ -164,9 +165,15 @@ export function getEffectiveCost(
 
   // Layer 1 & 2: Cost modifiers from active effects
   if (state && cardInstanceId) {
+    const card = findCardInstance(state, cardInstanceId);
     const effects = state.activeEffects as RuntimeActiveEffect[];
     for (const effect of effects) {
-      if (!effect.appliesTo?.includes(cardInstanceId)) continue;
+      // Use dynamic target resolution (same as getEffectivePower)
+      const applies = card && cardDb
+        ? effectAppliesToCard(effect, card, state, cardDb)
+        : effect.appliesTo?.includes(cardInstanceId);
+      if (!applies) continue;
+      if (!isEffectConditionMet(effect, state, cardDb)) continue;
       for (const mod of effect.modifiers ?? []) {
         if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
           cost += mod.params.amount as number;

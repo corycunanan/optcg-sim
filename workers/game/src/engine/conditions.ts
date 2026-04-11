@@ -532,16 +532,25 @@ export function matchesFilter(
   if (filter.base_cost_min !== undefined && cost < filter.base_cost_min) return false;
   if (filter.base_cost_max !== undefined && cost > filter.base_cost_max) return false;
 
-  // Power filters
-  const effectivePower = getEffectivePower(card, data, state, cardDb);
-  const basePower = data.power ?? 0;
-  if (filter.power_exact !== undefined && !matchesDynamicNum(effectivePower, "==", filter.power_exact, state, ctrl)) return false;
-  if (filter.power_min !== undefined && !matchesDynamicNum(effectivePower, ">=", filter.power_min, state, ctrl)) return false;
-  if (filter.power_max !== undefined && !matchesDynamicNum(effectivePower, "<=", filter.power_max, state, ctrl)) return false;
-  if (filter.power_range && (effectivePower < filter.power_range.min || effectivePower > filter.power_range.max)) return false;
-  if (filter.base_power_exact !== undefined && basePower !== filter.base_power_exact) return false;
-  if (filter.base_power_min !== undefined && basePower < filter.base_power_min) return false;
-  if (filter.base_power_max !== undefined && basePower > filter.base_power_max) return false;
+  // Power filters — compute effective power lazily to avoid circular recursion
+  // (getEffectivePower → effectAppliesToCard → matchesFilter → getEffectivePower)
+  const hasPowerFilter = filter.power_exact !== undefined || filter.power_min !== undefined
+    || filter.power_max !== undefined || filter.power_range !== undefined;
+  const hasBasePowerFilter = filter.base_power_exact !== undefined
+    || filter.base_power_min !== undefined || filter.base_power_max !== undefined;
+  if (hasPowerFilter) {
+    const effectivePower = getEffectivePower(card, data, state, cardDb);
+    if (filter.power_exact !== undefined && !matchesDynamicNum(effectivePower, "==", filter.power_exact, state, ctrl)) return false;
+    if (filter.power_min !== undefined && !matchesDynamicNum(effectivePower, ">=", filter.power_min, state, ctrl)) return false;
+    if (filter.power_max !== undefined && !matchesDynamicNum(effectivePower, "<=", filter.power_max, state, ctrl)) return false;
+    if (filter.power_range && (effectivePower < filter.power_range.min || effectivePower > filter.power_range.max)) return false;
+  }
+  if (hasBasePowerFilter) {
+    const basePower = data.power ?? 0;
+    if (filter.base_power_exact !== undefined && basePower !== filter.base_power_exact) return false;
+    if (filter.base_power_min !== undefined && basePower < filter.base_power_min) return false;
+    if (filter.base_power_max !== undefined && basePower > filter.base_power_max) return false;
+  }
 
   // Color filters
   const colors = data.color.map((c) => c.toUpperCase());
