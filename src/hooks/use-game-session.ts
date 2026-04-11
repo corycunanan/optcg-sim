@@ -105,6 +105,7 @@ export function useGameSession(
   /* ── Card DB ──────────────────────────────────────────────────────── */
 
   const [cardDb, setCardDb] = useState<CardDb>({});
+  const [cardDbError, setCardDbError] = useState<string | null>(null);
   const cardDbFetched = useRef(false);
   useEffect(() => {
     if (cardDbFetched.current) return;
@@ -125,6 +126,7 @@ export function useGameSession(
           if (!cancelled) {
             cardDbFetched.current = true;
             setCardDb(data);
+            setCardDbError(null);
           }
           return;
         } catch {
@@ -133,6 +135,9 @@ export function useGameSession(
             await new Promise((r) => setTimeout(r, 1000 * attempt));
           }
         }
+      }
+      if (!cancelled) {
+        setCardDbError("Failed to load card data. Please refresh to try again.");
       }
     }
 
@@ -352,7 +357,7 @@ export function useGameSession(
       cardDb,
       cardDbReady,
       connectionStatus,
-      lastError,
+      lastError: lastError ?? cardDbError,
       activePrompt,
       gameOver,
       sendAction,
