@@ -211,7 +211,8 @@ function processTriggerQueuePipeline(
   let nextState = state;
 
   while (queue.length > 0) {
-    const next = queue.shift()!;
+    const next = queue.shift();
+    if (!next) break;
 
     const result = resolveEffect(
       nextState,
@@ -227,7 +228,7 @@ function processTriggerQueuePipeline(
       const topFrame = peekStackFrame(nextState);
       if (topFrame) {
         nextState = updateStackTopFrame(nextState, {
-          pendingTriggers: [...(topFrame as any).pendingTriggers ?? [], ...queue],
+          pendingTriggers: [...topFrame.pendingTriggers ?? [], ...queue],
         });
       }
       return { state: nextState, pendingPrompt: result.pendingPrompt };
@@ -424,7 +425,7 @@ function processPlayerTriggerGroup(
       const topFrame = peekStackFrame(result.state);
       if (topFrame && afterTriggers.length > 0) {
         result.state = updateStackTopFrame(result.state, {
-          pendingTriggers: [...(topFrame as any).pendingTriggers ?? [], ...afterTriggers],
+          pendingTriggers: [...topFrame.pendingTriggers ?? [], ...afterTriggers],
         });
       }
       return result;
