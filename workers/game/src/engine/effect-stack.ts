@@ -10,7 +10,13 @@ import type { EffectStackFrame } from "../types.js";
 
 // ─── Stack Operations ────────────────────────────────────────────────────────
 
+const MAX_EFFECT_STACK_DEPTH = 100;
+
 export function pushFrame(state: GameState, frame: EffectStackFrame): GameState {
+  if (state.effectStack.length >= MAX_EFFECT_STACK_DEPTH) {
+    console.error(`[EffectStack] Max depth (${MAX_EFFECT_STACK_DEPTH}) exceeded — possible infinite loop`);
+    return state;
+  }
   return {
     ...state,
     effectStack: [...state.effectStack, frame] as GameState["effectStack"],
