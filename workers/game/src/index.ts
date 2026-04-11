@@ -32,6 +32,11 @@ export default {
 
     const [, gameId, route] = match;
 
+    // Validate required secrets exist
+    if (!env.GAME_WORKER_SECRET) {
+      return new Response("Server misconfigured", { status: 500 });
+    }
+
     // Auth check for /init and /notify-end (must come from Next.js with the shared secret)
     if (route === "init" || route === "notify-end") {
       if (request.method !== "POST") {

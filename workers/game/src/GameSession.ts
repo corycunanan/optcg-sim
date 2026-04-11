@@ -248,7 +248,9 @@ export class GameSession implements DurableObject {
     const tags = this.state.getTags(ws);
     const playerTag = tags.find((t) => t.startsWith("player-"));
     if (!playerTag) return;
-    const playerIndex = parseInt(playerTag.replace("player-", "")) as 0 | 1;
+    const parsed = parseInt(playerTag.replace("player-", ""));
+    if (parsed !== 0 && parsed !== 1) return;
+    const playerIndex = parsed as 0 | 1;
 
     let clientMsg: ClientMessage;
     try {
@@ -282,7 +284,9 @@ export class GameSession implements DurableObject {
     const playerTag = tags.find((t) => t.startsWith("player-"));
     if (!playerTag || !this.gameState) return;
 
-    const playerIndex = parseInt(playerTag.replace("player-", "")) as 0 | 1;
+    const parsed = parseInt(playerTag.replace("player-", ""));
+    if (parsed !== 0 && parsed !== 1) return;
+    const playerIndex = parsed as 0 | 1;
     if (!this.gameState.players[playerIndex].connected) return;
     await this.handlePlayerAway(playerIndex, "DISCONNECTED", ws);
   }

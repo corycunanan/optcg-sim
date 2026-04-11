@@ -408,6 +408,7 @@ export function executeEffectAction(
   if (handler) {
     return handler(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
   }
-  // Action type not yet implemented
-  return { state, events: [], succeeded: true };
+  // Action type not yet implemented — fail loudly so missing handlers are caught
+  console.warn(`[EffectResolver] Unhandled action type: ${action.type}`);
+  return { state, events: [], succeeded: false };
 }
