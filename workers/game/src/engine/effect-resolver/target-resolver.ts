@@ -420,7 +420,9 @@ export function autoSelectTargets(
   target: Target | undefined,
   allValidIds: string[],
 ): string[] {
-  if (!target || allValidIds.length === 0) return [];
+  if (allValidIds.length === 0) return [];
+  // No target spec — IDs come from a target_ref, use them directly
+  if (!target) return allValidIds;
   // dual_targets: return all provided IDs — they've already been validated by feasibility check
   if (target.dual_targets && target.dual_targets.length > 0) return allValidIds;
   const count = target.count;

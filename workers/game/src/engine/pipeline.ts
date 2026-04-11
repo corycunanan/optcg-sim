@@ -34,7 +34,6 @@ import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
 import {
-  expireBattleEffects,
   expireSourceLeftZone,
   evaluateWhileConditions,
 } from "./duration-tracker.js";
@@ -339,11 +338,6 @@ function recalculateModifiers(
 ): GameState {
   // Re-evaluate WHILE_CONDITION effects every step
   state = evaluateWhileConditions(state, cardDb);
-
-  // Expire battle-scoped effects when battle ends
-  if (action.type === "PASS" && state.turn.battle) {
-    state = expireBattleEffects(state, state.turn.battle.battleId);
-  }
 
   // End-of-turn expiry (THIS_TURN effects, prohibitions, scheduled actions) is now
   // handled inside runEndPhase() before the turn transition, so it runs while

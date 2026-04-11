@@ -15,6 +15,7 @@ import {
   restDonForCost,
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
+import { expireBattleEffects } from "./duration-tracker.js";
 import { hasDoubleAttack, hasBanish, hasTrigger } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
 import { resolveEffect } from "./effect-resolver/index.js";
@@ -522,6 +523,12 @@ function setCardState(
 }
 
 function endBattle(state: GameState, events: PendingEvent[]): GameState {
+  // Expire battle-scoped effects before clearing battle state
+  const battleId = state.turn.battle?.battleId;
+  if (battleId) {
+    state = expireBattleEffects(state, battleId);
+  }
+
   events.push({ type: "BATTLE_RESOLVED", playerIndex: state.turn.activePlayerIndex });
   events.push({
     type: "PHASE_CHANGED",
