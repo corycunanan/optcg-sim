@@ -9,6 +9,7 @@ import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeConte
 import type { ActionResult } from "../types.js";
 import { resolveAmount, shuffleArray } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
+import { matchesFilter } from "../../conditions.js";
 
 export function executePlaceHandToDeck(
   state: GameState,
@@ -337,23 +338,7 @@ export function executeSearchAndPlay(
   if (searchPool.length === 0) return { state, events, succeeded: false };
 
   // Find matching cards
-  const matching = searchPool.filter((c) => {
-    const data = cardDb.get(c.cardId);
-    if (!data) return false;
-    if (filter.traits && !filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
-    if (filter.exclude_name && data.name === filter.exclude_name) return false;
-    if (filter.name && data.name !== filter.name) return false;
-    if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
-    if (filter.card_type && data.type.toUpperCase() !== (filter.card_type as string).toUpperCase()) return false;
-    if (filter.cost_exact !== undefined && (data.cost ?? 0) !== (filter.cost_exact as number)) return false;
-    if (filter.cost_min !== undefined && (data.cost ?? 0) < (filter.cost_min as number)) return false;
-    if (filter.cost_max !== undefined && (data.cost ?? 0) > (filter.cost_max as number)) return false;
-    if (filter.color) {
-      const cardColors = data.color ?? [];
-      if (!cardColors.some((clr: string) => clr.toUpperCase() === (filter.color as string).toUpperCase())) return false;
-    }
-    return true;
-  });
+  const matching = searchPool.filter((c) => matchesFilter(c, filter, cardDb, state, resultRefs));
 
   const validTargets = matching.map((c) => c.instanceId);
 
