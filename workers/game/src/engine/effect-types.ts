@@ -1105,6 +1105,7 @@ export interface RuntimeActiveEffect {
   sourceEffectBlockId: string;
   category: EffectCategory;
   modifiers: Modifier[];
+  conditions?: Condition;  // block-level conditions, re-evaluated at runtime
   duration: Duration;
   expiresAt: ExpiryTiming;
   controller: 0 | 1;

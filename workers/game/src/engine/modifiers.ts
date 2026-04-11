@@ -19,8 +19,52 @@ import type {
   EffectSchema,
 } from "./effect-types.js";
 import type { CardData as CardDataType } from "../types.js";
-import { evaluateCondition, type ConditionContext } from "./conditions.js";
+import { evaluateCondition, matchesFilter, type ConditionContext } from "./conditions.js";
 import { findCardInstance } from "./state.js";
+
+/**
+ * Check whether a card is targeted by a permanent effect's modifiers.
+ * For SELF targets (or no target), uses the static appliesTo array.
+ * For non-SELF targets (e.g., CHARACTER with filter), dynamically resolves
+ * against the card's properties using the modifier's target filter.
+ */
+function effectAppliesToCard(
+  effect: RuntimeActiveEffect,
+  card: CardInstance,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>,
+): boolean {
+  // Static match — card is explicitly listed in appliesTo
+  if (effect.appliesTo?.includes(card.instanceId)) return true;
+
+  // Dynamic match — check non-SELF modifier targets against the card
+  if (!cardDb) return false;
+  for (const mod of effect.modifiers ?? []) {
+    if (!mod.target || mod.target.type === "SELF") continue;
+
+    // Controller check
+    const controller = mod.target.controller;
+    if (controller === "SELF" && card.controller !== effect.controller) continue;
+    if (controller === "OPPONENT" && card.controller === effect.controller) continue;
+
+    // Card type check
+    const targetType = mod.target.type?.toUpperCase();
+    if (targetType === "CHARACTER" || targetType === "ALL_YOUR_CHARACTERS") {
+      const data = cardDb.get(card.cardId);
+      if (!data || data.type?.toUpperCase() !== "CHARACTER") continue;
+    }
+
+    // Apply filter if present
+    if (mod.target.filter) {
+      if (matchesFilter(card, mod.target.filter, cardDb, state)) return true;
+    } else {
+      // No filter — matches all cards of the target type/controller
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
@@ -31,8 +75,6 @@ export function isEffectConditionMet(
   state: GameState,
   cardDb?: Map<string, CardDataType>,
 ): boolean {
-  const duration = effect.duration as { type: string; condition?: Condition } | undefined;
-  if (!duration || duration.type !== "WHILE_CONDITION" || !duration.condition) return true;
   if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
   const condCtx: ConditionContext = {
@@ -40,6 +82,15 @@ export function isEffectConditionMet(
     controller: effect.controller,
     cardDb,
   };
+
+  // Check block-level conditions (e.g., "if you have no other [Shirahoshi] with cost 2")
+  if (effect.conditions) {
+    if (!evaluateCondition(state, effect.conditions, condCtx)) return false;
+  }
+
+  // Check duration condition (e.g., IS_MY_TURN for opponent's turn effects)
+  const duration = effect.duration as { type: string; condition?: Condition } | undefined;
+  if (!duration || duration.type !== "WHILE_CONDITION" || !duration.condition) return true;
 
   return evaluateCondition(state, duration.condition, condCtx);
 }
@@ -60,7 +111,7 @@ export function getEffectivePower(
   // Layer 1: base-setting effects
   const effects = state.activeEffects as RuntimeActiveEffect[];
   const baseSetters = effects.filter((e) =>
-    e.appliesTo?.includes(card.instanceId) &&
+    effectAppliesToCard(e, card, state, cardDb) &&
     e.modifiers?.some((m) => m.type === "SET_POWER") &&
     isEffectConditionMet(e, state, cardDb),
   );
@@ -75,7 +126,7 @@ export function getEffectivePower(
 
   // Layer 2: additive/subtractive modifiers
   const additiveEffects = effects.filter((e) =>
-    e.appliesTo?.includes(card.instanceId) &&
+    effectAppliesToCard(e, card, state, cardDb) &&
     e.modifiers?.some((m) => m.type === "MODIFY_POWER") &&
     isEffectConditionMet(e, state, cardDb),
   );
@@ -312,7 +363,7 @@ export function hasGrantedKeyword(
 ): boolean {
   const effects = state.activeEffects as RuntimeActiveEffect[];
   return effects.some((e) =>
-    e.appliesTo?.includes(card.instanceId) &&
+    effectAppliesToCard(e, card, state, cardDb) &&
     e.modifiers?.some((m) =>
       m.type === "GRANT_KEYWORD" && m.params?.keyword === keyword,
     ) &&
@@ -331,7 +382,7 @@ export function hasRemovedKeyword(
 ): boolean {
   const effects = state.activeEffects as RuntimeActiveEffect[];
   return effects.some((e) =>
-    e.appliesTo?.includes(card.instanceId) &&
+    effectAppliesToCard(e, card, state, cardDb) &&
     e.modifiers?.some((m) =>
       m.type === "REMOVE_KEYWORD" && m.params?.keyword === keyword,
     ) &&

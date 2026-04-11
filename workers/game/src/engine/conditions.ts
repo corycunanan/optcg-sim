@@ -523,9 +523,10 @@ export function matchesFilter(
 
   // Cost filters
   const cost = data.cost ?? 0;
-  if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact)) return false;
-  if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min)) return false;
-  if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max)) return false;
+  const ctrl = card.controller;
+  if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact, state, ctrl)) return false;
+  if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min, state, ctrl)) return false;
+  if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max, state, ctrl)) return false;
   if (filter.cost_range && (cost < filter.cost_range.min || cost > filter.cost_range.max)) return false;
   if (filter.base_cost_exact !== undefined && cost !== filter.base_cost_exact) return false;
   if (filter.base_cost_min !== undefined && cost < filter.base_cost_min) return false;
@@ -534,9 +535,9 @@ export function matchesFilter(
   // Power filters
   const effectivePower = getEffectivePower(card, data, state, cardDb);
   const basePower = data.power ?? 0;
-  if (filter.power_exact !== undefined && !matchesDynamicNum(effectivePower, "==", filter.power_exact)) return false;
-  if (filter.power_min !== undefined && !matchesDynamicNum(effectivePower, ">=", filter.power_min)) return false;
-  if (filter.power_max !== undefined && !matchesDynamicNum(effectivePower, "<=", filter.power_max)) return false;
+  if (filter.power_exact !== undefined && !matchesDynamicNum(effectivePower, "==", filter.power_exact, state, ctrl)) return false;
+  if (filter.power_min !== undefined && !matchesDynamicNum(effectivePower, ">=", filter.power_min, state, ctrl)) return false;
+  if (filter.power_max !== undefined && !matchesDynamicNum(effectivePower, "<=", filter.power_max, state, ctrl)) return false;
   if (filter.power_range && (effectivePower < filter.power_range.min || effectivePower > filter.power_range.max)) return false;
   if (filter.base_power_exact !== undefined && basePower !== filter.base_power_exact) return false;
   if (filter.base_power_min !== undefined && basePower < filter.base_power_min) return false;
@@ -654,16 +655,59 @@ export function matchesFilter(
   return true;
 }
 
-function matchesDynamicNum(actual: number, op: NumericOperator, expected: number | DynamicValue): boolean {
+function matchesDynamicNum(
+  actual: number,
+  op: NumericOperator,
+  expected: number | DynamicValue,
+  state?: GameState,
+  controller?: 0 | 1,
+): boolean {
   if (typeof expected === "number") {
     return compareNum(actual, op, expected);
   }
-  // DynamicValue — resolve at runtime; for now just check FIXED
   if (expected.type === "FIXED") {
     return compareNum(actual, op, expected.value);
   }
-  // Other dynamic values need game state context — skip for now
+  if (expected.type === "GAME_STATE" && state) {
+    const resolved = resolveGameStateValue(expected.source, state, expected.controller, controller);
+    if (resolved !== null) return compareNum(actual, op, resolved);
+  }
+  // Unresolvable dynamic values — pass through
   return true;
+}
+
+function resolveGameStateValue(
+  source: string,
+  state: GameState,
+  sourceController?: string,
+  ctxController?: 0 | 1,
+): number | null {
+  const pi = ctxController ?? 0;
+  const opp: 0 | 1 = pi === 0 ? 1 : 0;
+  const resolvedPi = sourceController === "OPPONENT" ? opp : pi;
+  const p = state.players[resolvedPi];
+  switch (source) {
+    case "DON_FIELD_COUNT":
+      return p.donCostArea.length;
+    case "OPPONENT_DON_FIELD_COUNT":
+      return state.players[opp].donCostArea.length;
+    case "LIFE_COUNT":
+      return p.life.length;
+    case "OPPONENT_LIFE_COUNT":
+      return state.players[opp].life.length;
+    case "COMBINED_LIFE_COUNT":
+      return state.players[0].life.length + state.players[1].life.length;
+    case "HAND_COUNT":
+      return p.hand.length;
+    case "DECK_COUNT":
+      return p.deck.length;
+    case "RESTED_CARD_COUNT": {
+      const chars = p.characters.filter(Boolean) as CardInstance[];
+      return chars.filter((c) => c.state === "RESTED").length;
+    }
+    default:
+      return null;
+  }
 }
 
 function matchesNumericRange(value: number, range: NumericRange): boolean {

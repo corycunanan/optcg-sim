@@ -131,16 +131,13 @@ export function registerPermanentEffectsForCard(
 
     // Register modifiers as RuntimeActiveEffects
     if (hasModifiers) {
+      // Resolve appliesTo from modifier targets.
+      // SELF targets resolve statically to the source card.
+      // Non-SELF targets (e.g., CHARACTER with filter) are resolved dynamically
+      // at power-calculation time via effectAppliesToCard in modifiers.ts.
       const appliesTo: string[] = [];
       for (const mod of block.modifiers!) {
         if (!mod.target || mod.target.type === "SELF") {
-          if (!appliesTo.includes(cardInstance.instanceId)) {
-            appliesTo.push(cardInstance.instanceId);
-          }
-        }
-        // Non-SELF targets (ALL_YOUR_CHARACTERS, etc.) are not yet dynamically
-        // resolved — see OPT-126. For now, store the source card in appliesTo.
-        if (mod.target && mod.target.type !== "SELF") {
           if (!appliesTo.includes(cardInstance.instanceId)) {
             appliesTo.push(cardInstance.instanceId);
           }
@@ -153,6 +150,7 @@ export function registerPermanentEffectsForCard(
         sourceEffectBlockId: block.id,
         category: "permanent",
         modifiers: block.modifiers!,
+        conditions: block.conditions,
         duration,
         expiresAt,
         controller: cardInstance.controller,
@@ -169,7 +167,7 @@ export function registerPermanentEffectsForCard(
         if (!prohibition.target || prohibition.target.type === "SELF") {
           appliesTo.push(cardInstance.instanceId);
         }
-        // Non-SELF targets: store source card for now (same as modifiers)
+        // Non-SELF targets: store source card for now
         if (prohibition.target && prohibition.target.type !== "SELF") {
           appliesTo.push(cardInstance.instanceId);
         }
