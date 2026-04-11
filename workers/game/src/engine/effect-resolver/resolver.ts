@@ -334,10 +334,14 @@ export function executeActionChain(
       // Pause — push a stack frame with the remaining actions and surface the prompt
       const ctx = result.pendingPrompt.resumeContext as import("../../types.js").ResumeContext;
       const phaseForPrompt = promptTypeToPhase(result.pendingPrompt.options.promptType);
+      // Use the resume context's controller — it may differ from the chain's
+      // controller when an OPPONENT_ACTION flips who is acting (e.g. opponent
+      // trashes from their own hand via Perona OP06-093).
+      const resumeController = ctx.controller ?? controller;
       const frame: EffectStackFrame = {
         id: generateFrameId(),
         sourceCardInstanceId,
-        controller,
+        controller: resumeController,
         effectBlock: {} as EffectBlock, // not needed for mid-chain resumes
         phase: phaseForPrompt,
         pausedAction: ctx.pausedAction,
