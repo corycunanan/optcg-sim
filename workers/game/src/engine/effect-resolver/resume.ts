@@ -27,6 +27,7 @@ import { markOncePerTurnUsed, shuffleArray } from "./action-utils.js";
 import { payCostsWithSelection, applyCostSelection } from "./cost-handler.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "./resolver.js";
 import { validateTargetConstraints } from "./target-resolver.js";
+import { applyRedistributeDonTransfers } from "./actions/don.js";
 import { nanoid } from "../../util/nanoid.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../trigger-ordering.js";
 
@@ -298,6 +299,40 @@ export function resumeEffectChain(
 
       if (branchResult.pendingPrompt) {
         return { state: nextState, events, resolved: false, pendingPrompt: branchResult.pendingPrompt };
+      }
+    }
+  }
+
+  // Resume from REDISTRIBUTE_DON response
+  if (action.type === "REDISTRIBUTE_DON" && pausedAction !== null && pausedAction.type === "REDISTRIBUTE_DON") {
+    const transfers = action.transfers ?? [];
+    const amount = ((pausedAction.params?.amount as number) ?? 1);
+
+    // Re-derive valid sources (cards that have DON attached) for this controller.
+    const pp = nextState.players[controller];
+    const validSourceSet = new Set<string>();
+    if (pp.leader.attachedDon.length > 0) validSourceSet.add(pp.leader.instanceId);
+    for (const c of pp.characters) {
+      if (c && c.attachedDon.length > 0) validSourceSet.add(c.instanceId);
+    }
+    const validTargetSet = new Set(validTargets);
+
+    const allValid = transfers.length <= amount && transfers.every((t) =>
+      t.fromCardInstanceId !== t.toCardInstanceId &&
+      validSourceSet.has(t.fromCardInstanceId) &&
+      validTargetSet.has(t.toCardInstanceId),
+    );
+
+    if (!allValid) {
+      return { state, events, resolved: false };
+    }
+
+    if (transfers.length > 0) {
+      const actionResult = applyRedistributeDonTransfers(nextState, transfers, controller);
+      nextState = actionResult.state;
+      events.push(...actionResult.events);
+      if (actionResult.result && (pausedAction as any).result_ref) {
+        resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
       }
     }
   }

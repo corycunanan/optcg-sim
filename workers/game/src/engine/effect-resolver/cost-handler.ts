@@ -789,6 +789,7 @@ export function promptTypeToPhase(promptType: string): EffectStackFrame["phase"]
   switch (promptType) {
     case "OPTIONAL_EFFECT": return "AWAITING_OPTIONAL_RESPONSE";
     case "SELECT_TARGET": return "AWAITING_TARGET_SELECTION";
+    case "REDISTRIBUTE_DON": return "AWAITING_TARGET_SELECTION";
     case "ARRANGE_TOP_CARDS": return "AWAITING_ARRANGE_CARDS";
     case "PLAYER_CHOICE": return "AWAITING_PLAYER_CHOICE";
     default: return "AWAITING_TARGET_SELECTION";
