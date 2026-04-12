@@ -2,7 +2,7 @@
  * State mutation helpers for card movement.
  */
 
-import type { GameState, PendingEvent } from "../../types.js";
+import type { GameState, PendingEvent, DonInstance } from "../../types.js";
 
 export function koCharacter(
   state: GameState,
@@ -218,6 +218,79 @@ export function attachDonToCard(
   }
 
   newPlayers[controller] = pp;
+  return { ...state, players: newPlayers };
+}
+
+/**
+ * Detach a specific DON!! from a specific card (leader or character) owned by `controller`.
+ * Unlike koCharacter/trashCharacter, this does NOT return the DON to the cost area — the
+ * caller decides where it goes (typically reattached to a different card via reattachDon).
+ * Returns null if the card or DON is not found.
+ */
+export function detachOneDon(
+  state: GameState,
+  controller: 0 | 1,
+  donInstanceId: string,
+  fromCardInstanceId: string,
+): { state: GameState; detachedDon: DonInstance } | null {
+  const p = state.players[controller];
+  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+
+  if (p.leader.instanceId === fromCardInstanceId) {
+    const donIdx = p.leader.attachedDon.findIndex((d) => d.instanceId === donInstanceId);
+    if (donIdx === -1) return null;
+    const don = p.leader.attachedDon[donIdx]!;
+    const newAttached = p.leader.attachedDon.filter((_, i) => i !== donIdx);
+    newPlayers[controller] = { ...p, leader: { ...p.leader, attachedDon: newAttached } };
+    return {
+      state: { ...state, players: newPlayers },
+      detachedDon: { ...don, attachedTo: null },
+    };
+  }
+
+  const charIdx = p.characters.findIndex((c) => c?.instanceId === fromCardInstanceId);
+  if (charIdx === -1) return null;
+  const char = p.characters[charIdx]!;
+  const donIdx = char.attachedDon.findIndex((d) => d.instanceId === donInstanceId);
+  if (donIdx === -1) return null;
+  const don = char.attachedDon[donIdx]!;
+  const newChars = [...p.characters] as (typeof p.characters);
+  newChars[charIdx] = { ...char, attachedDon: char.attachedDon.filter((_, i) => i !== donIdx) };
+  newPlayers[controller] = { ...p, characters: newChars };
+  return {
+    state: { ...state, players: newPlayers },
+    detachedDon: { ...don, attachedTo: null },
+  };
+}
+
+/**
+ * Reattach a previously-detached DON!! to a target card (leader or character) owned by
+ * `controller`. Does NOT touch donCostArea — caller supplies the DonInstance directly.
+ * Returns null if the target card is not found.
+ */
+export function reattachDon(
+  state: GameState,
+  controller: 0 | 1,
+  don: DonInstance,
+  targetInstanceId: string,
+): GameState | null {
+  const p = state.players[controller];
+  const attached: DonInstance = { ...don, attachedTo: targetInstanceId };
+  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+
+  if (p.leader.instanceId === targetInstanceId) {
+    newPlayers[controller] = {
+      ...p,
+      leader: { ...p.leader, attachedDon: [...p.leader.attachedDon, attached] },
+    };
+    return { ...state, players: newPlayers };
+  }
+
+  const charIdx = p.characters.findIndex((c) => c?.instanceId === targetInstanceId);
+  if (charIdx === -1) return null;
+  const newChars = [...p.characters] as (typeof p.characters);
+  newChars[charIdx] = { ...newChars[charIdx]!, attachedDon: [...newChars[charIdx]!.attachedDon, attached] };
+  newPlayers[controller] = { ...p, characters: newChars };
   return { ...state, players: newPlayers };
 }
 
