@@ -9,7 +9,7 @@ import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { BoardCard } from "../board-card";
-import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag } from "./constants";
+import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
 
@@ -27,6 +27,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   boardFull,
   style,
   animationDelay,
+  redistributeSource,
+  donCountAdjust,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -41,6 +43,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   boardFull?: boolean;
   style: React.CSSProperties;
   animationDelay?: number;
+  redistributeSource?: boolean;
+  donCountAdjust?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const reducedMotion = useReducedMotion();
@@ -57,7 +61,26 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     disabled: !canAttack,
   });
 
-  const acceptsDon = activeDragType === "active-don";
+  const acceptsDon = activeDragType === "active-don" || activeDragType === "redistribute-don";
+
+  const firstDon = card.attachedDon[0];
+  const canRedistribute = !!redistributeSource && !!firstDon;
+  const {
+    attributes: donAttributes,
+    listeners: donListeners,
+    setNodeRef: setDonDragRef,
+    isDragging: isDonDragging,
+  } = useDraggable({
+    id: `redistribute-don-${card.instanceId}`,
+    data: firstDon
+      ? ({
+          type: "redistribute-don",
+          don: firstDon,
+          fromCardInstanceId: card.instanceId,
+        } satisfies RedistributeDonDrag)
+      : undefined,
+    disabled: !canRedistribute,
+  });
   const acceptsHandCard = !!boardFull && activeDragType === "hand-card";
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: acceptsHandCard ? `char-slot-${slotIndex}` : `don-target-${card.instanceId}`,
@@ -139,7 +162,26 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             width={BOARD_CARD_W}
             height={BOARD_CARD_H}
             className="relative z-[1]"
+            donCountAdjust={donCountAdjust}
           />
+          {canRedistribute && (
+            <div
+              ref={setDonDragRef}
+              {...donAttributes}
+              {...donListeners}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                donListeners?.onPointerDown?.(e);
+              }}
+              className={cn(
+                "absolute z-20 left-0 right-0 bottom-0 h-6 rounded-b-md cursor-grab",
+                "bg-gb-accent-gold/30 ring-1 ring-gb-accent-gold/60",
+                "animate-pulse",
+              )}
+              style={{ opacity: isDonDragging ? 0.3 : 1 }}
+              aria-label="Drag attached DON"
+            />
+          )}
         </motion.div>
       </DropdownMenuTrigger>
 
