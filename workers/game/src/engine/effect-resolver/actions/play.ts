@@ -149,6 +149,15 @@ function playOneStage(
   return { state: nextState, events, playedId: newStage.instanceId };
 }
 
+export type PlayCardResumeFrame = {
+  remainingTargetIds: string[];
+  remaining: { ACTIVE: number; RESTED: number };
+  playedSoFar: string[];
+  // Optional override for the first frame (the PLAYER_CHOICE response).
+  // If omitted, the distribution counters pick the state.
+  forcedFirstState?: "ACTIVE" | "RESTED";
+};
+
 export function executePlayCard(
   state: GameState,
   action: Action,
@@ -157,24 +166,47 @@ export function executePlayCard(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets?: string[],
+  resumeFrame?: PlayCardResumeFrame,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
-  }
-  const targetIds = autoSelectTargets(action.target, allValidIds);
-  if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  const entryState = (params.entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
-  const isSingletonBatch = targetIds.length === 1;
+  let targetIds: string[];
+  if (resumeFrame) {
+    targetIds = resumeFrame.remainingTargetIds;
+  } else {
+    const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+    if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+      return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    }
+    targetIds = autoSelectTargets(action.target, allValidIds);
+  }
+  if (targetIds.length === 0) {
+    if (resumeFrame) {
+      return {
+        state,
+        events,
+        succeeded: resumeFrame.playedSoFar.length > 0,
+        result: { targetInstanceIds: resumeFrame.playedSoFar, count: resumeFrame.playedSoFar.length },
+      };
+    }
+    return { state, events, succeeded: false };
+  }
+
+  const entryStateMode = (params.entry_state as "ACTIVE" | "RESTED" | "PLAYER_CHOICE" | undefined) ?? "ACTIVE";
+  const isDistributed = entryStateMode === "PLAYER_CHOICE";
+  let remaining = resumeFrame?.remaining ?? (() => {
+    const sd = (params.state_distribution as { ACTIVE?: number; RESTED?: number } | undefined) ?? {};
+    return { ACTIVE: sd.ACTIVE ?? 0, RESTED: sd.RESTED ?? 0 };
+  })();
+
+  const isSingletonBatch = targetIds.length === 1 && (resumeFrame?.playedSoFar.length ?? 0) === 0;
 
   let nextState = state;
-  const playedIds: string[] = [];
+  const playedIds: string[] = [...(resumeFrame?.playedSoFar ?? [])];
 
-  // Macro expansion: iterate single-target frames in order.
-  for (const id of targetIds) {
+  for (let i = 0; i < targetIds.length; i++) {
+    const id = targetIds[i];
     const card = findCardInstance(nextState, id);
     if (!card) continue;
     const data = cardDb.get(card.cardId);
@@ -183,11 +215,58 @@ export function executePlayCard(
     const cardType = data.type.toUpperCase();
     let frame: FrameResult;
     if (cardType === "CHARACTER") {
-      // Commit 1: overflow prompt gated to single-target batches (matches
-      // pre-refactor behavior). Commit 3 will drop the gate + wire resume
-      // to continue remaining frames after the prompt resolves.
-      const allowOverflowPrompt = isSingletonBatch && playedIds.length === 0;
-      frame = playOneCharacter(nextState, action, card, sourceCardInstanceId, controller, entryState, resultRefs, allowOverflowPrompt);
+      let frameEntryState: "ACTIVE" | "RESTED";
+      if (isDistributed) {
+        const forced = i === 0 ? resumeFrame?.forcedFirstState : undefined;
+        if (forced) {
+          frameEntryState = forced;
+        } else {
+          const activeLeft = remaining.ACTIVE > 0;
+          const restedLeft = remaining.RESTED > 0;
+          if (activeLeft && restedLeft) {
+            // Pause for PLAYER_CHOICE on this frame.
+            const pendingPrompt: PendingPromptState = {
+              options: {
+                promptType: "PLAYER_CHOICE",
+                choices: [
+                  { id: `play-state:${id}:ACTIVE`, label: "Active" },
+                  { id: `play-state:${id}:RESTED`, label: "Rested" },
+                ],
+                effectDescription: `Play ${data.name} as Active or Rested?`,
+              },
+              respondingPlayer: controller,
+              resumeContext: {
+                effectSourceInstanceId: sourceCardInstanceId,
+                controller,
+                pausedAction: action,
+                remainingActions: [],
+                resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+                validTargets: [],
+                stateDistributionForPlay: {
+                  pendingTargetId: id,
+                  remainingTargetIds: targetIds.slice(i),
+                  remaining,
+                  playedSoFar: playedIds,
+                },
+              },
+            };
+            return { state: nextState, events, succeeded: false, pendingPrompt };
+          }
+          frameEntryState = activeLeft ? "ACTIVE" : restedLeft ? "RESTED" : "ACTIVE";
+        }
+      } else {
+        frameEntryState = (entryStateMode === "RESTED") ? "RESTED" : "ACTIVE";
+      }
+
+      const allowOverflowPrompt = isSingletonBatch && playedIds.length === (resumeFrame?.playedSoFar.length ?? 0);
+      frame = playOneCharacter(nextState, action, card, sourceCardInstanceId, controller, frameEntryState, resultRefs, allowOverflowPrompt);
+
+      if (frame.playedId && isDistributed) {
+        remaining = {
+          ACTIVE: remaining.ACTIVE - (frameEntryState === "ACTIVE" ? 1 : 0),
+          RESTED: remaining.RESTED - (frameEntryState === "RESTED" ? 1 : 0),
+        };
+      }
     } else if (cardType === "STAGE") {
       frame = playOneStage(nextState, card, controller);
     } else {
@@ -199,7 +278,7 @@ export function executePlayCard(
     if (frame.pendingPrompt) {
       return { state: nextState, events, succeeded: false, pendingPrompt: frame.pendingPrompt };
     }
-    if (frame.failed) break; // board full in a batch — OPT-114 commit 3 will handle overflow mid-batch
+    if (frame.failed) break;
     if (frame.playedId) playedIds.push(frame.playedId);
   }
 
