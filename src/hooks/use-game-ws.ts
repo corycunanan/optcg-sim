@@ -75,7 +75,8 @@ export function useGameWs(
       let msg: ServerMessage;
       try {
         msg = JSON.parse(event.data);
-      } catch {
+      } catch (err) {
+        console.warn("[useGameWs] failed to parse server message", err, event.data);
         return;
       }
 
@@ -127,7 +128,8 @@ export function useGameWs(
       }
     };
 
-    ws.onerror = () => {
+    ws.onerror = (err) => {
+      console.warn("[useGameWs] websocket error", err);
       if (!unmountedRef.current) setConnectionStatus("error");
     };
 

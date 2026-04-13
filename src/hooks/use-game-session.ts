@@ -98,9 +98,24 @@ export function useGameSession(
     activePrompt,
     gameOver,
     canUndo,
-    sendAction,
+    sendAction: rawSendAction,
     leaveGame,
   } = useGameWs(gameId, workerUrl, getToken);
+
+  // Suppress duplicate identical actions fired within a short window. Rapid
+  // clicks (or double-trigger from keyboard + click) can otherwise send the
+  // same action twice before the server responds, causing desync.
+  const lastSendRef = useRef<{ signature: string; at: number } | null>(null);
+  const sendAction = useCallback((action: GameAction) => {
+    const signature = JSON.stringify(action);
+    const now = Date.now();
+    const last = lastSendRef.current;
+    if (last && last.signature === signature && now - last.at < 250) {
+      return;
+    }
+    lastSendRef.current = { signature, at: now };
+    rawSendAction(action);
+  }, [rawSendAction]);
 
   /* ── Card DB ──────────────────────────────────────────────────────── */
 
