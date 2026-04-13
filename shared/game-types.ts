@@ -229,7 +229,12 @@ export type EffectStackPhase =
   | "AWAITING_ARRANGE_CARDS"
   | "AWAITING_PLAYER_CHOICE"
   | "INTERRUPTED_BY_TRIGGERS"
-  | "AWAITING_TRIGGER_ORDER_SELECTION";
+  | "AWAITING_TRIGGER_ORDER_SELECTION"
+  // OPT-172: multi-target action paused mid-batch so a triggered effect from
+  // frame N can fully resolve before frame N+1 begins (rule 6-2). Frame carries
+  // a BatchResumeMarker identifying which action to re-invoke and with what
+  // remaining-batch state once pendingTriggers drain.
+  | "AWAITING_BATCH_RESUME";
 
 export interface EffectStackFrame {
   id: string;

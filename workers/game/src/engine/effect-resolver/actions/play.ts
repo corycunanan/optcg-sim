@@ -4,12 +4,13 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, CardInstance, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
+import type { BatchResumeMarker, CardData, CardInstance, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
+import { scanEventsForTriggers } from "../../trigger-ordering.js";
 
 // ─── Single-target play frames (OPT-114 macro expansion) ────────────────────
 // A multi-target PLAY_CARD conceptually expands to N single-target frames that
@@ -293,6 +294,33 @@ export function executePlayCard(
     }
     if (frame.failed) break;
     if (frame.playedId) playedIds.push(frame.playedId);
+
+    // OPT-172: rule 6-2 — drain ON_PLAY triggers between frames. If this
+    // frame queued any triggers and more frames remain, pause the batch and
+    // surface a resume marker so the resolver can drain triggers first and
+    // then re-invoke us with the remaining-batch state.
+    if (frame.playedId && i + 1 < targetIds.length && frame.events.length > 0) {
+      const scan = scanEventsForTriggers(nextState, frame.events, controller, cardDb);
+      nextState = scan.state;
+      if (scan.triggers.length > 0) {
+        const marker: BatchResumeMarker = {
+          kind: "PLAY_CARD",
+          pausedAction: action,
+          resumeFrame: {
+            remainingTargetIds: targetIds.slice(i + 1),
+            remaining,
+            playedSoFar: playedIds,
+          },
+        };
+        return {
+          state: nextState,
+          events,
+          succeeded: playedIds.length > 0,
+          result: { targetInstanceIds: playedIds, count: playedIds.length },
+          pendingBatchTriggers: { triggers: scan.triggers, marker },
+        };
+      }
+    }
   }
 
   return {

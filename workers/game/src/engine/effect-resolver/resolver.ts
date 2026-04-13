@@ -22,6 +22,7 @@ import { findCardInstance } from "../state.js";
 import type { EffectResolverResult, ActionResult, ActionHandler } from "./types.js";
 import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
+import { pushBatchResumeFrame, processRemainingTriggers } from "./resume.js";
 
 // Action handlers
 import * as drawSearch from "./actions/draw-search.js";
@@ -367,6 +368,31 @@ export function executeActionChain(
         prompt.options = { ...prompt.options, effectDescription } as typeof prompt.options;
       }
       return { state: updatedState, events, pendingPrompt: prompt };
+    }
+
+    // OPT-172: rule 6-2 — handler paused mid-batch because a frame's events
+    // queued ON_PLAY (or sibling) triggers. Push an AWAITING_BATCH_RESUME
+    // frame carrying the marker + remaining chain actions, then drain the
+    // triggers; reenterBatchResume re-invokes the handler with the
+    // remaining-batch state once the drain completes.
+    if (result.pendingBatchTriggers) {
+      const { triggers, marker } = result.pendingBatchTriggers;
+      const stateWithFrame = pushBatchResumeFrame(
+        result.state,
+        sourceCardInstanceId,
+        controller,
+        {} as EffectBlock,
+        marker,
+        triggers,
+        actions.slice(i + 1),
+        resultRefs,
+      );
+      const drain = processRemainingTriggers(stateWithFrame, triggers, cardDb, events);
+      return {
+        state: drain.state,
+        events: drain.events,
+        pendingPrompt: drain.pendingPrompt,
+      };
     }
 
     // Store result reference
