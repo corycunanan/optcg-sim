@@ -347,6 +347,14 @@ export type GameAction =
   | { type: "REVEAL_TRIGGER"; reveal: boolean }  // true = reveal and activate, false = add to hand
   | { type: "ARRANGE_TOP_CARDS"; keptCardInstanceId: string; orderedInstanceIds: string[]; destination: "top" | "bottom" }
   | { type: "SELECT_TARGET"; selectedInstanceIds: string[] }
+  | {
+      type: "REDISTRIBUTE_DON";
+      transfers: Array<{
+        fromCardInstanceId: string;
+        donInstanceId: string;
+        toCardInstanceId: string;
+      }>;
+    }
   | { type: "PLAYER_CHOICE"; choiceId: string }
   | { type: "PASS" }
   | { type: "CONCEDE" }
@@ -383,6 +391,7 @@ export type PromptOptions =
   | SelectCardToTrashPrompt
   | ArrangeTopCardsPrompt
   | SelectTargetPrompt
+  | RedistributeDonPrompt
   | PlayerChoicePrompt
   | OptionalEffectPrompt;
 
@@ -452,6 +461,14 @@ export interface SelectTargetPrompt {
       countMax: number;
     }>;
   };
+}
+
+export interface RedistributeDonPrompt {
+  promptType: "REDISTRIBUTE_DON";
+  validSourceCardIds: string[];
+  validTargetCardIds: string[];
+  maxTransfers: number;
+  effectDescription: string;
 }
 
 export interface PlayerChoicePrompt {

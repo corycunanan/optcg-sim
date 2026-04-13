@@ -372,6 +372,7 @@ export class GameSession implements DurableObject {
     if (this.gameState.pendingPrompt) {
       const isPromptResponse =
         action.type === "SELECT_TARGET" ||
+        action.type === "REDISTRIBUTE_DON" ||
         action.type === "PLAYER_CHOICE" ||
         action.type === "ARRANGE_TOP_CARDS" ||
         action.type === "PASS";

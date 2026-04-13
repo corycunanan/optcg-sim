@@ -55,6 +55,7 @@ export function validate(
       return validateManualEffect(state);
     // Prompt responses — intercepted by GameSession before the pipeline runs
     case "SELECT_TARGET":
+    case "REDISTRIBUTE_DON":
     case "PLAYER_CHOICE":
     case "ARRANGE_TOP_CARDS":
       return null;

@@ -5,9 +5,9 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, GameState, PendingEvent } from "../../../types.js";
+import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { attachDonToCard } from "../card-mutations.js";
+import { attachDonToCard, detachOneDon, reattachDon } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 
 export function executeGiveDon(
@@ -307,6 +307,43 @@ export function executeDistributeDon(
 
 // ─── REDISTRIBUTE_DON ────────────────────────────────────────────────────────
 
+export interface RedistributeTransfer {
+  fromCardInstanceId: string;
+  donInstanceId: string;
+  toCardInstanceId: string;
+}
+
+/**
+ * Apply a list of already-validated DON transfers (detach from source,
+ * reattach to target) for a redistribute effect. Invalid transfers are
+ * skipped; the returned count reflects actual transfers applied.
+ */
+export function applyRedistributeDonTransfers(
+  state: GameState,
+  transfers: RedistributeTransfer[],
+  controller: 0 | 1,
+): ActionResult {
+  const events: PendingEvent[] = [];
+  let nextState = state;
+  let moved = 0;
+
+  for (const t of transfers) {
+    const detached = detachOneDon(nextState, controller, t.donInstanceId, t.fromCardInstanceId);
+    if (!detached) continue;
+    const reattached = reattachDon(detached.state, controller, detached.detachedDon, t.toCardInstanceId);
+    if (!reattached) continue;
+    nextState = reattached;
+    moved++;
+  }
+
+  if (moved > 0) {
+    events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: moved } });
+  }
+
+  const targetInstanceIds = Array.from(new Set(transfers.map((t) => t.toCardInstanceId)));
+  return { state: nextState, events, succeeded: moved > 0, result: { targetInstanceIds, count: moved } };
+}
+
 export function executeRedistributeDon(
   state: GameState,
   action: Action,
@@ -320,29 +357,63 @@ export function executeRedistributeDon(
   const params = action.params ?? {};
   const amount = (params.amount as number) ?? 1;
 
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
-  }
-  const targetIds = autoSelectTargets(action.target, allValidIds);
-  if (targetIds.length === 0) return { state, events, succeeded: false };
-
-  let nextState = state;
-  let given = 0;
-  for (const targetId of targetIds) {
-    for (let i = 0; i < amount; i++) {
-      const result = attachDonToCard(nextState, controller, targetId);
-      if (!result) break;
-      nextState = result;
-      given++;
-    }
+  // If resume is handing us preselectedTargets, this handler should not run —
+  // resume.ts applies the transfers directly via applyRedistributeDonTransfers.
+  // Defensive: treat as no-op.
+  if (preselectedTargets && preselectedTargets.length > 0) {
+    return { state, events, succeeded: false };
   }
 
-  if (given > 0) {
-    events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: given } });
+  // Compute valid recipient cards per the action's target filter.
+  const validTargetIds = computeAllValidTargets(
+    state,
+    action.target,
+    controller,
+    cardDb,
+    sourceCardInstanceId,
+    resultRefs,
+  );
+
+  // Valid sources: controller's leader + characters that currently have DON attached.
+  const p = state.players[controller];
+  const validSourceIds: string[] = [];
+  if (p.leader.attachedDon.length > 0) validSourceIds.push(p.leader.instanceId);
+  for (const c of p.characters) {
+    if (c && c.attachedDon.length > 0) validSourceIds.push(c.instanceId);
   }
 
-  return { state: nextState, events, succeeded: given > 0, result: { targetInstanceIds: targetIds, count: given } };
+  // Nothing to move — fail softly.
+  if (validSourceIds.length === 0 || validTargetIds.length === 0) {
+    return { state, events, succeeded: false };
+  }
+
+  const sourceCard = state.players[controller].characters.find((c) => c?.instanceId === sourceCardInstanceId)
+    ?? (state.players[controller].leader.instanceId === sourceCardInstanceId ? state.players[controller].leader : null);
+  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const effectDescription = sourceCardData?.effectText ?? "";
+
+  const resumeCtx: ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [],
+    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    validTargets: validTargetIds,
+  };
+
+  const pendingPrompt: PendingPromptState = {
+    options: {
+      promptType: "REDISTRIBUTE_DON",
+      validSourceCardIds: validSourceIds,
+      validTargetCardIds: validTargetIds,
+      maxTransfers: amount,
+      effectDescription,
+    },
+    respondingPlayer: controller,
+    resumeContext: resumeCtx,
+  };
+
+  return { state, events, succeeded: false, pendingPrompt };
 }
 
 // ─── GIVE_OPPONENT_DON_TO_OPPONENT ───────────────────────────────────────────

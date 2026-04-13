@@ -42,6 +42,9 @@ interface PlayerFieldProps {
   setSelectedBlockerId: (id: string | null) => void;
   onAction: (action: GameAction) => void;
   onPreviewZone: (preview: { type: "deck" | "trash"; owner: "me" }) => void;
+  redistributeSourceIds?: Set<string>;
+  pendingTransferDonIdsByCard?: Map<string, Set<string>>;
+  donCountAdjustments?: Map<string, number>;
 }
 
 export function PlayerField({
@@ -57,6 +60,9 @@ export function PlayerField({
   setSelectedBlockerId,
   onAction,
   onPreviewZone,
+  redistributeSourceIds,
+  pendingTransferDonIdsByCard,
+  donCountAdjustments,
 }: PlayerFieldProps) {
   return (
     <>
@@ -102,6 +108,9 @@ export function PlayerField({
             slotIndex={i}
             boardFull={(me?.characters.filter(Boolean).length ?? 0) >= 5}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
+            redistributeSource={redistributeSourceIds?.has(char.instanceId)}
+            pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
+            donCountAdjust={donCountAdjustments?.get(char.instanceId)}
             style={{ position: "absolute", left: pos.left, top: playerCharTop }}
           />
         );
@@ -127,6 +136,9 @@ export function PlayerField({
           zoneKey="p-leader"
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
+          redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
+          pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
+          donCountAdjust={donCountAdjustments?.get(me.leader.instanceId)}
         />
       ) : (
         <BoardCard

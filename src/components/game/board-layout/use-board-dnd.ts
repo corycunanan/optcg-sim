@@ -14,6 +14,7 @@ export function useBoardDnd(
   cardDb: CardDb,
   battle: TurnState["battle"] | null,
   onAction: (action: GameAction) => void,
+  onRedistributeDrop?: (fromCardId: string, donId: string, toCardId: string) => void,
 ) {
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
 
@@ -53,6 +54,15 @@ export function useBoardDnd(
         targetInstanceId: dropData.targetInstanceId as string,
         count: 1,
       });
+    } else if (
+      dragData.type === "redistribute-don" &&
+      dropData.type === "don-target"
+    ) {
+      onRedistributeDrop?.(
+        dragData.fromCardInstanceId,
+        dragData.don.instanceId,
+        dropData.targetInstanceId as string,
+      );
     } else if (
       dragData.type === "attacker" &&
       dropData.type === "attack-target"

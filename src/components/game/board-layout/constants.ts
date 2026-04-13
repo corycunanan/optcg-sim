@@ -56,4 +56,10 @@ export interface AttackerDrag {
   card: CardInstance;
 }
 
-export type DragPayload = HandCardDrag | ActiveDonDrag | AttackerDrag;
+export interface RedistributeDonDrag {
+  type: "redistribute-don";
+  don: DonInstance;
+  fromCardInstanceId: string;
+}
+
+export type DragPayload = HandCardDrag | ActiveDonDrag | AttackerDrag | RedistributeDonDrag;

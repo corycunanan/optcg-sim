@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   ActiveEffect,
   CardDb,
@@ -41,6 +41,7 @@ import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-
 import { ActiveEffectsProvider } from "@/contexts/active-effects-context";
 import { useCardTransitions } from "@/hooks/use-card-transitions";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
+import type { RedistributeTransfer } from "../redistribute-don-overlay";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -99,6 +100,61 @@ function BoardLayoutInner({
     setIsPromptHidden(false);
   }, [activePrompt?.promptType]);
 
+  /* ── Redistribute DON prompt state ───────────────────────────── */
+
+  const redistributePrompt = activePrompt?.promptType === "REDISTRIBUTE_DON" ? activePrompt : null;
+  const [redistributeTransfers, setRedistributeTransfers] = useState<RedistributeTransfer[]>([]);
+
+  // Reset pending transfers when prompt identity changes (new prompt, or cleared).
+  useEffect(() => {
+    setRedistributeTransfers([]);
+  }, [redistributePrompt?.validSourceCardIds, redistributePrompt?.validTargetCardIds, redistributePrompt?.maxTransfers]);
+
+  const handleRedistributeDrop = useCallback(
+    (fromCardId: string, donId: string, toCardId: string) => {
+      if (!redistributePrompt) return;
+      if (fromCardId === toCardId) return;
+      if (!redistributePrompt.validSourceCardIds.includes(fromCardId)) return;
+      if (!redistributePrompt.validTargetCardIds.includes(toCardId)) return;
+      setRedistributeTransfers((prev) => {
+        if (prev.length >= redistributePrompt.maxTransfers) return prev;
+        // Each DON can only be moved once in one submission
+        if (prev.some((t) => t.donInstanceId === donId)) return prev;
+        return [...prev, { fromCardInstanceId: fromCardId, donInstanceId: donId, toCardInstanceId: toCardId }];
+      });
+    },
+    [redistributePrompt],
+  );
+
+  const redistributeSourceIds = useMemo(() => {
+    if (!redistributePrompt) return undefined;
+    return new Set(redistributePrompt.validSourceCardIds);
+  }, [redistributePrompt]);
+
+  const pendingTransferDonIdsByCard = useMemo(() => {
+    if (!redistributePrompt || redistributeTransfers.length === 0) return undefined;
+    const map = new Map<string, Set<string>>();
+    for (const t of redistributeTransfers) {
+      let set = map.get(t.fromCardInstanceId);
+      if (!set) {
+        set = new Set<string>();
+        map.set(t.fromCardInstanceId, set);
+      }
+      set.add(t.donInstanceId);
+    }
+    return map;
+  }, [redistributePrompt, redistributeTransfers]);
+
+  const donCountAdjustments = useMemo(() => {
+    if (!redistributePrompt || redistributeTransfers.length === 0) return undefined;
+    const map = new Map<string, number>();
+    for (const t of redistributeTransfers) {
+      map.set(t.fromCardInstanceId, (map.get(t.fromCardInstanceId) ?? 0) - 1);
+      map.set(t.toCardInstanceId, (map.get(t.toCardInstanceId) ?? 0) + 1);
+    }
+    return map;
+  }, [redistributePrompt, redistributeTransfers]);
+
   useLayoutEffect(() => {
     function update() {
       setViewport(getViewportSize());
@@ -124,7 +180,7 @@ function BoardLayoutInner({
     sensors,
     handleDragStart,
     handleDragEnd,
-  } = useBoardDnd(cardDb, bs.battle, onAction);
+  } = useBoardDnd(cardDb, bs.battle, onAction, handleRedistributeDrop);
 
   const dragTilt = useDragTilt();
 
@@ -311,6 +367,9 @@ function BoardLayoutInner({
             setSelectedBlockerId={bs.setSelectedBlockerId}
             onAction={onAction}
             onPreviewZone={setZonePreview}
+            redistributeSourceIds={redistributeSourceIds}
+            pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
+            donCountAdjustments={donCountAdjustments}
           />
         </div>
       </div>
@@ -351,6 +410,8 @@ function BoardLayoutInner({
         onCloseZonePreview={() => setZonePreview(null)}
         me={me}
         opp={opp}
+        redistributeTransfers={redistributeTransfers}
+        onRedistributeUndo={() => setRedistributeTransfers((prev) => prev.slice(0, -1))}
       />
     </div>
 
@@ -366,6 +427,16 @@ function BoardLayoutInner({
             />
           )}
           {activeDrag.type === "active-don" && (
+            <div
+              style={{
+                transform: `scale(${boardScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <DonCard donArtUrl={me?.donArtUrl} />
+            </div>
+          )}
+          {activeDrag.type === "redistribute-don" && (
             <div
               style={{
                 transform: `scale(${boardScale})`,
