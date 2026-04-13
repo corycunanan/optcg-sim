@@ -131,6 +131,20 @@ function BoardLayoutInner({
     return new Set(redistributePrompt.validSourceCardIds);
   }, [redistributePrompt]);
 
+  const pendingTransferDonIdsByCard = useMemo(() => {
+    if (!redistributePrompt || redistributeTransfers.length === 0) return undefined;
+    const map = new Map<string, Set<string>>();
+    for (const t of redistributeTransfers) {
+      let set = map.get(t.fromCardInstanceId);
+      if (!set) {
+        set = new Set<string>();
+        map.set(t.fromCardInstanceId, set);
+      }
+      set.add(t.donInstanceId);
+    }
+    return map;
+  }, [redistributePrompt, redistributeTransfers]);
+
   const donCountAdjustments = useMemo(() => {
     if (!redistributePrompt || redistributeTransfers.length === 0) return undefined;
     const map = new Map<string, number>();
@@ -354,6 +368,7 @@ function BoardLayoutInner({
             onAction={onAction}
             onPreviewZone={setZonePreview}
             redistributeSourceIds={redistributeSourceIds}
+            pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
             donCountAdjustments={donCountAdjustments}
           />
         </div>

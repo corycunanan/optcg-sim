@@ -28,6 +28,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   style,
   animationDelay,
   redistributeSource,
+  pendingTransferDonIds,
   donCountAdjust,
 }: {
   card: CardInstance;
@@ -44,6 +45,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   style: React.CSSProperties;
   animationDelay?: number;
   redistributeSource?: boolean;
+  pendingTransferDonIds?: Set<string>;
   donCountAdjust?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,7 +65,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
 
   const acceptsDon = activeDragType === "active-don" || activeDragType === "redistribute-don";
 
-  const firstDon = card.attachedDon[0];
+  const firstDon = pendingTransferDonIds
+    ? card.attachedDon.find((d) => !pendingTransferDonIds.has(d.instanceId))
+    : card.attachedDon[0];
   const canRedistribute = !!redistributeSource && !!firstDon;
   const {
     attributes: donAttributes,
