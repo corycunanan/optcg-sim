@@ -448,13 +448,46 @@ export function executeSetRest(
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   let nextState = state;
+  const restedIds: string[] = [];
 
-  for (const id of targetIds) {
+  for (let i = 0; i < targetIds.length; i++) {
+    const id = targetIds[i];
+    const frameEvents: PendingEvent[] = [];
+
     nextState = setCardState(nextState, id, "RESTED");
-    events.push({ type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED" } });
+    const evt: PendingEvent = { type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED" } };
+    events.push(evt);
+    frameEvents.push(evt);
+    restedIds.push(id);
+
+    // OPT-172: rule 6-2 — drain ON_REST triggers between SET_REST frames.
+    if (i + 1 < targetIds.length && frameEvents.length > 0) {
+      const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
+      nextState = scan.state;
+      if (scan.triggers.length > 0) {
+        const marker: BatchResumeMarker = {
+          kind: "SET_REST",
+          pausedAction: action,
+          remainingTargetIds: targetIds.slice(i + 1),
+          restedSoFar: restedIds,
+        };
+        return {
+          state: nextState,
+          events,
+          succeeded: restedIds.length > 0,
+          result: { targetInstanceIds: restedIds, count: restedIds.length },
+          pendingBatchTriggers: { triggers: scan.triggers, marker },
+        };
+      }
+    }
   }
 
-  return { state: nextState, events, succeeded: targetIds.length > 0 };
+  return {
+    state: nextState,
+    events,
+    succeeded: restedIds.length > 0,
+    result: { targetInstanceIds: restedIds, count: restedIds.length },
+  };
 }
 
 // ─── ACTIVATE_EVENT_FROM_HAND ────────────────────────────────────────────────
