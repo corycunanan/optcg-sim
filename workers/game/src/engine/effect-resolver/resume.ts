@@ -26,6 +26,7 @@ import { costResultToEntries, costResultRefsFromEntries } from "./types.js";
 import { markOncePerTurnUsed, shuffleArray } from "./action-utils.js";
 import { payCostsWithSelection, applyCostSelection } from "./cost-handler.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "./resolver.js";
+import { trashCharacter } from "./card-mutations.js";
 import { validateTargetConstraints } from "./target-resolver.js";
 import { applyRedistributeDonTransfers } from "./actions/don.js";
 import { nanoid } from "../../util/nanoid.js";
@@ -335,6 +336,69 @@ export function resumeEffectChain(
         resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
       }
     }
+  }
+
+  // Resume from rule 3-7-6-1 overflow trash prompt. The controller picked one
+  // of their own Characters to trash so the original effect-driven play can
+  // resolve. Trash-one runs as a rule process (emits CARD_TRASHED, NOT CARD_KO)
+  // so no On K.O. triggers fire per 3-7-6-1-1. Then re-enter the PLAY_CARD
+  // with the original play target preselected.
+  if (action.type === "SELECT_TARGET" && pausedAction !== null && resumeCtx.ruleTrashForPlay) {
+    const selected = action.selectedInstanceIds ?? [];
+    if (selected.length !== 1 || !validTargets.includes(selected[0])) {
+      return { state, events, resolved: false };
+    }
+    const victimId = selected[0];
+    const trashResult = trashCharacter(nextState, victimId, controller);
+    if (!trashResult) {
+      return { state, events, resolved: false };
+    }
+    nextState = trashResult.state;
+    events.push(...trashResult.events);
+
+    const actionResult = executeEffectAction(
+      nextState,
+      pausedAction,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      [resumeCtx.ruleTrashForPlay.playTargetId],
+    );
+    nextState = actionResult.state;
+    events.push(...actionResult.events);
+
+    if (actionResult.pendingPrompt) {
+      return { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt };
+    }
+    if (actionResult.result && (pausedAction as any).result_ref) {
+      resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+    }
+
+    // Scan for triggers produced by the re-entered play (e.g., ON_PLAY)
+    if (actionResult.events.length > 0) {
+      const scan = scanEventsForTriggers(nextState, actionResult.events, controller, cardDb);
+      nextState = scan.state;
+      // triggers drain via the outer pipeline — fall through to remainingActions
+    }
+
+    // Skip the generic SELECT_TARGET branch below
+    if (remainingActions.length > 0) {
+      const chainResult = executeActionChain(
+        nextState,
+        remainingActions,
+        effectSourceInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+      );
+      nextState = chainResult.state;
+      events.push(...chainResult.events);
+      if (chainResult.pendingPrompt) {
+        return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+      }
+    }
+    return { state: nextState, events, resolved: true };
   }
 
   // Resume from SELECT_TARGET response
@@ -664,6 +728,7 @@ export function resumeFromStack(
         remainingActions: topFrame.remainingActions as Action[],
         resultRefs: topFrame.resultRefs,
         validTargets: topFrame.validTargets,
+        ruleTrashForPlay: topFrame.ruleTrashForPlay,
       };
 
       const result = resumeEffectChain(nextState, legacyCtx, action, cardDb);

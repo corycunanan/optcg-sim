@@ -4,7 +4,7 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
+import type { CardData, CardInstance, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
@@ -48,7 +48,48 @@ export function executePlayCard(
     };
 
     if (data.type.toUpperCase() === "CHARACTER") {
-      const p = removeFromSourceZone(nextState.players[controller]);
+      const p0 = nextState.players[controller];
+      const slotIdx = p0.characters.indexOf(null);
+      // Rule 3-7-6-1: board full — prompt controller to pick one of their own
+      // Characters to rule-trash, then resume the play. Single-play scope only;
+      // multi-target batches preserve the existing break (fixed in OPT-114).
+      if (slotIdx === -1 && targetIds.length === 1 && playedIds.length === 0) {
+        const ownCharIds = p0.characters.filter((c): c is CardInstance => c !== null).map((c) => c.instanceId);
+        if (ownCharIds.length === 0) {
+          // Edge: no trashable own characters — fizzle
+          return { state: nextState, events, succeeded: false };
+        }
+        const cards: CardInstance[] = [];
+        for (const cid of ownCharIds) {
+          const ci = findCardInstance(nextState, cid);
+          if (ci) cards.push(ci);
+        }
+        const resumeCtx: ResumeContext = {
+          effectSourceInstanceId: sourceCardInstanceId,
+          controller,
+          pausedAction: action,
+          remainingActions: [],
+          resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+          validTargets: ownCharIds,
+          ruleTrashForPlay: { playTargetId: id },
+        };
+        const pendingPrompt: PendingPromptState = {
+          options: {
+            promptType: "SELECT_TARGET",
+            cards,
+            validTargets: ownCharIds,
+            effectDescription: "Character area is full. Choose one of your Characters to trash (rule 3-7-6-1).",
+            countMin: 1,
+            countMax: 1,
+            ctaLabel: "Confirm",
+          },
+          respondingPlayer: controller,
+          resumeContext: resumeCtx,
+        };
+        return { state: nextState, events, succeeded: false, pendingPrompt };
+      }
+      if (slotIdx === -1) break; // board full (batched case — OPT-114)
+      const p = removeFromSourceZone(p0);
       const newChar: CardInstance = {
         ...card,
         instanceId: nanoid(),
@@ -60,8 +101,6 @@ export function executePlayCard(
         owner: controller,
       };
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      const slotIdx = p.characters.indexOf(null);
-      if (slotIdx === -1) break; // board full
       const newChars = [...p.characters] as (typeof p.characters);
       newChars[slotIdx] = newChar;
       newPlayers[controller] = { ...p, characters: newChars };
