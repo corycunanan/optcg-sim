@@ -138,7 +138,10 @@ export function useCardTransitions(
   zoneRegistry?: ZonePositionRegistry | null,
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
-  const prevLengthRef = useRef(0);
+  // Track the highest timestamp we've processed. Using timestamps (instead of
+  // array length) keeps dedup stable when the server sends a reconstructed
+  // eventLog with the same length but different content.
+  const lastTimestampRef = useRef<number | null>(null);
   const dragCooldownRef = useRef(false);
 
   // After a drag ends, suppress animations briefly so the server-confirmed
@@ -156,15 +159,29 @@ export function useCardTransitions(
 
   // Detect new events and create transitions
   useEffect(() => {
-    const prevLen = prevLengthRef.current;
-    const newLen = eventLog.length;
-    prevLengthRef.current = newLen;
+    // First run: seed the cursor so historic events don't replay.
+    if (lastTimestampRef.current === null) {
+      const last = eventLog[eventLog.length - 1];
+      lastTimestampRef.current = last ? last.timestamp : 0;
+      return;
+    }
 
-    if (newLen <= prevLen || isDragging || dragCooldownRef.current || prevLen === 0) return;
+    const lastTs = lastTimestampRef.current;
+    let maxTs = lastTs;
+    const newEvents: GameEvent[] = [];
+    for (const ev of eventLog) {
+      if (ev.timestamp > lastTs) {
+        newEvents.push(ev);
+        if (ev.timestamp > maxTs) maxTs = ev.timestamp;
+      }
+    }
 
-    const newEvents = eventLog.slice(prevLen);
+    if (newEvents.length === 0) return;
+    lastTimestampRef.current = maxTs;
+
+    if (isDragging || dragCooldownRef.current) return;
+
     const newTransitions: CardTransition[] = [];
-
     for (const event of newEvents) {
       const t = eventToTransition(event, myIndex, zoneRegistry ?? null);
       if (t) newTransitions.push(t);
@@ -176,7 +193,7 @@ export function useCardTransitions(
       const combined = [...prev, ...newTransitions];
       return combined.slice(-MAX_CONCURRENT);
     });
-  }, [eventLog.length, eventLog, myIndex, isDragging, zoneRegistry]);
+  }, [eventLog, myIndex, isDragging, zoneRegistry]);
 
   // Auto-expire old transitions
   useEffect(() => {
