@@ -31,7 +31,7 @@ import { trashCharacter } from "./card-mutations.js";
 import { validateTargetConstraints } from "./target-resolver.js";
 import { applyRedistributeDonTransfers } from "./actions/don.js";
 import { executePlayCard, executeSetRest } from "./actions/play.js";
-import { executeTrashCard } from "./actions/removal.js";
+import { executeKO } from "./actions/removal.js";
 import { nanoid } from "../../util/nanoid.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../trigger-ordering.js";
 
@@ -1274,8 +1274,8 @@ function dispatchBatchResume(
         undefined,
         marker.resumeFrame,
       );
-    case "TRASH_CARD":
-      return executeTrashCard(
+    case "KO":
+      return executeKO(
         state,
         marker.pausedAction,
         sourceCardInstanceId,

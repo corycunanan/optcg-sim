@@ -80,8 +80,12 @@ export interface ResumeContext {
  *
  * Kinds are added incrementally per commits 2–4 of OPT-172:
  *   - PLAY_CARD  (commit 2)  ON_PLAY triggers between plays
- *   - TRASH_CARD (commit 3)  ON_KO / ON_TRASH triggers between trashes
+ *   - KO         (commit 3)  ON_KO triggers between KOs
  *   - SET_REST   (commit 4)  ON_REST triggers between rests
+ *
+ * Note: TRASH_CARD intentionally has no marker — per rule 10-2-1-3, TRASH
+ * emits CARD_TRASHED (not CARD_KO) and no trigger keyword listens for it,
+ * so a multi-target TRASH batch can never queue an interleaved auto trigger.
  */
 export type BatchResumeMarker =
   | {
@@ -95,10 +99,10 @@ export type BatchResumeMarker =
       };
     }
   | {
-      kind: "TRASH_CARD";
+      kind: "KO";
       pausedAction: import("./engine/effect-types.js").Action;
       remainingTargetIds: string[];
-      trashedSoFar: string[];
+      koedSoFar: string[];
     }
   | {
       kind: "SET_REST";

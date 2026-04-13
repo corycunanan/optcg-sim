@@ -3,13 +3,14 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, GameState, PendingEvent } from "../../../types.js";
+import type { BatchResumeMarker, CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { resolveAmount } from "../action-utils.js";
 import { koCharacter, trashCharacter, returnToHand, returnToDeck } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt, matchesFilterForTarget } from "../target-resolver.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
 import { findCardInstance } from "../../state.js";
+import { scanEventsForTriggers } from "../../trigger-ordering.js";
 
 export function executeKO(
   state: GameState,
@@ -30,7 +31,10 @@ export function executeKO(
 
   let nextState = state;
   const koedIds: string[] = [];
-  for (const id of targetIds) {
+  for (let i = 0; i < targetIds.length; i++) {
+    const id = targetIds[i];
+    const frameEvents: PendingEvent[] = [];
+
     // Check for replacement effects before completing the KO
     const replacement = checkReplacementForKO(nextState, id, "effect", controller, cardDb);
     if (replacement.pendingPrompt) {
@@ -40,14 +44,38 @@ export function executeKO(
     if (replacement.replaced) {
       nextState = replacement.state;
       events.push(...replacement.events);
-      continue; // KO was replaced — skip this target
+      frameEvents.push(...replacement.events);
+    } else {
+      const result = koCharacter(nextState, id, controller);
+      if (result) {
+        nextState = result.state;
+        events.push(...result.events);
+        frameEvents.push(...result.events);
+        koedIds.push(id);
+      }
     }
 
-    const result = koCharacter(nextState, id, controller);
-    if (result) {
-      nextState = result.state;
-      events.push(...result.events);
-      koedIds.push(id);
+    // OPT-172: rule 6-2 — drain ON_KO triggers between frames. If this frame
+    // emitted events and more targets remain, scan and pause the batch so the
+    // resolver can drain triggers before the next KO fires.
+    if (frameEvents.length > 0 && i + 1 < targetIds.length) {
+      const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
+      nextState = scan.state;
+      if (scan.triggers.length > 0) {
+        const marker: BatchResumeMarker = {
+          kind: "KO",
+          pausedAction: action,
+          remainingTargetIds: targetIds.slice(i + 1),
+          koedSoFar: koedIds,
+        };
+        return {
+          state: nextState,
+          events,
+          succeeded: koedIds.length > 0,
+          result: { targetInstanceIds: koedIds, count: koedIds.length },
+          pendingBatchTriggers: { triggers: scan.triggers, marker },
+        };
+      }
     }
   }
 
