@@ -408,15 +408,36 @@ export function resumeEffectChain(
     nextState = trashResult.state;
     events.push(...trashResult.events);
 
-    const actionResult = executeEffectAction(
-      nextState,
-      pausedAction,
-      effectSourceInstanceId,
-      controller,
-      cardDb,
-      resultRefs,
-      [resumeCtx.ruleTrashForPlay.playTargetId],
-    );
+    // OPT-114 commit 3: if the overflow happened mid-batch, re-enter
+    // executePlayCard with the batch resumeFrame so remaining frames continue
+    // after the current card is placed. Otherwise fall back to the legacy
+    // single-target re-entry (OPT-171).
+    const batch = resumeCtx.ruleTrashForPlay.batch;
+    const actionResult = batch
+      ? executePlayCard(
+          nextState,
+          pausedAction,
+          effectSourceInstanceId,
+          controller,
+          cardDb,
+          resultRefs,
+          undefined,
+          {
+            remainingTargetIds: batch.remainingTargetIds,
+            remaining: batch.remaining,
+            playedSoFar: batch.playedSoFar,
+            forcedFirstState: batch.forcedFirstState,
+          },
+        )
+      : executeEffectAction(
+          nextState,
+          pausedAction,
+          effectSourceInstanceId,
+          controller,
+          cardDb,
+          resultRefs,
+          [resumeCtx.ruleTrashForPlay.playTargetId],
+        );
     nextState = actionResult.state;
     events.push(...actionResult.events);
 

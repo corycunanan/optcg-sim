@@ -47,16 +47,18 @@ function playOneCharacter(
   controller: 0 | 1,
   entryState: "ACTIVE" | "RESTED",
   resultRefs: Map<string, EffectResult>,
-  allowOverflowPrompt: boolean,
+  batchContinuation?: {
+    remainingTargetIds: string[];
+    remaining: { ACTIVE: number; RESTED: number };
+    playedSoFar: string[];
+    forcedFirstState?: "ACTIVE" | "RESTED";
+  },
 ): FrameResult {
   const events: PendingEvent[] = [];
   const p0 = state.players[controller];
   const slotIdx = p0.characters.indexOf(null);
 
   if (slotIdx === -1) {
-    if (!allowOverflowPrompt) {
-      return { state, events, failed: true };
-    }
     // Rule 3-7-6-1: board full — prompt controller to pick one of their own
     // Characters to rule-trash, then resume the play.
     const ownCharIds = p0.characters.filter((c): c is CardInstance => c !== null).map((c) => c.instanceId);
@@ -75,7 +77,10 @@ function playOneCharacter(
       remainingActions: [],
       resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
       validTargets: ownCharIds,
-      ruleTrashForPlay: { playTargetId: card.instanceId },
+      ruleTrashForPlay: {
+        playTargetId: card.instanceId,
+        ...(batchContinuation ? { batch: batchContinuation } : {}),
+      },
     };
     const pendingPrompt: PendingPromptState = {
       options: {
@@ -200,8 +205,6 @@ export function executePlayCard(
     return { ACTIVE: sd.ACTIVE ?? 0, RESTED: sd.RESTED ?? 0 };
   })();
 
-  const isSingletonBatch = targetIds.length === 1 && (resumeFrame?.playedSoFar.length ?? 0) === 0;
-
   let nextState = state;
   const playedIds: string[] = [...(resumeFrame?.playedSoFar ?? [])];
 
@@ -258,8 +261,18 @@ export function executePlayCard(
         frameEntryState = (entryStateMode === "RESTED") ? "RESTED" : "ACTIVE";
       }
 
-      const allowOverflowPrompt = isSingletonBatch && playedIds.length === (resumeFrame?.playedSoFar.length ?? 0);
-      frame = playOneCharacter(nextState, action, card, sourceCardInstanceId, controller, frameEntryState, resultRefs, allowOverflowPrompt);
+      // Build batch continuation so that if this frame hits full-board (rule
+      // 3-7-6-1), resume can continue remaining frames after the victim is
+      // rule-trashed and the current card is placed.
+      const batchContinuation = {
+        remainingTargetIds: targetIds.slice(i),
+        remaining,
+        playedSoFar: playedIds,
+        // Pin the entry_state we'd already resolved for this frame so the
+        // state-choice prompt doesn't re-fire for the same card after overflow.
+        ...(isDistributed ? { forcedFirstState: frameEntryState } : {}),
+      };
+      frame = playOneCharacter(nextState, action, card, sourceCardInstanceId, controller, frameEntryState, resultRefs, batchContinuation);
 
       if (frame.playedId && isDistributed) {
         remaining = {

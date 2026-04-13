@@ -204,7 +204,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
     expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(0);
   });
 
-  it("mid-batch board-full stops remaining frames (commit 3 will continue via rule 3-7-6-1)", () => {
+  it("mid-batch board-full emits rule 3-7-6-1 overflow prompt (commit 3)", () => {
     const cardDb = createTestCardDb();
     const trashCards = [
       trashChar(CARDS.VANILLA.id, "m1"),
@@ -247,13 +247,16 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
       trashCards.map((c) => c.instanceId),
     );
 
-    expect(result.succeeded).toBe(true);
-    // 4 existing + 1 newly played = 5 full; 2nd and 3rd frames hit full board
-    // and stop cleanly (commit 1 behavior; commit 3 will prompt rule 3-7-6-1).
+    // 4 existing + 1 newly played = 5 full; frame 2 now pauses with the rule
+    // 3-7-6-1 overflow prompt carrying batch continuation for the remaining frames.
+    expect(result.succeeded).toBe(false);
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
     expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(5);
-    expect(result.result?.count).toBe(1);
-    // Remaining two cards still in trash (source zone only consumed by played frames)
+    // Frame 1's source-zone card was consumed; frames 2 and 3 still in trash.
     expect(result.state.players[0].trash).toHaveLength(2);
-    expect(result.pendingPrompt).toBeUndefined();
+    const ctx = result.pendingPrompt!.resumeContext!;
+    expect(ctx.ruleTrashForPlay?.playTargetId).toBe("trash-m2");
+    expect(ctx.ruleTrashForPlay?.batch?.remainingTargetIds).toEqual(["trash-m2", "trash-m3"]);
   });
 });
