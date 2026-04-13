@@ -40,6 +40,12 @@ export interface ResumeContext {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, unknown][];
   validTargets: string[];
+  // Rule 3-7-6-1: when an effect-driven play hits a full board, the prompt asks
+  // the controller to pick one of their own Characters to trash before the play
+  // resolves. On resume, the chosen victim is rule-trashed (no On K.O. triggers
+  // per 3-7-6-1-1) and the original play is re-entered with playTargetId as
+  // preselected. Only set when the pending prompt is this overflow choice.
+  ruleTrashForPlay?: { playTargetId: string };
 }
 
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
