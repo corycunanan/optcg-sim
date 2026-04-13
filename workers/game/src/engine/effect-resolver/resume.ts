@@ -1172,10 +1172,9 @@ export function reenterBatchResume(
     if (!top || top.phase !== "AWAITING_BATCH_RESUME" || !top.batchResumeMarker) {
       return { state: nextState, events, resolved: true };
     }
-    // Don't re-enter until this frame's queued triggers are all drained.
-    if ((top.pendingTriggers?.length ?? 0) > 0) {
-      return { state: nextState, events, resolved: true };
-    }
+    // Triggers were drained by processRemainingTriggers (the only caller). The
+    // frame's pendingTriggers snapshot is stale at this point; we pop and
+    // re-invoke unconditionally.
 
     nextState = popFrame(nextState);
     const marker = top.batchResumeMarker;
@@ -1191,7 +1190,6 @@ export function reenterBatchResume(
       cardDb,
       resultRefs,
     );
-
     nextState = actionResult.state;
     events.push(...actionResult.events);
 
