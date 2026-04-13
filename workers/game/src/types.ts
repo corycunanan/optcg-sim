@@ -78,6 +78,11 @@ export interface EffectStackFrame {
 
   // Events accumulated during partial execution
   accumulatedEvents: PendingEvent[];
+
+  // OPT-171: carries the pending rule-3-7-6-1 overflow info through frame
+  // persistence so the resume handler can trash the chosen victim and re-enter
+  // the original PLAY_CARD with playTargetId as preselected.
+  ruleTrashForPlay?: { playTargetId: string };
 }
 
 export interface QueuedTrigger {

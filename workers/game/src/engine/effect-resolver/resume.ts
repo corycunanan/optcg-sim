@@ -728,6 +728,7 @@ export function resumeFromStack(
         remainingActions: topFrame.remainingActions as Action[],
         resultRefs: topFrame.resultRefs,
         validTargets: topFrame.validTargets,
+        ruleTrashForPlay: topFrame.ruleTrashForPlay,
       };
 
       const result = resumeEffectChain(nextState, legacyCtx, action, cardDb);
