@@ -67,7 +67,45 @@ export interface ResumeContext {
     remaining: { ACTIVE: number; RESTED: number };
     playedSoFar: string[];
   };
+  // OPT-172: pause-and-return marker for rule 6-2 trigger interleaving.
+  batchResumeMarker?: BatchResumeMarker;
 }
+
+// ─── OPT-172: batch-trigger pause marker ─────────────────────────────────────
+
+/**
+ * Identifies which multi-target action to re-invoke after a mid-batch trigger
+ * drain, plus the remaining-batch state to continue with. Rule 6-2: triggered
+ * effect from frame N must fully resolve before frame N+1 begins.
+ *
+ * Kinds are added incrementally per commits 2–4 of OPT-172:
+ *   - PLAY_CARD  (commit 2)  ON_PLAY triggers between plays
+ *   - TRASH_CARD (commit 3)  ON_KO / ON_TRASH triggers between trashes
+ *   - SET_REST   (commit 4)  ON_REST triggers between rests
+ */
+export type BatchResumeMarker =
+  | {
+      kind: "PLAY_CARD";
+      pausedAction: import("./engine/effect-types.js").Action;
+      resumeFrame: {
+        remainingTargetIds: string[];
+        remaining: { ACTIVE: number; RESTED: number };
+        playedSoFar: string[];
+        forcedFirstState?: "ACTIVE" | "RESTED";
+      };
+    }
+  | {
+      kind: "TRASH_CARD";
+      pausedAction: import("./engine/effect-types.js").Action;
+      remainingTargetIds: string[];
+      trashedSoFar: string[];
+    }
+  | {
+      kind: "SET_REST";
+      pausedAction: import("./engine/effect-types.js").Action;
+      remainingTargetIds: string[];
+      restedSoFar: string[];
+    };
 
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
 
@@ -121,6 +159,9 @@ export interface EffectStackFrame {
     remaining: { ACTIVE: number; RESTED: number };
     playedSoFar: string[];
   };
+  // OPT-172: mirror of ActionResult.pendingBatchTriggers so the pending
+  // batch-resume survives stack persistence through disconnects.
+  batchResumeMarker?: BatchResumeMarker;
 }
 
 export interface QueuedTrigger {

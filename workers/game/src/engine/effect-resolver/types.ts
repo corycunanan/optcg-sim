@@ -3,9 +3,11 @@
  */
 
 import type {
+  BatchResumeMarker,
   GameState,
   PendingEvent,
   PendingPromptState,
+  QueuedTrigger,
 } from "../../types.js";
 import type {
   Action,
@@ -26,6 +28,16 @@ export interface ActionResult {
   succeeded: boolean;
   result?: EffectResult;
   pendingPrompt?: PendingPromptState;
+  // OPT-172: multi-target handlers set this when a frame's events queue
+  // triggers that must resolve before the next frame (rule 6-2). The handler
+  // bails out of its loop and returns the scanned triggers + a resume marker
+  // describing how to re-enter with the remaining batch. The caller (see
+  // resolver.executeActionChain) pushes an AWAITING_BATCH_RESUME frame,
+  // drains the triggers, then re-invokes the handler with the marker.
+  pendingBatchTriggers?: {
+    triggers: QueuedTrigger[];
+    marker: BatchResumeMarker;
+  };
 }
 
 export type ActionHandler = (
