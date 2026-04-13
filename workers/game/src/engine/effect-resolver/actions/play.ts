@@ -11,6 +11,158 @@ import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, 
 import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
 
+// ─── Single-target play frames (OPT-114 macro expansion) ────────────────────
+// A multi-target PLAY_CARD conceptually expands to N single-target frames that
+// resolve in order. Each frame is self-contained: it removes the card from its
+// source zone and places it into the field, or (for CHARACTER on a full board)
+// returns a rule 3-7-6-1 overflow prompt.
+//
+// Commit 1 scope: extract the frame helpers; executePlayCard iterates them.
+// Overflow prompt still gated to single-target batches — commits 2/3 extend
+// the resume path to continue remaining frames after a prompt resolves.
+
+type FrameResult = {
+  state: GameState;
+  events: PendingEvent[];
+  playedId?: string;
+  pendingPrompt?: PendingPromptState;
+  failed?: boolean;
+};
+
+function removeFromSourceZone(
+  player: GameState["players"][0],
+  card: CardInstance,
+): GameState["players"][0] {
+  if (card.zone === "HAND") return { ...player, hand: player.hand.filter((c) => c.instanceId !== card.instanceId) };
+  if (card.zone === "TRASH") return { ...player, trash: player.trash.filter((c) => c.instanceId !== card.instanceId) };
+  if (card.zone === "DECK") return { ...player, deck: player.deck.filter((c) => c.instanceId !== card.instanceId) };
+  return { ...player, hand: player.hand.filter((c) => c.instanceId !== card.instanceId) };
+}
+
+function playOneCharacter(
+  state: GameState,
+  action: Action,
+  card: CardInstance,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  entryState: "ACTIVE" | "RESTED",
+  resultRefs: Map<string, EffectResult>,
+  batchContinuation?: {
+    remainingTargetIds: string[];
+    remaining: { ACTIVE: number; RESTED: number };
+    playedSoFar: string[];
+    forcedFirstState?: "ACTIVE" | "RESTED";
+  },
+): FrameResult {
+  const events: PendingEvent[] = [];
+  const p0 = state.players[controller];
+  const slotIdx = p0.characters.indexOf(null);
+
+  if (slotIdx === -1) {
+    // Rule 3-7-6-1: board full — prompt controller to pick one of their own
+    // Characters to rule-trash, then resume the play.
+    const ownCharIds = p0.characters.filter((c): c is CardInstance => c !== null).map((c) => c.instanceId);
+    if (ownCharIds.length === 0) {
+      return { state, events, failed: true };
+    }
+    const cards: CardInstance[] = [];
+    for (const cid of ownCharIds) {
+      const ci = findCardInstance(state, cid);
+      if (ci) cards.push(ci);
+    }
+    const resumeCtx: ResumeContext = {
+      effectSourceInstanceId: sourceCardInstanceId,
+      controller,
+      pausedAction: action,
+      remainingActions: [],
+      resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+      validTargets: ownCharIds,
+      ruleTrashForPlay: {
+        playTargetId: card.instanceId,
+        ...(batchContinuation ? { batch: batchContinuation } : {}),
+      },
+    };
+    const pendingPrompt: PendingPromptState = {
+      options: {
+        promptType: "SELECT_TARGET",
+        cards,
+        validTargets: ownCharIds,
+        effectDescription: "Character area is full. Choose one of your Characters to trash (rule 3-7-6-1).",
+        countMin: 1,
+        countMax: 1,
+        ctaLabel: "Confirm",
+      },
+      respondingPlayer: controller,
+      resumeContext: resumeCtx,
+    };
+    return { state, events, pendingPrompt };
+  }
+
+  const p = removeFromSourceZone(p0, card);
+  const newChar: CardInstance = {
+    ...card,
+    instanceId: nanoid(),
+    zone: "CHARACTER",
+    state: entryState,
+    attachedDon: [],
+    turnPlayed: state.turn.number,
+    controller,
+    owner: controller,
+  };
+  const newPlayers = [...state.players] as [GameState["players"][0], GameState["players"][1]];
+  const newChars = [...p.characters] as (typeof p.characters);
+  newChars[slotIdx] = newChar;
+  newPlayers[controller] = { ...p, characters: newChars };
+  const nextState = { ...state, players: newPlayers };
+  events.push({
+    type: "CARD_PLAYED",
+    playerIndex: controller,
+    payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "BY_EFFECT" },
+  });
+  return { state: nextState, events, playedId: newChar.instanceId };
+}
+
+function playOneStage(
+  state: GameState,
+  card: CardInstance,
+  controller: 0 | 1,
+): FrameResult {
+  const events: PendingEvent[] = [];
+  const p = removeFromSourceZone(state.players[controller], card);
+  const newStage: CardInstance = {
+    ...card,
+    instanceId: nanoid(),
+    zone: "STAGE",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: state.turn.number,
+    controller,
+    owner: controller,
+  };
+  let newTrash = p.trash;
+  if (p.stage) {
+    newTrash = [{ ...p.stage, zone: "TRASH" as const }, ...newTrash];
+  }
+  const newPlayers = [...state.players] as [GameState["players"][0], GameState["players"][1]];
+  newPlayers[controller] = { ...p, stage: newStage, trash: newTrash };
+  const nextState = { ...state, players: newPlayers };
+  events.push({
+    type: "CARD_PLAYED",
+    playerIndex: controller,
+    payload: { cardInstanceId: newStage.instanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT" },
+  });
+  return { state: nextState, events, playedId: newStage.instanceId };
+}
+
+export type PlayCardResumeFrame = {
+  remainingTargetIds: string[];
+  remaining: { ACTIVE: number; RESTED: number };
+  playedSoFar: string[];
+  // Optional override for the first frame (the PLAYER_CHOICE response).
+  // If omitted, the distribution counters pick the state.
+  forcedFirstState?: "ACTIVE" | "RESTED";
+};
+
 export function executePlayCard(
   state: GameState,
   action: Action,
@@ -19,125 +171,128 @@ export function executePlayCard(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets?: string[],
+  resumeFrame?: PlayCardResumeFrame,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+
+  let targetIds: string[];
+  if (resumeFrame) {
+    targetIds = resumeFrame.remainingTargetIds;
+  } else {
+    const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+    if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+      return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    }
+    targetIds = autoSelectTargets(action.target, allValidIds);
   }
-  const targetIds = autoSelectTargets(action.target, allValidIds);
-  if (targetIds.length === 0) return { state, events, succeeded: false };
+  if (targetIds.length === 0) {
+    if (resumeFrame) {
+      return {
+        state,
+        events,
+        succeeded: resumeFrame.playedSoFar.length > 0,
+        result: { targetInstanceIds: resumeFrame.playedSoFar, count: resumeFrame.playedSoFar.length },
+      };
+    }
+    return { state, events, succeeded: false };
+  }
+
+  const entryStateMode = (params.entry_state as "ACTIVE" | "RESTED" | "PLAYER_CHOICE" | undefined) ?? "ACTIVE";
+  const isDistributed = entryStateMode === "PLAYER_CHOICE";
+  let remaining = resumeFrame?.remaining ?? (() => {
+    const sd = (params.state_distribution as { ACTIVE?: number; RESTED?: number } | undefined) ?? {};
+    return { ACTIVE: sd.ACTIVE ?? 0, RESTED: sd.RESTED ?? 0 };
+  })();
 
   let nextState = state;
-  const playedIds: string[] = [];
-  for (const id of targetIds) {
+  const playedIds: string[] = [...(resumeFrame?.playedSoFar ?? [])];
+
+  for (let i = 0; i < targetIds.length; i++) {
+    const id = targetIds[i];
     const card = findCardInstance(nextState, id);
     if (!card) continue;
     const data = cardDb.get(card.cardId);
     if (!data) continue;
 
-    const entryState = (params.entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
-
-    // Remove card from its source zone (hand, trash, or deck)
-    const removeFromSourceZone = (p: typeof nextState.players[0]): typeof nextState.players[0] => {
-      if (card.zone === "HAND") return { ...p, hand: p.hand.filter((c) => c.instanceId !== id) };
-      if (card.zone === "TRASH") return { ...p, trash: p.trash.filter((c) => c.instanceId !== id) };
-      if (card.zone === "DECK") return { ...p, deck: p.deck.filter((c) => c.instanceId !== id) };
-      return { ...p, hand: p.hand.filter((c) => c.instanceId !== id) }; // default to hand
-    };
-
-    if (data.type.toUpperCase() === "CHARACTER") {
-      const p0 = nextState.players[controller];
-      const slotIdx = p0.characters.indexOf(null);
-      // Rule 3-7-6-1: board full — prompt controller to pick one of their own
-      // Characters to rule-trash, then resume the play. Single-play scope only;
-      // multi-target batches preserve the existing break (fixed in OPT-114).
-      if (slotIdx === -1 && targetIds.length === 1 && playedIds.length === 0) {
-        const ownCharIds = p0.characters.filter((c): c is CardInstance => c !== null).map((c) => c.instanceId);
-        if (ownCharIds.length === 0) {
-          // Edge: no trashable own characters — fizzle
-          return { state: nextState, events, succeeded: false };
+    const cardType = data.type.toUpperCase();
+    let frame: FrameResult;
+    if (cardType === "CHARACTER") {
+      let frameEntryState: "ACTIVE" | "RESTED";
+      if (isDistributed) {
+        const forced = i === 0 ? resumeFrame?.forcedFirstState : undefined;
+        if (forced) {
+          frameEntryState = forced;
+        } else {
+          const activeLeft = remaining.ACTIVE > 0;
+          const restedLeft = remaining.RESTED > 0;
+          if (activeLeft && restedLeft) {
+            // Pause for PLAYER_CHOICE on this frame.
+            const pendingPrompt: PendingPromptState = {
+              options: {
+                promptType: "PLAYER_CHOICE",
+                choices: [
+                  { id: `play-state:${id}:ACTIVE`, label: "Active" },
+                  { id: `play-state:${id}:RESTED`, label: "Rested" },
+                ],
+                effectDescription: `Play ${data.name} as Active or Rested?`,
+              },
+              respondingPlayer: controller,
+              resumeContext: {
+                effectSourceInstanceId: sourceCardInstanceId,
+                controller,
+                pausedAction: action,
+                remainingActions: [],
+                resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+                validTargets: [],
+                stateDistributionForPlay: {
+                  pendingTargetId: id,
+                  remainingTargetIds: targetIds.slice(i),
+                  remaining,
+                  playedSoFar: playedIds,
+                },
+              },
+            };
+            return { state: nextState, events, succeeded: false, pendingPrompt };
+          }
+          frameEntryState = activeLeft ? "ACTIVE" : restedLeft ? "RESTED" : "ACTIVE";
         }
-        const cards: CardInstance[] = [];
-        for (const cid of ownCharIds) {
-          const ci = findCardInstance(nextState, cid);
-          if (ci) cards.push(ci);
-        }
-        const resumeCtx: ResumeContext = {
-          effectSourceInstanceId: sourceCardInstanceId,
-          controller,
-          pausedAction: action,
-          remainingActions: [],
-          resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
-          validTargets: ownCharIds,
-          ruleTrashForPlay: { playTargetId: id },
-        };
-        const pendingPrompt: PendingPromptState = {
-          options: {
-            promptType: "SELECT_TARGET",
-            cards,
-            validTargets: ownCharIds,
-            effectDescription: "Character area is full. Choose one of your Characters to trash (rule 3-7-6-1).",
-            countMin: 1,
-            countMax: 1,
-            ctaLabel: "Confirm",
-          },
-          respondingPlayer: controller,
-          resumeContext: resumeCtx,
-        };
-        return { state: nextState, events, succeeded: false, pendingPrompt };
+      } else {
+        frameEntryState = (entryStateMode === "RESTED") ? "RESTED" : "ACTIVE";
       }
-      if (slotIdx === -1) break; // board full (batched case — OPT-114)
-      const p = removeFromSourceZone(p0);
-      const newChar: CardInstance = {
-        ...card,
-        instanceId: nanoid(),
-        zone: "CHARACTER",
-        state: entryState,
-        attachedDon: [],
-        turnPlayed: nextState.turn.number,
-        controller,
-        owner: controller,
+
+      // Build batch continuation so that if this frame hits full-board (rule
+      // 3-7-6-1), resume can continue remaining frames after the victim is
+      // rule-trashed and the current card is placed.
+      const batchContinuation = {
+        remainingTargetIds: targetIds.slice(i),
+        remaining,
+        playedSoFar: playedIds,
+        // Pin the entry_state we'd already resolved for this frame so the
+        // state-choice prompt doesn't re-fire for the same card after overflow.
+        ...(isDistributed ? { forcedFirstState: frameEntryState } : {}),
       };
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      const newChars = [...p.characters] as (typeof p.characters);
-      newChars[slotIdx] = newChar;
-      newPlayers[controller] = { ...p, characters: newChars };
-      nextState = { ...nextState, players: newPlayers };
-      playedIds.push(newChar.instanceId);
-      events.push({
-        type: "CARD_PLAYED",
-        playerIndex: controller,
-        payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "BY_EFFECT" },
-      });
-    } else if (data.type.toUpperCase() === "STAGE") {
-      const p = removeFromSourceZone(nextState.players[controller]);
-      const newStage: CardInstance = {
-        ...card,
-        instanceId: nanoid(),
-        zone: "STAGE",
-        state: "ACTIVE",
-        attachedDon: [],
-        turnPlayed: nextState.turn.number,
-        controller,
-        owner: controller,
-      };
-      // If there's an existing stage, trash it
-      let newTrash = p.trash;
-      if (p.stage) {
-        newTrash = [{ ...p.stage, zone: "TRASH" as const }, ...newTrash];
+      frame = playOneCharacter(nextState, action, card, sourceCardInstanceId, controller, frameEntryState, resultRefs, batchContinuation);
+
+      if (frame.playedId && isDistributed) {
+        remaining = {
+          ACTIVE: remaining.ACTIVE - (frameEntryState === "ACTIVE" ? 1 : 0),
+          RESTED: remaining.RESTED - (frameEntryState === "RESTED" ? 1 : 0),
+        };
       }
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[controller] = { ...p, stage: newStage, trash: newTrash };
-      nextState = { ...nextState, players: newPlayers };
-      playedIds.push(newStage.instanceId);
-      events.push({
-        type: "CARD_PLAYED",
-        playerIndex: controller,
-        payload: { cardInstanceId: newStage.instanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT" },
-      });
+    } else if (cardType === "STAGE") {
+      frame = playOneStage(nextState, card, controller);
+    } else {
+      continue;
     }
+
+    nextState = frame.state;
+    events.push(...frame.events);
+    if (frame.pendingPrompt) {
+      return { state: nextState, events, succeeded: false, pendingPrompt: frame.pendingPrompt };
+    }
+    if (frame.failed) break;
+    if (frame.playedId) playedIds.push(frame.playedId);
   }
 
   return {

@@ -3155,7 +3155,12 @@ export const OP06_086_GECKO_MORIA_CHARACTER: EffectSchema = {
               { filter: { card_type: "CHARACTER", cost_max: 2 }, count: { up_to: 1 } },
             ],
           },
-          params: { source_zone: "TRASH", cost_override: "FREE" },
+          params: {
+            source_zone: "TRASH",
+            cost_override: "FREE",
+            entry_state: "PLAYER_CHOICE",
+            state_distribution: { ACTIVE: 1, RESTED: 1 },
+          },
         },
       ],
     },

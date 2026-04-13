@@ -646,7 +646,16 @@ export interface ActionParamsMap {
   SEARCH_AND_PLAY: { look_at?: number; filter?: TargetFilter; rest_destination?: string; search_full_deck?: boolean; shuffle_after?: boolean; entry_state?: "ACTIVE" | "RESTED" };
 
   // Play/move
-  PLAY_CARD: { source_zone?: string; cost_override?: string; entry_state?: "ACTIVE" | "RESTED" };
+  PLAY_CARD: {
+    source_zone?: string;
+    cost_override?: string;
+    entry_state?: "ACTIVE" | "RESTED" | "PLAYER_CHOICE";
+    // OPT-114: when entry_state is "PLAYER_CHOICE", state_distribution bounds how
+    // many plays in this multi-target PLAY_CARD may enter in each state. The
+    // controller is prompted per frame until one slot exhausts, then remaining
+    // frames auto-resolve into the other state.
+    state_distribution?: { ACTIVE?: number; RESTED?: number };
+  };
   RETURN_TO_DECK: { position?: "TOP" | "BOTTOM" };
 
   // Life

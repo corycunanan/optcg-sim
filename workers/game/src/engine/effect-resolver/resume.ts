@@ -29,6 +29,7 @@ import { resolveEffect, executeActionChain, executeEffectAction } from "./resolv
 import { trashCharacter } from "./card-mutations.js";
 import { validateTargetConstraints } from "./target-resolver.js";
 import { applyRedistributeDonTransfers } from "./actions/don.js";
+import { executePlayCard } from "./actions/play.js";
 import { nanoid } from "../../util/nanoid.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../trigger-ordering.js";
 
@@ -280,8 +281,59 @@ export function resumeEffectChain(
     } as unknown as PendingEvent);
   }
 
-  // Resume from PLAYER_CHOICE response
+  // OPT-114: Resume from per-frame PLAYER_CHOICE (ACTIVE/RESTED) during a
+  // multi-target PLAY_CARD with state_distribution. choiceId shape:
+  // "play-state:<instanceId>:<ACTIVE|RESTED>". Reject stale responses where the
+  // echoed instanceId does not match the pending target this prompt was bound
+  // to (defensive per stale-modal feedback).
   if (action.type === "PLAYER_CHOICE" && pausedAction !== null &&
+      pausedAction.type === "PLAY_CARD" && resumeCtx.stateDistributionForPlay) {
+    const sd = resumeCtx.stateDistributionForPlay;
+    const parts = action.choiceId.split(":");
+    if (parts.length !== 3 || parts[0] !== "play-state") {
+      return { state, events, resolved: false };
+    }
+    const [, echoedId, chosenState] = parts;
+    if (echoedId !== sd.pendingTargetId) {
+      return { state, events, resolved: false };
+    }
+    if (chosenState !== "ACTIVE" && chosenState !== "RESTED") {
+      return { state, events, resolved: false };
+    }
+    if (sd.remaining[chosenState] <= 0) {
+      return { state, events, resolved: false };
+    }
+
+    const actionResult = executePlayCard(
+      nextState,
+      pausedAction,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      undefined,
+      {
+        remainingTargetIds: sd.remainingTargetIds,
+        remaining: sd.remaining,
+        playedSoFar: sd.playedSoFar,
+        forcedFirstState: chosenState,
+      },
+    );
+    nextState = actionResult.state;
+    events.push(...actionResult.events);
+
+    if (actionResult.pendingPrompt) {
+      return { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt };
+    }
+    if (actionResult.result && (pausedAction as any).result_ref) {
+      resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+    }
+
+    // Fall through to remainingActions processing below.
+  }
+
+  // Resume from PLAYER_CHOICE response
+  else if (action.type === "PLAYER_CHOICE" && pausedAction !== null &&
       (pausedAction.type === "PLAYER_CHOICE" || pausedAction.type === "OPPONENT_CHOICE")) {
     const options = (pausedAction.params?.options as Action[][]) ?? [];
     const chosenIndex = parseInt(action.choiceId, 10);
@@ -356,15 +408,36 @@ export function resumeEffectChain(
     nextState = trashResult.state;
     events.push(...trashResult.events);
 
-    const actionResult = executeEffectAction(
-      nextState,
-      pausedAction,
-      effectSourceInstanceId,
-      controller,
-      cardDb,
-      resultRefs,
-      [resumeCtx.ruleTrashForPlay.playTargetId],
-    );
+    // OPT-114 commit 3: if the overflow happened mid-batch, re-enter
+    // executePlayCard with the batch resumeFrame so remaining frames continue
+    // after the current card is placed. Otherwise fall back to the legacy
+    // single-target re-entry (OPT-171).
+    const batch = resumeCtx.ruleTrashForPlay.batch;
+    const actionResult = batch
+      ? executePlayCard(
+          nextState,
+          pausedAction,
+          effectSourceInstanceId,
+          controller,
+          cardDb,
+          resultRefs,
+          undefined,
+          {
+            remainingTargetIds: batch.remainingTargetIds,
+            remaining: batch.remaining,
+            playedSoFar: batch.playedSoFar,
+            forcedFirstState: batch.forcedFirstState,
+          },
+        )
+      : executeEffectAction(
+          nextState,
+          pausedAction,
+          effectSourceInstanceId,
+          controller,
+          cardDb,
+          resultRefs,
+          [resumeCtx.ruleTrashForPlay.playTargetId],
+        );
     nextState = actionResult.state;
     events.push(...actionResult.events);
 
@@ -729,6 +802,7 @@ export function resumeFromStack(
         resultRefs: topFrame.resultRefs,
         validTargets: topFrame.validTargets,
         ruleTrashForPlay: topFrame.ruleTrashForPlay,
+        stateDistributionForPlay: topFrame.stateDistributionForPlay,
       };
 
       const result = resumeEffectChain(nextState, legacyCtx, action, cardDb);

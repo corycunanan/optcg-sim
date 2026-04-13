@@ -357,6 +357,7 @@ export function executeActionChain(
         simultaneousTriggers: [],
         accumulatedEvents: events,
         ruleTrashForPlay: ctx.ruleTrashForPlay,
+        stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
       const updatedState = pushFrame(result.state, frame);
       const prompt = { ...result.pendingPrompt, resumeContext: frame.id };

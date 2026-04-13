@@ -45,7 +45,28 @@ export interface ResumeContext {
   // resolves. On resume, the chosen victim is rule-trashed (no On K.O. triggers
   // per 3-7-6-1-1) and the original play is re-entered with playTargetId as
   // preselected. Only set when the pending prompt is this overflow choice.
-  ruleTrashForPlay?: { playTargetId: string };
+  // OPT-114 commit 3: when the overflow happens mid-batch in a multi-target
+  // PLAY_CARD, `batch` carries the remaining frames so resume continues the
+  // macro-expansion after the victim is trashed and the current card is placed.
+  ruleTrashForPlay?: {
+    playTargetId: string;
+    batch?: {
+      remainingTargetIds: string[];
+      remaining: { ACTIVE: number; RESTED: number };
+      playedSoFar: string[];
+      forcedFirstState?: "ACTIVE" | "RESTED";
+    };
+  };
+  // OPT-114: when a PLAY_CARD with entry_state="PLAYER_CHOICE" pauses to ask the
+  // controller which state (ACTIVE/RESTED) to play the current frame in, this
+  // carries the pending target instanceId, remaining capacity per state, and
+  // the remaining frames so the resume can continue the macro-expansion.
+  stateDistributionForPlay?: {
+    pendingTargetId: string;
+    remainingTargetIds: string[];
+    remaining: { ACTIVE: number; RESTED: number };
+    playedSoFar: string[];
+  };
 }
 
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
@@ -82,7 +103,24 @@ export interface EffectStackFrame {
   // OPT-171: carries the pending rule-3-7-6-1 overflow info through frame
   // persistence so the resume handler can trash the chosen victim and re-enter
   // the original PLAY_CARD with playTargetId as preselected.
-  ruleTrashForPlay?: { playTargetId: string };
+  // OPT-114 commit 3: `batch` extends this to multi-target mid-batch overflow.
+  ruleTrashForPlay?: {
+    playTargetId: string;
+    batch?: {
+      remainingTargetIds: string[];
+      remaining: { ACTIVE: number; RESTED: number };
+      playedSoFar: string[];
+      forcedFirstState?: "ACTIVE" | "RESTED";
+    };
+  };
+  // OPT-114: mirror of ResumeContext.stateDistributionForPlay so the per-frame
+  // state-choice prompt survives disconnect/stack persistence.
+  stateDistributionForPlay?: {
+    pendingTargetId: string;
+    remainingTargetIds: string[];
+    remaining: { ACTIVE: number; RESTED: number };
+    playedSoFar: string[];
+  };
 }
 
 export interface QueuedTrigger {
