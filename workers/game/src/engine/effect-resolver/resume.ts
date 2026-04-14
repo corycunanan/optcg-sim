@@ -505,6 +505,26 @@ export function resumeEffectChain(
     if (actionResult.pendingPrompt) {
       return { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt };
     }
+    // OPT-174: SELECT_TARGET resume into a multi-target handler (e.g. KO with
+    // dual_targets) can pause mid-batch when frame N's events queue triggers
+    // (rule 6-2). Mirror the resolver-level batch-resume push so the trigger
+    // drain can re-enter the handler with the remaining targets — otherwise
+    // remaining KO frames are silently dropped.
+    if (actionResult.pendingBatchTriggers) {
+      const { triggers, marker } = actionResult.pendingBatchTriggers;
+      nextState = pushBatchResumeFrame(
+        nextState,
+        effectSourceInstanceId,
+        controller,
+        {} as EffectBlock,
+        marker,
+        triggers,
+        remainingActions,
+        resultRefs,
+      );
+      const drain = processRemainingTriggers(nextState, triggers, cardDb, events);
+      return { state: drain.state, events: drain.events, resolved: drain.resolved, pendingPrompt: drain.pendingPrompt };
+    }
     if (actionResult.result && (pausedAction as any).result_ref) {
       resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
     }
