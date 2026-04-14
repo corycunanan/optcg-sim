@@ -16,6 +16,30 @@ import { CardTooltip } from "./use-card-tooltip";
 const CARD_W = 80;
 const CARD_H = 112;
 
+type DualSlot = { validIds: string[]; countMin: number; countMax: number };
+
+function canAssignDualTargets(selectedIds: string[], slots: DualSlot[]): boolean {
+  const counts = slots.map(() => 0);
+  const validSets = slots.map((s) => new Set(s.validIds));
+
+  function backtrack(idx: number): boolean {
+    if (idx === selectedIds.length) {
+      return slots.every((s, i) => counts[i] >= s.countMin);
+    }
+    const id = selectedIds[idx];
+    for (let s = 0; s < slots.length; s++) {
+      if (validSets[s].has(id) && counts[s] < slots[s].countMax) {
+        counts[s]++;
+        if (backtrack(idx + 1)) return true;
+        counts[s]--;
+      }
+    }
+    return false;
+  }
+
+  return backtrack(0);
+}
+
 function TargetCard({
   card,
   cardDb,
@@ -89,6 +113,9 @@ interface SelectTargetModalProps {
   aggregateConstraint?: { property: "power" | "cost"; operator: "<=" | ">=" | "=="; value: number };
   uniquenessConstraint?: { field: "name" | "color" };
   namedDistribution?: { names: string[] };
+  dualTargets?: {
+    slots: Array<{ validIds: string[]; countMin: number; countMax: number }>;
+  };
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -105,6 +132,7 @@ export function SelectTargetModal({
   aggregateConstraint,
   uniquenessConstraint,
   namedDistribution,
+  dualTargets,
   cardDb,
   isHidden,
   onHide,
@@ -170,6 +198,13 @@ export function SelectTargetModal({
       return `Only one "${data.name}" allowed`;
     }
 
+    if (dualTargets) {
+      const candidate = [...selectedIds, card.instanceId];
+      if (!canAssignDualTargets(candidate, dualTargets.slots)) {
+        return "No valid slot assignment with this card";
+      }
+    }
+
     return null;
   }
 
@@ -197,7 +232,10 @@ export function SelectTargetModal({
     else if (operator === ">=") aggregateOk = aggregateSum >= value;
     else aggregateOk = aggregateSum === value;
   }
-  const canConfirm = selectedIds.size >= countMin && aggregateOk;
+  const dualTargetsOk = dualTargets
+    ? canAssignDualTargets([...selectedIds], dualTargets.slots)
+    : true;
+  const canConfirm = selectedIds.size >= countMin && aggregateOk && dualTargetsOk;
 
   const countLabel =
     countMin === countMax

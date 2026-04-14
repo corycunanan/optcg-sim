@@ -75,6 +75,7 @@ export function BoardModals({
             aggregateConstraint={activePrompt.aggregateConstraint}
             uniquenessConstraint={activePrompt.uniquenessConstraint}
             namedDistribution={activePrompt.namedDistribution}
+            dualTargets={activePrompt.dualTargets}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}
