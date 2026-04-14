@@ -50,6 +50,12 @@ export function scanEventsForTriggers(
   }
 
   for (const event of events) {
+    // OPT-173: skip events that an inner multi-target batch handler already
+    // scanned via its `pendingBatchTriggers` drain. Without this guard, the
+    // pipeline's outer LIFO scan re-matches the same events and queues the
+    // same triggers a second time.
+    if (event.__scannedForTriggers) continue;
+
     const gameEvent = {
       type: event.type,
       playerIndex: event.playerIndex ?? defaultController,
@@ -69,6 +75,12 @@ export function scanEventsForTriggers(
         triggeringEvent: event,
       });
     }
+  }
+
+  // OPT-173: mark all scanned events so any future scan along the propagation
+  // path (LIFO pipeline scan, resume scans) treats them as already drained.
+  for (const event of events) {
+    event.__scannedForTriggers = true;
   }
 
   return { triggers, state: nextState };
