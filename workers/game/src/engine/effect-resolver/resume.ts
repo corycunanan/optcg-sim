@@ -28,7 +28,7 @@ import { markOncePerTurnUsed, shuffleArray } from "./action-utils.js";
 import { payCostsWithSelection, applyCostSelection } from "./cost-handler.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "./resolver.js";
 import { trashCharacter } from "./card-mutations.js";
-import { validateTargetConstraints } from "./target-resolver.js";
+import { validateTargetConstraints, buildSelectTargetPrompt } from "./target-resolver.js";
 import { applyRedistributeDonTransfers } from "./actions/don.js";
 import { executePlayCard, executeSetRest } from "./actions/play.js";
 import { executeKO } from "./actions/removal.js";
@@ -481,11 +481,13 @@ export function resumeEffectChain(
     const selected = action.selectedInstanceIds ?? [];
     // Validate — all selected ids must be in validTargets
     if (selected.some((id) => !validTargets.includes(id))) {
-      return { state, events, resolved: false };
+      const reprompt = buildSelectTargetPrompt(nextState, pausedAction, validTargets, effectSourceInstanceId, controller, cardDb, resultRefs);
+      return { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt };
     }
     // Validate target constraints (aggregate sum, uniqueness, named distribution, dual_targets)
     if (pausedAction.target && !validateTargetConstraints(selected, pausedAction.target, nextState, cardDb, resultRefs)) {
-      return { state, events, resolved: false };
+      const reprompt = buildSelectTargetPrompt(nextState, pausedAction, validTargets, effectSourceInstanceId, controller, cardDb, resultRefs);
+      return { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt };
     }
 
     const actionResult = executeEffectAction(

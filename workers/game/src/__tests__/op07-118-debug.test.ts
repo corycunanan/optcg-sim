@@ -146,4 +146,40 @@ describe("OP07-118 Sabo dual-target KO", () => {
     expect(opp.characters.find(c => c?.instanceId === oppCost5.instanceId)).toBeFalsy();
     expect(opp.trash.length).toBe(2);
   });
+
+  it("OPT-174: rejects [cost5, cost5] selection — only cost_max:5 slot can hold a cost-5", () => {
+    // Build a scenario where opponent has TWO cost-5 characters.
+    const { state: base, cardDb, sabo, hand0card1 } = buildScenario();
+    // Replace opponent characters with two cost-5s
+    const opp5a = makeInstance("COST5", "CHARACTER", 1, { instanceId: "opp-cost5-a" });
+    const opp5b = makeInstance("COST5", "CHARACTER", 1, { instanceId: "opp-cost5-b" });
+    const oppChars: (CardInstance | null)[] = [opp5a, opp5b, null, null, null];
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[1] = { ...newPlayers[1], characters: oppChars };
+    const state: GameState = { ...base, players: newPlayers };
+
+    const block = OP07_118_SABO.effects[0] as EffectBlock;
+    const step1 = resolveEffect(state, block, sabo.instanceId, 0, cardDb);
+    const step2 = resumeFromStack(step1.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+    const step3 = resumeFromStack(step2.state, { type: "SELECT_TARGET", selectedInstanceIds: [hand0card1.instanceId] }, cardDb);
+    expect(step3.pendingPrompt).toBeDefined();
+
+    // Player attempts to select both cost-5 characters as KO targets — illegal:
+    // slot 0 (cost_max:5, up_to:1) can take one of them, slot 1 (cost_max:3, up_to:1)
+    // cannot accommodate either. Engine must reject and re-prompt rather than KO one.
+    const step4 = resumeFromStack(
+      step3.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [opp5a.instanceId, opp5b.instanceId] },
+      cardDb,
+    );
+
+    // Both cost-5 characters must remain on the field — the illegal selection
+    // must be rejected wholesale (no partial KO).
+    const opp = step4.state.players[1];
+    expect(opp.characters.find(c => c?.instanceId === opp5a.instanceId)).toBeTruthy();
+    expect(opp.characters.find(c => c?.instanceId === opp5b.instanceId)).toBeTruthy();
+    expect(opp.trash.length).toBe(0);
+    // And the prompt should still be active for re-selection.
+    expect(step4.pendingPrompt).toBeDefined();
+  });
 });
