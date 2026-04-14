@@ -72,6 +72,9 @@ export function BoardModals({
             countMin={activePrompt.countMin}
             countMax={activePrompt.countMax}
             ctaLabel={activePrompt.ctaLabel}
+            aggregateConstraint={activePrompt.aggregateConstraint}
+            uniquenessConstraint={activePrompt.uniquenessConstraint}
+            namedDistribution={activePrompt.namedDistribution}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}
