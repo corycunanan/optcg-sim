@@ -21,23 +21,27 @@ function TargetCard({
   cardDb,
   selected,
   invalid,
+  disabledReason,
   onToggle,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   selected: boolean;
   invalid: boolean;
+  disabledReason: string | null;
   onToggle: () => void;
 }) {
+  const blocked = invalid || disabledReason !== null;
   const data = cardDb[card.cardId] ?? null;
 
   return (
     <CardTooltip data={data} cardId={card.cardId} card={card}>
       <div
-        onClick={invalid ? undefined : onToggle}
+        onClick={blocked ? undefined : onToggle}
+        title={disabledReason ?? undefined}
         className={cn(
           "relative rounded-md overflow-hidden border-2 transition-colors select-none shrink-0",
-          invalid
+          blocked
             ? "opacity-30 cursor-not-allowed border-transparent"
             : selected
               ? "border-gb-accent-amber ring-2 ring-gb-accent-amber/30 cursor-pointer"
@@ -82,6 +86,9 @@ interface SelectTargetModalProps {
   countMin: number;
   countMax: number;
   ctaLabel: string;
+  aggregateConstraint?: { property: "power" | "cost"; operator: "<=" | ">=" | "=="; value: number };
+  uniquenessConstraint?: { field: "name" | "color" };
+  namedDistribution?: { names: string[] };
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -95,6 +102,9 @@ export function SelectTargetModal({
   countMin,
   countMax,
   ctaLabel,
+  aggregateConstraint,
+  uniquenessConstraint,
+  namedDistribution,
   cardDb,
   isHidden,
   onHide,
@@ -103,6 +113,65 @@ export function SelectTargetModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const validSet = new Set(validTargets);
+  const selectedCards = cards.filter((c) => selectedIds.has(c.instanceId));
+
+  const aggregateSum = aggregateConstraint
+    ? selectedCards.reduce((sum, c) => {
+        const v = cardDb[c.cardId]?.[aggregateConstraint.property];
+        return sum + (v ?? 0);
+      }, 0)
+    : 0;
+
+  const takenNames = new Set<string>();
+  const takenColors = new Set<string>();
+  if (uniquenessConstraint) {
+    for (const c of selectedCards) {
+      const data = cardDb[c.cardId];
+      if (!data) continue;
+      if (uniquenessConstraint.field === "name") takenNames.add(data.name);
+      else for (const col of data.color) takenColors.add(col);
+    }
+  }
+
+  const takenDistNames = new Set<string>();
+  if (namedDistribution) {
+    for (const c of selectedCards) {
+      const data = cardDb[c.cardId];
+      if (data) takenDistNames.add(data.name);
+    }
+  }
+
+  function getDisabledReason(card: CardInstance): string | null {
+    if (selectedIds.has(card.instanceId)) return null;
+    const data = cardDb[card.cardId];
+    if (!data) return null;
+
+    if (aggregateConstraint) {
+      const v = data[aggregateConstraint.property] ?? 0;
+      const next = aggregateSum + v;
+      if (
+        (aggregateConstraint.operator === "<=" || aggregateConstraint.operator === "==") &&
+        next > aggregateConstraint.value
+      ) {
+        return `Adding this would exceed ${aggregateConstraint.value} ${aggregateConstraint.property}`;
+      }
+    }
+
+    if (uniquenessConstraint) {
+      if (uniquenessConstraint.field === "name" && takenNames.has(data.name)) {
+        return `Already selected a card named "${data.name}"`;
+      }
+      if (uniquenessConstraint.field === "color" && data.color.some((col) => takenColors.has(col))) {
+        return "Already selected a card of this color";
+      }
+    }
+
+    if (namedDistribution && takenDistNames.has(data.name)) {
+      return `Only one "${data.name}" allowed`;
+    }
+
+    return null;
+  }
 
   function toggleCard(instanceId: string) {
     setSelectedIds((prev) => {
@@ -121,7 +190,14 @@ export function SelectTargetModal({
     onAction({ type: "SELECT_TARGET", selectedInstanceIds: [...selectedIds] });
   }
 
-  const canConfirm = selectedIds.size >= countMin;
+  let aggregateOk = true;
+  if (aggregateConstraint) {
+    const { operator, value } = aggregateConstraint;
+    if (operator === "<=") aggregateOk = aggregateSum <= value;
+    else if (operator === ">=") aggregateOk = aggregateSum >= value;
+    else aggregateOk = aggregateSum === value;
+  }
+  const canConfirm = selectedIds.size >= countMin && aggregateOk;
 
   const countLabel =
     countMin === countMax
@@ -157,6 +233,7 @@ export function SelectTargetModal({
                 cardDb={cardDb}
                 selected={selectedIds.has(card.instanceId)}
                 invalid={!validSet.has(card.instanceId)}
+                disabledReason={getDisabledReason(card)}
                 onToggle={() => toggleCard(card.instanceId)}
               />
             ))}
@@ -169,6 +246,16 @@ export function SelectTargetModal({
             {selectedIds.size > 0 && (
               <span className="text-gb-text-subtle ml-1">
                 — {selectedIds.size} selected
+              </span>
+            )}
+            {aggregateConstraint && (
+              <span
+                className={cn(
+                  "ml-2 font-medium",
+                  aggregateOk ? "text-gb-text-bright" : "text-gb-accent-red",
+                )}
+              >
+                · Total {aggregateConstraint.property}: {aggregateSum} {aggregateConstraint.operator} {aggregateConstraint.value}
               </span>
             )}
           </span>
