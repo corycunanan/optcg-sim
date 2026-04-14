@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import type { EffectSchema, EffectBlock, EffectResult } from "../engine/effect-types.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
+import { registerTriggersForCard } from "../engine/triggers.js";
 import { OP07_118_SABO } from "../engine/schemas/op07.js";
 
 function noKeywords() {
@@ -145,5 +146,96 @@ describe("OP07-118 Sabo dual-target KO", () => {
     expect(opp.characters.find(c => c?.instanceId === oppCost2.instanceId)).toBeFalsy();
     expect(opp.characters.find(c => c?.instanceId === oppCost5.instanceId)).toBeFalsy();
     expect(opp.trash.length).toBe(2);
+  });
+
+  it("OPT-174: rejects [cost5, cost5] selection — only cost_max:5 slot can hold a cost-5", () => {
+    // Build a scenario where opponent has TWO cost-5 characters.
+    const { state: base, cardDb, sabo, hand0card1 } = buildScenario();
+    // Replace opponent characters with two cost-5s
+    const opp5a = makeInstance("COST5", "CHARACTER", 1, { instanceId: "opp-cost5-a" });
+    const opp5b = makeInstance("COST5", "CHARACTER", 1, { instanceId: "opp-cost5-b" });
+    const oppChars: (CardInstance | null)[] = [opp5a, opp5b, null, null, null];
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[1] = { ...newPlayers[1], characters: oppChars };
+    const state: GameState = { ...base, players: newPlayers };
+
+    const block = OP07_118_SABO.effects[0] as EffectBlock;
+    const step1 = resolveEffect(state, block, sabo.instanceId, 0, cardDb);
+    const step2 = resumeFromStack(step1.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+    const step3 = resumeFromStack(step2.state, { type: "SELECT_TARGET", selectedInstanceIds: [hand0card1.instanceId] }, cardDb);
+    expect(step3.pendingPrompt).toBeDefined();
+
+    // Player attempts to select both cost-5 characters as KO targets — illegal:
+    // slot 0 (cost_max:5, up_to:1) can take one of them, slot 1 (cost_max:3, up_to:1)
+    // cannot accommodate either. Engine must reject and re-prompt rather than KO one.
+    const step4 = resumeFromStack(
+      step3.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [opp5a.instanceId, opp5b.instanceId] },
+      cardDb,
+    );
+
+    // Both cost-5 characters must remain on the field — the illegal selection
+    // must be rejected wholesale (no partial KO).
+    const opp = step4.state.players[1];
+    expect(opp.characters.find(c => c?.instanceId === opp5a.instanceId)).toBeTruthy();
+    expect(opp.characters.find(c => c?.instanceId === opp5b.instanceId)).toBeTruthy();
+    expect(opp.trash.length).toBe(0);
+    // And the prompt should still be active for re-selection.
+    expect(step4.pendingPrompt).toBeDefined();
+  });
+
+  it("OPT-174: KOs BOTH cost-1 targets and drains ON_KO between frames", () => {
+    // Two cost-1 opponent characters with [On K.O.] Draw 1 — both fit slot 0
+    // (cost_max:5) AND slot 1 (cost_max:3), so the dual-target assignment is
+    // legal. Engine must KO both and fire ON_KO twice (rule 6-2 drain).
+    const { state: base, cardDb, sabo, hand0card1 } = buildScenario();
+
+    const ON_KO_DRAW: EffectSchema = {
+      card_id: "COST1_ONKO",
+      card_name: "OnKoDraw",
+      card_type: "Character",
+      effects: [{
+        id: "onko-draw-1",
+        category: "auto",
+        trigger: { keyword: "ON_KO" },
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      }],
+    };
+    cardDb.set("COST1_ONKO", makeCard("COST1_ONKO", {
+      cost: 1, power: 1000, color: ["Blue"], effectSchema: ON_KO_DRAW,
+      effectText: "[On K.O.] Draw 1.",
+    }));
+
+    const opp1a = makeInstance("COST1_ONKO", "CHARACTER", 1, { instanceId: "opp-c1-a" });
+    const opp1b = makeInstance("COST1_ONKO", "CHARACTER", 1, { instanceId: "opp-c1-b" });
+    const oppChars: (CardInstance | null)[] = [opp1a, opp1b, null, null, null];
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[1] = { ...newPlayers[1], characters: oppChars };
+    let state: GameState = { ...base, players: newPlayers };
+    // Register ON_KO triggers — characters were placed directly, not via PLAY.
+    const opp1aData = cardDb.get(opp1a.cardId)!;
+    state = registerTriggersForCard(state, opp1a, opp1aData);
+    state = registerTriggersForCard(state, opp1b, opp1aData);
+
+    const opp1HandSize = state.players[1].hand.length;
+    const block = OP07_118_SABO.effects[0] as EffectBlock;
+    const step1 = resolveEffect(state, block, sabo.instanceId, 0, cardDb);
+    const step2 = resumeFromStack(step1.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+    const step3 = resumeFromStack(step2.state, { type: "SELECT_TARGET", selectedInstanceIds: [hand0card1.instanceId] }, cardDb);
+    expect(step3.pendingPrompt).toBeDefined();
+
+    const step4 = resumeFromStack(
+      step3.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [opp1a.instanceId, opp1b.instanceId] },
+      cardDb,
+    );
+
+    // Both cost-1 chars must be KO'd.
+    const opp = step4.state.players[1];
+    expect(opp.characters.filter(Boolean)).toHaveLength(0);
+    expect(opp.trash.find(c => c.instanceId === opp1a.instanceId)).toBeTruthy();
+    expect(opp.trash.find(c => c.instanceId === opp1b.instanceId)).toBeTruthy();
+    // Both ON_KO triggers fired — opponent drew twice.
+    expect(opp.hand.length).toBe(opp1HandSize + 2);
   });
 });
