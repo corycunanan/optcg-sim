@@ -661,6 +661,104 @@ export function resumeFromStack(
         (topFrame.costResultRefs ?? []) as [string, EffectResult][],
       );
 
+      // CHOOSE_ONE_COST — player chose which option to pay; replace slot and re-enter.
+      if (action.type === "PLAYER_CHOICE" && cost.type === "CHOOSE_ONE_COST") {
+        const options = cost.options ?? [];
+        const choiceIdx = Number(action.choiceId);
+        const chosen = options[choiceIdx];
+        if (!chosen) {
+          return { state, events, resolved: false };
+        }
+
+        // Pop the waiting frame; we'll re-enter payCostsWithSelection with the replaced cost.
+        nextState = popFrame(nextState);
+
+        const replacedCosts = [...topFrame.costs] as Cost[];
+        replacedCosts[topFrame.currentCostIndex] = chosen;
+
+        const block = topFrame.effectBlock as EffectBlock;
+        const resumeResult = payCostsWithSelection(
+          nextState,
+          replacedCosts,
+          topFrame.currentCostIndex,
+          controller,
+          cardDb,
+          sourceCardInstanceId,
+          block,
+        );
+
+        if (resumeResult.cannotPay) {
+          return processRemainingTriggers(resumeResult.state, topFrame.pendingTriggers, cardDb, events);
+        }
+
+        nextState = resumeResult.state;
+        events.push(...resumeResult.events);
+
+        if (resumeResult.pendingPrompt) {
+          const newTop = peekFrame(nextState) as EffectStackFrame;
+          if (newTop) {
+            nextState = updateTopFrame(nextState, {
+              costResultRefs: topFrame.costResultRefs,
+              pendingTriggers: topFrame.pendingTriggers,
+            });
+          }
+          return { state: nextState, events, resolved: false, pendingPrompt: resumeResult.pendingPrompt };
+        }
+
+        // All costs paid — run actions.
+        if (block.flags?.once_per_turn && !topFrame.oncePerTurnMarked) {
+          nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
+        }
+
+        // Build cost refs from accumulated + any new results.
+        const mergedRefs = new Map<string, EffectResult>(accumulatedCostRefs);
+        if (resumeResult.costResult) {
+          const newRefs = costResultRefsFromEntries(costResultToEntries(resumeResult.costResult));
+          if (newRefs) {
+            for (const [key, val] of newRefs) {
+              const existing = mergedRefs.get(key);
+              mergedRefs.set(key, existing
+                ? { targetInstanceIds: [...existing.targetInstanceIds, ...val.targetInstanceIds], count: existing.count + val.count }
+                : val);
+            }
+          }
+        }
+        const hasRefs = [...mergedRefs.values()].some((v) => v.count > 0);
+        const costRefsForActions = hasRefs ? mergedRefs : undefined;
+
+        if (topFrame.remainingActions.length > 0) {
+          const chainResult = executeActionChain(
+            nextState,
+            topFrame.remainingActions as Action[],
+            sourceCardInstanceId,
+            controller,
+            cardDb,
+            costRefsForActions,
+          );
+          nextState = chainResult.state;
+          events.push(...chainResult.events);
+
+          if (chainResult.pendingPrompt) {
+            const newTop = peekFrame(nextState) as EffectStackFrame;
+            if (newTop) {
+              nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+            }
+            return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+          }
+
+          if (chainResult.events.length > 0) {
+            const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
+            nextState = chainScan.state;
+            if (chainScan.triggers.length > 0) {
+              const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+              return processRemainingTriggers(nextState, allTriggers, cardDb, events);
+            }
+          }
+        }
+
+        return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+      }
+
       // LIFE_TO_HAND with TOP_OR_BOTTOM — player chose a position
       if (action.type === "PLAYER_CHOICE" && cost.type === "LIFE_TO_HAND") {
         const position = action.choiceId === "1" ? "BOTTOM" : "TOP";

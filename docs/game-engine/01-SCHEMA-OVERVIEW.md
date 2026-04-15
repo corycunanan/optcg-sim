@@ -214,8 +214,34 @@ type CostType =
   | "RETURN_ATTACHED_DON_TO_COST" // Return given DON!! to cost area
 
   // Compound costs
-  | "PLACE_SELF_AND_HAND_TO_DECK"; // Stage + hand card to deck bottom
+  | "PLACE_SELF_AND_HAND_TO_DECK" // Stage + hand card to deck bottom
+
+  // Cost-level disjunction
+  | "CHOOSE_ONE_COST";        // Player picks ONE of the listed sub-costs to pay
 ```
+
+### CHOOSE_ONE_COST — cost-level "or"
+
+Most "or" in card text is expressible through a permissive target filter or through an action-level `choose_one`. But a small number of cards let the player pick between **fundamentally different** sub-costs (e.g. trash a character OR trash a card from hand). For those, wrap the alternatives in `CHOOSE_ONE_COST`:
+
+```json
+{
+  "type": "CHOOSE_ONE_COST",
+  "options": [
+    { "type": "TRASH_OWN_CHARACTER", "amount": 1, "filter": { "traits": ["Celestial Dragons"] } },
+    { "type": "TRASH_FROM_HAND", "amount": 1 }
+  ]
+}
+```
+
+Semantics at cost-payment time:
+
+1. Each option is checked for payability (selection options need enough valid targets; auto-payable options are dry-run).
+2. **0 payable** → the effect cannot pay; activation is blocked.
+3. **1 payable** → auto-selected; the normal prompt for that option fires. No choice prompt.
+4. **≥2 payable** → engine emits a `PLAYER_CHOICE` prompt listing the payable options by their cost label. After the player chooses, the chosen option replaces the `CHOOSE_ONE_COST` slot and its own selection flow runs.
+
+**When NOT to use.** If the alternatives differ only in target filter (e.g. "rest Leader or Stage"), use a single cost with a permissive filter. If the branching is within *actions*, use `choose_one` at the action level. `CHOOSE_ONE_COST` is specifically for disjunction of cost *types* / unrelated cost shapes.
 
 ### Filtered Costs
 
