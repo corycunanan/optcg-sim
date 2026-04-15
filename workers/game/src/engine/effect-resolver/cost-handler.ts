@@ -468,11 +468,38 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
   "REST_NAMED_CARD",
   "TRASH_OWN_CHARACTER",
   "REVEAL_FROM_HAND",
+  "CHOOSE_ONE_COST",
 ]);
 
 export function costNeedsPlayerSelection(cost: Cost): boolean {
   if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") return true;
   return SELECTION_COST_TYPES.has(cost.type);
+}
+
+/**
+ * Determine whether a single cost option is payable in the current state.
+ * Used by CHOOSE_ONE_COST to filter options before prompting.
+ */
+function isCostPayable(
+  state: GameState,
+  cost: Cost,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+): boolean {
+  if (cost.type === "CHOOSE_ONE_COST") {
+    const opts = cost.options ?? [];
+    return opts.some((o) => isCostPayable(state, o, controller, cardDb, sourceCardInstanceId));
+  }
+  if (costNeedsPlayerSelection(cost)) {
+    if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") {
+      return state.players[controller].life.length > 0;
+    }
+    const targets = computeCostTargets(state, cost, controller, cardDb);
+    const amount = typeof cost.amount === "number" ? cost.amount : 1;
+    return targets.length >= amount;
+  }
+  return payCosts(state, [cost], controller, cardDb, sourceCardInstanceId) !== null;
 }
 
 /**
@@ -501,8 +528,67 @@ export function payCostsWithSelection(
     charactersKoInstanceIds: [],
   };
 
-  for (let i = startIndex; i < costs.length; i++) {
-    const cost = costs[i];
+  // Use a mutable copy so CHOOSE_ONE_COST auto-select can replace the slot.
+  const workingCosts = [...costs];
+  for (let i = startIndex; i < workingCosts.length; i++) {
+    const cost = workingCosts[i];
+
+    // CHOOSE_ONE_COST — present payable options to the player.
+    if (cost.type === "CHOOSE_ONE_COST") {
+      const options = cost.options ?? [];
+      const payableIndices: number[] = [];
+      for (let oi = 0; oi < options.length; oi++) {
+        if (isCostPayable(nextState, options[oi], controller, cardDb, sourceCardInstanceId)) {
+          payableIndices.push(oi);
+        }
+      }
+
+      if (payableIndices.length === 0) {
+        return { state: nextState, events, cannotPay: true };
+      }
+
+      if (payableIndices.length === 1) {
+        // Auto-select: replace slot and retry this index.
+        workingCosts[i] = options[payableIndices[0]];
+        i--;
+        continue;
+      }
+
+      const frame: EffectStackFrame = {
+        id: generateFrameId(),
+        sourceCardInstanceId,
+        controller,
+        effectBlock,
+        phase: "AWAITING_COST_SELECTION",
+        pausedAction: null,
+        remainingActions: effectBlock.actions ?? [],
+        resultRefs: [],
+        validTargets: payableIndices.map((oi) => String(oi)),
+        costs: workingCosts,
+        currentCostIndex: i,
+        costsPaid: false,
+        oncePerTurnMarked: false,
+        costResultRefs: [...costResultToEntries(costResult)],
+        pendingTriggers: [],
+        simultaneousTriggers: [],
+        accumulatedEvents: events,
+      };
+      nextState = pushFrame(nextState, frame);
+
+      const pendingPrompt: PendingPromptState = {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          effectDescription: "Choose a cost to pay",
+          choices: payableIndices.map((oi) => ({
+            id: String(oi),
+            label: getCostLabel(options[oi]),
+          })),
+        },
+        respondingPlayer: controller,
+        resumeContext: frame.id,
+      };
+      return { state: nextState, events, pendingPrompt };
+    }
 
     if (costNeedsPlayerSelection(cost)) {
       // Special handling for LIFE_TO_HAND with TOP_OR_BOTTOM — use PLAYER_CHOICE
@@ -522,7 +608,7 @@ export function payCostsWithSelection(
           remainingActions: effectBlock.actions ?? [],
           resultRefs: [],
           validTargets: ["TOP", "BOTTOM"],
-          costs,
+          costs: workingCosts,
           currentCostIndex: i,
           costsPaid: false,
           oncePerTurnMarked: false,
@@ -567,7 +653,7 @@ export function payCostsWithSelection(
         remainingActions: effectBlock.actions ?? [],
         resultRefs: [],
         validTargets,
-        costs,
+        costs: workingCosts,
         currentCostIndex: i,
         costsPaid: false,
         oncePerTurnMarked: false,
@@ -711,6 +797,10 @@ export function computeCostTargets(
       return candidates;
     }
 
+    case "CHOOSE_ONE_COST":
+      // Targets are computed per-option after selection; no aggregate list.
+      return [];
+
     default:
       return [];
   }
@@ -728,6 +818,7 @@ export function getCostLabel(cost: Cost): string {
     case "REST_CARDS": return `Choose ${amount} card(s) to rest as cost`;
     case "TRASH_OWN_CHARACTER": return `Choose ${amount} character(s) to trash as cost`;
     case "REVEAL_FROM_HAND": return `Choose ${amount} card(s) from hand to reveal as cost`;
+    case "CHOOSE_ONE_COST": return "Choose a cost to pay";
     default: return "Select card(s) as cost";
   }
 }

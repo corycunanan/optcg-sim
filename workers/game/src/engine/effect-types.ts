@@ -887,6 +887,7 @@ export interface Cost {
   filter?: TargetFilter;
   target?: Target;
   position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+  options?: Cost[];
 }
 
 export type CostType =
@@ -915,7 +916,8 @@ export type CostType =
   | "LIFE_TO_HAND"
   | "REST_DON"
   | "TURN_LIFE_FACE_UP"
-  | "TURN_LIFE_FACE_DOWN";
+  | "TURN_LIFE_FACE_DOWN"
+  | "CHOOSE_ONE_COST";
 
 // ─── Durations (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────
 
