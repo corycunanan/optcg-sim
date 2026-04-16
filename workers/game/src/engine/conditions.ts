@@ -188,7 +188,8 @@ function evaluateSimple(
         return data.types?.some((t) => t.includes(prop.trait_contains as string)) ?? false;
       }
       if ("attribute" in prop) {
-        return data.attribute?.includes(prop.attribute) ?? false;
+        const want = prop.attribute.toUpperCase();
+        return data.attribute?.some((a) => a.toUpperCase() === want) ?? false;
       }
       if ("name" in prop) {
         return data.name === prop.name;
@@ -606,8 +607,14 @@ export function matchesFilter(
   if (filter.has_trigger === true && !data.keywords.trigger) return false;
   if (filter.has_trigger === false && data.keywords.trigger) return false;
 
-  if (filter.attribute && !(data.attribute ?? []).includes(filter.attribute)) return false;
-  if (filter.attribute_not && (data.attribute ?? []).includes(filter.attribute_not)) return false;
+  if (filter.attribute) {
+    const want = filter.attribute.toUpperCase();
+    if (!(data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
+  }
+  if (filter.attribute_not) {
+    const want = filter.attribute_not.toUpperCase();
+    if ((data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
+  }
 
   if (filter.has_effect === true) {
     if (!data.effectText || data.effectText.trim() === "") return false;
