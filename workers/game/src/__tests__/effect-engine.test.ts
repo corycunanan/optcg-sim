@@ -10,7 +10,7 @@ import { evaluateCondition, matchesFilter, type ConditionContext } from "../engi
 import { registerTriggersForCard, matchTriggersForEvent, orderMatchedTriggers, deregisterTriggersForCard } from "../engine/triggers.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { checkProhibitions, isProhibitedForCard } from "../engine/prohibitions.js";
-import { checkReplacementForKO } from "../engine/replacements.js";
+import { checkReplacementForKO, checkReplacementForRemoval } from "../engine/replacements.js";
 import { expireEndOfTurnEffects, expireBattleEffects, expireSourceLeftZone, processScheduledActions } from "../engine/duration-tracker.js";
 import { getEffectivePower, hasGrantedKeyword } from "../engine/modifiers.js";
 import type { GameState, CardData, CardInstance, GameEvent } from "../types.js";
@@ -984,6 +984,179 @@ describe("Replacement Effects", () => {
     const cardDb = makeCardDb(NAMI_CARD);
     const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
 
+    expect(result.replaced).toBe(false);
+    expect(result.pendingPrompt).toBeUndefined();
+  });
+
+  // ─── target_filter matching (OPT-217) ───────────────────────────────────────
+
+  it("matches replacement against non-source target via target_filter (Tashigi-style)", () => {
+    // Tashigi protects OTHER green characters. Register with appliesTo=[] (wildcard)
+    // and target_filter that excludes Tashigi by name.
+    const GREEN_ALLY: CardData = {
+      ...NAMI_CARD,
+      id: "GREEN-ALLY",
+      name: "Green Ally",
+      color: ["Green"],
+    };
+    const TASHIGI: CardData = {
+      ...NAMI_CARD,
+      id: "TASHIGI",
+      name: "Tashigi",
+      color: ["Green"],
+    };
+
+    const state = createInitialGameState();
+    const tashigi: CardInstance = {
+      instanceId: "tashigi-1",
+      cardId: TASHIGI.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    const ally: CardInstance = {
+      instanceId: "ally-1",
+      cardId: GREEN_ALLY.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    state.players[0].characters = padChars([tashigi, ally]);
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-tashigi",
+      sourceCardInstanceId: "tashigi-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_REMOVED_FROM_FIELD",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { color: "GREEN", exclude_name: "Tashigi", card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [], // wildcard — relies on target_filter
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+
+    const cardDb = makeCardDb(GREEN_ALLY, TASHIGI);
+
+    // Opponent effect would remove the green ally → prompt fires for Tashigi
+    const allyResult = checkReplacementForRemoval(state, "ally-1", 1, cardDb);
+    expect(allyResult.pendingPrompt).toBeDefined();
+    expect(allyResult.pendingPrompt!.respondingPlayer).toBe(0);
+
+    // Opponent effect would remove Tashigi herself → no prompt (self-excluded)
+    const selfResult = checkReplacementForRemoval(state, "tashigi-1", 1, cardDb);
+    expect(selfResult.pendingPrompt).toBeUndefined();
+    expect(selfResult.replaced).toBe(false);
+  });
+
+  it("does not match when target_filter rejects the target's color/trait", () => {
+    const RED_ALLY: CardData = {
+      ...NAMI_CARD,
+      id: "RED-ALLY",
+      name: "Red Ally",
+      color: ["Red"],
+    };
+    const TASHIGI: CardData = {
+      ...NAMI_CARD,
+      id: "TASHIGI",
+      name: "Tashigi",
+      color: ["Green"],
+    };
+
+    const state = createInitialGameState();
+    const redAlly: CardInstance = {
+      instanceId: "red-1",
+      cardId: RED_ALLY.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    state.players[0].characters = padChars([redAlly]);
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-tashigi",
+      sourceCardInstanceId: "tashigi-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_REMOVED_FROM_FIELD",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { color: "GREEN", exclude_name: "Tashigi", card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+
+    const cardDb = makeCardDb(RED_ALLY, TASHIGI);
+    const result = checkReplacementForRemoval(state, "red-1", 1, cardDb);
+    expect(result.replaced).toBe(false);
+    expect(result.pendingPrompt).toBeUndefined();
+  });
+
+  it("honors exclude_self on target_filter", () => {
+    const ALLY: CardData = {
+      ...NAMI_CARD,
+      id: "ALLY",
+      name: "Ally",
+      color: ["Green"],
+    };
+    const state = createInitialGameState();
+    const source: CardInstance = {
+      instanceId: "source-1",
+      cardId: ALLY.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    state.players[0].characters = padChars([source]);
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl",
+      sourceCardInstanceId: "source-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER", exclude_self: true },
+          replacement_actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+
+    const cardDb = makeCardDb(ALLY);
+    const result = checkReplacementForKO(state, "source-1", "effect", 1, cardDb);
     expect(result.replaced).toBe(false);
     expect(result.pendingPrompt).toBeUndefined();
   });

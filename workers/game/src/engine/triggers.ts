@@ -225,6 +225,11 @@ export function registerReplacementsForCard(
     const zone: EffectZone = block.zone ?? "FIELD";
     if (!isCardInValidZone(cardInstance, zone)) continue;
 
+    // If the schema declares a target_filter, the replacement protects any
+    // instance matching that filter — register with empty appliesTo (wildcard)
+    // and rely on the filter at check time. Otherwise it's self-protecting.
+    const hasTargetFilter = !!block.replaces.target_filter;
+
     newEffects.push({
       id: nanoid(),
       sourceCardInstanceId: cardInstance.instanceId,
@@ -244,7 +249,7 @@ export function registerReplacementsForCard(
       duration: { type: "PERMANENT" as const },
       expiresAt: { wave: "SOURCE_LEAVES_ZONE" as const },
       controller: cardInstance.controller,
-      appliesTo: [cardInstance.instanceId],
+      appliesTo: hasTargetFilter ? [] : [cardInstance.instanceId],
       timestamp: Date.now(),
     });
   }

@@ -18,6 +18,7 @@ import type {
   Action,
   CauseFilter,
   RuntimeActiveEffect,
+  TargetFilter,
 } from "./effect-types.js";
 import type {
   CardData,
@@ -28,6 +29,7 @@ import type {
   PendingPromptState,
 } from "../types.js";
 import { findCardInstance } from "./state.js";
+import { matchesFilter } from "./conditions.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -60,7 +62,7 @@ export interface ReplacementCheckResult {
 interface ReplacementParams {
   trigger: string;
   cause_filter: CauseFilter | null;
-  target_filter: Record<string, unknown> | null;
+  target_filter: TargetFilter | null;
   replacement_actions: Action[];
   optional: boolean;
   once_per_turn: boolean;
@@ -169,8 +171,18 @@ function checkReplacementForEvent(
     // Match trigger event
     if (params.trigger !== event) continue;
 
-    // Check if this replacement applies to the target card
+    // appliesTo: non-empty list = instance whitelist (self-protection);
+    // empty list = wildcard (rely on target_filter to narrow).
     if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) continue;
+
+    // target_filter: evaluate against the target card when present.
+    if (params.target_filter) {
+      const targetCard = findCardInstance(state, targetInstanceId);
+      if (!targetCard) continue;
+      // exclude_self is handled outside matchesFilter (same convention as target-resolver.ts)
+      if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) continue;
+      if (!matchesFilter(targetCard, params.target_filter, cardDb, state)) continue;
+    }
 
     // Check cause filter
     if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {
