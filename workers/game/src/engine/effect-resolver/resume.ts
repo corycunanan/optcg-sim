@@ -4,6 +4,7 @@
 
 import type {
   Action,
+  ChoiceCost,
   Cost,
   EffectBlock,
   EffectResult,
@@ -711,6 +712,101 @@ export function resumeFromStack(
         }
 
         // Build cost refs from accumulated + any new results.
+        const mergedRefs = new Map<string, EffectResult>(accumulatedCostRefs);
+        if (resumeResult.costResult) {
+          const newRefs = costResultRefsFromEntries(costResultToEntries(resumeResult.costResult));
+          if (newRefs) {
+            for (const [key, val] of newRefs) {
+              const existing = mergedRefs.get(key);
+              mergedRefs.set(key, existing
+                ? { targetInstanceIds: [...existing.targetInstanceIds, ...val.targetInstanceIds], count: existing.count + val.count }
+                : val);
+            }
+          }
+        }
+        const hasRefs = [...mergedRefs.values()].some((v) => v.count > 0);
+        const costRefsForActions = hasRefs ? mergedRefs : undefined;
+
+        if (topFrame.remainingActions.length > 0) {
+          const chainResult = executeActionChain(
+            nextState,
+            topFrame.remainingActions as Action[],
+            sourceCardInstanceId,
+            controller,
+            cardDb,
+            costRefsForActions,
+          );
+          nextState = chainResult.state;
+          events.push(...chainResult.events);
+
+          if (chainResult.pendingPrompt) {
+            const newTop = peekFrame(nextState) as EffectStackFrame;
+            if (newTop) {
+              nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+            }
+            return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+          }
+
+          if (chainResult.events.length > 0) {
+            const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
+            nextState = chainScan.state;
+            if (chainScan.triggers.length > 0) {
+              const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+              return processRemainingTriggers(nextState, allTriggers, cardDb, events);
+            }
+          }
+        }
+
+        return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+      }
+
+      // CHOICE — player chose a branch; splice that branch's costs in and re-enter.
+      if (action.type === "PLAYER_CHOICE" && cost.type === "CHOICE") {
+        const choiceCost = cost as ChoiceCost;
+        const branchIdx = Number(action.choiceId);
+        const branch = choiceCost.options[branchIdx];
+        if (!branch) {
+          return { state, events, resolved: false };
+        }
+
+        nextState = popFrame(nextState);
+
+        const replacedCosts = [...topFrame.costs] as Cost[];
+        replacedCosts.splice(topFrame.currentCostIndex, 1, ...branch);
+
+        const block = topFrame.effectBlock as EffectBlock;
+        const resumeResult = payCostsWithSelection(
+          nextState,
+          replacedCosts,
+          topFrame.currentCostIndex,
+          controller,
+          cardDb,
+          sourceCardInstanceId,
+          block,
+        );
+
+        if (resumeResult.cannotPay) {
+          return processRemainingTriggers(resumeResult.state, topFrame.pendingTriggers, cardDb, events);
+        }
+
+        nextState = resumeResult.state;
+        events.push(...resumeResult.events);
+
+        if (resumeResult.pendingPrompt) {
+          const newTop = peekFrame(nextState) as EffectStackFrame;
+          if (newTop) {
+            nextState = updateTopFrame(nextState, {
+              costResultRefs: topFrame.costResultRefs,
+              pendingTriggers: topFrame.pendingTriggers,
+            });
+          }
+          return { state: nextState, events, resolved: false, pendingPrompt: resumeResult.pendingPrompt };
+        }
+
+        if (block.flags?.once_per_turn && !topFrame.oncePerTurnMarked) {
+          nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
+        }
+
         const mergedRefs = new Map<string, EffectResult>(accumulatedCostRefs);
         if (resumeResult.costResult) {
           const newRefs = costResultRefsFromEntries(costResultToEntries(resumeResult.costResult));
