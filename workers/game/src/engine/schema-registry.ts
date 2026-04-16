@@ -10,7 +10,7 @@
  * from the schemas/ directory.
  */
 
-import type { EffectSchema, EffectBlock, Action } from "./effect-types.js";
+import type { EffectSchema, EffectBlock, Action, Cost } from "./effect-types.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
 import { OP03_SCHEMAS } from "./schemas/op03.js";
@@ -265,6 +265,13 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
       break;
   }
 
+  // Validate costs
+  if (block.costs) {
+    for (let i = 0; i < block.costs.length; i++) {
+      errors.push(...validateCost(block.costs[i], `${prefix}.costs[${i}]`, false));
+    }
+  }
+
   // Validate actions
   if (block.actions) {
     for (let i = 0; i < block.actions.length; i++) {
@@ -275,6 +282,51 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
   if (block.replacement_actions) {
     for (let i = 0; i < block.replacement_actions.length; i++) {
       errors.push(...validateAction(block.replacement_actions[i], `${prefix}.replacement_actions[${i}]`));
+    }
+  }
+
+  return errors;
+}
+
+export function validateCost(cost: Cost, prefix: string, insideChoice: boolean): string[] {
+  const errors: string[] = [];
+
+  if (!cost || typeof cost !== "object") {
+    errors.push(`${prefix}: cost must be an object`);
+    return errors;
+  }
+
+  if (!cost.type) {
+    errors.push(`${prefix}: Missing 'type' field`);
+    return errors;
+  }
+
+  if (cost.type === "CHOICE") {
+    if (insideChoice) {
+      errors.push(`${prefix}: CHOICE cost cannot nest inside another CHOICE`);
+    }
+    const options = (cost as { options?: unknown }).options;
+    if (!Array.isArray(options) || options.length < 2) {
+      errors.push(`${prefix}: CHOICE cost requires 'options' with at least 2 branches`);
+    } else {
+      for (let i = 0; i < options.length; i++) {
+        const branch = options[i];
+        if (!Array.isArray(branch)) {
+          errors.push(`${prefix}.options[${i}]: each branch must be an array of costs`);
+          continue;
+        }
+        for (let j = 0; j < branch.length; j++) {
+          errors.push(...validateCost(branch[j] as Cost, `${prefix}.options[${i}][${j}]`, true));
+        }
+      }
+    }
+    const labels = (cost as { labels?: unknown }).labels;
+    if (labels !== undefined) {
+      if (!Array.isArray(labels) || !labels.every((l) => typeof l === "string")) {
+        errors.push(`${prefix}: 'labels' must be an array of strings`);
+      } else if (Array.isArray(options) && labels.length !== options.length) {
+        errors.push(`${prefix}: 'labels' length must equal 'options' length`);
+      }
     }
   }
 
