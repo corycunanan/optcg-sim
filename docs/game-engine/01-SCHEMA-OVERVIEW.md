@@ -217,8 +217,35 @@ type CostType =
   | "PLACE_SELF_AND_HAND_TO_DECK" // Stage + hand card to deck bottom
 
   // Cost-level disjunction
-  | "CHOOSE_ONE_COST";        // Player picks ONE of the listed sub-costs to pay
+  | "CHOOSE_ONE_COST"         // Player picks ONE of the listed sub-costs to pay (single-cost options)
+  | "CHOICE";                 // Player picks ONE branch from a list of multi-cost branches
 ```
+
+### CHOICE — branched cost ("A or B")
+
+`CHOICE` expresses "pay one of these branches," where each branch can be one or more sub-costs. Use this for card text like OP13-079 Imu's [Activate: Main]:
+
+> You may trash 1 of your {Celestial Dragons} type Characters or 1 card from your hand: Draw 1 card.
+
+```json
+{
+  "type": "CHOICE",
+  "labels": ["Trash Celestial Dragons Character", "Trash card from hand"],
+  "options": [
+    [{ "type": "TRASH_OWN_CHARACTER", "amount": 1, "filter": { "traits": ["Celestial Dragons"] } }],
+    [{ "type": "TRASH_FROM_HAND", "amount": 1 }]
+  ]
+}
+```
+
+Semantics at cost-payment time:
+
+1. Each branch is checked for payability via `isCostPayable` — a branch is payable iff **every** sub-cost in that branch is payable.
+2. **0 payable** → activation is blocked at the validation step (`Cost cannot be paid`).
+3. **1 payable** → the payable branch auto-expands inline; no branch prompt is emitted. The remaining sub-cost prompts (e.g. `SELECT_TARGET`) fire normally.
+4. **≥2 payable** → engine emits a `PLAYER_CHOICE` prompt listing payable branches (unpayable branches are hidden). After the player picks, the chosen branch's sub-costs expand inline and the cost loop resumes.
+
+`labels` is optional per-branch UI hint; if omitted, labels are derived from sub-cost types.
 
 ### CHOOSE_ONE_COST — cost-level "or"
 
@@ -241,7 +268,7 @@ Semantics at cost-payment time:
 3. **1 payable** → auto-selected; the normal prompt for that option fires. No choice prompt.
 4. **≥2 payable** → engine emits a `PLAYER_CHOICE` prompt listing the payable options by their cost label. After the player chooses, the chosen option replaces the `CHOOSE_ONE_COST` slot and its own selection flow runs.
 
-**When NOT to use.** If the alternatives differ only in target filter (e.g. "rest Leader or Stage"), use a single cost with a permissive filter. If the branching is within *actions*, use `choose_one` at the action level. `CHOOSE_ONE_COST` is specifically for disjunction of cost *types* / unrelated cost shapes.
+**When NOT to use.** If the alternatives differ only in target filter (e.g. "rest Leader or Stage"), use a single cost with a permissive filter. If the branching is within *actions*, use `choose_one` at the action level. `CHOOSE_ONE_COST` is specifically for disjunction of cost *types* / unrelated cost shapes. If any branch is itself a sequence of sub-costs (e.g. "trash 2 from hand AND rest 1 DON!!"), use `CHOICE` instead.
 
 ### Filtered Costs
 
