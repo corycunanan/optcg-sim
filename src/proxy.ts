@@ -1,6 +1,5 @@
-export { proxy as default } from "@/lib/proxy";
+export { routeGuard as default } from "@/lib/route-guard";
 
 export const config = {
   matcher: ["/admin/:path*", "/onboarding"],
-  runtime: "nodejs",
 };
