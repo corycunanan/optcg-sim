@@ -330,4 +330,110 @@ describe("OPT-178: CHOICE cost", () => {
       expect(resumed.resolved).toBe(false);
     });
   });
+
+  // ─── OPT-179: branch-expansion acceptance (hand vs character) ────────────
+
+  describe("OPT-179: branch expansion — TRASH_FROM_HAND vs TRASH_OWN_CHARACTER", () => {
+    function handOrCharacterChoice(): ChoiceCost {
+      return {
+        type: "CHOICE",
+        options: [
+          [{ type: "TRASH_FROM_HAND", amount: 1 }],
+          [{ type: "TRASH_OWN_CHARACTER", amount: 1 }],
+        ],
+      };
+    }
+
+    function placeVanillaChar(
+      state: ReturnType<typeof createBattleReadyState>,
+    ): { state: ReturnType<typeof createBattleReadyState>; charId: string } {
+      const charId = "char-0-vanilla";
+      const vanilla: CardInstance = {
+        instanceId: charId,
+        cardId: CARDS.VANILLA.id,
+        zone: "CHARACTER",
+        state: "ACTIVE",
+        attachedDon: [],
+        turnPlayed: 1,
+        controller: 0,
+        owner: 0,
+      };
+      return {
+        state: withPlayer(state, 0, { characters: padChars([vanilla]) }),
+        charId,
+      };
+    }
+
+    it("branch 0 (hand): player picks hand branch → hand-pick prompt → effect resolves", () => {
+      const cardDb = createTestCardDb();
+      const base = createBattleReadyState(cardDb);
+      const { state, charId } = placeVanillaChar(base);
+
+      const block = makeBlock([handOrCharacterChoice()]);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+
+      const afterChoice = resumeFromStack(
+        first.state,
+        { type: "PLAYER_CHOICE", choiceId: "0" },
+        cardDb,
+      );
+      expect(afterChoice.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+      const handCardId = afterChoice.state.players[0].hand[0].instanceId;
+      const deckSizeBefore = afterChoice.state.players[0].deck.length;
+
+      const final = resumeFromStack(
+        afterChoice.state,
+        { type: "SELECT_TARGET", selectedInstanceIds: [handCardId] },
+        cardDb,
+      );
+
+      const p0 = final.state.players[0];
+      // Hand card trashed.
+      expect(p0.trash.find((c) => c.instanceId === handCardId)).toBeTruthy();
+      // Character untouched.
+      expect(p0.characters.some((c) => c?.instanceId === charId)).toBe(true);
+      // DRAW resolved.
+      expect(p0.deck.length).toBe(deckSizeBefore - 1);
+    });
+
+    it("branch 1 (character): player picks character branch → character-pick prompt → effect resolves", () => {
+      const cardDb = createTestCardDb();
+      const base = createBattleReadyState(cardDb);
+      const { state, charId } = placeVanillaChar(base);
+
+      const block = makeBlock([handOrCharacterChoice()]);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+
+      const afterChoice = resumeFromStack(
+        first.state,
+        { type: "PLAYER_CHOICE", choiceId: "1" },
+        cardDb,
+      );
+      expect(afterChoice.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      if (afterChoice.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+        expect(afterChoice.pendingPrompt.options.validTargets).toContain(charId);
+      }
+
+      const handSizeBefore = afterChoice.state.players[0].hand.length;
+      const deckSizeBefore = afterChoice.state.players[0].deck.length;
+
+      const final = resumeFromStack(
+        afterChoice.state,
+        { type: "SELECT_TARGET", selectedInstanceIds: [charId] },
+        cardDb,
+      );
+
+      const p0 = final.state.players[0];
+      // Character trashed from field.
+      expect(p0.characters.some((c) => c?.instanceId === charId)).toBe(false);
+      expect(p0.trash.find((c) => c.instanceId === charId)).toBeTruthy();
+      // Hand only gained the DRAW card — character branch did not take from hand.
+      expect(p0.hand.length).toBe(handSizeBefore + 1);
+      // DRAW resolved.
+      expect(p0.deck.length).toBe(deckSizeBefore - 1);
+    });
+  });
 });
