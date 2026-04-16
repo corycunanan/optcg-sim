@@ -881,13 +881,21 @@ export interface MixedPool {
 
 // ─── Costs (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────────
 
-export interface Cost {
-  type: CostType;
+export type Cost = SimpleCost | ChoiceCost;
+
+export interface SimpleCost {
+  type: Exclude<CostType, "CHOICE">;
   amount?: number | "ANY_NUMBER" | DynamicValue;
   filter?: TargetFilter;
   target?: Target;
   position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
   options?: Cost[];
+}
+
+export interface ChoiceCost {
+  type: "CHOICE";
+  options: Cost[][];
+  labels?: string[];
 }
 
 export type CostType =
@@ -917,7 +925,8 @@ export type CostType =
   | "REST_DON"
   | "TURN_LIFE_FACE_UP"
   | "TURN_LIFE_FACE_DOWN"
-  | "CHOOSE_ONE_COST";
+  | "CHOOSE_ONE_COST"
+  | "CHOICE";
 
 // ─── Durations (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────
 

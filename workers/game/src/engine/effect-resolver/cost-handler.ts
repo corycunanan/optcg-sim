@@ -6,6 +6,7 @@ import type {
   Cost,
   CostResult,
   EffectBlock,
+  SimpleCost,
 } from "../effect-types.js";
 import type {
   CardData,
@@ -496,7 +497,7 @@ function isCostPayable(
       return state.players[controller].life.length > 0;
     }
     const targets = computeCostTargets(state, cost, controller, cardDb);
-    const amount = typeof cost.amount === "number" ? cost.amount : 1;
+    const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
     return targets.length >= amount;
   }
   return payCosts(state, [cost], controller, cardDb, sourceCardInstanceId) !== null;
@@ -636,7 +637,7 @@ export function payCostsWithSelection(
 
       // Build valid targets for this cost
       const validTargets = computeCostTargets(nextState, cost, controller, cardDb);
-      const amount = typeof cost.amount === "number" ? cost.amount : 1;
+      const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
 
       if (validTargets.length < amount) {
         return { state: nextState, events, cannotPay: true };
@@ -807,7 +808,7 @@ export function computeCostTargets(
 }
 
 export function getCostLabel(cost: Cost): string {
-  const amount = typeof cost.amount === "number" ? cost.amount : 1;
+  const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
   switch (cost.type) {
     case "TRASH_FROM_HAND": return `Choose ${amount} card(s) from hand to trash as cost`;
     case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;
