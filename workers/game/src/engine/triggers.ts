@@ -605,7 +605,8 @@ function matchesEventFilter(
       const card = findCardInstance(state, cardId);
       if (card) {
         const data = cardDb.get(card.cardId);
-        if (!data?.attribute?.includes(filter.attribute)) return false;
+        const want = filter.attribute.toUpperCase();
+        if (!data?.attribute?.some((a) => a.toUpperCase() === want)) return false;
       }
     }
   }
