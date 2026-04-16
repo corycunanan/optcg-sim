@@ -2759,17 +2759,22 @@ export const OP13_079_IMU: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [
         {
-          type: "CHOOSE_ONE_COST",
+          type: "CHOICE",
+          labels: ["Trash Celestial Dragons Character", "Trash card from hand"],
           options: [
-            {
-              type: "TRASH_OWN_CHARACTER",
-              amount: 1,
-              filter: { traits: ["Celestial Dragons"] },
-            },
-            {
-              type: "TRASH_FROM_HAND",
-              amount: 1,
-            },
+            [
+              {
+                type: "TRASH_OWN_CHARACTER",
+                amount: 1,
+                filter: { traits: ["Celestial Dragons"] },
+              },
+            ],
+            [
+              {
+                type: "TRASH_FROM_HAND",
+                amount: 1,
+              },
+            ],
           ],
         },
       ],

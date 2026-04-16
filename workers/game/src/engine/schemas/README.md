@@ -366,6 +366,30 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `PLACE_SELF_AND_HAND_TO_DECK` | "Place this card and hand to deck" |
 | `REST_DON` | "Rest N DON!!" (as cost) |
 
+### Branched Costs ("A or B")
+
+| Type | Card Text | Notes |
+|------|-----------|-------|
+| `CHOOSE_ONE_COST` | "Pay X or Y" where X and Y are single costs | `options: SimpleCost[]` |
+| `CHOICE` | "Pay X or Y" where a branch may itself be multiple costs | `options: Cost[][]`, optional `labels: string[]` |
+
+Payability is evaluated per-branch: unpayable branches are hidden, a single payable branch auto-selects without prompting, and if no branch is payable the activation is blocked with `Cost cannot be paid`. Use `CHOICE` whenever any branch bundles more than one sub-cost; use `CHOOSE_ONE_COST` for the simpler flat case.
+
+**Example — OP13-079 Imu [Activate: Main]:** "trash 1 {Celestial Dragons} Character **or** 1 card from hand: Draw 1."
+
+```ts
+costs: [
+  {
+    type: "CHOICE",
+    labels: ["Trash Celestial Dragons Character", "Trash card from hand"],
+    options: [
+      [{ type: "TRASH_OWN_CHARACTER", amount: 1, filter: { traits: ["Celestial Dragons"] } }],
+      [{ type: "TRASH_FROM_HAND", amount: 1 }],
+    ],
+  },
+],
+```
+
 ---
 
 ## Complete Action Catalog
