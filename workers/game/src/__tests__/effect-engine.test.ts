@@ -10,7 +10,7 @@ import { evaluateCondition, matchesFilter, type ConditionContext } from "../engi
 import { registerTriggersForCard, matchTriggersForEvent, orderMatchedTriggers, deregisterTriggersForCard } from "../engine/triggers.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { checkProhibitions, isProhibitedForCard } from "../engine/prohibitions.js";
-import { checkReplacementForKO, checkReplacementForRemoval } from "../engine/replacements.js";
+import { checkReplacementForKO, checkReplacementForRemoval, resumeReplacement } from "../engine/replacements.js";
 import { expireEndOfTurnEffects, expireBattleEffects, expireSourceLeftZone, processScheduledActions } from "../engine/duration-tracker.js";
 import { getEffectivePower, hasGrantedKeyword } from "../engine/modifiers.js";
 import type { GameState, CardData, CardInstance, GameEvent } from "../types.js";
@@ -1159,6 +1159,107 @@ describe("Replacement Effects", () => {
     const result = checkReplacementForKO(state, "source-1", "effect", 1, cardDb);
     expect(result.replaced).toBe(false);
     expect(result.pendingPrompt).toBeUndefined();
+  });
+
+  // ─── Substitute action dispatcher (OPT-218) ────────────────────────────────
+
+  it("dispatches SET_REST substitute — Tashigi rests herself when accepting", () => {
+    const TASHIGI: CardData = { ...NAMI_CARD, id: "TASHIGI", name: "Tashigi", color: ["Green"] };
+    const GREEN_ALLY: CardData = { ...NAMI_CARD, id: "GREEN-ALLY", name: "Green Ally", color: ["Green"] };
+
+    const state = createInitialGameState();
+    const tashigi: CardInstance = {
+      instanceId: "tashigi-1", cardId: TASHIGI.id, zone: "CHARACTER", state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    const ally: CardInstance = {
+      instanceId: "ally-1", cardId: GREEN_ALLY.id, zone: "CHARACTER", state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    state.players[0].characters = padChars([tashigi, ally]);
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-tashigi",
+      sourceCardInstanceId: "tashigi-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_REMOVED_FROM_FIELD",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { color: "GREEN", exclude_name: "Tashigi", card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+    const cardDb = makeCardDb(GREEN_ALLY, TASHIGI);
+
+    // Player accepts the prompt; resumeReplacement applies the substitute.
+    const result = resumeReplacement(
+      state,
+      { type: "REPLACEMENT", effectId: "repl-tashigi", targetInstanceId: "ally-1", event: "WOULD_BE_REMOVED_FROM_FIELD" },
+      true,
+      cardDb,
+    );
+
+    expect(result.replaced).toBe(true);
+    const tashigiAfter = result.state.players[0].characters.find((c) => c?.instanceId === "tashigi-1");
+    expect(tashigiAfter?.state).toBe("RESTED");
+    // Ally remains untouched by the replacement itself (original removal is skipped by caller)
+    const allyAfter = result.state.players[0].characters.find((c) => c?.instanceId === "ally-1");
+    expect(allyAfter?.zone).toBe("CHARACTER");
+  });
+
+  it("dispatches TRASH_CARD substitute — Ivankov-style trashes himself", () => {
+    const IVANKOV: CardData = { ...NAMI_CARD, id: "IVANKOV", name: "Emporio Ivankov" };
+
+    const state = createInitialGameState();
+    const ivankov: CardInstance = {
+      instanceId: "ivankov-1", cardId: IVANKOV.id, zone: "CHARACTER", state: "ACTIVE",
+      attachedDon: [], turnPlayed: 1, controller: 0, owner: 0,
+    };
+    state.players[0].characters = padChars([ivankov]);
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-ivankov",
+      sourceCardInstanceId: "ivankov-1",
+      sourceEffectBlockId: "block-1",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: null,
+          target_filter: null,
+          replacement_actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+          optional: false,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: ["ivankov-1"],
+      timestamp: Date.now(),
+    };
+    state.activeEffects = [effect as any];
+    const cardDb = makeCardDb(IVANKOV);
+
+    const result = checkReplacementForKO(state, "ivankov-1", "effect", 1, cardDb);
+    expect(result.replaced).toBe(true);
+    // Ivankov trashed (not KO'd — no DON returned to deck)
+    const onField = result.state.players[0].characters.filter(Boolean);
+    expect(onField).toHaveLength(0);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === "ivankov-1")).toBe(true);
   });
 });
 

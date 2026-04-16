@@ -23,6 +23,7 @@ import type { EffectResolverResult, ActionResult, ActionHandler } from "./types.
 import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import { pushBatchResumeFrame, processRemainingTriggers } from "./resume.js";
+import { setReplacementDispatcher } from "../replacements.js";
 
 // Action handlers
 import * as drawSearch from "./actions/draw-search.js";
@@ -139,6 +140,12 @@ setChoiceDependencies({
   executeEffectAction,
   resolveEffect,
 });
+
+// Install the action dispatcher for replacement effects so their substitute
+// actions (SET_REST, TRASH_CARD, MODIFY_POWER, …) run through the real
+// handlers. Registered here to avoid a resolver → replacements → resolver
+// import cycle.
+setReplacementDispatcher(executeEffectAction);
 
 // ─── resolveEffect ───────────────────────────────────────────────────────────
 

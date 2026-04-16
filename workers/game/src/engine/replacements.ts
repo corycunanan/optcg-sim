@@ -17,6 +17,7 @@
 import type {
   Action,
   CauseFilter,
+  EffectResult,
   RuntimeActiveEffect,
   TargetFilter,
 } from "./effect-types.js";
@@ -28,8 +29,32 @@ import type {
   PendingEvent,
   PendingPromptState,
 } from "../types.js";
+import type { ActionResult } from "./effect-resolver/types.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter } from "./conditions.js";
+
+// ─── Dispatcher injection ────────────────────────────────────────────────────
+//
+// Replacement substitutes reuse the real action handlers (SET_REST, TRASH_CARD,
+// MODIFY_POWER, etc). Importing resolver directly would create a cycle
+// (resolver → removal → replacements → resolver), so the resolver installs
+// its dispatcher here at module init via setReplacementDispatcher.
+
+type ActionDispatcher = (
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+) => ActionResult;
+
+let executeActionDispatcher: ActionDispatcher | null = null;
+
+export function setReplacementDispatcher(dispatcher: ActionDispatcher): void {
+  executeActionDispatcher = dispatcher;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -302,11 +327,25 @@ function applyReplacement(
   const events: PendingEvent[] = [];
   let nextState = state;
 
-  // Execute replacement actions (costs like trash from hand)
+  // Execute each substitute action through the real resolver dispatcher.
+  // sourceCardInstanceId = the replacement's source (e.g. Tashigi), so that
+  // target: { type: "SELF" } resolves to her, not the event's original target.
   for (const action of params.replacement_actions) {
-    const result = executeReplacementAction(nextState, action, effect.controller, cardDb);
+    const result = executeReplacementAction(
+      nextState,
+      action,
+      effect.sourceCardInstanceId,
+      effect.controller,
+      cardDb,
+    );
     nextState = result.state;
     events.push(...result.events);
+
+    // If a substitute itself raises a prompt (e.g. opponent-targeting SET_REST
+    // with multiple choices, Kujyaku selecting 3 from trash), surface it.
+    if (result.pendingPrompt) {
+      return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
+    }
   }
 
   // Mark once-per-turn if applicable
@@ -318,56 +357,34 @@ function applyReplacement(
 }
 
 /**
- * Execute a single replacement action (the "instead" behavior).
- * These are simpler than full effect actions — typically just costs.
+ * Execute a single replacement substitute action by dispatching to the
+ * effect-resolver's action handlers. Falls back to a no-op if the resolver
+ * hasn't installed its dispatcher yet (unreachable at runtime).
  */
 function executeReplacementAction(
   state: GameState,
   action: Action,
+  replacementSourceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-): { state: GameState; events: PendingEvent[] } {
-  const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-
-  switch (action.type) {
-    case "TRASH_FROM_HAND": {
-      const amount = (params.amount as number) ?? 1;
-      const filter = params.filter as Record<string, unknown> | undefined;
-      const player = state.players[controller];
-
-      let candidates = [...player.hand];
-      if (filter) {
-        candidates = candidates.filter((c) => matchesCardFilter(c, filter, cardDb));
-      }
-
-      // Auto-select: trash from end of hand (most recently drawn)
-      const toTrash = candidates.slice(-amount);
-      const trashIds = new Set(toTrash.map((c) => c.instanceId));
-
-      const newHand = player.hand.filter((c) => !trashIds.has(c.instanceId));
-      const newTrash = [
-        ...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })),
-        ...player.trash,
-      ];
-
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...player, hand: newHand, trash: newTrash };
-
-      for (const card of toTrash) {
-        events.push({
-          type: "CARD_TRASHED",
-          playerIndex: controller,
-          payload: { cardId: card.cardId, from: "HAND", reason: "REPLACEMENT_EFFECT" },
-        });
-      }
-
-      return { state: { ...state, players: newPlayers }, events };
-    }
-    default:
-      // Unhandled replacement action type — skip
-      return { state, events };
+): { state: GameState; events: PendingEvent[]; pendingPrompt?: PendingPromptState } {
+  if (!executeActionDispatcher) {
+    console.warn("[Replacements] No dispatcher installed; skipping action", action.type);
+    return { state, events: [] };
   }
+  const result = executeActionDispatcher(
+    state,
+    action,
+    replacementSourceId,
+    controller,
+    cardDb,
+    new Map<string, EffectResult>(),
+  );
+  return {
+    state: result.state,
+    events: result.events,
+    pendingPrompt: result.pendingPrompt,
+  };
 }
 
 function markReplacementUsed(state: GameState, effect: RuntimeActiveEffect, turn: number): GameState {
