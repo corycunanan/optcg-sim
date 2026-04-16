@@ -706,6 +706,64 @@ export function payCostsWithSelection(
       return { state: nextState, events, pendingPrompt };
     }
 
+    // CHOICE — branching cost paths; each option is a full Cost[].
+    if (cost.type === "CHOICE") {
+      const choiceCost = cost as ChoiceCost;
+      const payableBranchIndices: number[] = [];
+      for (let bi = 0; bi < choiceCost.options.length; bi++) {
+        const branchPayable = choiceCost.options[bi].every((c) =>
+          isCostPayable(nextState, c, controller, cardDb, sourceCardInstanceId),
+        );
+        if (branchPayable) payableBranchIndices.push(bi);
+      }
+
+      if (payableBranchIndices.length === 0) {
+        return { state: nextState, events, cannotPay: true };
+      }
+
+      if (payableBranchIndices.length === 1) {
+        const branch = choiceCost.options[payableBranchIndices[0]];
+        workingCosts.splice(i, 1, ...branch);
+        i--;
+        continue;
+      }
+
+      const frame: EffectStackFrame = {
+        id: generateFrameId(),
+        sourceCardInstanceId,
+        controller,
+        effectBlock,
+        phase: "AWAITING_COST_SELECTION",
+        pausedAction: null,
+        remainingActions: effectBlock.actions ?? [],
+        resultRefs: [],
+        validTargets: payableBranchIndices.map((bi) => String(bi)),
+        costs: workingCosts,
+        currentCostIndex: i,
+        costsPaid: false,
+        oncePerTurnMarked: false,
+        costResultRefs: [...costResultToEntries(costResult)],
+        pendingTriggers: [],
+        simultaneousTriggers: [],
+        accumulatedEvents: events,
+      };
+      nextState = pushFrame(nextState, frame);
+
+      const pendingPrompt: PendingPromptState = {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          effectDescription: "Select how to pay the cost",
+          choices: payableBranchIndices.map((bi) => ({
+            id: String(bi),
+            label: choiceCost.labels?.[bi] ?? deriveBranchLabel(choiceCost.options[bi]),
+          })),
+        },
+        respondingPlayer: controller,
+        resumeContext: frame.id,
+      };
+      return { state: nextState, events, pendingPrompt };
+    }
+
     if (costNeedsPlayerSelection(cost)) {
       // Special handling for LIFE_TO_HAND with TOP_OR_BOTTOM — use PLAYER_CHOICE
       if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") {
@@ -937,6 +995,10 @@ export function getCostLabel(cost: Cost): string {
     case "CHOOSE_ONE_COST": return "Choose a cost to pay";
     default: return "Select card(s) as cost";
   }
+}
+
+export function deriveBranchLabel(branch: Cost[]): string {
+  return branch.map((c) => getCostLabel(c)).join(" + ");
 }
 
 export function getCostCtaLabel(cost: Cost): string {
