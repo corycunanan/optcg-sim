@@ -1,15 +1,7 @@
-import nextDynamic from "next/dynamic";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-
-const CardEditForm = nextDynamic(
-  () =>
-    import("@/components/admin/card-edit-form").then(
-      (mod) => mod.CardEditForm
-    ),
-  { ssr: false }
-);
+import { CardEditForm } from "./card-edit-form-loader";
 
 export const dynamic = "force-dynamic";
 
