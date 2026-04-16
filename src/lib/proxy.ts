@@ -26,8 +26,3 @@ export const proxy = auth((req) => {
     return Response.redirect(new URL("/onboarding", req.nextUrl.origin));
   }
 });
-
-export const config = {
-  matcher: ["/admin/:path*", "/onboarding"],
-  runtime: "nodejs" as const,
-};
