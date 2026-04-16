@@ -25,6 +25,25 @@ export function PlayerChoiceModal({
   onHide,
   onAction,
 }: PlayerChoiceModalProps) {
+  // Defensive safeguard: a single-choice PLAYER_CHOICE is a server-side bug
+  // (CHOICE and CHOOSE_ONE_COST auto-select when only one branch/option is
+  // payable). Auto-dispatch the lone choice and log so we notice in dev.
+  const autoDispatchedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (choices.length !== 1 || autoDispatchedRef.current) return;
+    autoDispatchedRef.current = true;
+    const [only] = choices;
+    console.warn(
+      "[PlayerChoiceModal] Received single-choice prompt from server — " +
+        "server should auto-select when only one option is payable. " +
+        "Auto-dispatching the only choice as a safe fallback.",
+      { choiceId: only.id, label: only.label },
+    );
+    onAction({ type: "PLAYER_CHOICE", choiceId: only.id });
+  }, [choices, onAction]);
+
+  if (choices.length <= 1) return null;
+
   return (
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
       <DialogContent
