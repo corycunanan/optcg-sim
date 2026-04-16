@@ -3,9 +3,9 @@
  * Protects /admin and /onboarding — redirects unauthenticated users to /login.
  * Also redirects authenticated users without a username to /onboarding.
  *
- * NOTE: This file contains the middleware logic but is not yet wired as
- * Next.js middleware. To activate, create src/middleware.ts that imports
- * and re-exports { proxy as default, config } from "@/lib/proxy".
+ * Wired as Next.js middleware via src/middleware.ts.
+ * Runs on the Node.js runtime because @/auth imports PrismaAdapter/bcryptjs
+ * which are not Edge-compatible.
  */
 import { auth } from "@/auth";
 
@@ -29,4 +29,5 @@ export const proxy = auth((req) => {
 
 export const config = {
   matcher: ["/admin/:path*", "/onboarding"],
+  runtime: "nodejs" as const,
 };

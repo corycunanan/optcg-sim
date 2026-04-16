@@ -7,14 +7,13 @@ import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiList, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { cardIdToOriginSet } from "@/lib/utils";
-import { CreateCardSchema } from "@/lib/validators/cards";
+import { CreateCardSchema, CardSearchParamsSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { searchLimiter, apiLimiter } from "@/lib/rate-limit";
 import {
   buildCardWhereClause,
   buildCardOrderBy,
   buildCardPagination,
-  type CardSearchParams,
 } from "@/lib/cards/search";
 
 export async function GET(request: NextRequest) {
@@ -24,26 +23,13 @@ export async function GET(request: NextRequest) {
     return apiError("Too many requests. Try again later.", 429);
   }
 
-  const sp = request.nextUrl.searchParams;
-  const params: CardSearchParams = {
-    q: sp.get("q") || undefined,
-    color: sp.get("color") || undefined,
-    type: sp.get("type") || undefined,
-    costMin: sp.get("costMin") || undefined,
-    costMax: sp.get("costMax") || undefined,
-    powerMin: sp.get("powerMin") || undefined,
-    powerMax: sp.get("powerMax") || undefined,
-    set: sp.get("set") || undefined,
-    block: sp.get("block") || undefined,
-    rarity: sp.get("rarity") || undefined,
-    ban: sp.get("ban") || undefined,
-    traits: sp.get("traits") || undefined,
-    attribute: sp.get("attribute") || undefined,
-    page: sp.get("page") || undefined,
-    limit: sp.get("limit") || undefined,
-    sort: sp.get("sort") || undefined,
-    order: sp.get("order") || undefined,
-  };
+  const parsed = CardSearchParamsSchema.safeParse(
+    Object.fromEntries(request.nextUrl.searchParams.entries()),
+  );
+  if (!parsed.success) {
+    return apiError("Invalid search parameters", 400);
+  }
+  const params = parsed.data;
 
   const where = buildCardWhereClause(params);
   const orderBy = buildCardOrderBy(params.sort, params.order);
