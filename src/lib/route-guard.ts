@@ -1,15 +1,15 @@
 /**
- * Route protection middleware logic.
+ * Route protection handler.
  * Protects /admin and /onboarding — redirects unauthenticated users to /login.
  * Also redirects authenticated users without a username to /onboarding.
  *
- * Wired as Next.js middleware via src/middleware.ts.
- * Runs on the Node.js runtime because @/auth imports PrismaAdapter/bcryptjs
- * which are not Edge-compatible.
+ * Wired as a Next.js proxy via src/proxy.ts.
+ * Runs on the Node.js runtime (the only runtime supported by proxy)
+ * because @/auth imports PrismaAdapter/bcryptjs, which are not Edge-compatible.
  */
 import { auth } from "@/auth";
 
-export const proxy = auth((req) => {
+export const routeGuard = auth((req) => {
   const isAdmin = req.nextUrl.pathname.startsWith("/admin");
   const isOnboarding = req.nextUrl.pathname === "/onboarding";
 
