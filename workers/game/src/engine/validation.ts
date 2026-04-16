@@ -6,9 +6,11 @@
  */
 
 import type { CardData, GameAction, GameState } from "../types.js";
+import type { EffectSchema } from "./effect-types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
 import { getEffectiveCost } from "./modifiers.js";
 import { canAttackThisTurn, canAttackLeader } from "./keywords.js";
+import { isCostPayable } from "./effect-resolver/cost-handler.js";
 
 export function validate(
   state: GameState,
@@ -46,7 +48,7 @@ export function validate(
       return validatePass(state);
 
     case "ACTIVATE_EFFECT":
-      return validateActivateEffect(state);
+      return validateActivateEffect(state, action.cardInstanceId, action.effectId, cardDb);
 
     case "CONCEDE":
       return null; // always legal
@@ -287,10 +289,29 @@ function validatePass(state: GameState): string | null {
   return null;
 }
 
-function validateActivateEffect(state: GameState): string | null {
+function validateActivateEffect(
+  state: GameState,
+  cardInstanceId: string,
+  effectId: string,
+  cardDb: Map<string, CardData>,
+): string | null {
   if (state.turn.phase !== "MAIN") return "Effects can only be activated during Main Phase";
   if (state.turn.battleSubPhase !== null) return "[Activate: Main] cannot be used during battle";
-  // Full validation deferred to M4 (effect ID, once-per-turn, etc.)
+
+  const found = findCardInState(state, cardInstanceId);
+  if (!found) return null; // executeActivateEffect will no-op; keep behavior parity
+
+  const cardData = cardDb.get(found.card.cardId);
+  const schema = cardData?.effectSchema as EffectSchema | null | undefined;
+  const block = schema?.effects.find((b) => b.id === effectId);
+  if (!block || block.category !== "activate" || !block.costs?.length) return null;
+
+  const controller = found.playerIndex;
+  for (const cost of block.costs) {
+    if (!isCostPayable(state, cost, controller, cardDb, cardInstanceId)) {
+      return "Cost cannot be paid";
+    }
+  }
   return null;
 }
 
