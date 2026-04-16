@@ -22,6 +22,20 @@ import type { CostPaymentResult, CostSelectionResult } from "./types.js";
 import { setCardState } from "./card-mutations.js";
 import { costResultToEntries } from "./types.js";
 
+// ─── Filter helpers ──────────────────────────────────────────────────────────
+
+function matchesHandFilter(data: CardData, filter: NonNullable<SimpleCost["filter"]>): boolean {
+  if (filter.traits && !filter.traits.every((t) => (data.types ?? []).includes(t))) return false;
+  if (filter.traits_contains) {
+    const cardTraits = data.types ?? [];
+    if (!filter.traits_contains.every((t) => cardTraits.some((tr) => tr.includes(t)))) return false;
+  }
+  if (filter.color && !(data.color ?? []).some((clr) => filter.color!.includes(clr as never))) return false;
+  if (filter.name && data.name !== filter.name) return false;
+  if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
+  return true;
+}
+
 // ─── payCosts (auto-payable) ─────────────────────────────────────────────────
 
 export function payCosts(
@@ -179,15 +193,7 @@ export function payCosts(
           trashable = trashable.filter((c) => {
             const data = _cardDb.get(c.cardId);
             if (!data) return false;
-            // Basic filter check for traits
-            if (cost.filter?.traits) {
-              if (!cost.filter.traits.every((t) => (data.types ?? []).includes(t))) return false;
-            }
-            if (cost.filter?.traits_contains) {
-              const cardTraits = data.types ?? [];
-              if (!cost.filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
-            }
-            return true;
+            return matchesHandFilter(data, cost.filter!);
           });
         }
         if (trashable.length < amount) return null;
@@ -370,6 +376,30 @@ export function payCosts(
         newPlayers[controller] = { ...p, stage: null, deck: newDeck };
         nextState = { ...nextState, players: newPlayers };
         events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId } });
+        break;
+      }
+
+      case "TRASH_OWN_STAGE": {
+        const p = nextState.players[controller];
+        if (!p.stage) return null;
+        if (cost.filter) {
+          const data = _cardDb.get(p.stage.cardId);
+          if (!data || !matchesHandFilter(data, cost.filter)) return null;
+        }
+        const stage = p.stage;
+        const newTrash = [{ ...stage, zone: "TRASH" as const, attachedDon: [] as typeof stage.attachedDon }, ...p.trash];
+        const returnedDon = stage.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = {
+          ...p,
+          stage: null,
+          trash: newTrash,
+          donCostArea: [...p.donCostArea, ...returnedDon],
+        };
+        nextState = { ...nextState, players: newPlayers };
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, cardId: stage.cardId, reason: "cost" } });
+        costResult.cardsTrashedCount += 1;
+        costResult.cardsTrashedInstanceIds.push(stage.instanceId);
         break;
       }
 
@@ -586,6 +616,14 @@ export function isCostPayable(
 
     case "PLACE_STAGE_TO_DECK":
       return !!player.stage;
+
+    case "TRASH_OWN_STAGE": {
+      if (!player.stage) return false;
+      if (!simple.filter) return true;
+      const data = cardDb.get(player.stage.cardId);
+      if (!data) return false;
+      return matchesHandFilter(data, simple.filter);
+    }
 
     case "RETURN_ATTACHED_DON_TO_COST": {
       if (!sourceCardInstanceId) return false;
@@ -894,17 +932,7 @@ export function computeCostTargets(
         candidates = candidates.filter((c) => {
           const data = cardDb.get(c.cardId);
           if (!data) return false;
-          if (cost.filter?.traits) {
-            if (!cost.filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
-          }
-          if (cost.filter?.traits_contains) {
-            const cardTraits = data.types ?? [];
-            if (!cost.filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
-          }
-          if (cost.filter?.color) {
-            if (!(data.color ?? []).some((clr: string) => cost.filter!.color!.includes(clr as never))) return false;
-          }
-          return true;
+          return matchesHandFilter(data, cost.filter!);
         });
       }
       return candidates.map((c) => c.instanceId);
