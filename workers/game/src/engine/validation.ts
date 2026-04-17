@@ -8,7 +8,7 @@
 import type { CardData, GameAction, GameState } from "../types.js";
 import type { EffectSchema } from "./effect-types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
-import { getEffectiveCost } from "./modifiers.js";
+import { getEffectiveCost, hasGrantedKeyword, hasRemovedKeyword } from "./modifiers.js";
 import { canAttackThisTurn, canAttackLeader } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
 
@@ -205,14 +205,20 @@ function validateDeclareBlocker(
 
   const cardData = cardDb.get(found.card.cardId);
   if (!cardData) return "Blocker card data not found";
-  if (!cardData.keywords.blocker) return "This card does not have [Blocker]";
+  const hasBlocker =
+    (cardData.keywords.blocker || hasGrantedKeyword(found.card, "BLOCKER", state, cardDb)) &&
+    !hasRemovedKeyword(found.card, "BLOCKER", state, cardDb);
+  if (!hasBlocker) return "This card does not have [Blocker]";
 
-  // Check if attacker is [Unblockable]
   if (state.turn.battle) {
     const attackerFound = findCardInState(state, state.turn.battle.attackerInstanceId);
     if (attackerFound) {
       const attackerData = cardDb.get(attackerFound.card.cardId);
-      if (attackerData?.keywords.unblockable) return "Attacker has [Unblockable]";
+      const attackerUnblockable =
+        (attackerData?.keywords.unblockable ||
+          hasGrantedKeyword(attackerFound.card, "UNBLOCKABLE", state, cardDb)) &&
+        !hasRemovedKeyword(attackerFound.card, "UNBLOCKABLE", state, cardDb);
+      if (attackerUnblockable) return "Attacker has [Unblockable]";
     }
   }
 
