@@ -58,7 +58,7 @@
 | "When 2 or more DON!! cards...returned" | above + `"quantity_threshold": 2` |
 | "When...returned to your DON!! deck by your effect" | above + `"filter": { "controller": "SELF", "cause": "BY_YOUR_EFFECT" }` |
 | "When...given a DON!! card" | `{ "event": "DON_GIVEN_TO_CARD" }` |
-| "When your opponent activates an Event" | `{ "event": "EVENT_ACTIVATED", "filter": { "controller": "OPPONENT" } }` |
+| "When your opponent activates an Event" (classes 1+2, excludes [Trigger] from Life) | `{ "any_of": [{ "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } }, { "event": "EVENT_MAIN_RESOLVED_FROM_TRASH", "filter": { "controller": "OPPONENT" } }] }` |
 | "When you play a Character" | `{ "event": "CHARACTER_PLAYED", "filter": { "controller": "SELF" } }` |
 | "When your opponent plays a Character with base cost 8+" | `{ "event": "CHARACTER_PLAYED", "filter": { "controller": "OPPONENT", "target_filter": { "base_cost_min": 8 } } }` |
 | "When a card is removed from your or your opponent's Life cards" | `{ "event": "CARD_REMOVED_FROM_LIFE", "filter": { "controller": "EITHER" } }` |

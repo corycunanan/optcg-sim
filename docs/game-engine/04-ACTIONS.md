@@ -2343,7 +2343,7 @@ interface ActivateEventFromHandParams {
 |-------|-------|
 | **Target** | An Event card in hand matching `filter` |
 | **Failure mode** | If no matching Event exists in hand, the action is ignored. |
-| **Fired events** | `EVENT_ACTIVATED` |
+| **Fired events** | `EVENT_ACTIVATED_FROM_HAND` |
 | **Example cards** | OP12-041 Sanji, OP15-014 Bartolomeo, OP15-046 Sabo |
 
 ```json
@@ -2373,8 +2373,8 @@ interface ActivateEventFromTrashParams {
 |-------|-------|
 | **Target** | An Event card in trash matching `filter` |
 | **Failure mode** | If no matching Event exists in trash, the action is ignored. |
-| **Fired events** | `EVENT_ACTIVATED` |
-| **Example cards** | EB03-031 Vinsmoke Reiju |
+| **Fired events** | `EVENT_MAIN_RESOLVED_FROM_TRASH` |
+| **Example cards** | EB03-031 Vinsmoke Reiju, OP12-041 Sanji |
 
 ```json
 {
@@ -2586,8 +2586,8 @@ All action types at a glance with their primary zone interactions and event emis
 | `REDIRECT_ATTACK` | -- | -- | `ATTACK_REDIRECTED` |
 | `DEAL_DAMAGE` | LIFE | HAND/TRASH | `DAMAGE_DEALT` |
 | `SELF_TAKE_DAMAGE` | LIFE | HAND/TRASH | `DAMAGE_TAKEN` |
-| `ACTIVATE_EVENT_FROM_HAND` | HAND | TRASH | `EVENT_ACTIVATED` |
-| `ACTIVATE_EVENT_FROM_TRASH` | TRASH | TRASH | `EVENT_ACTIVATED` |
+| `ACTIVATE_EVENT_FROM_HAND` | HAND | TRASH | `EVENT_ACTIVATED_FROM_HAND` |
+| `ACTIVATE_EVENT_FROM_TRASH` | TRASH | TRASH | `EVENT_MAIN_RESOLVED_FROM_TRASH` |
 | `REUSE_EFFECT` | -- | -- | (varies) |
 | `NEGATE_TRIGGER_TYPE` | -- | -- | `TRIGGER_TYPE_NEGATED` |
 | `GRANT_ATTRIBUTE` | -- | -- | `ATTRIBUTE_GRANTED` |

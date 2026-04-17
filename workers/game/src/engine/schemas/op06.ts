@@ -1578,10 +1578,20 @@ export const OP06_044_GION: EffectSchema = {
       id: "OP06-044_effect_1",
       category: "auto",
       trigger: {
-        event: "EVENT_ACTIVATED",
-        filter: { controller: "OPPONENT" },
-        turn_restriction: "YOUR_TURN",
-        once_per_turn: true,
+        any_of: [
+          {
+            event: "EVENT_ACTIVATED_FROM_HAND",
+            filter: { controller: "OPPONENT" },
+            turn_restriction: "YOUR_TURN",
+            once_per_turn: true,
+          },
+          {
+            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+            filter: { controller: "OPPONENT" },
+            turn_restriction: "YOUR_TURN",
+            once_per_turn: true,
+          },
+        ],
       },
       actions: [
         {
@@ -1716,7 +1726,12 @@ export const OP06_048_ZEFF: EffectSchema = {
             turn_restriction: "YOUR_TURN",
           },
           {
-            event: "EVENT_ACTIVATED",
+            event: "EVENT_ACTIVATED_FROM_HAND",
+            filter: { controller: "OPPONENT" },
+            turn_restriction: "YOUR_TURN",
+          },
+          {
+            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
             filter: { controller: "OPPONENT" },
             turn_restriction: "YOUR_TURN",
           },
