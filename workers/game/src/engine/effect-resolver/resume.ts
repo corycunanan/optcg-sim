@@ -891,6 +891,19 @@ export function resumeFromStack(
         const selected = action.selectedInstanceIds ?? [];
         nextState = applyCostSelection(nextState, cost, selected, controller);
 
+        // OPT-224: a REST_CARDS / REST_NAMED_CARD cost publishes CHARACTER_BECOMES_RESTED
+        // (via CARD_STATE_CHANGED) for each character transitioned ACTIVE → RESTED. Valid
+        // cost targets are guaranteed active by computeCostValidTargets.
+        if (cost.type === "REST_CARDS" || cost.type === "REST_NAMED_CARD") {
+          for (const id of selected) {
+            events.push({
+              type: "CARD_STATE_CHANGED",
+              playerIndex: controller,
+              payload: { targetInstanceId: id, newState: "RESTED" },
+            });
+          }
+        }
+
         // Track selected card IDs as cost result refs based on cost type
         if (cost.type === "TRASH_FROM_HAND" || cost.type === "TRASH_SELF" || cost.type === "TRASH_OWN_CHARACTER") {
           const existing = accumulatedCostRefs.get("__cost_cards_trashed") ?? { targetInstanceIds: [], count: 0 };

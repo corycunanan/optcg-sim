@@ -472,6 +472,12 @@ export function executeSetRest(
 
   for (let i = 0; i < unprotectedIds.length; i++) {
     const id = unprotectedIds[i];
+
+    // OPT-224: resting a Character that is already RESTED is a no-op —
+    // no state change, no CHARACTER_BECOMES_RESTED event, no ON_REST drain.
+    const preRest = findCardInstance(nextState, id);
+    if (preRest && preRest.state !== "ACTIVE") continue;
+
     const frameEvents: PendingEvent[] = [];
 
     nextState = setCardState(nextState, id, "RESTED");
