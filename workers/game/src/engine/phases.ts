@@ -144,6 +144,7 @@ function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>)
       battle: null,
       oncePerTurnUsed: {},
       actionsPerformedThisTurn: [],
+      deckHitZeroThisTurn: [false, false],
     },
   };
 

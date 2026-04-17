@@ -77,6 +77,7 @@ export function buildInitialState(payload: GameInitPayload): {
     battle: null,
     oncePerTurnUsed: {},
     actionsPerformedThisTurn: [],
+    deckHitZeroThisTurn: [false, false],
   };
 
   let state: GameState = {

@@ -348,16 +348,43 @@ function recalculateModifiers(
 
 // ─── Step 7: Rule Processing ──────────────────────────────────────────────────
 
+function updateDeckHitZeroFlag(state: GameState): GameState {
+  const [p0, p1] = state.players;
+  const flag: [boolean, boolean] = state.turn.deckHitZeroThisTurn ?? [false, false];
+  const next0 = flag[0] || p0.deck.length === 0;
+  const next1 = flag[1] || p1.deck.length === 0;
+  if (next0 === flag[0] && next1 === flag[1] && state.turn.deckHitZeroThisTurn) {
+    return state;
+  }
+  return {
+    ...state,
+    turn: { ...state.turn, deckHitZeroThisTurn: [next0, next1] },
+  };
+}
+
 function finishPipeline(
   state: GameState,
   actingPlayerIndex: 0 | 1,
-  _cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>,
   execResult?: ExecuteResult,
 ): PipelineResult {
-  const defeatCtx = execResult?.damagedPlayerIndex !== undefined
-    ? { damagedPlayerIndex: execResult.damagedPlayerIndex }
-    : {};
-  const defeat = checkDefeat(state, defeatCtx);
+  // Mark the sticky "deck hit zero this turn" flag the first time either
+  // player's deck transitions to 0. Reset on turn change by phases.ts.
+  // Must fire before checkDefeat so end-of-turn evaluation sees the flag.
+  state = updateDeckHitZeroFlag(state);
+
+  // An ADVANCE_PHASE that crosses MAIN → END emits TURN_ENDED as part of the
+  // same action. Treat that boundary as the end-of-turn defeat window so
+  // delayed-loss leaders (Brook) collect their deferred loss.
+  const isEndOfTurn = !!execResult?.events.some((e) => e.type === "TURN_ENDED");
+
+  const defeatCtx: { damagedPlayerIndex?: 0 | 1; endOfTurn?: boolean } = {};
+  if (execResult?.damagedPlayerIndex !== undefined) {
+    defeatCtx.damagedPlayerIndex = execResult.damagedPlayerIndex;
+  }
+  if (isEndOfTurn) defeatCtx.endOfTurn = true;
+
+  const defeat = checkDefeat(state, defeatCtx, cardDb);
 
   if (defeat) {
     state = {

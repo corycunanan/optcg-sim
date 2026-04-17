@@ -82,6 +82,10 @@ export interface TurnState {
   oncePerTurnUsed: Record<string, string[]>; // effectId → instanceIds used this turn
   actionsPerformedThisTurn: PerformedAction[];
   extraTurnsPending?: number;
+  // Per-turn sticky flag: set to true the first time a player's deck transitions
+  // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
+  // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).
+  deckHitZeroThisTurn: [boolean, boolean];
 }
 
 // ─── Player State ─────────────────────────────────────────────────────────────
