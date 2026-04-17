@@ -625,3 +625,229 @@ describe("Roronoa Zoro (PRB02-006) — WOULD_BE_RESTED replacement", () => {
     expect(zoro?.state).toBe("RESTED");
   });
 });
+
+// ─── OPT-232: replacement-action feasibility gate ────────────────────────────
+//
+// Rules §6-6-3: a replacement only applies if its substitute can actually
+// resolve. For rest-instead-of-KO replacements that means the source must be
+// ACTIVE and not under a CANNOT_BE_RESTED prohibition. Infeasible matches must
+// fall through to the original consequence without surfacing a prompt.
+
+describe("Feasibility gate — rest-instead-of-KO declines when SET_REST cannot succeed", () => {
+  function buildTashigiReplacementOnState(
+    cardDb: Map<string, CardData>,
+    opts: { tashigiState: "ACTIVE" | "RESTED"; tashigiProhibited?: boolean },
+  ) {
+    const tashigi = makeCharCard("TASHIGI", "Tashigi", { color: ["Green"] });
+    const greenAlly = makeCharCard("GREEN-ALLY", "GreenAlly", { color: ["Green"] });
+    cardDb.set(tashigi.id, tashigi);
+    cardDb.set(greenAlly.id, greenAlly);
+
+    const base = createBattleReadyState(cardDb);
+    const tashigiInst: CardInstance = { ...fieldInstance(tashigi.id, 0, "tashigi"), state: opts.tashigiState };
+    const greenInst = fieldInstance(greenAlly.id, 0, "green");
+
+    const tashigiEffect: RuntimeActiveEffect = {
+      id: "repl-tashigi",
+      sourceCardInstanceId: tashigiInst.instanceId,
+      sourceEffectBlockId: "tashigi-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { color: "GREEN", exclude_name: "Tashigi", card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+
+    const prohibitions = opts.tashigiProhibited
+      ? [{
+          id: "prohib-no-rest",
+          sourceCardInstanceId: "src",
+          sourceEffectBlockId: "block",
+          prohibitionType: "CANNOT_BE_RESTED" as const,
+          controller: 1 as 0 | 1,
+          appliesTo: [tashigiInst.instanceId],
+          scope: {},
+          duration: { type: "PERMANENT" as const },
+          expiresAt: { wave: "SOURCE_LEAVES_ZONE" as const },
+          usesRemaining: null,
+          conditionalOverride: null,
+          timestamp: Date.now(),
+        }]
+      : [];
+
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([tashigiInst, greenInst]) };
+    const state: GameState = {
+      ...base,
+      players: newPlayers,
+      activeEffects: [tashigiEffect as never],
+      prohibitions: prohibitions as never,
+    };
+    return { state, ids: { tashigi: tashigiInst.instanceId, green: greenInst.instanceId } };
+  }
+
+  it("falls through to KO when Tashigi is already RESTED (no prompt)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildTashigiReplacementOnState(cardDb, { tashigiState: "RESTED" });
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.green]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    // Green ally KO'd normally.
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.green)).toBeUndefined();
+    expect(result.state.players[0].trash.some((c) => c.instanceId === ids.green)).toBe(true);
+    // Tashigi unchanged by the replacement.
+    const tashigi = result.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi);
+    expect(tashigi?.state).toBe("RESTED");
+  });
+
+  it("falls through to KO when Tashigi is under CANNOT_BE_RESTED (no prompt)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildTashigiReplacementOnState(cardDb, {
+      tashigiState: "ACTIVE",
+      tashigiProhibited: true,
+    });
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.green]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.green)).toBeUndefined();
+    const tashigi = result.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi);
+    expect(tashigi?.state).toBe("ACTIVE");
+  });
+
+  it("still prompts when Tashigi is ACTIVE (regression guard)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildTashigiReplacementOnState(cardDb, { tashigiState: "ACTIVE" });
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.green]);
+
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+  });
+});
+
+describe("Feasibility gate — Pica-style filter-target rest falls through with no candidates", () => {
+  // Pica (OP05-032): "if this Character would be K.O.'d, you may rest up to 1
+  // of your Characters with cost 3+ other than [Pica] instead." If no eligible
+  // ally exists, the replacement must decline and Pica is K.O.'d.
+  function buildPicaState(
+    cardDb: Map<string, CardData>,
+    opts: { allyCost: number; allyState: "ACTIVE" | "RESTED" },
+  ) {
+    const pica = makeCharCard("PICA", "Pica", { color: ["Purple"], cost: 5 });
+    const ally = makeCharCard("ALLY", "AllyDude", { color: ["Purple"], cost: opts.allyCost });
+    cardDb.set(pica.id, pica);
+    cardDb.set(ally.id, ally);
+
+    const base = createBattleReadyState(cardDb);
+    const picaInst = fieldInstance(pica.id, 0, "pica");
+    const allyInst: CardInstance = { ...fieldInstance(ally.id, 0, "ally"), state: opts.allyState };
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-pica",
+      sourceCardInstanceId: picaInst.instanceId,
+      sourceEffectBlockId: "pica-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "ANY" },
+          target_filter: null,
+          replacement_actions: [{
+            type: "SET_REST",
+            target: {
+              type: "CHARACTER",
+              controller: "SELF",
+              count: { up_to: 1 },
+              filter: { cost_min: 3, exclude_name: "Pica" },
+            },
+          }],
+          optional: true,
+          once_per_turn: true,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [picaInst.instanceId], // self-protect
+      timestamp: Date.now(),
+    };
+
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([picaInst, allyInst]) };
+    const state: GameState = {
+      ...base,
+      players: newPlayers,
+      activeEffects: [effect as never],
+    };
+    return { state, ids: { pica: picaInst.instanceId, ally: allyInst.instanceId } };
+  }
+
+  it("declines when the only ally is below cost_min (no prompt)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildPicaState(cardDb, { allyCost: 2, allyState: "ACTIVE" });
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.pica]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.pica)).toBeUndefined();
+  });
+
+  it("declines when every eligible ally is already RESTED (no prompt)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildPicaState(cardDb, { allyCost: 4, allyState: "RESTED" });
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.pica]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.pica)).toBeUndefined();
+  });
+
+  it("prompts when at least one ACTIVE ally meets cost_min (regression guard)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildPicaState(cardDb, { allyCost: 4, allyState: "ACTIVE" });
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.pica]);
+
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+  });
+});
