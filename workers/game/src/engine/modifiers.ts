@@ -97,6 +97,25 @@ export function isEffectConditionMet(
 }
 
 /**
+ * OPT-241: Within a single modifier layer, simultaneous effects resolve
+ * turn-player-first, non-turn-player-second. For "last wins" layers
+ * (SET_POWER, SET_COST) this places the non-turn-player's effect last so
+ * it wins the tie, matching Bandai's ruling.
+ */
+function sortByTurnPlayerPriority<T extends { controller: 0 | 1 }>(
+  items: T[],
+  turnPlayerIndex: 0 | 1,
+): T[] {
+  const turnPlayer: T[] = [];
+  const nonTurnPlayer: T[] = [];
+  for (const item of items) {
+    if (item.controller === turnPlayerIndex) turnPlayer.push(item);
+    else nonTurnPlayer.push(item);
+  }
+  return [...turnPlayer, ...nonTurnPlayer];
+}
+
+/**
  * Returns the effective power of a card in the current game state.
  * Power can be negative — no floor (rules §1-3-6-1).
  */
@@ -109,15 +128,21 @@ export function getEffectivePower(
   // Layer 0: base printed value
   let power = cardData.power ?? 0;
 
+  const turnPlayerIndex = state.turn.activePlayerIndex;
+
   // Layer 1: base-setting effects
   const effects = state.activeEffects as RuntimeActiveEffect[];
-  const baseSetters = effects.filter((e) =>
-    effectAppliesToCard(e, card, state, cardDb) &&
-    e.modifiers?.some((m) => m.type === "SET_POWER") &&
-    isEffectConditionMet(e, state, cardDb),
+  const baseSetters = sortByTurnPlayerPriority(
+    effects.filter((e) =>
+      effectAppliesToCard(e, card, state, cardDb) &&
+      e.modifiers?.some((m) => m.type === "SET_POWER") &&
+      isEffectConditionMet(e, state, cardDb),
+    ),
+    turnPlayerIndex,
   );
   if (baseSetters.length > 0) {
-    // Last base-setter wins (timestamp order)
+    // Last base-setter wins (timestamp/priority order). Turn-player resolves
+    // first, non-turn-player resolves last and therefore clobbers.
     const lastSetter = baseSetters[baseSetters.length - 1];
     const mod = lastSetter.modifiers?.find((m) => m.type === "SET_POWER");
     if (mod?.params?.value !== undefined) {
@@ -125,11 +150,15 @@ export function getEffectivePower(
     }
   }
 
-  // Layer 2: additive/subtractive modifiers
-  const additiveEffects = effects.filter((e) =>
-    effectAppliesToCard(e, card, state, cardDb) &&
-    e.modifiers?.some((m) => m.type === "MODIFY_POWER") &&
-    isEffectConditionMet(e, state, cardDb),
+  // Layer 2: additive/subtractive modifiers (commutative, but sort for
+  // determinism and to make ordering visible in event traces).
+  const additiveEffects = sortByTurnPlayerPriority(
+    effects.filter((e) =>
+      effectAppliesToCard(e, card, state, cardDb) &&
+      e.modifiers?.some((m) => m.type === "MODIFY_POWER") &&
+      isEffectConditionMet(e, state, cardDb),
+    ),
+    turnPlayerIndex,
   );
   for (const effect of additiveEffects) {
     for (const mod of effect.modifiers ?? []) {
@@ -167,19 +196,38 @@ export function getEffectiveCost(
   if (state && cardInstanceId) {
     const card = findCardInstance(state, cardInstanceId);
     const effects = state.activeEffects as RuntimeActiveEffect[];
-    for (const effect of effects) {
-      // Use dynamic target resolution (same as getEffectivePower)
+    const turnPlayerIndex = state.turn.activePlayerIndex;
+
+    const applyingEffects = effects.filter((effect) => {
       const applies = card && cardDb
         ? effectAppliesToCard(effect, card, state, cardDb)
         : effect.appliesTo?.includes(cardInstanceId);
-      if (!applies) continue;
-      if (!isEffectConditionMet(effect, state, cardDb)) continue;
+      if (!applies) return false;
+      return isEffectConditionMet(effect, state, cardDb);
+    });
+
+    // Layer 1: SET_COST — last wins after turn-player-first sort.
+    const setters = sortByTurnPlayerPriority(
+      applyingEffects.filter((e) => e.modifiers?.some((m) => m.type === "SET_COST")),
+      turnPlayerIndex,
+    );
+    for (const effect of setters) {
+      for (const mod of effect.modifiers ?? []) {
+        if (mod.type === "SET_COST" && mod.params?.value !== undefined) {
+          cost = mod.params.value as number;
+        }
+      }
+    }
+
+    // Layer 2: MODIFY_COST — additive, sorted turn-player-first for consistency.
+    const modifiers = sortByTurnPlayerPriority(
+      applyingEffects.filter((e) => e.modifiers?.some((m) => m.type === "MODIFY_COST")),
+      turnPlayerIndex,
+    );
+    for (const effect of modifiers) {
       for (const mod of effect.modifiers ?? []) {
         if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
           cost += mod.params.amount as number;
-        }
-        if (mod.type === "SET_COST" && mod.params?.value !== undefined) {
-          cost = mod.params.value as number;
         }
       }
     }
