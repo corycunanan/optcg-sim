@@ -15,9 +15,27 @@ import type {
   PlayerInitData,
   TurnState,
 } from "../types.js";
+import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
 import { injectSchemasIntoCardDb } from "./schema-registry.js";
 import { registerTriggersForCard, registerReplacementsForCard, registerPermanentEffectsForCard } from "./triggers.js";
+
+const DEFAULT_DON_DECK_SIZE = 10;
+
+/**
+ * OPT-228: Leaders may override the starting DON!! deck size via a
+ * DON_DECK_SIZE_OVERRIDE rule_modification (e.g. OP15-058 Enel starts with 6).
+ * The value is resolved once at setup and frozen into the state — runtime
+ * negation of the Leader effect does not restore the default.
+ */
+function resolveDonDeckSize(leaderData: CardData | undefined): number {
+  const schema = (leaderData?.effectSchema ?? null) as EffectSchema | null;
+  const override = schema?.rule_modifications?.find(
+    (m): m is { rule_type: "DON_DECK_SIZE_OVERRIDE"; size: number } =>
+      m.rule_type === "DON_DECK_SIZE_OVERRIDE",
+  );
+  return override?.size ?? DEFAULT_DON_DECK_SIZE;
+}
 
 export function buildInitialState(payload: GameInitPayload): {
   state: GameState;
@@ -49,9 +67,9 @@ export function buildInitialState(payload: GameInitPayload): {
   const deal0 = dealCards(p0Deck, leaderLife0, payload.player1.testOrder);
   const deal1 = dealCards(p1Deck, leaderLife1, payload.player2.testOrder);
 
-  // Build 10 DON!! cards per player
-  const donDeck0 = buildDonDeck(0 as const);
-  const donDeck1 = buildDonDeck(1 as const);
+  // Build DON!! deck per player (default 10, overridable per Leader — OPT-228).
+  const donDeck0 = buildDonDeck(0 as const, resolveDonDeckSize(leader0Data));
+  const donDeck1 = buildDonDeck(1 as const, resolveDonDeckSize(leader1Data));
 
   const player0 = {
     ...p0State,
@@ -198,8 +216,8 @@ function buildPlayerDeck(
   return [partialState, deckCards];
 }
 
-function buildDonDeck(owner: 0 | 1): DonInstance[] {
-  return Array.from({ length: 10 }, () => ({
+function buildDonDeck(owner: 0 | 1, size: number = DEFAULT_DON_DECK_SIZE): DonInstance[] {
+  return Array.from({ length: size }, () => ({
     instanceId: nanoid(),
     state: "ACTIVE" as const,
     attachedTo: null,
