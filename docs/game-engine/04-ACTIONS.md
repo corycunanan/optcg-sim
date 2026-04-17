@@ -2360,7 +2360,7 @@ interface ActivateEventFromHandParams {
 
 ### ACTIVATE_EVENT_FROM_TRASH
 
-Execute an Event card's effect from the trash (flashback). The Event stays in trash after resolution.
+Resolve an Event card's **[Main] effect** directly from the trash (e.g. EB03-031 Vinsmoke Reiju). The activating Character's effect pays its own inline DON!! cost; the Event's **printed main cost is skipped**. The Event stays in trash — it does not move zones — and the resolved [Main] block may surface its own prompts (e.g. target selection, PLAYER_CHOICE) which bubble up through the action handler.
 
 ```typescript
 interface ActivateEventFromTrashParams {
@@ -2371,17 +2371,20 @@ interface ActivateEventFromTrashParams {
 
 | Field | Value |
 |-------|-------|
-| **Target** | An Event card in trash matching `filter` |
-| **Failure mode** | If no matching Event exists in trash, the action is ignored. |
-| **Fired events** | `EVENT_MAIN_RESOLVED_FROM_TRASH` |
-| **Example cards** | EB03-031 Vinsmoke Reiju, OP12-041 Sanji |
+| **Target** | An Event card in trash matching `filter`. Events without a `MAIN_EVENT` block (Counter-only, Trigger-only) are automatically excluded from valid targets. |
+| **Failure mode** | If no matching [Main]-bearing Event exists in trash, the action is ignored (no event emitted, no resolution). |
+| **Fired events** | `EVENT_MAIN_RESOLVED_FROM_TRASH` (emitted first), followed by whatever events the resolved [Main] block produces (e.g. `CARD_DRAWN`, `CARD_KO`). |
+| **Example cards** | EB03-031 Vinsmoke Reiju |
 
 ```json
 {
   "type": "ACTIVATE_EVENT_FROM_TRASH",
-  "params": {
-    "filter": { "card_type": "EVENT", "traits": ["GERMA 66"] },
-    "cost_override": "FREE"
+  "target": {
+    "type": "EVENT_CARD",
+    "source_zone": "TRASH",
+    "controller": "SELF",
+    "count": { "up_to": 1 },
+    "filter": { "cost_max": 7 }
   }
 }
 ```
