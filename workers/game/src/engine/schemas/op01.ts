@@ -1702,11 +1702,13 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
   ],
 };
 
-// ─── OP01-062 Crocodile (Leader) — DON!!×1 draw on event activation
-// [DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or
-// less cards in your hand and haven't drawn a card using this Leader's effect
-// during this turn.
-// NOTE: "haven't drawn using this Leader's effect" approximated as once_per_turn.
+// ─── OP01-062 Crocodile (Leader) — DON!!×1 draw when a cost-reduced Event is played
+// [DON!! x1] Once per turn, when you play an Event whose cost was reduced by
+// an effect, you may draw 1 card if you have 4 or less cards in your hand.
+// OPT-238: trigger fires only on class-1 activation (EVENT_ACTIVATED_FROM_HAND)
+// where costReducedAmount > 0. Class 2 (from trash) does not pay a cost and so
+// never qualifies. Once-per-turn re-arms only when the cost-reduction condition
+// is re-met; a full-cost play does not consume the slot.
 
 export const OP01_062_CROCODILE: EffectSchema = {
   card_id: "OP01-062",
@@ -1717,20 +1719,9 @@ export const OP01_062_CROCODILE: EffectSchema = {
       id: "OP01-062_event_draw",
       category: "auto",
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "SELF" },
-            don_requirement: 1,
-            once_per_turn: true,
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "SELF" },
-            don_requirement: 1,
-            once_per_turn: true,
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "SELF", cost_reduced: true },
+        don_requirement: 1,
       },
       conditions: {
         type: "HAND_COUNT",
@@ -1744,7 +1735,7 @@ export const OP01_062_CROCODILE: EffectSchema = {
           params: { amount: 1 },
         },
       ],
-      flags: { optional: true },
+      flags: { once_per_turn: true, optional: true },
     },
   ],
 };

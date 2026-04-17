@@ -570,7 +570,10 @@ export function executeActivateEventFromHand(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
 
-  events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: eventCard.instanceId } });
+  // Effect-driven activation bypasses the normal cost-payment step, so no
+  // printed cost was "reduced" by a modifier — OPT-238 Crocodile should not
+  // fire on this path.
+  events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: eventCard.instanceId, costReducedAmount: 0 } });
 
   return {
     state: { ...state, players: newPlayers },

@@ -324,7 +324,8 @@ For "when your opponent activates an Event" rulings (Usopp, Page One, Lucy, Luff
 | Text Pattern | Subscribe to | Example Cards |
 |-------------|--------------|---------------|
 | "When your opponent activates an Event" | classes 1 + 2 | OP01-004 Usopp, OP06-044 Gion, OP04-053 Page One |
-| "When you activate an Event" | classes 1 + 2 | OP01-062 Crocodile, OP10-062 |
+| "When you activate an Event" | classes 1 + 2 | OP10-062 |
+| "When you play a cost-reduced Event" | class 1 only, with `cost_reduced: true` | OP01-062 Crocodile (Leader) |
 | "When your opponent activates an Event or [Trigger]" | classes 1 + 2 + `TRIGGER_ACTIVATED` | OP11-102 Camie |
 | "When your opponent activates an Event or [Blocker]" | classes 1 + 2 + `BLOCKER_ACTIVATED` | OP15-119 Monkey.D.Luffy |
 
@@ -352,6 +353,19 @@ Example — OP11-102 Camie (Event or any [Trigger]):
       { "event": "TRIGGER_ACTIVATED", "filter": { "controller": "OPPONENT" } }
     ]
   }
+}
+```
+
+**`cost_reduced` filter (OPT-238).** `EVENT_ACTIVATED_FROM_HAND` carries `costReducedAmount: number` on its payload — the printed cost minus the actual paid cost, clamped at 0. Triggers that only want to fire when the Event's cost was reduced by an effect (OP01-062 Crocodile) use `filter: { cost_reduced: true }`. The filter is only meaningful on class 1: class 2 (from trash) skips cost entirely, so no reduction concept applies, and class 3 (from life) has no cost path at all. Effect-driven class-1 activation (`executeActivateEventFromHand`) emits `costReducedAmount: 0` because the cost-payment step is bypassed.
+
+```json
+{
+  "trigger": {
+    "event": "EVENT_ACTIVATED_FROM_HAND",
+    "filter": { "controller": "SELF", "cost_reduced": true },
+    "don_requirement": 1
+  },
+  "flags": { "once_per_turn": true, "optional": true }
 }
 ```
 

@@ -73,7 +73,7 @@ Every trigger requires an event to be emitted. If the event isn't emitted, the t
 | Event Type | Trigger Keywords | Emitted In |
 |-----------|-----------------|-----------|
 | `CARD_PLAYED` | ON_PLAY, CHARACTER_PLAYED | execute.ts (hand play), play.ts (effect play), life.ts (play from life) |
-| `EVENT_ACTIVATED_FROM_HAND` | EVENT_ACTIVATED_FROM_HAND | execute.ts:executePlayCard (Event from hand), play.ts:executeActivateEventFromHand (effect-driven) |
+| `EVENT_ACTIVATED_FROM_HAND` | EVENT_ACTIVATED_FROM_HAND | execute.ts:executePlayCard (Event from hand), play.ts:executeActivateEventFromHand (effect-driven). Payload carries `costReducedAmount` (printed − paid, clamped ≥ 0) for OPT-238 `cost_reduced` filter; effect-driven path always emits 0 since no cost is paid. |
 | `EVENT_MAIN_RESOLVED_FROM_TRASH` | EVENT_MAIN_RESOLVED_FROM_TRASH | play.ts:executeActivateEventFromTrash (Character activates Event [Main] from trash, e.g. Reiju) |
 | `EVENT_TRIGGER_RESOLVED` | EVENT_TRIGGER_RESOLVED | battle.ts:executeRevealTrigger (Event card [Trigger] from life) |
 | `CARD_KO` | ON_KO, OPPONENT_CHARACTER_KO, ANY_CHARACTER_KO | card-mutations.ts, battle.ts |
