@@ -386,6 +386,12 @@ function matchesKeywordTrigger(
     if (cardInEvent && cardInEvent !== sourceCard.instanceId) return false;
   }
 
+  // On Play does not fire when the Character entered the field rested.
+  // EB04-018 Megalo and similar "play rested" effects skip the On Play window.
+  if (trigger.keyword === "ON_PLAY" && event.type === "CARD_PLAYED") {
+    if (event.payload.playedRested) return false;
+  }
+
   // ON_OPPONENT_ATTACK: only fires when it is the opponent's turn to attack
   if (trigger.keyword === "ON_OPPONENT_ATTACK") {
     if (state.turn.activePlayerIndex === sourceCard.controller) return false;

@@ -761,6 +761,109 @@ describe("Trigger System", () => {
     expect(matched.length).toBe(1);
   });
 
+  // OPT-230 (A8): EB04-018 Megalo — "If played rested, On Play does not fire."
+  // When a Character enters the field rested via an effect, CARD_PLAYED carries
+  // playedRested: true, which disqualifies every ON_PLAY trigger from matching.
+  it("does NOT match ON_PLAY triggers when CARD_PLAYED has playedRested=true", () => {
+    const state = createInitialGameState();
+
+    const luffyInstance: CardInstance = {
+      instanceId: "luffy-rested",
+      cardId: LUFFY_CARD.id,
+      zone: "CHARACTER",
+      state: "RESTED",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    state.players[0].characters = padChars([luffyInstance]);
+
+    const effectBlock: EffectBlock = {
+      id: "on-play-draw",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    };
+
+    state.triggerRegistry = [{
+      id: "trig-1",
+      sourceCardInstanceId: "luffy-rested",
+      effectBlockId: "on-play-draw",
+      trigger: { keyword: "ON_PLAY" },
+      effectBlock,
+      zone: "FIELD",
+      controller: 0,
+    } as any];
+
+    const event: GameEvent = {
+      type: "CARD_PLAYED",
+      playerIndex: 0,
+      payload: {
+        cardInstanceId: "luffy-rested",
+        cardId: LUFFY_CARD.id,
+        zone: "CHARACTER" as const,
+        source: "BY_EFFECT",
+        playedRested: true,
+      },
+      timestamp: Date.now(),
+    };
+
+    const cardDb = makeCardDb(LUFFY_CARD);
+    const matched = matchTriggersForEvent(state, event, cardDb);
+    expect(matched.length).toBe(0);
+  });
+
+  it("still matches ON_PLAY when CARD_PLAYED has playedRested=false (played active)", () => {
+    const state = createInitialGameState();
+
+    const luffyInstance: CardInstance = {
+      instanceId: "luffy-active",
+      cardId: LUFFY_CARD.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    state.players[0].characters = padChars([luffyInstance]);
+
+    const effectBlock: EffectBlock = {
+      id: "on-play-draw",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    };
+
+    state.triggerRegistry = [{
+      id: "trig-1",
+      sourceCardInstanceId: "luffy-active",
+      effectBlockId: "on-play-draw",
+      trigger: { keyword: "ON_PLAY" },
+      effectBlock,
+      zone: "FIELD",
+      controller: 0,
+    } as any];
+
+    const event: GameEvent = {
+      type: "CARD_PLAYED",
+      playerIndex: 0,
+      payload: {
+        cardInstanceId: "luffy-active",
+        cardId: LUFFY_CARD.id,
+        zone: "CHARACTER" as const,
+        source: "BY_EFFECT",
+        playedRested: false,
+      },
+      timestamp: Date.now(),
+    };
+
+    const cardDb = makeCardDb(LUFFY_CARD);
+    const matched = matchTriggersForEvent(state, event, cardDb);
+    expect(matched.length).toBe(1);
+  });
+
   it("orders triggers: turn player first", () => {
     const turnPlayerTrigger = {
       trigger: { controller: 0 } as any,
