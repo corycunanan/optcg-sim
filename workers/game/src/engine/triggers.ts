@@ -528,6 +528,13 @@ function customEventToGameEvent(event: CustomEventType): GameEventType | null {
   const map: Partial<Record<CustomEventType, GameEventType>> = {
     OPPONENT_CHARACTER_KO: "CARD_KO",
     ANY_CHARACTER_KO: "CARD_KO",
+    // OPT-235: "when a Character is trashed" watchers (Basil-style) match the
+    // CARD_TRASHED event emitted by trashCharacter — distinct from CARD_KO per
+    // rule 10-2-1-3. ON_KO keyword triggers intentionally do NOT listen for
+    // CARD_TRASHED, so a KO replaced by trash suppresses Rob Lucci-style
+    // ON_KO watchers while still firing these CHARACTER_TRASHED watchers.
+    ANY_CHARACTER_TRASHED: "CARD_TRASHED",
+    OPPONENT_CHARACTER_TRASHED: "CARD_TRASHED",
     DON_RETURNED_TO_DON_DECK: "DON_DETACHED",
     DON_GIVEN_TO_CARD: "DON_GIVEN_TO_CARD",
     EVENT_ACTIVATED: "CARD_PLAYED",

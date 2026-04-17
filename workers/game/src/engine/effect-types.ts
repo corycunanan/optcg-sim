@@ -131,6 +131,8 @@ export type KeywordTriggerType =
 export type CustomEventType =
   | "OPPONENT_CHARACTER_KO"
   | "ANY_CHARACTER_KO"
+  | "ANY_CHARACTER_TRASHED"
+  | "OPPONENT_CHARACTER_TRASHED"
   | "DON_RETURNED_TO_DON_DECK"
   | "DON_GIVEN_TO_CARD"
   | "EVENT_ACTIVATED"
