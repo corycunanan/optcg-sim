@@ -418,6 +418,17 @@ export function executeRedistributeDon(
 
 // ─── GIVE_OPPONENT_DON_TO_OPPONENT ───────────────────────────────────────────
 
+/**
+ * OPT-226: pull DON from opponent's cost area and attach it to an
+ * opponent's Leader/Character — OP-15 Enel/God archetype "give 1 of
+ * your opponent's DON!! to their Character" flow.
+ *
+ * Honors `params.source_filter.is_rested` / `.is_active` so cards like
+ * OP15-023 Arlong and OP15-028 Meowban Brothers — which the FAQ says
+ * may pull ACTIVE or RESTED DON alike — can encode the permissive variant.
+ * When no source filter is present the default is RESTED (matching the
+ * most common OP-15 text "give up to 1 rested DON!!").
+ */
 export function executeGiveOpponentDonToOpponent(
   state: GameState,
   action: Action,
@@ -432,6 +443,17 @@ export function executeGiveOpponentDonToOpponent(
   const amount = (params.amount as number) ?? 1;
   const opp = (controller === 0 ? 1 : 0) as 0 | 1;
 
+  const sourceFilter = (params.source_filter as { is_rested?: boolean; is_active?: boolean } | undefined);
+  const matchesSource = (d: { state: "ACTIVE" | "RESTED"; attachedTo: string | null }): boolean => {
+    if (d.attachedTo) return false;
+    if (!sourceFilter) return d.state === "RESTED"; // historical default
+    if (sourceFilter.is_rested === true && d.state !== "RESTED") return false;
+    if (sourceFilter.is_rested === false && d.state === "RESTED") return false;
+    if (sourceFilter.is_active === true && d.state !== "ACTIVE") return false;
+    if (sourceFilter.is_active === false && d.state === "ACTIVE") return false;
+    return true;
+  };
+
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
@@ -439,17 +461,16 @@ export function executeGiveOpponentDonToOpponent(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  // Take rested DON from opponent's cost area and attach to opponent's character
   let nextState = state;
   let given = 0;
   for (const targetId of targetIds) {
     for (let i = 0; i < amount; i++) {
       const oppPlayer = nextState.players[opp];
-      const restedIdx = oppPlayer.donCostArea.findIndex((d) => d.state === "RESTED" && !d.attachedTo);
-      if (restedIdx === -1) break;
+      const donIdx = oppPlayer.donCostArea.findIndex(matchesSource);
+      if (donIdx === -1) break;
 
-      const donCard = oppPlayer.donCostArea[restedIdx];
-      const newDonCostArea = oppPlayer.donCostArea.filter((_, idx) => idx !== restedIdx);
+      const donCard = oppPlayer.donCostArea[donIdx];
+      const newDonCostArea = oppPlayer.donCostArea.filter((_, idx) => idx !== donIdx);
       const attachedDon = { ...donCard, attachedTo: targetId };
 
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];

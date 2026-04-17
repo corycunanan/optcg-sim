@@ -189,20 +189,37 @@ export function setCardState(state: GameState, instanceId: string, newState: "AC
   return state;
 }
 
+/**
+ * Attach a DON!! to a Leader or Character.
+ *
+ * OPT-226: the DON is pulled from — and attached within — the PLAYER WHO OWNS
+ * THE TARGET. OP-15 "give opp's rested DON to their Character" effects pass
+ * an opp-side target; this helper finds the target on whichever side it
+ * lives and pulls the DON from that same side's cost area. The old
+ * `controller` argument is ignored except as a fallback when the target
+ * cannot be located on either side.
+ */
 export function attachDonToCard(
   state: GameState,
   controller: 0 | 1,
   targetInstanceId: string,
   donState: "ACTIVE" | "RESTED" = "ACTIVE",
 ): GameState | null {
-  const p = state.players[controller];
+  // Infer owner side from the target — DON flows from its owner's cost area.
+  let ownerIdx: 0 | 1 = controller;
+  for (const pi of [0, 1] as const) {
+    const pp = state.players[pi];
+    if (pp.leader.instanceId === targetInstanceId) { ownerIdx = pi; break; }
+    if (pp.characters.some((c) => c?.instanceId === targetInstanceId)) { ownerIdx = pi; break; }
+  }
+
+  const p = state.players[ownerIdx];
   const don = p.donCostArea.find((d) => d.state === donState && !d.attachedTo);
   if (!don) return null;
 
   const newDonCostArea = p.donCostArea.filter((d) => d.instanceId !== don.instanceId);
   const attachedDon = { ...don, attachedTo: targetInstanceId };
 
-  // Find the target card and attach
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   let pp = { ...p, donCostArea: newDonCostArea };
 
@@ -214,10 +231,13 @@ export function attachDonToCard(
       const newChars = [...pp.characters] as (typeof pp.characters);
       newChars[charIdx] = { ...newChars[charIdx]!, attachedDon: [...newChars[charIdx]!.attachedDon, attachedDon] };
       pp = { ...pp, characters: newChars };
+    } else {
+      // Target not found on inferred owner's field — bail.
+      return null;
     }
   }
 
-  newPlayers[controller] = pp;
+  newPlayers[ownerIdx] = pp;
   return { ...state, players: newPlayers };
 }
 
