@@ -196,6 +196,8 @@ export interface GameEventPayloadMap {
   LIFE_CARD_TURNED_FACE_DOWN: { count: number };
   COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string };
   CHARACTER_BATTLES: { cardInstanceId: string; targetInstanceId: string };
+  END_OF_BATTLE: { attackerInstanceId: string; targetInstanceId: string; aborted: boolean };
+  BATTLE_ABORTED: { attackerInstanceId: string; targetInstanceId: string; reason: "ATTACKER_LEFT_FIELD" | "TARGET_LEFT_FIELD" };
   LIFE_COUNT_BECOMES_ZERO: Record<string, never>;
   DRAW_OUTSIDE_DRAW_PHASE: { count: number };
 }

@@ -221,11 +221,28 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
   // ─── 2. CHARACTER_BATTLES ───────────────────────────────────────────────────
 
   describe("CHARACTER_BATTLES event", () => {
-    it("emits CHARACTER_BATTLES when a character attacks", () => {
+    it("emits CHARACTER_BATTLES when a character attacks and reaches Damage Step", () => {
       const cardDb = createTestCardDb();
       const state = createBattleReadyState(cardDb);
 
-      // Character attacks leader
+      // Character attacks leader — full battle so Damage Step publishes the event
+      const charAttacker = state.players[0].characters[0]!;
+      const finalState = runFullAttack(
+        state,
+        charAttacker.instanceId,
+        state.players[1].leader.instanceId,
+        cardDb,
+      );
+
+      const charBattleEvents = findEvents(finalState, "CHARACTER_BATTLES");
+      expect(charBattleEvents.length).toBe(1);
+      expect(charBattleEvents[0].payload.cardInstanceId).toBe(charAttacker.instanceId);
+    });
+
+    it("does NOT emit CHARACTER_BATTLES at ATTACK_DECLARED (emission deferred to Damage Step)", () => {
+      const cardDb = createTestCardDb();
+      const state = createBattleReadyState(cardDb);
+
       const charAttacker = state.players[0].characters[0]!;
       const result = runPipeline(state, {
         type: "DECLARE_ATTACK",
@@ -235,22 +252,21 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       expect(result.valid).toBe(true);
 
       const charBattleEvents = findEvents(result.state, "CHARACTER_BATTLES");
-      expect(charBattleEvents.length).toBe(1);
-      expect(charBattleEvents[0].payload.cardInstanceId).toBe(charAttacker.instanceId);
+      expect(charBattleEvents.length).toBe(0);
     });
 
     it("does NOT emit CHARACTER_BATTLES when leader attacks", () => {
       const cardDb = createTestCardDb();
       const state = createBattleReadyState(cardDb);
 
-      const result = runPipeline(state, {
-        type: "DECLARE_ATTACK",
-        attackerInstanceId: state.players[0].leader.instanceId,
-        targetInstanceId: state.players[1].leader.instanceId,
-      }, cardDb, 0);
-      expect(result.valid).toBe(true);
+      const finalState = runFullAttack(
+        state,
+        state.players[0].leader.instanceId,
+        state.players[1].leader.instanceId,
+        cardDb,
+      );
 
-      const charBattleEvents = findEvents(result.state, "CHARACTER_BATTLES");
+      const charBattleEvents = findEvents(finalState, "CHARACTER_BATTLES");
       expect(charBattleEvents.length).toBe(0);
     });
   });
