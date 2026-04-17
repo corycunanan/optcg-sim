@@ -231,6 +231,11 @@ export function executeLifeToHand(
       playerIndex: targetController,
       payload: { cardId: lc.cardId, cardInstanceId: lc.instanceId },
     });
+    events.push({
+      type: "CARD_REMOVED_FROM_LIFE",
+      playerIndex: targetController,
+      payload: { cardInstanceId: lc.instanceId },
+    });
   }
 
   return {
