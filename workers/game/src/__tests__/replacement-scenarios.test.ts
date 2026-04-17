@@ -1075,3 +1075,175 @@ describe("OPT-233 — spared targets emit no CARD_KO event", () => {
     }
   });
 });
+
+// ─── OPT-234: Flip-Life-instead-of-removal feasibility gate ─────────────────
+//
+// Shirahoshi (OP12-102) / Bonney (OP13-109) pattern: "If this Character would
+// be removed from the field by your opponent's effect, you may turn 1 card
+// from the top of your Life cards face-up instead." Per the Bandai ruling
+// cited in OPT-234, the replacement is infeasible when every Life card is
+// already face-up (or the Life pile is empty) — the removal must then proceed
+// without surfacing a prompt.
+
+describe("Feasibility gate — flip-Life-instead-of-removal declines without face-down Life", () => {
+  function buildShirahoshiState(
+    cardDb: Map<string, CardData>,
+    opts: { faceDownCount: number; faceUpCount: number },
+  ) {
+    const shirahoshi = makeCharCard("OP12-102-TEST", "Shirahoshi", { color: ["Yellow"], cost: 2 });
+    const ally = makeCharCard("NEPTUNIAN-ALLY", "NeptAlly", { color: ["Yellow"], cost: 4 });
+    cardDb.set(shirahoshi.id, shirahoshi);
+    cardDb.set(ally.id, ally);
+
+    const base = createBattleReadyState(cardDb);
+    const shirahoshiInst = fieldInstance(shirahoshi.id, 0, "shirahoshi");
+    const allyInst = fieldInstance(ally.id, 0, "nept-ally");
+
+    const life = [
+      ...Array.from({ length: opts.faceDownCount }, (_, i) => ({
+        instanceId: `life-p0-down-${i}`,
+        cardId: ally.id,
+        face: "DOWN" as const,
+      })),
+      ...Array.from({ length: opts.faceUpCount }, (_, i) => ({
+        instanceId: `life-p0-up-${i}`,
+        cardId: ally.id,
+        face: "UP" as const,
+      })),
+    ];
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-shirahoshi",
+      sourceCardInstanceId: shirahoshiInst.instanceId,
+      sourceEffectBlockId: "OP12-102_replacement",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_REMOVED_FROM_FIELD",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER", base_cost_max: 6 },
+          replacement_actions: [{ type: "TURN_LIFE_FACE_UP", params: { amount: 1, position: "TOP" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      characters: padChars([shirahoshiInst, allyInst]),
+      life,
+    };
+    const state: GameState = {
+      ...base,
+      players: newPlayers,
+      activeEffects: [effect as never],
+    };
+    return { state, ids: { shirahoshi: shirahoshiInst.instanceId, ally: allyInst.instanceId } };
+  }
+
+  it("prompts when at least one face-down Life exists (regression guard)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildShirahoshiState(cardDb, { faceDownCount: 3, faceUpCount: 0 });
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally]);
+
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+  });
+
+  it("accepting flips the top Life face-up and spares the character", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildShirahoshiState(cardDb, { faceDownCount: 3, faceUpCount: 0 });
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const promptResult = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally]);
+    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb);
+
+    // Ally stayed on the field; Life[0] flipped face-up; remainder still face-down.
+    const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
+    expect(ally?.zone).toBe("CHARACTER");
+    expect(resumed.state.players[0].life[0].face).toBe("UP");
+    expect(resumed.state.players[0].life.slice(1).every((l) => l.face === "DOWN")).toBe(true);
+    expect(resumed.finalizedIds).toEqual([]);
+  });
+
+  it("falls through to removal when every Life is already face-up (no prompt)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildShirahoshiState(cardDb, { faceDownCount: 0, faceUpCount: 3 });
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    // Ally removed from field and returned to hand normally.
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.ally)).toBeUndefined();
+    expect(result.state.players[0].hand.some((c) => c.instanceId === ids.ally)).toBe(true);
+    // Life untouched.
+    expect(result.state.players[0].life.every((l) => l.face === "UP")).toBe(true);
+    expect(result.state.players[0].life).toHaveLength(3);
+  });
+
+  it("falls through to removal when the Life pile is empty (no prompt)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildShirahoshiState(cardDb, { faceDownCount: 0, faceUpCount: 0 });
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.ally)).toBeUndefined();
+    expect(result.state.players[0].life).toHaveLength(0);
+  });
+
+  it("still prompts when only a bottom Life is face-down (global face-down predicate)", () => {
+    // Bandai's infeasibility wording is "all Life face-up" — a single face-down
+    // card anywhere in the pile keeps the replacement feasible, even if the
+    // substitute's position=TOP would flip an already face-up card.
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildShirahoshiState(cardDb, { faceDownCount: 0, faceUpCount: 2 });
+    const stateWithOneDown: GameState = {
+      ...state,
+      players: [
+        {
+          ...state.players[0],
+          life: [
+            ...state.players[0].life,
+            { instanceId: "life-p0-tail-down", cardId: "anything", face: "DOWN" as const },
+          ],
+        },
+        state.players[1],
+      ],
+    };
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeReturnToHand(stateWithOneDown, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally]);
+
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+  });
+});
