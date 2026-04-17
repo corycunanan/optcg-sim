@@ -545,7 +545,11 @@ function customEventToGameEvent(event: CustomEventType): GameEventType | null {
     EVENT_MAIN_RESOLVED_FROM_TRASH: "EVENT_MAIN_RESOLVED_FROM_TRASH",
     EVENT_TRIGGER_RESOLVED: "EVENT_TRIGGER_RESOLVED",
     CHARACTER_PLAYED: "CARD_PLAYED",
-    CARD_REMOVED_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
+    // OPT-240: CARD_REMOVED_FROM_LIFE is its own GameEventType emitted after
+    // any life exit (banish, add-to-hand, trigger resolution). Previously
+    // aliased to CARD_ADDED_TO_HAND_FROM_LIFE, which missed banish + trigger
+    // paths and collapsed the FAQ's "after-trigger" ordering.
+    CARD_REMOVED_FROM_LIFE: "CARD_REMOVED_FROM_LIFE",
     TRIGGER_ACTIVATED: "TRIGGER_ACTIVATED",
     DAMAGE_TAKEN: "DAMAGE_DEALT",
     BLOCKER_ACTIVATED: "BLOCK_DECLARED",

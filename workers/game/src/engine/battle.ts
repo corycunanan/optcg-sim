@@ -316,6 +316,16 @@ export function executeRevealTrigger(
     events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId } });
   }
 
+  // OPT-240: emit CARD_REMOVED_FROM_LIFE AFTER the Trigger window fully
+  // resolves (or is declined). Auto-effects watching this event (e.g.
+  // OP08-105 Bonney) observe the post-trigger board state, so a Trigger
+  // that KOs the watcher suppresses its fire via the on-field check.
+  events.push({
+    type: "CARD_REMOVED_FROM_LIFE",
+    playerIndex: inactiveIdx,
+    payload: { cardInstanceId: lifeCard.instanceId },
+  });
+
   // Clear pending trigger and end battle
   const cleanedBattle = { ...battle };
   delete (cleanedBattle as Partial<typeof cleanedBattle & { pendingTriggerLifeCard?: LifeCard }>).pendingTriggerLifeCard;
@@ -483,6 +493,11 @@ function executeDamageStep(
               trash: [trashCard, ...newPlayers[inactiveIdx].trash],
             };
             nextState = { ...nextState, players: newPlayers };
+            events.push({
+              type: "CARD_REMOVED_FROM_LIFE",
+              playerIndex: inactiveIdx,
+              payload: { cardInstanceId: lifeCard.instanceId },
+            });
           } else if (hasTrigger(cardDb.get(lifeCard.cardId) ?? { keywords: { trigger: false } } as CardData)) {
             // Has [Trigger] — pause for defending player's choice (rules §10-1-5-1)
             const updatedBattle = {
@@ -514,6 +529,11 @@ function executeDamageStep(
             };
             nextState = { ...nextState, players: newPlayers };
             events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId } });
+            events.push({
+              type: "CARD_REMOVED_FROM_LIFE",
+              playerIndex: inactiveIdx,
+              payload: { cardInstanceId: lifeCard.instanceId },
+            });
           }
         }
       } else if (targetFound.card.zone === "CHARACTER") {
