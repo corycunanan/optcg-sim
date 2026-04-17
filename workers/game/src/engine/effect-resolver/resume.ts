@@ -203,7 +203,13 @@ export function resumeEffectChain(
           events.push({
             type: "CARD_PLAYED",
             playerIndex: controller,
-            payload: { cardInstanceId: newChar.instanceId, cardId: kept.cardId, zone: "CHARACTER", source: "search_and_play" },
+            payload: {
+              cardInstanceId: newChar.instanceId,
+              cardId: kept.cardId,
+              zone: "CHARACTER",
+              source: "search_and_play",
+              playedRested: entryState === "RESTED",
+            },
           });
         } else if (data && data.type.toUpperCase() === "STAGE") {
           // If a Stage already exists, trash it first

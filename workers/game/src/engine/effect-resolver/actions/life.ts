@@ -396,7 +396,13 @@ export function executePlayFromLife(
     events.push({
       type: "CARD_PLAYED",
       playerIndex: controller,
-      payload: { cardInstanceId: newChar.instanceId, cardId: lifeCard.cardId, zone: "CHARACTER", source: "LIFE" },
+      payload: {
+        cardInstanceId: newChar.instanceId,
+        cardId: lifeCard.cardId,
+        zone: "CHARACTER",
+        source: "LIFE",
+        playedRested: entryState === "RESTED",
+      },
     });
 
     return {

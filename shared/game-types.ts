@@ -155,7 +155,7 @@ export interface GameEventPayloadMap {
   PHASE_CHANGED: { from: string; to: string };
   TURN_STARTED: Record<string, never>;
   TURN_ENDED: Record<string, never>;
-  CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string };
+  CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean };
   CARD_KO: { cardInstanceId: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
   CARD_TRASHED: { cardId?: string; cardInstanceId?: string; count?: number; reason: string; from?: string };

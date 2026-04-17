@@ -119,7 +119,13 @@ function playOneCharacter(
   events.push({
     type: "CARD_PLAYED",
     playerIndex: controller,
-    payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "BY_EFFECT" },
+    payload: {
+      cardInstanceId: newChar.instanceId,
+      cardId: card.cardId,
+      zone: "CHARACTER",
+      source: "BY_EFFECT",
+      playedRested: entryState === "RESTED",
+    },
   });
   return { state: nextState, events, playedId: newChar.instanceId };
 }
