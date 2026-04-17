@@ -165,7 +165,7 @@ function validateDeclareAttack(
   const attackerData = cardDb.get(attackerFound.card.cardId);
   if (!attackerData) return "Attacker card data not found";
 
-  if (!canAttackThisTurn(attackerFound.card, attackerData, state)) {
+  if (!canAttackThisTurn(attackerFound.card, attackerData, state, cardDb)) {
     return "This card cannot attack this turn";
   }
 
@@ -174,7 +174,7 @@ function validateDeclareAttack(
   if (targetFound.playerIndex === state.turn.activePlayerIndex) return "Cannot attack your own cards";
 
   if (targetFound.card.zone === "LEADER") {
-    if (!canAttackLeader(attackerFound.card, attackerData, state)) {
+    if (!canAttackLeader(attackerFound.card, attackerData, state, cardDb)) {
       return "This card can only attack Characters on the turn it is played";
     }
   } else if (targetFound.card.zone === "CHARACTER") {
