@@ -890,6 +890,38 @@ Card text: `[Once Per Turn] If this Character would be K.O.'d, you may trash 1 {
 }
 ```
 
+#### Self-exclusion (enforced by lint)
+
+When the replacement's card text says **"other than [<self>]"**, the
+`target_filter` MUST explicitly exclude the source card. Pick either:
+
+- `exclude_self: true` (preferred — rename-safe), or
+- `exclude_name: "<card_name>"` (matches the card's own name)
+
+Example — OP10-032 Tashigi: _"If you have a green Character **other than [Tashigi]** that would be removed from the field..."_
+
+```typescript
+{
+  category: "replacement",
+  replaces: {
+    event: "WOULD_BE_REMOVED_FROM_FIELD",
+    target_filter: {
+      color: "GREEN",
+      card_type: "CHARACTER",
+      exclude_name: "Tashigi", // REQUIRED — text says "other than [Tashigi]"
+    },
+    cause_filter: { by: "OPPONENT_EFFECT" },
+  },
+  // ...
+}
+```
+
+Replacements without a `target_filter` default to "self only" at runtime
+(see `triggers.ts` `appliesTo` fallback), so no exclusion is needed — but
+once you add a filter, the lint expects the exclusion when the card text
+contains the "other than [<self>]" phrasing. The enforcing test is
+`src/__tests__/schema-lint-replacements.test.ts`.
+
 ### Permanent Aura
 
 Card text: `Your {Straw Hat Crew} type Characters gain +1000 power.`

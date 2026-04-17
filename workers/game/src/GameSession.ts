@@ -22,7 +22,12 @@ import type {
 } from "./types.js";
 import { buildInitialState } from "./engine/setup.js";
 import { runPipeline } from "./engine/pipeline.js";
-import { resumeReplacement, type ReplacementResumeContext } from "./engine/replacements.js";
+import {
+  resumeReplacement,
+  resumeReplacementBatch,
+  type ReplacementBatchResumeContext,
+  type ReplacementResumeContext,
+} from "./engine/replacements.js";
 import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
 import { validateGameInitPayload, validateClientMessage } from "./util/validate.js";
@@ -536,6 +541,19 @@ export class GameSession implements DurableObject {
 
       if (replacementResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
+      }
+    } else if (resumeCtx?.type === "REPLACEMENT_BATCH") {
+      const accepted = action.type !== "PASS";
+      const batchResult = resumeReplacementBatch(
+        this.gameState,
+        resumeCtx as unknown as ReplacementBatchResumeContext,
+        accepted,
+        this.cardDb,
+      );
+      this.gameState = batchResult.state;
+
+      if (batchResult.pendingPrompt) {
+        this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
       }
     } else if (this.gameState.effectStack.length > 0) {
       // Stack-based resume — use new effect stack system

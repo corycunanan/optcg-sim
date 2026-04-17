@@ -11,6 +11,7 @@ import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, 
 import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
+import { processBatchReplacements } from "../../replacements.js";
 
 // ─── Single-target play frames (OPT-114 macro expansion) ────────────────────
 // A multi-target PLAY_CARD conceptually expands to N single-target frames that
@@ -447,11 +448,24 @@ export function executeSetRest(
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
-  let nextState = state;
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  // OPT-222: scan for WOULD_BE_RESTED replacements (e.g. PRB02-006 Zoro)
+  // across the batch of targets. One prompt per matching replacement; cost
+  // paid once. Protected targets drop out of the rest loop; unprotected ones
+  // proceed through the per-frame ON_REST drain below.
+  const batch = processBatchReplacements(state, targetIds, "SET_REST", "WOULD_BE_RESTED", "effect", controller, cardDb);
+  events.push(...batch.events);
+  if (batch.pendingPrompt) {
+    return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
+  }
+
+  let nextState = batch.state;
+  const unprotectedIds = batch.unprotectedIds;
   const restedIds: string[] = [];
 
-  for (let i = 0; i < targetIds.length; i++) {
-    const id = targetIds[i];
+  for (let i = 0; i < unprotectedIds.length; i++) {
+    const id = unprotectedIds[i];
     const frameEvents: PendingEvent[] = [];
 
     nextState = setCardState(nextState, id, "RESTED");
@@ -461,14 +475,14 @@ export function executeSetRest(
     restedIds.push(id);
 
     // OPT-172: rule 6-2 — drain ON_REST triggers between SET_REST frames.
-    if (i + 1 < targetIds.length && frameEvents.length > 0) {
+    if (i + 1 < unprotectedIds.length && frameEvents.length > 0) {
       const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
       nextState = scan.state;
       if (scan.triggers.length > 0) {
         const marker: BatchResumeMarker = {
           kind: "SET_REST",
           pausedAction: action,
-          remainingTargetIds: targetIds.slice(i + 1),
+          remainingTargetIds: unprotectedIds.slice(i + 1),
           restedSoFar: restedIds,
         };
         return {
