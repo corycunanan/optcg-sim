@@ -130,12 +130,13 @@ function evaluateSimple(
     }
 
     case "MULTIPLE_NAMED_CARDS": {
+      // OPT-227: a field card "treated as all names" satisfies any required name.
       const p = getPlayerByController(state, cond.controller, ctx.controller);
       const cards = getFieldCards(p);
       return cond.names.every((name) =>
         cards.some((c) => {
           const data = ctx.cardDb.get(c.cardId);
-          return data?.name === name;
+          return data?.name === name || cardTreatsAsAll(data, "names");
         }),
       );
     }
@@ -145,7 +146,9 @@ function evaluateSimple(
       const cards = getFieldCards(p);
       return cards.some((c) => {
         const data = ctx.cardDb.get(c.cardId);
-        if (!data || data.name !== cond.name) return false;
+        if (!data) return false;
+        const nameMatches = data.name === cond.name || cardTreatsAsAll(data, "names");
+        if (!nameMatches) return false;
         if (cond.property.power) {
           const power = getEffectivePower(c, data, state, ctx.cardDb);
           if (!matchesNumericRange(power, cond.property.power)) return false;
@@ -180,18 +183,23 @@ function evaluateSimple(
         return data.color.length === 1 && data.color[0].toUpperCase() === prop.color;
       }
       if ("trait" in prop) {
-        // {Type} notation — exact match in types array
+        // {Type} notation — exact match in types array.
+        // OPT-227: a Leader "treated as all types" satisfies any trait check.
+        if (cardTreatsAsAll(data, "types")) return true;
         return data.types?.includes(prop.trait) ?? false;
       }
       if ("trait_contains" in prop) {
         // "type including X" — substring match
+        if (cardTreatsAsAll(data, "types")) return true;
         return data.types?.some((t) => t.includes(prop.trait_contains as string)) ?? false;
       }
       if ("attribute" in prop) {
+        if (cardTreatsAsAll(data, "attributes")) return true;
         const want = prop.attribute.toUpperCase();
         return data.attribute?.some((a) => a.toUpperCase() === want) ?? false;
       }
       if ("name" in prop) {
+        if (cardTreatsAsAll(data, "names")) return true;
         return data.name === prop.name;
       }
       if ("multicolored" in prop) {
@@ -500,6 +508,26 @@ function hasEffectKeyword(data: CardData, effectType: string): boolean {
 }
 
 /**
+ * OPT-227: Does this card have the OP-15 Enel-style "treated as all
+ * names/types/attributes" blanket rule modification for the given kind?
+ *
+ * Applied to identity checks in both positive ("has name X") and negative
+ * ("exclude name X") directions — per Bandai rulings, the blanket is
+ * omnidirectional, so defender protections keyed on the attacker's
+ * attributes still apply.
+ */
+export function cardTreatsAsAll(
+  data: CardData | undefined,
+  kind: "names" | "types" | "attributes",
+): boolean {
+  const mods = (data?.effectSchema as { rule_modifications?: Array<Record<string, unknown>> } | null)
+    ?.rule_modifications ?? [];
+  return mods.some(
+    (m) => m.rule_type === "TREATED_AS_ALL_IDENTITIES" && m[kind] === true,
+  );
+}
+
+/**
  * Check if a card instance matches a TargetFilter.
  * Used by condition evaluator and target resolver.
  */
@@ -571,18 +599,22 @@ export function matchesFilter(
     }
   }
 
-  // Trait filters
+  // Trait filters — OPT-227: blanket "treated as all types" satisfies positive
+  // trait checks and fails negative (exclude) checks symmetrically.
   const traits = data.types ?? [];
-  if (filter.traits && !filter.traits.every((t) => traits.includes(t))) return false;
-  if (filter.traits_any_of && !filter.traits_any_of.some((t) => traits.includes(t))) return false;
-  if (filter.traits_contains && !filter.traits_contains.every((t) => traits.some((tr) => tr.includes(t)))) return false;
-  if (filter.traits_exclude && filter.traits_exclude.some((t) => traits.includes(t))) return false;
+  const treatsAsAllTypes = cardTreatsAsAll(data, "types");
+  if (filter.traits && !treatsAsAllTypes && !filter.traits.every((t) => traits.includes(t))) return false;
+  if (filter.traits_any_of && !treatsAsAllTypes && !filter.traits_any_of.some((t) => traits.includes(t))) return false;
+  if (filter.traits_contains && !treatsAsAllTypes && !filter.traits_contains.every((t) => traits.some((tr) => tr.includes(t)))) return false;
+  if (filter.traits_exclude && (treatsAsAllTypes || filter.traits_exclude.some((t) => traits.includes(t)))) return false;
 
-  // Name filters
-  if (filter.name && data.name !== filter.name) return false;
-  if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
-  if (filter.name_includes && !data.name.includes(filter.name_includes)) return false;
-  if (filter.exclude_name && data.name === filter.exclude_name) return false;
+  // Name filters — OPT-227: blanket "treated as all names" matches any positive
+  // name check and is caught by any exclude_name.
+  const treatsAsAllNames = cardTreatsAsAll(data, "names");
+  if (filter.name && !treatsAsAllNames && data.name !== filter.name) return false;
+  if (filter.name_any_of && !treatsAsAllNames && !filter.name_any_of.includes(data.name)) return false;
+  if (filter.name_includes && !treatsAsAllNames && !data.name.includes(filter.name_includes)) return false;
+  if (filter.exclude_name && (treatsAsAllNames || data.name === filter.exclude_name)) return false;
   if (filter.name_matching_ref && resultRefs) {
     const refResult = resultRefs.get(filter.name_matching_ref);
     if (refResult && refResult.targetInstanceIds.length > 0) {
@@ -607,13 +639,17 @@ export function matchesFilter(
   if (filter.has_trigger === true && !data.keywords.trigger) return false;
   if (filter.has_trigger === false && data.keywords.trigger) return false;
 
-  if (filter.attribute) {
+  // Attribute filters — OPT-227: "treated as all attributes" is omnidirectional.
+  // Positive checks pass; attribute_not excludes (e.g. defender's "cannot be
+  // K.O.'d by Slash" correctly fires vs. the blanket Leader).
+  const treatsAsAllAttrs = cardTreatsAsAll(data, "attributes");
+  if (filter.attribute && !treatsAsAllAttrs) {
     const want = filter.attribute.toUpperCase();
     if (!(data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
   }
   if (filter.attribute_not) {
     const want = filter.attribute_not.toUpperCase();
-    if ((data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
+    if (treatsAsAllAttrs || (data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
   }
 
   if (filter.has_effect === true) {

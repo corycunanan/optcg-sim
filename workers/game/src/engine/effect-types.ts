@@ -1051,7 +1051,8 @@ export type RuleModification =
   | StartOfGameEffect
   | TriggerTypeNegation
   | PlayStateMod
-  | DamageRuleMod;
+  | DamageRuleMod
+  | TreatedAsAllIdentities;
 
 export interface NameAlias {
   rule_type: "NAME_ALIAS";
@@ -1116,6 +1117,24 @@ export interface DamageRuleMod {
   applies_to: "FACE_UP_LIFE";
   destination: "DECK_BOTTOM" | "TRASH";
   instead_of: "HAND";
+}
+
+/**
+ * OPT-227: Leaders (typically OP-15 Enel archetype) whose effect reads
+ * "This Leader is treated as a card with all card names, types, and attributes."
+ *
+ * The blanket satisfies positive identity checks and — per Bandai rulings — is
+ * NOT asymmetric: when the blanket Leader attacks into "cannot be K.O.'d by
+ * Slash" it still counts as Slash, so the defender's protection applies (i.e.
+ * Leader cannot KO). Positive filters like `{ name: "X" }`, `{ traits: [...] }`,
+ * `{ attribute: "Y" }` match; negative filters like `exclude_name`,
+ * `attribute_not`, `traits_exclude` exclude such cards for the same reason.
+ */
+export interface TreatedAsAllIdentities {
+  rule_type: "TREATED_AS_ALL_IDENTITIES";
+  names?: boolean;
+  types?: boolean;
+  attributes?: boolean;
 }
 
 // ─── Runtime Effect State (08-ENGINE-ARCHITECTURE) ───────────────────────────
