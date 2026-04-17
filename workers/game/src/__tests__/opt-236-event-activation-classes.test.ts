@@ -175,7 +175,20 @@ describe("OPT-236 — event class emission", () => {
 
   it("class 2: executeActivateEventFromTrash emits EVENT_MAIN_RESOLVED_FROM_TRASH", () => {
     const cardDb = createTestCardDb();
-    const eventCard = makeEventCard("EVT-CLASS2");
+    // OPT-237: the handler now requires a [Main] block to accept the target.
+    const eventCard = makeEventCard("EVT-CLASS2", {
+      effectText: "[Main] Draw 1 card.",
+      effectSchema: {
+        effects: [
+          {
+            id: "main-event",
+            category: "auto",
+            trigger: { keyword: "MAIN_EVENT" },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          },
+        ],
+      },
+    });
     cardDb.set(eventCard.id, eventCard);
 
     const state = createBattleReadyState(cardDb);

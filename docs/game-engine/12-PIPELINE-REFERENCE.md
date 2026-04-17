@@ -72,7 +72,10 @@ Every trigger requires an event to be emitted. If the event isn't emitted, the t
 
 | Event Type | Trigger Keywords | Emitted In |
 |-----------|-----------------|-----------|
-| `CARD_PLAYED` | ON_PLAY, EVENT_ACTIVATED_FROM_HAND, EVENT_MAIN_RESOLVED_FROM_TRASH, EVENT_TRIGGER_RESOLVED, CHARACTER_PLAYED | execute.ts (hand play), play.ts (effect play), life.ts (play from life), battle.ts (Event [Trigger] from Life) |
+| `CARD_PLAYED` | ON_PLAY, CHARACTER_PLAYED | execute.ts (hand play), play.ts (effect play), life.ts (play from life) |
+| `EVENT_ACTIVATED_FROM_HAND` | EVENT_ACTIVATED_FROM_HAND | execute.ts:executePlayCard (Event from hand), play.ts:executeActivateEventFromHand (effect-driven) |
+| `EVENT_MAIN_RESOLVED_FROM_TRASH` | EVENT_MAIN_RESOLVED_FROM_TRASH | play.ts:executeActivateEventFromTrash (Character activates Event [Main] from trash, e.g. Reiju) |
+| `EVENT_TRIGGER_RESOLVED` | EVENT_TRIGGER_RESOLVED | battle.ts:executeRevealTrigger (Event card [Trigger] from life) |
 | `CARD_KO` | ON_KO, OPPONENT_CHARACTER_KO, ANY_CHARACTER_KO | card-mutations.ts, battle.ts |
 | `ATTACK_DECLARED` | WHEN_ATTACKING, ON_OPPONENT_ATTACK | battle.ts:executeDeclareAttack |
 | `BLOCK_DECLARED` | ON_BLOCK, BLOCKER_ACTIVATED | battle.ts:executeDeclareBlocker |
@@ -126,9 +129,9 @@ matchesTrigger(trigger, event, state, sourceCard, cardDb)
 | ANY_CHARACTER_KO | CARD_KO |
 | DON_RETURNED_TO_DON_DECK | DON_DETACHED |
 | DON_GIVEN_TO_CARD | DON_GIVEN_TO_CARD |
-| EVENT_ACTIVATED_FROM_HAND | CARD_PLAYED |
-| EVENT_MAIN_RESOLVED_FROM_TRASH | CARD_PLAYED |
-| EVENT_TRIGGER_RESOLVED | CARD_PLAYED |
+| EVENT_ACTIVATED_FROM_HAND | EVENT_ACTIVATED_FROM_HAND |
+| EVENT_MAIN_RESOLVED_FROM_TRASH | EVENT_MAIN_RESOLVED_FROM_TRASH |
+| EVENT_TRIGGER_RESOLVED | EVENT_TRIGGER_RESOLVED |
 | CHARACTER_PLAYED | CARD_PLAYED |
 | CARD_REMOVED_FROM_LIFE | CARD_ADDED_TO_HAND_FROM_LIFE |
 | LIFE_CARD_REMOVED | CARD_ADDED_TO_HAND_FROM_LIFE |
