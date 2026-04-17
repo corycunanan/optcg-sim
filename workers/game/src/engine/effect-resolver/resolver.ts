@@ -141,6 +141,10 @@ setChoiceDependencies({
   resolveEffect,
 });
 
+// OPT-237: ACTIVATE_EVENT_FROM_TRASH recursively resolves the target Event's
+// [Main] block, so play.ts needs a reference back to resolveEffect.
+play.setPlayDependencies({ resolveEffect });
+
 // Install the action dispatcher for replacement effects so their substitute
 // actions (SET_REST, TRASH_CARD, MODIFY_POWER, …) run through the real
 // handlers. Registered here to avoid a resolver → replacements → resolver

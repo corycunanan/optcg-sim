@@ -3,15 +3,37 @@
  * ACTIVATE_EVENT_FROM_HAND, ACTIVATE_EVENT_FROM_TRASH
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
+import type { Action, EffectBlock, EffectResult, EffectSchema } from "../../effect-types.js";
 import type { BatchResumeMarker, CardData, CardInstance, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
-import type { ActionResult } from "../types.js";
+import type { ActionResult, EffectResolverResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { processBatchReplacements } from "../../replacements.js";
+
+// Injected by the resolver module to break the circular dependency so
+// ACTIVATE_EVENT_FROM_TRASH can resolve the selected Event's [Main] block.
+let _resolveEffect: (
+  state: GameState,
+  block: EffectBlock,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+) => EffectResolverResult;
+
+export function setPlayDependencies(deps: { resolveEffect: typeof _resolveEffect }) {
+  _resolveEffect = deps.resolveEffect;
+}
+
+function findMainEventBlock(cardData: CardData): EffectBlock | undefined {
+  const schema = cardData.effectSchema as EffectSchema | null;
+  if (!schema) return undefined;
+  return schema.effects.find(
+    (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
+  );
+}
 
 // ─── Single-target play frames (OPT-114 macro expansion) ────────────────────
 // A multi-target PLAY_CARD conceptually expands to N single-target frames that
@@ -571,7 +593,16 @@ export function executeActivateEventFromTrash(
 ): ActionResult {
   const events: PendingEvent[] = [];
 
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  // OPT-237: restrict candidates to Events that actually have a [Main] block —
+  // Counter-only / Trigger-only Events are invalid targets for this action.
+  const rawValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  const allValidIds = rawValidIds.filter((id) => {
+    const card = findCardInstance(state, id);
+    if (!card) return false;
+    const data = cardDb.get(card.cardId);
+    return data ? findMainEventBlock(data) !== undefined : false;
+  });
+
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
@@ -579,12 +610,29 @@ export function executeActivateEventFromTrash(
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   const eventInstanceId = targetIds[0];
-  events.push({ type: "EVENT_MAIN_RESOLVED_FROM_TRASH", playerIndex: controller, payload: { cardInstanceId: eventInstanceId } });
+  const eventCard = findCardInstance(state, eventInstanceId);
+  if (!eventCard) return { state, events, succeeded: false };
+  const eventData = cardDb.get(eventCard.cardId);
+  if (!eventData) return { state, events, succeeded: false };
+  const mainBlock = findMainEventBlock(eventData);
+  if (!mainBlock) return { state, events, succeeded: false };
+
+  // Class 2: Character activates Event [Main] from trash. FAQ: the Event's
+  // printed main cost is skipped (the character already paid its inline cost),
+  // and the Event stays in trash after resolution.
+  events.push({
+    type: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+    playerIndex: controller,
+    payload: { cardId: eventCard.cardId, cardInstanceId: eventInstanceId },
+  });
+
+  const resolveResult = _resolveEffect(state, mainBlock, eventInstanceId, controller, cardDb);
 
   return {
-    state,
-    events,
+    state: resolveResult.state,
+    events: [...events, ...resolveResult.events],
     succeeded: true,
     result: { targetInstanceIds: [eventInstanceId], count: 1 },
+    ...(resolveResult.pendingPrompt && { pendingPrompt: resolveResult.pendingPrompt }),
   };
 }
