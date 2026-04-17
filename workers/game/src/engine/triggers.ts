@@ -655,6 +655,14 @@ function matchesEventFilter(
     }
   }
 
+  if (filter.cost_reduced !== undefined) {
+    const reduced =
+      "costReducedAmount" in event.payload
+        ? ((event.payload as { costReducedAmount?: number }).costReducedAmount ?? 0) > 0
+        : false;
+    if (filter.cost_reduced !== reduced) return false;
+  }
+
   return true;
 }
 

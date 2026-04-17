@@ -167,6 +167,10 @@ export interface EventFilter {
   attribute?: Attribute;
   battle_target_type?: "CHARACTER" | "LEADER";
   no_base_effect?: boolean;
+  // OPT-238: filter EVENT_ACTIVATED_FROM_HAND by whether the Event's cost was
+  // reduced by an effect. `true` requires costReducedAmount > 0 on the event
+  // payload. Only meaningful on EVENT_ACTIVATED_FROM_HAND-matching triggers.
+  cost_reduced?: boolean;
 }
 
 export type EventCause =

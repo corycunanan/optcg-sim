@@ -126,7 +126,9 @@ function executePlayCard(
     // OPT-236 class 1: distinct event for "Event [Main] activated from hand".
     // Watchers subscribing to EVENT_ACTIVATED_FROM_HAND (Usopp-style) fire here
     // and NOT on class 2 (from trash) or class 3 (from life trigger).
-    events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId } });
+    const printedCost = cardData.cost ?? 0;
+    const costReducedAmount = Math.max(0, printedCost - cost);
+    events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, costReducedAmount } });
 
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
     const schema = cardData.effectSchema as EffectSchema | null;
