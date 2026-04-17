@@ -4785,7 +4785,8 @@ export const OP15_119_MONKEY_D_LUFFY: EffectSchema = {
       category: "auto",
       trigger: {
         any_of: [
-          { event: "EVENT_ACTIVATED", filter: { controller: "OPPONENT" } },
+          { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "OPPONENT" } },
+          { event: "EVENT_MAIN_RESOLVED_FROM_TRASH", filter: { controller: "OPPONENT" } },
           { event: "BLOCKER_ACTIVATED", filter: { controller: "OPPONENT" } },
         ],
       },

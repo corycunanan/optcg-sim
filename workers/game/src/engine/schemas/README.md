@@ -173,7 +173,10 @@ For effects that react to game events (not bracket-tag abilities):
 | "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
-| "When an Event is activated" | `{ event: "EVENT_ACTIVATED" }` |
+| "When an Event is activated (from hand)" | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
+| "When a Character activates an Event's [Main] from trash" | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
+| "When an Event's [Trigger] resolves from Life" | `{ event: "EVENT_TRIGGER_RESOLVED" }` |
+| "When an Event is activated (any path, excluding [Trigger] from Life)" | `{ any_of: [{ event: "EVENT_ACTIVATED_FROM_HAND" }, { event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }] }` |
 | "When you play a Character" | `{ event: "CHARACTER_PLAYED" }` |
 | "When a card is removed from Life" | `{ event: "CARD_REMOVED_FROM_LIFE" }` |
 | "When [Trigger] is activated" | `{ event: "TRIGGER_ACTIVATED" }` |

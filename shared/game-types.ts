@@ -189,7 +189,9 @@ export interface GameEventPayloadMap {
   ATTACK_REDIRECTED: { newTargetInstanceId: string };
   CARD_REMOVED_FROM_LIFE: { cardInstanceId: string };
   EXTRA_TURN_GRANTED: Record<string, never>;
-  EVENT_ACTIVATED: { cardId?: string; cardInstanceId: string; source?: string };
+  EVENT_ACTIVATED_FROM_HAND: { cardId?: string; cardInstanceId: string };
+  EVENT_MAIN_RESOLVED_FROM_TRASH: { cardId?: string; cardInstanceId: string };
+  EVENT_TRIGGER_RESOLVED: { cardId?: string; cardInstanceId: string };
   LIFE_CARD_TURNED_FACE_UP: { count: number };
   LIFE_CARD_TURNED_FACE_DOWN: { count: number };
   COMBAT_VICTORY: { cardInstanceId: string; targetInstanceId: string };

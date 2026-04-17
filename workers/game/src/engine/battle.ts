@@ -264,6 +264,13 @@ export function executeRevealTrigger(
 
     // If the trigger card has an effectSchema with a TRIGGER block, resolve it
     const triggerCardData = cardDb.get(lifeCard.cardId);
+    if (triggerCardData?.type === "Event") {
+      events.push({
+        type: "EVENT_TRIGGER_RESOLVED",
+        playerIndex: inactiveIdx,
+        payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+      });
+    }
     const schema = triggerCardData?.effectSchema as EffectSchema | null;
     if (schema?.effects) {
       const triggerBlock = schema.effects.find(

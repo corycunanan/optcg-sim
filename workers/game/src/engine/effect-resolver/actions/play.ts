@@ -548,7 +548,7 @@ export function executeActivateEventFromHand(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
 
-  events.push({ type: "EVENT_ACTIVATED", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: eventCard.instanceId } });
+  events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: eventCard.instanceId } });
 
   return {
     state: { ...state, players: newPlayers },
@@ -579,7 +579,7 @@ export function executeActivateEventFromTrash(
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   const eventInstanceId = targetIds[0];
-  events.push({ type: "EVENT_ACTIVATED", playerIndex: controller, payload: { cardInstanceId: eventInstanceId, source: "TRASH" } });
+  events.push({ type: "EVENT_MAIN_RESOLVED_FROM_TRASH", playerIndex: controller, payload: { cardInstanceId: eventInstanceId } });
 
   return {
     state,

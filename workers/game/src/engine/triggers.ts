@@ -537,7 +537,13 @@ function customEventToGameEvent(event: CustomEventType): GameEventType | null {
     OPPONENT_CHARACTER_TRASHED: "CARD_TRASHED",
     DON_RETURNED_TO_DON_DECK: "DON_DETACHED",
     DON_GIVEN_TO_CARD: "DON_GIVEN_TO_CARD",
-    EVENT_ACTIVATED: "CARD_PLAYED",
+    // OPT-236: three distinct Event-activation event classes. Each maps to its
+    // own GameEventType rather than all collapsing to CARD_PLAYED, so Usopp-style
+    // watchers on FROM_HAND don't spuriously fire on Character plays (which emit
+    // CARD_PLAYED) or on Event [Trigger] resolutions from life.
+    EVENT_ACTIVATED_FROM_HAND: "EVENT_ACTIVATED_FROM_HAND",
+    EVENT_MAIN_RESOLVED_FROM_TRASH: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+    EVENT_TRIGGER_RESOLVED: "EVENT_TRIGGER_RESOLVED",
     CHARACTER_PLAYED: "CARD_PLAYED",
     CARD_REMOVED_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
     TRIGGER_ACTIVATED: "TRIGGER_ACTIVATED",

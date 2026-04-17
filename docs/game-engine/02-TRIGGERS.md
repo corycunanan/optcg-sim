@@ -127,7 +127,9 @@ type CustomEventType =
   | "ANY_CHARACTER_KO"
   | "DON_RETURNED_TO_DON_DECK"
   | "DON_GIVEN_TO_CARD"
-  | "EVENT_ACTIVATED"
+  | "EVENT_ACTIVATED_FROM_HAND"
+  | "EVENT_MAIN_RESOLVED_FROM_TRASH"
+  | "EVENT_TRIGGER_RESOLVED"
   | "CHARACTER_PLAYED"
   | "CARD_REMOVED_FROM_LIFE"
   | "TRIGGER_ACTIVATED"
@@ -300,53 +302,58 @@ Example:
 
 ---
 
-### EVENT_ACTIVATED
+### EVENT_ACTIVATED_FROM_HAND / EVENT_MAIN_RESOLVED_FROM_TRASH / EVENT_TRIGGER_RESOLVED
 
-Fires when a player activates an Event card. The `controller` filter determines whose Event activation triggers it. Can also fire on [Trigger] or [Blocker] activations via additional filter flags.
+Bandai FAQs distinguish three activation paths that share the surface wording "an Event is activated":
+
+1. **`EVENT_ACTIVATED_FROM_HAND`** — normal play of an Event card from hand (pay cost, resolve [Main]).
+2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — a Character activates the [Main] of an Event card from trash (OP12-041 Sanji, EB03-031 Reiju). Inline DON!! cost is paid; the Event's printed cost is skipped; the Event is trashed after.
+3. **`EVENT_TRIGGER_RESOLVED`** — an Event card's [Trigger] effect resolves from Life.
+
+For "when your opponent activates an Event" rulings (Usopp, Page One, Lucy, Luffy, Crocodile Leader), Bandai clarifies that classes 1 and 2 count but class 3 does NOT. Cards subscribe to the exact set of classes they care about via a `CompoundTrigger`:
 
 ```typescript
 {
-  event: "EVENT_ACTIVATED",
-  filter?: {
-    controller?: Controller,
-    includes_trigger_keyword?: boolean,
-    includes_blocker_keyword?: boolean
-  }
+  any_of: [
+    { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "OPPONENT" } },
+    { event: "EVENT_MAIN_RESOLVED_FROM_TRASH", filter: { controller: "OPPONENT" } },
+  ]
 }
 ```
 
-| Text Pattern | Example Cards |
-|-------------|---------------|
-| "When your opponent activates an Event" | OP01-004 Usopp, OP06-044 Gion |
-| "When you activate an Event" | OP04-053 Page One |
-| "When your opponent activates an Event or [Trigger]" | OP11-102 Camie |
-| "When your opponent activates an Event or [Blocker]" | OP15-119 Monkey.D.Luffy |
+| Text Pattern | Subscribe to | Example Cards |
+|-------------|--------------|---------------|
+| "When your opponent activates an Event" | classes 1 + 2 | OP01-004 Usopp, OP06-044 Gion, OP04-053 Page One |
+| "When you activate an Event" | classes 1 + 2 | OP01-062 Crocodile, OP10-062 |
+| "When your opponent activates an Event or [Trigger]" | classes 1 + 2 + `TRIGGER_ACTIVATED` | OP11-102 Camie |
+| "When your opponent activates an Event or [Blocker]" | classes 1 + 2 + `BLOCKER_ACTIVATED` | OP15-119 Monkey.D.Luffy |
 
-Example — OP01-004 (opponent activates Event):
-
-```json
-{
-  "trigger": {
-    "event": "EVENT_ACTIVATED",
-    "filter": { "controller": "OPPONENT" }
-  }
-}
-```
-
-Example — OP11-102 (Event or Trigger):
+Example — OP01-004 Usopp (opponent activates Event, excluding [Trigger] from Life):
 
 ```json
 {
   "trigger": {
     "any_of": [
-      { "event": "EVENT_ACTIVATED", "filter": { "controller": "OPPONENT" } },
-      { "event": "TRIGGER_ACTIVATED", "filter": { "controller": "OPPONENT" } }
+      { "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } },
+      { "event": "EVENT_MAIN_RESOLVED_FROM_TRASH", "filter": { "controller": "OPPONENT" } }
     ]
   }
 }
 ```
 
-Note: The "Event or [Trigger]" and "Event or [Blocker]" patterns can alternatively be modeled as a `CompoundTrigger` with `any_of`, or as a single `EVENT_ACTIVATED` trigger with inclusive filter flags. The compound approach is preferred for clarity.
+Example — OP11-102 Camie (Event or any [Trigger]):
+
+```json
+{
+  "trigger": {
+    "any_of": [
+      { "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } },
+      { "event": "EVENT_MAIN_RESOLVED_FROM_TRASH", "filter": { "controller": "OPPONENT" } },
+      { "event": "TRIGGER_ACTIVATED", "filter": { "controller": "OPPONENT" } }
+    ]
+  }
+}
+```
 
 ---
 
@@ -805,7 +812,9 @@ Example:
 | `ANY_CHARACTER_KO` | "When a Character is K.O.'d" | ST08-001, EB01-047 |
 | `DON_RETURNED_TO_DON_DECK` | "When a DON!! card...is returned to your DON!! deck" | OP02-071, OP05-074, OP09-061, EB03-033, ST10-007, ST10-011, ST10-014 |
 | `DON_GIVEN_TO_CARD` | "When...given a DON!! card" | OP02-002 |
-| `EVENT_ACTIVATED` | "When [you/opponent] activates an Event" | OP01-004, OP04-053, OP06-044 |
+| `EVENT_ACTIVATED_FROM_HAND` | "When [you/opponent] plays an Event from hand" | OP01-004, OP04-053, OP06-044 |
+| `EVENT_MAIN_RESOLVED_FROM_TRASH` | "When a Character activates an Event's [Main] from trash" | OP01-004, OP04-053 (firing path for OP12-041, EB03-031) |
+| `EVENT_TRIGGER_RESOLVED` | "When an Event card's [Trigger] resolves from Life" | — (typically excluded from 'Event activated' listeners) |
 | `CHARACTER_PLAYED` | "When [you/opponent] plays a Character" | OP02-026, OP04-024, OP12-081, OP13-100 |
 | `CARD_REMOVED_FROM_LIFE` | "When a card is removed from...Life cards" | OP08-105, OP11-041, OP12-099 |
 | `TRIGGER_ACTIVATED` | "When a [Trigger] activates" | OP05-109, OP13-106 |

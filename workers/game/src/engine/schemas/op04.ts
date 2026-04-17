@@ -1791,9 +1791,18 @@ export const OP04_053_PAGE_ONE: EffectSchema = {
       id: "event_activated_draw_cycle",
       category: "auto",
       trigger: {
-        event: "EVENT_ACTIVATED",
-        filter: { controller: "SELF" },
-        don_requirement: 1,
+        any_of: [
+          {
+            event: "EVENT_ACTIVATED_FROM_HAND",
+            filter: { controller: "SELF" },
+            don_requirement: 1,
+          },
+          {
+            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+            filter: { controller: "SELF" },
+            don_requirement: 1,
+          },
+        ],
       },
       flags: { once_per_turn: true },
       actions: [

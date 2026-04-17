@@ -132,11 +132,22 @@ export const OP01_004_USOPP: EffectSchema = {
       id: "draw_on_event",
       category: "auto",
       trigger: {
-        event: "EVENT_ACTIVATED",
-        filter: { controller: "OPPONENT" },
-        don_requirement: 1,
-        turn_restriction: "YOUR_TURN",
-        once_per_turn: true,
+        any_of: [
+          {
+            event: "EVENT_ACTIVATED_FROM_HAND",
+            filter: { controller: "OPPONENT" },
+            don_requirement: 1,
+            turn_restriction: "YOUR_TURN",
+            once_per_turn: true,
+          },
+          {
+            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+            filter: { controller: "OPPONENT" },
+            don_requirement: 1,
+            turn_restriction: "YOUR_TURN",
+            once_per_turn: true,
+          },
+        ],
       },
       actions: [{ type: "DRAW", params: { amount: 1 } }],
       flags: { once_per_turn: true },
@@ -1706,10 +1717,20 @@ export const OP01_062_CROCODILE: EffectSchema = {
       id: "OP01-062_event_draw",
       category: "auto",
       trigger: {
-        event: "EVENT_ACTIVATED",
-        filter: { controller: "SELF" },
-        don_requirement: 1,
-        once_per_turn: true,
+        any_of: [
+          {
+            event: "EVENT_ACTIVATED_FROM_HAND",
+            filter: { controller: "SELF" },
+            don_requirement: 1,
+            once_per_turn: true,
+          },
+          {
+            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+            filter: { controller: "SELF" },
+            don_requirement: 1,
+            once_per_turn: true,
+          },
+        ],
       },
       conditions: {
         type: "HAND_COUNT",

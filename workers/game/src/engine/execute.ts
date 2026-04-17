@@ -123,6 +123,10 @@ function executePlayCard(
     nextState = moveCard(nextState, cardInstanceId, "TRASH");
     const newEventInstance = nextState.players[pi].trash[0]; // trash is LIFO, newest at [0]
     events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH", source: "FROM_HAND" } });
+    // OPT-236 class 1: distinct event for "Event [Main] activated from hand".
+    // Watchers subscribing to EVENT_ACTIVATED_FROM_HAND (Usopp-style) fire here
+    // and NOT on class 2 (from trash) or class 3 (from life trigger).
+    events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId } });
 
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
     const schema = cardData.effectSchema as EffectSchema | null;
