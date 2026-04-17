@@ -32,6 +32,7 @@ import type {
 import type { ActionResult } from "./effect-resolver/types.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter } from "./conditions.js";
+import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 
 // ─── Dispatcher injection ────────────────────────────────────────────────────
 //
@@ -176,6 +177,40 @@ export function checkReplacementForRemoval(
 
 // ─── Core Matching Logic ─────────────────────────────────────────────────────
 
+/**
+ * Test whether a specific replacement effect matches a single target in a
+ * given event. Centralizes the appliesTo / target_filter / cause_filter
+ * checks so `checkReplacementForEvent` and `scanReplacementsForBatch` agree.
+ */
+function replacementMatchesTarget(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+  params: ReplacementParams,
+  targetInstanceId: string,
+  event: ReplacementEvent,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (params.trigger !== event) return false;
+
+  // appliesTo: non-empty = instance whitelist; empty = wildcard.
+  if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) return false;
+
+  if (params.target_filter) {
+    const targetCard = findCardInstance(state, targetInstanceId);
+    if (!targetCard) return false;
+    if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
+    if (!matchesFilter(targetCard, params.target_filter, cardDb, state)) return false;
+  }
+
+  if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {
+    return false;
+  }
+
+  return true;
+}
+
 function checkReplacementForEvent(
   state: GameState,
   targetInstanceId: string,
@@ -193,24 +228,7 @@ function checkReplacementForEvent(
     const params = mod.params as unknown as ReplacementParams;
     if (!params) continue;
 
-    // Match trigger event
-    if (params.trigger !== event) continue;
-
-    // appliesTo: non-empty list = instance whitelist (self-protection);
-    // empty list = wildcard (rely on target_filter to narrow).
-    if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) continue;
-
-    // target_filter: evaluate against the target card when present.
-    if (params.target_filter) {
-      const targetCard = findCardInstance(state, targetInstanceId);
-      if (!targetCard) continue;
-      // exclude_self is handled outside matchesFilter (same convention as target-resolver.ts)
-      if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) continue;
-      if (!matchesFilter(targetCard, params.target_filter, cardDb, state)) continue;
-    }
-
-    // Check cause filter
-    if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {
+    if (!replacementMatchesTarget(state, effect, params, targetInstanceId, event, cause, causingController, cardDb)) {
       continue;
     }
 
@@ -232,6 +250,108 @@ function checkReplacementForEvent(
   }
 
   return { replaced: false, state, events: [] };
+}
+
+// ─── Batch Replacement Scan (OPT-219) ────────────────────────────────────────
+//
+// When a single action enqueues multiple targets for the same event (Kaido KO
+// of 3 characters, mass-return effects, etc.), the replacement intercepts the
+// *event*, not each target — cost paid once, all matching targets saved. See
+// rules §6-6-3 and the OP11 Koby FAQ for the canonical Navy-cost example.
+
+export interface ReplacementBatchMatch {
+  /** The replacement effect that matches. */
+  effectId: string;
+  /** Target ids this replacement would save. */
+  matchedTargetIds: string[];
+  /** Whether the player is prompted (true) or the replacement applies automatically. */
+  optional: boolean;
+}
+
+/**
+ * Scan every active replacement against a batch of targets and return one
+ * match per eligible replacement effect, collecting the subset of targets it
+ * covers. Skips replacements already consumed this turn or that can't pay
+ * their cost. Preserves registration order so downstream resolution is
+ * deterministic.
+ */
+export function scanReplacementsForBatch(
+  state: GameState,
+  targetInstanceIds: string[],
+  event: ReplacementEvent,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ReplacementBatchMatch[] {
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const matches: ReplacementBatchMatch[] = [];
+
+  for (const effect of effects) {
+    const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
+    if (!mod) continue;
+    const params = mod.params as unknown as ReplacementParams;
+    if (!params) continue;
+    if (params.trigger !== event) continue;
+    if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
+    if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) continue;
+
+    const matchedIds = targetInstanceIds.filter((id) =>
+      replacementMatchesTarget(state, effect, params, id, event, cause, causingController, cardDb),
+    );
+    if (matchedIds.length === 0) continue;
+
+    matches.push({
+      effectId: effect.id,
+      matchedTargetIds: matchedIds,
+      optional: params.optional,
+    });
+  }
+
+  return matches;
+}
+
+/**
+ * Apply a batch-match replacement: run its substitute actions once, regardless
+ * of how many targets it covers. Caller is responsible for skipping the KO /
+ * removal on the matched targets.
+ */
+export function applyBatchReplacement(
+  state: GameState,
+  effectId: string,
+  cardDb: Map<string, CardData>,
+): ReplacementCheckResult {
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effect = effects.find((e) => e.id === effectId);
+  if (!effect) return { replaced: false, state, events: [] };
+  const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
+  const params = mod?.params as unknown as ReplacementParams;
+  if (!params) return { replaced: false, state, events: [] };
+  return applyReplacement(state, effect, params, "", cardDb);
+}
+
+/**
+ * Build the opt-in prompt for a batch match. The resume context carries the
+ * information the batch-aware resume handler needs to continue the event after
+ * the player accepts or declines.
+ */
+export function buildBatchReplacementPrompt(
+  state: GameState,
+  effectId: string,
+  event: ReplacementEvent,
+  resumeContext: ReplacementBatchResumeContext,
+  cardDb: Map<string, CardData>,
+): PendingPromptState {
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effect = effects.find((e) => e.id === effectId);
+  const sourceCard = effect ? findCardInstance(state, effect.sourceCardInstanceId) : undefined;
+  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const effectDescription = sourceData?.effectText ?? describeReplacementEvent(event);
+  const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
+  return {
+    options: { promptType: "OPTIONAL_EFFECT", effectDescription, cards },
+    respondingPlayer: effect?.controller ?? 0,
+    resumeContext: resumeContext as unknown,
+  };
 }
 
 function matchesCauseFilter(
@@ -486,5 +606,245 @@ export function resumeReplacement(
   }
 
   return applyReplacement(state, effect, params, ctx.targetInstanceId, cardDb);
+}
+
+// ─── Batch Resume (OPT-219) ──────────────────────────────────────────────────
+
+export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK";
+
+export interface ReplacementBatchResumeContext {
+  type: "REPLACEMENT_BATCH";
+  actionKind: BatchActionKind;
+  event: ReplacementEvent;
+  /** Every target the caller originally queued for this event. */
+  allTargetIds: string[];
+  /** Targets already saved by earlier replacements. */
+  protectedIds: string[];
+  /** Pending matches to resolve, in registration order. */
+  pendingMatches: ReplacementBatchMatch[];
+  /** Index into pendingMatches of the match this prompt belongs to. */
+  currentMatchIndex: number;
+  /** Controller of the action that produced the event. */
+  causingController: 0 | 1;
+  /** Only used when actionKind === "RETURN_TO_DECK". */
+  returnToDeckPosition?: "TOP" | "BOTTOM";
+}
+
+export interface BatchResumeResult {
+  state: GameState;
+  events: PendingEvent[];
+  /** Targets that ended up protected by replacements (for caller bookkeeping). */
+  protectedIds: string[];
+  /**
+   * Targets that were finalized (KO'd / returned). Only populated when
+   * stepBatch ran the finalization path (i.e. after resume or when
+   * callerFinalizes=false).
+   */
+  finalizedIds: string[];
+  /**
+   * Targets still eligible for KO / return after all replacements resolved.
+   * Populated when the caller is responsible for finalization (so the action
+   * handler can run its own per-frame trigger drain loop).
+   */
+  unprotectedIds: string[];
+  pendingPrompt?: PendingPromptState;
+}
+
+/**
+ * Drive the batch state machine: iterate `pendingMatches` from
+ * `startMatchIndex`, prompting on optional matches and applying non-optional
+ * matches. Does NOT finalize targets — returns `unprotectedIds` and lets the
+ * caller run its own finalization loop (executeKO needs a per-frame ON_KO
+ * drain per rule 6-2, so it can't delegate finalization). Reused by
+ * `processBatchReplacements` and `resumeReplacementBatch`.
+ */
+function stepBatch(
+  state: GameState,
+  ctx: ReplacementBatchResumeContext,
+  startMatchIndex: number,
+  cardDb: Map<string, CardData>,
+): BatchResumeResult {
+  let nextState = state;
+  const events: PendingEvent[] = [];
+  const protectedIds = new Set<string>(ctx.protectedIds);
+
+  for (let i = startMatchIndex; i < ctx.pendingMatches.length; i++) {
+    const match = ctx.pendingMatches[i];
+    // Skip matches whose targets are all already protected by an earlier match
+    const applicable = match.matchedTargetIds.filter((id) => !protectedIds.has(id));
+    if (applicable.length === 0) continue;
+
+    if (match.optional) {
+      const prompt = buildBatchReplacementPrompt(
+        nextState,
+        match.effectId,
+        ctx.event,
+        {
+          ...ctx,
+          protectedIds: [...protectedIds],
+          currentMatchIndex: i,
+        },
+        cardDb,
+      );
+      return {
+        state: nextState,
+        events,
+        protectedIds: [...protectedIds],
+        finalizedIds: [],
+        unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
+        pendingPrompt: prompt,
+      };
+    }
+
+    // Non-optional: apply once, mark covered targets as protected.
+    const applied = applyBatchReplacement(nextState, match.effectId, cardDb);
+    nextState = applied.state;
+    events.push(...applied.events);
+    applicable.forEach((id) => protectedIds.add(id));
+  }
+
+  return {
+    state: nextState,
+    events,
+    protectedIds: [...protectedIds],
+    finalizedIds: [],
+    unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
+  };
+}
+
+function finalizeTarget(
+  state: GameState,
+  targetId: string,
+  kind: BatchActionKind,
+  causingController: 0 | 1,
+  returnToDeckPosition: "TOP" | "BOTTOM" | undefined,
+): { state: GameState; events: PendingEvent[] } | null {
+  switch (kind) {
+    case "KO":
+      return koCharacter(state, targetId, causingController);
+    case "RETURN_TO_HAND":
+      return returnToHand(state, targetId);
+    case "RETURN_TO_DECK":
+      return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM");
+  }
+}
+
+/**
+ * Entry point for batch replacement processing. Action handlers
+ * (executeKO, executeReturnToHand, executeReturnToDeck) call this instead of
+ * iterating targets one by one. Returns either:
+ *   - finalized result with state + events, OR
+ *   - pendingPrompt if an optional replacement needs player input.
+ */
+export function processBatchReplacements(
+  state: GameState,
+  targetIds: string[],
+  actionKind: BatchActionKind,
+  event: ReplacementEvent,
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+  returnToDeckPosition?: "TOP" | "BOTTOM",
+): BatchResumeResult {
+  const matches = scanReplacementsForBatch(state, targetIds, event, cause, causingController, cardDb);
+  const ctx: ReplacementBatchResumeContext = {
+    type: "REPLACEMENT_BATCH",
+    actionKind,
+    event,
+    allTargetIds: targetIds,
+    protectedIds: [],
+    pendingMatches: matches,
+    currentMatchIndex: 0,
+    causingController,
+    returnToDeckPosition,
+  };
+  return stepBatch(state, ctx, 0, cardDb);
+}
+
+/**
+ * Called by GameSession.resumeFromPrompt when a batch replacement prompt is
+ * answered. If accepted, applies the current match's substitute once, then
+ * continues processing remaining matches. If declined, advances past the
+ * current match without protecting its targets. After all replacements are
+ * resolved and no prompt is pending, finalizes the unprotected targets inline.
+ *
+ * NOTE: the resume path does NOT run the per-frame ON_KO drain. Callers that
+ * need drain semantics (executeKO for non-resume flows) call
+ * `processBatchReplacements` directly and loop over `unprotectedIds`
+ * themselves. In practice, the resume path is only reached when the player
+ * interacted with an optional replacement prompt, which is rare enough that
+ * mid-resume ON_KO interleave is acceptable as a future refinement.
+ */
+export function resumeReplacementBatch(
+  state: GameState,
+  ctx: ReplacementBatchResumeContext,
+  accepted: boolean,
+  cardDb: Map<string, CardData>,
+): BatchResumeResult {
+  let nextState = state;
+  const events: PendingEvent[] = [];
+  const protectedIds = new Set<string>(ctx.protectedIds);
+
+  const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
+  if (accepted && currentMatch) {
+    const applicable = currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id));
+    const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb);
+    nextState = applied.state;
+    events.push(...applied.events);
+    if (applied.pendingPrompt) {
+      // A substitute action raised its own target prompt — surface it and stop.
+      // The outer resume system will chain: when this inner prompt resolves,
+      // the caller is responsible for re-entering the batch with the same
+      // ctx, which will continue from currentMatchIndex + 1.
+      return {
+        state: nextState,
+        events,
+        protectedIds: [...protectedIds],
+        finalizedIds: [],
+        unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
+        pendingPrompt: applied.pendingPrompt,
+      };
+    }
+    applicable.forEach((id) => protectedIds.add(id));
+  }
+
+  // Advance past the current match and continue the state machine.
+  const nextCtx: ReplacementBatchResumeContext = {
+    ...ctx,
+    protectedIds: [...protectedIds],
+  };
+  const rest = stepBatch(nextState, nextCtx, ctx.currentMatchIndex + 1, cardDb);
+  let resumeState = rest.state;
+  const resumeEvents = [...events, ...rest.events];
+
+  if (rest.pendingPrompt) {
+    return {
+      state: resumeState,
+      events: resumeEvents,
+      protectedIds: rest.protectedIds,
+      finalizedIds: [],
+      unprotectedIds: rest.unprotectedIds,
+      pendingPrompt: rest.pendingPrompt,
+    };
+  }
+
+  // All replacements resolved — finalize unprotected targets inline.
+  const finalizedIds: string[] = [];
+  for (const id of rest.unprotectedIds) {
+    const finalized = finalizeTarget(resumeState, id, ctx.actionKind, ctx.causingController, ctx.returnToDeckPosition);
+    if (finalized) {
+      resumeState = finalized.state;
+      resumeEvents.push(...finalized.events);
+      finalizedIds.push(id);
+    }
+  }
+
+  return {
+    state: resumeState,
+    events: resumeEvents,
+    protectedIds: rest.protectedIds,
+    finalizedIds,
+    unprotectedIds: rest.unprotectedIds,
+  };
 }
 

@@ -6,9 +6,9 @@ import type { Action, EffectResult } from "../../effect-types.js";
 import type { BatchResumeMarker, CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { resolveAmount } from "../action-utils.js";
-import { koCharacter, trashCharacter, returnToHand, returnToDeck } from "../card-mutations.js";
+import { koCharacter, returnToHand, returnToDeck, trashCharacter } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt, matchesFilterForTarget } from "../target-resolver.js";
-import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
+import { processBatchReplacements } from "../../replacements.js";
 import { findCardInstance } from "../../state.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 
@@ -29,43 +29,42 @@ export function executeKO(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  let nextState = state;
+  // OPT-219: one batch scan for the whole target set — cost paid once per
+  // replacement regardless of how many targets it protects. The batch does
+  // NOT finalize; it hands back the subset still eligible for KO so this
+  // handler can run its own per-frame loop with rule 6-2 trigger drain.
+  const batch = processBatchReplacements(state, targetIds, "KO", "WOULD_BE_KO", "effect", controller, cardDb);
+  events.push(...batch.events);
+  if (batch.pendingPrompt) {
+    return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
+  }
+  let nextState = batch.state;
+  const unprotectedIds = batch.unprotectedIds;
   const koedIds: string[] = [];
-  for (let i = 0; i < targetIds.length; i++) {
-    const id = targetIds[i];
+
+  // OPT-172: rule 6-2 — drain ON_KO triggers between frames. Each frame KOs
+  // one target, then scans its events for auto triggers. If any fire and more
+  // targets remain, pause the batch so the resolver can resolve the triggers
+  // before the next CARD_KO is emitted.
+  for (let i = 0; i < unprotectedIds.length; i++) {
+    const id = unprotectedIds[i];
     const frameEvents: PendingEvent[] = [];
-
-    // Check for replacement effects before completing the KO
-    const replacement = checkReplacementForKO(nextState, id, "effect", controller, cardDb);
-    if (replacement.pendingPrompt) {
-      events.push(...replacement.events);
-      return { state: replacement.state, events, succeeded: false, pendingPrompt: replacement.pendingPrompt };
-    }
-    if (replacement.replaced) {
-      nextState = replacement.state;
-      events.push(...replacement.events);
-      frameEvents.push(...replacement.events);
-    } else {
-      const result = koCharacter(nextState, id, controller);
-      if (result) {
-        nextState = result.state;
-        events.push(...result.events);
-        frameEvents.push(...result.events);
-        koedIds.push(id);
-      }
+    const result = koCharacter(nextState, id, controller);
+    if (result) {
+      nextState = result.state;
+      events.push(...result.events);
+      frameEvents.push(...result.events);
+      koedIds.push(id);
     }
 
-    // OPT-172: rule 6-2 — drain ON_KO triggers between frames. If this frame
-    // emitted events and more targets remain, scan and pause the batch so the
-    // resolver can drain triggers before the next KO fires.
-    if (frameEvents.length > 0 && i + 1 < targetIds.length) {
+    if (frameEvents.length > 0 && i + 1 < unprotectedIds.length) {
       const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
       nextState = scan.state;
       if (scan.triggers.length > 0) {
         const marker: BatchResumeMarker = {
           kind: "KO",
           pausedAction: action,
-          remainingTargetIds: targetIds.slice(i + 1),
+          remainingTargetIds: unprotectedIds.slice(i + 1),
           koedSoFar: koedIds,
         };
         return {
@@ -104,33 +103,30 @@ export function executeReturnToHand(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  let nextState = state;
-  const returnedIds: string[] = [];
-  for (const id of targetIds) {
-    const replacement = checkReplacementForRemoval(nextState, id, controller, cardDb);
-    if (replacement.pendingPrompt) {
-      events.push(...replacement.events);
-      return { state: replacement.state, events, succeeded: false, pendingPrompt: replacement.pendingPrompt };
-    }
-    if (replacement.replaced) {
-      nextState = replacement.state;
-      events.push(...replacement.events);
-      continue;
-    }
+  const batch = processBatchReplacements(state, targetIds, "RETURN_TO_HAND", "WOULD_BE_REMOVED_FROM_FIELD", "effect", controller, cardDb);
+  events.push(...batch.events);
+  if (batch.pendingPrompt) {
+    return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
+  }
 
+  // RETURN_TO_HAND emits CARD_RETURNED_TO_HAND, not CARD_KO — no ON_KO drain
+  // is required between frames. Finalize the unprotected subset inline.
+  let nextState = batch.state;
+  const finalizedIds: string[] = [];
+  for (const id of batch.unprotectedIds) {
     const result = returnToHand(nextState, id);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
-      returnedIds.push(id);
+      finalizedIds.push(id);
     }
   }
 
   return {
     state: nextState,
     events,
-    succeeded: returnedIds.length > 0,
-    result: { targetInstanceIds: returnedIds, count: returnedIds.length },
+    succeeded: finalizedIds.length > 0,
+    result: { targetInstanceIds: finalizedIds, count: finalizedIds.length },
   };
 }
 
@@ -153,33 +149,30 @@ export function executeReturnToDeck(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  let nextState = state;
-  const returnedIds: string[] = [];
-  for (const id of targetIds) {
-    const replacement = checkReplacementForRemoval(nextState, id, controller, cardDb);
-    if (replacement.pendingPrompt) {
-      events.push(...replacement.events);
-      return { state: replacement.state, events, succeeded: false, pendingPrompt: replacement.pendingPrompt };
-    }
-    if (replacement.replaced) {
-      nextState = replacement.state;
-      events.push(...replacement.events);
-      continue;
-    }
+  const batch = processBatchReplacements(
+    state, targetIds, "RETURN_TO_DECK", "WOULD_BE_REMOVED_FROM_FIELD", "effect", controller, cardDb, position,
+  );
+  events.push(...batch.events);
+  if (batch.pendingPrompt) {
+    return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
+  }
 
+  let nextState = batch.state;
+  const finalizedIds: string[] = [];
+  for (const id of batch.unprotectedIds) {
     const result = returnToDeck(nextState, id, position);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
-      returnedIds.push(id);
+      finalizedIds.push(id);
     }
   }
 
   return {
     state: nextState,
     events,
-    succeeded: returnedIds.length > 0,
-    result: { targetInstanceIds: returnedIds, count: returnedIds.length },
+    succeeded: finalizedIds.length > 0,
+    result: { targetInstanceIds: finalizedIds, count: finalizedIds.length },
   };
 }
 
