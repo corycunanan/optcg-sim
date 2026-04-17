@@ -155,6 +155,14 @@ export function listAuthoredSchemas(): string[] {
   return Object.keys(AUTHORED_SCHEMAS);
 }
 
+/**
+ * Return all authored schemas keyed by card ID. Used by schema-lint tests
+ * that need to iterate every registered schema.
+ */
+export function getAllAuthoredSchemas(): Record<string, EffectSchema> {
+  return AUTHORED_SCHEMAS;
+}
+
 // ─── Schema Validation ───────────────────────────────────────────────────────
 
 const VALID_CATEGORIES = new Set(["auto", "activate", "permanent", "replacement", "rule_modification"]);
