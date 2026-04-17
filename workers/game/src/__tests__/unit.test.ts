@@ -451,6 +451,17 @@ describe("isOpenArea / isSecretArea", () => {
 
 // ─── Keyword helpers ──────────────────────────────────────────────────────────
 
+function makeAttackState(turnNumber: number, activeEffects: unknown[] = []): GameState {
+  return { turn: { number: turnNumber }, activeEffects } as unknown as GameState;
+}
+
+function makeCharInstance(cardId: string, instanceId: string, turnPlayed: number): CardInstance {
+  return {
+    instanceId, cardId, zone: "CHARACTER",
+    state: "ACTIVE", attachedDon: [], turnPlayed, controller: 0, owner: 0,
+  };
+}
+
 describe("canAttackThisTurn", () => {
   it("Leader can always attack", () => {
     const { state } = setupGame();
@@ -459,49 +470,76 @@ describe("canAttackThisTurn", () => {
   });
 
   it("character played on a previous turn can attack", () => {
-    const state = { turn: { number: 3 } } as GameState;
-    const card: CardInstance = {
-      instanceId: "c1", cardId: CARDS.VANILLA.id, zone: "CHARACTER",
-      state: "ACTIVE", attachedDon: [], turnPlayed: 2, controller: 0, owner: 0,
-    };
+    const state = makeAttackState(3);
+    const card = makeCharInstance(CARDS.VANILLA.id, "c1", 2);
     expect(canAttackThisTurn(card, CARDS.VANILLA, state)).toBe(true);
   });
 
   it("vanilla character played this turn cannot attack", () => {
-    const state = { turn: { number: 3 } } as GameState;
-    const card: CardInstance = {
-      instanceId: "c1", cardId: CARDS.VANILLA.id, zone: "CHARACTER",
-      state: "ACTIVE", attachedDon: [], turnPlayed: 3, controller: 0, owner: 0,
-    };
+    const state = makeAttackState(3);
+    const card = makeCharInstance(CARDS.VANILLA.id, "c1", 3);
     expect(canAttackThisTurn(card, CARDS.VANILLA, state)).toBe(false);
   });
 
   it("Rush character played this turn CAN attack", () => {
-    const state = { turn: { number: 3 } } as GameState;
-    const card: CardInstance = {
-      instanceId: "c1", cardId: CARDS.RUSH.id, zone: "CHARACTER",
-      state: "ACTIVE", attachedDon: [], turnPlayed: 3, controller: 0, owner: 0,
-    };
+    const state = makeAttackState(3);
+    const card = makeCharInstance(CARDS.RUSH.id, "c1", 3);
     expect(canAttackThisTurn(card, CARDS.RUSH, state)).toBe(true);
+  });
+
+  it("vanilla with granted RUSH this turn CAN attack (OP04-118 Vivi style)", () => {
+    const card = makeCharInstance(CARDS.VANILLA.id, "c1", 3);
+    const state = makeAttackState(3, [{
+      id: "eff-rush", sourceCardInstanceId: "src", sourceEffectBlockId: "b",
+      category: "permanent", modifiers: [{ type: "GRANT_KEYWORD", params: { keyword: "RUSH" } }],
+      duration: { type: "THIS_TURN" }, expiresAt: { wave: "END_OF_TURN", turn: 3 },
+      controller: 0, appliesTo: ["c1"], timestamp: 0,
+    }]);
+    expect(canAttackThisTurn(card, CARDS.VANILLA, state)).toBe(true);
+  });
+
+  it("granted RUSH whose condition fails is ineffective (OP04-118 Vivi cost-reduced)", () => {
+    // Simulates Vivi's conditional [Rush]: live-evaluated block condition.
+    // When the condition no longer holds, the grant drops and attack is blocked.
+    const { state: base, cardDb } = setupGame();
+    const card = makeCharInstance(CARDS.VANILLA.id, "c1", base.turn.number);
+    const state: GameState = {
+      ...base,
+      activeEffects: [{
+        id: "eff-rush", sourceCardInstanceId: "src", sourceEffectBlockId: "b",
+        category: "permanent",
+        modifiers: [{ type: "GRANT_KEYWORD", params: { keyword: "RUSH" } }],
+        // Condition never satisfied — hand can't have 999 cards
+        conditions: { type: "HAND_COUNT", controller: "SELF", operator: "GTE", value: 999 },
+        duration: { type: "THIS_TURN" }, expiresAt: { wave: "END_OF_TURN", turn: base.turn.number },
+        controller: 0, appliesTo: ["c1"], timestamp: 0,
+      }] as unknown as GameState["activeEffects"],
+    };
+    expect(canAttackThisTurn(card, CARDS.VANILLA, state, cardDb)).toBe(false);
   });
 });
 
 describe("canAttackLeader", () => {
   it("Rush:Character cannot attack Leader on turn played", () => {
-    const state = { turn: { number: 3 } } as GameState;
-    const card: CardInstance = {
-      instanceId: "c1", cardId: CARDS.RUSH_CHAR.id, zone: "CHARACTER",
-      state: "ACTIVE", attachedDon: [], turnPlayed: 3, controller: 0, owner: 0,
-    };
+    const state = makeAttackState(3);
+    const card = makeCharInstance(CARDS.RUSH_CHAR.id, "c1", 3);
     expect(canAttackLeader(card, CARDS.RUSH_CHAR, state)).toBe(false);
   });
 
   it("Rush:Character CAN attack Leader on subsequent turns", () => {
-    const state = { turn: { number: 4 } } as GameState;
-    const card: CardInstance = {
-      instanceId: "c1", cardId: CARDS.RUSH_CHAR.id, zone: "CHARACTER",
-      state: "ACTIVE", attachedDon: [], turnPlayed: 3, controller: 0, owner: 0,
-    };
+    const state = makeAttackState(4);
+    const card = makeCharInstance(CARDS.RUSH_CHAR.id, "c1", 3);
+    expect(canAttackLeader(card, CARDS.RUSH_CHAR, state)).toBe(true);
+  });
+
+  it("Rush:Character + granted RUSH CAN attack Leader same turn (stacked)", () => {
+    const card = makeCharInstance(CARDS.RUSH_CHAR.id, "c1", 3);
+    const state = makeAttackState(3, [{
+      id: "eff-rush", sourceCardInstanceId: "src", sourceEffectBlockId: "b",
+      category: "permanent", modifiers: [{ type: "GRANT_KEYWORD", params: { keyword: "RUSH" } }],
+      duration: { type: "THIS_TURN" }, expiresAt: { wave: "END_OF_TURN", turn: 3 },
+      controller: 0, appliesTo: ["c1"], timestamp: 0,
+    }]);
     expect(canAttackLeader(card, CARDS.RUSH_CHAR, state)).toBe(true);
   });
 });
