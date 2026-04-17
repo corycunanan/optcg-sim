@@ -16,6 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import { executeKO, executeReturnToHand } from "../engine/effect-resolver/actions/removal.js";
+import { executeSetRest } from "../engine/effect-resolver/actions/play.js";
 import { resumeReplacementBatch, type ReplacementBatchResumeContext } from "../engine/replacements.js";
 import "../engine/effect-resolver/resolver.js"; // installs replacement dispatcher
 import type { Action, EffectResult, RuntimeActiveEffect } from "../engine/effect-types.js";
@@ -492,5 +493,135 @@ describe("Batch replacement — cost paid once no matter how many targets", () =
     const effect = (resumed.state.activeEffects as RuntimeActiveEffect[]).find((e) => e.id === "repl-koby");
     const mod = effect?.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
     expect((mod?.params as Record<string, unknown>)?.usedOnTurn).toBe(state.turn.number);
+  });
+});
+
+// ─── PRB02-006 Roronoa Zoro — WOULD_BE_RESTED (OPT-222) ─────────────────────
+//
+// "[Opponent's Turn] If this Character would be rested by your opponent's
+// Character's effect, you may rest 1 of your other Characters instead."
+//
+// Wires the WOULD_BE_RESTED replacement path through executeSetRest. The
+// batch flow is reused (actionKind "SET_REST") so single- and multi-target
+// rest effects both run through one scan with decline semantics that fall
+// through to the normal per-frame rest loop.
+
+describe("Roronoa Zoro (PRB02-006) — WOULD_BE_RESTED replacement", () => {
+  function buildZoroState(cardDb: Map<string, CardData>) {
+    const zoro = makeCharCard("PRB02-006", "Roronoa Zoro", { color: ["Green"], power: 5000 });
+    const ally = makeCharCard("GREEN-ALLY", "GreenAlly", { color: ["Green"], power: 4000 });
+    cardDb.set(zoro.id, zoro);
+    cardDb.set(ally.id, ally);
+
+    const base = createBattleReadyState(cardDb);
+    const zoroInst = fieldInstance(zoro.id, 0, "zoro");
+    const allyInst = fieldInstance(ally.id, 0, "ally");
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-zoro",
+      sourceCardInstanceId: zoroInst.instanceId,
+      sourceEffectBlockId: "rest_replacement",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_RESTED",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: null,
+          replacement_actions: [{
+            type: "SET_REST",
+            target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 }, filter: { exclude_self: true } },
+          }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [zoroInst.instanceId], // self-only: no target_filter → whitelist Zoro
+      timestamp: Date.now(),
+    };
+
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([zoroInst, allyInst]) };
+    const state: GameState = {
+      ...base,
+      players: newPlayers,
+      activeEffects: [effect as never],
+    };
+    return { state, ids: { zoro: zoroInst.instanceId, ally: allyInst.instanceId } };
+  }
+
+  it("prompts Zoro's controller when an opponent effect would rest Zoro", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildZoroState(cardDb);
+
+    const action: Action = {
+      type: "SET_REST",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeSetRest(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.zoro]);
+
+    expect(result.pendingPrompt).toBeDefined();
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+    const ctx = result.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    expect(ctx.type).toBe("REPLACEMENT_BATCH");
+    expect(ctx.actionKind).toBe("SET_REST");
+    expect(ctx.pendingMatches).toHaveLength(1);
+    expect(ctx.pendingMatches[0].matchedTargetIds).toEqual([ids.zoro]);
+  });
+
+  it("accepting keeps Zoro active and rests the chosen other character instead", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildZoroState(cardDb);
+
+    const action: Action = {
+      type: "SET_REST",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const promptResult = executeSetRest(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.zoro]);
+    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb);
+
+    const zoro = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.zoro);
+    const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
+    expect(zoro?.state).toBe("ACTIVE");
+    expect(ally?.state).toBe("RESTED");
+  });
+
+  it("declining rests Zoro normally and leaves the ally active", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildZoroState(cardDb);
+
+    const action: Action = {
+      type: "SET_REST",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const promptResult = executeSetRest(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.zoro]);
+    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb);
+
+    const zoro = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.zoro);
+    const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
+    expect(zoro?.state).toBe("RESTED");
+    expect(ally?.state).toBe("ACTIVE");
+    expect(resumed.finalizedIds).toEqual([ids.zoro]);
+  });
+
+  it("does not prompt when the source is a self effect (cause_filter rejects)", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildZoroState(cardDb);
+
+    // Self-initiated rest: controller = 0, same as Zoro's owner → OPPONENT_EFFECT denies.
+    const action: Action = {
+      type: "SET_REST",
+      target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 } },
+    };
+    const result = executeSetRest(state, action, "self-source", 0, cardDb, new Map<string, EffectResult>(), [ids.zoro]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    const zoro = result.state.players[0].characters.find((c) => c?.instanceId === ids.zoro);
+    expect(zoro?.state).toBe("RESTED");
   });
 });

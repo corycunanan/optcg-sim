@@ -32,7 +32,7 @@ import type {
 import type { ActionResult } from "./effect-resolver/types.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter } from "./conditions.js";
-import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
+import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
 
 // ─── Dispatcher injection ────────────────────────────────────────────────────
 //
@@ -562,6 +562,8 @@ function describeReplacementEvent(event: ReplacementEvent): string {
       return "This character would be removed from the field. Activate replacement effect?";
     case "WOULD_LEAVE_FIELD":
       return "This character would leave the field. Activate replacement effect?";
+    case "WOULD_BE_RESTED":
+      return "This character would be rested. Activate replacement effect?";
     default:
       return "Activate replacement effect?";
   }
@@ -610,7 +612,7 @@ export function resumeReplacement(
 
 // ─── Batch Resume (OPT-219) ──────────────────────────────────────────────────
 
-export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK";
+export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "SET_REST";
 
 export interface ReplacementBatchResumeContext {
   type: "REPLACEMENT_BATCH";
@@ -726,6 +728,18 @@ function finalizeTarget(
       return returnToHand(state, targetId);
     case "RETURN_TO_DECK":
       return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM");
+    case "SET_REST": {
+      const nextState = setCardState(state, targetId, "RESTED");
+      if (nextState === state) return null;
+      return {
+        state: nextState,
+        events: [{
+          type: "CARD_STATE_CHANGED",
+          playerIndex: causingController,
+          payload: { targetInstanceId: targetId, newState: "RESTED" },
+        }],
+      };
+    }
   }
 }
 
