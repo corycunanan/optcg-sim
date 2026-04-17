@@ -67,10 +67,11 @@ export function executeDeclareAttack(
     payload: { attackerInstanceId, targetInstanceId, attackerPower },
   });
 
-  // Emit CHARACTER_BATTLES when attacker is a character (not leader)
-  if (attackerFound.card.zone === "CHARACTER") {
-    events.push({ type: "CHARACTER_BATTLES", playerIndex: pi, payload: { cardInstanceId: attackerInstanceId, targetInstanceId } });
-  }
+  // OPT-243: CHARACTER_BATTLES does NOT fire here. Per Bandai rulings, it fires
+  // only when the Damage Step actually begins with both combatants still on the
+  // field. Mid-battle removal (e.g. [On Block] trashing the attacker or target)
+  // aborts the battle before Damage Step and CHARACTER_BATTLES must not publish.
+  // Emission is deferred to executeDamageStep.
 
   // [When Attacking] and [On Your Opponent's Attack] fire here in M4
 
@@ -366,6 +367,22 @@ export function recalculateBattlePowers(
 
 // ─── Damage Step (internal) ──────────────────────────────────────────────────
 
+/**
+ * OPT-243: both the attacker and the battle target must still be on the field
+ * (LEADER or CHARACTER) at the moment Damage Step begins. A zone transition
+ * (KO, trash, return-to-hand, move-to-deck) mid-battle strips the instanceId,
+ * so a null lookup here means the card was removed during Attack / Block /
+ * Counter Step — not merely resting or wounded.
+ */
+function isOnField(
+  state: GameState,
+  instanceId: string,
+): { found: ReturnType<typeof findCardInState>; onField: boolean } {
+  const found = findCardInState(state, instanceId);
+  const onField = !!found && (found.card.zone === "LEADER" || found.card.zone === "CHARACTER");
+  return { found, onField };
+}
+
 function executeDamageStep(
   state: GameState,
   cardDb: Map<string, CardData>,
@@ -373,6 +390,40 @@ function executeDamageStep(
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
   const inactiveIdx = getInactivePlayerIndex(state);
+
+  // OPT-243: guard against mid-step removal before we recalc powers or emit
+  // CHARACTER_BATTLES. If either combatant left the field during Block /
+  // Counter Step the battle aborts — no damage, no "battled" triggers.
+  const battleBeforeRecalc = state.turn.battle!;
+  const attackerCheck = isOnField(state, battleBeforeRecalc.attackerInstanceId);
+  const targetCheck = isOnField(state, battleBeforeRecalc.targetInstanceId);
+  if (!attackerCheck.onField || !targetCheck.onField) {
+    const reason = !attackerCheck.onField ? "ATTACKER_LEFT_FIELD" : "TARGET_LEFT_FIELD";
+    events.push({
+      type: "BATTLE_ABORTED",
+      playerIndex: pi,
+      payload: {
+        attackerInstanceId: battleBeforeRecalc.attackerInstanceId,
+        targetInstanceId: battleBeforeRecalc.targetInstanceId,
+        reason,
+      },
+    });
+    const abortedState = endBattle(state, events, { aborted: true });
+    return { state: abortedState, events };
+  }
+
+  // Both combatants on field — emit CHARACTER_BATTLES now (gated on attacker
+  // being a Character rather than a Leader). Leader attacks do not publish.
+  if (attackerCheck.found!.card.zone === "CHARACTER") {
+    events.push({
+      type: "CHARACTER_BATTLES",
+      playerIndex: pi,
+      payload: {
+        cardInstanceId: battleBeforeRecalc.attackerInstanceId,
+        targetInstanceId: battleBeforeRecalc.targetInstanceId,
+      },
+    });
+  }
 
   // Recalculate powers to reflect all modifiers (triggers, counters, effects)
   let nextState = recalculateBattlePowers(state, cardDb);
@@ -529,11 +580,32 @@ function setCardState(
   return { ...state, players: newPlayers };
 }
 
-function endBattle(state: GameState, events: PendingEvent[]): GameState {
+function endBattle(
+  state: GameState,
+  events: PendingEvent[],
+  options: { aborted?: boolean } = {},
+): GameState {
   // Expire battle-scoped effects before clearing battle state
   const battleId = state.turn.battle?.battleId;
+  const battle = state.turn.battle;
   if (battleId) {
     state = expireBattleEffects(state, battleId);
+  }
+
+  // OPT-243: END_OF_BATTLE fires on every battle end — aborted or not — so
+  // "at end of battle" cleanup effects (OP04-047 etc.) can rely on a single
+  // terminal signal. The `aborted` flag lets schemas that only care about
+  // completed battles filter END_OF_BATTLE by payload.
+  if (battle) {
+    events.push({
+      type: "END_OF_BATTLE",
+      playerIndex: state.turn.activePlayerIndex,
+      payload: {
+        attackerInstanceId: battle.attackerInstanceId,
+        targetInstanceId: battle.targetInstanceId,
+        aborted: options.aborted === true,
+      },
+    });
   }
 
   events.push({ type: "BATTLE_RESOLVED", playerIndex: state.turn.activePlayerIndex });
