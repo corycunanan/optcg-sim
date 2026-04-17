@@ -19,6 +19,7 @@ import type {
   CauseFilter,
   EffectResult,
   RuntimeActiveEffect,
+  Target,
   TargetFilter,
 } from "./effect-types.js";
 import type {
@@ -32,6 +33,7 @@ import type {
 import type { ActionResult } from "./effect-resolver/types.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter } from "./conditions.js";
+import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
 
 // ─── Dispatcher injection ────────────────────────────────────────────────────
@@ -240,6 +242,15 @@ function checkReplacementForEvent(
       continue;
     }
 
+    // OPT-232: replacement-action feasibility gate. If the substitute action
+    // cannot legally execute in the current state (e.g. SET_REST on a source
+    // already rested, or with no valid targets), decline the replacement and
+    // fall through to the original consequence. Checked at match time, before
+    // prompting — an infeasible replacement should not surface a prompt.
+    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb)) {
+      continue;
+    }
+
     // Match found — if optional, prompt the player
     if (params.optional) {
       return buildReplacementPrompt(state, effect, targetInstanceId, event, cardDb);
@@ -294,6 +305,8 @@ export function scanReplacementsForBatch(
     if (params.trigger !== event) continue;
     if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
     if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) continue;
+    // OPT-232: skip replacements whose substitute action cannot execute.
+    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb)) continue;
 
     const matchedIds = targetInstanceIds.filter((id) =>
       replacementMatchesTarget(state, effect, params, id, event, cause, causingController, cardDb),
@@ -407,6 +420,84 @@ function canPayReplacementCost(
   }
 
   return true;
+}
+
+// ─── Substitute-Action Feasibility (OPT-232) ─────────────────────────────────
+//
+// Rules §6-6-3: a replacement is a choice that applies only if its substitute
+// can actually resolve. Example: Tashigi's "rest this Character instead" is
+// infeasible when she is already rested or under a CANNOT_BE_RESTED
+// prohibition; the original K.O. / removal must proceed.
+//
+// Feasibility is evaluated at match time so infeasible replacements never
+// surface a prompt. This is a pre-resolution check using the pre-event state;
+// it does not mutate anything.
+
+function canExecuteReplacementSubstitute(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+  actions: Action[],
+  cardDb: Map<string, CardData>,
+): boolean {
+  for (const action of actions) {
+    if (action.type === "SET_REST") {
+      if (!canSetRestSucceed(state, action, effect, cardDb)) return false;
+    }
+    // Other substitute types (TRASH_CARD, RETURN_TO_HAND, MODIFY_POWER, …):
+    // default to feasible. Add explicit checks here as card interactions
+    // surface (e.g. RETURN_TO_HAND with zero valid targets).
+  }
+  return true;
+}
+
+function canSetRestSucceed(
+  state: GameState,
+  action: Action,
+  effect: RuntimeActiveEffect,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const target = action.target;
+  if (!target) return true; // malformed schemas flow through to the dispatcher.
+
+  if (target.type === "SELF") {
+    const source = findCardInstance(state, effect.sourceCardInstanceId);
+    if (!source) return false;
+    if (source.state !== "ACTIVE") return false;
+    if (isProhibitedForCard(state, source.instanceId, "CANNOT_BE_RESTED", cardDb)) return false;
+    return true;
+  }
+
+  // Filter path (e.g. Pica: rest another cost-3+ character instead).
+  const candidates = collectSubstituteCandidates(state, target, effect.controller);
+  for (const candidate of candidates) {
+    if (candidate.state !== "ACTIVE") continue;
+    if (target.filter?.exclude_self && candidate.instanceId === effect.sourceCardInstanceId) continue;
+    if (isProhibitedForCard(state, candidate.instanceId, "CANNOT_BE_RESTED", cardDb)) continue;
+    if (target.filter && !matchesFilter(candidate, target.filter, cardDb, state)) continue;
+    return true;
+  }
+  return false;
+}
+
+function collectSubstituteCandidates(
+  state: GameState,
+  target: Target,
+  replacementController: 0 | 1,
+): CardInstance[] {
+  const scope = target.controller ?? "SELF";
+  const opp = replacementController === 0 ? 1 : 0;
+  const pickChars = (pi: 0 | 1) => state.players[pi].characters.filter(Boolean) as CardInstance[];
+  const pickLeader = (pi: 0 | 1) => state.players[pi].leader;
+  const includeLeader = target.type === "LEADER_OR_CHARACTER";
+
+  const gather = (pi: 0 | 1): CardInstance[] => {
+    const chars = pickChars(pi);
+    return includeLeader ? [pickLeader(pi), ...chars] : chars;
+  };
+
+  if (scope === "OPPONENT") return gather(opp);
+  if (scope === "EITHER" || scope === "ANY") return [...gather(0), ...gather(1)];
+  return gather(replacementController);
 }
 
 function matchesCardFilter(
