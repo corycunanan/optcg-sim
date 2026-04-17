@@ -439,8 +439,10 @@ export function executeSwapBasePower(
   const dataB = cardB ? cardDb.get(cardB.cardId) : undefined;
   if (!cardA || !cardB || !dataA || !dataB) return { state, events, succeeded: false };
 
-  const powerA = getEffectivePower(cardA, dataA, state, cardDb);
-  const powerB = getEffectivePower(cardB, dataB, state, cardDb);
+  // OPT-225: capture Layer 0 base power (printed value) — not effective power.
+  // Layer-2 MODIFY_POWER buffs layer on top of the swapped Layer-1 value.
+  const powerA = dataA.power ?? 0;
+  const powerB = dataB.power ?? 0;
   const expiry = computeExpiry(duration, state);
 
   const effectA: RuntimeActiveEffect = {
