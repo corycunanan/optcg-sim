@@ -8,6 +8,10 @@
  *   - Ivankov-style TRASH_CARD substitute — source trashes itself
  *   - Koby-style (OP11-001) batch replacement — cost paid once, two Navy saved,
  *     non-Navy still returned; decline path; once-per-turn enforcement
+ *   - OPT-232: SET_REST feasibility gate (prohibitions + rested filter targets)
+ *   - OPT-233: Borsalino-style TRASH_FROM_HAND substitute — target survives,
+ *     hand-trash payment emits CARD_TRASHED, empty-hand falls through; plus
+ *     Ivankov-style event suppression (no CARD_KO for spared ally).
  *
  * Imports resolver.js for its side-effect: registering the replacement
  * action dispatcher via setReplacementDispatcher, which is required for
@@ -623,5 +627,225 @@ describe("Roronoa Zoro (PRB02-006) — WOULD_BE_RESTED replacement", () => {
     expect(result.pendingPrompt).toBeUndefined();
     const zoro = result.state.players[0].characters.find((c) => c?.instanceId === ids.zoro);
     expect(zoro?.state).toBe("RESTED");
+  });
+});
+
+// ─── OPT-233: Borsalino-style TRASH_FROM_HAND replacement ────────────────────
+//
+// B3 pattern from rules §6-6-3: "If this Character would be removed from the
+// field by your opponent's effect, trash 1 card from your hand instead." The
+// character is NOT K.O.'d/removed — so no CARD_KO / CARD_RETURNED_TO_HAND
+// event fires and ON_KO watchers don't see it. The only state change is the
+// hand-trash payment.
+//
+// Invariants locked in here:
+//   1. Accepting the replacement keeps the target on the field in its prior
+//      state and emits zero removal events for it.
+//   2. The hand-trash payment emits CARD_TRASHED for the discarded hand card.
+//   3. Empty hand → canPayReplacementCost rejects → no prompt, removal
+//      proceeds as written (B2 fall-through).
+
+describe("Borsalino-style — TRASH_FROM_HAND substitute on WOULD_BE_REMOVED_FROM_FIELD", () => {
+  function buildBorsalinoState(cardDb: Map<string, CardData>, handSize: number) {
+    const borsalino = makeCharCard("BORSALINO", "Borsalino", { color: ["Yellow"], types: ["Navy"] });
+    const handFiller = makeCharCard("HAND-FILLER", "HandFiller", { color: ["Yellow"] });
+    cardDb.set(borsalino.id, borsalino);
+    cardDb.set(handFiller.id, handFiller);
+
+    const base = createBattleReadyState(cardDb);
+    const borsalinoInst = fieldInstance(borsalino.id, 0, "bors");
+
+    const handCards: CardInstance[] = Array.from({ length: handSize }, (_, i) => ({
+      instanceId: `hand-p0-${i}`,
+      cardId: handFiller.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 0,
+      controller: 0,
+      owner: 0,
+    }));
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-borsalino",
+      sourceCardInstanceId: borsalinoInst.instanceId,
+      sourceEffectBlockId: "bors-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_REMOVED_FROM_FIELD",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER" },
+          replacement_actions: [{
+            type: "TRASH_FROM_HAND",
+            target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 1 } },
+            params: { amount: 1 },
+          }],
+          optional: true,
+          once_per_turn: true,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([borsalinoInst]), hand: handCards };
+    const state: GameState = {
+      ...base,
+      players: newPlayers,
+      activeEffects: [effect as never],
+    };
+    return { state, ids: { borsalino: borsalinoInst.instanceId, handCards: handCards.map((c) => c.instanceId) } };
+  }
+
+  it("accepting keeps Borsalino on field, trashes a hand card, emits no removal events", () => {
+    const cardDb = createTestCardDb();
+    // Hand size 1 so the nested TRASH_FROM_HAND auto-selects without prompting
+    // (the replacement batch resolver doesn't chain a secondary prompt within
+    // a single substitute step).
+    const { state, ids } = buildBorsalinoState(cardDb, 1);
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const promptResult = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.borsalino]);
+    expect(promptResult.pendingPrompt).toBeDefined();
+
+    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb);
+
+    // Borsalino survives on the field in its prior state.
+    const bors = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.borsalino);
+    expect(bors?.zone).toBe("CHARACTER");
+    expect(bors?.state).toBe("ACTIVE");
+
+    // Hand emptied; trash gained the hand card.
+    expect(resumed.state.players[0].hand).toHaveLength(0);
+    expect(resumed.state.players[0].trash).toHaveLength(1);
+    expect(resumed.state.players[0].trash[0].instanceId).toBe(ids.handCards[0]);
+
+    // No CARD_RETURNED_TO_HAND / CARD_KO for the protected target.
+    const allEvents = [...promptResult.events, ...resumed.events];
+    const removedForBors = allEvents.some((e) => {
+      if (e.type !== "CARD_RETURNED_TO_HAND" && e.type !== "CARD_KO") return false;
+      const payload = e.payload as { cardInstanceId?: string } | undefined;
+      return payload?.cardInstanceId === ids.borsalino;
+    });
+    expect(removedForBors).toBe(false);
+
+    // Hand-trash payment emits a CARD_TRASHED event.
+    const trashedEvent = resumed.events.find((e) => e.type === "CARD_TRASHED");
+    expect(trashedEvent).toBeDefined();
+  });
+
+  it("declining returns Borsalino to hand normally and leaves the trash untouched", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildBorsalinoState(cardDb, 1);
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const promptResult = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.borsalino]);
+    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb);
+
+    // Borsalino left the field and entered the hand; trash untouched.
+    const bors = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.borsalino);
+    expect(bors).toBeUndefined();
+    expect(resumed.state.players[0].hand).toHaveLength(2); // 1 filler + Borsalino
+    expect(resumed.state.players[0].trash).toHaveLength(0);
+  });
+
+  it("empty hand falls through: no prompt, Borsalino returned to hand as written", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildBorsalinoState(cardDb, 0);
+
+    const action: Action = {
+      type: "RETURN_TO_HAND",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const result = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.borsalino]);
+
+    expect(result.pendingPrompt).toBeUndefined();
+    const bors = result.state.players[0].characters.find((c) => c?.instanceId === ids.borsalino);
+    expect(bors).toBeUndefined();
+    const returned = result.events.some((e) => {
+      if (e.type !== "CARD_RETURNED_TO_HAND") return false;
+      const payload = e.payload as { cardInstanceId?: string } | undefined;
+      return payload?.cardInstanceId === ids.borsalino;
+    });
+    expect(returned).toBe(true);
+  });
+});
+
+// ─── OPT-233: event suppression for self-trash replacements ─────────────────
+//
+// Extends the Ivankov-style coverage: when the ally is spared by a replacement,
+// the engine must not emit CARD_KO for that ally. ON_KO triggers key off
+// CARD_KO events (see triggers.ts), so their non-firing is a direct consequence
+// of event suppression.
+
+describe("OPT-233 — spared targets emit no CARD_KO event", () => {
+  it("Ivankov-style: ally saved, no CARD_KO event for ally, no KO event for Ivankov", () => {
+    const cardDb = createTestCardDb();
+    const ivankov = makeCharCard("IVANKOV-233", "Emporio Ivankov", { color: ["Green"] });
+    const ally = makeCharCard("REV-ALLY-233", "RevAlly", { color: ["Green"] });
+    cardDb.set(ivankov.id, ivankov);
+    cardDb.set(ally.id, ally);
+
+    const base = createBattleReadyState(cardDb);
+    const ivankovInst = fieldInstance(ivankov.id, 0, "ivan233");
+    const allyInst = fieldInstance(ally.id, 0, "rev233");
+
+    const effect: RuntimeActiveEffect = {
+      id: "repl-ivankov-233",
+      sourceCardInstanceId: ivankovInst.instanceId,
+      sourceEffectBlockId: "ivan-233-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER", exclude_self: true },
+          replacement_actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+
+    const newPlayers = [...base.players] as [PlayerState, PlayerState];
+    newPlayers[0] = { ...newPlayers[0], characters: padChars([ivankovInst, allyInst]) };
+    const state: GameState = { ...base, players: newPlayers, activeEffects: [effect as never] };
+
+    const action: Action = {
+      type: "KO",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    };
+    const promptResult = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [allyInst.instanceId]);
+    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb);
+
+    const allEvents = [...promptResult.events, ...resumed.events];
+    const koEvents = allEvents.filter((e) => e.type === "CARD_KO");
+    // The ally was spared; Ivankov is trashed via TRASH_CARD (not KO).
+    for (const e of koEvents) {
+      const payload = e.payload as { cardInstanceId?: string } | undefined;
+      expect(payload?.cardInstanceId).not.toBe(allyInst.instanceId);
+      expect(payload?.cardInstanceId).not.toBe(ivankovInst.instanceId);
+    }
   });
 });
