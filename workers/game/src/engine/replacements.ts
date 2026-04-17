@@ -442,6 +442,11 @@ function canExecuteReplacementSubstitute(
   for (const action of actions) {
     if (action.type === "SET_REST") {
       if (!canSetRestSucceed(state, action, effect, cardDb)) return false;
+    } else if (action.type === "TURN_LIFE_FACE_UP") {
+      // OPT-234: Shirahoshi / Bonney "flip 1 Life instead of removal". Per
+      // Bandai rulings, if every Life is already face-up (or Life is empty)
+      // the replacement is infeasible — the removal proceeds as written.
+      if (!canTurnLifeFaceUpSucceed(state, effect)) return false;
     }
     // Other substitute types (TRASH_CARD, RETURN_TO_HAND, MODIFY_POWER, …):
     // default to feasible. Add explicit checks here as card interactions
@@ -477,6 +482,13 @@ function canSetRestSucceed(
     return true;
   }
   return false;
+}
+
+function canTurnLifeFaceUpSucceed(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+): boolean {
+  return state.players[effect.controller].life.some((l) => l.face === "DOWN");
 }
 
 function collectSubstituteCandidates(
