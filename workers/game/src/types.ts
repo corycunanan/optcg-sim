@@ -84,8 +84,11 @@ export interface ResumeContext {
  *   - SET_REST   (commit 4)  ON_REST triggers between rests
  *
  * Note: TRASH_CARD intentionally has no marker — per rule 10-2-1-3, TRASH
- * emits CARD_TRASHED (not CARD_KO) and no trigger keyword listens for it,
- * so a multi-target TRASH batch can never queue an interleaved auto trigger.
+ * emits CARD_TRASHED (not CARD_KO). No ON_KO keyword trigger listens for it,
+ * and the ANY_CHARACTER_TRASHED / OPPONENT_CHARACTER_TRASHED custom triggers
+ * added in OPT-235 are matched at the pipeline's Step-5 scan rather than as
+ * interleaved auto triggers between frames, so a multi-target TRASH batch
+ * still can't queue an in-batch trigger drain.
  */
 export type BatchResumeMarker =
   | {

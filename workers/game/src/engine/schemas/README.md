@@ -169,6 +169,8 @@ For effects that react to game events (not bracket-tag abilities):
 |-------------------|---------|
 | "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` |
 | "When a Character is K.O.'d" | `{ event: "ANY_CHARACTER_KO" }` |
+| "When a Character is trashed" | `{ event: "ANY_CHARACTER_TRASHED" }` |
+| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
 | "When an Event is activated" | `{ event: "EVENT_ACTIVATED" }` |
