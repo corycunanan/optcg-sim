@@ -228,7 +228,7 @@ function evaluateSimple(
       if (!card) return false;
       const data = ctx.cardDb.get(card.cardId);
       if (!data) return false;
-      return !data.effectText || data.effectText.trim() === "";
+      return !hasBaseEffect(data);
     }
 
     case "HAS_EFFECT_TYPE":
@@ -489,6 +489,40 @@ function getMetricValue(p: PlayerState, metric: string): number {
   }
 }
 
+/**
+ * OPT-249: Does this card have a "base effect" per Bandai's rulings?
+ *
+ * Relevant comprehensive rules:
+ *   • 2-8-5  — A card without card text may be described as having "no base effect".
+ *   • 2-11-2 — [Trigger] is part of the card text (but is NOT counted as a base
+ *              effect for filter purposes — it fires only from Life).
+ *   • 8-2-2  — Cards with invalid (negated) effects are NOT treated as "no base
+ *              effect". The predicate is schema-level, not runtime-level.
+ *
+ * Implementation notes:
+ *   • This is a pure function over CardData. It intentionally does NOT consult
+ *     runtime state (activeEffects, EFFECTS_NEGATED, etc.) so that a Character
+ *     whose [On Play] has been negated still reports `true` per 8-2-2.
+ *   • We rely on the pipeline invariant that `data.effectText` holds only the
+ *     non-Trigger card text; the [Trigger] body lives in `data.triggerText`
+ *     (see `pipeline/transform.ts:163-164`). So a non-empty `effectText`
+ *     means the card has printed text other than [Trigger] — which covers
+ *     [On Play], [When Attacking], [Activate: Main], [Main], [Counter],
+ *     keyword-only bodies (`[Blocker] (...)`, `[Rush] (...)`), passive
+ *     modifiers, etc. An empty `effectText` covers truly vanilla cards and
+ *     Trigger-only cards.
+ *   • We deliberately do NOT consult `data.keywords` here: the KeywordSet
+ *     is derived from both `effectText` AND `triggerText` (see
+ *     `src/lib/game/keywords.ts`), so a card whose only mention of "Blocker"
+ *     lives inside its [Trigger] body would yield a false positive.
+ *   • The printed counter symbol (`data.counter` as a number) is a stat, not
+ *     an effect — it does not appear in `effectText` and correctly does not
+ *     flip this predicate.
+ */
+export function hasBaseEffect(data: CardData): boolean {
+  return data.effectText.trim().length > 0;
+}
+
 function hasEffectKeyword(data: CardData, effectType: string): boolean {
   const kw = data.keywords;
   switch (effectType) {
@@ -675,7 +709,7 @@ export function matchesFilter(
   }
 
   if (filter.no_base_effect === true) {
-    if (data.effectText && data.effectText.trim() !== "") return false;
+    if (hasBaseEffect(data)) return false;
   }
 
   if (filter.has_counter === true) {
