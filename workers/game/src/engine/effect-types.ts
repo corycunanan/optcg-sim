@@ -72,6 +72,10 @@ export interface EffectBlock {
 export interface EffectFlags {
   once_per_turn?: boolean;
   optional?: boolean;
+  // Per-card lockout: declining this optional effect marks it used for the
+  // rest of the turn (PRB02-004 Bonney ruling). Without this flag, declining
+  // is a no-op and the trigger remains eligible on subsequent events.
+  lock_on_decline?: boolean;
   keywords?: Keyword[];
 }
 

@@ -297,8 +297,11 @@ export function matchTriggersForEvent(
 
     if (!isOnKOSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
 
-    // Check once-per-turn
-    if (reg.effectBlock.flags?.once_per_turn) {
+    // Check once-per-turn / lock-on-decline: both flags consult the same
+    // `oncePerTurnUsed` bag. once_per_turn writes on accept; lock_on_decline
+    // writes on decline (OPT-244). Either flag's presence means we skip if
+    // the source has been recorded used this turn.
+    if (reg.effectBlock.flags?.once_per_turn || reg.effectBlock.flags?.lock_on_decline) {
       const usedSet = state.turn.oncePerTurnUsed[reg.effectBlockId];
       if (usedSet?.includes(reg.sourceCardInstanceId)) continue;
     }
