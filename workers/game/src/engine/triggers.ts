@@ -389,6 +389,16 @@ function matchesKeywordTrigger(
     if (cardInEvent && cardInEvent !== sourceCard.instanceId) return false;
   }
 
+  // OPT-246: WHEN_ATTACKED is target-locked. ATTACK_TARGET_FINAL is emitted
+  // after Block Step closes; the source card must be the FINAL target
+  // (qa_op03.md:26-28 — if a friendly Character is attacked instead, or
+  // a Blocker redirects the attack to itself, the original card's
+  // WHEN_ATTACKED does not fire).
+  if (trigger.keyword === "WHEN_ATTACKED") {
+    if (event.type !== "ATTACK_TARGET_FINAL") return false;
+    if (event.payload.targetInstanceId !== sourceCard.instanceId) return false;
+  }
+
   // On Play does not fire when the Character entered the field rested.
   // EB04-018 Megalo and similar "play rested" effects skip the On Play window.
   if (trigger.keyword === "ON_PLAY" && event.type === "CARD_PLAYED") {
@@ -481,6 +491,8 @@ function keywordToEventType(keyword: KeywordTriggerType): GameEventType | null {
   const map: Record<KeywordTriggerType, GameEventType> = {
     ON_PLAY: "CARD_PLAYED",
     WHEN_ATTACKING: "ATTACK_DECLARED",
+    // OPT-246: target-locked window, fires after Block Step closes
+    WHEN_ATTACKED: "ATTACK_TARGET_FINAL",
     ON_KO: "CARD_KO",
     ON_BLOCK: "BLOCK_DECLARED",
     ON_OPPONENT_ATTACK: "ATTACK_DECLARED",
