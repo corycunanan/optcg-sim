@@ -326,13 +326,210 @@ export function executeRevealTrigger(
     payload: { cardInstanceId: lifeCard.instanceId },
   });
 
-  // Clear pending trigger and end battle
+  // Clear the pending trigger marker. The damage that opened this window is
+  // now complete — decrement damagesRemaining and continue the DA sequence
+  // (OPT-239 / qa_rules.md:229-231). If the Character was not DA, or we just
+  // dealt the final damage, the continuation will exit via endBattle.
   const cleanedBattle = { ...battle };
   delete (cleanedBattle as Partial<typeof cleanedBattle & { pendingTriggerLifeCard?: LifeCard }>).pendingTriggerLifeCard;
+  const remainingBefore = cleanedBattle.damagesRemaining ?? 1;
+  cleanedBattle.damagesRemaining = Math.max(0, remainingBefore - 1);
   nextState = { ...nextState, turn: { ...nextState.turn, battle: cleanedBattle } };
-  nextState = endBattle(nextState, events);
 
-  return { state: nextState, events };
+  const cont = continueLeaderDamageSequence(nextState, cardDb);
+  events.push(...cont.events);
+  return { state: cont.state, events, damagedPlayerIndex: cont.damagedPlayerIndex };
+}
+
+// ─── Leader-damage helpers (OPT-239) ────────────────────────────────────────
+
+/**
+ * Deal one damage to the defending Leader. Returns `paused: true` when the
+ * revealed Life card has [Trigger] and the defender must choose whether to
+ * activate it (§10-1-5). Does NOT decrement `damagesRemaining` — callers
+ * (executeRevealTrigger or continueLeaderDamageSequence) own that.
+ */
+function dealOneLeaderDamage(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+  attackerInstanceId: string,
+  isBanish: boolean,
+  attackerType: "LEADER" | "CHARACTER",
+): { state: GameState; events: PendingEvent[]; paused: boolean; damagedPlayerIndex?: 0 | 1; lethal?: boolean } {
+  const events: PendingEvent[] = [];
+  const pi = getActivePlayerIndex(state);
+  const inactiveIdx = getInactivePlayerIndex(state);
+  let nextState = state;
+
+  // §7-1-4-1-1-1: 0 life → defeat on the next damage.
+  if (nextState.players[inactiveIdx].life.length === 0) {
+    events.push({
+      type: "DAMAGE_DEALT",
+      playerIndex: pi,
+      payload: { target: "leader", amount: 1, lethal: true, attackerInstanceId, attackerType },
+    });
+    return { state: nextState, events, paused: false, damagedPlayerIndex: inactiveIdx, lethal: true };
+  }
+
+  // §7-1-4-1-1-2: pop the top Life card.
+  const result = removeTopLifeCard(nextState, inactiveIdx);
+  if (!result) return { state: nextState, events, paused: false };
+  const { lifeCard, state: stateAfterRemoval } = result;
+  nextState = stateAfterRemoval;
+
+  events.push({
+    type: "DAMAGE_DEALT",
+    playerIndex: pi,
+    payload: { amount: 1, attackerInstanceId, attackerType },
+  });
+
+  if (nextState.players[inactiveIdx].life.length === 0) {
+    events.push({ type: "LIFE_COUNT_BECOMES_ZERO", playerIndex: inactiveIdx, payload: {} });
+  }
+
+  if (isBanish) {
+    const trashCard = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "TRASH" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: inactiveIdx,
+      owner: inactiveIdx,
+    };
+    const newPlayers = [...nextState.players] as typeof nextState.players;
+    newPlayers[inactiveIdx] = {
+      ...newPlayers[inactiveIdx],
+      trash: [trashCard, ...newPlayers[inactiveIdx].trash],
+    };
+    nextState = { ...nextState, players: newPlayers };
+    events.push({
+      type: "CARD_REMOVED_FROM_LIFE",
+      playerIndex: inactiveIdx,
+      payload: { cardInstanceId: lifeCard.instanceId },
+    });
+    return { state: nextState, events, paused: false };
+  }
+
+  if (hasTrigger(cardDb.get(lifeCard.cardId) ?? ({ keywords: { trigger: false } } as CardData))) {
+    const curBattle = nextState.turn.battle!;
+    const updatedBattle = { ...curBattle, pendingTriggerLifeCard: lifeCard };
+    nextState = {
+      ...nextState,
+      turn: { ...nextState.turn, battle: updatedBattle as typeof curBattle },
+    };
+    events.push({
+      type: "TRIGGER_ACTIVATED",
+      playerIndex: inactiveIdx,
+      payload: { cardId: lifeCard.cardId },
+    });
+    return { state: nextState, events, paused: true };
+  }
+
+  // Normal: Life → hand.
+  const handCard = {
+    instanceId: lifeCard.instanceId,
+    cardId: lifeCard.cardId,
+    zone: "HAND" as const,
+    state: "ACTIVE" as const,
+    attachedDon: [],
+    turnPlayed: null,
+    controller: inactiveIdx,
+    owner: inactiveIdx,
+  };
+  const newPlayers = [...nextState.players] as typeof nextState.players;
+  newPlayers[inactiveIdx] = {
+    ...newPlayers[inactiveIdx],
+    hand: [...newPlayers[inactiveIdx].hand, handCard],
+  };
+  nextState = { ...nextState, players: newPlayers };
+  events.push({
+    type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+    playerIndex: inactiveIdx,
+    payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+  });
+  events.push({
+    type: "CARD_REMOVED_FROM_LIFE",
+    playerIndex: inactiveIdx,
+    payload: { cardInstanceId: lifeCard.instanceId },
+  });
+  return { state: nextState, events, paused: false };
+}
+
+/**
+ * Drive `dealOneLeaderDamage` while `battle.damagesRemaining > 0`, pausing
+ * on [Trigger] Life cards and aborting if the attacker leaves the field
+ * between damages. Calls `endBattle` once the sequence completes (or aborts).
+ *
+ * Between damages, runs `recalculateBattlePowers` so Life-threshold power
+ * buffs (e.g., ST09-001 Yamato gaining +1000 at ≤2 Life) apply to the 2nd
+ * damage context — see qa_st-09.md:6-8 and qa_op03.md:283-285.
+ */
+function continueLeaderDamageSequence(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
+  const events: PendingEvent[] = [];
+  let nextState = state;
+  let damagedPlayerIndex: 0 | 1 | undefined;
+
+  while (true) {
+    const battle = nextState.turn.battle;
+    if (!battle) break;
+    const remaining = battle.damagesRemaining ?? 0;
+    if (remaining <= 0) break;
+
+    // Attacker must still be on field to deal further damage (inferred from
+    // §7-1-4 — damage dealing requires a source). If a [Trigger] K.O.'d the
+    // attacker during the previous damage's window, skip remaining damage.
+    const attackerFound = findCardInState(nextState, battle.attackerInstanceId);
+    const onField =
+      !!attackerFound &&
+      (attackerFound.card.zone === "CHARACTER" || attackerFound.card.zone === "LEADER");
+    if (!onField) break;
+
+    // Re-apply modifiers so between-damage power conditions are honored.
+    nextState = recalculateBattlePowers(nextState, cardDb);
+
+    const attackerData = cardDb.get(attackerFound!.card.cardId);
+    const isBanish = attackerData ? hasBanish(attackerData) : false;
+    const attackerType: "LEADER" | "CHARACTER" =
+      attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER";
+
+    const one = dealOneLeaderDamage(
+      nextState,
+      cardDb,
+      battle.attackerInstanceId,
+      isBanish,
+      attackerType,
+    );
+    nextState = one.state;
+    events.push(...one.events);
+    if (one.damagedPlayerIndex !== undefined) damagedPlayerIndex = one.damagedPlayerIndex;
+
+    if (one.paused) {
+      // Pending Trigger: defender will send REVEAL_TRIGGER which re-enters
+      // this function via executeRevealTrigger after resolution.
+      return { state: nextState, events, damagedPlayerIndex };
+    }
+
+    // Damage completed (or lethal) — decrement remaining.
+    const curBattle = nextState.turn.battle;
+    if (curBattle) {
+      nextState = {
+        ...nextState,
+        turn: {
+          ...nextState.turn,
+          battle: { ...curBattle, damagesRemaining: Math.max(0, remaining - 1) },
+        },
+      };
+    }
+    if (one.lethal) break;
+  }
+
+  nextState = endBattle(nextState, events);
+  return { state: nextState, events, damagedPlayerIndex };
 }
 
 // ─── Recalculate Battle Powers ───────────────────────────────────────────────
@@ -446,96 +643,30 @@ function executeDamageStep(
     const targetFound = findCardInState(state, targetInstanceId);
     if (targetFound) {
       if (targetFound.card.zone === "LEADER") {
-        // Leader takes damage
+        // Leader takes damage — lock the damage count at Damage Step entry
+        // (qa_rules.md:154: damage is fixed at 2 for DA even if the keyword
+        // is stripped between damages) and drive the sequence through
+        // continueLeaderDamageSequence so the [Trigger] window can pause
+        // between damages (§7-1-4-1-1-3, OPT-239).
         const attackerFound = findCardInState(state, battle.attackerInstanceId);
         const attackerData = attackerFound ? cardDb.get(attackerFound.card.cardId) : undefined;
         const damageCount = attackerData && hasDoubleAttack(attackerData) ? 2 : 1;
-        const isBanish = attackerData ? hasBanish(attackerData) : false;
 
-        // Process each damage point (rules §7-1-4-1-1-3)
-        for (let i = 0; i < damageCount; i++) {
-          // §7-1-4-1-1-1: If 0 life at the point damage would be dealt → defeat
-          if (nextState.players[inactiveIdx].life.length === 0) {
-            damagedPlayerIndex = inactiveIdx;
-            events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { target: "leader", amount: 1, lethal: true, attackerInstanceId: battle.attackerInstanceId, attackerType: attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER" } });
-            break;
-          }
+        nextState = {
+          ...nextState,
+          turn: {
+            ...nextState.turn,
+            battle: { ...nextState.turn.battle!, damagesRemaining: damageCount },
+          },
+        };
 
-          // §7-1-4-1-1-2: Has life → remove top life card
-          const result = removeTopLifeCard(nextState, inactiveIdx);
-          if (!result) break;
-
-          const { lifeCard, state: stateAfterRemoval } = result;
-          nextState = stateAfterRemoval;
-
-          events.push({ type: "DAMAGE_DEALT", playerIndex: pi, payload: { amount: 1, attackerInstanceId: battle.attackerInstanceId, attackerType: attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER" } });
-
-          // Emit when life just hit zero (trigger for cards like OP05)
-          if (nextState.players[inactiveIdx].life.length === 0) {
-            events.push({ type: "LIFE_COUNT_BECOMES_ZERO", playerIndex: inactiveIdx, payload: {} });
-          }
-
-          if (isBanish) {
-            // Banish: life card goes to trash, no Trigger (rules §10-1-3-1)
-            const trashCard = {
-              instanceId: lifeCard.instanceId,
-              cardId: lifeCard.cardId,
-              zone: "TRASH" as const,
-              state: "ACTIVE" as const,
-              attachedDon: [],
-              turnPlayed: null,
-              controller: inactiveIdx,
-              owner: inactiveIdx,
-            };
-            const newPlayers = [...nextState.players] as typeof nextState.players;
-            newPlayers[inactiveIdx] = {
-              ...newPlayers[inactiveIdx],
-              trash: [trashCard, ...newPlayers[inactiveIdx].trash],
-            };
-            nextState = { ...nextState, players: newPlayers };
-            events.push({
-              type: "CARD_REMOVED_FROM_LIFE",
-              playerIndex: inactiveIdx,
-              payload: { cardInstanceId: lifeCard.instanceId },
-            });
-          } else if (hasTrigger(cardDb.get(lifeCard.cardId) ?? { keywords: { trigger: false } } as CardData)) {
-            // Has [Trigger] — pause for defending player's choice (rules §10-1-5-1)
-            const updatedBattle = {
-              ...nextState.turn.battle!,
-              pendingTriggerLifeCard: lifeCard,
-            };
-            nextState = {
-              ...nextState,
-              turn: { ...nextState.turn, battle: updatedBattle as typeof battle },
-            };
-            events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId } });
-            return { state: nextState, events, damagedPlayerIndex };
-          } else {
-            // Normal: add life card to hand
-            const handCard = {
-              instanceId: lifeCard.instanceId,
-              cardId: lifeCard.cardId,
-              zone: "HAND" as const,
-              state: "ACTIVE" as const,
-              attachedDon: [],
-              turnPlayed: null,
-              controller: inactiveIdx,
-              owner: inactiveIdx,
-            };
-            const newPlayers = [...nextState.players] as typeof nextState.players;
-            newPlayers[inactiveIdx] = {
-              ...newPlayers[inactiveIdx],
-              hand: [...newPlayers[inactiveIdx].hand, handCard],
-            };
-            nextState = { ...nextState, players: newPlayers };
-            events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId } });
-            events.push({
-              type: "CARD_REMOVED_FROM_LIFE",
-              playerIndex: inactiveIdx,
-              payload: { cardInstanceId: lifeCard.instanceId },
-            });
-          }
-        }
+        const cont = continueLeaderDamageSequence(nextState, cardDb);
+        events.push(...cont.events);
+        return {
+          state: cont.state,
+          events,
+          damagedPlayerIndex: cont.damagedPlayerIndex ?? damagedPlayerIndex,
+        };
       } else if (targetFound.card.zone === "CHARACTER") {
         // Emit COMBAT_VICTORY — attacker won against a character
         events.push({ type: "COMBAT_VICTORY", playerIndex: pi, payload: { cardInstanceId: battle.attackerInstanceId, targetInstanceId } });
