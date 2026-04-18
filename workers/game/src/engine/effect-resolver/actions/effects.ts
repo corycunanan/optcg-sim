@@ -191,11 +191,14 @@ export function executeNegateTriggerType(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const triggerType = params.trigger_type as string;
+  const triggerType = params.trigger_type as import("../../effect-types.js").KeywordTriggerType;
   const affectedController = params.affected_controller as string ?? "OPPONENT";
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
-  // Map trigger type to prohibition type
+  // Map trigger type to prohibition type. The prohibitionType is informational
+  // here — OPT-260 wires trigger-type negation through the scope.triggerType
+  // check in matchTriggersForEvent, so any non-null trigger-type prohibition
+  // is consumed by its scope, not by its type.
   const prohibMap: Record<string, string> = {
     "ON_PLAY": "CANNOT_ACTIVATE_ON_PLAY",
     "WHEN_ATTACKING": "CANNOT_ACTIVATE_EFFECT",
@@ -211,7 +214,7 @@ export function executeNegateTriggerType(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     prohibitionType: prohibType as any,
-    scope: { triggerType } as any,
+    scope: { triggerType },
     duration,
     controller: targetController as 0 | 1,
     appliesTo: [],
