@@ -537,6 +537,7 @@ export function matchesFilter(
   cardDb: Map<string, CardData>,
   state: GameState,
   resultRefs?: Map<string, EffectResult>,
+  costOverride?: number,
 ): boolean {
   const data = cardDb.get(card.cardId);
   if (!data) return false;
@@ -545,21 +546,23 @@ export function matchesFilter(
   if (filter.any_of) {
     const baseFilter = { ...filter, any_of: undefined };
     const baseOk = Object.keys(baseFilter).filter((k) => baseFilter[k as keyof TargetFilter] !== undefined).length === 0
-      || matchesFilter(card, baseFilter, cardDb, state, resultRefs);
+      || matchesFilter(card, baseFilter, cardDb, state, resultRefs, costOverride);
     if (!baseOk) return false;
-    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state, resultRefs));
+    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state, resultRefs, costOverride));
   }
 
-  // Cost filters
-  const cost = data.cost ?? 0;
+  // Cost filters — OPT-242: cost_* filters re-evaluate against effective cost
+  // when passed an override. base_cost_* always uses the printed base cost.
+  const baseCost = data.cost ?? 0;
+  const cost = costOverride ?? baseCost;
   const ctrl = card.controller;
   if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact, state, ctrl)) return false;
   if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min, state, ctrl)) return false;
   if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max, state, ctrl)) return false;
   if (filter.cost_range && (cost < filter.cost_range.min || cost > filter.cost_range.max)) return false;
-  if (filter.base_cost_exact !== undefined && cost !== filter.base_cost_exact) return false;
-  if (filter.base_cost_min !== undefined && cost < filter.base_cost_min) return false;
-  if (filter.base_cost_max !== undefined && cost > filter.base_cost_max) return false;
+  if (filter.base_cost_exact !== undefined && baseCost !== filter.base_cost_exact) return false;
+  if (filter.base_cost_min !== undefined && baseCost < filter.base_cost_min) return false;
+  if (filter.base_cost_max !== undefined && baseCost > filter.base_cost_max) return false;
 
   // Power filters — compute effective power lazily to avoid circular recursion
   // (getEffectivePower → effectAppliesToCard → matchesFilter → getEffectivePower)

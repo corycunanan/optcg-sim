@@ -33,6 +33,7 @@ function effectAppliesToCard(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>,
+  costOverride?: number,
 ): boolean {
   // Static match — card is explicitly listed in appliesTo
   if (effect.appliesTo?.includes(card.instanceId)) return true;
@@ -57,7 +58,7 @@ function effectAppliesToCard(
 
     // Apply filter if present
     if (mod.target.filter) {
-      if (matchesFilter(card, mod.target.filter, cardDb, state)) return true;
+      if (matchesFilter(card, mod.target.filter, cardDb, state, undefined, costOverride)) return true;
     } else {
       // No filter — matches all cards of the target type/controller
       return true;
@@ -219,18 +220,13 @@ export function getEffectiveCost(
       }
     }
 
-    // Layer 2: MODIFY_COST — additive, sorted turn-player-first for consistency.
-    const modifiers = sortByTurnPlayerPriority(
-      applyingEffects.filter((e) => e.modifiers?.some((m) => m.type === "MODIFY_COST")),
-      turnPlayerIndex,
-    );
-    for (const effect of modifiers) {
-      for (const mod of effect.modifiers ?? []) {
-        if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
-          cost += mod.params.amount as number;
-        }
-      }
-    }
+    // Layer 2: MODIFY_COST — OPT-242: include-once fixed-point iteration.
+    // A threshold filter (e.g., cost_min: 2) re-evaluates against the cost
+    // accumulated so far. Per Bandai ruling, once an effect is applied it
+    // stays applied (even if its own contribution pushes the card past the
+    // threshold). We therefore only add new effects, never remove included
+    // ones — this also guarantees termination (cycle-free).
+    cost = applyLayer2CostModifiers(cost, cardInstanceId, card, state, cardDb, effects, turnPlayerIndex);
 
     // One-time modifiers (unconsumed, matching cost modification for this play action)
     const oneTimeModifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
@@ -252,6 +248,65 @@ export function getEffectiveCost(
   }
 
   return Math.max(0, cost);
+}
+
+/**
+ * OPT-242: Apply Layer 2 MODIFY_COST modifiers with include-once iteration.
+ *
+ * Each iteration, any un-included Layer 2 effect whose filter now matches the
+ * accumulated cost is included and its modifiers applied. Iteration stops when
+ * a full pass adds nothing. Once included, an effect stays included for the
+ * remainder of this evaluation (no un-applying), per Bandai ruling.
+ *
+ * This resolves threshold scenarios like OP10-042 Usopp ("your {Dressrosa}
+ * Characters with cost ≥2 get +1 cost") interacting with auto cost-reduction:
+ * the filter sees the post-reduction cost rather than the base cost.
+ */
+const MAX_COST_LAYER2_ITERATIONS = 16;
+
+function applyLayer2CostModifiers(
+  startingCost: number,
+  cardInstanceId: string,
+  card: CardInstance | null,
+  state: GameState,
+  cardDb: Map<string, CardData> | undefined,
+  effects: RuntimeActiveEffect[],
+  turnPlayerIndex: 0 | 1,
+): number {
+  let cost = startingCost;
+
+  // Candidates: effects carrying a MODIFY_COST mod whose block-level condition
+  // is currently met. Applicability-to-card is re-evaluated each pass.
+  const rawCandidates = effects.filter(
+    (e) =>
+      e.modifiers?.some((m) => m.type === "MODIFY_COST") &&
+      isEffectConditionMet(e, state, cardDb),
+  );
+  const candidates = sortByTurnPlayerPriority(rawCandidates, turnPlayerIndex);
+
+  const includedEffectIds = new Set<string>();
+  for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
+    let addedThisPass = false;
+    for (const effect of candidates) {
+      if (includedEffectIds.has(effect.id)) continue;
+
+      const applies = card && cardDb
+        ? effectAppliesToCard(effect, card, state, cardDb, cost)
+        : effect.appliesTo?.includes(cardInstanceId);
+      if (!applies) continue;
+
+      for (const mod of effect.modifiers ?? []) {
+        if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
+          cost += mod.params.amount as number;
+        }
+      }
+      includedEffectIds.add(effect.id);
+      addedThisPass = true;
+    }
+    if (!addedThisPass) break;
+  }
+
+  return cost;
 }
 
 // ─── Hand-Zone Modifiers ────────────────────────────────────────────────────
