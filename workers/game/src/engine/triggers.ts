@@ -33,7 +33,7 @@ import type {
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
 import { findCardInstance } from "./state.js";
-import { matchesFilter } from "./conditions.js";
+import { matchesFilter, hasBaseEffect } from "./conditions.js";
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -670,7 +670,7 @@ function matchesEventFilter(
       const card = findCardInstance(state, cardId);
       if (card) {
         const data = cardDb.get(card.cardId);
-        const hasNoEffect = !data?.effectText || data.effectText.trim() === "";
+        const hasNoEffect = !data || !hasBaseEffect(data);
         if (filter.no_base_effect !== hasNoEffect) return false;
       }
     }
