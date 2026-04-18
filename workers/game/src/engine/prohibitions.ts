@@ -229,6 +229,169 @@ export function isProhibitedForCard(
   return false;
 }
 
+// ─── Removal Prohibition (OPT-251) ───────────────────────────────────────────
+//
+// Separates narrow "cannot be K.O.'d" (OP01-024 Luffy) from broad "cannot be
+// removed from the field by opp's effects" (OP02-027 Inuarashi). Every removal
+// path — effect K.O., battle K.O., return-to-hand, return-to-deck, trash — must
+// consult this helper so the protection classes remain distinct.
+//
+// Mapping per rules §6-6-2 and Bandai FAQ on removal taxonomy:
+//   KO             → CANNOT_BE_KO, CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
+//   RETURN_TO_HAND → CANNOT_BE_RETURNED_TO_HAND, CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
+//   RETURN_TO_DECK → CANNOT_BE_RETURNED_TO_DECK, CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
+//   TRASH          → CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
+//
+// CANNOT_BE_KO alone does NOT block non-K.O. removals (return-to-hand/deck,
+// trash) — that's the Luffy/Inuarashi distinction the taxonomy encodes.
+
+export type RemovalAction = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "TRASH";
+
+export interface RemovalContext {
+  /** Which removal action is being attempted. */
+  action: RemovalAction;
+  /** Whether this removal stems from battle damage or an effect. */
+  cause: "BATTLE" | "EFFECT";
+  /** The player whose action/effect caused the removal. */
+  causingController: 0 | 1;
+  /**
+   * The card instance whose effect is causing the removal, if any. Used to
+   * evaluate `scope.source_filter` (e.g., Luffy's "by Strike attribute"
+   * protection). Omit for battle-K.O. — battle uses the attacker filter
+   * pathway instead, which is not yet wired in.
+   */
+  sourceCardInstanceId?: string | null;
+}
+
+const PROHIBITION_TYPES_FOR_ACTION: Record<RemovalAction, ProhibitionType[]> = {
+  KO: ["CANNOT_BE_KO", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
+  RETURN_TO_HAND: ["CANNOT_BE_RETURNED_TO_HAND", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
+  RETURN_TO_DECK: ["CANNOT_BE_RETURNED_TO_DECK", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
+  TRASH: ["CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
+};
+
+/**
+ * Return true if any active prohibition blocks `action` against
+ * `targetInstanceId` under the given `context`. Evaluated per-target at the
+ * point of removal, after replacement effects have resolved.
+ */
+export function isRemovalProhibited(
+  state: GameState,
+  targetInstanceId: string,
+  context: RemovalContext,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  if (prohibitions.length === 0) return false;
+
+  const applicableTypes = PROHIBITION_TYPES_FOR_ACTION[context.action];
+  const target = findCardOnField(state, targetInstanceId);
+  if (!target) return false;
+
+  for (const p of prohibitions) {
+    if (!applicableTypes.includes(p.prohibitionType)) continue;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+
+    // Conditional override — if the override condition is satisfied the
+    // prohibition does not apply (e.g., "unless your life has N or less").
+    if (p.conditionalOverride) {
+      const ctx: ConditionContext = {
+        sourceCardInstanceId: p.sourceCardInstanceId,
+        controller: p.controller,
+        cardDb,
+      };
+      if (evaluateCondition(state, p.conditionalOverride, ctx)) continue;
+    }
+
+    // Scope: target must be covered by appliesTo or scope.filter.
+    const appliesTo = p.appliesTo ?? [];
+    const coversTarget =
+      (appliesTo.length > 0 && appliesTo.includes(targetInstanceId)) ||
+      (appliesTo.length === 0 && p.scope?.filter
+        ? matchesFilter(target, p.scope.filter as TargetFilter, cardDb, state)
+        : false);
+    if (!coversTarget) continue;
+
+    // Scope: controller gate (SELF/OPPONENT/EITHER) — whose cards this
+    // prohibition protects, relative to the prohibition source's controller.
+    if (!scopeControllerMatches(p.controller, target.controller, p.scope?.controller)) {
+      continue;
+    }
+
+    // Scope: cause gate — map context (BATTLE/EFFECT + opponent-ness) against
+    // the prohibition's declared cause. See defaultCauseForType() for why the
+    // default differs between CANNOT_BE_KO (ANY) and the "removed" family
+    // (BY_OPPONENT_EFFECT) — it mirrors the canonical card text.
+    const declaredCause = p.scope?.cause ?? defaultCauseForType(p.prohibitionType);
+    if (!causeMatches(declaredCause, context, target.controller)) continue;
+
+    // Scope: source filter — "by Strike attribute Characters", etc. Skip if
+    // the causing source doesn't match.
+    if (p.scope?.source_filter) {
+      if (!context.sourceCardInstanceId) continue;
+      const source = findCardOnField(state, context.sourceCardInstanceId);
+      if (!source) continue;
+      if (!matchesFilter(source, p.scope.source_filter as TargetFilter, cardDb, state)) continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+function defaultCauseForType(type: ProhibitionType): string {
+  // Card-text conventions when `scope.cause` is unspecified:
+  //  - CANNOT_BE_KO without qualifier means every K.O. (battle or effect).
+  //  - The three "removed/returned" types are almost always qualified
+  //    "by your opponent's effects" in the printed text; default to that so
+  //    schemas don't need to spell it out.
+  //  - CANNOT_LEAVE_FIELD is absolute — no cause gate.
+  switch (type) {
+    case "CANNOT_BE_KO":
+      return "ANY";
+    case "CANNOT_BE_REMOVED_FROM_FIELD":
+    case "CANNOT_BE_RETURNED_TO_HAND":
+    case "CANNOT_BE_RETURNED_TO_DECK":
+      return "BY_OPPONENT_EFFECT";
+    case "CANNOT_LEAVE_FIELD":
+      return "ANY";
+    default:
+      return "ANY";
+  }
+}
+
+function causeMatches(
+  declaredCause: string,
+  context: RemovalContext,
+  targetController: 0 | 1,
+): boolean {
+  switch (declaredCause) {
+    case "ANY":
+      return true;
+    case "BATTLE":
+      return context.cause === "BATTLE";
+    case "EFFECT":
+      return context.cause === "EFFECT";
+    case "OPPONENT_EFFECT":
+    case "BY_OPPONENT_EFFECT":
+      return context.cause === "EFFECT" && context.causingController !== targetController;
+    default:
+      return true;
+  }
+}
+
+function scopeControllerMatches(
+  prohibitionOwner: 0 | 1,
+  targetController: 0 | 1,
+  scopeController: string | undefined,
+): boolean {
+  if (!scopeController) return true;
+  if (scopeController === "SELF") return targetController === prohibitionOwner;
+  if (scopeController === "OPPONENT") return targetController !== prohibitionOwner;
+  return true;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function matchesController(
