@@ -398,7 +398,11 @@ function dealOneLeaderDamage(
     return { state: nextState, events, paused: false, damagedPlayerIndex: inactiveIdx, lethal: true };
   }
 
-  // §7-1-4-1-1-2: pop the top Life card.
+  // §7-1-4-1-1-2: pop the top Life card. This MUST happen before the Trigger
+  // window opens — OPT-255 (F2): Life-threshold [Trigger] conditions like
+  // "if you have ≤N Life cards" must exclude the revealed card from the count.
+  // Popping first means `resolveEffect` sees the post-exclusion life array for
+  // free through every LIFE_COUNT / COMBINED_TOTAL / COMBINED_ZONE_COUNT path.
   const result = removeTopLifeCard(nextState, inactiveIdx);
   if (!result) return { state: nextState, events, paused: false };
   const { lifeCard, state: stateAfterRemoval } = result;
