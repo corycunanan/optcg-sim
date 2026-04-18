@@ -22,7 +22,7 @@ import type {
   EffectResult,
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
-import { getEffectivePower } from "./modifiers.js";
+import { getEffectivePower, getEffectiveCost } from "./modifiers.js";
 import { findCardInstance } from "./state.js";
 
 export interface ConditionContext {
@@ -551,15 +551,27 @@ export function matchesFilter(
     return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state, resultRefs, costOverride));
   }
 
-  // Cost filters — OPT-242: cost_* filters re-evaluate against effective cost
-  // when passed an override. base_cost_* always uses the printed base cost.
+  // Cost filters — OPT-247: cost_* reads the EFFECTIVE (post-modifier) cost per
+  // Bandai's default. Card text "cost of N or less" with no "base" qualifier
+  // means current cost (OP09-098 Black Hole); "base cost of N or less" means
+  // printed value (OP10-098 Liberation).
+  //
+  // OPT-242: during MODIFY_COST fixed-point iteration, the caller passes the
+  // accumulated cost as costOverride — use it directly so the iteration sees a
+  // stable snapshot and cannot recurse back into getEffectiveCost.
   const baseCost = data.cost ?? 0;
-  const cost = costOverride ?? baseCost;
   const ctrl = card.controller;
-  if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact, state, ctrl)) return false;
-  if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min, state, ctrl)) return false;
-  if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max, state, ctrl)) return false;
-  if (filter.cost_range && (cost < filter.cost_range.min || cost > filter.cost_range.max)) return false;
+  const hasCurrentCostFilter = filter.cost_exact !== undefined
+    || filter.cost_min !== undefined
+    || filter.cost_max !== undefined
+    || filter.cost_range !== undefined;
+  if (hasCurrentCostFilter) {
+    const cost = costOverride ?? getEffectiveCost(data, state, card.instanceId, cardDb);
+    if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact, state, ctrl)) return false;
+    if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min, state, ctrl)) return false;
+    if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max, state, ctrl)) return false;
+    if (filter.cost_range && (cost < filter.cost_range.min || cost > filter.cost_range.max)) return false;
+  }
   if (filter.base_cost_exact !== undefined && baseCost !== filter.base_cost_exact) return false;
   if (filter.base_cost_min !== undefined && baseCost < filter.base_cost_min) return false;
   if (filter.base_cost_max !== undefined && baseCost > filter.base_cost_max) return false;
