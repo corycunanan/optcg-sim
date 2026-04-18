@@ -171,6 +171,10 @@ export interface GameEventPayloadMap {
   CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
   LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
   ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };
+  // OPT-246: emitted at BLOCK_STEP → COUNTER_STEP boundary. Marks the
+  // moment the attack target is locked in (after any [Blocker] redirect),
+  // and is the firing window for "When this is attacked" effects.
+  ATTACK_TARGET_FINAL: { attackerInstanceId: string; targetInstanceId: string; redirected: boolean };
   BLOCK_DECLARED: { blockerInstanceId: string };
   COUNTER_USED: { cardId: string; counterValue?: number; counterTargetInstanceId?: string; cardInstanceId?: string; type?: string };
   BATTLE_RESOLVED: Record<string, never>;

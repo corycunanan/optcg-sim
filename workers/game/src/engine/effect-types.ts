@@ -120,6 +120,7 @@ export type TurnRestriction = "YOUR_TURN" | "OPPONENT_TURN";
 export type KeywordTriggerType =
   | "ON_PLAY"
   | "WHEN_ATTACKING"
+  | "WHEN_ATTACKED"
   | "ON_KO"
   | "ON_BLOCK"
   | "ON_OPPONENT_ATTACK"

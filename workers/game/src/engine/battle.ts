@@ -116,6 +116,20 @@ export function executeDeclareBlocker(
   events.push({ type: "BLOCK_DECLARED", playerIndex: inactiveIdx, payload: { blockerInstanceId } });
   // [On Block] fires in M4
 
+  // OPT-246: Block Step closed with the target redirected to the blocker.
+  // Emit ATTACK_TARGET_FINAL so [When Attacked] effects on the new (blocker)
+  // target can fire before Counter Step — and so the original target's
+  // [When Attacked] does NOT fire (qa_op03.md:18-20).
+  events.push({
+    type: "ATTACK_TARGET_FINAL",
+    playerIndex: inactiveIdx,
+    payload: {
+      attackerInstanceId: battle.attackerInstanceId,
+      targetInstanceId: blockerInstanceId,
+      redirected: true,
+    },
+  });
+
   // Advance to COUNTER_STEP
   nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" } };
   events.push({ type: "PHASE_CHANGED", playerIndex: inactiveIdx, payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" } });
@@ -132,6 +146,18 @@ export function executePass(state: GameState, cardDb: Map<string, CardData>): Ex
 
   if (state.turn.battleSubPhase === "BLOCK_STEP") {
     // Defender passes blocker window → advance to COUNTER_STEP
+    // OPT-246: emit ATTACK_TARGET_FINAL on the original target so its
+    // [When Attacked] effects can fire before Counter Step.
+    const battle = nextState.turn.battle!;
+    events.push({
+      type: "ATTACK_TARGET_FINAL",
+      playerIndex: pi,
+      payload: {
+        attackerInstanceId: battle.attackerInstanceId,
+        targetInstanceId: battle.targetInstanceId,
+        redirected: false,
+      },
+    });
     nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" } };
     events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" } });
   } else if (state.turn.battleSubPhase === "COUNTER_STEP") {

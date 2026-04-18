@@ -28,10 +28,13 @@ export const OP03_001_PORTGAS_D_ACE: EffectSchema = {
     {
       id: "attack_or_attacked_trash_buff",
       category: "auto",
+      // OPT-246: card text reads "When this Leader attacks or is attacked".
+      // "is attacked" is target-locked (qa_op03.md:26-28), so it must use
+      // WHEN_ATTACKED — not ON_OPPONENT_ATTACK, which fires on any opp attack.
       trigger: {
         any_of: [
           { keyword: "WHEN_ATTACKING" },
-          { keyword: "ON_OPPONENT_ATTACK" },
+          { keyword: "WHEN_ATTACKED" },
         ],
       },
       costs: [
