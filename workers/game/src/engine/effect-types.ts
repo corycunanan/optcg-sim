@@ -1029,6 +1029,8 @@ export interface ProhibitionScope {
   cost_filter?: { operator: NumericOperator; value: number };
   from_zone?: string;
   when_attacking?: Target;
+  // OPT-260: keyword trigger type negated by NEGATE_TRIGGER_TYPE (OP09-081).
+  triggerType?: KeywordTriggerType;
 }
 
 export type ConditionalOverride = Condition;

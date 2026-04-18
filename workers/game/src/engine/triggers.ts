@@ -271,6 +271,60 @@ export interface MatchedTrigger {
 }
 
 /**
+ * OPT-260: Is a given keyword trigger type negated for the source's controller?
+ *
+ * Two distinct sources feed this check (the FAQ for OP09-081 Marshall.D.Teach
+ * exercises both):
+ *
+ *   1. Active prohibitions whose `scope.triggerType` matches the keyword, written
+ *      by the `NEGATE_TRIGGER_TYPE` action (duration-tracked and cleared at
+ *      end-of-turn). This is the Activate-Main ability that silences the
+ *      opponent's future [On Play] triggers.
+ *
+ *   2. `rule_modification` blocks with `rule_type === "TRIGGER_TYPE_NEGATION"`
+ *      sourced from a Leader's own schema, applied while that card is the Leader.
+ *      This is the passive "Your [On Play] effects are negated" rule.
+ *
+ * Unlike OPT-253's per-instance flag, this prohibition is controller-scoped and
+ * prospective: it applies to every Character under that controller, including
+ * Characters that enter play after the negation was registered.
+ */
+export function isTriggerTypeNegated(
+  state: GameState,
+  sourceCard: CardInstance,
+  triggerType: KeywordTriggerType,
+  cardDb: Map<string, CardData>,
+): boolean {
+  // (1) Active prohibitions (NEGATE_TRIGGER_TYPE action).
+  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  for (const p of prohibitions) {
+    if (p.scope?.triggerType !== triggerType) continue;
+    if (p.controller !== sourceCard.controller) continue;
+    return true;
+  }
+
+  // (2) Leader rule_modification (passive while card is the Leader).
+  for (const player of state.players) {
+    const leaderData = cardDb.get(player.leader.cardId);
+    const schema = leaderData?.effectSchema as EffectSchema | null;
+    if (!schema?.effects) continue;
+    const leaderController = player.leader.controller;
+    for (const block of schema.effects) {
+      if (block.category !== "rule_modification") continue;
+      const rule = (block as { rule?: { rule_type?: string; trigger_type?: string; affected_controller?: string } }).rule;
+      if (!rule || rule.rule_type !== "TRIGGER_TYPE_NEGATION") continue;
+      if (rule.trigger_type !== triggerType) continue;
+      const affected = rule.affected_controller === "OPPONENT"
+        ? ((1 - leaderController) as 0 | 1)
+        : leaderController;
+      if (affected === sourceCard.controller) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Scan all registered triggers and return those that match the given game event.
  */
 export function matchTriggersForEvent(
@@ -383,7 +437,7 @@ function matchesKeywordTrigger(
   event: GameEvent,
   state: GameState,
   sourceCard: CardInstance,
-  _cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>,
 ): boolean {
   // Map keyword trigger types to event types
   const eventType = keywordToEventType(trigger.keyword);
@@ -391,6 +445,11 @@ function matchesKeywordTrigger(
 
   // Check if the event type matches
   if (!matchesEventType(event.type, eventType, trigger.keyword)) return false;
+
+  // OPT-260: trigger-type negation (OP09-081). Checked here — not at the
+  // registry level in matchTriggersForEvent — so compound triggers naturally
+  // filter only the negated branch and still fire on other branches.
+  if (isTriggerTypeNegated(state, sourceCard, trigger.keyword, cardDb)) return false;
 
   // For self-referencing triggers, check that the event involves this card
   if (isSelfReferencingTrigger(trigger.keyword)) {

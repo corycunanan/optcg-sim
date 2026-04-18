@@ -31,6 +31,7 @@ import type {
 } from "../types.js";
 import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
 import {
+  getEffectiveCost,
   getEffectivePower,
   isCardNegated,
 } from "../engine/modifiers.js";
@@ -489,5 +490,69 @@ describe("OPT-253: a negated Character's own passive buff to other cards pauses"
     const resumed = expireEndOfTurnEffects(negated);
     expect(isCardNegated(bufferInst, resumed, cardDb)).toBe(false);
     expect(getEffectivePower(allyInst, ally, resumed, cardDb)).toBe(5000);
+  });
+});
+
+// ─── 11. OPT-261: field→hand cost reductions pause under negation ───────────
+
+describe("OPT-261: a negated field Character stops granting hand-zone cost reductions", () => {
+  it("field card's permanent MODIFY_COST targeting CARD_IN_HAND is suppressed while its source is negated", () => {
+    // OP01-067-style: a field Character whose permanent block gives your
+    // blue Events in hand −1 cost. Negation on the field card must turn the
+    // reduction off, and its expiry must restore it.
+    const fieldSchema: EffectSchema = {
+      effects: [{
+        id: "field-aura-hand-cost",
+        category: "permanent",
+        modifiers: [{
+          type: "MODIFY_COST",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            filter: { color: "Blue", card_type: "EVENT" },
+          },
+          params: { amount: -1 },
+        }],
+      }],
+    } as EffectSchema;
+
+    const fieldCard = makeCard("FIELD", {
+      type: "Character",
+      color: ["Blue"],
+      effectText: "Your blue Events cost -1.",
+      effectSchema: fieldSchema,
+    });
+    const handCard = makeCard("HAND-EVENT", {
+      type: "Event",
+      color: ["Blue"],
+      cost: 3,
+    });
+    const cardDb = new Map<string, CardData>([
+      [fieldCard.id, fieldCard],
+      [handCard.id, handCard],
+      [CARDS.LEADER.id, CARDS.LEADER],
+    ]);
+
+    const state = buildMinimalState();
+    const fieldInst = makeInstance(fieldCard.id, "CHARACTER", 0, { instanceId: "field-src" });
+    const handInst = makeInstance(handCard.id, "HAND", 0, { instanceId: "hand-evt" });
+    state.players[0].characters = padChars([fieldInst]);
+    state.players[0].hand = [handInst];
+
+    // Baseline: reduction applies → 3 − 1 = 2.
+    expect(getEffectiveCost(handCard, state, handInst.instanceId, cardDb)).toBe(2);
+
+    // Negate the field source → reduction vanishes → cost back to 3.
+    const negated = {
+      ...state,
+      activeEffects: [negationEffect(fieldInst.instanceId, { turn: state.turn.number })] as any,
+    };
+    expect(isCardNegated(fieldInst, negated, cardDb)).toBe(true);
+    expect(getEffectiveCost(handCard, negated, handInst.instanceId, cardDb)).toBe(3);
+
+    // Negation expires at end of turn → reduction resumes.
+    const resumed = expireEndOfTurnEffects(negated);
+    expect(isCardNegated(fieldInst, resumed, cardDb)).toBe(false);
+    expect(getEffectiveCost(handCard, resumed, handInst.instanceId, cardDb)).toBe(2);
   });
 });

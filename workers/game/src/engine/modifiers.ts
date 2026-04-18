@@ -447,6 +447,10 @@ function getFieldToHandCostModifier(
     ];
 
     for (const fieldCard of fieldCards) {
+      // OPT-261: a negated field Character's schema-sourced contributions are
+      // suppressed, including hand-zone cost modifiers it grants.
+      if (isCardNegated(fieldCard, state, cardDb)) continue;
+
       const fieldCardData = cardDb.get(fieldCard.cardId);
       if (!fieldCardData) continue;
 
