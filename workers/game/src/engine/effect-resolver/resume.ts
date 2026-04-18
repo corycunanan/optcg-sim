@@ -583,7 +583,11 @@ export function resumeFromStack(
     // ── Optional effect: accept or decline ──────────────────────────────
     case "AWAITING_OPTIONAL_RESPONSE": {
       if (action.type === "PASS" || (action.type === "PLAYER_CHOICE" && action.choiceId === "skip")) {
+        const declinedBlock = topFrame.effectBlock as EffectBlock;
         nextState = popFrame(nextState);
+        if (declinedBlock.flags?.lock_on_decline) {
+          nextState = markOncePerTurnUsed(nextState, declinedBlock.id, sourceCardInstanceId);
+        }
         return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
       }
 

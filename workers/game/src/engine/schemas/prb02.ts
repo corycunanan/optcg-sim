@@ -180,7 +180,7 @@ export const PRB02_004_JEWELRY_BONNEY: EffectSchema = {
       id: "on_opponent_attack_set_don_active",
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
-      flags: { once_per_turn: true },
+      flags: { once_per_turn: true, optional: true, lock_on_decline: true },
       actions: [
         {
           type: "SET_DON_ACTIVE",
