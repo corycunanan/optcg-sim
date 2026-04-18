@@ -199,9 +199,13 @@ export function getEffectiveCost(
     const effects = state.activeEffects as RuntimeActiveEffect[];
     const turnPlayerIndex = state.turn.activePlayerIndex;
 
+    // Pass `cost` (base Layer 0 at this point) as override so any cost_* filter
+    // inside a modifier's target filter resolves against base — this also
+    // breaks recursion: OPT-247 made cost_* default to getEffectiveCost(), and
+    // without an override the filter would call back into us.
     const applyingEffects = effects.filter((effect) => {
       const applies = card && cardDb
-        ? effectAppliesToCard(effect, card, state, cardDb)
+        ? effectAppliesToCard(effect, card, state, cardDb, cost)
         : effect.appliesTo?.includes(cardInstanceId);
       if (!applies) return false;
       return isEffectConditionMet(effect, state, cardDb);

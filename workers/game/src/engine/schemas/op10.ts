@@ -936,7 +936,7 @@ export const OP10_026_KINEMON: EffectSchema = {
         {
           type: "PLACE_FROM_TRASH_TO_DECK",
           amount: 1,
-          filter: { name: "Kin'emon", base_power_exact: 0 },
+          filter: { name: "Kin'emon", power_exact: 0 },
           position: "BOTTOM",
         },
       ],
@@ -977,7 +977,7 @@ export const OP10_027_KINEMON: EffectSchema = {
         {
           type: "PLACE_FROM_TRASH_TO_DECK",
           amount: 1,
-          filter: { name: "Kin'emon", base_power_exact: 1000 },
+          filter: { name: "Kin'emon", power_exact: 1000 },
           position: "BOTTOM",
         },
       ],
