@@ -11,6 +11,28 @@ import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, 
 import { processBatchReplacements } from "../../replacements.js";
 import { findCardInstance } from "../../state.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
+import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
+
+// OPT-251: filter targets that are protected by a "cannot be …" prohibition.
+// Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
+// are an opt-in swap, while prohibitions are a flat veto that silently drops
+// the target from the batch.
+function filterProhibitedTargets(
+  state: GameState,
+  ids: string[],
+  action: RemovalAction,
+  cause: "BATTLE" | "EFFECT",
+  causingController: 0 | 1,
+  sourceCardInstanceId: string | null,
+  cardDb: Map<string, CardData>,
+): string[] {
+  return ids.filter((id) => !isRemovalProhibited(
+    state,
+    id,
+    { action, cause, causingController, sourceCardInstanceId },
+    cardDb,
+  ));
+}
 
 export function executeKO(
   state: GameState,
@@ -39,7 +61,11 @@ export function executeKO(
     return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
   }
   let nextState = batch.state;
-  const unprotectedIds = batch.unprotectedIds;
+  // OPT-251: drop targets covered by CANNOT_BE_KO / CANNOT_BE_REMOVED_FROM_FIELD
+  // / CANNOT_LEAVE_FIELD before the K.O. frame loop begins.
+  const unprotectedIds = filterProhibitedTargets(
+    nextState, batch.unprotectedIds, "KO", "EFFECT", controller, sourceCardInstanceId, cardDb,
+  );
   const koedIds: string[] = [];
 
   // OPT-172: rule 6-2 — drain ON_KO triggers between frames. Each frame KOs
@@ -112,8 +138,11 @@ export function executeReturnToHand(
   // RETURN_TO_HAND emits CARD_RETURNED_TO_HAND, not CARD_KO — no ON_KO drain
   // is required between frames. Finalize the unprotected subset inline.
   let nextState = batch.state;
+  const finalIds = filterProhibitedTargets(
+    nextState, batch.unprotectedIds, "RETURN_TO_HAND", "EFFECT", controller, sourceCardInstanceId, cardDb,
+  );
   const finalizedIds: string[] = [];
-  for (const id of batch.unprotectedIds) {
+  for (const id of finalIds) {
     const result = returnToHand(nextState, id);
     if (result) {
       nextState = result.state;
@@ -158,8 +187,11 @@ export function executeReturnToDeck(
   }
 
   let nextState = batch.state;
+  const finalIds = filterProhibitedTargets(
+    nextState, batch.unprotectedIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
+  );
   const finalizedIds: string[] = [];
-  for (const id of batch.unprotectedIds) {
+  for (const id of finalIds) {
     const result = returnToDeck(nextState, id, position);
     if (result) {
       nextState = result.state;
@@ -201,6 +233,15 @@ export function executeTrashCard(
 
     // For characters on field, trash (return DON!!) — NOT a KO per Rule 10-2-1-3
     if (found.zone === "CHARACTER") {
+      // OPT-251: trash-from-field is a removal, so CANNOT_BE_REMOVED_FROM_FIELD
+      // / CANNOT_LEAVE_FIELD block it. (CANNOT_BE_KO does NOT — trash is not K.O.)
+      if (isRemovalProhibited(
+        nextState, id,
+        { action: "TRASH", cause: "EFFECT", causingController: controller, sourceCardInstanceId },
+        cardDb,
+      )) {
+        continue;
+      }
       const result = trashCharacter(nextState, id, controller);
       if (result) {
         nextState = result.state;

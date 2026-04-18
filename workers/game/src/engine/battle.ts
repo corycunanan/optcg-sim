@@ -20,6 +20,7 @@ import { hasDoubleAttack, hasBanish, hasTrigger, hasEffectiveKeyword } from "./k
 import { checkReplacementForKO } from "./replacements.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
+import { isRemovalProhibited } from "./prohibitions.js";
 import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
 
@@ -714,6 +715,20 @@ function executeDamageStep(
         if (replacement.replaced) {
           nextState = replacement.state;
           events.push(...replacement.events);
+        } else if (isRemovalProhibited(
+          nextState,
+          targetInstanceId,
+          {
+            action: "KO",
+            cause: "BATTLE",
+            causingController: pi as 0 | 1,
+            sourceCardInstanceId: battle.attackerInstanceId,
+          },
+          cardDb,
+        )) {
+          // OPT-251: CANNOT_BE_KO (with cause BATTLE or ANY) prevents battle
+          // K.O.'s like Luffy's "cannot be K.O.'d in battle by Strike Characters".
+          // Combat Victory still fired; the character just doesn't leave the field.
         } else {
           // KO the character — use koCharacter() to preserve instanceId for ON_KO triggers
           const preKODonCount = targetFound.card.attachedDon.length;
