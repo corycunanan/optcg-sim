@@ -8,9 +8,10 @@
  * Characters with cost 2 or less", "Cannot be K.O.'d by effects"
  */
 
-import type { RuntimeProhibition, ProhibitionType, TargetFilter } from "./effect-types.js";
+import type { EffectSchema, RuntimeProhibition, ProhibitionType, TargetFilter } from "./effect-types.js";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "./conditions.js";
+import { findCardInState } from "./state.js";
 
 /**
  * Check if an action is prohibited by any active prohibition.
@@ -102,6 +103,17 @@ function matchesProhibition(
       // This is checked during block step, not at action validation
       // The battle system checks this
       return null;
+    }
+
+    case "CANNOT_PLAY_FROM_HAND": {
+      // OPT-252 (E6): player-level restriction on normal hand-plays. Block any
+      // user-initiated PLAY_CARD by the affected player. Effect-driven plays
+      // never hit this matcher (effect resolver path), so they're unaffected
+      // by this prohibition — matching Bandai's "from hand" wording where
+      // effect-sourced plays from non-hand zones still resolve.
+      if (action.type !== "PLAY_CARD") return null;
+      if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
+      return "Cannot play cards from hand (prohibited by an effect)";
     }
 
     case "CANNOT_PLAY_CHARACTER":
@@ -338,6 +350,64 @@ export function isRemovalProhibited(
   }
 
   return false;
+}
+
+// ─── Effect-driven Play Prohibition (OPT-252) ────────────────────────────────
+//
+// CANNOT_BE_PLAYED_BY_EFFECTS is intrinsic to the card and lives on its own
+// permanent block (e.g., OP12-036 Zoro: zone "HAND", category "permanent").
+// HAND-zone permanents aren't injected into state.prohibitions — there's no
+// hand-card permanent registrar — so we scan the card's schema on demand,
+// matching how modifiers.ts evaluates HAND-zone cost reductions.
+//
+// We also consult state.prohibitions in case another effect granted the flag
+// at runtime (the registrar in triggers.ts emits these for FIELD-zone cards).
+
+export function isCardPlayProhibitedByEffect(
+  state: GameState,
+  cardInstanceId: string,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const found = findCardInState(state, cardInstanceId);
+  if (!found) return false;
+  const card = found.card;
+  const data = cardDb.get(card.cardId);
+  if (!data) return false;
+
+  const schema = data.effectSchema as EffectSchema | null;
+  if (schema?.effects) {
+    const ctx: ConditionContext = {
+      sourceCardInstanceId: cardInstanceId,
+      controller: card.controller,
+      cardDb,
+    };
+    for (const block of schema.effects) {
+      if (block.category !== "permanent") continue;
+      const blockZone = block.zone ?? "FIELD";
+      if (!zoneMatchesCardZone(blockZone, card.zone)) continue;
+      if (block.conditions && !evaluateCondition(state, block.conditions, ctx)) continue;
+      if (!block.prohibitions) continue;
+      for (const p of block.prohibitions) {
+        if (p.type === "CANNOT_BE_PLAYED_BY_EFFECTS") return true;
+      }
+    }
+  }
+
+  for (const p of state.prohibitions as RuntimeProhibition[]) {
+    if (p.prohibitionType !== "CANNOT_BE_PLAYED_BY_EFFECTS") continue;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (p.appliesTo && p.appliesTo.length > 0 && !p.appliesTo.includes(cardInstanceId)) continue;
+    return true;
+  }
+
+  return false;
+}
+
+function zoneMatchesCardZone(blockZone: string, cardZone: string): boolean {
+  if (blockZone === "FIELD") {
+    return cardZone === "CHARACTER" || cardZone === "LEADER" || cardZone === "STAGE";
+  }
+  return blockZone === cardZone;
 }
 
 function defaultCauseForType(type: ProhibitionType): string {

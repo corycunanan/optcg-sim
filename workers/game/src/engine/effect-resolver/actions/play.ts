@@ -12,7 +12,7 @@ import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { processBatchReplacements } from "../../replacements.js";
-import { isProhibitedForCard } from "../../prohibitions.js";
+import { isProhibitedForCard, isCardPlayProhibitedByEffect } from "../../prohibitions.js";
 
 // Injected by the resolver module to break the circular dependency so
 // ACTIVATE_EVENT_FROM_TRASH can resolve the selected Event's [Main] block.
@@ -212,10 +212,16 @@ export function executePlayCard(
     targetIds = resumeFrame.remainingTargetIds;
   } else {
     const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-    if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-      return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    // OPT-252 (E6): cards with intrinsic CANNOT_BE_PLAYED_BY_EFFECTS (e.g., OP12-036
+    // Zoro) are unselectable when an effect tries to play them, regardless of
+    // source zone. Filter at target gate so the player isn't prompted with
+    // ineligible cards. Manual hand-play (cost-paid PLAY_CARD via execute.ts)
+    // bypasses this code path entirely.
+    const eligibleIds = allValidIds.filter((id) => !isCardPlayProhibitedByEffect(state, id, cardDb));
+    if (!preselectedTargets && needsPlayerTargetSelection(action.target, eligibleIds)) {
+      return buildSelectTargetPrompt(state, action, eligibleIds, sourceCardInstanceId, controller, cardDb, resultRefs);
     }
-    targetIds = autoSelectTargets(action.target, allValidIds);
+    targetIds = autoSelectTargets(action.target, eligibleIds);
   }
   if (targetIds.length === 0) {
     if (resumeFrame) {

@@ -664,7 +664,7 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 | `CANNOT_BE_KO` | "Cannot be K.O.'d" | `cause: "IN_BATTLE" \| "BY_EFFECT" \| "ANY"` |
 | `CANNOT_ATTACK` | "Cannot attack" | Optional conditional_override |
 | `CANNOT_BLOCK` / `CANNOT_ACTIVATE_BLOCKER` | "Cannot block" | |
-| `CANNOT_PLAY_CARDS` | "Cannot play cards" | `card_type_filter`, `cost_filter` |
+| `CANNOT_PLAY_FROM_HAND` | "Unable to play cards from hand" | `controller: "SELF" \| "OPPONENT"` |
 | `CANNOT_BE_REMOVED_FROM_FIELD` | "Cannot be removed" | |
 | `CANNOT_BE_RESTED` | "Cannot be rested" | |
 | `CANNOT_DRAW` | "Cannot draw by effects" | |
