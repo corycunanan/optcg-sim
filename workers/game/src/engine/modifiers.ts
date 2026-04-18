@@ -69,8 +69,61 @@ function effectAppliesToCard(
 }
 
 /**
+ * OPT-253: Is this Character currently effect-negated?
+ *
+ * True when any activeEffect carries a NEGATE_EFFECTS_FLAG modifier that lists
+ * the card in its appliesTo set and whose duration condition (if any) currently
+ * holds. The flag is source-independent: we deliberately skip the normal
+ * `isEffectConditionMet` path on the negation effect itself to avoid recursion
+ * (and to prevent an attacker mutually-negating their way out of a negation).
+ */
+export function isCardNegated(
+  card: CardInstance,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>,
+): boolean {
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  for (const effect of effects) {
+    if (!effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG")) continue;
+    if (!effect.appliesTo?.includes(card.instanceId)) continue;
+
+    const duration = effect.duration as { type: string; condition?: Condition } | undefined;
+    if (duration?.type === "WHILE_CONDITION" && duration.condition) {
+      if (!cardDb) return true;
+      const condCtx: ConditionContext = {
+        sourceCardInstanceId: effect.sourceCardInstanceId,
+        controller: effect.controller,
+        cardDb,
+      };
+      if (!evaluateCondition(state, duration.condition, condCtx)) continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * OPT-253: Is this effect's source Character currently negated?
+ * If so, its non-negation modifiers should be treated as inactive.
+ */
+function isEffectSourceNegated(
+  effect: RuntimeActiveEffect,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>,
+): boolean {
+  if (!effect.sourceCardInstanceId) return false;
+  const source = findCardInstance(state, effect.sourceCardInstanceId);
+  if (!source) return false;
+  return isCardNegated(source, state, cardDb);
+}
+
+/**
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
  * Returns true for effects that have no WHILE_CONDITION duration (always active).
+ *
+ * OPT-253: also returns false if the effect's source Character is currently
+ * effect-negated, except for the negation flag itself (which must stay active
+ * regardless of who negated whom, to avoid recursion and mutual-negation cycles).
  */
 export function isEffectConditionMet(
   effect: RuntimeActiveEffect,
@@ -78,6 +131,12 @@ export function isEffectConditionMet(
   cardDb?: Map<string, CardDataType>,
 ): boolean {
   if (!cardDb) return true; // can't evaluate without cardDb — assume active
+
+  // OPT-253: suppress effects whose source Character is negated. The
+  // NEGATE_EFFECTS_FLAG modifier itself is exempt to keep the negation
+  // itself resolvable even if the negator is later negated.
+  const isNegationFlag = effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG");
+  if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb)) return false;
 
   const condCtx: ConditionContext = {
     sourceCardInstanceId: effect.sourceCardInstanceId,

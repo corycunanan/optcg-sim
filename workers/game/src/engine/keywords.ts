@@ -4,10 +4,14 @@
  * Pure functions that query keyword state from CardData + active effects.
  * Printed keywords come from `cardData.keywords`; keywords granted by effects
  * live on `state.activeEffects` as GRANT_KEYWORD modifiers.
+ *
+ * OPT-253: "has X" at runtime is `(printed AND !negated) OR externally granted`.
+ * Negation suppresses schema-printed keywords but not keywords granted by
+ * other cards (those originate outside the negated card's schema).
  */
 
 import type { CardData, CardInstance, GameState } from "../types.js";
-import { hasGrantedKeyword } from "./modifiers.js";
+import { hasGrantedKeyword, isCardNegated } from "./modifiers.js";
 
 export function hasRush(cardData: CardData): boolean {
   return cardData.keywords.rush;
@@ -23,7 +27,9 @@ function hasEffectiveRush(
   state: GameState,
   cardDb?: Map<string, CardData>,
 ): boolean {
-  return cardData.keywords.rush || hasGrantedKeyword(card, "RUSH", state, cardDb);
+  const negated = isCardNegated(card, state, cardDb);
+  const printed = cardData.keywords.rush && !negated;
+  return printed || hasGrantedKeyword(card, "RUSH", state, cardDb);
 }
 
 function hasEffectiveRushCharacter(
@@ -32,7 +38,9 @@ function hasEffectiveRushCharacter(
   state: GameState,
   cardDb?: Map<string, CardData>,
 ): boolean {
-  return cardData.keywords.rushCharacter || hasGrantedKeyword(card, "RUSH_CHARACTER", state, cardDb);
+  const negated = isCardNegated(card, state, cardDb);
+  const printed = cardData.keywords.rushCharacter && !negated;
+  return printed || hasGrantedKeyword(card, "RUSH_CHARACTER", state, cardDb);
 }
 
 export function hasDoubleAttack(cardData: CardData): boolean {
@@ -53,6 +61,32 @@ export function hasTrigger(cardData: CardData): boolean {
 
 export function hasUnblockable(cardData: CardData): boolean {
   return cardData.keywords.unblockable;
+}
+
+/**
+ * OPT-253: runtime keyword check — printed keyword is suppressed while the
+ * Character is effect-negated; externally granted keywords always apply.
+ */
+export function hasEffectiveKeyword(
+  card: CardInstance,
+  cardData: CardData,
+  keyword: "BLOCKER" | "RUSH" | "RUSH_CHARACTER" | "DOUBLE_ATTACK" | "BANISH" | "UNBLOCKABLE" | "TRIGGER",
+  state: GameState,
+  cardDb?: Map<string, CardData>,
+): boolean {
+  const negated = isCardNegated(card, state, cardDb);
+  let printed = false;
+  switch (keyword) {
+    case "BLOCKER": printed = cardData.keywords.blocker; break;
+    case "RUSH": printed = cardData.keywords.rush; break;
+    case "RUSH_CHARACTER": printed = cardData.keywords.rushCharacter; break;
+    case "DOUBLE_ATTACK": printed = cardData.keywords.doubleAttack; break;
+    case "BANISH": printed = cardData.keywords.banish; break;
+    case "UNBLOCKABLE": printed = cardData.keywords.unblockable; break;
+    case "TRIGGER": printed = cardData.keywords.trigger; break;
+  }
+  if (printed && !negated) return true;
+  return hasGrantedKeyword(card, keyword, state, cardDb);
 }
 
 /**

@@ -8,7 +8,7 @@
 import type { CardData, GameAction, GameState } from "../types.js";
 import type { EffectSchema } from "./effect-types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
-import { getEffectiveCost, hasGrantedKeyword, hasRemovedKeyword } from "./modifiers.js";
+import { getEffectiveCost, hasGrantedKeyword, hasRemovedKeyword, isCardNegated } from "./modifiers.js";
 import { canAttackThisTurn, canAttackLeader } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
 
@@ -205,8 +205,12 @@ function validateDeclareBlocker(
 
   const cardData = cardDb.get(found.card.cardId);
   if (!cardData) return "Blocker card data not found";
+  // OPT-253: printed [Blocker] is suppressed while the Character is negated;
+  // externally granted [Blocker] (via GRANT_KEYWORD) still applies.
+  const blockerNegated = isCardNegated(found.card, state, cardDb);
+  const blockerPrinted = cardData.keywords.blocker && !blockerNegated;
   const hasBlocker =
-    (cardData.keywords.blocker || hasGrantedKeyword(found.card, "BLOCKER", state, cardDb)) &&
+    (blockerPrinted || hasGrantedKeyword(found.card, "BLOCKER", state, cardDb)) &&
     !hasRemovedKeyword(found.card, "BLOCKER", state, cardDb);
   if (!hasBlocker) return "This card does not have [Blocker]";
 
@@ -214,8 +218,10 @@ function validateDeclareBlocker(
     const attackerFound = findCardInState(state, state.turn.battle.attackerInstanceId);
     if (attackerFound) {
       const attackerData = cardDb.get(attackerFound.card.cardId);
+      const attackerNegated = isCardNegated(attackerFound.card, state, cardDb);
+      const attackerUnblockablePrinted = (attackerData?.keywords.unblockable ?? false) && !attackerNegated;
       const attackerUnblockable =
-        (attackerData?.keywords.unblockable ||
+        (attackerUnblockablePrinted ||
           hasGrantedKeyword(attackerFound.card, "UNBLOCKABLE", state, cardDb)) &&
         !hasRemovedKeyword(attackerFound.card, "UNBLOCKABLE", state, cardDb);
       if (attackerUnblockable) return "Attacker has [Unblockable]";
