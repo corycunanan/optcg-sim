@@ -978,7 +978,10 @@ export const OP13_028_SHANKS: EffectSchema = {
         },
         {
           type: "APPLY_PROHIBITION",
-          params: { prohibition_type: "CANNOT_PLAY_CARDS" },
+          params: {
+            prohibition_type: "CANNOT_PLAY_FROM_HAND",
+            scope: { controller: "SELF" },
+          },
           duration: { type: "THIS_TURN" },
           chain: "THEN",
         },

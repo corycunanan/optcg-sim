@@ -27,11 +27,18 @@ export function executeApplyProhibition(
   const params = action.params ?? {};
   const prohibType = params.prohibition_type as string;
   const duration = action.duration ?? { type: "THIS_TURN" as const };
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+
+  // Player-level prohibitions (e.g., CANNOT_PLAY_FROM_HAND) have no card targets;
+  // they bind to the controller via scope.controller. Skip target resolution when
+  // action.target is omitted.
+  let targetIds: string[] = [];
+  if (action.target) {
+    const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+    if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+      return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+    }
+    targetIds = autoSelectTargets(action.target, allValidIds);
   }
-  const targetIds = autoSelectTargets(action.target, allValidIds);
 
   const prohibition: import("../../effect-types.js").RuntimeProhibition = {
     id: nanoid(),
