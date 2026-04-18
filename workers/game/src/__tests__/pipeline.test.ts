@@ -154,6 +154,14 @@ describe("battle", () => {
     const cardDb = createTestCardDb();
     let state = createBattleReadyState(cardDb);
 
+    // Pin the top life card to a non-[Trigger] card so the shuffle doesn't
+    // park the battle in DAMAGE_STEP (flaky pre-OPT-239 as well).
+    const p1Life = [...state.players[1].life];
+    p1Life[0] = { ...p1Life[0], cardId: CARDS.VANILLA.id };
+    const pinnedPlayers = [...state.players] as [PlayerState, PlayerState];
+    pinnedPlayers[1] = { ...pinnedPlayers[1], life: p1Life };
+    state = { ...state, players: pinnedPlayers };
+
     const attacker = state.players[0].leader;
     const target = state.players[1].leader;
     const lifeBefore = state.players[1].life.length;
@@ -675,8 +683,9 @@ describe("defeat conditions", () => {
     };
     let newPlayers = [...state.players] as [PlayerState, PlayerState];
     newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], datkChar]) };
-    // Give player 1 exactly 1 life card
-    newPlayers[1] = { ...newPlayers[1], life: [newPlayers[1].life[0]] };
+    // Pin to one non-[Trigger] life card so both DA damages resolve in-line.
+    const loneLife = { ...newPlayers[1].life[0], cardId: CARDS.VANILLA.id };
+    newPlayers[1] = { ...newPlayers[1], life: [loneLife] };
     state = { ...state, players: newPlayers };
 
     // Attack leader with Double Attack (2 damage vs 1 life)

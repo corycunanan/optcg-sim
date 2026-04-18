@@ -54,6 +54,10 @@ export interface BattleContext {
   defenderPower: number;    // recomputed after counters are applied
   counterPowerAdded: number;
   blockerActivated: boolean;
+  // OPT-239: damage count locked at Damage Step entry. 2 for [Double Attack],
+  // 1 otherwise. Decremented each time a damage is dealt to Leader life, so
+  // the [Trigger] resume path knows whether another damage is still owed.
+  damagesRemaining?: number;
 }
 
 export type BattleSubPhase =
