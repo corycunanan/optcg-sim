@@ -23,6 +23,7 @@ import type {
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
 import { getEffectivePower, getEffectiveCost } from "./modifiers.js";
+import { hasEffectiveKeyword } from "./keywords.js";
 import { findCardInstance } from "./state.js";
 
 export interface ConditionContext {
@@ -675,14 +676,19 @@ export function matchesFilter(
     }
   }
 
-  // Keyword / ability filters
+  // Keyword / ability filters — OPT-253: the "has X" predicate consults the
+  // runtime keyword state, which respects effect negation of the card's
+  // printed keywords while preserving externally granted keywords. [Trigger]
+  // (on a Life card) is not affected by field-level negation, so the
+  // has_trigger check stays schema-only.
   if (filter.keywords) {
     for (const kw of filter.keywords) {
-      if (kw === "BLOCKER" && !data.keywords.blocker) return false;
-      if (kw === "RUSH" && !data.keywords.rush && !data.keywords.rushCharacter) return false;
-      if (kw === "DOUBLE_ATTACK" && !data.keywords.doubleAttack) return false;
-      if (kw === "BANISH" && !data.keywords.banish) return false;
-      if (kw === "UNBLOCKABLE" && !data.keywords.unblockable) return false;
+      if (kw === "BLOCKER" && !hasEffectiveKeyword(card, data, "BLOCKER", state, cardDb)) return false;
+      if (kw === "RUSH" && !hasEffectiveKeyword(card, data, "RUSH", state, cardDb)
+        && !hasEffectiveKeyword(card, data, "RUSH_CHARACTER", state, cardDb)) return false;
+      if (kw === "DOUBLE_ATTACK" && !hasEffectiveKeyword(card, data, "DOUBLE_ATTACK", state, cardDb)) return false;
+      if (kw === "BANISH" && !hasEffectiveKeyword(card, data, "BANISH", state, cardDb)) return false;
+      if (kw === "UNBLOCKABLE" && !hasEffectiveKeyword(card, data, "UNBLOCKABLE", state, cardDb)) return false;
     }
   }
   if (filter.has_trigger === true && !data.keywords.trigger) return false;

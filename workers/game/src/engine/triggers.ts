@@ -34,6 +34,7 @@ import type {
 import { nanoid } from "../util/nanoid.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter, hasBaseEffect } from "./conditions.js";
+import { isCardNegated } from "./modifiers.js";
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -296,6 +297,14 @@ export function matchTriggersForEvent(
       isOnKOTrigger(reg.trigger);
 
     if (!isOnKOSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
+
+    // OPT-253: skip triggers whose source Character is currently effect-negated.
+    // [Trigger] on Life (ON_TRIGGER_FROM_LIFE) is exempt — field-level negation
+    // cannot affect Life-zone cards, and the source is normally in Life at fire
+    // time. Likewise ON_KO triggers from the just-KO'd card are allowed through
+    // the zone exception above; any negation the card carried into the trash
+    // effectively ended with the zone change.
+    if (!isOnKOSelfTrigger && isCardInValidZone(sourceCard, "FIELD") && isCardNegated(sourceCard, state, cardDb)) continue;
 
     // Check once-per-turn / lock-on-decline: both flags consult the same
     // `oncePerTurnUsed` bag. once_per_turn writes on accept; lock_on_decline

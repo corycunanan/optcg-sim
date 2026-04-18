@@ -391,7 +391,7 @@ describe("REVEAL action", () => {
 // ─── NEGATE_EFFECTS Tests ────────────────────────────────────────────────────
 
 describe("NEGATE_EFFECTS action", () => {
-  it("removes active effects from negated card", () => {
+  it("registers a negation flag that suppresses the negated card's self-sourced effects", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
 
@@ -430,7 +430,19 @@ describe("NEGATE_EFFECTS action", () => {
 
     const negateResult = resolveEffect(modState, negateBlock, "char-0-v1", 0, cardDb);
     expect(negateResult.resolved).toBe(true);
-    expect(negateResult.state.activeEffects.length).toBe(0);
+
+    // OPT-253: the MODIFY_POWER effect is NOT stripped — it's left in the registry
+    // so it can resume when negation wears off. A NEGATE_EFFECTS_FLAG is added.
+    const effects = negateResult.state.activeEffects as any[];
+    expect(effects.length).toBe(2);
+
+    const negationFlag = effects.find((e) => e.modifiers?.some((m: any) => m.type === "NEGATE_EFFECTS_FLAG"));
+    expect(negationFlag).toBeDefined();
+    expect(negationFlag.appliesTo).toContain("char-1-v1");
+
+    const buff = effects.find((e) => e.modifiers?.some((m: any) => m.type === "MODIFY_POWER"));
+    expect(buff).toBeDefined();
+    expect(buff.sourceCardInstanceId).toBe("char-1-v1");
   });
 });
 

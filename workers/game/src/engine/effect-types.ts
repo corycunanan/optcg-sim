@@ -972,7 +972,8 @@ export type ModifierType =
   | "MODIFY_COST"
   | "GRANT_KEYWORD"
   | "REMOVE_KEYWORD"
-  | "REPLACEMENT_EFFECT";
+  | "REPLACEMENT_EFFECT"
+  | "NEGATE_EFFECTS_FLAG";
 
 export interface Modifier {
   type: ModifierType;

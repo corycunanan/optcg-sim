@@ -16,7 +16,7 @@ import {
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
 import { expireBattleEffects } from "./duration-tracker.js";
-import { hasDoubleAttack, hasBanish, hasTrigger } from "./keywords.js";
+import { hasDoubleAttack, hasBanish, hasTrigger, hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
@@ -519,7 +519,11 @@ function continueLeaderDamageSequence(
     nextState = recalculateBattlePowers(nextState, cardDb);
 
     const attackerData = cardDb.get(attackerFound!.card.cardId);
-    const isBanish = attackerData ? hasBanish(attackerData) : false;
+    // OPT-253: [Banish] is suppressed while the attacker is effect-negated,
+    // preserved if it came from an external GRANT_KEYWORD.
+    const isBanish = attackerData
+      ? hasEffectiveKeyword(attackerFound!.card, attackerData, "BANISH", nextState, cardDb)
+      : false;
     const attackerType: "LEADER" | "CHARACTER" =
       attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER";
 
@@ -676,7 +680,11 @@ function executeDamageStep(
         // between damages (§7-1-4-1-1-3, OPT-239).
         const attackerFound = findCardInState(state, battle.attackerInstanceId);
         const attackerData = attackerFound ? cardDb.get(attackerFound.card.cardId) : undefined;
-        const damageCount = attackerData && hasDoubleAttack(attackerData) ? 2 : 1;
+        // OPT-253: consult runtime keyword state so a negated attacker with
+        // printed [Double Attack] locks in 1 damage, while a negated attacker
+        // that was externally granted [Double Attack] still locks in 2.
+        const damageCount = attackerFound && attackerData
+          && hasEffectiveKeyword(attackerFound.card, attackerData, "DOUBLE_ATTACK", state, cardDb) ? 2 : 1;
 
         nextState = {
           ...nextState,

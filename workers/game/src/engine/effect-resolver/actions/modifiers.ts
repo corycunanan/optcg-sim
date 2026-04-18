@@ -217,11 +217,31 @@ export function executeNegateEffects(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  // Remove all active effects sourced by negated cards
-  const negatedSet = new Set(targetIds);
-  const newActiveEffects = state.activeEffects.filter(
-    (e) => !negatedSet.has((e as any).sourceCardInstanceId),
-  );
+  // OPT-253: flag-based negation. Register a NEGATE_EFFECTS_FLAG active effect
+  // listing the negated Characters in `appliesTo`. Query sites (keywords,
+  // triggers, modifier collection) consult `isCardNegated` and suppress the
+  // card's own schema-sourced contributions while the flag is live. External
+  // modifiers applied TO the negated card by other sources are unaffected.
+  // The flag expires through the standard duration machinery, after which
+  // effects resume immediately (schema triggers were never unregistered,
+  // just skipped).
+  const duration = action.duration ?? { type: "THIS_TURN" as const };
+  const negationEffect: RuntimeActiveEffect = {
+    id: nanoid(),
+    sourceCardInstanceId,
+    sourceEffectBlockId: "",
+    category: "auto",
+    modifiers: [{
+      type: "NEGATE_EFFECTS_FLAG",
+      params: {},
+      duration,
+    }],
+    duration,
+    expiresAt: computeExpiry(duration, state),
+    controller,
+    appliesTo: targetIds,
+    timestamp: Date.now(),
+  };
 
   events.push({
     type: "EFFECTS_NEGATED",
@@ -230,7 +250,7 @@ export function executeNegateEffects(
   });
 
   return {
-    state: { ...state, activeEffects: newActiveEffects },
+    state: { ...state, activeEffects: [...state.activeEffects, negationEffect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
