@@ -21,6 +21,7 @@ import { generateFrameId, pushFrame } from "../effect-stack.js";
 import type { CostPaymentResult, CostSelectionResult } from "./types.js";
 import { setCardState } from "./card-mutations.js";
 import { costResultToEntries } from "./types.js";
+import { isProhibitedForCard } from "../prohibitions.js";
 
 // ─── Filter helpers ──────────────────────────────────────────────────────────
 
@@ -126,6 +127,11 @@ export function payCosts(
 
       case "REST_SELF": {
         if (!sourceCardInstanceId) return null;
+        // OPT-250: if the source is under CANNOT_BE_RESTED, the cost cannot
+        // be paid — the entire effect fails (qa_op13.md:77-79).
+        if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb)) {
+          return null;
+        }
         nextState = setCardState(nextState, sourceCardInstanceId, "RESTED");
         events.push({
           type: "CARD_STATE_CHANGED",
@@ -574,7 +580,11 @@ export function isCostPayable(
     }
 
     case "REST_SELF":
-      return !!sourceCardInstanceId;
+      // OPT-250: a source under CANNOT_BE_RESTED can't pay this cost
+      // (qa_op13.md:77-79 — [Activate: Main] rest-self effects are gated).
+      if (!sourceCardInstanceId) return false;
+      if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb)) return false;
+      return true;
 
     case "TRASH_SELF": {
       if (!sourceCardInstanceId) return false;
@@ -968,8 +978,11 @@ export function computeCostTargets(
     }
 
     case "REST_CARDS": {
+      // OPT-250: characters under CANNOT_BE_RESTED cannot satisfy a rest cost
+      // (qa_op13.md:85-87 — "cannot become rested by the effects of other cards").
       return player.characters
         .filter((c): c is CardInstance => c !== null && c.state === "ACTIVE")
+        .filter((c) => !isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb))
         .map((c) => c.instanceId);
     }
 
@@ -979,6 +992,7 @@ export function computeCostTargets(
       // Include matching active characters
       for (const c of player.characters) {
         if (!c || c.state !== "ACTIVE") continue;
+        if (isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb)) continue;
         if (nameFilter) {
           const data = cardDb.get(c.cardId);
           if (!data || data.name !== nameFilter) continue;
@@ -986,7 +1000,8 @@ export function computeCostTargets(
         candidates.push(c.instanceId);
       }
       // Include leader if active and matches name filter
-      if (player.leader.state === "ACTIVE") {
+      if (player.leader.state === "ACTIVE" &&
+          !isProhibitedForCard(state, player.leader.instanceId, "CANNOT_BE_RESTED", cardDb)) {
         if (nameFilter) {
           const leaderData = cardDb.get(player.leader.cardId);
           if (leaderData && leaderData.name === nameFilter) {
