@@ -70,6 +70,25 @@ function matchesProhibition(
       return "This card cannot attack (prohibited by an effect)";
     }
 
+    case "CANNOT_BE_RESTED": {
+      // OPT-250: attacking and declaring [Blocker] both rest the source card,
+      // so a "cannot be rested" prohibition transitively blocks both
+      // (qa_op13.md:73-87).
+      if (action.type === "DECLARE_ATTACK") {
+        if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
+          if (!prohibition.appliesTo.includes(action.attackerInstanceId)) return null;
+        }
+        return "This card cannot be rested, so it cannot attack";
+      }
+      if (action.type === "DECLARE_BLOCKER") {
+        if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
+          if (!prohibition.appliesTo.includes(action.blockerInstanceId)) return null;
+        }
+        return "This card cannot be rested, so it cannot activate [Blocker]";
+      }
+      return null;
+    }
+
     case "CANNOT_BLOCK": {
       if (action.type !== "DECLARE_BLOCKER") return null;
       if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {

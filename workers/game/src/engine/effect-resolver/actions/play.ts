@@ -12,6 +12,7 @@ import { findCardInstance } from "../../state.js";
 import { nanoid } from "../../../util/nanoid.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { processBatchReplacements } from "../../replacements.js";
+import { isProhibitedForCard } from "../../prohibitions.js";
 
 // Injected by the resolver module to break the circular dependency so
 // ACTIVATE_EVENT_FROM_TRASH can resolve the selected Event's [Main] block.
@@ -471,7 +472,13 @@ export function executeSetRest(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  const rawValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  // OPT-250: strip targets under CANNOT_BE_RESTED before prompting or
+  // auto-selecting. Rest-as-consequence is a silent no-op on protected
+  // cards (qa_op13.md:85-87) — the effect proceeds for the remainder.
+  const allValidIds = rawValidIds.filter(
+    (id) => !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb),
+  );
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
