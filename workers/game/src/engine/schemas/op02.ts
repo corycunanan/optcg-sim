@@ -518,7 +518,7 @@ export const OP02_018_MARCO: EffectSchema = {
           target: { type: "SELF" },
           params: {
             source_zone: "TRASH",
-            play_state: "RESTED",
+            entry_state: "RESTED",
             cost_override: "FREE",
           },
         },

@@ -35,6 +35,7 @@ import type { QueuedTrigger } from "../types.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
 import {
   expireSourceLeftZone,
+  expireTargetLeftZone,
   evaluateWhileConditions,
 } from "./duration-tracker.js";
 
@@ -297,18 +298,29 @@ function registerNewCardTriggers(
   return state;
 }
 
-/** Deregister triggers for cards that left the field (KO, bounce, trash). */
+/** Deregister triggers for cards that left the field (KO, bounce, trash, to-deck). */
 function deregisterLeftFieldTriggers(
   state: GameState,
   execResult: ExecuteResult,
 ): GameState {
+  const cleanupInstance = (s: GameState, id: string): GameState => {
+    s = deregisterTriggersForCard(s, id);
+    s = expireSourceLeftZone(s, id);
+    // OPT-256: also strip the leaving instanceId from every effect/prohibition
+    // target list so fresh-instance invariants hold on re-summon.
+    s = expireTargetLeftZone(s, id);
+    return s;
+  };
+
   for (const event of execResult.events) {
-    if (event.type === "CARD_KO" || event.type === "CARD_RETURNED_TO_HAND") {
+    if (
+      event.type === "CARD_KO" ||
+      event.type === "CARD_RETURNED_TO_HAND" ||
+      event.type === "CARD_RETURNED_TO_DECK"
+    ) {
       const instanceId = event.payload?.cardInstanceId;
       if (!instanceId) continue;
-
-      state = deregisterTriggersForCard(state, instanceId);
-      state = expireSourceLeftZone(state, instanceId);
+      state = cleanupInstance(state, instanceId);
     }
 
     if (event.type === "CARD_TRASHED") {
@@ -317,8 +329,7 @@ function deregisterLeftFieldTriggers(
         for (const player of state.players) {
           const trashed = player.trash.find((c) => c.cardId === cardId);
           if (trashed) {
-            state = deregisterTriggersForCard(state, trashed.instanceId);
-            state = expireSourceLeftZone(state, trashed.instanceId);
+            state = cleanupInstance(state, trashed.instanceId);
             break;
           }
         }

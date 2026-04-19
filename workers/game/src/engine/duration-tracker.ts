@@ -89,6 +89,75 @@ export function expireSourceLeftZone(state: GameState, instanceId: string): Game
 }
 
 /**
+ * OPT-256: Strip a leaving instanceId from every effect/prohibition target list.
+ *
+ * Why: rules §3-1-6 treats zone transitions as instance-identity boundaries — a
+ * re-summoned Character is a fresh object. The new instance gets a fresh
+ * instanceId (play.ts:129), so it won't match stale `appliesTo` entries anyway,
+ * but explicit strip keeps state clean, prevents unbounded growth across long
+ * games, and makes the invariant testable directly on the registries.
+ *
+ * For AOE entries whose `appliesTo` lists multiple instances we only drop the
+ * leaving id; the effect persists for remaining targets. An entry whose
+ * `appliesTo` becomes empty is dropped entirely, UNLESS it carries a dynamic
+ * (non-SELF) modifier target — dynamic targets re-resolve at read time and
+ * should not be killed by an empty static list.
+ *
+ * Source-bound entries (sourceCardInstanceId === instanceId) are left to
+ * expireSourceLeftZone so the two helpers don't step on each other.
+ */
+export function expireTargetLeftZone(state: GameState, instanceId: string): GameState {
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  let effectsChanged = false;
+  const remainingEffects: RuntimeActiveEffect[] = [];
+
+  for (const e of effects) {
+    if (!e.appliesTo.includes(instanceId) || e.sourceCardInstanceId === instanceId) {
+      remainingEffects.push(e);
+      continue;
+    }
+
+    const filteredAppliesTo = e.appliesTo.filter((id) => id !== instanceId);
+    const hasDynamicTarget = (e.modifiers ?? []).some(
+      (m) => m.target && m.target.type !== "SELF",
+    );
+
+    if (filteredAppliesTo.length === 0 && !hasDynamicTarget) {
+      effectsChanged = true;
+      continue;
+    }
+
+    effectsChanged = true;
+    remainingEffects.push({ ...e, appliesTo: filteredAppliesTo });
+  }
+
+  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  let prohibitionsChanged = false;
+  const remainingProhibitions: RuntimeProhibition[] = [];
+
+  for (const p of prohibitions) {
+    if (!p.appliesTo.includes(instanceId) || p.sourceCardInstanceId === instanceId) {
+      remainingProhibitions.push(p);
+      continue;
+    }
+    const filteredAppliesTo = p.appliesTo.filter((id) => id !== instanceId);
+    if (filteredAppliesTo.length === 0) {
+      prohibitionsChanged = true;
+      continue;
+    }
+    prohibitionsChanged = true;
+    remainingProhibitions.push({ ...p, appliesTo: filteredAppliesTo });
+  }
+
+  if (!effectsChanged && !prohibitionsChanged) return state;
+  return {
+    ...state,
+    activeEffects: effectsChanged ? remainingEffects as any : state.activeEffects,
+    prohibitions: prohibitionsChanged ? remainingProhibitions as any : state.prohibitions,
+  };
+}
+
+/**
  * Process scheduled actions for the given timing.
  */
 export function processScheduledActions(
