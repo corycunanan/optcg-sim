@@ -261,11 +261,18 @@ export function executeRevealTrigger(
   reveal: boolean,
   cardDb: Map<string, CardData>,
 ): ExecuteResult {
+  const battle = state.turn.battle as typeof state.turn.battle & { pendingTriggerLifeCard?: LifeCard };
+  // OPT-259 (F6): effect-sourced damage parks its pending Trigger on turn
+  // state rather than battle state. Route to the effect-damage resolver when
+  // no battle trigger is pending.
+  if (!battle?.pendingTriggerLifeCard && state.turn.pendingTriggerFromEffect) {
+    return executeRevealEffectDamageTrigger(state, reveal, cardDb);
+  }
+
   const events: PendingEvent[] = [];
   const inactiveIdx = getInactivePlayerIndex(state);
   let nextState = state;
 
-  const battle = state.turn.battle as typeof state.turn.battle & { pendingTriggerLifeCard?: LifeCard };
   if (!battle?.pendingTriggerLifeCard) return { state, events };
 
   const lifeCard = battle.pendingTriggerLifeCard;
@@ -368,7 +375,274 @@ export function executeRevealTrigger(
   return { state: cont.state, events, damagedPlayerIndex: cont.damagedPlayerIndex };
 }
 
+// ─── Effect-damage Trigger resolver (OPT-259 / F6) ───────────────────────────
+
+/**
+ * Resume the damage loop after the defender accepts or declines a [Trigger]
+ * window that was opened by effect-sourced damage (DEAL_DAMAGE). Mirrors the
+ * battle-damage `executeRevealTrigger` accept/decline/resolve pattern but
+ * consumes `turn.pendingTriggerFromEffect` instead of `battle.pendingTriggerLifeCard`.
+ *
+ * If the trigger effect itself pauses for player input, we end the damage
+ * loop here (same policy the battle path uses at the `endBattle` branch) —
+ * any remaining damages on a multi-damage effect are not dealt, matching
+ * the precedent that trigger-effect resolution supersedes further damage.
+ */
+function executeRevealEffectDamageTrigger(
+  state: GameState,
+  reveal: boolean,
+  cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  const pending = state.turn.pendingTriggerFromEffect;
+  if (!pending) return { state, events };
+
+  const { lifeCard, damagedPlayerIndex, remainingDamages, controllerIndex } = pending;
+  let nextState: GameState = {
+    ...state,
+    turn: { ...state.turn, pendingTriggerFromEffect: null },
+  };
+
+  if (reveal) {
+    // Trash the revealed Life card (rules §10-1-5-3) before resolving the
+    // trigger block. The trigger block runs from the trash.
+    const trashCard = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "TRASH" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: damagedPlayerIndex,
+      owner: damagedPlayerIndex,
+    };
+    const newPlayers = [...nextState.players] as typeof nextState.players;
+    newPlayers[damagedPlayerIndex] = {
+      ...newPlayers[damagedPlayerIndex],
+      trash: [trashCard, ...newPlayers[damagedPlayerIndex].trash],
+    };
+    nextState = { ...nextState, players: newPlayers };
+    events.push({ type: "TRIGGER_ACTIVATED", playerIndex: damagedPlayerIndex, payload: { cardId: lifeCard.cardId, activated: true } });
+
+    const triggerCardData = cardDb.get(lifeCard.cardId);
+    if (triggerCardData?.type === "Event") {
+      events.push({
+        type: "EVENT_TRIGGER_RESOLVED",
+        playerIndex: damagedPlayerIndex,
+        payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+      });
+    }
+    const schema = triggerCardData?.effectSchema as EffectSchema | null;
+    if (schema?.effects) {
+      const triggerBlock = schema.effects.find(
+        (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
+      );
+      if (triggerBlock) {
+        const effectResult = resolveEffect(
+          nextState,
+          triggerBlock,
+          lifeCard.instanceId,
+          damagedPlayerIndex,
+          cardDb,
+        );
+        nextState = effectResult.state;
+        events.push(...effectResult.events);
+        if (effectResult.pendingPrompt) {
+          // Trigger effect itself needs input — abandon remaining damages
+          // (parity with battle path at executeRevealTrigger's endBattle).
+          events.push({
+            type: "CARD_REMOVED_FROM_LIFE",
+            playerIndex: damagedPlayerIndex,
+            payload: { cardInstanceId: lifeCard.instanceId },
+          });
+          return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
+        }
+      }
+    }
+  } else {
+    const handResult = moveLifeCardToHand(nextState, lifeCard, damagedPlayerIndex);
+    nextState = handResult.state;
+    events.push(...handResult.events);
+    // Decline emits the REMOVED event inside moveLifeCardToHand — we do NOT
+    // want to emit it again below, so return after resuming remaining damage.
+    const cont = continueEffectDamageSequence(
+      nextState,
+      cardDb,
+      damagedPlayerIndex,
+      remainingDamages,
+      pending.sourceCardInstanceId,
+      controllerIndex,
+    );
+    return {
+      state: cont.state,
+      events: [...events, ...cont.events],
+      ...(cont.pendingPrompt && { pendingPrompt: cont.pendingPrompt }),
+    };
+  }
+
+  // Accept path: emit REMOVED_FROM_LIFE after the trigger block resolves, per
+  // OPT-240. Then resume the remaining damages.
+  events.push({
+    type: "CARD_REMOVED_FROM_LIFE",
+    playerIndex: damagedPlayerIndex,
+    payload: { cardInstanceId: lifeCard.instanceId },
+  });
+
+  const cont = continueEffectDamageSequence(
+    nextState,
+    cardDb,
+    damagedPlayerIndex,
+    remainingDamages,
+    pending.sourceCardInstanceId,
+    controllerIndex,
+  );
+  return {
+    state: cont.state,
+    events: [...events, ...cont.events],
+    ...(cont.pendingPrompt && { pendingPrompt: cont.pendingPrompt }),
+  };
+}
+
+/**
+ * Deal `remainingDamages` more damages to `damagedPlayerIndex` as the
+ * continuation of an effect-sourced damage loop (DEAL_DAMAGE). Pops Life
+ * cards one at a time; on a [Trigger] reveal, parks state in
+ * `turn.pendingTriggerFromEffect` and returns — the REVEAL_TRIGGER handler
+ * will re-enter here. Lethal (life already 0) stops the loop.
+ *
+ * This is the shared continuation used by both the initial call from
+ * `executeDealDamage` and the resume after `executeRevealEffectDamageTrigger`.
+ */
+export function continueEffectDamageSequence(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+  damagedPlayerIndex: 0 | 1,
+  remainingDamages: number,
+  sourceCardInstanceId: string,
+  controllerIndex: 0 | 1,
+): ExecuteResult {
+  const events: PendingEvent[] = [];
+  let nextState = state;
+
+  for (let i = 0; i < remainingDamages; i++) {
+    const popResult = popLifeForDamage(nextState, damagedPlayerIndex);
+    if (popResult.lethal) break;
+    if (!popResult.lifeCard) break;
+    nextState = popResult.state;
+    events.push(...popResult.events);
+
+    const lifeCard = popResult.lifeCard;
+    const cardData = cardDb.get(lifeCard.cardId);
+
+    if (hasTrigger(cardData ?? ({ keywords: { trigger: false } } as CardData))) {
+      const damagesAfterThis = remainingDamages - i - 1;
+      nextState = {
+        ...nextState,
+        turn: {
+          ...nextState.turn,
+          pendingTriggerFromEffect: {
+            lifeCard,
+            damagedPlayerIndex,
+            remainingDamages: damagesAfterThis,
+            sourceCardInstanceId,
+            controllerIndex,
+          },
+        },
+      };
+      events.push({
+        type: "TRIGGER_ACTIVATED",
+        playerIndex: damagedPlayerIndex,
+        payload: { cardId: lifeCard.cardId },
+      });
+      return { state: nextState, events, damagedPlayerIndex };
+    }
+
+    const handResult = moveLifeCardToHand(nextState, lifeCard, damagedPlayerIndex);
+    nextState = handResult.state;
+    events.push(...handResult.events);
+  }
+
+  return { state: nextState, events, damagedPlayerIndex };
+}
+
 // ─── Leader-damage helpers (OPT-239) ────────────────────────────────────────
+
+/**
+ * Pop the top Life card for a damage resolution. Shared by battle damage
+ * (`dealOneLeaderDamage`) and effect-sourced damage (`executeDealDamage`) so
+ * both paths agree on the §7-1-4-1-1 ordering: lethal check first, then pop,
+ * then emit LIFE_COUNT_BECOMES_ZERO if this damage drained the Life zone.
+ *
+ * OPT-255 (F2): popping here — before any Trigger window or caller-specific
+ * resolution — ensures life-threshold conditions inside a `[Trigger]` block
+ * evaluate against the post-pop life array.
+ *
+ * Does NOT emit `DAMAGE_DEALT` (payload shape differs between battle/effect
+ * damage) and does NOT open the Trigger window — callers own both.
+ */
+export function popLifeForDamage(
+  state: GameState,
+  damagedPlayerIndex: 0 | 1,
+): { state: GameState; lifeCard: LifeCard | null; lethal: boolean; events: PendingEvent[] } {
+  const events: PendingEvent[] = [];
+
+  if (state.players[damagedPlayerIndex].life.length === 0) {
+    return { state, lifeCard: null, lethal: true, events };
+  }
+
+  const result = removeTopLifeCard(state, damagedPlayerIndex);
+  if (!result) return { state, lifeCard: null, lethal: false, events };
+
+  const { lifeCard, state: nextState } = result;
+
+  if (nextState.players[damagedPlayerIndex].life.length === 0) {
+    events.push({ type: "LIFE_COUNT_BECOMES_ZERO", playerIndex: damagedPlayerIndex, payload: {} });
+  }
+
+  return { state: nextState, lifeCard, lethal: false, events };
+}
+
+/**
+ * Move a revealed Life card into the damaged player's hand and emit the
+ * standard pair of events in the OPT-240 order (ADDED_TO_HAND before
+ * REMOVED_FROM_LIFE). Used by both battle damage's no-[Trigger] path and by
+ * effect damage whenever the revealed card lacks [Trigger] or the defender
+ * declines to activate.
+ */
+export function moveLifeCardToHand(
+  state: GameState,
+  lifeCard: LifeCard,
+  damagedPlayerIndex: 0 | 1,
+): { state: GameState; events: PendingEvent[] } {
+  const events: PendingEvent[] = [];
+  const player = state.players[damagedPlayerIndex];
+  const handCard = {
+    instanceId: lifeCard.instanceId,
+    cardId: lifeCard.cardId,
+    zone: "HAND" as const,
+    state: "ACTIVE" as const,
+    attachedDon: [],
+    turnPlayed: null,
+    controller: damagedPlayerIndex,
+    owner: damagedPlayerIndex,
+  };
+  const newPlayers = [...state.players] as typeof state.players;
+  newPlayers[damagedPlayerIndex] = { ...player, hand: [...player.hand, handCard] };
+  const nextState = { ...state, players: newPlayers };
+
+  events.push({
+    type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+    playerIndex: damagedPlayerIndex,
+    payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+  });
+  events.push({
+    type: "CARD_REMOVED_FROM_LIFE",
+    playerIndex: damagedPlayerIndex,
+    payload: { cardInstanceId: lifeCard.instanceId },
+  });
+
+  return { state: nextState, events };
+}
 
 /**
  * Deal one damage to the defending Leader. Returns `paused: true` when the
@@ -386,37 +660,27 @@ function dealOneLeaderDamage(
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
   const inactiveIdx = getInactivePlayerIndex(state);
-  let nextState = state;
 
-  // §7-1-4-1-1-1: 0 life → defeat on the next damage.
-  if (nextState.players[inactiveIdx].life.length === 0) {
+  const popResult = popLifeForDamage(state, inactiveIdx);
+  if (popResult.lethal) {
     events.push({
       type: "DAMAGE_DEALT",
       playerIndex: pi,
       payload: { target: "leader", amount: 1, lethal: true, attackerInstanceId, attackerType },
     });
-    return { state: nextState, events, paused: false, damagedPlayerIndex: inactiveIdx, lethal: true };
+    return { state: popResult.state, events, paused: false, damagedPlayerIndex: inactiveIdx, lethal: true };
   }
+  if (!popResult.lifeCard) return { state: popResult.state, events, paused: false };
 
-  // §7-1-4-1-1-2: pop the top Life card. This MUST happen before the Trigger
-  // window opens — OPT-255 (F2): Life-threshold [Trigger] conditions like
-  // "if you have ≤N Life cards" must exclude the revealed card from the count.
-  // Popping first means `resolveEffect` sees the post-exclusion life array for
-  // free through every LIFE_COUNT / COMBINED_TOTAL / COMBINED_ZONE_COUNT path.
-  const result = removeTopLifeCard(nextState, inactiveIdx);
-  if (!result) return { state: nextState, events, paused: false };
-  const { lifeCard, state: stateAfterRemoval } = result;
-  nextState = stateAfterRemoval;
+  let nextState = popResult.state;
+  const { lifeCard } = popResult;
 
   events.push({
     type: "DAMAGE_DEALT",
     playerIndex: pi,
     payload: { amount: 1, attackerInstanceId, attackerType },
   });
-
-  if (nextState.players[inactiveIdx].life.length === 0) {
-    events.push({ type: "LIFE_COUNT_BECOMES_ZERO", playerIndex: inactiveIdx, payload: {} });
-  }
+  events.push(...popResult.events);
 
   if (isBanish) {
     const trashCard = {
@@ -458,34 +722,8 @@ function dealOneLeaderDamage(
     return { state: nextState, events, paused: true };
   }
 
-  // Normal: Life → hand.
-  const handCard = {
-    instanceId: lifeCard.instanceId,
-    cardId: lifeCard.cardId,
-    zone: "HAND" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: inactiveIdx,
-    owner: inactiveIdx,
-  };
-  const newPlayers = [...nextState.players] as typeof nextState.players;
-  newPlayers[inactiveIdx] = {
-    ...newPlayers[inactiveIdx],
-    hand: [...newPlayers[inactiveIdx].hand, handCard],
-  };
-  nextState = { ...nextState, players: newPlayers };
-  events.push({
-    type: "CARD_ADDED_TO_HAND_FROM_LIFE",
-    playerIndex: inactiveIdx,
-    payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
-  });
-  events.push({
-    type: "CARD_REMOVED_FROM_LIFE",
-    playerIndex: inactiveIdx,
-    payload: { cardInstanceId: lifeCard.instanceId },
-  });
-  return { state: nextState, events, paused: false };
+  const handResult = moveLifeCardToHand(nextState, lifeCard, inactiveIdx);
+  return { state: handResult.state, events: [...events, ...handResult.events], paused: false };
 }
 
 /**
