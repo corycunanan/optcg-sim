@@ -102,6 +102,15 @@ export interface TurnState {
   // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
   // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).
   deckHitZeroThisTurn: [boolean, boolean];
+  // OPT-257 (F4): instance IDs currently in trigger-resolution staging — Life
+  // cards that have been moved to trash for an activated [Trigger] but whose
+  // effect block has not yet built its candidate list. Per Bandai rulings the
+  // staging card is NOT yet "in trash" for trash-targeting effects (e.g.
+  // OP14-082 Trigger "Play X from trash" must not be able to pick itself).
+  // Filtered out of TRASH source-zone candidates and TRASH_COUNT queries.
+  // Cleared once resolveEffect returns — by then any pending prompt's valid
+  // targets have already been locked in.
+  triggerStagingInstanceIds?: string[];
 }
 
 // ─── Player State ─────────────────────────────────────────────────────────────

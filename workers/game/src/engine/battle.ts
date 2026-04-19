@@ -13,6 +13,8 @@ import {
   moveCard,
   removeTopLifeCard,
   restDonForCost,
+  pushTriggerStaging,
+  popTriggerStaging,
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
 import { expireBattleEffects } from "./duration-tracker.js";
@@ -295,6 +297,11 @@ export function executeRevealTrigger(
       trash: [trashCard, ...newPlayers[inactiveIdx].trash],
     };
     nextState = { ...nextState, players: newPlayers };
+    // OPT-257 (F4): mark the just-trashed Life card as staging so trash-targeting
+    // effects (PLAY_CARD source_zone TRASH, TRASH_COUNT, etc.) don't see it
+    // during this Trigger's resolution. Cleared after resolveEffect returns —
+    // any pending prompt's candidate list is already built/locked at that point.
+    nextState = pushTriggerStaging(nextState, lifeCard.instanceId);
     events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, activated: true } });
 
     // If the trigger card has an effectSchema with a TRIGGER block, resolve it
@@ -321,13 +328,18 @@ export function executeRevealTrigger(
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
+        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
         // If the trigger effect needs player input, end the battle first
         // then surface the prompt — battle is over, we're just resolving the effect
         if (effectResult.pendingPrompt) {
           nextState = endBattle(nextState, events);
           return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
         }
+      } else {
+        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
       }
+    } else {
+      nextState = popTriggerStaging(nextState, lifeCard.instanceId);
     }
   } else {
     // Decline trigger — add to hand
@@ -422,6 +434,10 @@ function executeRevealEffectDamageTrigger(
       trash: [trashCard, ...newPlayers[damagedPlayerIndex].trash],
     };
     nextState = { ...nextState, players: newPlayers };
+    // OPT-257 (F4): see executeRevealTrigger above — staging marker keeps the
+    // just-trashed Life card invisible to trash-targeting effects during the
+    // Trigger's effect resolution.
+    nextState = pushTriggerStaging(nextState, lifeCard.instanceId);
     events.push({ type: "TRIGGER_ACTIVATED", playerIndex: damagedPlayerIndex, payload: { cardId: lifeCard.cardId, activated: true } });
 
     const triggerCardData = cardDb.get(lifeCard.cardId);
@@ -447,6 +463,7 @@ function executeRevealEffectDamageTrigger(
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
+        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
         if (effectResult.pendingPrompt) {
           // Trigger effect itself needs input — abandon remaining damages
           // (parity with battle path at executeRevealTrigger's endBattle).
@@ -457,7 +474,11 @@ function executeRevealEffectDamageTrigger(
           });
           return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
         }
+      } else {
+        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
       }
+    } else {
+      nextState = popTriggerStaging(nextState, lifeCard.instanceId);
     }
   } else {
     const handResult = moveLifeCardToHand(nextState, lifeCard, damagedPlayerIndex);
