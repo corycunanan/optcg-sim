@@ -32,15 +32,22 @@ import type { ActionResult } from "./types.js";
 function getCandidatesFromSourceZones(
   sourceZone: SourceZone | SourceZone[] | undefined,
   player: PlayerState,
+  state?: GameState,
 ): CardInstance[] {
   if (!sourceZone) return player.hand;
   const zones = Array.isArray(sourceZone) ? sourceZone : [sourceZone];
+  // OPT-257 (F4): cards in trigger-resolution staging are physically in
+  // player.trash but invisible to trash-targeting effects from the same
+  // window. The Bandai ruling for the OP14 Thriller Bark Trigger pattern
+  // ("Play X from trash") is that the just-revealed Life card cannot be
+  // chosen as its own target.
+  const stagingIds = new Set(state?.turn.triggerStagingInstanceIds ?? []);
   const candidates: CardInstance[] = [];
   const seen = new Set<string>();
   for (const zone of zones) {
     let cards: CardInstance[];
     switch (zone) {
-      case "TRASH": cards = player.trash; break;
+      case "TRASH": cards = player.trash.filter((c) => !stagingIds.has(c.instanceId)); break;
       case "DECK": cards = player.deck; break;
       case "DECK_TOP": cards = player.deck.slice(0, 1); break;
       case "FIELD": cards = [player.leader, ...(player.characters.filter(Boolean) as CardInstance[]), ...(player.stage ? [player.stage] : [])]; break;
@@ -326,7 +333,7 @@ export function computeAllValidTargets(
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       // Determine source zone(s) — may be a single zone or array of zones
       let candidates: CardInstance[];
-      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi]);
+      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi], state);
       // Apply card_type filter for typed target types
       if (targetType === "CHARACTER_CARD") {
         candidates = candidates.filter((c) => {
@@ -350,7 +357,9 @@ export function computeAllValidTargets(
     case "CARD_IN_TRASH": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      let candidates = state.players[pi].trash;
+      // OPT-257 (F4): exclude trigger-staging instances from trash queries.
+      const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
+      let candidates = state.players[pi].trash.filter((c) => !stagingIds.has(c.instanceId));
       if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       return candidates.map((c) => c.instanceId);
     }
@@ -636,7 +645,7 @@ export function resolveTargetInstances(
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates: CardInstance[];
-      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi]);
+      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi], state);
       if (targetType === "CHARACTER_CARD") {
         candidates = candidates.filter((c) => { const d = cardDb.get(c.cardId); return d && d.type?.toUpperCase() === "CHARACTER"; });
       } else if (targetType === "EVENT_CARD") {
@@ -657,7 +666,9 @@ export function resolveTargetInstances(
     case "CARD_IN_TRASH": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      let candidates = state.players[pi].trash;
+      // OPT-257 (F4): exclude trigger-staging instances from trash queries.
+      const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
+      let candidates = state.players[pi].trash.filter((c) => !stagingIds.has(c.instanceId));
       if (target.filter) {
         candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
       }

@@ -229,6 +229,48 @@ export function removeTopLifeCard(
   };
 }
 
+// ─── Trigger staging (OPT-257 / F4) ──────────────────────────────────────────
+
+/**
+ * Push a Life-card instanceId onto the trigger-staging set. The card has
+ * physically been placed in trash for the [Trigger]'s effect resolution, but
+ * per Bandai rulings it is NOT yet "in trash" for trash-targeting effects
+ * sourced from this same Trigger (e.g. OP14-082's "Play X from trash" must
+ * not pick the OP14-082 instance that just opened the window).
+ */
+export function pushTriggerStaging(state: GameState, instanceId: string): GameState {
+  const current = state.turn.triggerStagingInstanceIds ?? [];
+  return {
+    ...state,
+    turn: {
+      ...state.turn,
+      triggerStagingInstanceIds: [...current, instanceId],
+    },
+  };
+}
+
+/**
+ * Pop a staged instanceId. Called once `resolveEffect` returns — by then any
+ * pending prompt's candidate list has already been built against the filtered
+ * trash, so a sync clear is safe even on the prompt path.
+ */
+export function popTriggerStaging(state: GameState, instanceId: string): GameState {
+  const current = state.turn.triggerStagingInstanceIds ?? [];
+  if (!current.includes(instanceId)) return state;
+  return {
+    ...state,
+    turn: {
+      ...state.turn,
+      triggerStagingInstanceIds: current.filter((id) => id !== instanceId),
+    },
+  };
+}
+
+/** True if the given instanceId is currently in trigger-resolution staging. */
+export function isInTriggerStaging(state: GameState, instanceId: string): boolean {
+  return (state.turn.triggerStagingInstanceIds ?? []).includes(instanceId);
+}
+
 /**
  * Add a card to the top of a player's life zone.
  */

@@ -80,12 +80,14 @@ function evaluateSimple(
         cond.value,
       );
 
-    case "TRASH_COUNT":
-      return compareNum(
-        getPlayerByController(state, cond.controller, ctx.controller).trash.length,
-        cond.operator,
-        cond.value,
-      );
+    case "TRASH_COUNT": {
+      // OPT-257 (F4): exclude trigger-staging instances from trash count —
+      // a card mid-Trigger-resolution is not yet "in trash" for queries.
+      const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
+      const trashCount = getPlayerByController(state, cond.controller, ctx.controller)
+        .trash.filter((c) => !stagingIds.has(c.instanceId)).length;
+      return compareNum(trashCount, cond.operator, cond.value);
+    }
 
     case "DECK_COUNT":
       return compareNum(
@@ -302,12 +304,14 @@ function evaluateSimple(
 
     case "COMBINED_ZONE_COUNT": {
       const p = getPlayerByController(state, cond.controller, ctx.controller);
+      // OPT-257 (F4): see TRASH_COUNT — staging cards are excluded from trash.
+      const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
       let total = 0;
       for (const zone of cond.zones) {
         const z = zone.toUpperCase();
         if (z === "LIFE") total += p.life.length;
         else if (z === "HAND") total += p.hand.length;
-        else if (z === "TRASH") total += p.trash.length;
+        else if (z === "TRASH") total += p.trash.filter((c) => !stagingIds.has(c.instanceId)).length;
         else if (z === "DECK") total += p.deck.length;
       }
       return compareNum(total, cond.operator, cond.value);
