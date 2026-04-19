@@ -86,6 +86,18 @@ export interface TurnState {
   oncePerTurnUsed: Record<string, string[]>; // effectId → instanceIds used this turn
   actionsPerformedThisTurn: PerformedAction[];
   extraTurnsPending?: number;
+  // OPT-259 (F6): effect-sourced damage (DEAL_DAMAGE) reveals a Life card
+  // with [Trigger]. The damaged player must decide to activate or decline,
+  // after which the damage loop resumes for any remaining iterations.
+  // Battle damage uses `battle.pendingTriggerLifeCard` instead — effect damage
+  // is decoupled so it can happen outside the battle phase.
+  pendingTriggerFromEffect?: {
+    lifeCard: LifeCard;
+    damagedPlayerIndex: 0 | 1;
+    remainingDamages: number;  // damages still to deal AFTER the current one resolves
+    sourceCardInstanceId: string;
+    controllerIndex: 0 | 1;    // controller of the effect that dealt the damage
+  } | null;
   // Per-turn sticky flag: set to true the first time a player's deck transitions
   // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
   // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).

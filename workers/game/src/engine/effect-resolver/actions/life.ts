@@ -48,6 +48,7 @@ export function executeAddToLifeFromDeck(
   };
 }
 
+// OPT-259 (F6): trashing a Life card is not damage — never fire [Trigger].
 export function executeTrashFromLife(
   state: GameState,
   action: Action,
@@ -102,6 +103,7 @@ export function executeTrashFromLife(
   };
 }
 
+// OPT-259 (F6): flipping a Life face-up is not damage — never fire [Trigger].
 export function executeTurnLifeFaceUp(
   state: GameState,
   action: Action,
@@ -185,6 +187,8 @@ export function executeTurnAllLifeFaceDown(
   return { state: { ...state, players: newPlayers }, events, succeeded: true };
 }
 
+// OPT-259 (F6): non-damage Life→hand adds (e.g. OP05-107) do NOT fire [Trigger].
+// Damage-driven Life→hand goes through executeDealDamage / battle damage.
 export function executeLifeToHand(
   state: GameState,
   action: Action,
@@ -421,6 +425,7 @@ export function executePlayFromLife(
   return { state, events, succeeded: false };
 }
 
+// OPT-259 (F6): Life → bottom of deck is not damage — never fire [Trigger].
 export function executeLifeCardToDeck(
   state: GameState,
   action: Action,
@@ -511,6 +516,7 @@ export function executeTrashFaceUpLife(
   };
 }
 
+// OPT-259 (F6): "look at top Life" (Katakuri) is not damage — never fire [Trigger].
 export function executeLifeScry(
   state: GameState,
   action: Action,
@@ -578,6 +584,7 @@ export function executeDrainLifeToThreshold(
   };
 }
 
+// OPT-259 (F6): reordering Life cards (Viola) is not damage — never fire [Trigger].
 export function executeReorderAllLife(
   state: GameState,
   action: Action,

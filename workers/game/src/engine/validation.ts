@@ -289,6 +289,9 @@ function validateUseCounterEvent(
 }
 
 function validateRevealTrigger(state: GameState): string | null {
+  // OPT-259 (F6): effect-sourced damage can open a [Trigger] window outside a
+  // battle. Allow REVEAL_TRIGGER whenever either path has a pending Life card.
+  if (state.turn.pendingTriggerFromEffect) return null;
   if (state.turn.battleSubPhase !== "DAMAGE_STEP") return "Trigger reveal only during Damage Step";
   return null;
 }

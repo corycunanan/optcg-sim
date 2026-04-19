@@ -412,9 +412,17 @@ export class GameSession implements DurableObject {
         "PASS",
       ]);
 
-      const expectedPlayer = inactiveActions.has(action.type)
+      let expectedPlayer: 0 | 1 = inactiveActions.has(action.type)
         ? (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0)
         : this.gameState.turn.activePlayerIndex;
+
+      // OPT-259 (F6): effect-sourced damage can open a [Trigger] window where
+      // the damaged player is the controller/active player (e.g. an opponent's
+      // ON_KO OPPONENT_TURN trigger dealing damage back at the attacker). The
+      // damaged player is the authoritative responder.
+      if (action.type === "REVEAL_TRIGGER" && this.gameState.turn.pendingTriggerFromEffect) {
+        expectedPlayer = this.gameState.turn.pendingTriggerFromEffect.damagedPlayerIndex;
+      }
 
       if (playerIndex !== expectedPlayer) {
         this.send(ws, { type: "game:error", message: "Not your turn" });
@@ -671,24 +679,38 @@ export class GameSession implements DurableObject {
   }
 
   /**
-   * If the effect stack is empty and no prompt is pending, check whether the
-   * battle has a pendingTriggerLifeCard that needs a REVEAL_TRIGGER prompt.
-   * Surfacing it as a durable pendingPrompt on the game state makes it survive
-   * reconnections and prevents a race between game:update (clears activePrompt)
-   * and game:prompt (sets it again).
+   * If the effect stack is empty and no prompt is pending, check whether a
+   * [Trigger] Life card reveal is awaiting a decision — either on the active
+   * battle (battle damage, battle.pendingTriggerLifeCard) or on the turn
+   * (effect damage, turn.pendingTriggerFromEffect / OPT-259 F6). Surfacing it
+   * as a durable pendingPrompt on the game state makes it survive reconnections
+   * and prevents a race between game:update (clears activePrompt) and
+   * game:prompt (sets it again).
    */
   private surfaceRevealTriggerIfNeeded(): void {
     if (!this.gameState || !this.cardDb) return;
     if (this.gameState.pendingPrompt) return;
     if (this.gameState.effectStack.length > 0) return;
 
-    const { battleSubPhase, battle } = this.gameState.turn;
-    if (battleSubPhase !== "DAMAGE_STEP" || !battle) return;
+    const { battleSubPhase, battle, pendingTriggerFromEffect } = this.gameState.turn;
 
-    const triggerLifeCard = (battle as BattleContext & { pendingTriggerLifeCard?: LifeCard }).pendingTriggerLifeCard;
-    if (!triggerLifeCard) return;
+    let triggerLifeCard: LifeCard | undefined;
+    let respondingIdx: 0 | 1 | undefined;
 
-    const inactiveIdx = (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0) as 0 | 1;
+    if (battleSubPhase === "DAMAGE_STEP" && battle) {
+      const candidate = (battle as BattleContext & { pendingTriggerLifeCard?: LifeCard }).pendingTriggerLifeCard;
+      if (candidate) {
+        triggerLifeCard = candidate;
+        respondingIdx = (this.gameState.turn.activePlayerIndex === 0 ? 1 : 0) as 0 | 1;
+      }
+    } else if (pendingTriggerFromEffect) {
+      // OPT-259: effect-sourced damage trigger window.
+      triggerLifeCard = pendingTriggerFromEffect.lifeCard;
+      respondingIdx = pendingTriggerFromEffect.damagedPlayerIndex;
+    }
+
+    if (!triggerLifeCard || respondingIdx === undefined) return;
+
     const triggerCardData = this.cardDb.get(triggerLifeCard.cardId);
 
     const cards = [{
@@ -698,8 +720,8 @@ export class GameSession implements DurableObject {
       state: "ACTIVE" as const,
       attachedDon: [] as DonInstance[],
       turnPlayed: null,
-      controller: inactiveIdx,
-      owner: inactiveIdx,
+      controller: respondingIdx,
+      owner: respondingIdx,
     }];
 
     const effectDescription = triggerCardData?.triggerText
@@ -710,7 +732,7 @@ export class GameSession implements DurableObject {
       ...this.gameState,
       pendingPrompt: {
         options: { promptType: "REVEAL_TRIGGER" as const, cards, effectDescription, optional: false, timeoutMs: 30_000 },
-        respondingPlayer: inactiveIdx,
+        respondingPlayer: respondingIdx,
         resumeContext: null,
       },
     };
