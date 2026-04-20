@@ -10,6 +10,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241205.0",
     "@vitest/coverage-v8": "^4.1.4",
