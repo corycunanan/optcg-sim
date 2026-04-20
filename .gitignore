@@ -56,3 +56,4 @@ next-env.d.ts
 .env.vercel-token
 
 workers/game/.wrangler/
+workers/game/coverage/
