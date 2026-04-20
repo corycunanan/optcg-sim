@@ -62,7 +62,9 @@ export function trashCharacter(
   state: GameState,
   instanceId: string,
   causingController: 0 | 1,
+  reason: "effect" | "cost" = "effect",
 ): { state: GameState; events: PendingEvent[] } | null {
+  void causingController;
   for (const [pi, player] of state.players.entries()) {
     const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
     if (charIdx === -1) continue;
@@ -96,10 +98,101 @@ export function trashCharacter(
         payload: {
           cardInstanceId: instanceId,
           cardId: char.cardId,
-          reason: "effect",
+          reason,
         },
       }],
     };
+  }
+  return null;
+}
+
+/**
+ * Trash the stage card at `instanceId`. Returns attached DON!! to cost area
+ * (rested) and emits CARD_TRASHED. Per OPT-256, the trashed card is reset to
+ * a fresh ACTIVE instance on zone exit.
+ */
+export function trashStage(
+  state: GameState,
+  instanceId: string,
+  reason: "effect" | "cost" = "effect",
+): { state: GameState; events: PendingEvent[] } | null {
+  for (const [pi, player] of state.players.entries()) {
+    if (player.stage?.instanceId !== instanceId) continue;
+
+    const stage = player.stage;
+    const returnedDon = stage.attachedDon.map((d) => ({
+      ...d,
+      state: "RESTED" as const,
+      attachedTo: null,
+    }));
+    const newTrash = [{ ...stage, zone: "TRASH" as const, attachedDon: [], state: "ACTIVE" as const }, ...player.trash];
+
+    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+    newPlayers[pi] = {
+      ...player,
+      stage: null,
+      trash: newTrash,
+      donCostArea: [...player.donCostArea, ...returnedDon],
+    };
+
+    return {
+      state: { ...state, players: newPlayers },
+      events: [{
+        type: "CARD_TRASHED",
+        playerIndex: pi as 0 | 1,
+        payload: {
+          cardInstanceId: stage.instanceId,
+          cardId: stage.cardId,
+          reason,
+        },
+      }],
+    };
+  }
+  return null;
+}
+
+/**
+ * Detach up to `amount` DON!! from the card at `cardInstanceId` (leader or character)
+ * and return them to that player's cost area in the RESTED state. Returns null if
+ * the card is not found or has zero attached DON!!.
+ */
+export function detachDonToCostArea(
+  state: GameState,
+  cardInstanceId: string,
+  amount: number,
+): GameState | null {
+  for (const [pi, player] of state.players.entries()) {
+    const charIdx = player.characters.findIndex((c) => c?.instanceId === cardInstanceId);
+    if (charIdx !== -1) {
+      const char = player.characters[charIdx]!;
+      const detachCount = Math.min(amount, char.attachedDon.length);
+      if (detachCount === 0) return null;
+      const detached = char.attachedDon.slice(0, detachCount).map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
+      const remainingDon = char.attachedDon.slice(detachCount);
+      const newChars = [...player.characters] as (typeof player.characters);
+      newChars[charIdx] = { ...char, attachedDon: remainingDon };
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[pi] = {
+        ...player,
+        characters: newChars,
+        donCostArea: [...player.donCostArea, ...detached],
+      };
+      return { ...state, players: newPlayers };
+    }
+    if (player.leader?.instanceId === cardInstanceId) {
+      const leader = player.leader;
+      const detachCount = Math.min(amount, leader.attachedDon.length);
+      if (detachCount === 0) return null;
+      const detached = leader.attachedDon.slice(0, detachCount).map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
+      const remainingDon = leader.attachedDon.slice(detachCount);
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[pi] = {
+        ...player,
+        leader: { ...leader, attachedDon: remainingDon },
+        donCostArea: [...player.donCostArea, ...detached],
+      };
+      return { ...state, players: newPlayers };
+    }
   }
   return null;
 }

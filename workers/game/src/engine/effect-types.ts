@@ -904,6 +904,7 @@ export interface SimpleCost {
   target?: Target;
   position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
   options?: Cost[];
+  card_name?: string;
 }
 
 export interface ChoiceCost {
