@@ -17,6 +17,9 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:promote-admin": "tsx scripts/promote-admin.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "pipeline:import": "tsx pipeline/import.ts",
     "pipeline:migrate-images": "tsx pipeline/migrate-images.ts",
     "worker:deploy": "cd workers/images && pnpm install && pnpm deploy"
@@ -66,7 +69,8 @@
     "prisma": "^6.19.2",
     "tailwindcss": "^4",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

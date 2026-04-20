@@ -25,6 +25,21 @@ export async function requireAuth() {
   return { session, userId: session.user.id };
 }
 
+/**
+ * Admin guard for API routes. Returns session + userId on success, or a 401
+ * for unauthenticated callers and 403 for authenticated non-admins.
+ */
+export async function requireAdmin() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return apiError("Unauthorized", 401);
+  }
+  if (!session.user.isAdmin) {
+    return apiError("Forbidden", 403);
+  }
+  return { session, userId: session.user.id };
+}
+
 export function apiSuccess<T>(data: T, status = 200, headers?: HeadersInit) {
   return NextResponse.json({ data }, { status, headers });
 }

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { requireAuth, apiSuccess, apiList, apiError } from "@/lib/api-response";
+import { requireAdmin, apiSuccess, apiList, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { cardIdToOriginSet } from "@/lib/utils";
 import { CreateCardSchema, CardSearchParamsSchema } from "@/lib/validators/cards";
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAdmin();
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
 
