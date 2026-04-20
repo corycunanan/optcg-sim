@@ -1,11 +1,14 @@
 /**
  * Runtime validation for payloads entering the Durable Object.
  *
- * Manual validators (no zod dependency) to keep the Worker bundle small.
+ * GameInitPayload uses manual validators; ClientMessage / GameAction use the
+ * shared Zod schemas from shared/validators so both the worker and the Next.js
+ * app validate WebSocket action params identically (OPT-187).
  */
 
+import { ClientMessageSchema } from "../../../../shared/validators/client-message.js";
 import type { GameInitPayload, PlayerInitData, DeckCardData } from "../types.js";
-import type { ClientMessage, GameAction } from "../types.js";
+import type { ClientMessage } from "../types.js";
 
 // ─── GameInitPayload ─────────────────────────────────────────────────────────
 
@@ -69,35 +72,12 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
 
 // ─── ClientMessage ───────────────────────────────────────────────────────────
 
-const ACTION_TYPES = new Set<string>([
-  "ADVANCE_PHASE", "PLAY_CARD", "ATTACH_DON", "ACTIVATE_EFFECT",
-  "DECLARE_ATTACK", "DECLARE_BLOCKER", "USE_COUNTER", "USE_COUNTER_EVENT",
-  "REVEAL_TRIGGER", "ARRANGE_TOP_CARDS", "SELECT_TARGET", "REDISTRIBUTE_DON", "PLAYER_CHOICE",
-  "PASS", "CONCEDE", "MANUAL_EFFECT", "UNDO",
-]);
-
-function isGameAction(v: unknown): v is GameAction {
-  if (typeof v !== "object" || v === null) return false;
-  const a = v as Record<string, unknown>;
-  return typeof a.type === "string" && ACTION_TYPES.has(a.type);
-}
-
 export function validateClientMessage(raw: unknown): ClientMessage {
-  if (typeof raw !== "object" || raw === null) {
-    throw new Error("ClientMessage must be a non-null object");
+  const result = ClientMessageSchema.safeParse(raw);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+    throw new Error(`Invalid ClientMessage at ${path}: ${issue.message}`);
   }
-  const msg = raw as Record<string, unknown>;
-
-  if (msg.type === "game:leave") {
-    return { type: "game:leave" };
-  }
-
-  if (msg.type === "game:action") {
-    if (!isGameAction(msg.action)) {
-      throw new Error("ClientMessage action has invalid or missing type");
-    }
-    return msg as unknown as ClientMessage;
-  }
-
-  throw new Error(`Unknown ClientMessage type: ${String(msg.type)}`);
+  return result.data as ClientMessage;
 }
