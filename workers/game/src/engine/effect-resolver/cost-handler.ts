@@ -19,7 +19,13 @@ import type {
 } from "../../types.js";
 import { generateFrameId, pushFrame } from "../effect-stack.js";
 import type { CostPaymentResult, CostSelectionResult } from "./types.js";
-import { setCardState } from "./card-mutations.js";
+import {
+  detachDonToCostArea,
+  returnToDeck,
+  setCardState,
+  trashCharacter,
+  trashStage,
+} from "./card-mutations.js";
 import { costResultToEntries } from "./types.js";
 import { isProhibitedForCard } from "../prohibitions.js";
 
@@ -143,47 +149,14 @@ export function payCosts(
 
       case "TRASH_SELF": {
         if (!sourceCardInstanceId) return null;
-        // Trash the source card (the card whose effect is being activated)
-        let found = false;
-        for (let pIdx = 0; pIdx < 2; pIdx++) {
-          const player = nextState.players[pIdx as 0 | 1];
-          const charIdx = player.characters.findIndex(
-            (c) => c?.instanceId === sourceCardInstanceId,
-          );
-          if (charIdx !== -1) {
-            const card = player.characters[charIdx]!;
-            const newChars = [...player.characters] as (typeof player.characters);
-            newChars[charIdx] = null;
-            const newTrash = [{ ...card, zone: "TRASH" as const, attachedDon: [] as typeof card.attachedDon }, ...player.trash];
-            const returnedDon = card.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
-            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-            newPlayers[pIdx as 0 | 1] = {
-              ...player,
-              characters: newChars,
-              trash: newTrash,
-              donCostArea: [...player.donCostArea, ...returnedDon],
-            };
-            nextState = { ...nextState, players: newPlayers };
-            events.push({ type: "CARD_TRASHED", playerIndex: pIdx as 0 | 1, payload: { cardInstanceId: card.instanceId, cardId: card.cardId, reason: "cost" } });
-            costResult.cardsTrashedCount = 1;
-            costResult.cardsTrashedInstanceIds.push(card.instanceId);
-            found = true;
-            break;
-          }
-          if (player.stage?.instanceId === sourceCardInstanceId) {
-            const card = player.stage;
-            const newTrash = [{ ...card, zone: "TRASH" as const, attachedDon: [] as typeof card.attachedDon }, ...player.trash];
-            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-            newPlayers[pIdx as 0 | 1] = { ...player, stage: null, trash: newTrash };
-            nextState = { ...nextState, players: newPlayers };
-            events.push({ type: "CARD_TRASHED", playerIndex: pIdx as 0 | 1, payload: { cardInstanceId: card.instanceId, cardId: card.cardId, reason: "cost" } });
-            costResult.cardsTrashedCount = 1;
-            costResult.cardsTrashedInstanceIds.push(card.instanceId);
-            found = true;
-            break;
-          }
-        }
-        if (!found) return null;
+        const result =
+          trashCharacter(nextState, sourceCardInstanceId, controller, "cost") ??
+          trashStage(nextState, sourceCardInstanceId, "cost");
+        if (!result) return null;
+        nextState = result.state;
+        events.push(...result.events);
+        costResult.cardsTrashedCount = 1;
+        costResult.cardsTrashedInstanceIds.push(sourceCardInstanceId);
         break;
       }
 
@@ -220,7 +193,7 @@ export function payCosts(
 
       case "LIFE_TO_HAND": {
         const amount = typeof cost.amount === "number" ? cost.amount : 1;
-        const position = (cost as any).position ?? "TOP";
+        const position = cost.position ?? "TOP";
         if (position === "TOP_OR_BOTTOM") return null; // Needs player selection
         const p = nextState.players[controller];
         if (p.life.length < amount) return null;
@@ -392,88 +365,40 @@ export function payCosts(
           const data = _cardDb.get(p.stage.cardId);
           if (!data || !matchesHandFilter(data, cost.filter)) return null;
         }
-        const stage = p.stage;
-        const newTrash = [{ ...stage, zone: "TRASH" as const, attachedDon: [] as typeof stage.attachedDon }, ...p.trash];
-        const returnedDon = stage.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        newPlayers[controller] = {
-          ...p,
-          stage: null,
-          trash: newTrash,
-          donCostArea: [...p.donCostArea, ...returnedDon],
-        };
-        nextState = { ...nextState, players: newPlayers };
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, cardId: stage.cardId, reason: "cost" } });
+        const stageId = p.stage.instanceId;
+        const result = trashStage(nextState, stageId, "cost");
+        if (!result) return null;
+        nextState = result.state;
+        events.push(...result.events);
         costResult.cardsTrashedCount += 1;
-        costResult.cardsTrashedInstanceIds.push(stage.instanceId);
+        costResult.cardsTrashedInstanceIds.push(stageId);
         break;
       }
 
       case "RETURN_ATTACHED_DON_TO_COST": {
-        // Detach DON from a card and return to cost area
         const amount = typeof cost.amount === "number" ? cost.amount : 1;
         if (!sourceCardInstanceId) return null;
-
-        let found = false;
-        for (let pIdx = 0; pIdx < 2 && !found; pIdx++) {
-          const player = nextState.players[pIdx as 0 | 1];
-          // Check characters
-          const charIdx = player.characters.findIndex((c) => c?.instanceId === sourceCardInstanceId);
-          if (charIdx !== -1) {
-            const char = player.characters[charIdx]!;
-            const detachCount = Math.min(amount, char.attachedDon.length);
-            if (detachCount === 0) return null;
-            const detached = char.attachedDon.slice(0, detachCount).map((d: any) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
-            const remainingDon = char.attachedDon.slice(detachCount);
-            const newChars = [...player.characters] as (typeof player.characters);
-            newChars[charIdx] = { ...char, attachedDon: remainingDon };
-            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-            newPlayers[pIdx as 0 | 1] = { ...player, characters: newChars, donCostArea: [...player.donCostArea, ...detached] };
-            nextState = { ...nextState, players: newPlayers };
-            found = true;
-          }
-          // Check leader
-          if (!found && player.leader?.instanceId === sourceCardInstanceId) {
-            const leader = player.leader;
-            const detachCount = Math.min(amount, leader.attachedDon.length);
-            if (detachCount === 0) return null;
-            const detached = leader.attachedDon.slice(0, detachCount).map((d: any) => ({ ...d, state: "RESTED" as const, attachedTo: null }));
-            const remainingDon = leader.attachedDon.slice(detachCount);
-            const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-            newPlayers[pIdx as 0 | 1] = { ...player, leader: { ...leader, attachedDon: remainingDon }, donCostArea: [...player.donCostArea, ...detached] };
-            nextState = { ...nextState, players: newPlayers };
-            found = true;
-          }
-        }
-        if (!found) return null;
+        const newState = detachDonToCostArea(nextState, sourceCardInstanceId, amount);
+        if (!newState) return null;
+        nextState = newState;
         break;
       }
 
       case "PLACE_SELF_AND_HAND_TO_DECK": {
         if (!sourceCardInstanceId) return null;
-        const p = nextState.players[controller];
-        // Move source card + specified hand cards to deck bottom
-        // For auto-pay, just move the source card
-        let found = false;
-        const charIdx = p.characters.findIndex((c) => c?.instanceId === sourceCardInstanceId);
-        if (charIdx !== -1) {
-          const card = p.characters[charIdx]!;
-          const newChars = [...p.characters] as (typeof p.characters);
-          newChars[charIdx] = null;
-          const newDeck = [...p.deck, { ...card, zone: "DECK" as const }];
-          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-          newPlayers[controller] = { ...p, characters: newChars, deck: newDeck };
-          nextState = { ...nextState, players: newPlayers };
-          found = true;
-        }
-        if (!found) return null;
+        // Move source card + specified hand cards to deck bottom.
+        // For auto-pay, just move the source card.
+        const result = returnToDeck(nextState, sourceCardInstanceId, "BOTTOM");
+        if (!result) return null;
+        nextState = result.state;
+        events.push(...result.events);
         break;
       }
 
       case "PLAY_NAMED_CARD_FROM_HAND": {
         // Play a specific named card from hand as part of the cost
         const p = nextState.players[controller];
-        const cardName = (cost as any).card_name;
+        const cardName = cost.card_name;
         if (!cardName) return null;
         const handIdx = p.hand.findIndex((c) => {
           const data = _cardDb.get(c.cardId);
@@ -510,7 +435,7 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
 ]);
 
 export function costNeedsPlayerSelection(cost: Cost): boolean {
-  if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") return true;
+  if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") return true;
   return SELECTION_COST_TYPES.has(cost.type);
 }
 
@@ -653,7 +578,7 @@ export function isCostPayable(
     }
 
     case "PLAY_NAMED_CARD_FROM_HAND": {
-      const cardName = (simple as any).card_name;
+      const cardName = simple.card_name;
       if (!cardName) return false;
       return player.hand.some((c) => {
         const data = cardDb.get(c.cardId);
@@ -814,7 +739,7 @@ export function payCostsWithSelection(
 
     if (costNeedsPlayerSelection(cost)) {
       // Special handling for LIFE_TO_HAND with TOP_OR_BOTTOM — use PLAYER_CHOICE
-      if (cost.type === "LIFE_TO_HAND" && (cost as any).position === "TOP_OR_BOTTOM") {
+      if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
         const p = nextState.players[controller];
         if (p.life.length === 0) {
           return { state: nextState, events, cannotPay: true };
