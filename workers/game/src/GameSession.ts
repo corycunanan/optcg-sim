@@ -35,6 +35,7 @@ import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
 import { recalculateBattlePowers } from "./engine/battle.js";
 import { isEffectConditionMet } from "./engine/modifiers.js";
+import { configureLogger, log } from "./lib/log.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -59,6 +60,7 @@ export class GameSession implements DurableObject {
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
+    configureLogger(env.LOG_URL);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -120,6 +122,7 @@ export class GameSession implements DurableObject {
   private async handleNotifyEnd(request: Request): Promise<Response> {
     const auth = request.headers.get("Authorization");
     if (auth !== `Bearer ${this.env.GAME_WORKER_SECRET}`) {
+      log("auth.failure", { reason: "notify_end_bad_secret", gameId: this.gameState?.id });
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -742,11 +745,19 @@ export class GameSession implements DurableObject {
 
   private async validateToken(token: string): Promise<0 | 1 | null> {
     const userId = await verifyGameToken(token, this.env.GAME_WORKER_SECRET);
-    if (!userId || !this.gameState) return null;
+    if (!userId) {
+      log("auth.failure", { reason: "invalid_token", gameId: this.gameState?.id });
+      return null;
+    }
+    if (!this.gameState) {
+      log("auth.failure", { reason: "no_game_state" });
+      return null;
+    }
 
     const players = this.gameState!.players;
     if (players[0].playerId === userId) return 0;
     if (players[1].playerId === userId) return 1;
+    log("auth.failure", { reason: "user_not_in_game", gameId: this.gameState.id, userId });
     return null;
   }
 

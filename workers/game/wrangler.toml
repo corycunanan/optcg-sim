@@ -10,6 +10,12 @@ NEXTJS_URL = "https://optcg-sim.vercel.app"
 #   wrangler secret put GAME_WORKER_SECRET
 #   wrangler secret put JWT_SECRET
 # For local dev, create a .dev.vars file in workers/game/ with these values.
+#
+# LOG_URL (optional): HTTP endpoint that receives structured JSON log events
+# (pipeline steps, auth failures, effect resolution, schema misses). When
+# unset, logging is a no-op for the HTTP sink but events are still printed
+# to stdout (visible in `wrangler tail`). Set per environment via:
+#   wrangler secret put LOG_URL
 
 [[durable_objects.bindings]]
 name = "GAME_SESSION"

@@ -11,6 +11,7 @@
  */
 
 import type { EffectSchema, EffectBlock, Action, Cost } from "./effect-types.js";
+import { log } from "../lib/log.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
 import { OP03_SCHEMAS } from "./schemas/op03.js";
@@ -123,7 +124,12 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
  * Returns null if the card has no authored schema.
  */
 export function getEffectSchema(cardId: string): EffectSchema | null {
-  return AUTHORED_SCHEMAS[cardId] ?? null;
+  const schema = AUTHORED_SCHEMAS[cardId];
+  if (!schema) {
+    log("schema.missing", { cardId });
+    return null;
+  }
+  return schema;
 }
 
 /**
@@ -137,6 +143,7 @@ export function injectSchemasIntoCardDb(
   for (const [cardId, schema] of Object.entries(AUTHORED_SCHEMAS)) {
     const errors = validateEffectSchema(schema, cardId);
     if (errors.length > 0) {
+      log("schema.validation_errors", { cardId, errors });
       console.warn(`[schema] Validation errors for ${cardId}:\n  ${errors.join("\n  ")}`);
     }
     const data = cardDb.get(cardId);
