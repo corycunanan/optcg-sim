@@ -38,6 +38,7 @@ import {
   expireTargetLeftZone,
   evaluateWhileConditions,
 } from "./duration-tracker.js";
+import { log } from "../lib/log.js";
 
 export interface PipelineResult {
   state: GameState;
@@ -53,19 +54,32 @@ export function runPipeline(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
 ): PipelineResult {
+  const logCtx = {
+    gameId: state.id,
+    turn: state.turn.number,
+    actingPlayer: actingPlayerIndex,
+    actionType: action.type,
+  };
+  log("pipeline.start", logCtx);
+
   // Step 1: Validate
+  log("pipeline.step", { ...logCtx, step: "validate" });
   const validationError = validate(state, action, cardDb);
   if (validationError) {
+    log("pipeline.end", { ...logCtx, outcome: "invalid", error: validationError });
     return { state, valid: false, error: validationError };
   }
 
   // Step 2: Check Prohibitions
+  log("pipeline.step", { ...logCtx, step: "prohibitions" });
   const prohibitionVeto = checkProhibitions(state, action, cardDb, actingPlayerIndex);
   if (prohibitionVeto) {
+    log("pipeline.end", { ...logCtx, outcome: "prohibited", error: prohibitionVeto });
     return { state, valid: false, error: prohibitionVeto };
   }
 
   // Step 3: Check Replacements
+  log("pipeline.step", { ...logCtx, step: "replacements" });
   const replacementResult = checkReplacements(state, action, cardDb, actingPlayerIndex);
   let nextState = replacementResult.state;
   const actionToExecute = replacementResult.replaced && replacementResult.substituteAction
@@ -79,31 +93,54 @@ export function runPipeline(
 
   // If the action was fully replaced (no substitute), skip execution
   if (replacementResult.replaced && !replacementResult.substituteAction) {
+    log("pipeline.end", { ...logCtx, outcome: "fully_replaced" });
     return finishPipeline(nextState, actingPlayerIndex, cardDb);
   }
 
   // Step 4: Execute — produce new state snapshot
+  log("pipeline.step", { ...logCtx, step: "execute" });
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
   nextState = execResult.state;
 
   if (execResult.pendingPrompt) {
     nextState = { ...nextState, pendingPrompt: execResult.pendingPrompt };
+    log("pipeline.end", {
+      ...logCtx,
+      outcome: "prompt_pending",
+      stage: "execute",
+      promptType: execResult.pendingPrompt.options.promptType,
+    });
     return { state: nextState, valid: true, pendingPrompt: execResult.pendingPrompt };
   }
 
   // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
+  log("pipeline.step", { ...logCtx, step: "triggers" });
   nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb);
 
   // If triggers paused for player input, skip steps 6-7 and surface the prompt
   if (nextState.pendingPrompt) {
+    log("pipeline.end", {
+      ...logCtx,
+      outcome: "prompt_pending",
+      stage: "triggers",
+      promptType: nextState.pendingPrompt.options.promptType,
+    });
     return { state: nextState, valid: true, pendingPrompt: nextState.pendingPrompt };
   }
 
   // Step 6: Recalculate Modifiers — expire effects whose duration ended
+  log("pipeline.step", { ...logCtx, step: "recalculate_modifiers" });
   nextState = recalculateModifiers(nextState, actionToExecute, cardDb);
 
   // Step 7: Rule Processing — defeat conditions, zero-power KOs
-  return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
+  log("pipeline.step", { ...logCtx, step: "rule_processing" });
+  const result = finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
+  log("pipeline.end", {
+    ...logCtx,
+    outcome: result.gameOver ? "game_over" : "ok",
+    ...(result.gameOver ? { winner: result.gameOver.winner, reason: result.gameOver.reason } : {}),
+  });
+  return result;
 }
 
 // ─── Step 5: Fire Events & Triggers ───────────────────────────────────────────

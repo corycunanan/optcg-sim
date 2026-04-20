@@ -36,6 +36,7 @@ import * as handDeck from "./actions/hand-deck.js";
 import * as effects from "./actions/effects.js";
 import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
+import { log } from "../../lib/log.js";
 
 import type { ActionType } from "../effect-types.js";
 
@@ -161,11 +162,18 @@ export function resolveEffect(
   cardDb: Map<string, CardData>,
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
+  const logCtx = {
+    blockId: block.id,
+    category: block.category,
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+  };
 
   // Guard: reject once-per-turn effects already used this turn
   if (block.flags?.once_per_turn) {
     const usedSet = state.turn.oncePerTurnUsed[block.id];
     if (usedSet?.includes(sourceCardInstanceId)) {
+      log("effect.skipped", { ...logCtx, reason: "once_per_turn_used" });
       return { state, events, resolved: false };
     }
   }
@@ -185,6 +193,7 @@ export function resolveEffect(
   // Step 1: Evaluate block-level conditions
   if (block.conditions) {
     if (!evaluateCondition(state, block.conditions, condCtx)) {
+      log("effect.skipped", { ...logCtx, reason: "conditions_not_met" });
       return { state, events, resolved: false };
     }
   }
@@ -219,6 +228,7 @@ export function resolveEffect(
       respondingPlayer: controller,
       resumeContext: frame.id,
     };
+    log("effect.prompt", { ...logCtx, phase: "optional_prompt" });
     return { state, events, resolved: false, pendingPrompt };
   }
 
@@ -231,6 +241,7 @@ export function resolveEffect(
 
     if (costPayResult.cannotPay) {
       state = markOncePerTurnUsed(costPayResult.state, block.id, sourceCardInstanceId);
+      log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
       return { state, events, resolved: false };
     }
 
@@ -239,6 +250,7 @@ export function resolveEffect(
     costResult = costPayResult.costResult;
 
     if (costPayResult.pendingPrompt) {
+      log("effect.prompt", { ...logCtx, phase: "cost_selection" });
       return { state, events, resolved: false, pendingPrompt: costPayResult.pendingPrompt };
     }
   }
@@ -263,10 +275,12 @@ export function resolveEffect(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
+      log("effect.prompt", { ...logCtx, phase: "action_chain" });
       return { state, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
     }
   }
 
+  log("effect.resolved", { ...logCtx, eventCount: events.length });
   return { state, events, resolved: true };
 }
 
@@ -452,6 +466,7 @@ export function executeEffectAction(
     return handler(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
   }
   // Action type not yet implemented — fail loudly so missing handlers are caught
+  log("action.unhandled", { actionType: action.type, sourceInstanceId: sourceCardInstanceId, controller });
   console.warn(`[EffectResolver] Unhandled action type: ${action.type}`);
   return { state, events: [], succeeded: false };
 }

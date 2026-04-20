@@ -209,4 +209,5 @@ export interface Env {
   GAME_SESSION: DurableObjectNamespace;
   NEXTJS_URL: string;
   GAME_WORKER_SECRET: string;
+  LOG_URL?: string;
 }
