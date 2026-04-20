@@ -54,12 +54,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         // token.sub is set to user.id automatically
         token.username = (user as { username?: string | null }).username ?? null;
+        token.isAdmin = (user as { isAdmin?: boolean }).isAdmin ?? false;
+        return token;
+      }
+      // Refresh isAdmin from DB on token rotation so admin flips take effect
+      // without requiring re-login. Skipped when we have no user id yet.
+      if (token.sub) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { isAdmin: true },
+        });
+        token.isAdmin = dbUser?.isAdmin ?? false;
       }
       return token;
     },
     async session({ session, token }) {
       session.user.id = token.sub!;
       session.user.username = (token.username ?? null) as string | null;
+      session.user.isAdmin = Boolean(token.isAdmin);
       return session;
     },
   },
@@ -76,7 +88,9 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       username?: string | null;
+      isAdmin: boolean;
     };
   }
 }
+
 

@@ -3,7 +3,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
+import { requireAdmin, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { UpdateCardSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -43,7 +43,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireAuth();
+  const authResult = await requireAdmin();
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
 

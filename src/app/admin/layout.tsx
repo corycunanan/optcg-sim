@@ -10,6 +10,9 @@ export default async function AdminLayout({
   if (!session?.user?.id) {
     redirect("/login?callbackUrl=/admin");
   }
+  if (!session.user.isAdmin) {
+    redirect("/");
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-content-primary">
