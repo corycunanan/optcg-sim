@@ -68,17 +68,20 @@ export function stateToMotionConfig(
         whileTap: reducedMotion ? undefined : tap,
       };
     case "invalid":
-      // Target picker: card exists but is not a legal choice.
+      // Target picker: card exists but is not a legal choice. Dimmed only —
+      // no filter tint (no gradient effect) and no ring (no stroke).
       return {
-        animate: { rotate: 0, opacity: 0.35, filter: "grayscale(0.4)" },
+        animate: { rotate: 0, opacity: 0.35, filter: "brightness(1)" },
         transition: cardRest,
         whileHover: undefined,
         whileTap: undefined,
       };
     case "dragging":
-      // Consumer's drag overlay is authoritative — fade the origin.
+      // Origin stays visually intact during drag — the consumer's dnd-kit
+      // overlay owns the "card follows cursor" visual. Suppressing hover/tap
+      // is enough; don't dim or tint.
       return {
-        animate: { rotate: 0, opacity: 0.3, filter: "brightness(1)" },
+        animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
         transition: cardRest,
         whileHover: undefined,
         whileTap: undefined,

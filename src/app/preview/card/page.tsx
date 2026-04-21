@@ -123,11 +123,15 @@ function makeEmptyKeywords(): KeywordSet {
 }
 
 export default function CardPreviewPage() {
-  const [faceDown, setFaceDown] = useState(false);
+  // Toggle meaning: "flip every card from its baseline face state." XOR'd
+  // with each card's intended face so cards that default to face-down (like
+  // the life-zone overlay example) flip to face-up when the toggle is on.
+  const [flipped, setFlipped] = useState(false);
+  const flip = (baseFaceDown: boolean) => flipped !== baseFaceDown;
 
   return (
     <TooltipProvider>
-      <main className="min-h-screen bg-gb-board p-8 text-gb-text">
+      <div className="h-full overflow-y-auto bg-gb-board p-8 text-gb-text">
         <div className="mx-auto max-w-6xl space-y-12">
           <header className="space-y-2">
             <h1 className="font-serif text-4xl text-gb-text-bright">
@@ -143,11 +147,11 @@ export default function CardPreviewPage() {
             <label className="inline-flex items-center gap-2 pt-2">
               <input
                 type="checkbox"
-                checked={faceDown}
-                onChange={(e) => setFaceDown(e.target.checked)}
+                checked={flipped}
+                onChange={(e) => setFlipped(e.target.checked)}
                 className="size-4"
               />
-              <span className="text-sm">Flip all cards to back face</span>
+              <span className="text-sm">Flip all cards (face ↔ sleeve)</span>
             </label>
           </header>
 
@@ -158,7 +162,7 @@ export default function CardPreviewPage() {
                   <Card
                     data={{ card: LUFFY_INSTANCE, cardDb: CARD_DB }}
                     variant={variant}
-                    faceDown={faceDown}
+                    faceDown={flip(false)}
                   />
                 </Labeled>
               ))}
@@ -173,7 +177,7 @@ export default function CardPreviewPage() {
                     data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
                     variant="field"
                     state={state}
-                    faceDown={faceDown}
+                    faceDown={flip(false)}
                     overlays={{
                       donCount: 2,
                       highlightRing:
@@ -197,7 +201,7 @@ export default function CardPreviewPage() {
                     data={{ card: LUFFY_INSTANCE, cardDb: CARD_DB }}
                     variant="modal"
                     size={size}
-                    faceDown={faceDown}
+                    faceDown={flip(false)}
                   />
                 </Labeled>
               ))}
@@ -210,7 +214,7 @@ export default function CardPreviewPage() {
                 <Card
                   data={{ card: null, cardId: "OP01-001", cardDb: CARD_DB }}
                   variant="life"
-                  faceDown
+                  faceDown={flip(true)}
                   overlays={{ countBadge: 4 }}
                 />
               </Labeled>
@@ -218,6 +222,7 @@ export default function CardPreviewPage() {
                 <Card
                   data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
                   variant="field"
+                  faceDown={flip(false)}
                   overlays={{ donCount: 3 }}
                 />
               </Labeled>
@@ -226,6 +231,7 @@ export default function CardPreviewPage() {
                   data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
                   variant="field"
                   state="selected"
+                  faceDown={flip(false)}
                   overlays={{ highlightRing: "selected" }}
                 />
               </Labeled>
@@ -234,6 +240,7 @@ export default function CardPreviewPage() {
                   data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
                   variant="modal"
                   state="invalid"
+                  faceDown={flip(false)}
                   overlays={{ highlightRing: "invalid" }}
                 />
               </Labeled>
@@ -248,7 +255,7 @@ export default function CardPreviewPage() {
             </Row>
           </Section>
         </div>
-      </main>
+      </div>
     </TooltipProvider>
   );
 }

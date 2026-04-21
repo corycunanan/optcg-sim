@@ -16,15 +16,16 @@ export function CardHighlightRing({
   color: HighlightRingColor;
   className?: string;
 }) {
+  // `selected` / `invalid` intentionally render no visual treatment for now —
+  // consumers will define their own feedback in downstream tickets. Only the
+  // `valid` drop-target affordance still draws a ring.
+  if (color !== "valid") return null;
+
   return (
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-0 z-10 rounded",
-        color === "selected" &&
-          "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
-        color === "valid" && "ring-2 ring-gb-accent-amber/70",
-        color === "invalid" && "ring-2 ring-gb-accent-red/70",
+        "pointer-events-none absolute inset-0 z-10 rounded ring-2 ring-gb-accent-amber/70",
         className,
       )}
     />

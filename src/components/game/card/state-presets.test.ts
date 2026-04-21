@@ -40,9 +40,9 @@ describe("stateToMotionConfig", () => {
     expect(cfg.whileTap).toBeUndefined();
   });
 
-  it("dragging fades to 0.3 and removes hover/tap", () => {
+  it("dragging keeps the origin visually intact (no fade) but removes hover/tap", () => {
     const cfg = stateToMotionConfig("dragging", "hand", false);
-    expect(cfg.animate.opacity).toBe(0.3);
+    expect(cfg.animate.opacity).toBe(1);
     expect(cfg.whileHover).toBeUndefined();
     expect(cfg.whileTap).toBeUndefined();
   });

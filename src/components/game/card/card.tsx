@@ -77,6 +77,16 @@ export const Card = React.memo(function Card({
     reducedMotion ?? false,
   );
 
+  // Counter-rotation keeps corner-badge labels horizontal even when the
+  // card itself is rotated (e.g. state=`rest` → 90°). Badges live inside the
+  // rotating layer so they pin to card corners; their *content* rotates the
+  // opposite way so text stays upright.
+  const cardRotate =
+    typeof motionConfig.animate.rotate === "number"
+      ? motionConfig.animate.rotate
+      : 0;
+  const counterRotate = -cardRotate;
+
   const cardElement = (
     <PerspectiveContainer
       width={width}
@@ -100,18 +110,34 @@ export const Card = React.memo(function Card({
           <CardBack sleeveUrl={sleeveUrl} />
         </CardFaces>
 
-        {/* Overlays render above the 3D stack so they remain visible mid-flip. */}
+        {/* Highlight ring follows the card outline, so it sits inside the
+            rotating layer without any counter-rotation. */}
         {overlays?.highlightRing && (
           <CardHighlightRing color={overlays.highlightRing} />
         )}
+
+        {/* Corner badges: positioned on the card face, counter-rotated so
+            their labels stay horizontal regardless of card rotation. */}
         {overlays?.countBadge != null && (
-          <CardCountBadge
-            count={overlays.countBadge}
-            position={faceDown ? "bottom-right" : "top-right"}
-          />
+          <motion.div
+            className={cn(
+              "absolute z-10",
+              faceDown ? "bottom-1 right-1" : "top-1 right-1",
+            )}
+            animate={{ rotate: counterRotate }}
+            transition={motionConfig.transition}
+          >
+            <CardCountBadge count={overlays.countBadge} />
+          </motion.div>
         )}
         {overlays?.donCount != null && (
-          <CardDonBadge count={overlays.donCount} />
+          <motion.div
+            className="absolute bottom-1 right-1 z-10"
+            animate={{ rotate: counterRotate }}
+            transition={motionConfig.transition}
+          >
+            <CardDonBadge count={overlays.donCount} />
+          </motion.div>
         )}
       </motion.div>
     </PerspectiveContainer>

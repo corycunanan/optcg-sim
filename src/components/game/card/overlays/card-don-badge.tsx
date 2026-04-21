@@ -4,9 +4,9 @@ import React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * `+N DON` badge anchored to the bottom edge of a field card. Extracted from
- * the inline overlay that used to live on `board-card.tsx:183`. Sits above
- * the 3D face stack so it doesn't get clipped by `backface-visibility`.
+ * `+N DON!!` corner badge. Shares its visual vocabulary with `CardCountBadge`
+ * for consistency across corner counters. Positioning + counter-rotation are
+ * owned by the parent in `Card.tsx` — this component just paints the pill.
  */
 export function CardDonBadge({
   count,
@@ -17,16 +17,14 @@ export function CardDonBadge({
 }) {
   if (count <= 0) return null;
   return (
-    <div
+    <span
       className={cn(
-        "absolute bottom-0 left-0 right-0 z-10 py-1 text-center",
-        "bg-gb-board-dark/75",
+        "rounded px-1 text-center text-xs font-bold",
+        "bg-gb-board-dark/80 text-gb-text-bright",
         className,
       )}
     >
-      <span className="text-xs font-extrabold leading-none text-white">
-        +{count} DON
-      </span>
-    </div>
+      +{count} DON!!
+    </span>
   );
 }
