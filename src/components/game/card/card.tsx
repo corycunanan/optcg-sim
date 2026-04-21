@@ -97,10 +97,7 @@ export const Card = React.memo(function Card({
       >
         <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
           <CardFront data={cardData} fallbackLabel={overlays?.label} />
-          <CardBack
-            sleeveUrl={sleeveUrl}
-            showSleeveArt={variant !== "deck-back"}
-          />
+          <CardBack sleeveUrl={sleeveUrl} />
         </CardFaces>
 
         {/* Overlays render above the 3D stack so they remain visible mid-flip. */}

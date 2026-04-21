@@ -9,12 +9,11 @@ import type { CardData, CardDb, CardInstance } from "@shared/game-types";
  */
 
 export type CardVariant =
-  | "field"      // board character / leader slot
-  | "hand"       // card in a hand row
-  | "modal"      // modal/dialog card (target picker, trash preview, arrange)
-  | "life"       // life zone (face-down or revealed)
-  | "trash"      // trash preview
-  | "deck-back"; // face-down deck/DON deck placeholder
+  | "field"  // board character / leader slot
+  | "hand"   // card in a hand row
+  | "modal"  // modal/dialog card (target picker, trash preview, arrange)
+  | "life"   // life zone (face-down or revealed)
+  | "trash"; // trash preview
 
 /**
  * Interaction + lifecycle state. Drives motion preset + visual treatment.

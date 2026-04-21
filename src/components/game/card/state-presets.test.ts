@@ -76,14 +76,7 @@ describe("stateToMotionConfig", () => {
   });
 
   it("is exhaustive over CardState (no accidental undefined)", () => {
-    const variants: CardVariant[] = [
-      "field",
-      "hand",
-      "modal",
-      "life",
-      "trash",
-      "deck-back",
-    ];
+    const variants: CardVariant[] = ["field", "hand", "modal", "life", "trash"];
     for (const s of ALL_STATES) {
       for (const v of variants) {
         const cfg = stateToMotionConfig(s, v, false);

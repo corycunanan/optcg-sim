@@ -19,7 +19,6 @@ export const DEFAULT_SIZE_FOR_VARIANT: Record<CardVariant, CardSize> = {
   modal: "modal",
   life: "field",
   trash: "field",
-  "deck-back": "field",
 };
 
 export function resolveSize(

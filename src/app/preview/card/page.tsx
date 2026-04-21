@@ -34,7 +34,7 @@ const SAMPLE_CARDS: CardData[] = [
     triggerText: null,
     keywords: makeEmptyKeywords(),
     effectSchema: null,
-    imageUrl: null,
+    imageUrl: "/images/cards/image%2029.png",
   },
   {
     id: "OP01-013",
@@ -51,7 +51,7 @@ const SAMPLE_CARDS: CardData[] = [
     triggerText: null,
     keywords: makeEmptyKeywords(),
     effectSchema: null,
-    imageUrl: null,
+    imageUrl: "/images/cards/image%2029.png",
   },
   {
     id: "OP01-025",
@@ -68,7 +68,7 @@ const SAMPLE_CARDS: CardData[] = [
     triggerText: null,
     keywords: { ...makeEmptyKeywords(), rush: true },
     effectSchema: null,
-    imageUrl: null,
+    imageUrl: "/images/cards/image%2029.png",
   },
 ];
 
@@ -108,14 +108,7 @@ const STATES: CardState[] = [
   "in-flight",
 ];
 
-const VARIANTS: CardVariant[] = [
-  "field",
-  "hand",
-  "modal",
-  "life",
-  "trash",
-  "deck-back",
-];
+const VARIANTS: CardVariant[] = ["field", "hand", "modal", "life", "trash"];
 
 function makeEmptyKeywords(): KeywordSet {
   return {
@@ -165,7 +158,7 @@ export default function CardPreviewPage() {
                   <Card
                     data={{ card: LUFFY_INSTANCE, cardDb: CARD_DB }}
                     variant={variant}
-                    faceDown={faceDown || variant === "deck-back"}
+                    faceDown={faceDown}
                   />
                 </Labeled>
               ))}
