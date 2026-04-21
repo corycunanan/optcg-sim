@@ -16,7 +16,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Priority | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | In Review | #TBD | Gate — blocks every other ticket in the project |
+| 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | In Review | #99 | Gate — blocks every other ticket in the project |
 | 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | Backlog | — | Pilot — API may tune during this migration |
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Backlog | — | Serial after pilot (shared-file risk with field-card) |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Backlog | — | |
@@ -40,7 +40,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 Append new entries at the bottom. Each entry is written *by* the agent who just finished a ticket, *for* the agent who picks up the next ticket.
 
 ### OPT-266 → OPT-267
-**From:** session on 2026-04-20 · **Commit:** `2ef2ff5` (+ `99cffbf`) · **PR:** #TBD
+**From:** session on 2026-04-20 · **Commit:** `2ef2ff5` (+ `99cffbf`) · **PR:** #99
 
 - **Primer:** `<Card>` primitive lives at `src/components/game/card/` with a 3D DOM structure (perspective container → preserve-3d faces → front/back, both always mounted). It composes existing motion presets through a pure `stateToMotionConfig(state, variant, reducedMotion)` mapping. `BoardCard` is untouched; no consumers migrated in this ticket. `/preview/card` renders the full variant × state × size matrix.
 - **Read first:** `src/components/game/card/card.tsx` (composition), `state-presets.ts` (state enum + preset mapping), `types.ts` (public API), `sizes.ts` (size tokens align with `board-layout/constants.ts`). Diff `board-card.tsx` side-by-side with `card.tsx` when porting.
