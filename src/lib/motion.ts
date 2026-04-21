@@ -57,9 +57,9 @@ const variants = {
 
 const board = {
   card: {
-    /** Field card hover: scale(1.03), 200ms ease-out */
+    /** Field card hover: scale(1.08), 200ms ease-out */
     hover: {
-      scale: 1.03,
+      scale: 1.08,
       transition: { duration: 0.2, ease: "easeOut" as const },
     },
     /** Field card tap: scale(0.97), 150ms ease-out */
