@@ -3,6 +3,9 @@
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameWs } from "@/hooks/use-game-ws";
+import { useCardDatabase } from "@/hooks/use-card-database";
+import { useRemoteGameStatus } from "@/hooks/use-remote-game-status";
+import { useGameFinalizer } from "@/hooks/use-game-finalizer";
 import type {
   CardDb,
   GameAction,
@@ -11,16 +14,7 @@ import type {
   PromptOptions,
   TurnState,
 } from "@shared/game-types";
-
-interface RemoteGameStatus {
-  id: string;
-  status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
-  winnerId: string | null;
-  winReason: string | null;
-  winnerPerspective: "SELF" | "OPPONENT" | "NONE";
-  canFallbackConcede: boolean;
-  playerIndex?: 0 | 1;
-}
+import type { RemoteGameStatus } from "@/hooks/use-remote-game-status";
 
 export interface GameSessionGame {
   gameState: GameState | null;
@@ -75,14 +69,6 @@ export function useGameSession(
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
 
-  const [now, setNow] = useState(() => Date.now());
-  const [leavingGame, setLeavingGame] = useState(false);
-  const [leaveError, setLeaveError] = useState<string | null>(null);
-  const [remoteGameStatus, setRemoteGameStatus] =
-    useState<RemoteGameStatus | null>(null);
-  const [fallbackSubmitting, setFallbackSubmitting] = useState(false);
-  const [fallbackError, setFallbackError] = useState<string | null>(null);
-
   const getToken = useCallback(async () => {
     const r = await fetch("/api/game/token");
     if (!r.ok) throw new Error(`Token fetch: ${r.status}`);
@@ -90,6 +76,8 @@ export function useGameSession(
     if (!d.data?.token) throw new Error("No token");
     return d.data.token;
   }, []);
+
+  /* ── WebSocket ────────────────────────────────────────────────────── */
 
   const {
     gameState,
@@ -119,46 +107,16 @@ export function useGameSession(
 
   /* ── Card DB ──────────────────────────────────────────────────────── */
 
-  const [cardDb, setCardDb] = useState<CardDb>({});
-  const [cardDbError, setCardDbError] = useState<string | null>(null);
-  const cardDbFetched = useRef(false);
-  useEffect(() => {
-    if (cardDbFetched.current) return;
+  const { cardDb, cardDbReady, cardDbError } = useCardDatabase(
+    gameId,
+    workerUrl,
+    getToken,
+  );
 
-    let cancelled = false;
-    let attempt = 0;
-    const maxAttempts = 3;
+  /* ── Remote game status polling ───────────────────────────────────── */
 
-    async function fetchCards() {
-      while (attempt < maxAttempts && !cancelled) {
-        try {
-          const token = await getToken();
-          const r = await fetch(
-            `${workerUrl}/game/${gameId}/cards?token=${encodeURIComponent(token)}`,
-          );
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const data: CardDb = await r.json();
-          if (!cancelled) {
-            cardDbFetched.current = true;
-            setCardDb(data);
-            setCardDbError(null);
-          }
-          return;
-        } catch {
-          attempt++;
-          if (attempt < maxAttempts && !cancelled) {
-            await new Promise((r) => setTimeout(r, 1000 * attempt));
-          }
-        }
-      }
-      if (!cancelled) {
-        setCardDbError("Failed to load card data. Please refresh to try again.");
-      }
-    }
-
-    fetchCards();
-    return () => { cancelled = true; };
-  }, [gameId, workerUrl, getToken]);
+  const { remoteGameStatus, setRemoteGameStatus } =
+    useRemoteGameStatus(gameId);
 
   /* ── Player derivation ────────────────────────────────────────────── */
 
@@ -180,6 +138,7 @@ export function useGameSession(
 
   /* ── Opponent away / disconnect ───────────────────────────────────── */
 
+  const [now, setNow] = useState(() => Date.now());
   const opponentAway = !!opp && !opp.connected;
   const opponentDeadlineRemaining = opp?.rejoinDeadlineAt
     ? Math.max(0, opp.rejoinDeadlineAt - now)
@@ -207,36 +166,6 @@ export function useGameSession(
     return () => clearInterval(timer);
   }, [gameState]);
 
-  /* ── Remote game status polling ───────────────────────────────────── */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadGameStatus = async () => {
-      const response = await fetch(`/api/game/${gameId}`, {
-        cache: "no-store",
-      }).catch(() => null);
-      if (!response?.ok || cancelled) return;
-
-      const json = (await response.json().catch(() => null)) as {
-        data?: RemoteGameStatus;
-      } | null;
-      if (!cancelled && json?.data) {
-        setRemoteGameStatus(json.data);
-      }
-    };
-
-    void loadGameStatus();
-    const interval = setInterval(() => {
-      void loadGameStatus();
-    }, 2000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [gameId]);
-
   /* ── Match closed ─────────────────────────────────────────────────── */
 
   const resolvedWithoutSocket = Boolean(
@@ -256,82 +185,24 @@ export function useGameSession(
     remoteGameStatus?.status === "IN_PROGRESS" &&
     !!remoteGameStatus.canFallbackConcede;
 
-  /* ── Finalize game in DB ──────────────────────────────────────────── */
+  /* ── Finalize / leave handlers ────────────────────────────────────── */
 
-  const finalizedRef = useRef(false);
-  const finalizeGame = useCallback(async () => {
-    if (finalizedRef.current) return;
-    finalizedRef.current = true;
-
-    const winnerId =
-      gameOver?.winner != null && gameState
-        ? gameState.players[gameOver.winner].playerId
-        : null;
-
-    await fetch(`/api/game/${gameId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "FINALIZE",
-        winnerId,
-        winReason: gameOver?.reason ?? "Game ended",
-      }),
-    }).catch(() => {});
-  }, [gameId, gameOver, gameState]);
-
-  useEffect(() => {
-    if (matchClosed) void finalizeGame();
-  }, [matchClosed, finalizeGame]);
-
-  /* ── Navigation / leave handlers ──────────────────────────────────── */
-
-  const handleBackToLobbies = useCallback(async () => {
-    if (matchClosed) {
-      await finalizeGame();
-    } else {
-      await leaveGame().catch(() => {});
-    }
-    window.location.href = "/lobbies";
-  }, [matchClosed, finalizeGame, leaveGame]);
-
-  const handleLeaveGame = useCallback(async () => {
-    setLeavingGame(true);
-    setLeaveError(null);
-    try {
-      await leaveGame();
-      window.location.href = "/lobbies";
-    } catch {
-      setLeaveError("Failed to leave the game cleanly");
-      setLeavingGame(false);
-    }
-  }, [leaveGame]);
-
-  const handleFallbackConcede = useCallback(async () => {
-    setFallbackSubmitting(true);
-    setFallbackError(null);
-    try {
-      const response = await fetch(`/api/game/${gameId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "CONCEDE" }),
-      });
-      const json = (await response.json().catch(() => null)) as {
-        error?: string;
-        data?: RemoteGameStatus;
-      } | null;
-      if (!response.ok || !json?.data) {
-        throw new Error(json?.error ?? "Failed to concede");
-      }
-
-      setRemoteGameStatus(json.data);
-      window.location.href = "/lobbies";
-    } catch (error) {
-      setFallbackError(
-        error instanceof Error ? error.message : "Failed to concede",
-      );
-      setFallbackSubmitting(false);
-    }
-  }, [gameId]);
+  const {
+    leavingGame,
+    leaveError,
+    fallbackSubmitting,
+    fallbackError,
+    handleBackToLobbies,
+    handleLeaveGame,
+    handleFallbackConcede,
+  } = useGameFinalizer({
+    gameId,
+    gameState,
+    gameOver,
+    matchClosed,
+    leaveGame,
+    setRemoteGameStatus,
+  });
 
   /* ── End-of-match display values ──────────────────────────────────── */
 
@@ -363,8 +234,6 @@ export function useGameSession(
     gameOver?.reason ??
     remoteGameStatus?.winReason ??
     "The game has ended.";
-
-  const cardDbReady = Object.keys(cardDb).length > 0;
 
   return {
     game: {
