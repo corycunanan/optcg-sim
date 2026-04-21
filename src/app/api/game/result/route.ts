@@ -7,6 +7,7 @@
 import { NextRequest } from "next/server";
 import { apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
+import { apiLimiter } from "@/lib/rate-limit";
 import { GameResultSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
@@ -22,6 +23,12 @@ export async function POST(request: NextRequest) {
   const parsed = await parseBody(request, GameResultSchema);
   if (isErrorResponse(parsed)) return parsed;
   const { gameId, status, winnerId, winReason } = parsed;
+
+  // Defense-in-depth if GAME_WORKER_SECRET leaks: cap writes per game.
+  const { limited } = await apiLimiter.check(`game-result:${gameId}`);
+  if (limited) {
+    return apiError("Too many requests. Try again later.", 429);
+  }
 
   try {
     await prisma.gameSession.update({
