@@ -57,21 +57,34 @@ const variants = {
 
 const board = {
   card: {
-    /** Field card hover: scale(1.08), 200ms ease-out */
+    /** Field card hover: scale bounce + a single back-and-forth tilt.
+     *  Springs in, tweens out. The `rotate` keyframes live on the card's
+     *  *inner* motion layer (see `card.tsx`) so the wiggle is additive to
+     *  state rotation (e.g. a rested card wiggles around 90°, not 0°). */
     hover: {
       scale: 1.08,
-      transition: { duration: 0.2, ease: "easeOut" as const },
+      rotate: [0, 1.2, -1.2, 0] as number[],
+      transition: {
+        scale: { type: "spring" as const, stiffness: 420, damping: 13 },
+        rotate: { duration: 0.55, ease: "easeInOut" as const },
+      },
     },
     /** Field card tap: scale(0.97), 150ms ease-out */
     tap: {
       scale: 0.97,
       transition: { duration: 0.15, ease: "easeOut" as const },
     },
-    /** Hand card hover: lift + scale, 200ms ease-out */
+    /** Hand card hover: lift + scale, same spring-in / tween-out shape,
+     *  same wiggle. */
     handHover: {
       scale: 1.05,
       y: -8,
-      transition: { duration: 0.2, ease: "easeOut" as const },
+      rotate: [0, 1.2, -1.2, 0] as number[],
+      transition: {
+        scale: { type: "spring" as const, stiffness: 420, damping: 13 },
+        y: { type: "spring" as const, stiffness: 420, damping: 13 },
+        rotate: { duration: 0.55, ease: "easeInOut" as const },
+      },
     },
   },
   flight: {
