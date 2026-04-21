@@ -9,7 +9,7 @@ import type {
 } from "@shared/game-types";
 import { Card } from "@/components/game/card";
 import type { CardState, CardVariant } from "@/components/game/card";
-import { TooltipProvider } from "@/components/ui";
+import { Button, TooltipProvider } from "@/components/ui";
 
 /**
  * Internal preview page for the `<Card>` primitive (OPT-266). Not linked
@@ -129,6 +129,8 @@ export default function CardPreviewPage() {
   const [flipped, setFlipped] = useState(false);
   const flip = (baseFaceDown: boolean) => flipped !== baseFaceDown;
 
+  const [resting, setResting] = useState(false);
+
   return (
     <TooltipProvider>
       <div className="h-full overflow-y-auto bg-gb-board p-8 text-gb-text">
@@ -191,6 +193,30 @@ export default function CardPreviewPage() {
                 </Labeled>
               ))}
             </Row>
+          </Section>
+
+          {/* Board-cell simulation: the card sits in a SQUARE (112×112)
+              slot — same footprint the character row uses on the real board
+              — so the rotated silhouette reads like it does in game. */}
+          <Section title="Board simulation — active ↔ rest toggle">
+            <div className="flex items-center gap-6">
+              <Button
+                variant="secondary"
+                onClick={() => setResting((r) => !r)}
+                aria-pressed={resting}
+              >
+                {resting ? "Rest" : "Active"}
+              </Button>
+              <div className="flex h-28 w-28 items-center justify-center rounded bg-gb-surface/50">
+                <Card
+                  data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
+                  variant="field"
+                  state={resting ? "rest" : "active"}
+                  faceDown={flip(false)}
+                  overlays={{ donCount: 2 }}
+                />
+              </div>
+            </div>
           </Section>
 
           <Section title="Sizes — size token matrix">

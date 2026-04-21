@@ -77,10 +77,10 @@ export const Card = React.memo(function Card({
     reducedMotion ?? false,
   );
 
-  // Counter-rotation keeps corner-badge labels horizontal even when the
-  // card itself is rotated (e.g. state=`rest` → 90°). Badges live inside the
-  // rotating layer so they pin to card corners; their *content* rotates the
-  // opposite way so text stays upright.
+  // Counter-rotation keeps the count badge label horizontal even when the
+  // card itself is rotated (e.g. state=`rest` → 90°). The count badge lives
+  // inside the rotating layer so it pins to a card-local corner; its
+  // *content* rotates the opposite way so text stays upright.
   const cardRotate =
     typeof motionConfig.animate.rotate === "number"
       ? motionConfig.animate.rotate
@@ -116,8 +116,10 @@ export const Card = React.memo(function Card({
           <CardHighlightRing color={overlays.highlightRing} />
         )}
 
-        {/* Corner badges: positioned on the card face, counter-rotated so
-            their labels stay horizontal regardless of card rotation. */}
+        {/* Count badge: rides with the card face, counter-rotated so its
+            label stays horizontal regardless of card rotation. Stacked-zone
+            cards (life, deck, trash) don't rest, so pinning to a card-local
+            corner is fine here. */}
         {overlays?.countBadge != null && (
           <motion.div
             className={cn(
@@ -130,16 +132,27 @@ export const Card = React.memo(function Card({
             <CardCountBadge count={overlays.countBadge} />
           </motion.div>
         )}
-        {overlays?.donCount != null && (
-          <motion.div
-            className="absolute bottom-1 right-1 z-10"
-            animate={{ rotate: counterRotate }}
-            transition={motionConfig.transition}
-          >
-            <CardDonBadge count={overlays.donCount} />
-          </motion.div>
-        )}
       </motion.div>
+
+      {/* DON badge lives outside the rotating layer so it can track the
+          card's *visible* bottom-right — not a card-local corner that
+          spins with the card. For rest (90° CW), the visible BR sits at
+          container-local ((W+H)/2, (W+H)/2), so the right/bottom insets
+          shift by (W-H)/2 and (H-W)/2. No counter-rotation needed —
+          the badge is never rotated in the first place. */}
+      {overlays?.donCount != null && (
+        <motion.div
+          className="absolute z-10"
+          initial={false}
+          animate={{
+            right: state === "rest" ? (width - height) / 2 + 4 : 4,
+            bottom: state === "rest" ? (height - width) / 2 + 4 : 4,
+          }}
+          transition={motionConfig.transition}
+        >
+          <CardDonBadge count={overlays.donCount} />
+        </motion.div>
+      )}
     </PerspectiveContainer>
   );
 
