@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-21
+last-updated: 2026-04-22
 ---
 
 # Card Animations — Handoff Doc
@@ -17,7 +17,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Priority | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | Done (2026-04-21) | [#99](https://github.com/corycunanan/optcg-sim/pull/99) merged; [#101](https://github.com/corycunanan/optcg-sim/pull/101) VQA polish | Gate — blocks every other ticket in the project |
-| 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | Backlog | — | Pilot — API may tune during this migration |
+| 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | In Review (2026-04-22) | [#102](https://github.com/corycunanan/optcg-sim/pull/102) | Pilot — API tuned: added `motionDelay`. Ring semantics deferred to OPT-273. |
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Backlog | — | Serial after pilot (shared-file risk with field-card) |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Backlog | — | |
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Backlog | — | Must compose with 3D flip for OPT-276 |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-267 — `field-card.tsx` pilot migration.
+**Next up:** OPT-268 — `hand-layer.tsx` migration (serial after the pilot).
 
 ---
 
@@ -59,3 +59,19 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
 - **Motion structure split.** The rotating `motion.div` now wraps a nested interaction `motion.div`. Outer owns state rotate/opacity/filter (`cardRest`/`cardActivate`), inner owns `whileHover`/`whileTap`. Done so interaction transforms *compose* with state rotation instead of overwriting it — rested cards wiggle around 90° now, not snap back to 0°.
 - **Hover feel.** Scale springs *in* (stiffness 420 / damping 13, faster + more pronounced than `cardActivate`) and tweens *out* (150ms easeOut) so the bounce plays on pointer-enter only. Added a single-cycle ±1.2° / 550ms rotate wiggle on hover-in via keyframes in `board.card.hover` / `handHover` — cards feel alive when picked up.
 - **Preview addition.** `/preview/card` now has a **Board simulation — active ↔ rest toggle** section: single field card with DON, inside a 112×112 `SQUARE` slot matching the real character row, with a `secondary` button to flip state. Useful for VQA'ing the rotation + DON + hover combo in isolation.
+
+### OPT-267 → OPT-268
+**From:** session on 2026-04-22 · **Commits:** `bd358c2` (primitive), `88508e5` (consumer) · **PR:** #102
+
+- **Primer:** `field-card.tsx` is now on `<Card variant="field">` — the hardest-complexity consumer survived. The primitive owns rest/active rotate + brightness, hover/tap springs, DON corner badge, and tooltip. Consumer wrapper retains dnd-kit refs, zone registration, action menu, selection/blocker rings, `DropOverlay`, DON-redistribute amber bar, and drag-origin opacity. Pattern validated for OPT-268..271.
+- **Read first:** `src/components/game/board-layout/field-card.tsx` (the reference pattern for all zone migrations), `src/components/game/card/state-presets.ts` + `card.tsx` for the `motionDelay` wiring, `src/components/game/board-layout/hand-layer.tsx` (OPT-268 target).
+- **Gotchas / do NOT touch:**
+  - Selection ring and blocker blue ring live as Tailwind classes on the *consumer* outer motion.div, not on the primitive. Don't try to route them through `overlays.highlightRing` — that overlay intentionally no-ops for `selected`/`invalid` right now (see comment in `card-highlight-ring.tsx`). OPT-273 is where ring semantics consolidate.
+  - Drag-origin opacity (0.3 ghost) is owned by the consumer (minimal opacity-only `motion.div`). The primitive's `state="dragging"` is explicitly non-dimming because dnd-kit overlays own drag visuals elsewhere — but field-card doesn't use a DragOverlay, so the consumer has to dim itself. Replicate this pattern in hand-layer.
+  - DON badge switched from a full-width bar to a corner pill (primitive default). That's intentional — the OPT-266 redesign. If a wrapper relies on bottom-bar geometry (e.g. the DON redistribute amber bar still stretches full-width), it overlays the pill correctly but the z-index order matters: primitive is `z-[1]`, drag-source bar is `z-20`.
+  - `donCountAdjust` + `pendingTransferDonIds` are resolved inside the consumer into a single `overlays.donCount` integer. The primitive doesn't know about adjustments or pending transfers.
+- **Unresolved:**
+  - Ring semantics consolidation → OPT-273. Until then, every consumer replicates the `ring-2 ring-gb-accent-green shadow-[...]` / `ring-2 ring-gb-accent-blue/40` className pair on the outer wrapper when selection is in play.
+  - No visual VQA happened this session (auto mode, no browser). The behaviors listed in the PR test plan are unverified manually; first thing to do when picking up OPT-268 is spin up a 2-player lobby and walk through the field-card checklist on PR #102 before depending on its claims.
+  - `BoardCard` is still alive and used by non-migrated zones (life, deck, trash stacks, leader-empty placeholder, `DroppableStageZone`). Do not delete yet — that's OPT-272.
+- **Why this matters for OPT-268:** hand-layer is structurally simpler than field-card (no dnd-kit droppable, no action menu, no DON), but it introduces *hand-specific* motion — the hand fan/re-fan + card-raise on hover. Reuse the field-card consumer pattern (primitive inside, dnd-kit + interactions outside). The primitive's `variant="hand"` already wires `handCardHover` and suppresses tap; expect less API tuning than the pilot needed.
