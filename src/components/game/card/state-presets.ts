@@ -34,28 +34,33 @@ export interface CardMotionConfig {
  * @param state visual state enum
  * @param variant consumer domain (drives which hover preset is used)
  * @param reducedMotion true when the user has `prefers-reduced-motion`
+ * @param delay optional delay (seconds) merged into the state transition,
+ *   for staggered board updates (e.g. refresh-wave on a character row)
  */
 export function stateToMotionConfig(
   state: CardState,
   variant: CardVariant,
   reducedMotion: boolean,
+  delay?: number,
 ): CardMotionConfig {
   const hover = variantHover(variant);
   const tap = variantTap(variant);
+  const withDelay = (t: Transition): Transition =>
+    delay != null ? { ...t, delay } : t;
 
   switch (state) {
     case "rest":
       // Game-RESTED position: rotated 90°, dimmed.
       return {
         animate: { rotate: 90, opacity: 1, filter: "brightness(0.6)" },
-        transition: cardRest,
+        transition: withDelay(cardRest),
         whileHover: reducedMotion ? undefined : hover,
         whileTap: reducedMotion ? undefined : tap,
       };
     case "active":
       return {
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
-        transition: cardActivate,
+        transition: withDelay(cardActivate),
         whileHover: reducedMotion ? undefined : hover,
         whileTap: reducedMotion ? undefined : tap,
       };
@@ -63,7 +68,7 @@ export function stateToMotionConfig(
       // Upright + subtle lift; highlight ring renders separately via overlays.
       return {
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
-        transition: cardActivate,
+        transition: withDelay(cardActivate),
         whileHover: reducedMotion ? undefined : hover,
         whileTap: reducedMotion ? undefined : tap,
       };
@@ -72,7 +77,7 @@ export function stateToMotionConfig(
       // no filter tint (no gradient effect) and no ring (no stroke).
       return {
         animate: { rotate: 0, opacity: 0.35, filter: "brightness(1)" },
-        transition: cardRest,
+        transition: withDelay(cardRest),
         whileHover: undefined,
         whileTap: undefined,
       };
@@ -82,7 +87,7 @@ export function stateToMotionConfig(
       // is enough; don't dim or tint.
       return {
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
-        transition: cardRest,
+        transition: withDelay(cardRest),
         whileHover: undefined,
         whileTap: undefined,
       };
@@ -90,7 +95,7 @@ export function stateToMotionConfig(
       // Position/scale driven externally by the flight layer.
       return {
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
-        transition: cardActivate,
+        transition: withDelay(cardActivate),
         whileHover: undefined,
         whileTap: undefined,
       };

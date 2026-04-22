@@ -75,6 +75,19 @@ describe("stateToMotionConfig", () => {
     }
   });
 
+  it("merges motionDelay into the state transition without overwriting the spring", () => {
+    const cfg = stateToMotionConfig("active", "field", false, 0.15);
+    expect(cfg.transition).toEqual({ ...cardActivate, delay: 0.15 });
+    const rest = stateToMotionConfig("rest", "field", false, 0.09);
+    expect(rest.transition).toEqual({ ...cardRest, delay: 0.09 });
+  });
+
+  it("omits delay when motionDelay is undefined (identity on transition)", () => {
+    const cfg = stateToMotionConfig("active", "field", false);
+    expect(cfg.transition).toEqual(cardActivate);
+    expect((cfg.transition as { delay?: number }).delay).toBeUndefined();
+  });
+
   it("is exhaustive over CardState (no accidental undefined)", () => {
     const variants: CardVariant[] = ["field", "hand", "modal", "life", "trash"];
     for (const s of ALL_STATES) {

@@ -71,6 +71,11 @@ export interface CardProps {
   /** Empty-slot placeholder (e.g. empty life zone) — takes precedence over data. */
   empty?: boolean;
   emptyLabel?: string;
+  /**
+   * Optional delay (seconds) merged into the state transition, for staggered
+   * board updates (e.g. refresh-wave ripple across a character row).
+   */
+  motionDelay?: number;
   className?: string;
   style?: React.CSSProperties;
   onClick?: () => void;

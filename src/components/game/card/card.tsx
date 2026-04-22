@@ -38,6 +38,7 @@ export const Card = React.memo(function Card({
   overlays,
   empty,
   emptyLabel,
+  motionDelay,
   className,
   style,
   onClick,
@@ -75,6 +76,7 @@ export const Card = React.memo(function Card({
     state,
     variant,
     reducedMotion ?? false,
+    motionDelay,
   );
 
   // Counter-rotation keeps the count badge label horizontal even when the
