@@ -2,12 +2,17 @@
 
 import React, { useCallback, useRef } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
-import { handCardHover } from "@/lib/motion";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { BoardCard } from "../board-card";
-import { FIELD_W, HAND_CARD_W, HAND_CARD_H, type HandCardDrag } from "./constants";
+import { Card } from "../card";
+import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
+
+// Migrated onto `<Card variant="hand">` (OPT-268). The primitive owns the
+// hand-card hover lift (handCardHover preset), tooltip, and 3D face stack.
+// Consumer wrapper keeps: dnd-kit refs, zone registration, drag-origin
+// opacity ghost (0.3), counter-mode dim (0.35), in-flight hidden placeholder,
+// and the newly-arrived hide-until-transition-registered trick.
 
 function isCounterEligible(data: CardData | undefined): boolean {
   if (!data) return false;
@@ -19,8 +24,6 @@ function isCounterEligible(data: CardData | undefined): boolean {
 function DraggableHandCard({
   card,
   cardDb,
-  width,
-  height,
   disabled,
   dimmed,
   hidden,
@@ -28,37 +31,41 @@ function DraggableHandCard({
 }: {
   card: CardInstance;
   cardDb: CardDb;
-  width: number;
-  height: number;
   disabled?: boolean;
   dimmed?: boolean;
   /** When true the card reserves layout space but is invisible (in-flight placeholder). */
   hidden?: boolean;
   style?: React.CSSProperties;
 }) {
-  const reducedMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `hand-${card.instanceId}`,
     data: { type: "hand-card", card } satisfies HandCardDrag,
     disabled: disabled || hidden,
   });
 
-  const skipMotion = reducedMotion || isDragging;
+  const cardState = isDragging ? "dragging" : "active";
+  const opacity = isDragging ? 0.3 : dimmed ? 0.35 : 1;
 
   return (
     <motion.div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      whileHover={skipMotion || hidden ? undefined : handCardHover}
+      initial={false}
+      animate={{ opacity }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
       style={{
         ...style,
-        opacity: isDragging ? 0.3 : dimmed ? 0.35 : 1,
         cursor: disabled || hidden ? "default" : "grab",
         visibility: hidden ? "hidden" : undefined,
       }}
     >
-      <BoardCard card={card} cardDb={cardDb} width={width} height={height} />
+      <Card
+        data={{ card, cardDb }}
+        variant="hand"
+        state={cardState}
+        interaction={isDragging ? { tooltipDisabled: true } : undefined}
+      />
     </motion.div>
   );
 }
@@ -129,13 +136,12 @@ export const HandLayer = React.memo(function HandLayer({
 
         if (faceDown) {
           return (
-            <BoardCard
+            <Card
               key={card.instanceId}
-              cardDb={cardDb}
-              sleeve
+              data={{ card, cardDb }}
+              variant="hand"
+              faceDown
               sleeveUrl={sleeveUrl}
-              width={HAND_CARD_W}
-              height={HAND_CARD_H}
               style={marginStyle}
             />
           );
@@ -154,8 +160,6 @@ export const HandLayer = React.memo(function HandLayer({
             disabled={disabled}
             dimmed={counterMode && !eligible}
             hidden={isInFlight}
-            width={HAND_CARD_W}
-            height={HAND_CARD_H}
             style={marginStyle}
           />
         );
