@@ -14,7 +14,7 @@
 | Backend API | Next.js API Routes | REST endpoints for CRUD operations |
 | Realtime | WebSocket (native) | Game state sync via Cloudflare Durable Objects |
 | Auth | NextAuth.js v5 (Auth.js) — Google OAuth + Email/Password | Authentication, session management |
-| Database | PostgreSQL (via Supabase) | Primary data store |
+| Database | PostgreSQL (via Neon) | Primary data store — separate Neon branches for dev and prod (see [DEPLOYMENT.md](./DEPLOYMENT.md)) |
 | ORM | Prisma | Type-safe DB access, migrations |
 | Object Storage | Cloudflare R2 | Card images, raw data snapshots |
 | CDN | Cloudflare Workers | Image delivery with CORS |
@@ -90,7 +90,7 @@
 
 ## Data Layer
 
-### PostgreSQL (via Supabase)
+### PostgreSQL (via Neon)
 
 - **Why PostgreSQL:**
   - Card data is relational: cards belong to sets, decks contain cards, users have friends, games have players
@@ -157,7 +157,7 @@
 | Vercel | Next.js frontend + API routes | Native Next.js support, preview deploys on PR, global edge network |
 | Cloudflare Workers | Game server (Durable Objects) | Stateful WebSocket sessions, hibernation, zero cold starts, global edge |
 | Cloudflare Workers | Image CDN (`workers/images/`) | Card image serving with CORS, R2 integration |
-| Supabase | PostgreSQL | Managed Postgres with connection pooling |
+| Neon | PostgreSQL | Managed Postgres with branching (separate dev/prod branches) and connection pooling (pgbouncer) |
 | Cloudflare R2 | Card image storage | S3-compatible, zero egress fees |
 
 ### CI/CD — GitHub Actions
@@ -186,7 +186,7 @@
 | Tailwind CSS | 3.4+ | 4.2.1 | v4 with @tailwindcss/postcss |
 | Prisma | 5.x+ | 6.19.2 | Prisma 7 deferred (new config format) |
 | vegapull | 1.2.0 | 1.2.0 | Rust CLI for card data sourcing; installed via `cargo install vegapull` |
-| PostgreSQL | 15+ | 16.13 | Local via Homebrew; Supabase for production |
+| PostgreSQL | 15+ | 16.13 | Neon (managed) for both dev and prod, on separate branches |
 | pnpm | 10+ | 10.32.1 | Package manager |
 
 ---

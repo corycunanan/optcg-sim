@@ -17,7 +17,7 @@ Pipeline (TypeScript)
     ├─ write.ts        → Upsert to PostgreSQL via Prisma
     └─ verify.ts       → Post-import sanity checks
     ↓
-PostgreSQL (Supabase)     Cloudflare R2 CDN
+PostgreSQL (Neon)         Cloudflare R2 CDN
   cards                     cards/{id}.webp
   art_variants              variants/{variantId}.webp
   card_sets
@@ -61,6 +61,11 @@ pnpm pipeline:migrate-images [--dry-run] [--concurrency <n>] [--limit <n>]
 DATABASE_URL=postgresql://user:password@host:5432/optcg_sim?schema=public
 DIRECT_DATABASE_URL=postgresql://user:password@host:5432/optcg_sim?schema=public
 ```
+
+Pipeline scripts run against whatever DB `.env` points at — after the OPT-278 split, that's
+the dev Neon branch by default. To promote card data to prod, see the "Promoting card data
+from dev → prod" section in [`docs/architecture/DEPLOYMENT.md`](../docs/architecture/DEPLOYMENT.md).
+Don't run `pnpm pipeline:import` directly against prod.
 
 **Required for image migration:**
 ```

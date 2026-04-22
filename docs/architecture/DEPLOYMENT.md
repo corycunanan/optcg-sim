@@ -7,7 +7,7 @@
 | Next.js app | Vercel | https://optcg-sim.vercel.app |
 | Image CDN Worker | Cloudflare Workers | `workers/images/` |
 | Game Server Worker | Cloudflare Workers | `workers/game/` (M3) |
-| Database | PostgreSQL (Supabase or similar) | via `DATABASE_URL` env var |
+| Database | Neon PostgreSQL | via `DATABASE_URL` / `DIRECT_DATABASE_URL` env vars |
 
 ## How services interact
 
@@ -42,12 +42,122 @@ Browser
 5. On game end: DO writes result back to PostgreSQL
 ```
 
+## Database: Neon branches for dev and prod
+
+Dev and prod target **separate Neon branches**. Destructive migrations or a bad `prisma migrate reset` from a dev workstation cannot touch prod data.
+
+| Env | Neon branch | Where `DATABASE_URL` / `DIRECT_DATABASE_URL` live | Who consumes |
+|-----|------------|----------------------------------------------------|--------------|
+| Local dev | `dev` (Neon branch, separate from `main`) | `.env` on disk | `next dev`, `pipeline/*.ts`, `prisma migrate dev`, `db:seed`, `db:promote-admin` |
+| Production | `main` (Neon default branch) | Vercel → Project Settings → Environment Variables → Production. `.env.production` on disk is a **reference copy only** and is not read by Vercel. | Vercel production build + runtime |
+
+Workers (`workers/game/` and `workers/images/`) do not talk to Postgres, so they are unaffected by this split.
+
+### Both URLs are required
+
+`prisma/schema.prisma` declares both `url` and `directUrl`:
+
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")          // pooled (pgbouncer)
+  directUrl = env("DIRECT_DATABASE_URL")   // direct connection for migrations
+}
+```
+
+Forgetting `DIRECT_DATABASE_URL` breaks `prisma migrate deploy`. Both must be set in both places (local `.env` and Vercel Production env).
+
+### Applying migrations
+
+| Context | Command | Targets |
+|--------|---------|---------|
+| Local, authoring a migration | `pnpm db:migrate` (= `prisma migrate dev`) | Dev Neon branch |
+| Local, applying committed migrations (CI-style) | `pnpm db:migrate:deploy` (= `prisma migrate deploy`) | Dev Neon branch |
+| Production | `prisma migrate deploy` runs automatically on every Vercel build (see `vercel.json`) | Prod Neon branch |
+
+The Vercel build command is `prisma migrate deploy && next build`. This closes the gap that let migration `20260419120000_add_user_is_admin` sit unapplied for 3 days — every production deploy now applies all pending migrations before the app is built.
+
+### Seeding the dev branch
+
+A fresh Neon dev branch starts empty. Card data is ~all of the volume; users/accounts/sessions/decks/friendships/lobbies/game_sessions should stay empty so dev starts clean.
+
+**One-time seed (card data only, from prod):**
+
+```bash
+# From any machine with access to DIRECT_DATABASE_URL for both branches.
+PROD_DIRECT=<prod DIRECT_DATABASE_URL>
+DEV_DIRECT=<dev DIRECT_DATABASE_URL>
+
+# Dump only card-data tables from prod. No user / session / deck / friendship / lobby / game data.
+pg_dump \
+  --dbname="$PROD_DIRECT" \
+  --data-only \
+  --no-owner \
+  --no-acl \
+  -t '"Card"' \
+  -t '"ArtVariant"' \
+  -t '"CardSet"' \
+  -t '"Errata"' \
+  > /tmp/optcg-card-data.sql
+
+# Restore into the dev branch.
+psql "$DEV_DIRECT" < /tmp/optcg-card-data.sql
+```
+
+Before dumping, run `pnpm db:migrate:deploy` against the dev branch so the schema matches.
+
+**Alternative:** re-run the pipeline against dev (`pnpm pipeline:import`). Slower and re-downloads images unless they're already on R2, but reproducible from vegapull source.
+
+### Resetting the dev branch
+
+Destructive, only affects dev. Three flavors:
+
+| Want | Command | Effect |
+|------|---------|--------|
+| Drop all data, keep schema | `pnpm prisma migrate reset` | Runs migrations from scratch + re-seeds via `prisma/seed.ts` |
+| Wipe Neon branch entirely | Neon console → Branches → delete dev branch → create new branch from `main` | Starts from prod's current schema + data |
+| Partial wipe (e.g. game sessions) | `psql "$DIRECT_DATABASE_URL"` + manual `DELETE` | Targeted |
+
+`prisma migrate reset` checks `DATABASE_URL` and refuses to run against what it thinks is prod, but don't rely on that — always confirm `.env` points at the dev branch before running reset.
+
+### Promoting card data from dev → prod
+
+Card data updates (new set drops, errata patches, pipeline re-runs) land on dev first, get inspected, then get promoted to prod. Don't run `pnpm pipeline:import` against prod.
+
+```bash
+DEV_DIRECT=<dev DIRECT_DATABASE_URL>
+PROD_DIRECT=<prod DIRECT_DATABASE_URL>
+
+# 1. Make sure schema is in sync on both branches (prod deploys apply migrations automatically;
+#    dev should already be caught up from local `pnpm db:migrate`).
+
+# 2. Dump only card-data tables from dev.
+pg_dump \
+  --dbname="$DEV_DIRECT" \
+  --data-only \
+  --no-owner \
+  --no-acl \
+  -t '"Card"' \
+  -t '"ArtVariant"' \
+  -t '"CardSet"' \
+  -t '"Errata"' \
+  > /tmp/optcg-card-data.sql
+
+# 3. Take a prod snapshot (Neon console → Branches → branch from main) as a rollback point.
+
+# 4. Restore into prod. Card rows are upserted on primary key; safe to re-apply.
+#    CardSet is a clean-slate table in the pipeline — if the dump wasn't taken at a stable
+#    point, prefer re-running the pipeline against dev, freezing dev, then dumping.
+psql "$PROD_DIRECT" < /tmp/optcg-card-data.sql
+```
+
 ## Shared Secrets
 
 | Secret | Consumers | Storage |
 |--------|-----------|---------|
 | `GAME_WORKER_SECRET` | Next.js API (`/api/game/*`), Cloudflare Game Worker (`workers/game/`) | Vercel env var, `wrangler secret` |
 | `AUTH_SECRET` | Next.js (NextAuth) | Vercel env var |
+| `DATABASE_URL` / `DIRECT_DATABASE_URL` | Next.js (Prisma), `pipeline/` scripts | `.env` (dev Neon branch), Vercel Production env (prod Neon branch) |
 
 ### Rotating `GAME_WORKER_SECRET`
 
@@ -65,4 +175,4 @@ The worker uses this secret for three things: (a) Bearer auth on API callbacks (
 
 **When to rotate:** suspected leak (log exposure, accidental commit, contractor offboarding), at least annually, and any time the secret is known to have been on a developer machine that was lost or decommissioned.
 
-_Last updated: 2026-04-20_
+_Last updated: 2026-04-21_

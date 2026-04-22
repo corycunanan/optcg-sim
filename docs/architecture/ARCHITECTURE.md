@@ -209,8 +209,8 @@ If offline → message stored; delivered on next connect
            │         ┌───────────────────┘
            │         │
 ┌──────────▼─────────▼────────┐   ┌────────────────────┐
-│   Supabase                   │   │   Cloudflare R2     │
-│   (PostgreSQL)               │   │   (Card images)     │
+│   Neon                       │   │   Cloudflare R2     │
+│   (PostgreSQL, branched)     │   │   (Card images)     │
 └──────────────────────────────┘   └────────────────────┘
 
 ┌──────────────────────────────┐
@@ -223,9 +223,9 @@ If offline → message stored; delivered on next connect
 
 | Environment | Purpose | Infrastructure |
 |------------|---------|---------------|
-| Development | Local dev | Next.js dev server, local PostgreSQL, `wrangler dev` for game worker |
-| Staging | Pre-release testing | Vercel preview deploys, staging DB, staging Cloudflare Workers |
-| Production | Live | Vercel production, Supabase PostgreSQL, Cloudflare Workers (game + images) |
+| Development | Local dev | Next.js dev server, Neon `dev` branch, `wrangler dev` for game worker |
+| Staging | Pre-release testing | Vercel preview deploys, Cloudflare Workers (preview) |
+| Production | Live | Vercel production, Neon `main` branch, Cloudflare Workers (game + images) |
 
 ---
 

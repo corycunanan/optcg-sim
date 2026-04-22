@@ -225,7 +225,7 @@ This is a transform step (~50–100 lines of code), not a scraper problem. The d
               └──────────────┬──────────────────┘
                              │
               ┌──────────────▼──────────────┐
-              │   PostgreSQL (Supabase)       │
+              │   PostgreSQL (Neon)           │
               │   cards + art_variants tables │
               └──────────────────────────────┘
 ```
@@ -454,7 +454,7 @@ Images download successfully via `--with-images` flag:
               └──────────────┬──────────────────┘
                              │
               ┌──────────────▼──────────────┐
-              │   PostgreSQL (Supabase)       │
+              │   PostgreSQL (Neon)           │
               │   cards + art_variants +      │
               │   card_sets (join table)       │
               └──────────────────────────────┘
