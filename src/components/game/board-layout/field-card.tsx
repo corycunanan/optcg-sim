@@ -2,16 +2,21 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
-import { BoardCard } from "../board-card";
-import { SQUARE, BOARD_CARD_W, BOARD_CARD_H, type AttackerDrag, type RedistributeDonDrag } from "./constants";
+import { Card } from "../card";
+import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
+
+// Pilot migration onto `<Card>` primitive (OPT-267). The primitive owns the
+// 3D face stack, rest/active rotation, hover/tap springs, DON corner badge,
+// and tooltip. Consumer wrappers keep: dnd-kit refs, zone registration,
+// right-click menu, selection/blocker rings, drop-zone affordances, and the
+// DON-redistribute drag-source bar.
 
 export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   card,
@@ -49,7 +54,6 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   donCountAdjust?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const reducedMotion = useReducedMotion();
   const zonePos = useZonePosition();
 
   const {
@@ -125,7 +129,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     [],
   );
 
-  const skipMotion = reducedMotion || isDragging;
+  const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
+  const cardState = card.state === "RESTED" ? "rest" : "active";
 
   return (
     <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
@@ -136,17 +141,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           {...listeners}
           onClick={onSelect}
           onContextMenu={handleContextMenu}
-          animate={{
-            rotate: card.state === "RESTED" ? 90 : 0,
-            opacity: isDragging ? 0.3 : 1,
-            filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
-          }}
-          transition={{
-            ...(card.state === "RESTED" ? cardRest : cardActivate),
-            delay: animationDelay ?? 0,
-          }}
-          whileHover={skipMotion ? undefined : cardHover}
-          whileTap={skipMotion ? undefined : cardTap}
+          initial={false}
+          animate={{ opacity: isDragging ? 0.3 : 1 }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
           style={{
             ...style,
             width: SQUARE,
@@ -160,13 +157,13 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           )}
         >
           <DropOverlay active={acceptsDon || acceptsHandCard} hovered={isOver && (acceptsDon || acceptsHandCard)} color={acceptsHandCard ? "red" : "amber"} />
-          <BoardCard
-            card={card}
-            cardDb={cardDb}
-            width={BOARD_CARD_W}
-            height={BOARD_CARD_H}
+          <Card
+            data={{ card, cardDb }}
+            variant="field"
+            state={cardState}
+            overlays={{ donCount }}
+            motionDelay={animationDelay}
             className="relative z-[1]"
-            donCountAdjust={donCountAdjust}
           />
           {canRedistribute && (
             <div
@@ -216,7 +213,6 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   style: React.CSSProperties;
   animationDelay?: number;
 }) {
-  const reducedMotion = useReducedMotion();
   const zonePos = useZonePosition();
   const accepts = activeDragType === "attacker";
   const { setNodeRef, isOver } = useDroppable({
@@ -246,29 +242,23 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     return () => { zonePos.unregisterCard(card.instanceId); };
   }, [card.instanceId, zoneKey, zonePos]);
 
+  const cardState = card.state === "RESTED" ? "rest" : "active";
+
   return (
-    <motion.div
+    <div
       ref={ref}
-      animate={{
-        rotate: card.state === "RESTED" ? 90 : 0,
-        filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
-      }}
-      transition={{
-        ...(card.state === "RESTED" ? cardRest : cardActivate),
-        delay: animationDelay ?? 0,
-      }}
-      whileHover={reducedMotion ? undefined : cardHover}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="red" />
-      <BoardCard
-        card={card}
-        cardDb={cardDb}
-        width={BOARD_CARD_W}
-        height={BOARD_CARD_H}
+      <Card
+        data={{ card, cardDb }}
+        variant="field"
+        state={cardState}
+        overlays={{ donCount: card.attachedDon.length }}
+        motionDelay={animationDelay}
         className="relative z-[1]"
       />
-    </motion.div>
+    </div>
   );
 });
