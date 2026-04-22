@@ -67,6 +67,17 @@ datasource db {
 
 Forgetting `DIRECT_DATABASE_URL` breaks `prisma migrate deploy`. Both must be set in both places (local `.env` and Vercel Production env).
 
+### `connection_limit` by environment
+
+The pooled `DATABASE_URL` needs different `connection_limit` query params depending on the runtime:
+
+| Runtime | `connection_limit` | Why |
+|--------|--------------------|-----|
+| Local dev (`.env`) | `5` | Long-lived Node process; a few in-flight queries at a time is fine. |
+| Vercel serverless (Production + Preview) | `1` | Each function invocation gets its own Prisma client. Without a cap, Prisma defaults to `num_cpus*2 + 1` connections *per instance* — Vercel scales instances horizontally, and the Neon pooler runs out of slots under load. Force each instance to take one slot; pgbouncer handles the real multiplexing. |
+
+`DIRECT_DATABASE_URL` doesn't take `connection_limit` — it's only used by `prisma migrate` during builds, which runs one operation at a time.
+
 ### Applying migrations
 
 | Context | Command | Targets |
