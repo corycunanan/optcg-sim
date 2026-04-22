@@ -77,10 +77,10 @@ export const Card = React.memo(function Card({
     reducedMotion ?? false,
   );
 
-  // Counter-rotation keeps corner-badge labels horizontal even when the
-  // card itself is rotated (e.g. state=`rest` → 90°). Badges live inside the
-  // rotating layer so they pin to card corners; their *content* rotates the
-  // opposite way so text stays upright.
+  // Counter-rotation keeps the count badge label horizontal even when the
+  // card itself is rotated (e.g. state=`rest` → 90°). The count badge lives
+  // inside the rotating layer so it pins to a card-local corner; its
+  // *content* rotates the opposite way so text stays upright.
   const cardRotate =
     typeof motionConfig.animate.rotate === "number"
       ? motionConfig.animate.rotate
@@ -95,51 +95,77 @@ export const Card = React.memo(function Card({
       style={style}
       onClick={onClick}
     >
+      {/* Outer layer owns state rotation (rest = 90°) / opacity / filter.
+          Nesting the interaction layer inside means hover/tap transforms
+          *compose* with state rotation instead of overwriting it — so a
+          rested card wiggles around 90°, not 0°. */}
       <motion.div
-        className={cn(
-          "absolute inset-0 rounded",
-          interaction?.clickable && "cursor-pointer",
-        )}
+        className="absolute inset-0 rounded"
         animate={motionConfig.animate}
         transition={motionConfig.transition}
-        whileHover={motionConfig.whileHover}
-        whileTap={motionConfig.whileTap}
       >
-        <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
-          <CardFront data={cardData} fallbackLabel={overlays?.label} />
-          <CardBack sleeveUrl={sleeveUrl} />
-        </CardFaces>
+        {/* Interaction layer: scale spring + wiggle keyframes spring *in*
+            via whileHover; all interaction transforms tween *out* via this
+            default transition so hover-off/tap-off don't inherit the
+            state-change spring and bounce back. */}
+        <motion.div
+          className={cn(
+            "absolute inset-0 rounded",
+            interaction?.clickable && "cursor-pointer",
+          )}
+          transition={{ duration: 0.15, ease: "easeOut" as const }}
+          whileHover={motionConfig.whileHover}
+          whileTap={motionConfig.whileTap}
+        >
+          <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
+            <CardFront data={cardData} fallbackLabel={overlays?.label} />
+            <CardBack sleeveUrl={sleeveUrl} />
+          </CardFaces>
 
-        {/* Highlight ring follows the card outline, so it sits inside the
-            rotating layer without any counter-rotation. */}
-        {overlays?.highlightRing && (
-          <CardHighlightRing color={overlays.highlightRing} />
-        )}
+          {/* Highlight ring follows the card outline, so it sits inside the
+              rotating layer without any counter-rotation. */}
+          {overlays?.highlightRing && (
+            <CardHighlightRing color={overlays.highlightRing} />
+          )}
 
-        {/* Corner badges: positioned on the card face, counter-rotated so
-            their labels stay horizontal regardless of card rotation. */}
-        {overlays?.countBadge != null && (
-          <motion.div
-            className={cn(
-              "absolute z-10",
-              faceDown ? "bottom-1 right-1" : "top-1 right-1",
-            )}
-            animate={{ rotate: counterRotate }}
-            transition={motionConfig.transition}
-          >
-            <CardCountBadge count={overlays.countBadge} />
-          </motion.div>
-        )}
-        {overlays?.donCount != null && (
-          <motion.div
-            className="absolute bottom-1 right-1 z-10"
-            animate={{ rotate: counterRotate }}
-            transition={motionConfig.transition}
-          >
-            <CardDonBadge count={overlays.donCount} />
-          </motion.div>
-        )}
+          {/* Count badge: rides with the card face, counter-rotated so its
+              label stays horizontal regardless of card rotation. Stacked-zone
+              cards (life, deck, trash) don't rest, so pinning to a card-local
+              corner is fine here. */}
+          {overlays?.countBadge != null && (
+            <motion.div
+              className={cn(
+                "absolute z-10",
+                faceDown ? "bottom-1 right-1" : "top-1 right-1",
+              )}
+              animate={{ rotate: counterRotate }}
+              transition={motionConfig.transition}
+            >
+              <CardCountBadge count={overlays.countBadge} />
+            </motion.div>
+          )}
+        </motion.div>
       </motion.div>
+
+      {/* DON badge lives outside the rotating layer so it can track the
+          card's *visible* bottom-right — not a card-local corner that
+          spins with the card. For rest (90° CW), the visible BR sits at
+          container-local ((W+H)/2, (W+H)/2), so the right/bottom insets
+          shift by (W-H)/2 and (H-W)/2. No counter-rotation needed —
+          the badge is never rotated in the first place. */}
+      {overlays?.donCount != null && (
+        <motion.div
+          className="absolute z-10"
+          initial={false}
+          animate={{
+            right: state === "rest" ? (width - height) / 2 + 4 : 4,
+            bottom: state === "rest" ? (height - width) / 2 + 4 : 4,
+          }}
+          transition={motionConfig.transition}
+        >
+          <CardDonBadge count={overlays.donCount} />
+        </motion.div>
+      )}
     </PerspectiveContainer>
   );
 

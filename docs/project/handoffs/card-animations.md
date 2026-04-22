@@ -16,7 +16,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Priority | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | Done (2026-04-21) | [#99](https://github.com/corycunanan/optcg-sim/pull/99) | Gate — blocks every other ticket in the project |
+| 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | Done (2026-04-21) | [#99](https://github.com/corycunanan/optcg-sim/pull/99) merged; [#101](https://github.com/corycunanan/optcg-sim/pull/101) VQA polish | Gate — blocks every other ticket in the project |
 | 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | Backlog | — | Pilot — API may tune during this migration |
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Backlog | — | Serial after pilot (shared-file risk with field-card) |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Backlog | — | |
@@ -52,3 +52,10 @@ Append new entries at the bottom. Each entry is written *by* the agent who just 
   - No jsdom in `vitest.config.ts` yet (node env). Component-render tests need either a jsdom config or a dedicated config file — deferred; OPT-267 should raise this if it wants rendered tests, otherwise stay on the pure unit-test pattern used here.
   - Size token `preview` (200×280) is only used by the preview page; remove in OPT-272 if no production consumer picks it up.
 - **Why this matters for OPT-267:** OPT-267 is the pilot — the first consumer to prove the primitive API survives contact with reality (dnd-kit drag/drop, right-click menu, attack drop target, DON drag-source bar, redistribute overlay, zone registration). Expect API tuning. If a prop is awkward for `field-card.tsx`, fix the primitive in the same PR — don't paper over it downstream.
+
+#### Round 2 VQA (2026-04-21) · PR #101
+Follow-up polish on the merged primitive, still under OPT-266 scope. Public API unchanged — consumers get these for free once they migrate.
+- **DON label in rest state.** The pill was inside the card's rotating layer, so its `bottom-1 right-1` anchor rotated with the card and ended up overflowing the visible bottom-*left* of a rested card. Moved it out of the rotating layer; `right`/`bottom` insets are now computed from the card's un-rotated `(W, H)` so it tracks the *visible* bottom-right in both orientations (`card.tsx` lines ~137-155). Count badge is untouched (stacked-zone cards don't rest).
+- **Motion structure split.** The rotating `motion.div` now wraps a nested interaction `motion.div`. Outer owns state rotate/opacity/filter (`cardRest`/`cardActivate`), inner owns `whileHover`/`whileTap`. Done so interaction transforms *compose* with state rotation instead of overwriting it — rested cards wiggle around 90° now, not snap back to 0°.
+- **Hover feel.** Scale springs *in* (stiffness 420 / damping 13, faster + more pronounced than `cardActivate`) and tweens *out* (150ms easeOut) so the bounce plays on pointer-enter only. Added a single-cycle ±1.2° / 550ms rotate wiggle on hover-in via keyframes in `board.card.hover` / `handHover` — cards feel alive when picked up.
+- **Preview addition.** `/preview/card` now has a **Board simulation — active ↔ rest toggle** section: single field card with DON, inside a 112×112 `SQUARE` slot matching the real character row, with a `secondary` button to flip state. Useful for VQA'ing the rotation + DON + hover combo in isolation.
