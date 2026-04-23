@@ -14,6 +14,40 @@ import {
 import { GameButton } from "./game-button";
 import { Card } from "./card";
 
+// The `<Card>` primitive renders inside a 3D DOM tree (perspective + preserve-3d
+// + backface-visibility + inline rotateX/rotateY motion values). The browser's
+// HTML5 drag-image snapshot of that tree shows the back face or a black box.
+// Swap in a flat `<img>` clone of the card art so the snapshot bypasses the
+// 3D context entirely.
+function setFlatCardDragImage(
+  e: React.DragEvent<HTMLDivElement>,
+  imageUrl: string,
+) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const offsetX = e.clientX - rect.left;
+  const offsetY = e.clientY - rect.top;
+
+  const ghost = document.createElement("img");
+  ghost.src = imageUrl;
+  ghost.alt = "";
+  ghost.draggable = false;
+  ghost.style.position = "fixed";
+  ghost.style.top = "-10000px";
+  ghost.style.left = "-10000px";
+  ghost.style.width = "80px";
+  ghost.style.height = "112px";
+  ghost.style.borderRadius = "4px";
+  ghost.style.objectFit = "cover";
+  ghost.style.pointerEvents = "none";
+  document.body.appendChild(ghost);
+
+  e.dataTransfer.setDragImage(ghost, offsetX, offsetY);
+
+  // The browser snapshots synchronously, but the element must stay in the DOM
+  // until the next frame or Safari drops the bitmap.
+  requestAnimationFrame(() => ghost.remove());
+}
+
 function ModalCard({
   card,
   cardDb,
@@ -35,11 +69,17 @@ function ModalCard({
   onDragOver: () => void;
   onDrop: () => void;
 }) {
+  const imageUrl = cardDb[card.cardId]?.imageUrl ?? null;
+
   return (
     <div
       draggable
       onClick={onSelect}
-      onDragStart={(e) => { e.stopPropagation(); onDragStart(); }}
+      onDragStart={(e) => {
+        e.stopPropagation();
+        if (imageUrl) setFlatCardDragImage(e, imageUrl);
+        onDragStart();
+      }}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(); }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(); }}
       className={cn(
