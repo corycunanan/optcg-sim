@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-275 merged; OPT-281 + OPT-282 filed)
+last-updated: 2026-04-23 (OPT-281 in review; interim drag-image fix shipped)
 ---
 
 # Card Animations — Handoff Doc
@@ -24,7 +24,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Done (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) merged | Consolidates the two tooltip paths — `CardTooltipContent` extracted, both paths reach for it |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Done (2026-04-23) | [#115](https://github.com/corycunanan/optcg-sim/pull/115) merged | Capstone — migration gate; Phase 2 complete |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Done (2026-04-23) | [#117](https://github.com/corycunanan/optcg-sim/pull/117) merged | Idle breathing + pointer tilt + 3D click bob — all layered onto the primitive. Surfaced the OPT-281 regression in HTML5-drag modals. |
-| 9 | OPT-281 | Fix modal drag image: shows card back + black box | High (Bug) | OPT-275 | Backlog | — | Regression from OPT-275 — interim fix via `setDragImage`, or wait for OPT-282 rewire |
+| 9 | OPT-281 | Fix modal drag image: shows card back + black box | High (Bug) | OPT-275 | In Review (2026-04-23) | [#119](https://github.com/corycunanan/optcg-sim/pull/119) | Interim fix via `setDragImage` with a flat `<img>` ghost; OPT-282 will supersede when the modal rewires onto `@dnd-kit/sortable`. |
 | 10 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
 | 11 | OPT-282 | Drag-to-reorder in hand + "insert between" UX | Medium | OPT-276 | Backlog | — | Wires `@dnd-kit/sortable`; absorbs OPT-281 if not patched sooner |
 | 12 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
@@ -33,7 +33,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-281 — Fix modal drag image (regression from OPT-275). OPT-276 remains the next behavioral feature after the bug is patched; OPT-282 slots in after OPT-276.
+**Next up:** OPT-276 — drag tilt + flip animations. OPT-282 slots in after OPT-276 and will absorb the OPT-281 patch when it rewires the modal onto `@dnd-kit/sortable`.
 
 ---
 
@@ -182,3 +182,19 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **Perf measurement deferred.** The ticket asks for a frame-time pass with ~30 cards active. Structure already applies the Balatro's "gate breathing in non-focal zones" rule via `idleBreathingConfig`, so the most likely perf-regression vector is already mitigated. If VQA surfaces jank, options are: throttle pointer tilt with `requestAnimationFrame` batching, reduce `TILT_SPRING` stiffness, or bump the breathing duration to 4.5s.
   - **`state="invalid"` still wired but unused** — carried forward from OPT-271/272. OPT-273 is where this lands.
 - **Why this matters for OPT-276:** OPT-276 is drag tilt + flip animations. Drag tilt is structurally identical to the pointer tilt I just added — same motion-value + useSpring plumbing, but driven by dnd-kit drag delta instead of pointer position. Candidate API: expose `drag.tilt.set(deg)` via a primitive prop, or — cleaner — teach the existing tilt handler to prefer the drag-delta source when dnd-kit says the card is dragging. The flip part consumes the existing `CardFaces` rotateY layer (OPT-266 foundation), which now sits INSIDE the tilt layer — so a flipping card tilts naturally with the flip. Expect minimal new primitive API; most of the work is consumer wiring to pass drag delta through.
+
+### OPT-281 → OPT-276
+**From:** session on 2026-04-23 · **Commit:** `4837122` · **PR:** [#119](https://github.com/corycunanan/optcg-sim/pull/119)
+
+- **Primer:** Interim fix for the HTML5-drag regression that OPT-275 exposed. `src/components/game/arrange-top-cards-modal.tsx` now builds a flat offscreen `<img>` in `onDragStart` and passes it to `e.dataTransfer.setDragImage` with the cursor's offset — bypassing the 3D DOM tree entirely. The ghost lives at `position: fixed; top/left: -10000px`, sized to `80×112` (`size="field"`) with a 4px radius and `object-fit: cover`, appended to `document.body`, and removed on the next `requestAnimationFrame` (Safari needs it to survive one frame). Drag state (`dragIndex`/`dropIndex`) logic is untouched — this is a pure visual fix.
+- **Read first:** `src/components/game/arrange-top-cards-modal.tsx` (the one HTML5-drag consumer in the codebase — `grep -rn 'draggable' src/components/game` confirms). `src/components/game/card/card.tsx` for the three-layer motion structure that makes the implicit drag snapshot misbehave. No other files touched.
+- **Gotchas / do NOT touch:**
+  - The `setFlatCardDragImage` helper is intentionally local to `arrange-top-cards-modal.tsx`, not hoisted to `src/lib/`. Reason: it's the only HTML5-drag consumer, and OPT-282 will rewire this modal onto `@dnd-kit/sortable` and delete the helper along with the raw `draggable`/`onDragStart`/`onDrop` props. Don't generalize it.
+  - The ghost sizing is hard-coded to `80×112` (matching `Card variant="modal" size="field"` — `CARD_SIZES.field`). If the modal ever bumps to `size="modal"` (120×168), update the helper's width/height at the same time. No token lookup because (a) adding a dependency on the sizes module for a soon-to-be-deleted helper is overkill, (b) the modal uses `size="field"` specifically to keep the 5-per-row layout (see OPT-271 → OPT-272 gotcha on modal sizing).
+  - `requestAnimationFrame` cleanup, not `setTimeout(0)`. Safari's drag bitmap pipeline drops the ghost if it's removed inside the same microtask as `setDragImage`. rAF is the cheapest guarantee that the snapshot has been composited.
+  - Fallback path: if `cardDb[card.cardId]?.imageUrl` is null, the helper is skipped and the browser's default drag image renders. Acceptable because (a) the placeholder text-front doesn't trigger the black-box bug as severely, (b) in practice every `ArrangeTopCards` card has an imageUrl — the effect only fires on real cards.
+- **Unresolved:**
+  - **No visual VQA on OPT-281.** Auto-mode session, no browser. Code is type-checked + linted + tested (34/34), but the actual drag-image needs to be eyeballed. Repro: cast an effect that opens the Arrange Top Cards modal (e.g. a top-3 reveal with reorder), then drag any card. Before: back face on a black rectangle. After: the card's front art. Also confirm amber selection ring + blue drop-target ring still render correctly (no drag-logic touched, but worth a glance).
+  - **OPT-282 will delete this helper.** When the modal rewires onto `@dnd-kit/sortable`, dnd-kit's `<DragOverlay>` owns the drag visual and the HTML5 snapshot never fires. Don't port the helper to a generic util in the meantime — it has no other consumer.
+  - **Other HTML5-drag modals** — there are none right now (`grep -rn 'draggable' src/components/game` returns only this file), but if a future modal ever adds `draggable` on a `<Card>` wrapper before migrating to dnd-kit, the same bug will appear. Fix is the same pattern.
+- **Why this matters for OPT-276:** OPT-276 is independent of this fix — drag tilt + flip land on the `<Card>` primitive, not on the modal-specific HTML5-drag handler. The only interaction: OPT-276 adds new motion to the interaction layer (flip via `CardFaces` `rotateY`, drag tilt via a new motion-value source). Both changes make the implicit drag-image snapshot *worse*, not better. If OPT-276 ships before OPT-282, and a new modal (or a developer forgetting to use dnd-kit) reintroduces HTML5 drag, expect the same bug class — reach for `setFlatCardDragImage`-style patterns rather than trying to flatten the 3D tree during dragstart.
