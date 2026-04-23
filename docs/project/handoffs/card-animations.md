@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-22 (OPT-267 merged)
+last-updated: 2026-04-23 (OPT-268 merged)
 ---
 
 # Card Animations — Handoff Doc
@@ -18,7 +18,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | Done (2026-04-21) | [#99](https://github.com/corycunanan/optcg-sim/pull/99) merged; [#101](https://github.com/corycunanan/optcg-sim/pull/101) VQA polish | Gate — blocks every other ticket in the project |
 | 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | Done (2026-04-22) | [#102](https://github.com/corycunanan/optcg-sim/pull/102) merged | Pilot — API tuned: added `motionDelay`. Ring semantics deferred to OPT-273. |
-| 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Backlog | — | Serial after pilot (shared-file risk with field-card) |
+| 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Done (2026-04-22) | [#103](https://github.com/corycunanan/optcg-sim/pull/103) merged | Face-up + face-down both on primitive; in-flight placeholder preserved. Pattern re-validated — no primitive API changes needed. |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Backlog | — | |
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Backlog | — | Must compose with 3D flip for OPT-276 |
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Backlog | — | Consolidates the two tooltip paths |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-268 — `hand-layer.tsx` migration (serial after the pilot).
+**Next up:** OPT-269 — passive zones (DON active bar + life + trash) migration.
 
 ---
 
@@ -75,3 +75,21 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - No visual VQA happened this session (auto mode, no browser). The behaviors listed in the PR test plan are unverified manually; first thing to do when picking up OPT-268 is spin up a 2-player lobby and walk through the field-card checklist on PR #102 before depending on its claims.
   - `BoardCard` is still alive and used by non-migrated zones (life, deck, trash stacks, leader-empty placeholder, `DroppableStageZone`). Do not delete yet — that's OPT-272.
 - **Why this matters for OPT-268:** hand-layer is structurally simpler than field-card (no dnd-kit droppable, no action menu, no DON), but it introduces *hand-specific* motion — the hand fan/re-fan + card-raise on hover. Reuse the field-card consumer pattern (primitive inside, dnd-kit + interactions outside). The primitive's `variant="hand"` already wires `handCardHover` and suppresses tap; expect less API tuning than the pilot needed.
+
+### OPT-268 → OPT-269
+**From:** session on 2026-04-22 · **Commit:** `ef27ec6` · **Merge:** `a2534c7` · **PR:** [#103](https://github.com/corycunanan/optcg-sim/pull/103)
+
+- **Primer:** `hand-layer.tsx` is on `<Card variant="hand">` end to end. `DraggableHandCard` (face-up) composes the primitive inside a consumer `motion.div` that owns dnd-kit refs + `animate={{ opacity }}` (0.3 drag ghost / 0.35 counter-mode dim) + `style.visibility: hidden` for the in-flight placeholder. The opponent face-down row renders `<Card variant="hand" faceDown sleeveUrl={…} />` inline — no wrapper, no dnd-kit. No primitive API changes were required; the OPT-267 pattern survived the second consumer cleanly.
+- **Read first:** `src/components/game/board-layout/hand-layer.tsx` — the inline face-down render is the closest analogue to the passive zones OPT-269 targets (static, no drag, optional overlays). `src/components/game/board-layout/field-card.tsx` remains the reference for anything draggable or drop-targeted. Before touching zones, `grep -rn '<BoardCard' src/components/game` to scope remaining consumers — life, deck, trash stacks, leader-empty placeholder, `DroppableStageZone`, DON active bar.
+- **Gotchas / do NOT touch:**
+  - **Size tokens need a cross-check per zone.** `variant="hand"` → 84×118, `variant="field"` → 80×112 (aligns with `BOARD_CARD_W`×`BOARD_CARD_H`), and `variant="life"`/`"trash"` both fall through to the field size via `DEFAULT_SIZE_FOR_VARIANT` in `sizes.ts`. The DON active bar / life / trash zones all render inside `SQUARE` (112) slots today — verify each zone's existing footprint before migrating; if a zone needs its own size, extend `CARD_SIZES` rather than passing raw `style` width/height.
+  - **Count badges are a first-class overlay.** Life/deck/trash render "+N" counts today — the primitive already has `overlays.countBadge` (top-right corner, counter-rotated so labels stay horizontal). Use it; do not layer a second badge on top.
+  - **The `prevIdsRef` + `newlyArrived` block in `HandLayer` is load-bearing** — it hides brand-new cards for one render until the transition system registers them in `useEffect`. Two `Cannot access refs during render` ESLint warnings on that block are pre-existing and intentional; leave them.
+  - **Face-down hover behavior delta from OPT-268.** The opponent face-down row now gets the `handCardHover` lift on pointer-enter (was static before with `<BoardCard sleeve/>`). Kept because (a) tooltip is auto-suppressed by `faceDown`, (b) easy to add `interaction.hoverDisabled` later. If OPT-269 hits a "this zone shouldn't lift on hover" question (likely for life/trash stacks), the clean fix is to add that flag to the primitive in the same PR rather than paper over in the consumer.
+  - **Drag-ghost pattern stays consumer-owned.** If any zone has a drag-source affordance (the DON active bar has active-DON drags), replicate the hand/field pattern: `state="dragging"` on the primitive (suppresses hover/tap + tooltip) plus the outer `motion.div` `animate={{ opacity: isDragging ? 0.3 : 1 }}`. The primitive intentionally doesn't dim in `dragging` state.
+- **Unresolved:**
+  - **No visual VQA on OPT-268 yet.** Auto-mode session, no browser. Hand hover/drag/counter-mode/draw-placeholder behaviors are only type-checked + tested, not eyeballed. First thing when picking up OPT-269: spin up a 2-player lobby and walk PR #103's test plan so OPT-269 isn't stacking unverified claims.
+  - **Face-down hover delta** (see gotcha above) — no ticket, track as TODO until VQA decides.
+  - **`BoardCard` still alive** — used by every non-migrated zone. OPT-272 remains the deletion gate; don't front-run it.
+  - **Ring semantics** still deferred to OPT-273. Any zone that surfaces selection/validation rings (e.g. target picker on life) should keep them as consumer className on the outer wrapper, not route through `overlays.highlightRing`.
+- **Why this matters for OPT-269:** DON active bar + life + trash are a *cluster* of static render zones — mostly stacks of face-down sleeves with a count badge. The closest precedent is hand-layer's face-down path: `<Card variant="…" faceDown sleeveUrl={…} overlays={{ countBadge }} />` inline, no consumer wrapper unless the zone registers itself with `ZonePosition` or participates in drag. Expect minimal API tuning — the primitive has variants and `countBadge` already, and the behaviors are simpler than hand/field. The main judgment call is per-zone variant/size alignment and whether you need `interaction.hoverDisabled` for stacks that shouldn't lift.
