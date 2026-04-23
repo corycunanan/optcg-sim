@@ -162,6 +162,31 @@ pg_dump \
 psql "$PROD_DIRECT" < /tmp/optcg-card-data.sql
 ```
 
+## Cloudflare Workers: deploying on merge
+
+Both workers (`workers/game/` and `workers/images/`) are deployed by GitHub Actions on pushes to `main` when their respective directories change — see `.github/workflows/deploy-workers.yml`. This closes the same class of gap that OPT-278 closed for Prisma migrations: worker code merged to `main` now lands on Cloudflare automatically instead of relying on someone to remember to run `wrangler deploy`.
+
+| Context | Command | Targets |
+|--------|---------|---------|
+| Local, iterating on a worker | `pnpm --filter optcg-game dev` / `pnpm --filter optcg-images-worker dev` | Local miniflare |
+| Manual deploy (game worker) | `pnpm worker:deploy:game` | Cloudflare |
+| Manual deploy (images worker) | `pnpm worker:deploy` | Cloudflare |
+| CI/CD | Push to `main` with changes under `workers/game/**` or `workers/images/**` | Cloudflare (auto) |
+
+### Required GitHub secret
+
+The workflow authenticates with Cloudflare via `CLOUDFLARE_API_TOKEN` (repo secret). The token needs **Account → Workers Scripts → Edit** and **Account → Account Settings → Read**. Create one at https://dash.cloudflare.com/profile/api-tokens using the "Edit Cloudflare Workers" template.
+
+If the secret is missing, the workflow will fail loudly rather than silently skipping — that's intentional, because a silent skip is what let OPT-279 happen.
+
+### Why both a script and CI
+
+The `worker:deploy:game` script stays around for manual hotfixes and for local `wrangler tail` debugging sessions. CI is the primary path, but a dev with `wrangler` auth can always push a fix without waiting for `main`.
+
+### History
+
+Before OPT-279, only the images worker had a deploy script (`worker:deploy` in `package.json`) and neither worker had CI coverage. The game worker had not been deployed since commit `74635d8` (2026-03-21), so every engine improvement between then and 2026-04-22 — the M3.5–M4 effect engine, OPT-100, OPT-119, OPT-122, OPT-124, OPT-132, OPT-160, OPT-187, OPT-190, OPT-191, OPT-204, OPT-253, OPT-259, OPT-260, and more — was invisible in production. Games on `optcg-sim.vercel.app` failed to load because `/cards` and `/notify-end` were missing from the deployed worker.
+
 ## Shared Secrets
 
 | Secret | Consumers | Storage |
@@ -186,4 +211,4 @@ The worker uses this secret for three things: (a) Bearer auth on API callbacks (
 
 **When to rotate:** suspected leak (log exposure, accidental commit, contractor offboarding), at least annually, and any time the secret is known to have been on a developer machine that was lost or decommissioned.
 
-_Last updated: 2026-04-21_
+_Last updated: 2026-04-22_

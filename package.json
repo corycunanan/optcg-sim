@@ -23,7 +23,8 @@
     "test:watch": "vitest",
     "pipeline:import": "tsx pipeline/import.ts",
     "pipeline:migrate-images": "tsx pipeline/migrate-images.ts",
-    "worker:deploy": "cd workers/images && pnpm install && pnpm deploy"
+    "worker:deploy": "cd workers/images && pnpm install && pnpm run deploy",
+    "worker:deploy:game": "cd workers/game && pnpm install && pnpm run deploy"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
