@@ -12,13 +12,19 @@ import { cn } from "@/lib/utils";
 export function CardFront({
   data,
   fallbackLabel,
+  imageUrlOverride,
   className,
 }: {
   data: CardData | null;
   fallbackLabel?: string;
+  /**
+   * Direct image URL that bypasses the cardDb lookup — used by tokens
+   * without card data (DON!!). Falls back to `data.imageUrl` when absent.
+   */
+  imageUrlOverride?: string;
   className?: string;
 }) {
-  const imageUrl = data?.imageUrl ?? null;
+  const imageUrl = imageUrlOverride ?? data?.imageUrl ?? null;
 
   return (
     <div

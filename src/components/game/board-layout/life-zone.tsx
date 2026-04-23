@@ -3,8 +3,7 @@
 import React, { useCallback } from "react";
 import type { CardDb, LifeCard } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { BoardCard } from "../board-card";
-import { BOARD_CARD_W, BOARD_CARD_H } from "./constants";
+import { Card } from "../card";
 
 const LIFE_STACK_OFFSET = 20;
 
@@ -36,13 +35,7 @@ export const LifeZone = React.memo(function LifeZone({
   if (count === 0) {
     return (
       <div ref={ref} style={style}>
-        <BoardCard
-          cardDb={cardDb}
-          empty
-          label="LIFE"
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
-        />
+        <Card variant="life" data={{ cardDb }} empty emptyLabel="LIFE" />
       </div>
     );
   }
@@ -50,15 +43,13 @@ export const LifeZone = React.memo(function LifeZone({
   return (
     <div ref={ref} style={style}>
       {life.map((card, i) => (
-        <BoardCard
+        <Card
           key={card.instanceId}
-          cardDb={cardDb}
-          cardId={card.face === "UP" ? card.cardId : undefined}
-          sleeve={card.face === "DOWN"}
+          variant="life"
+          data={{ cardDb, cardId: card.face === "UP" ? card.cardId : undefined }}
+          faceDown={card.face === "DOWN"}
           sleeveUrl={sleeveUrl}
-          count={i === 0 ? count : undefined}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
+          overlays={i === 0 ? { countBadge: count } : undefined}
           style={{
             position: "absolute",
             left: 0,

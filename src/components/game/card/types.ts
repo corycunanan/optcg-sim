@@ -13,7 +13,8 @@ export type CardVariant =
   | "hand"   // card in a hand row
   | "modal"  // modal/dialog card (target picker, trash preview, arrange)
   | "life"   // life zone (face-down or revealed)
-  | "trash"; // trash preview
+  | "trash"  // trash preview
+  | "don";   // DON!! token in the cost area (custom art, no card data)
 
 /**
  * Interaction + lifecycle state. Drives motion preset + visual treatment.
@@ -30,7 +31,7 @@ export type CardState =
   | "dragging"
   | "in-flight";
 
-export type CardSize = "field" | "hand" | "modal" | "preview";
+export type CardSize = "field" | "hand" | "modal" | "preview" | "don";
 
 export type HighlightRingColor = "selected" | "valid" | "invalid";
 
@@ -59,13 +60,23 @@ export interface CardDataProp {
 }
 
 export interface CardProps {
-  data: CardDataProp;
+  /**
+   * Card data source. Optional so DON tokens (variant="don") can render
+   * through `artUrl` without a cardDb lookup.
+   */
+  data?: CardDataProp;
   variant: CardVariant;
   state?: CardState;
   size?: CardSize;
   /** Flip to the back face (animated via 3D rotateY). */
   faceDown?: boolean;
   sleeveUrl?: string | null;
+  /**
+   * Direct image URL override for the front face — used by DON tokens
+   * whose art isn't sourced from the card database. When set, suppresses
+   * the tooltip (no card data to show).
+   */
+  artUrl?: string;
   interaction?: CardInteraction;
   overlays?: CardOverlays;
   /** Empty-slot placeholder (e.g. empty life zone) — takes precedence over data. */

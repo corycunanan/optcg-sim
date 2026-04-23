@@ -4,7 +4,7 @@ import React, { useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { BattleSubPhase, CardDb, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { BoardCard } from "../board-card";
+import { Card } from "../card";
 import { BOARD_CARD_W, BOARD_CARD_H, type DragPayload } from "./constants";
 import { DropOverlay } from "./drop-zones";
 
@@ -64,14 +64,15 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
       style={{ ...style, width: BOARD_CARD_W, height: BOARD_CARD_H }}
     >
       <DropOverlay active={validDrag} hovered={isOver && validDrag} color="red" />
-      <BoardCard
-        card={topCard}
-        cardDb={cardDb}
+      <Card
+        variant="trash"
+        data={{ cardDb, card: topCard }}
         empty={!topCard}
-        label="TRASH"
-        count={trash.length > 1 ? trash.length : undefined}
-        width={BOARD_CARD_W}
-        height={BOARD_CARD_H}
+        emptyLabel="TRASH"
+        overlays={
+          trash.length > 1 ? { countBadge: trash.length } : undefined
+        }
+        interaction={{ clickable: !!onClickTrash }}
         onClick={onClickTrash}
         className="relative z-[1]"
       />

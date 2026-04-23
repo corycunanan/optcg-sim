@@ -16,14 +16,13 @@ import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui";
 import { BoardCard } from "../board-card";
+import { Card } from "../card";
 import {
   NAVBAR_H,
   HAND_CARD_W,
   HAND_CARD_H,
   FIELD_W,
   BOARD_CONTENT_H,
-  BOARD_CARD_W,
-  BOARD_CARD_H,
   getViewportSize,
 } from "./constants";
 import { midTop, computeBoardScaling } from "./board-geometry";
@@ -447,12 +446,19 @@ function BoardLayoutInner({
             </div>
           )}
           {activeDrag.type === "attacker" && (
-            <BoardCard
-              card={activeDrag.card}
-              cardDb={cardDb}
-              width={BOARD_CARD_W * boardScale}
-              height={BOARD_CARD_H * boardScale}
-            />
+            <div
+              style={{
+                transform: `scale(${boardScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <Card
+                variant="field"
+                data={{ cardDb, card: activeDrag.card }}
+                overlays={{ donCount: activeDrag.card.attachedDon.length }}
+                interaction={{ tooltipDisabled: true }}
+              />
+            </div>
           )}
         </motion.div>
       )}
