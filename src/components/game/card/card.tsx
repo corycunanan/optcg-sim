@@ -52,6 +52,7 @@ export const Card = React.memo(function Card({
   state = "active",
   size,
   faceDown,
+  flipFrom,
   sleeveUrl,
   artUrl,
   interaction,
@@ -201,7 +202,7 @@ export const Card = React.memo(function Card({
             onPointerMove={handlePointerMove}
             onPointerLeave={handlePointerLeave}
           >
-            <CardFaces faceDown={!!faceDown}>
+            <CardFaces faceDown={!!faceDown} flipFrom={flipFrom}>
               <CardFront
                 data={cardData}
                 fallbackLabel={overlays?.label}

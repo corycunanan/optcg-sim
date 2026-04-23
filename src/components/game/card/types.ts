@@ -70,6 +70,14 @@ export interface CardProps {
   size?: CardSize;
   /** Flip to the back face (animated via 3D rotateY). */
   faceDown?: boolean;
+  /**
+   * When set, renders the flip animation on mount by seeding `initial` at
+   * the opposite face. Caller uses this to guarantee a flip plays whenever
+   * `faceDown` changes — useful when the Card may remount or when motion
+   * prop-change detection fails (e.g. Shirahoshi activating a modal in the
+   * same render as the life flip). Set to the *previous* face state.
+   */
+  flipFrom?: "UP" | "DOWN";
   sleeveUrl?: string | null;
   /**
    * Direct image URL override for the front face — used by DON tokens
