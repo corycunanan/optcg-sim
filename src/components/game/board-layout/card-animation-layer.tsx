@@ -16,6 +16,13 @@ interface CardAnimationLayerProps {
   sleeveUrls?: [string | null, string | null];
 }
 
+/**
+ * Delay before triggering a mid-flight flip on life reveals (OPT-276).
+ * Smaller than the `cardTransitions.zoneMove` spring settle time so the
+ * flip lands while the card is still visibly flying — not at the endpoint.
+ */
+const LIFE_REVEAL_FLIP_DELAY_MS = 180;
+
 function FlyingCard({
   transition,
   cardDb,
@@ -32,10 +39,29 @@ function FlyingCard({
   const toRect = zonePos.getRect(transition.toZoneKey);
   const canAnimate = !!fromRect && !!toRect;
 
+  // Life reveal (OPT-276): when a card flies FROM a life zone AND we know
+  // its id (viewer's own reveal), start face-down to match the life stack
+  // and flip mid-flight. Opponent-side reveals keep cardId=null and stay
+  // face-down throughout. Non-life flights use the default: face-up when
+  // id is known, face-down when it isn't.
+  const revealsMidFlight =
+    transition.fromZoneKey.endsWith("-life") && !!transition.cardId;
+  const [faceDown, setFaceDown] = React.useState(
+    revealsMidFlight ? true : !transition.cardId,
+  );
+
   // If we can't resolve both positions, clean up immediately
   React.useEffect(() => {
     if (!canAnimate) onComplete();
   }, [canAnimate, onComplete]);
+
+  // Schedule the mid-flight flip. Guarded by `canAnimate` so we don't queue
+  // a setState after the FlyingCard unmounts through the clean-up path.
+  React.useEffect(() => {
+    if (!canAnimate || !revealsMidFlight) return;
+    const timer = setTimeout(() => setFaceDown(false), LIFE_REVEAL_FLIP_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [canAnimate, revealsMidFlight]);
 
   if (!canAnimate) return null;
 
@@ -58,7 +84,6 @@ function FlyingCard({
   // matches the outer motion.div's animated `toW/toH` so the card settles
   // into the destination zone at exactly the right dimensions.
   const variant = isHandBound ? "hand" : "field";
-  const isFaceDown = !transition.cardId;
 
   return (
     <motion.div
@@ -93,7 +118,7 @@ function FlyingCard({
         data={
           transition.cardId ? { cardId: transition.cardId, cardDb } : undefined
         }
-        faceDown={isFaceDown}
+        faceDown={faceDown}
         sleeveUrl={sleeveUrl}
         interaction={{ tooltipDisabled: true }}
       />
