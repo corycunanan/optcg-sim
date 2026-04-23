@@ -1,7 +1,24 @@
 "use client";
 
 import React, { useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
+import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -14,78 +31,48 @@ import {
 import { GameButton } from "./game-button";
 import { Card } from "./card";
 
-// The `<Card>` primitive renders inside a 3D DOM tree (perspective + preserve-3d
-// + backface-visibility + inline rotateX/rotateY motion values). The browser's
-// HTML5 drag-image snapshot of that tree shows the back face or a black box.
-// Swap in a flat `<img>` clone of the card art so the snapshot bypasses the
-// 3D context entirely.
-function setFlatCardDragImage(
-  e: React.DragEvent<HTMLDivElement>,
-  imageUrl: string,
-) {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const offsetX = e.clientX - rect.left;
-  const offsetY = e.clientY - rect.top;
-
-  const ghost = document.createElement("img");
-  ghost.src = imageUrl;
-  ghost.alt = "";
-  ghost.draggable = false;
-  ghost.style.position = "fixed";
-  ghost.style.top = "-10000px";
-  ghost.style.left = "-10000px";
-  ghost.style.width = "80px";
-  ghost.style.height = "112px";
-  ghost.style.borderRadius = "4px";
-  ghost.style.objectFit = "cover";
-  ghost.style.pointerEvents = "none";
-  document.body.appendChild(ghost);
-
-  e.dataTransfer.setDragImage(ghost, offsetX, offsetY);
-
-  // The browser snapshots synchronously, but the element must stay in the DOM
-  // until the next frame or Safari drops the bitmap.
-  requestAnimationFrame(() => ghost.remove());
-}
-
-function ModalCard({
+function SortableModalCard({
   card,
   cardDb,
   selected,
   dimmed,
-  isDragOver,
+  reducedMotion,
   onSelect,
-  onDragStart,
-  onDragOver,
-  onDrop,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   selected?: boolean;
   dimmed?: boolean;
-  isDragOver?: boolean;
+  reducedMotion: boolean;
   onSelect: () => void;
-  onDragStart: () => void;
-  onDragOver: () => void;
-  onDrop: () => void;
 }) {
-  const imageUrl = cardDb[card.cardId]?.imageUrl ?? null;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.instanceId });
+
+  const sortableTransform = transform
+    ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+    : undefined;
 
   return (
     <div
-      draggable
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       onClick={onSelect}
-      onDragStart={(e) => {
-        e.stopPropagation();
-        if (imageUrl) setFlatCardDragImage(e, imageUrl);
-        onDragStart();
+      style={{
+        transform: sortableTransform,
+        transition: reducedMotion ? "none" : (transition ?? undefined),
+        opacity: isDragging ? 0.3 : undefined,
       }}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(); }}
-      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(); }}
       className={cn(
-        "relative rounded select-none shrink-0 cursor-grab transition-[box-shadow] duration-150",
+        "relative rounded select-none shrink-0 cursor-grab touch-none",
         selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent",
-        isDragOver && !selected && "ring-2 ring-gb-accent-blue",
         dimmed && "opacity-40",
       )}
     >
@@ -93,6 +80,8 @@ function ModalCard({
         variant="modal"
         size="field"
         data={{ card, cardId: card.cardId, cardDb }}
+        state={isDragging ? "dragging" : undefined}
+        interaction={isDragging ? { tooltipDisabled: true } : undefined}
       />
       {selected && (
         <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
@@ -131,36 +120,35 @@ export function ArrangeTopCardsModal({
   const [orderedCards, setOrderedCards] = useState<CardInstance[]>(initialCards);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [keptCardInstanceId, setKeptCardInstanceId] = useState<string | null>(null);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const reducedMotion = useReducedMotion() ?? false;
+  const dragTilt = useDragTilt({ disabled: reducedMotion });
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   // If validTargets is provided, only those cards can be selected
   const canSelectCard = (instanceId: string) =>
     validTargets === undefined || validTargets.includes(instanceId);
 
-  function handleDragStart(i: number) {
-    setDragIndex(i);
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+    dragTilt.handleDragStart(event);
   }
 
-  function handleDragOver(i: number) {
-    if (dragIndex === null || dragIndex === i) return;
-    setDropIndex(i);
-  }
-
-  function handleDrop(i: number) {
-    if (dragIndex !== null && dragIndex !== i) {
-      const next = [...orderedCards];
-      const [moved] = next.splice(dragIndex, 1);
-      next.splice(i, 0, moved);
-      setOrderedCards(next);
+  function handleDragEnd(event: DragEndEvent) {
+    dragTilt.handleDragEnd(event);
+    setActiveId(null);
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setOrderedCards((prev) => {
+        const oldIndex = prev.findIndex((c) => c.instanceId === active.id);
+        const newIndex = prev.findIndex((c) => c.instanceId === over.id);
+        if (oldIndex === -1 || newIndex === -1) return prev;
+        return arrayMove(prev, oldIndex, newIndex);
+      });
     }
-    setDragIndex(null);
-    setDropIndex(null);
-  }
-
-  function handleDragEnd() {
-    setDragIndex(null);
-    setDropIndex(null);
   }
 
   function handleAddToHand() {
@@ -190,13 +178,15 @@ export function ArrangeTopCardsModal({
       ? effectDescription
       : `Put the remaining ${orderedCards.length} card${orderedCards.length !== 1 ? "s" : ""} back`;
 
+  const activeCard = activeId
+    ? orderedCards.find((c) => c.instanceId === activeId) ?? null
+    : null;
+
   return (
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
       <DialogContent
         showCloseButton={false}
         className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDragEnd}
       >
         <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
           <DialogTitle className="text-sm font-bold text-gb-text-bright">
@@ -208,37 +198,69 @@ export function ArrangeTopCardsModal({
         </DialogHeader>
 
         <TooltipProvider delayDuration={0} disableHoverableContent>
-          <div className="px-4 py-5">
-            <div className="flex items-center justify-center gap-3 flex-wrap">
-              {orderedCards.map((card, i) => (
-                <ModalCard
-                  key={card.instanceId}
-                  card={card}
-                  cardDb={cardDb}
-                  selected={step === 1 && selectedId === card.instanceId}
-                  dimmed={step === 1 && !canSelectCard(card.instanceId)}
-                  isDragOver={dropIndex === i}
-                  onSelect={() => {
-                    if (step === 1 && canSelectCard(card.instanceId)) {
-                      setSelectedId((prev) =>
-                        prev === card.instanceId ? null : card.instanceId,
-                      );
-                    }
-                  }}
-                  onDragStart={() => handleDragStart(i)}
-                  onDragOver={() => handleDragOver(i)}
-                  onDrop={() => handleDrop(i)}
-                />
-              ))}
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragMove={dragTilt.handleDragMove}
+            onDragEnd={handleDragEnd}
+            onDragCancel={() => {
+              dragTilt.handleDragEnd({} as DragEndEvent);
+              setActiveId(null);
+            }}
+          >
+            <div className="px-4 py-5">
+              <SortableContext
+                items={orderedCards.map((c) => c.instanceId)}
+                strategy={rectSortingStrategy}
+              >
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  {orderedCards.map((card) => (
+                    <SortableModalCard
+                      key={card.instanceId}
+                      card={card}
+                      cardDb={cardDb}
+                      selected={step === 1 && selectedId === card.instanceId}
+                      dimmed={step === 1 && !canSelectCard(card.instanceId)}
+                      reducedMotion={reducedMotion}
+                      onSelect={() => {
+                        if (step === 1 && canSelectCard(card.instanceId)) {
+                          setSelectedId((prev) =>
+                            prev === card.instanceId ? null : card.instanceId,
+                          );
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+
+              {step === 2 && (
+                <div className="flex justify-between mt-3">
+                  <span className="text-xs text-gb-text-dim">← top of deck</span>
+                  <span className="text-xs text-gb-text-dim">bottom of deck →</span>
+                </div>
+              )}
             </div>
 
-            {step === 2 && (
-              <div className="flex justify-between mt-3">
-                <span className="text-xs text-gb-text-dim">← top of deck</span>
-                <span className="text-xs text-gb-text-dim">bottom of deck →</span>
-              </div>
-            )}
-          </div>
+            <DragOverlay dropAnimation={null}>
+              {activeCard && (
+                <motion.div
+                  style={{
+                    transformPerspective: 1000,
+                    rotateX: dragTilt.tiltX,
+                    rotateY: dragTilt.tiltY,
+                  }}
+                >
+                  <Card
+                    variant="modal"
+                    size="field"
+                    data={{ card: activeCard, cardId: activeCard.cardId, cardDb }}
+                    interaction={{ tooltipDisabled: true }}
+                  />
+                </motion.div>
+              )}
+            </DragOverlay>
+          </DndContext>
         </TooltipProvider>
 
         <DialogFooter className="flex-row items-center justify-end gap-2 px-4 py-3 border-t border-gb-border pt-3">
