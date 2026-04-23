@@ -11,26 +11,25 @@ import { cn } from "@/lib/utils";
  * Kept minimal — layout + sizing. Motion, state, and face rendering are
  * handled by `<CardFaces>` inside.
  */
+type PerspectiveContainerProps = React.HTMLAttributes<HTMLDivElement> & {
+  width: number;
+  height: number;
+};
+
 export const PerspectiveContainer = React.forwardRef<
   HTMLDivElement,
-  {
-    width: number;
-    height: number;
-    className?: string;
-    style?: React.CSSProperties;
-    onClick?: () => void;
-    onContextMenu?: (e: React.MouseEvent) => void;
-    children: React.ReactNode;
-  }
+  PerspectiveContainerProps
 >(function PerspectiveContainer(
-  { width, height, className, style, onClick, onContextMenu, children },
+  { width, height, className, style, children, ...rest },
   ref,
 ) {
+  // `...rest` is load-bearing: Radix's `<TooltipTrigger asChild>` clones the
+  // child and spreads `onPointerEnter` / `onPointerLeave` / `onFocus` onto it.
+  // Without the spread, tooltips silently don't fire on any `<Card>` consumer.
   return (
     <div
       ref={ref}
-      onClick={onClick}
-      onContextMenu={onContextMenu}
+      {...rest}
       className={cn("relative [perspective:1000px]", className)}
       style={{ width, height, ...style }}
     >
