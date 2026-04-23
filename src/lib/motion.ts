@@ -69,10 +69,31 @@ const board = {
         rotate: { duration: 0.55, ease: "easeInOut" as const },
       },
     },
-    /** Field card tap: scale(0.97), 150ms ease-out */
+    /** Field card tap: scale-down + 3D `rotateX` dip, ~120ms (OPT-275).
+     *  Composes with the outer state rotation (rest = rotateZ 90°) and with
+     *  the pointer-driven tilt — dip takes priority briefly, then reverts. */
     tap: {
-      scale: 0.97,
-      transition: { duration: 0.15, ease: "easeOut" as const },
+      scale: 0.96,
+      rotateX: -6,
+      transition: { duration: 0.12, ease: "easeOut" as const },
+    },
+    /** `prefers-reduced-motion` fallback for tap — plain scale, no 3D dip. */
+    tapReduced: {
+      scale: 0.96,
+      transition: { duration: 0.12, ease: "easeOut" as const },
+    },
+    /** Balatro-style passive breathing (OPT-275). Subtle drift + scale pulse,
+     *  3.5s loop. Applied on a dedicated motion layer inside state rotation
+     *  so hover/tap composes on top without clobbering the loop. */
+    breathing: {
+      y: [0, -2, 0] as number[],
+      scale: [1, 1.008, 1] as number[],
+      transition: {
+        duration: 3.5,
+        ease: "easeInOut" as const,
+        repeat: Infinity,
+        repeatType: "loop" as const,
+      },
     },
     /** Hand card hover: lift + scale, same spring-in / tween-out shape,
      *  same wiggle. */
@@ -117,6 +138,8 @@ export const motionPresets = {
 
 export const cardHover = board.card.hover;
 export const cardTap = board.card.tap;
+export const cardTapReduced = board.card.tapReduced;
+export const cardBreathing = board.card.breathing;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
 export const cardRest = board.stateChange.rest;

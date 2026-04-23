@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-272 merged)
+last-updated: 2026-04-23 (OPT-275 in review)
 ---
 
 # Card Animations — Handoff Doc
@@ -23,7 +23,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Done (2026-04-23) | [#111](https://github.com/corycunanan/optcg-sim/pull/111) merged | Flip-during-flight deferred to OPT-276 (primitive ready, orchestration not wired) |
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Done (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) merged | Consolidates the two tooltip paths — `CardTooltipContent` extracted, both paths reach for it |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Done (2026-04-23) | [#115](https://github.com/corycunanan/optcg-sim/pull/115) merged | Capstone — migration gate; Phase 2 complete |
-| 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Backlog | — | Can start once field-card is on primitive |
+| 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | In Review (2026-04-23) | [#117](https://github.com/corycunanan/optcg-sim/pull/117) | Idle breathing + pointer tilt + 3D click bob — all layered onto the primitive |
 | 9 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
 | 10 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
 | 11 | OPT-274 | Entry + hand re-fan micro-interactions | Medium | OPT-267, OPT-268, OPT-270 | Backlog | — | |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-275 — Balatro-style passive motion.
+**Next up:** OPT-276 — Drag tilt + flip animations.
 
 ---
 
@@ -162,3 +162,21 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **`state="invalid"` still wired but unused** — carried over from OPT-271. Still OPT-273's scope to pick up.
   - **Every remaining design-system follow-up is now closed** — no more inline style design properties on the touched files. Wider repo audit (if it ever happens) is a separate exercise.
 - **Why this matters for OPT-275:** the primitive is now the *only* render path for game cards, which means any behavioral work (Balatro-style passive motion, battle-state micro-interactions, entry/re-fan choreography) only needs to touch `<Card>` + its state presets — no more double-maintenance against `BoardCard`. OPT-275 is the first ticket to exploit that: it wants to layer passive idle motion (subtle drift / breath / micro-rotation) on top of the existing state matrix. Candidate home is `state-presets.ts` — either a new state (`"idle"` distinct from `"active"`) or an extension to the default `active` preset gated on a variant. Read the OPT-267 → OPT-268 entry above for the consumer pattern first; it applies unchanged.
+
+### OPT-275 → OPT-276
+**From:** session on 2026-04-23 · **Commits:** `0bf0ffb` (presets), `48ea103` (card integration) · **PR:** [#117](https://github.com/corycunanan/optcg-sim/pull/117)
+
+- **Primer:** Passive motion now stacks on every game card through three layers inside `<Card>` — (1) the existing outer state-rotation layer, (2) a new middle breathing layer (`y: [0,-2,0]` + `scale: [1,1.008,1]` 3.5s `repeat: Infinity`), (3) the existing interaction layer, now also driven by pointer-tracking tilt (`useMotionValue` → `useSpring` → inline `rotateX`/`rotateY`, ±12° max). The `whileTap` preset (`cardTap`) was upgraded in place with a `rotateX: -6` dip; `cardTapReduced` is the plain-scale fallback wired through `variantTap(variant, reducedMotion)`. Breathing + tilt are gated by `idleBreathingConfig` and `tiltEnabled` respectively — both respect `prefers-reduced-motion` and skip non-focal zones (trash, life, DON, face-down, non-idle states). `will-change-transform` lives on the interaction layer.
+- **Read first:** `src/components/game/card/card.tsx` (three-layer structure is the reference point for OPT-276's flip + drag-tilt wiring), `src/components/game/card/state-presets.ts` + `src/lib/motion.ts` (where all the motion presets live — extend here, not in consumers), `src/components/game/card/card-faces.tsx` (the `rotateY` flip layer OPT-276 targets — note it already composes with the new pointer tilt because both live under the same perspective container). `/preview/card` exercises every variant × state × size combo and is the natural VQA harness.
+- **Gotchas / do NOT touch:**
+  - **Three nested motion.divs now** (state → breathing → interaction). Don't flatten them; each owns a distinct transform axis (outer: rotateZ + opacity + filter, breathing: y + scale loop, interaction: whileHover/Tap scale/rotateZ wiggle + inline rotateX/rotateY tilt). Collapsing breaks composition and reintroduces the OPT-266 "rotated card snaps back to 0°" bug.
+  - **`style={{ rotateX, rotateY }}` with motion values** on the interaction layer is load-bearing for tilt composition. `whileHover`/`whileTap` must NOT target `rotateX` or `rotateY` keys or they'll clobber the pointer tilt. `cardTap`'s `rotateX: -6` is deliberately a brief dip that motion.dev overlays on top, then reverts — don't extend `whileHover` the same way.
+  - **Breathing layer always renders**, even when disabled. Gating happens via the `animate` prop (`breathing?.animate ?? BREATHING_BASELINE`). Keep this pattern — making the layer conditional remounts the DOM tree and would invalidate dnd-kit/Radix refs on consumer wrappers.
+  - **Hooks order.** `useMotionValue`/`useSpring`/`useRef`/`useCallback` sit ABOVE the `if (empty)` short-circuit on purpose. They're cheap even for empty placeholders; moving them back below the early return re-triggers the rules-of-hooks lint errors I just fixed.
+  - **DON badge lives outside the rotating layer** and therefore also outside the breathing + tilt stack. Left alone on purpose — UI chrome shouldn't breathe or tilt. If OPT-276's flip wants the badge to fade/flip with the card, that's a separate decision, don't port it into the interaction layer.
+- **Unresolved:**
+  - **No visual VQA on OPT-275.** Auto-mode session, no browser. Type-check + lint (0 new warnings, 632 baseline warnings unchanged) + tests (34/34 pass), but no manual eyeball. First thing when picking up OPT-276: spin up a 2-player lobby with a full board (hand + both fields + DON + opponent hand backs, ~30 cards) and walk through (a) idle breathing feel across zones — focal cards breathe, trash/life/DON/face-down do not; (b) hover tilt on field + hand + modal cards follows pointer with a spring ease; (c) click bob reads as a brief 3D dip; (d) prefers-reduced-motion disables breathing + tilt entirely and leaves only a plain scale tap; (e) 60fps target with devtools Performance tab.
+  - **`cardTap` behavior change.** Non-reduced-motion clicks now dip 6° in 3D in addition to scaling 0.96 (was flat `scale: 0.97`). If any consumer relied on a purely-2D tap feel, it'll show. I don't expect that — tap is brief and the perspective container keeps the dip readable — but it's the only consumer-visible surprise.
+  - **Perf measurement deferred.** The ticket asks for a frame-time pass with ~30 cards active. Structure already applies the Balatro's "gate breathing in non-focal zones" rule via `idleBreathingConfig`, so the most likely perf-regression vector is already mitigated. If VQA surfaces jank, options are: throttle pointer tilt with `requestAnimationFrame` batching, reduce `TILT_SPRING` stiffness, or bump the breathing duration to 4.5s.
+  - **`state="invalid"` still wired but unused** — carried forward from OPT-271/272. OPT-273 is where this lands.
+- **Why this matters for OPT-276:** OPT-276 is drag tilt + flip animations. Drag tilt is structurally identical to the pointer tilt I just added — same motion-value + useSpring plumbing, but driven by dnd-kit drag delta instead of pointer position. Candidate API: expose `drag.tilt.set(deg)` via a primitive prop, or — cleaner — teach the existing tilt handler to prefer the drag-delta source when dnd-kit says the card is dragging. The flip part consumes the existing `CardFaces` rotateY layer (OPT-266 foundation), which now sits INSIDE the tilt layer — so a flipping card tilts naturally with the flip. Expect minimal new primitive API; most of the work is consumer wiring to pass drag delta through.

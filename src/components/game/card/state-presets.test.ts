@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   cardActivate,
+  cardBreathing,
   cardHover,
   cardRest,
   cardTap,
+  cardTapReduced,
   handCardHover,
 } from "@/lib/motion";
-import { faceDownRotateY, stateToMotionConfig } from "./state-presets";
+import {
+  faceDownRotateY,
+  idleBreathingConfig,
+  stateToMotionConfig,
+} from "./state-presets";
 import type { CardState, CardVariant } from "./types";
 
 const ALL_STATES: CardState[] = [
@@ -67,12 +73,16 @@ describe("stateToMotionConfig", () => {
     expect(stateToMotionConfig("active", "hand", false).whileTap).toBeUndefined();
   });
 
-  it("reducedMotion strips whileHover/whileTap across every active state", () => {
+  it("reducedMotion strips hover and falls the tap back to plain scale (no 3D dip)", () => {
     for (const s of ["rest", "active", "selected"] as const) {
       const cfg = stateToMotionConfig(s, "field", true);
       expect(cfg.whileHover).toBeUndefined();
-      expect(cfg.whileTap).toBeUndefined();
+      // Non-hand variants keep a simple-scale tap under reduced-motion (OPT-275).
+      expect(cfg.whileTap).toEqual(cardTapReduced);
+      expect((cfg.whileTap as Record<string, unknown>).rotateX).toBeUndefined();
     }
+    // Hand keeps its lift-hover-only contract — still no tap.
+    expect(stateToMotionConfig("active", "hand", true).whileTap).toBeUndefined();
   });
 
   it("merges motionDelay into the state transition without overwriting the spring", () => {
@@ -97,6 +107,42 @@ describe("stateToMotionConfig", () => {
         expect(cfg.transition).toBeDefined();
       }
     }
+  });
+});
+
+describe("idleBreathingConfig", () => {
+  it("returns the cardBreathing loop for focal active field/hand/modal cards", () => {
+    for (const v of ["field", "hand", "modal"] as const) {
+      const cfg = idleBreathingConfig("active", v, false, false);
+      expect(cfg).toBeDefined();
+      const { transition: _, ...animateOnly } = cardBreathing;
+      expect(cfg!.animate).toEqual(animateOnly);
+      expect(cfg!.transition).toBe(cardBreathing.transition);
+    }
+  });
+
+  it("returns the loop for selected cards (target picker keeps them alive)", () => {
+    expect(idleBreathingConfig("selected", "field", false, false)).toBeDefined();
+  });
+
+  it("skips non-focal zones (trash / life / don)", () => {
+    for (const v of ["trash", "life", "don"] as const) {
+      expect(idleBreathingConfig("active", v, false, false)).toBeUndefined();
+    }
+  });
+
+  it("skips non-idle states (rest / invalid / dragging / in-flight)", () => {
+    for (const s of ["rest", "invalid", "dragging", "in-flight"] as const) {
+      expect(idleBreathingConfig(s, "field", false, false)).toBeUndefined();
+    }
+  });
+
+  it("skips face-down cards — sleeves don't breathe", () => {
+    expect(idleBreathingConfig("active", "field", true, false)).toBeUndefined();
+  });
+
+  it("honors prefers-reduced-motion", () => {
+    expect(idleBreathingConfig("active", "field", false, true)).toBeUndefined();
   });
 });
 

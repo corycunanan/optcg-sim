@@ -1,9 +1,11 @@
 import type { Transition, TargetAndTransition } from "motion/react";
 import {
   cardActivate,
+  cardBreathing,
   cardHover,
   cardRest,
   cardTap,
+  cardTapReduced,
   handCardHover,
 } from "@/lib/motion";
 import type { CardState, CardVariant } from "./types";
@@ -44,7 +46,7 @@ export function stateToMotionConfig(
   delay?: number,
 ): CardMotionConfig {
   const hover = variantHover(variant);
-  const tap = variantTap(variant);
+  const tap = variantTap(variant, reducedMotion);
   const withDelay = (t: Transition): Transition =>
     delay != null ? { ...t, delay } : t;
 
@@ -55,14 +57,14 @@ export function stateToMotionConfig(
         animate: { rotate: 90, opacity: 1, filter: "brightness(0.6)" },
         transition: withDelay(cardRest),
         whileHover: reducedMotion ? undefined : hover,
-        whileTap: reducedMotion ? undefined : tap,
+        whileTap: tap,
       };
     case "active":
       return {
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
         transition: withDelay(cardActivate),
         whileHover: reducedMotion ? undefined : hover,
-        whileTap: reducedMotion ? undefined : tap,
+        whileTap: tap,
       };
     case "selected":
       // Upright + subtle lift; highlight ring renders separately via overlays.
@@ -70,7 +72,7 @@ export function stateToMotionConfig(
         animate: { rotate: 0, opacity: 1, filter: "brightness(1)" },
         transition: withDelay(cardActivate),
         whileHover: reducedMotion ? undefined : hover,
-        whileTap: reducedMotion ? undefined : tap,
+        whileTap: tap,
       };
     case "invalid":
       // Target picker: card exists but is not a legal choice. Dimmed only —
@@ -106,9 +108,38 @@ function variantHover(variant: CardVariant): TargetAndTransition {
   return variant === "hand" ? handCardHover : cardHover;
 }
 
-function variantTap(variant: CardVariant): TargetAndTransition | undefined {
+function variantTap(
+  variant: CardVariant,
+  reducedMotion: boolean,
+): TargetAndTransition | undefined {
   // Hand cards use lift-hover only (no squish-tap) to match existing handCardHover feel.
-  return variant === "hand" ? undefined : cardTap;
+  if (variant === "hand") return undefined;
+  // Under reduced-motion the 3D dip (rotateX) is suppressed but a simple
+  // scale tap remains, per OPT-275 spec.
+  return reducedMotion ? cardTapReduced : cardTap;
+}
+
+/**
+ * Ambient "card feels alive" idle loop (Balatro-style). Disabled on:
+ * `prefers-reduced-motion`, face-down cards, non-focal zones (trash /
+ * life / DON tokens), and non-idle states (rest / invalid / dragging /
+ * in-flight). When disabled, the layer still renders but animates once
+ * to a baseline — no infinite loop cost.
+ */
+export function idleBreathingConfig(
+  state: CardState,
+  variant: CardVariant,
+  faceDown: boolean | undefined,
+  reducedMotion: boolean,
+): { animate: TargetAndTransition; transition: Transition } | undefined {
+  if (reducedMotion) return undefined;
+  if (faceDown) return undefined;
+  if (state !== "active" && state !== "selected") return undefined;
+  if (variant === "trash" || variant === "life" || variant === "don") {
+    return undefined;
+  }
+  const { transition, ...animate } = cardBreathing;
+  return { animate, transition };
 }
 
 /**
