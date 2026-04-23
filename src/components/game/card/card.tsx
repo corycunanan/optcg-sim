@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { motion, useReducedMotion } from "motion/react";
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+} from "motion/react";
 import { cn } from "@/lib/utils";
 import { CardTooltip } from "../use-card-tooltip";
 import { CardBack } from "./card-back";
@@ -12,8 +17,22 @@ import { CardDonBadge } from "./overlays/card-don-badge";
 import { CardHighlightRing } from "./overlays/card-highlight-ring";
 import { PerspectiveContainer } from "./perspective-container";
 import { resolveSize } from "./sizes";
-import { stateToMotionConfig } from "./state-presets";
+import { idleBreathingConfig, stateToMotionConfig } from "./state-presets";
 import type { CardProps } from "./types";
+
+/** Max pointer-tilt deflection in degrees (OPT-275). Stays inside the
+ *  ticket's 10–15° target; further composes with the outer state rotation. */
+const TILT_MAX_DEG = 12;
+
+/** Spring for the pointer-driven tilt motion values. Gentle enough that a
+ *  fast flick reads as a smooth lean, stiff enough that leaving the card
+ *  snaps back promptly. */
+const TILT_SPRING = { stiffness: 220, damping: 22, mass: 0.6 } as const;
+
+/** Used when idle breathing is disabled for a given card — animate once to
+ *  baseline, then stay put. No infinite loop cost. */
+const BREATHING_BASELINE = { y: 0, scale: 1 };
+const BREATHING_BASELINE_TRANSITION = { duration: 0 };
 
 /**
  * `<Card>` — unified primitive for every game card rendering surface.
@@ -47,6 +66,58 @@ export const Card = React.memo(function Card({
   const reducedMotion = useReducedMotion();
   const { width, height } = resolveSize(variant, size);
 
+  // All hooks must run in a stable order on every render — keep them above
+  // the `empty` short-circuit. Computations that depend on props the empty
+  // path doesn't use are cheap and harmless to run anyway.
+  const motionConfig = stateToMotionConfig(
+    state,
+    variant,
+    reducedMotion ?? false,
+    motionDelay,
+  );
+
+  const breathing = idleBreathingConfig(
+    state,
+    variant,
+    faceDown,
+    reducedMotion ?? false,
+  );
+
+  // Pointer-driven 3D tilt (OPT-275). Raw motion values track the pointer
+  // directly; a spring smooths them into the inline `rotateX/rotateY`. The
+  // spring also owns the ease-back-to-zero when the pointer leaves — no
+  // imperative animation needed.
+  //
+  // Tilt composes with the outer state rotation via perspective-preserve-3d,
+  // so a rested card (rotateZ 90°) still leans toward the cursor correctly.
+  const tiltXRaw = useMotionValue(0);
+  const tiltYRaw = useMotionValue(0);
+  const tiltX = useSpring(tiltXRaw, TILT_SPRING);
+  const tiltY = useSpring(tiltYRaw, TILT_SPRING);
+  const tiltEnabled = !reducedMotion && motionConfig.whileHover !== undefined;
+  const interactionRef = React.useRef<HTMLDivElement>(null);
+
+  const handlePointerMove = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!tiltEnabled || !interactionRef.current) return;
+      const rect = interactionRef.current.getBoundingClientRect();
+      const dx = (e.clientX - rect.left) / rect.width - 0.5; // -0.5..0.5
+      const dy = (e.clientY - rect.top) / rect.height - 0.5;
+      // dy<0 (pointer above center) → rotateX<0 → top of card leans toward
+      // the viewer. dx>0 (pointer right) → rotateY<0 → right edge toward
+      // viewer. In CSS left-handed 3D space, negative angles on these axes
+      // produce the "follow-pointer" Balatro tilt.
+      tiltXRaw.set(dy * 2 * TILT_MAX_DEG);
+      tiltYRaw.set(-dx * 2 * TILT_MAX_DEG);
+    },
+    [tiltEnabled, tiltXRaw, tiltYRaw],
+  );
+
+  const handlePointerLeave = React.useCallback(() => {
+    tiltXRaw.set(0);
+    tiltYRaw.set(0);
+  }, [tiltXRaw, tiltYRaw]);
+
   // Empty placeholder short-circuits the 3D stack — nothing to flip, no
   // motion needed.
   if (empty) {
@@ -73,13 +144,6 @@ export const Card = React.memo(function Card({
   const resolvedCardId = data?.card?.cardId ?? data?.cardId;
   const cardData =
     resolvedCardId && data?.cardDb ? data.cardDb[resolvedCardId] ?? null : null;
-
-  const motionConfig = stateToMotionConfig(
-    state,
-    variant,
-    reducedMotion ?? false,
-    motionDelay,
-  );
 
   // Counter-rotation keeps the count badge label horizontal even when the
   // card itself is rotated (e.g. state=`rest` → 90°). The count badge lives
@@ -108,50 +172,67 @@ export const Card = React.memo(function Card({
         animate={motionConfig.animate}
         transition={motionConfig.transition}
       >
-        {/* Interaction layer: scale spring + wiggle keyframes spring *in*
-            via whileHover; all interaction transforms tween *out* via this
-            default transition so hover-off/tap-off don't inherit the
-            state-change spring and bounce back. */}
+        {/* Breathing layer (OPT-275): passive idle drift + scale pulse.
+            Always mounted so the DOM tree is stable across state changes —
+            when breathing is disabled (non-focal zones, face-down, reduced
+            motion, non-idle states) the layer animates once to baseline and
+            stays put. */}
         <motion.div
-          className={cn(
-            "absolute inset-0 rounded",
-            interaction?.clickable && "cursor-pointer",
-          )}
-          transition={{ duration: 0.15, ease: "easeOut" as const }}
-          whileHover={motionConfig.whileHover}
-          whileTap={motionConfig.whileTap}
+          className="absolute inset-0 rounded"
+          animate={breathing?.animate ?? BREATHING_BASELINE}
+          transition={breathing?.transition ?? BREATHING_BASELINE_TRANSITION}
         >
-          <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
-            <CardFront
-              data={cardData}
-              fallbackLabel={overlays?.label}
-              imageUrlOverride={artUrl}
-            />
-            <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
-          </CardFaces>
+          {/* Interaction layer: scale spring + wiggle keyframes spring *in*
+              via whileHover; all interaction transforms tween *out* via this
+              default transition so hover-off/tap-off don't inherit the
+              state-change spring and bounce back. Pointer-driven tilt values
+              ride on `style` (motion values) so they compose cleanly with
+              `whileHover` / `whileTap` on independent transform axes. */}
+          <motion.div
+            ref={interactionRef}
+            className={cn(
+              "absolute inset-0 rounded will-change-transform",
+              interaction?.clickable && "cursor-pointer",
+            )}
+            transition={{ duration: 0.15, ease: "easeOut" as const }}
+            whileHover={motionConfig.whileHover}
+            whileTap={motionConfig.whileTap}
+            style={{ rotateX: tiltX, rotateY: tiltY }}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
+          >
+            <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
+              <CardFront
+                data={cardData}
+                fallbackLabel={overlays?.label}
+                imageUrlOverride={artUrl}
+              />
+              <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
+            </CardFaces>
 
-          {/* Highlight ring follows the card outline, so it sits inside the
-              rotating layer without any counter-rotation. */}
-          {overlays?.highlightRing && (
-            <CardHighlightRing color={overlays.highlightRing} />
-          )}
+            {/* Highlight ring follows the card outline, so it sits inside the
+                rotating layer without any counter-rotation. */}
+            {overlays?.highlightRing && (
+              <CardHighlightRing color={overlays.highlightRing} />
+            )}
 
-          {/* Count badge: rides with the card face, counter-rotated so its
-              label stays horizontal regardless of card rotation. Stacked-zone
-              cards (life, deck, trash) don't rest, so pinning to a card-local
-              corner is fine here. */}
-          {overlays?.countBadge != null && (
-            <motion.div
-              className={cn(
-                "absolute z-10",
-                faceDown ? "bottom-1 right-1" : "top-1 right-1",
-              )}
-              animate={{ rotate: counterRotate }}
-              transition={motionConfig.transition}
-            >
-              <CardCountBadge count={overlays.countBadge} />
-            </motion.div>
-          )}
+            {/* Count badge: rides with the card face, counter-rotated so its
+                label stays horizontal regardless of card rotation. Stacked-zone
+                cards (life, deck, trash) don't rest, so pinning to a card-local
+                corner is fine here. */}
+            {overlays?.countBadge != null && (
+              <motion.div
+                className={cn(
+                  "absolute z-10",
+                  faceDown ? "bottom-1 right-1" : "top-1 right-1",
+                )}
+                animate={{ rotate: counterRotate }}
+                transition={motionConfig.transition}
+              >
+                <CardCountBadge count={overlays.countBadge} />
+              </motion.div>
+            )}
+          </motion.div>
         </motion.div>
       </motion.div>
 
