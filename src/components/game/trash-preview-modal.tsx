@@ -2,7 +2,6 @@
 
 import React from "react";
 import type { CardDb, CardInstance } from "@shared/game-types";
-import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +10,7 @@ import {
   Badge,
   TooltipProvider,
 } from "@/components/ui";
-import { CardTooltip } from "./use-card-tooltip";
+import { Card } from "./card";
 
 interface TrashPreviewModalProps {
   trash: CardInstance[];
@@ -57,10 +56,11 @@ export function TrashPreviewModal({
           ) : (
             <div className="flex flex-wrap gap-3">
               {trash.map((card, i) => (
-                <TrashCard
+                <Card
                   key={`${card.instanceId}-${i}`}
-                  card={card}
-                  cardDb={cardDb}
+                  variant="modal"
+                  size="field"
+                  data={{ card, cardId: card.cardId, cardDb }}
                 />
               ))}
             </div>
@@ -69,47 +69,5 @@ export function TrashPreviewModal({
         </TooltipProvider>
       </DialogContent>
     </Dialog>
-  );
-}
-
-const CARD_W = 100;
-
-function TrashCard({
-  card,
-  cardDb,
-}: {
-  card: CardInstance;
-  cardDb: CardDb;
-}) {
-  const data = cardDb[card.cardId] ?? null;
-
-  return (
-    <CardTooltip data={data} cardId={card.cardId} card={card}>
-      <div
-        className={cn(
-          "overflow-hidden rounded-md border border-gb-border-strong shadow-sm cursor-pointer",
-          "transition-transform duration-150 hover:-translate-y-1 hover:shadow-md",
-        )}
-        style={{ width: CARD_W, aspectRatio: "600/838" }}
-      >
-        {data?.imageUrl ? (
-          <img
-            src={data.imageUrl}
-            alt={data.name}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-full w-full bg-gb-surface-raised flex flex-col items-center justify-center gap-1 p-2">
-            <span className="text-xs text-gb-text-dim text-center leading-tight">
-              {data?.name ?? card.cardId}
-            </span>
-            {data?.cost != null && (
-              <span className="text-xs text-gb-text-subtle">{data.cost}</span>
-            )}
-          </div>
-        )}
-      </div>
-    </CardTooltip>
   );
 }

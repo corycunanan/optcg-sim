@@ -9,12 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  TooltipProvider,
 } from "@/components/ui";
 import { GameButton } from "./game-button";
-import { CardTooltip } from "./use-card-tooltip";
+import { Card } from "./card";
 
 const CARD_W = 80;
-const CARD_H = 112;
 
 type DualSlot = { validIds: string[]; countMin: number; countMax: number };
 
@@ -56,50 +56,32 @@ function TargetCard({
   onToggle: () => void;
 }) {
   const blocked = invalid || disabledReason !== null;
-  const data = cardDb[card.cardId] ?? null;
 
   return (
-    <CardTooltip data={data} cardId={card.cardId} card={card}>
-      <div
-        onClick={blocked ? undefined : onToggle}
-        title={disabledReason ?? undefined}
-        className={cn(
-          "relative rounded-md overflow-hidden border-2 transition-colors select-none shrink-0",
-          blocked
-            ? "opacity-30 cursor-not-allowed border-transparent"
-            : selected
-              ? "border-gb-accent-amber ring-2 ring-gb-accent-amber/30 cursor-pointer"
-              : "border-transparent hover:border-gb-border-strong cursor-pointer",
-        )}
-        style={{ width: CARD_W, height: CARD_H }}
-      >
-        {data?.imageUrl ? (
-          <img
-            src={data.imageUrl}
-            alt={data.name}
-            className="w-full h-full object-cover"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-full h-full bg-gb-surface-raised flex flex-col items-center justify-center gap-1 p-2">
-            <span className="text-xs text-gb-text-dim text-center leading-tight">
-              {data?.name ?? "?"}
-            </span>
-            {data?.cost !== null && data?.cost !== undefined && (
-              <span className="text-xs text-gb-text-subtle">{data.cost}</span>
-            )}
-          </div>
-        )}
-
-        {selected && (
-          <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        )}
-      </div>
-    </CardTooltip>
+    <div
+      onClick={blocked ? undefined : onToggle}
+      title={disabledReason ?? undefined}
+      className={cn(
+        "relative rounded select-none shrink-0 transition-[box-shadow] duration-150",
+        blocked && "opacity-30 cursor-not-allowed",
+        !blocked && selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent cursor-pointer",
+        !blocked && !selected && "cursor-pointer",
+      )}
+    >
+      <Card
+        variant="modal"
+        size="field"
+        data={{ card, cardId: card.cardId, cardDb }}
+        interaction={{ tooltipDisabled: blocked }}
+      />
+      {selected && (
+        <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -259,24 +241,26 @@ export function SelectTargetModal({
           </GameButton>
         </DialogHeader>
 
-        <div className="px-4 py-4 overflow-y-auto" style={{ maxHeight: 300 }}>
-          <div
-            className={cn("flex flex-wrap gap-2", cards.length <= 5 ? "justify-center" : "justify-start")}
-            style={{ maxWidth: `${CARD_W * 5 + 8 * 4}px`, margin: "0 auto" }}
-          >
-            {cards.map((card) => (
-              <TargetCard
-                key={card.instanceId}
-                card={card}
-                cardDb={cardDb}
-                selected={selectedIds.has(card.instanceId)}
-                invalid={!validSet.has(card.instanceId)}
-                disabledReason={getDisabledReason(card)}
-                onToggle={() => toggleCard(card.instanceId)}
-              />
-            ))}
+        <TooltipProvider delayDuration={0} disableHoverableContent>
+          <div className="px-4 py-4 overflow-y-auto" style={{ maxHeight: 300 }}>
+            <div
+              className={cn("flex flex-wrap gap-2", cards.length <= 5 ? "justify-center" : "justify-start")}
+              style={{ maxWidth: `${CARD_W * 5 + 8 * 4}px`, margin: "0 auto" }}
+            >
+              {cards.map((card) => (
+                <TargetCard
+                  key={card.instanceId}
+                  card={card}
+                  cardDb={cardDb}
+                  selected={selectedIds.has(card.instanceId)}
+                  invalid={!validSet.has(card.instanceId)}
+                  disabledReason={getDisabledReason(card)}
+                  onToggle={() => toggleCard(card.instanceId)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </TooltipProvider>
 
         <DialogFooter className="flex-row items-center justify-between px-4 py-3 border-t border-gb-border pt-3">
           <span className="text-xs text-gb-text-dim">

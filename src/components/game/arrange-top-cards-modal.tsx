@@ -9,12 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  TooltipProvider,
 } from "@/components/ui";
 import { GameButton } from "./game-button";
-import { CardTooltip } from "./use-card-tooltip";
-
-const CARD_W = 80;
-const CARD_H = 112;
+import { Card } from "./card";
 
 function ModalCard({
   card,
@@ -37,54 +35,33 @@ function ModalCard({
   onDragOver: () => void;
   onDrop: () => void;
 }) {
-  const data = cardDb[card.cardId] ?? null;
-
   return (
-    <CardTooltip data={data} cardId={card.cardId} card={card}>
-      <div
-        draggable
-        onClick={onSelect}
-        onDragStart={(e) => { e.stopPropagation(); onDragStart(); }}
-        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(); }}
-        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(); }}
-        className={cn(
-          "relative rounded-md overflow-hidden cursor-grab border-2 transition-colors select-none shrink-0",
-          selected
-            ? "border-gb-accent-amber ring-2 ring-gb-accent-amber/30"
-            : isDragOver
-              ? "border-gb-accent-blue"
-              : "border-transparent hover:border-gb-border-strong",
-          dimmed && "opacity-40",
-        )}
-        style={{ width: CARD_W, height: CARD_H }}
-      >
-        {data?.imageUrl ? (
-          <img
-            src={data.imageUrl}
-            alt={data.name}
-            className="w-full h-full object-cover"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-full h-full bg-gb-surface-raised flex flex-col items-center justify-center gap-1 p-2">
-            <span className="text-xs text-gb-text-dim text-center leading-tight">
-              {data?.name ?? "?"}
-            </span>
-            {data?.cost !== null && data?.cost !== undefined && (
-              <span className="text-xs text-gb-text-subtle">{data.cost}</span>
-            )}
-          </div>
-        )}
-
-        {selected && (
-          <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        )}
-      </div>
-    </CardTooltip>
+    <div
+      draggable
+      onClick={onSelect}
+      onDragStart={(e) => { e.stopPropagation(); onDragStart(); }}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onDragOver(); }}
+      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(); }}
+      className={cn(
+        "relative rounded select-none shrink-0 cursor-grab transition-[box-shadow] duration-150",
+        selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent",
+        isDragOver && !selected && "ring-2 ring-gb-accent-blue",
+        dimmed && "opacity-40",
+      )}
+    >
+      <Card
+        variant="modal"
+        size="field"
+        data={{ card, cardId: card.cardId, cardDb }}
+      />
+      {selected && (
+        <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -190,37 +167,39 @@ export function ArrangeTopCardsModal({
           </GameButton>
         </DialogHeader>
 
-        <div className="px-4 py-5">
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            {orderedCards.map((card, i) => (
-              <ModalCard
-                key={card.instanceId}
-                card={card}
-                cardDb={cardDb}
-                selected={step === 1 && selectedId === card.instanceId}
-                dimmed={step === 1 && !canSelectCard(card.instanceId)}
-                isDragOver={dropIndex === i}
-                onSelect={() => {
-                  if (step === 1 && canSelectCard(card.instanceId)) {
-                    setSelectedId((prev) =>
-                      prev === card.instanceId ? null : card.instanceId,
-                    );
-                  }
-                }}
-                onDragStart={() => handleDragStart(i)}
-                onDragOver={() => handleDragOver(i)}
-                onDrop={() => handleDrop(i)}
-              />
-            ))}
-          </div>
-
-          {step === 2 && (
-            <div className="flex justify-between mt-3">
-              <span className="text-xs text-gb-text-dim">← top of deck</span>
-              <span className="text-xs text-gb-text-dim">bottom of deck →</span>
+        <TooltipProvider delayDuration={0} disableHoverableContent>
+          <div className="px-4 py-5">
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              {orderedCards.map((card, i) => (
+                <ModalCard
+                  key={card.instanceId}
+                  card={card}
+                  cardDb={cardDb}
+                  selected={step === 1 && selectedId === card.instanceId}
+                  dimmed={step === 1 && !canSelectCard(card.instanceId)}
+                  isDragOver={dropIndex === i}
+                  onSelect={() => {
+                    if (step === 1 && canSelectCard(card.instanceId)) {
+                      setSelectedId((prev) =>
+                        prev === card.instanceId ? null : card.instanceId,
+                      );
+                    }
+                  }}
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={() => handleDragOver(i)}
+                  onDrop={() => handleDrop(i)}
+                />
+              ))}
             </div>
-          )}
-        </div>
+
+            {step === 2 && (
+              <div className="flex justify-between mt-3">
+                <span className="text-xs text-gb-text-dim">← top of deck</span>
+                <span className="text-xs text-gb-text-dim">bottom of deck →</span>
+              </div>
+            )}
+          </div>
+        </TooltipProvider>
 
         <DialogFooter className="flex-row items-center justify-end gap-2 px-4 py-3 border-t border-gb-border pt-3">
           {step === 1 && (
