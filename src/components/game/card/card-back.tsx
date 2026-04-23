@@ -12,9 +12,11 @@ const DEFAULT_SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
  */
 export function CardBack({
   sleeveUrl,
+  label,
   className,
 }: {
   sleeveUrl?: string | null;
+  label?: string;
   className?: string;
 }) {
   return (
@@ -33,6 +35,11 @@ export function CardBack({
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />
+      {label && (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-gb-text-dim/40 select-none uppercase tracking-wider">
+          {label}
+        </span>
+      )}
     </div>
   );
 }
