@@ -28,6 +28,73 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
   const activePrompt = devPrompt ?? game.activePrompt;
 
   if (!game.gameState || !game.cardDbReady) {
+    if (game.connectivityFailed) {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-gb-board px-4">
+          <div className="flex flex-col items-center gap-4 max-w-md text-center">
+            <div className="text-lg text-gb-text-bright font-bold">
+              Can&rsquo;t reach the game server
+            </div>
+            <div className="text-sm text-gb-text leading-relaxed">
+              Your browser couldn&rsquo;t establish a connection after several
+              attempts. This usually means something on your network is
+              blocking the connection.
+            </div>
+            <ul className="text-xs text-gb-text-subtle leading-relaxed text-left list-disc list-inside">
+              <li>Try a different network (mobile hotspot works well)</li>
+              <li>Disable VPN, antivirus HTTPS scanning, or ad-blockers</li>
+              <li>Check that your device clock is correct</li>
+              <li>Try another browser or an incognito window</li>
+            </ul>
+            {game.lastError && (
+              <div className="text-xs text-gb-accent-red">
+                {game.lastError}
+              </div>
+            )}
+            <div className="flex gap-3 mt-2">
+              <GameButton
+                variant="primary"
+                size="sm"
+                onClick={game.retryConnection}
+              >
+                Retry
+              </GameButton>
+              <GameButton
+                variant="ghost"
+                size="sm"
+                onClick={navigation.handleBackToLobbies}
+              >
+                &larr; Back to Lobbies
+              </GameButton>
+            </div>
+            {navigation.fallbackConcedeAvailable && (
+              <div className="mt-2 flex flex-col gap-2 items-center">
+                <div className="text-gb-text-subtle text-xs">
+                  You can also concede this match without reconnecting.
+                </div>
+                {navigation.fallbackError && (
+                  <div className="text-gb-accent-red text-xs">
+                    {navigation.fallbackError}
+                  </div>
+                )}
+                <GameButton
+                  variant="danger"
+                  size="sm"
+                  onClick={navigation.handleFallbackConcede}
+                  disabled={navigation.fallbackSubmitting}
+                  className="font-mono"
+                >
+                  {navigation.fallbackSubmitting
+                    ? "Conceding\u2026"
+                    : "Concede Match"}
+                </GameButton>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex h-full w-full items-center justify-center bg-gb-board">
         <div className="flex flex-col items-center gap-3">
