@@ -15,6 +15,7 @@ export function useBoardDnd(
   battle: TurnState["battle"] | null,
   onAction: (action: GameAction) => void,
   onRedistributeDrop?: (fromCardId: string, donId: string, toCardId: string) => void,
+  onHandReorder?: (activeInstanceId: string, overInstanceId: string) => void,
 ) {
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
 
@@ -32,7 +33,21 @@ export function useBoardDnd(
     if (!over) return;
 
     const dragData = active.data.current as DragPayload;
-    const dropData = over.data.current as Record<string, unknown>;
+    const dropData = over.data.current as Record<string, unknown> | undefined;
+
+    // Hand-card reorder: sortable reports the target hand card via over.data.
+    // Only fires when active.id !== over.id (dropping on self is a no-op).
+    if (
+      dragData.type === "hand-card" &&
+      dropData?.type === "hand-card" &&
+      active.id !== over.id
+    ) {
+      const overCard = (dropData as unknown as { card: { instanceId: string } }).card;
+      onHandReorder?.(dragData.card.instanceId, overCard.instanceId);
+      return;
+    }
+
+    if (!dropData) return;
 
     if (dragData.type === "hand-card" && dropData.type === "character-slot") {
       onAction({

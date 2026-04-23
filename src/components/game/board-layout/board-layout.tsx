@@ -25,6 +25,7 @@ import {
 } from "./constants";
 import { midTop, computeBoardScaling } from "./board-geometry";
 import { useBoardDnd } from "./use-board-dnd";
+import { useHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
@@ -171,13 +172,23 @@ function BoardLayoutInner({
 
   const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
 
+  const { orderedHand: playerOrderedHand, reorder: reorderPlayerHand } = useHandOrder(
+    me?.hand ?? [],
+  );
+
   const {
     activeDrag,
     activeDragType,
     sensors,
     handleDragStart,
     handleDragEnd,
-  } = useBoardDnd(cardDb, bs.battle, onAction, handleRedistributeDrop);
+  } = useBoardDnd(
+    cardDb,
+    bs.battle,
+    onAction,
+    handleRedistributeDrop,
+    reorderPlayerHand,
+  );
 
   const reducedMotion = useReducedMotion();
   const dragTilt = useDragTilt({ disabled: !!reducedMotion });
@@ -200,7 +211,7 @@ function BoardLayoutInner({
     zoneRegistry,
   );
 
-  const playerHandAnim = useHandAnimationState(cardAnimations, me?.hand ?? [], "p-hand");
+  const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
   const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
 
   /* ── Sleeve/DON URLs per player index ────────────────────────── */
@@ -386,7 +397,7 @@ function BoardLayoutInner({
           }}
         >
           <HandLayer
-            cards={me?.hand ?? []}
+            cards={playerOrderedHand}
             cardDb={cardDb}
             enableDrag={bs.canInteract || bs.canDragCounter}
             counterMode={bs.canDragCounter}
