@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-268 merged)
+last-updated: 2026-04-23 (OPT-269 opened)
 ---
 
 # Card Animations — Handoff Doc
@@ -19,7 +19,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-266 | Build `<Card>` primitive with 3D DOM foundation | High | — | Done (2026-04-21) | [#99](https://github.com/corycunanan/optcg-sim/pull/99) merged; [#101](https://github.com/corycunanan/optcg-sim/pull/101) VQA polish | Gate — blocks every other ticket in the project |
 | 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | Done (2026-04-22) | [#102](https://github.com/corycunanan/optcg-sim/pull/102) merged | Pilot — API tuned: added `motionDelay`. Ring semantics deferred to OPT-273. |
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Done (2026-04-22) | [#103](https://github.com/corycunanan/optcg-sim/pull/103) merged | Face-up + face-down both on primitive; in-flight placeholder preserved. Pattern re-validated — no primitive API changes needed. |
-| 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Backlog | — | |
+| 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | In Review (2026-04-23) | [#108](https://github.com/corycunanan/optcg-sim/pull/108) | Primitive grew a `"don"` variant + `artUrl` prop for DON tokens; `data` now optional. |
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Backlog | — | Must compose with 3D flip for OPT-276 |
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Backlog | — | Consolidates the two tooltip paths |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Backlog | — | Capstone — migration gate |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-269 — passive zones (DON active bar + life + trash) migration.
+**Next up:** OPT-270 — `card-animation-layer.tsx` (flying cards) migration.
 
 ---
 
@@ -93,3 +93,21 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **`BoardCard` still alive** — used by every non-migrated zone. OPT-272 remains the deletion gate; don't front-run it.
   - **Ring semantics** still deferred to OPT-273. Any zone that surfaces selection/validation rings (e.g. target picker on life) should keep them as consumer className on the outer wrapper, not route through `overlays.highlightRing`.
 - **Why this matters for OPT-269:** DON active bar + life + trash are a *cluster* of static render zones — mostly stacks of face-down sleeves with a count badge. The closest precedent is hand-layer's face-down path: `<Card variant="…" faceDown sleeveUrl={…} overlays={{ countBadge }} />` inline, no consumer wrapper unless the zone registers itself with `ZonePosition` or participates in drag. Expect minimal API tuning — the primitive has variants and `countBadge` already, and the behaviors are simpler than hand/field. The main judgment call is per-zone variant/size alignment and whether you need `interaction.hoverDisabled` for stacks that shouldn't lift.
+
+### OPT-269 → OPT-270
+**From:** session on 2026-04-23 · **Commit:** `60be547` · **PR:** [#108](https://github.com/corycunanan/optcg-sim/pull/108)
+
+- **Primer:** Three passive zones now render through `<Card>`. The primitive grew a `"don"` variant (50×70 size token) and an optional `artUrl` string prop so DON tokens — which have no card data — can reuse the primitive's motion + state machinery. `CardProps.data` is now optional as a consequence; `card-front.tsx` gained an `imageUrlOverride` internal prop that `artUrl` flows into. `<CardDonBadge>` is the only render path for the `+N DON` overlay; the inline HTML at `board-card.tsx:183-192` is gone along with the unused `donCountAdjust` prop on `BoardCardProps`. `BoardCard` is still alive — only used by deck stack, empty char/leader placeholders, drop-zones drag overlay, and `card-animation-layer.tsx` (OPT-270's target).
+- **Read first:** `src/components/game/board-layout/card-animation-layer.tsx` (flight layer — OPT-270's target; still imports `BoardCard`), `src/components/game/card/card.tsx` (for the `state="in-flight"` branch that already exists in `state-presets.ts`), `src/components/game/board-layout/hand-layer.tsx` (draw-placeholder pattern — the in-flight slot is coordinated by `inFlightInstanceIds`). `board-layout.tsx:~440-455` renders a `<BoardCard>` inside the `DragOverlay` for the `attacker` drag type; check whether flight + dragOverlay share any code before touching them.
+- **Gotchas / do NOT touch:**
+  - `artUrl` is intentionally a thin front-face override, not a replacement for `data`. Don't route game-card flight images through it — flying cards have real card data and should pass `data: { cardDb, card }` so tooltip suppression / `state="in-flight"` routing stays coherent.
+  - DON tokens have no "back" face in reality, but the `<Card>` 3D stack still mounts both faces (`faceDown` is always false for `variant="don"`). That's fine — the back is hidden by `backface-visibility: hidden` — but don't try to build a flip mechanic on DON without considering that DON tokens have no art for the back face.
+  - DON drag ghost opacity and rested layout still live on the consumer's outer `motion.div` wrappers in `don-zone.tsx`; the primitive's `state="dragging"` is non-dimming on purpose (matches the hand/field pattern from OPT-267/268). If flight ever introduces a drag-source that has a DragOverlay, the ghost pattern changes — double-check `card-animation-layer` to see how it interacts with drag currently.
+  - `<Card>`'s existing `state="in-flight"` returns `{ rotate: 0, filter: "brightness(1)", opacity: 1 }` with `cardActivate` spring and suppressed hover/tap — i.e. position/scale is owned externally. Don't add animation *to* the primitive for flight; the flight layer's `motion.div` drives position, and `<Card state="in-flight">` is the render target.
+  - Do **not** mark the next ticket (OPT-270) anything other than Backlog/Todo during this close-out. The `/ticket` skill's Phase 8 writes OPT-269 → Done after PR #108 merges; the next agent transitions OPT-270 → In Progress when they start. See `feedback_handoff_status_update.md` in memory for why this rule exists.
+- **Unresolved:**
+  - **No visual VQA on OPT-269 yet.** Auto-mode session, no browser. Zone renders are type-checked + unit-tested (`state-presets` variant-exhaustiveness extended to `"don"`) but not eyeballed. Before depending on claims in PR #108, spin up a 2-player lobby and walk the test plan — especially the rested-DON rotation/spacing and trash click-to-preview flow.
+  - **Animation delay on rested DON** (`animationDelay` prop) still flows through, but I didn't verify the stagger visually. Worth eyeballing during refresh-wave.
+  - **`data` now optional on `CardProps`** — if any consumer *should* pass data but accidentally doesn't, the primitive will silently render the empty/blank card face instead of the intended card. TypeScript won't catch it. Something to keep in mind when reviewing OPT-270 and OPT-271.
+  - `BoardCard` is still alive for deck/empty placeholders/drag-overlay/flight. OPT-272 remains the deletion gate.
+- **Why this matters for OPT-270:** The flight layer at `card-animation-layer.tsx` is the last frequently-rendered consumer of `BoardCard` before the deletion gate. It's also structurally different — the consumer owns *all* positioning (the primitive's `state="in-flight"` explicitly cedes position/scale to an external driver). Expect the migration to look more like "swap the inner render from `<BoardCard>` to `<Card state="in-flight">` while keeping the outer flight `motion.div` untouched" rather than a structural overhaul. One judgment call: whether to pass `state="in-flight"` unconditionally, or only when the card is mid-flight vs. settled — check how the flight layer distinguishes those today.
