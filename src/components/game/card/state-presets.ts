@@ -2,6 +2,7 @@ import type { Transition, TargetAndTransition } from "motion/react";
 import {
   cardActivate,
   cardBreathing,
+  cardFlip,
   cardHover,
   cardRest,
   cardTap,
@@ -149,4 +150,16 @@ export function idleBreathingConfig(
  */
 export function faceDownRotateY(faceDown: boolean | undefined): number {
   return faceDown ? 180 : 0;
+}
+
+/**
+ * Transition used by the face-up ↔ face-down flip (OPT-276). The flip has
+ * its own spring (`cardFlip`) so it doesn't inherit the ambient state
+ * transition — a rested card flipping face-up shouldn't borrow `cardRest`
+ * timing, and a flight-layer card flipping mid-arc shouldn't borrow
+ * `cardActivate` timing. Reduced motion collapses the rotation to an instant
+ * swap, satisfying the `prefers-reduced-motion` requirement.
+ */
+export function flipTransition(reducedMotion: boolean): Transition {
+  return reducedMotion ? { duration: 0 } : cardFlip;
 }

@@ -95,6 +95,10 @@ const board = {
         repeatType: "loop" as const,
       },
     },
+    /** Face-up ↔ face-down flip (OPT-276). ~300ms spring so the card lands
+     *  before a follow-up state change overlays its own transition. Reduced
+     *  motion fallback is instant — see `flipTransition` in state-presets. */
+    flip: { type: "spring" as const, stiffness: 260, damping: 22 },
     /** Hand card hover: lift + scale, same spring-in / tween-out shape,
      *  same wiggle. */
     handHover: {
@@ -140,6 +144,7 @@ export const cardHover = board.card.hover;
 export const cardTap = board.card.tap;
 export const cardTapReduced = board.card.tapReduced;
 export const cardBreathing = board.card.breathing;
+export const cardFlip = board.card.flip;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
 export const cardRest = board.stateChange.rest;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cardActivate,
   cardBreathing,
+  cardFlip,
   cardHover,
   cardRest,
   cardTap,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/motion";
 import {
   faceDownRotateY,
+  flipTransition,
   idleBreathingConfig,
   stateToMotionConfig,
 } from "./state-presets";
@@ -151,5 +153,15 @@ describe("faceDownRotateY", () => {
     expect(faceDownRotateY(true)).toBe(180);
     expect(faceDownRotateY(false)).toBe(0);
     expect(faceDownRotateY(undefined)).toBe(0);
+  });
+});
+
+describe("flipTransition", () => {
+  it("uses the dedicated cardFlip spring when motion is allowed (OPT-276)", () => {
+    expect(flipTransition(false)).toBe(cardFlip);
+  });
+
+  it("collapses to an instant swap under prefers-reduced-motion (OPT-276)", () => {
+    expect(flipTransition(true)).toEqual({ duration: 0 });
   });
 });

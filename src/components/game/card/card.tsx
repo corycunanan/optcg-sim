@@ -201,7 +201,7 @@ export const Card = React.memo(function Card({
             onPointerMove={handlePointerMove}
             onPointerLeave={handlePointerLeave}
           >
-            <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
+            <CardFaces faceDown={!!faceDown}>
               <CardFront
                 data={cardData}
                 fallbackLabel={overlays?.label}
