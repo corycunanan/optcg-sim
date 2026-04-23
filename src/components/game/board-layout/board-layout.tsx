@@ -179,7 +179,8 @@ function BoardLayoutInner({
     handleDragEnd,
   } = useBoardDnd(cardDb, bs.battle, onAction, handleRedistributeDrop);
 
-  const dragTilt = useDragTilt();
+  const reducedMotion = useReducedMotion();
+  const dragTilt = useDragTilt({ disabled: !!reducedMotion });
 
   /* ── Status indicator ──────────────────────────────────────────── */
 
@@ -210,7 +211,6 @@ function BoardLayoutInner({
 
   /* ── Refresh phase stagger detection ────────────────────────── */
 
-  const reducedMotion = useReducedMotion();
   const prevPhaseRef = useRef(turn?.phase);
   const [refreshWave, setRefreshWave] = useState(false);
 
@@ -414,7 +414,17 @@ function BoardLayoutInner({
 
     <DragOverlay dropAnimation={null}>
       {activeDrag && (
-        <motion.div style={{ rotate: dragTilt.tilt }}>
+        <motion.div
+          style={{
+            // Parent perspective so the rotateX/rotateY reads as depth rather
+            // than orthographic skew. The inner <Card> owns its own
+            // perspective stack; this one lives on the DragOverlay wrapper
+            // specifically to give the drag tilt physical volume.
+            transformPerspective: 1000,
+            rotateX: dragTilt.tiltX,
+            rotateY: dragTilt.tiltY,
+          }}
+        >
           {activeDrag.type === "hand-card" && (
             <div
               style={{

@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-281 merged; interim drag-image fix shipped)
+last-updated: 2026-04-23 (OPT-276 In Review; drag tilt 3D + dedicated flip spring)
 ---
 
 # Card Animations — Handoff Doc
@@ -25,7 +25,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Done (2026-04-23) | [#115](https://github.com/corycunanan/optcg-sim/pull/115) merged | Capstone — migration gate; Phase 2 complete |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Done (2026-04-23) | [#117](https://github.com/corycunanan/optcg-sim/pull/117) merged | Idle breathing + pointer tilt + 3D click bob — all layered onto the primitive. Surfaced the OPT-281 regression in HTML5-drag modals. |
 | 9 | OPT-281 | Fix modal drag image: shows card back + black box | High (Bug) | OPT-275 | Done (2026-04-23) | [#119](https://github.com/corycunanan/optcg-sim/pull/119) merged | Interim fix via `setDragImage` with a flat `<img>` ghost; OPT-282 will supersede when the modal rewires onto `@dnd-kit/sortable`. |
-| 10 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
+| 10 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | In Review (2026-04-23) | [#121](https://github.com/corycunanan/optcg-sim/pull/121) | Drag tilt went 3D (rotateX/rotateY) + reduced-motion gate; flip got a dedicated `cardFlip` spring owned by `CardFaces` |
 | 11 | OPT-282 | Drag-to-reorder in hand + "insert between" UX | Medium | OPT-276 | Backlog | — | Wires `@dnd-kit/sortable`; absorbs OPT-281 if not patched sooner |
 | 12 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
 | 13 | OPT-274 | Entry + hand re-fan micro-interactions | Medium | OPT-267, OPT-268, OPT-270 | Backlog | — | |
@@ -33,7 +33,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-276 — drag tilt + flip animations. OPT-282 slots in after OPT-276 and will absorb the OPT-281 patch when it rewires the modal onto `@dnd-kit/sortable`.
+**Next up:** OPT-282 — drag-to-reorder in hand + "insert between" UX. Wires `@dnd-kit/sortable` and supersedes the OPT-281 interim `setFlatCardDragImage` helper.
 
 ---
 
@@ -198,3 +198,23 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **OPT-282 will delete this helper.** When the modal rewires onto `@dnd-kit/sortable`, dnd-kit's `<DragOverlay>` owns the drag visual and the HTML5 snapshot never fires. Don't port the helper to a generic util in the meantime — it has no other consumer.
   - **Other HTML5-drag modals** — there are none right now (`grep -rn 'draggable' src/components/game` returns only this file), but if a future modal ever adds `draggable` on a `<Card>` wrapper before migrating to dnd-kit, the same bug will appear. Fix is the same pattern.
 - **Why this matters for OPT-276:** OPT-276 is independent of this fix — drag tilt + flip land on the `<Card>` primitive, not on the modal-specific HTML5-drag handler. The only interaction: OPT-276 adds new motion to the interaction layer (flip via `CardFaces` `rotateY`, drag tilt via a new motion-value source). Both changes make the implicit drag-image snapshot *worse*, not better. If OPT-276 ships before OPT-282, and a new modal (or a developer forgetting to use dnd-kit) reintroduces HTML5 drag, expect the same bug class — reach for `setFlatCardDragImage`-style patterns rather than trying to flatten the 3D tree during dragstart.
+
+### OPT-276 → OPT-282
+**From:** session on 2026-04-23 · **Commit:** `b362f4e` · **PR:** [#121](https://github.com/corycunanan/optcg-sim/pull/121)
+
+- **Primer:** Drag tilt went 3D. `useDragTilt` now returns `{ tiltX, tiltY }` (rotateX/rotateY motion values) instead of a single rotateZ roll, matching OPT-275's pointer-tilt axis convention so hover and drag share a motion language. The DragOverlay motion.div at `board-layout.tsx:~417-427` owns `transformPerspective: 1000` so the rotations read as depth rather than orthographic skew — the inner `<Card>` keeps its own perspective stack for hover tilt; the outer perspective is specifically for drag. The hook now accepts `{ disabled }` and honors `prefers-reduced-motion` (both motion values stay at zero). Flip got its own spring: new `cardFlip` preset (`stiffness: 260, damping: 22`, ~300ms) in `motion.ts`, exposed via a pure `flipTransition(reducedMotion)` helper in `state-presets.ts` — reduced motion collapses to `{ duration: 0 }`. `CardFaces` now owns its flip transition internally and no longer takes a `transition` prop — the face-up ↔ face-down rotateY no longer borrows the ambient state transition (`cardActivate` / `cardRest`). "Unused per audit" in the OPT-276 ticket was stale — the hook had been wired since before this branch; this PR upgraded the wiring.
+- **Read first:** `src/hooks/use-drag-tilt.ts` (hook + pure `velocityToTilt` helper — the pattern you replicate if you add any new `DragOverlay` inside the sortable context), `src/components/game/board-layout/board-layout.tsx:~182,~414-430` (the single consumer of `useDragTilt` today — one DragOverlay, four drag types all inheriting 3D tilt for free), `src/components/game/card/card-faces.tsx` + `src/components/game/card/state-presets.ts` (the flip wiring; `flipTransition` is the single decision point), `src/components/game/arrange-top-cards-modal.tsx` (OPT-281's HTML5-drag patch — `setFlatCardDragImage` is the helper OPT-282 deletes when sortable lands).
+- **Gotchas / do NOT touch:**
+  - `CardFaces` no longer accepts a `transition` prop — its flip spring is owned internally. If a future consumer needs a custom flip timing, add an override prop rather than reinstating the coupling to state transitions; the old behavior caused rested/in-flight cards to inherit the wrong spring on flip, which was precisely the ticket's ask to fix.
+  - `transformPerspective: 1000` on the DragOverlay wrapper is tuned for the card footprint (80×112 / 84×118). If OPT-282 introduces a new DragOverlay for sortable reordering, keep the same value — smaller = extreme depth distortion, larger = flatter tilt. Pre-baking it avoids surprises.
+  - `useDragTilt` keeps wiring the dnd-kit handlers even when `disabled: true` — motion values just hold zero. Don't early-return the handlers; the board's existing `onDragStart`/`onDragMove`/`onDragEnd` composition at `board-layout.tsx:~231-233` relies on them being callable unconditionally.
+  - Velocity sampling uses `performance.now()` + drag-delta deltas. The 12° ceiling + spring smoothing keep motion-value churn bounded; don't move it to `requestAnimationFrame` batching without profiling first.
+  - `-vx * scale` can produce `-0` at zero velocity. It's CSS-equivalent to `+0` but surprises `toEqual`/`Object.is` in tests — see the `velocityToTilt` zero-velocity test for the pattern.
+  - The Arrange Top Cards modal's `setFlatCardDragImage` helper does NOT see drag tilt (native HTML5 drag doesn't compose with dnd-kit's DragOverlay). That's expected — OPT-282's sortable migration brings the modal into the DragOverlay-based system, at which point the helper comes out in the same PR.
+- **Unresolved:**
+  - **No visual VQA on OPT-276.** Auto-mode session, no browser. Type-check + lint (0 errors, 632 baseline warnings — unchanged) + tests (46/46 — 12 new) all green. Before depending on claims in PR #121: spin up a 2-player lobby, then (a) drag hand card across the field — card tilts in motion direction with 3D depth, springs back on release; (b) drag active DON / DON redistribute / attacker — same tilt behavior for all four drag types; (c) reveal a face-down trigger or take damage so a life card reveals — flip plays as a dedicated ~300ms spring, composes cleanly if the card is mid-flight; (d) emulate `prefers-reduced-motion` — flip is instant, drag tilt stays at zero.
+  - **`cardFlip` spring values not eyeballed.** Current params (`stiffness: 260, damping: 22`) were chosen to land near 300ms without overshoot. If VQA surfaces "too bouncy" or "too slow," tune there — not on `cardActivate` / `cardRest`, which are owned by state changes and would regress OPT-275's rest/active feel.
+  - **Drag-tilt ceiling (12°) and velocity scale (0.08) not VQA'd together.** If a fast flick saturates and feels rigid at the clamp, reduce scale; if a slow drag feels dead, raise scale. The pure `velocityToTilt` helper is tunable via arguments for experimentation without rewiring the hook.
+  - **Arrange Top Cards modal still on HTML5 drag** (OPT-281's interim patch). OPT-282 is the supersession point — delete `setFlatCardDragImage` in the same PR as the sortable wiring so the migration moves atomically.
+  - **`state="invalid"` still wired but unused** — carried over from OPT-271/272/275. Still OPT-273's scope.
+- **Why this matters for OPT-282:** OPT-282 wires `@dnd-kit/sortable` into the Arrange Top Cards modal. The drag-to-reorder ghost will render through a `<DragOverlay>` — so drag tilt applies *for free* if you reuse `useDragTilt` + the `transformPerspective: 1000` wrapper pattern. The "insert between" drop-indicator UX is orthogonal to tilt/flip and lives in the sortable DnD logic, not the `<Card>` primitive. One judgment call: whether to share the board's top-level `DragOverlay` (hand card / DON / attacker all pass through it today) or introduce a modal-local one. If modal-local, duplicate the tilt + perspective pattern; if shared, OPT-282 is purely a sortable wiring exercise.
