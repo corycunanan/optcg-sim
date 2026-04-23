@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-270 opened)
+last-updated: 2026-04-23 (OPT-271 opened)
 ---
 
 # Card Animations — Handoff Doc
@@ -21,7 +21,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Done (2026-04-22) | [#103](https://github.com/corycunanan/optcg-sim/pull/103) merged | Face-up + face-down both on primitive; in-flight placeholder preserved. Pattern re-validated — no primitive API changes needed. |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Done (2026-04-23) | [#108](https://github.com/corycunanan/optcg-sim/pull/108) merged | Primitive grew a `"don"` variant + `artUrl` prop for DON tokens; `data` now optional. VQA surfaced a pre-existing tooltip regression (PerspectiveContainer wasn't spreading Radix props) + attacker DragOverlay still on `<BoardCard>` — both fixed in the same PR. |
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | In Review (2026-04-23) | [#111](https://github.com/corycunanan/optcg-sim/pull/111) | Must compose with 3D flip for OPT-276 |
-| 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Backlog | — | Consolidates the two tooltip paths |
+| 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | In Review (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) | Consolidates the two tooltip paths |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Backlog | — | Capstone — migration gate |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Backlog | — | Can start once field-card is on primitive |
 | 9 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-271 — Migrate modal cards + unify `CardTooltip`.
+**Next up:** OPT-272 — Delete `BoardCard` + design-system cleanup.
 
 ---
 
@@ -128,3 +128,21 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **`BoardCard` still alive.** Used by `deck-preview-modal.tsx` (via `CardTooltipContent` import), `board-layout.tsx` (DragOverlay), `player-field.tsx`, `opponent-field.tsx`, `drop-zones.tsx` (placeholder paths). OPT-272 is still the deletion gate — don't front-run.
   - **Ring semantics** still deferred to OPT-273. Modal target-picker rings, if any, stay as consumer className on the outer wrapper.
 - **Why this matters for OPT-271:** modal cards are the *easiest* structurally (no dnd-kit, no flight, no zone registration — just a larger static render with a tooltip), but the *tooltip consolidation* is the OPT-272 gate. If `CardTooltipContent` is extracted cleanly and both code paths converge on it, OPT-272's `BoardCard` deletion becomes a find-and-delete exercise. If they diverge, OPT-272 turns into a feature-parity audit. Treat the tooltip extract as load-bearing, not a side quest.
+
+### OPT-271 → OPT-272
+**From:** session on 2026-04-23 · **Commits:** `a3d6443` (tooltip extract), `b475c77` (modal migrations) · **PR:** [#113](https://github.com/corycunanan/optcg-sim/pull/113)
+
+- **Primer:** Tooltip paths are collapsed. `CardTooltipContent` lives at `src/components/game/card/card-tooltip-content.tsx` and is the single source of truth — both the `<Card>` primitive's built-in tooltip (via the `CardTooltip` wrapper at `src/components/game/use-card-tooltip.tsx`) and the legacy `BoardCard` render go through it. `BoardCard` itself no longer owns inline `TooltipRoot`/`TooltipTrigger`/`TooltipContent` wiring — it now wraps its cardElement in `<CardTooltip>` like everything else. All five modal card renderers (`trash-preview`, `reveal-trigger`, `optional-effect`, `arrange-top-cards`, `select-target`) render through `<Card variant="modal" size="field">`; inner `ModalCard`/`TargetCard` wrappers remain only to carry drag handlers + selection/drag-over ring utilities (moved from outer `border-gb-accent-*` to `ring-gb-accent-*` to avoid double-border against the primitive's `border-gb-border-strong`).
+- **Read first:** `grep -rn '<BoardCard' src` — after this PR, the only remaining consumers are `board-layout/board-layout.tsx:~421` (attacker DragOverlay), `board-layout/player-field.tsx` (deck / leader-empty placeholders), `board-layout/opponent-field.tsx` (deck / life count / leader-empty / face-down trash stacks), and `board-layout/drop-zones.tsx:~167` (empty drop zone placeholder). These are the OPT-272 deletion targets. `src/components/game/board-card.tsx` — read it before deletion: it still owns three distinct visual paths (empty placeholder, face-down / sleeve, and face-up) and the tooltip path is now a one-line `<CardTooltip>` wrap. The face-down + empty paths are what the remaining consumers depend on.
+- **Gotchas / do NOT touch:**
+  - **Modal-variant hover is the primitive's `cardHover` scale+wiggle** (stiffness 420 / damping 13). The old trash preview had `hover:-translate-y-1 hover:shadow-md`; that's gone — intentional, swap to the project's shared motion preset. If anyone flags the delta during review, don't paper over with custom hover — route through variant hover instead.
+  - **Select-target still uses consumer outer opacity for the "blocked" dim**, not `state="invalid"` on the primitive, even though the primitive already has that preset wired. The two dims were stacking (0.3 × 0.35 ≈ 0.10), so I left the semantic state alone to preserve visual parity. If OPT-273 wants to consolidate invalid semantics, that's where to flip it — and remove the outer `opacity-30`.
+  - **`size="field"` on every modal card** (80×112). The primitive's default `size="modal"` is 120×168, which would have regressed the arrange/select grids (5-per-row layout breaks at that width inside the 520px modal). Stay conservative; modal upsizing is a design decision, not a migration decision.
+  - **`data={{ card, cardId: card.cardId, cardDb }}` shape is important.** `CardInstance.cardId` is authoritative; passing just `{ card, cardDb }` works because the primitive falls back to `data.card.cardId`, but being explicit matches the OPT-269 pattern used by DON tokens.
+  - **`TooltipProvider` is local to each migrated modal** (wraps the card row). There's already a top-level `TooltipProvider` in `board-layout.tsx`, but making modals self-contained means they survive being mounted outside the board. `deck-preview-modal.tsx` already does this; all five migrated modals follow suit.
+  - **Do not delete `src/components/game/use-card-tooltip.tsx`.** The `<Card>` primitive imports `CardTooltip` from there. It's load-bearing after OPT-271.
+- **Unresolved:**
+  - **No visual VQA on OPT-271 yet.** Auto-mode session, no browser. Type-check + lint (0 errors) + tests (28/28 pass) all green, but no manual eyeball. First thing when picking up OPT-272: trigger each modal flow in a 2-player lobby (drop a trigger card, resolve an optional effect, cast an ARRANGE_TOP_CARDS effect, resolve a SELECT_TARGET with multiple valid/invalid cards, view trash) and confirm tooltips + selection rings look right. Particularly watch for the ring-offset in select/arrange — if the amber ring visually clips against neighbor cards at `gap-2`, bump the ring-offset back to `0` or let OPT-273 handle it.
+  - **`state="invalid"` is wired but unused** — see gotcha above. Dead semantic path until OPT-273 picks it up.
+  - **`BoardCard` is still alive** for five consumers listed in "Read first." OPT-272's actual scope.
+- **Why this matters for OPT-272:** this is the deletion gate. With the tooltip path consolidated and every *card* consumer on the primitive, the only remaining `BoardCard` usages are *placeholder* / *drag-ghost* render paths. Two options: (a) migrate the placeholders to `<Card empty />` + the drag-ghost to `<Card state="dragging">` and delete `BoardCard` outright, or (b) if any of those placeholder paths turn out to need behavior the primitive doesn't offer, tune the primitive in the same PR rather than keeping `BoardCard` as a long-tail parallel impl. The face-down/sleeve render in `BoardCard` is the only thing left that the primitive's face-down path doesn't fully cover end-to-end (it does `sleeveUrl`, but the striped pattern fallback for no-sleeve face-down lives only in BoardCard) — check that before deleting.
