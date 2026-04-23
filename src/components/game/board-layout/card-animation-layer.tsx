@@ -6,7 +6,7 @@ import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { cardTransitions } from "@/lib/motion";
-import { BoardCard } from "../board-card";
+import { Card } from "../card";
 import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constants";
 
 interface CardAnimationLayerProps {
@@ -54,6 +54,12 @@ function FlyingCard({
     : toRect.left + (toRect.width - toW) / 2;
   const toY = toRect.top + (toRect.height - toH) / 2;
 
+  // Variant tracks the destination footprint — the primitive's size token
+  // matches the outer motion.div's animated `toW/toH` so the card settles
+  // into the destination zone at exactly the right dimensions.
+  const variant = isHandBound ? "hand" : "field";
+  const isFaceDown = !transition.cardId;
+
   return (
     <motion.div
       initial={{
@@ -81,13 +87,15 @@ function FlyingCard({
         zIndex: 9999,
       }}
     >
-      <BoardCard
-        cardId={transition.cardId ?? undefined}
-        cardDb={cardDb}
-        sleeve={!transition.cardId}
+      <Card
+        variant={variant}
+        state="in-flight"
+        data={
+          transition.cardId ? { cardId: transition.cardId, cardDb } : undefined
+        }
+        faceDown={isFaceDown}
         sleeveUrl={sleeveUrl}
-        width={toW}
-        height={toH}
+        interaction={{ tooltipDisabled: true }}
       />
     </motion.div>
   );
