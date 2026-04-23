@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-275 in review)
+last-updated: 2026-04-23 (OPT-275 merged; OPT-281 + OPT-282 filed)
 ---
 
 # Card Animations — Handoff Doc
@@ -23,15 +23,17 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Done (2026-04-23) | [#111](https://github.com/corycunanan/optcg-sim/pull/111) merged | Flip-during-flight deferred to OPT-276 (primitive ready, orchestration not wired) |
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Done (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) merged | Consolidates the two tooltip paths — `CardTooltipContent` extracted, both paths reach for it |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Done (2026-04-23) | [#115](https://github.com/corycunanan/optcg-sim/pull/115) merged | Capstone — migration gate; Phase 2 complete |
-| 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | In Review (2026-04-23) | [#117](https://github.com/corycunanan/optcg-sim/pull/117) | Idle breathing + pointer tilt + 3D click bob — all layered onto the primitive |
-| 9 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
-| 10 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
-| 11 | OPT-274 | Entry + hand re-fan micro-interactions | Medium | OPT-267, OPT-268, OPT-270 | Backlog | — | |
-| 12 | OPT-121 | Remaining event coverage + indicator polish | High | primitive finalized | Backlog | — | Last — composes indicators through overlay slots |
+| 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Done (2026-04-23) | [#117](https://github.com/corycunanan/optcg-sim/pull/117) merged | Idle breathing + pointer tilt + 3D click bob — all layered onto the primitive. Surfaced the OPT-281 regression in HTML5-drag modals. |
+| 9 | OPT-281 | Fix modal drag image: shows card back + black box | High (Bug) | OPT-275 | Backlog | — | Regression from OPT-275 — interim fix via `setDragImage`, or wait for OPT-282 rewire |
+| 10 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
+| 11 | OPT-282 | Drag-to-reorder in hand + "insert between" UX | Medium | OPT-276 | Backlog | — | Wires `@dnd-kit/sortable`; absorbs OPT-281 if not patched sooner |
+| 12 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
+| 13 | OPT-274 | Entry + hand re-fan micro-interactions | Medium | OPT-267, OPT-268, OPT-270 | Backlog | — | |
+| 14 | OPT-121 | Remaining event coverage + indicator polish | High | primitive finalized | Backlog | — | Last — composes indicators through overlay slots |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-276 — Drag tilt + flip animations.
+**Next up:** OPT-281 — Fix modal drag image (regression from OPT-275). OPT-276 remains the next behavioral feature after the bug is patched; OPT-282 slots in after OPT-276.
 
 ---
 
