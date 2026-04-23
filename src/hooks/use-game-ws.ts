@@ -8,7 +8,22 @@ import type {
   ServerMessage,
 } from "@shared/game-types";
 
-export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+export type ConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "error"
+  | "failed";
+
+// After MAX_RECONNECT_ATTEMPTS consecutive failed connection attempts we stop
+// retrying and surface a "failed" status so the UI can show an actionable
+// error instead of spinning forever. Total elapsed time at the last attempt is
+// roughly sum(1,2,4,8,16,30) = 61s, which is long enough to distinguish a
+// transient dropout from a persistent failure (bad network, TLS block, token
+// endpoint down).
+const MAX_RECONNECT_ATTEMPTS = 6;
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30_000;
 
 /**
  * useGameWs — manages the WebSocket connection to the Cloudflare game DO.
@@ -48,9 +63,16 @@ export function useGameWs(
       token = await getToken();
     } catch {
       if (unmountedRef.current) return;
-      setConnectionStatus("error");
       setLastError("Failed to get auth token");
-      const delay = Math.min(5000 * Math.pow(2, reconnectAttemptsRef.current), 60000);
+      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setConnectionStatus("failed");
+        return;
+      }
+      setConnectionStatus("error");
+      const delay = Math.min(
+        RECONNECT_BASE_MS * Math.pow(2, reconnectAttemptsRef.current),
+        RECONNECT_MAX_MS,
+      );
       reconnectAttemptsRef.current += 1;
       reconnectTimerRef.current = setTimeout(() => { void connectImpl(); }, delay);
       return;
@@ -135,15 +157,42 @@ export function useGameWs(
 
     ws.onclose = () => {
       if (unmountedRef.current || manualCloseRef.current) return;
-      setConnectionStatus("disconnected");
       wsRef.current = null;
 
+      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setConnectionStatus("failed");
+        return;
+      }
+
+      setConnectionStatus("disconnected");
       // Exponential backoff; fresh token fetched on each attempt via connect()
-      const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+      const delay = Math.min(
+        RECONNECT_BASE_MS * Math.pow(2, reconnectAttemptsRef.current),
+        RECONNECT_MAX_MS,
+      );
       reconnectAttemptsRef.current += 1;
       reconnectTimerRef.current = setTimeout(() => { void connectImpl(); }, delay);
     };
   }, [gameId, workerUrl, getToken]);
+
+  // Manual retry from the UI after we've given up. Clears the attempt counter
+  // and any pending timers, drops any stale socket, and kicks off a fresh
+  // connection cycle.
+  const retryConnection = useCallback(() => {
+    reconnectAttemptsRef.current = 0;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setLastError(null);
+    setConnectionStatus("connecting");
+    void connect();
+  }, [connect]);
 
   useEffect(() => {
     unmountedRef.current = false;
@@ -187,5 +236,15 @@ export function useGameWs(
     setConnectionStatus("disconnected");
   }, []);
 
-  return { gameState, connectionStatus, lastError, activePrompt, gameOver, canUndo, sendAction, leaveGame };
+  return {
+    gameState,
+    connectionStatus,
+    lastError,
+    activePrompt,
+    gameOver,
+    canUndo,
+    sendAction,
+    leaveGame,
+    retryConnection,
+  };
 }

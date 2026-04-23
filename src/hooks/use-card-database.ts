@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CardDb } from "@shared/game-types";
 
 export interface UseCardDatabaseReturn {
   cardDb: CardDb;
   cardDbReady: boolean;
   cardDbError: string | null;
+  retryFetchCards: () => void;
 }
+
+const MAX_ATTEMPTS = 3;
 
 export function useCardDatabase(
   gameId: string,
@@ -16,6 +19,8 @@ export function useCardDatabase(
 ): UseCardDatabaseReturn {
   const [cardDb, setCardDb] = useState<CardDb>({});
   const [cardDbError, setCardDbError] = useState<string | null>(null);
+  // Bump to force the effect to re-run after a manual retry.
+  const [retryNonce, setRetryNonce] = useState(0);
   const fetchedRef = useRef(false);
 
   useEffect(() => {
@@ -23,10 +28,9 @@ export function useCardDatabase(
 
     let cancelled = false;
     let attempt = 0;
-    const maxAttempts = 3;
 
     async function fetchCards() {
-      while (attempt < maxAttempts && !cancelled) {
+      while (attempt < MAX_ATTEMPTS && !cancelled) {
         try {
           const token = await getToken();
           const r = await fetch(
@@ -42,21 +46,27 @@ export function useCardDatabase(
           return;
         } catch {
           attempt++;
-          if (attempt < maxAttempts && !cancelled) {
+          if (attempt < MAX_ATTEMPTS && !cancelled) {
             await new Promise((r) => setTimeout(r, 1000 * attempt));
           }
         }
       }
       if (!cancelled) {
-        setCardDbError("Failed to load card data. Please refresh to try again.");
+        setCardDbError("Failed to load card data.");
       }
     }
 
     fetchCards();
     return () => { cancelled = true; };
-  }, [gameId, workerUrl, getToken]);
+  }, [gameId, workerUrl, getToken, retryNonce]);
+
+  const retryFetchCards = useCallback(() => {
+    fetchedRef.current = false;
+    setCardDbError(null);
+    setRetryNonce((n) => n + 1);
+  }, []);
 
   const cardDbReady = Object.keys(cardDb).length > 0;
 
-  return { cardDb, cardDbReady, cardDbError };
+  return { cardDb, cardDbReady, cardDbError, retryFetchCards };
 }

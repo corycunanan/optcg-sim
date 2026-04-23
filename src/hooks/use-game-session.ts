@@ -35,6 +35,8 @@ export interface GameSessionGame {
   inBattle: boolean;
   matchClosed: boolean;
   canUndo: boolean;
+  retryConnection: () => void;
+  connectivityFailed: boolean;
 }
 
 export interface GameSessionOpponent {
@@ -88,6 +90,7 @@ export function useGameSession(
     canUndo,
     sendAction: rawSendAction,
     leaveGame,
+    retryConnection,
   } = useGameWs(gameId, workerUrl, getToken);
 
   // Suppress duplicate identical actions fired within a short window. Rapid
@@ -107,11 +110,18 @@ export function useGameSession(
 
   /* ── Card DB ──────────────────────────────────────────────────────── */
 
-  const { cardDb, cardDbReady, cardDbError } = useCardDatabase(
+  const { cardDb, cardDbReady, cardDbError, retryFetchCards } = useCardDatabase(
     gameId,
     workerUrl,
     getToken,
   );
+
+  // Single retry entry point for the UI. Re-runs whichever subsystem is
+  // currently broken; each call is idempotent.
+  const retryConnectivity = useCallback(() => {
+    if (cardDbError) retryFetchCards();
+    retryConnection();
+  }, [cardDbError, retryFetchCards, retryConnection]);
 
   /* ── Remote game status polling ───────────────────────────────────── */
 
@@ -255,6 +265,9 @@ export function useGameSession(
       inBattle,
       matchClosed,
       canUndo,
+      retryConnection: retryConnectivity,
+      connectivityFailed:
+        connectionStatus === "failed" || cardDbError !== null,
     },
     opponent: {
       opponentAway,
