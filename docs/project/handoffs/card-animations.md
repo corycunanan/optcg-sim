@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-271 opened)
+last-updated: 2026-04-23 (OPT-271 merged)
 ---
 
 # Card Animations — Handoff Doc
@@ -21,7 +21,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Done (2026-04-22) | [#103](https://github.com/corycunanan/optcg-sim/pull/103) merged | Face-up + face-down both on primitive; in-flight placeholder preserved. Pattern re-validated — no primitive API changes needed. |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Done (2026-04-23) | [#108](https://github.com/corycunanan/optcg-sim/pull/108) merged | Primitive grew a `"don"` variant + `artUrl` prop for DON tokens; `data` now optional. VQA surfaced a pre-existing tooltip regression (PerspectiveContainer wasn't spreading Radix props) + attacker DragOverlay still on `<BoardCard>` — both fixed in the same PR. |
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Done (2026-04-23) | [#111](https://github.com/corycunanan/optcg-sim/pull/111) merged | Flip-during-flight deferred to OPT-276 (primitive ready, orchestration not wired) |
-| 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | In Review (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) | Consolidates the two tooltip paths |
+| 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Done (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) merged | Consolidates the two tooltip paths — `CardTooltipContent` extracted, both paths reach for it |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Backlog | — | Capstone — migration gate |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Backlog | — | Can start once field-card is on primitive |
 | 9 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
