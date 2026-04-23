@@ -12,10 +12,9 @@ import type { CardState, CardVariant } from "@/components/game/card";
 import { Button, TooltipProvider } from "@/components/ui";
 
 /**
- * Internal preview page for the `<Card>` primitive (OPT-266). Not linked
- * from the app — exists for visual QA of the variant × state matrix, the
- * 3D flip, and the size tokens. Safe to delete once the primitive fully
- * replaces `BoardCard` (capstone: OPT-272).
+ * Internal preview page for the `<Card>` primitive. Not linked from the app —
+ * exists for visual QA of the variant × state matrix, the 3D flip, and the
+ * size tokens.
  */
 
 const SAMPLE_CARDS: CardData[] = [

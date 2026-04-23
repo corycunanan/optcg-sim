@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-271 merged)
+last-updated: 2026-04-23 (OPT-272 in review)
 ---
 
 # Card Animations — Handoff Doc
@@ -22,7 +22,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Done (2026-04-23) | [#108](https://github.com/corycunanan/optcg-sim/pull/108) merged | Primitive grew a `"don"` variant + `artUrl` prop for DON tokens; `data` now optional. VQA surfaced a pre-existing tooltip regression (PerspectiveContainer wasn't spreading Radix props) + attacker DragOverlay still on `<BoardCard>` — both fixed in the same PR. |
 | 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Done (2026-04-23) | [#111](https://github.com/corycunanan/optcg-sim/pull/111) merged | Flip-during-flight deferred to OPT-276 (primitive ready, orchestration not wired) |
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Done (2026-04-23) | [#113](https://github.com/corycunanan/optcg-sim/pull/113) merged | Consolidates the two tooltip paths — `CardTooltipContent` extracted, both paths reach for it |
-| 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Backlog | — | Capstone — migration gate |
+| 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | In Review (2026-04-23) | [#115](https://github.com/corycunanan/optcg-sim/pull/115) | Capstone — migration gate |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Backlog | — | Can start once field-card is on primitive |
 | 9 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Backlog | — | Flip uses the 3D structure from OPT-266 |
 | 10 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-272 — Delete `BoardCard` + design-system cleanup.
+**Next up:** OPT-275 — Balatro-style passive motion.
 
 ---
 
@@ -146,3 +146,19 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **`state="invalid"` is wired but unused** — see gotcha above. Dead semantic path until OPT-273 picks it up.
   - **`BoardCard` is still alive** for five consumers listed in "Read first." OPT-272's actual scope.
 - **Why this matters for OPT-272:** this is the deletion gate. With the tooltip path consolidated and every *card* consumer on the primitive, the only remaining `BoardCard` usages are *placeholder* / *drag-ghost* render paths. Two options: (a) migrate the placeholders to `<Card empty />` + the drag-ghost to `<Card state="dragging">` and delete `BoardCard` outright, or (b) if any of those placeholder paths turn out to need behavior the primitive doesn't offer, tune the primitive in the same PR rather than keeping `BoardCard` as a long-tail parallel impl. The face-down/sleeve render in `BoardCard` is the only thing left that the primitive's face-down path doesn't fully cover end-to-end (it does `sleeveUrl`, but the striped pattern fallback for no-sleeve face-down lives only in BoardCard) — check that before deleting.
+
+### OPT-272 → OPT-275
+**From:** session on 2026-04-23 · **Commit:** `7c9242d` · **PR:** [#115](https://github.com/corycunanan/optcg-sim/pull/115)
+
+- **Primer:** `BoardCard` is gone. The last five consumers — the attacker/hand-card `DragOverlay` in `board-layout.tsx`, the player + opponent deck piles, opponent trash, opponent stage, leader/char/empty placeholders — now route through `<Card>`. The primitive's `CardBack` gained an optional `label` prop so the DECK / TRASH text labels that used to live in `BoardCard`'s face-down branch ride along with the sleeve face (hidden by `backface-visibility` when the card flips to front). Empty slot placeholders (leader + opponent character row) went to a new `src/components/game/board-layout/empty-slot.tsx` helper that just mirrors `DroppableCharSlot`'s bordered-square pattern — deliberately *not* using `<Card empty />` because these are 112×112 slots, not the 80×112 card footprint.
+- **Read first:** `src/components/game/card/card.tsx` + `src/components/game/card/card-back.tsx` — the primitive is now the sole renderer; any future behavioral addition lands here. `src/components/game/board-layout/empty-slot.tsx` for the empty-slot pattern. `src/app/preview/card/page.tsx` is still a useful VQA harness for the primitive. The never-rendered striped-pattern fallback `BoardCard` had for `faceDown` without `sleeve` is gone — no consumer used it.
+- **Gotchas / do NOT touch:**
+  - **`overlays.label` now means two things** depending on `faceDown`. On face-up/empty it's the fallback text shown on the card front or placeholder; on face-down it's overlaid centered on the sleeve as a pile label (DECK / TRASH). Keep this dual-purpose if you touch it, and don't let it bleed onto face-up cards mid-flip.
+  - **`size="preview"` (200×280)** is still in `CARD_SIZES` and *only* used by `/preview/card`. The OPT-266 handoff suggested pruning it; I left it because it's still exercised by the preview matrix. If you want to drop it, either delete the preview entry or migrate it to a non-token fixed dimension.
+  - **`cardDb` on `DroppableCharSlot`** is an unused prop (pre-existing ESLint warning). It's one of 631 baseline warnings — didn't clean up as part of this PR to keep the diff focused. If you want it gone, also trim the callers in `player-field.tsx`.
+  - **Empty-slot vs. empty-card distinction.** `<EmptySlot>` = 112×112 bordered square for leader/char placeholders. `<Card empty>` = card-shaped dashed placeholder used by life-zone + trash-zone. Don't collapse them — the footprints are intentionally different.
+- **Unresolved:**
+  - **No visual VQA on OPT-272.** Auto-mode session, no browser. Type-check + lint (0 new warnings) + tests (28/28 pass), but no manual eyeball. The migrations that matter most to verify: player + opponent deck click opens the preview modal; opponent trash click opens the preview (and shows count > 1 correctly); opponent stage rotates 90° when rested; hand-card drag overlay still shows a correctly-scaled ghost; empty leader / opponent character slots render the LDR / C1–C5 labels.
+  - **`state="invalid"` still wired but unused** — carried over from OPT-271. Still OPT-273's scope to pick up.
+  - **Every remaining design-system follow-up is now closed** — no more inline style design properties on the touched files. Wider repo audit (if it ever happens) is a separate exercise.
+- **Why this matters for OPT-275:** the primitive is now the *only* render path for game cards, which means any behavioral work (Balatro-style passive motion, battle-state micro-interactions, entry/re-fan choreography) only needs to touch `<Card>` + its state presets — no more double-maintenance against `BoardCard`. OPT-275 is the first ticket to exploit that: it wants to layer passive idle motion (subtle drift / breath / micro-rotation) on top of the existing state matrix. Candidate home is `state-presets.ts` — either a new state (`"idle"` distinct from `"active"`) or an extension to the default `active` preset gated on a variant. Read the OPT-267 → OPT-268 entry above for the consumer pattern first; it applies unchanged.

@@ -1,13 +1,12 @@
 "use client";
 
 import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
-import { BoardCard } from "../board-card";
+import { Card } from "../card";
+import { EmptySlot } from "./empty-slot";
 import {
   SQUARE,
   SIDE_ZONE_GAP,
   FIELD_W,
-  BOARD_CARD_W,
-  BOARD_CARD_H,
   type DragPayload,
 } from "./constants";
 import {
@@ -141,12 +140,8 @@ export function PlayerField({
           donCountAdjust={donCountAdjustments?.get(me.leader.instanceId)}
         />
       ) : (
-        <BoardCard
-          cardDb={cardDb}
-          empty
+        <EmptySlot
           label="LDR"
-          width={SQUARE}
-          height={SQUARE}
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
         />
       )}
@@ -163,14 +158,13 @@ export function PlayerField({
 
       {/* Zone 3 (right): Deck + Trash */}
       <ZoneRef zoneKey="p-deck" style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}>
-        <BoardCard
-          cardDb={cardDb}
-          sleeve
+        <Card
+          variant="trash"
+          data={{ cardDb }}
+          faceDown
           sleeveUrl={me?.sleeveUrl}
-          label="DECK"
-          count={me?.deck.length}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
+          overlays={{ countBadge: me?.deck.length, label: "DECK" }}
+          interaction={{ clickable: !!me }}
           onClick={() => me && onPreviewZone({ type: "deck", owner: "me" })}
         />
       </ZoneRef>

@@ -178,8 +178,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
                 "absolute z-20 left-0 right-0 bottom-0 h-6 rounded-b-md cursor-grab",
                 "bg-gb-accent-gold/30 ring-1 ring-gb-accent-gold/60",
                 "animate-pulse",
+                isDonDragging ? "opacity-30" : "opacity-100",
               )}
-              style={{ opacity: isDonDragging ? 0.3 : 1 }}
               aria-label="Drag attached DON"
             />
           )}

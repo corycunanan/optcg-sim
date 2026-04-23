@@ -48,7 +48,7 @@ export const Card = React.memo(function Card({
   const { width, height } = resolveSize(variant, size);
 
   // Empty placeholder short-circuits the 3D stack — nothing to flip, no
-  // motion needed. Matches the old `BoardCard empty` code path.
+  // motion needed.
   if (empty) {
     return (
       <div
@@ -127,7 +127,7 @@ export const Card = React.memo(function Card({
               fallbackLabel={overlays?.label}
               imageUrlOverride={artUrl}
             />
-            <CardBack sleeveUrl={sleeveUrl} />
+            <CardBack sleeveUrl={sleeveUrl} label={overlays?.label} />
           </CardFaces>
 
           {/* Highlight ring follows the card outline, so it sits inside the

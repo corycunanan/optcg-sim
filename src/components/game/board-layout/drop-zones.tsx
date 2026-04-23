@@ -2,14 +2,12 @@
 
 import React, { useCallback, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-import { cardHover, cardTap, cardRest, cardActivate } from "@/lib/motion";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
-import { BoardCard } from "../board-card";
-import { SQUARE, BOARD_CARD_W, BOARD_CARD_H } from "./constants";
+import { Card } from "../card";
+import { SQUARE } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
@@ -114,7 +112,6 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   animationDelay?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const reducedMotion = useReducedMotion();
   const zonePos = useZonePosition();
   const accepts = activeDragType === "hand-card";
   const { setNodeRef, isOver } = useDroppable({
@@ -150,27 +147,17 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
       {card ? (
         <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
           <DropdownMenuTrigger asChild>
-            <motion.div
+            <div
               onContextMenu={handleContextMenu}
-              animate={{
-                rotate: card.state === "RESTED" ? 90 : 0,
-                filter: card.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
-              }}
-              transition={{
-                ...(card.state === "RESTED" ? cardRest : cardActivate),
-                delay: animationDelay ?? 0,
-              }}
-              whileHover={reducedMotion ? undefined : cardHover}
-              whileTap={reducedMotion ? undefined : cardTap}
               className="relative z-[1]"
             >
-              <BoardCard
-                card={card}
-                cardDb={cardDb}
-                width={BOARD_CARD_W}
-                height={BOARD_CARD_H}
+              <Card
+                data={{ card, cardDb }}
+                variant="field"
+                state={card.state === "RESTED" ? "rest" : "active"}
+                motionDelay={animationDelay}
               />
-            </motion.div>
+            </div>
           </DropdownMenuTrigger>
           {onAction && (
             <CardActionMenuContent

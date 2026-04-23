@@ -1,15 +1,12 @@
 "use client";
 
-import { motion } from "motion/react";
 import type { CardDb, PlayerState } from "@shared/game-types";
-import { cardRest, cardActivate, cardHover } from "@/lib/motion";
-import { BoardCard } from "../board-card";
+import { Card } from "../card";
+import { EmptySlot } from "./empty-slot";
 import {
   SQUARE,
   SIDE_ZONE_GAP,
   FIELD_W,
-  BOARD_CARD_W,
-  BOARD_CARD_H,
 } from "./constants";
 import {
   zone2Left,
@@ -42,30 +39,35 @@ export function OpponentField({
   refreshWave,
   onPreviewZone,
 }: OpponentFieldProps) {
+  const hasTrash = !!opp && opp.trash.length > 0;
+  const topTrash = hasTrash ? opp.trash[0] : undefined;
+
   return (
     <>
       {/* Zone 3 (left): Trash + Deck */}
       <ZoneRef zoneKey="o-trash" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}>
-        <BoardCard
-          card={opp && opp.trash.length > 0 ? opp.trash[0] : undefined}
-          cardDb={cardDb}
-          empty={!opp || opp.trash.length === 0}
-          label="TRASH"
-          count={opp && opp.trash.length > 1 ? opp.trash.length : undefined}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
-          onClick={() => opp && opp.trash.length > 0 && onPreviewZone({ type: "trash", owner: "opp" })}
+        <Card
+          variant="trash"
+          data={{ cardDb, card: topTrash }}
+          empty={!hasTrash}
+          emptyLabel="TRASH"
+          overlays={
+            hasTrash && opp.trash.length > 1
+              ? { countBadge: opp.trash.length }
+              : undefined
+          }
+          interaction={{ clickable: hasTrash }}
+          onClick={() => hasTrash && onPreviewZone({ type: "trash", owner: "opp" })}
         />
       </ZoneRef>
       <ZoneRef zoneKey="o-deck" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}>
-        <BoardCard
-          cardDb={cardDb}
-          sleeve
+        <Card
+          variant="trash"
+          data={{ cardDb }}
+          faceDown
           sleeveUrl={opp?.sleeveUrl}
-          label="DECK"
-          count={opp?.deck.length}
-          width={BOARD_CARD_W}
-          height={BOARD_CARD_H}
+          overlays={{ countBadge: opp?.deck.length, label: "DECK" }}
+          interaction={{ clickable: !!opp }}
           onClick={() => opp && onPreviewZone({ type: "deck", owner: "opp" })}
         />
       </ZoneRef>
@@ -73,24 +75,12 @@ export function OpponentField({
       {/* Zone 2: Leader row — STG / LDR / DON */}
       <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
         {opp?.stage ? (
-          <motion.div
-            animate={{
-              rotate: opp.stage.state === "RESTED" ? 90 : 0,
-              filter: opp.stage.state === "RESTED" ? "brightness(0.6)" : "brightness(1)",
-            }}
-            transition={{
-              ...(opp.stage.state === "RESTED" ? cardRest : cardActivate),
-              delay: refreshWave ? 0.18 : 0,
-            }}
-            whileHover={cardHover}
-          >
-            <BoardCard
-              card={opp.stage}
-              cardDb={cardDb}
-              width={BOARD_CARD_W}
-              height={BOARD_CARD_H}
-            />
-          </motion.div>
+          <Card
+            variant="field"
+            data={{ card: opp.stage, cardDb }}
+            state={opp.stage.state === "RESTED" ? "rest" : "active"}
+            motionDelay={refreshWave ? 0.18 : undefined}
+          />
         ) : (
           <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
             STG
@@ -108,12 +98,8 @@ export function OpponentField({
           animationDelay={refreshWave ? 0 : undefined}
         />
       ) : (
-        <BoardCard
-          cardDb={cardDb}
-          empty
+        <EmptySlot
           label="LDR"
-          width={SQUARE}
-          height={SQUARE}
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
         />
       )}
@@ -140,13 +126,9 @@ export function OpponentField({
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
           />
         ) : (
-          <BoardCard
+          <EmptySlot
             key={`opp-c${i}`}
-            cardDb={cardDb}
-            empty
             label={`C${i + 1}`}
-            width={SQUARE}
-            height={SQUARE}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}
           />
         );

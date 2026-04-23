@@ -15,11 +15,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui";
-import { BoardCard } from "../board-card";
 import { Card } from "../card";
 import {
   NAVBAR_H,
-  HAND_CARD_W,
   HAND_CARD_H,
   FIELD_W,
   BOARD_CONTENT_H,
@@ -418,12 +416,18 @@ function BoardLayoutInner({
       {activeDrag && (
         <motion.div style={{ rotate: dragTilt.tilt }}>
           {activeDrag.type === "hand-card" && (
-            <BoardCard
-              card={activeDrag.card}
-              cardDb={cardDb}
-              width={HAND_CARD_W * boardScale}
-              height={HAND_CARD_H * boardScale}
-            />
+            <div
+              style={{
+                transform: `scale(${boardScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <Card
+                variant="hand"
+                data={{ cardDb, card: activeDrag.card }}
+                interaction={{ tooltipDisabled: true }}
+              />
+            </div>
           )}
           {activeDrag.type === "active-don" && (
             <div
