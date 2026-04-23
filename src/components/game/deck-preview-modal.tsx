@@ -15,7 +15,7 @@ import {
   TooltipContent,
 } from "@/components/ui";
 import { VisuallyHidden } from "radix-ui";
-import { CardTooltipContent } from "./board-card";
+import { CardTooltipContent } from "./card/card-tooltip-content";
 
 interface GameDeckPreviewModalProps {
   deckList: DeckListEntry[];
