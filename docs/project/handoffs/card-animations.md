@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-276 In Review; drag tilt 3D + dedicated flip spring)
+last-updated: 2026-04-23 (OPT-276 merged; drag tilt 3D + dedicated flip spring)
 ---
 
 # Card Animations — Handoff Doc
@@ -25,7 +25,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Done (2026-04-23) | [#115](https://github.com/corycunanan/optcg-sim/pull/115) merged | Capstone — migration gate; Phase 2 complete |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Done (2026-04-23) | [#117](https://github.com/corycunanan/optcg-sim/pull/117) merged | Idle breathing + pointer tilt + 3D click bob — all layered onto the primitive. Surfaced the OPT-281 regression in HTML5-drag modals. |
 | 9 | OPT-281 | Fix modal drag image: shows card back + black box | High (Bug) | OPT-275 | Done (2026-04-23) | [#119](https://github.com/corycunanan/optcg-sim/pull/119) merged | Interim fix via `setDragImage` with a flat `<img>` ghost; OPT-282 will supersede when the modal rewires onto `@dnd-kit/sortable`. |
-| 10 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | In Review (2026-04-23) | [#121](https://github.com/corycunanan/optcg-sim/pull/121) | Drag tilt went 3D (rotateX/rotateY) + reduced-motion gate; flip got a dedicated `cardFlip` spring owned by `CardFaces` |
+| 10 | OPT-276 | Drag tilt + flip animations | Medium | OPT-266, OPT-270 | Done (2026-04-23) | [#121](https://github.com/corycunanan/optcg-sim/pull/121) merged | Drag tilt went 3D (rotateX/rotateY) + reduced-motion gate; flip got a dedicated `cardFlip` spring owned by `CardFaces`. Flight-layer flip + modal-open instant-flip deferred (VQA attempts reverted). |
 | 11 | OPT-282 | Drag-to-reorder in hand + "insert between" UX | Medium | OPT-276 | Backlog | — | Wires `@dnd-kit/sortable`; absorbs OPT-281 if not patched sooner |
 | 12 | OPT-273 | Battle-state micro-interactions | Medium | OPT-267 | Backlog | — | New `<Card state>` values + presets |
 | 13 | OPT-274 | Entry + hand re-fan micro-interactions | Medium | OPT-267, OPT-268, OPT-270 | Backlog | — | |
