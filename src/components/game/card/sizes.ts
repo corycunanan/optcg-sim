@@ -10,6 +10,7 @@ export const CARD_SIZES: Record<CardSize, { width: number; height: number }> = {
   hand: { width: 84, height: 118 },    // HAND_CARD_W × HAND_CARD_H
   modal: { width: 120, height: 168 },  // modal target picker / trash grid
   preview: { width: 200, height: 280 }, // preview page showcase + large callouts
+  don: { width: 50, height: 70 },      // DON!! token in the cost area
 };
 
 /** Default size token for a given variant. Consumers can override via `size`. */
@@ -19,6 +20,7 @@ export const DEFAULT_SIZE_FOR_VARIANT: Record<CardVariant, CardSize> = {
   modal: "modal",
   life: "field",
   trash: "field",
+  don: "don",
 };
 
 export function resolveSize(

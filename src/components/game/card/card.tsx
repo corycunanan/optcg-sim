@@ -34,6 +34,7 @@ export const Card = React.memo(function Card({
   size,
   faceDown,
   sleeveUrl,
+  artUrl,
   interaction,
   overlays,
   empty,
@@ -69,8 +70,9 @@ export const Card = React.memo(function Card({
     );
   }
 
-  const resolvedCardId = data.card?.cardId ?? data.cardId;
-  const cardData = resolvedCardId ? data.cardDb[resolvedCardId] ?? null : null;
+  const resolvedCardId = data?.card?.cardId ?? data?.cardId;
+  const cardData =
+    resolvedCardId && data?.cardDb ? data.cardDb[resolvedCardId] ?? null : null;
 
   const motionConfig = stateToMotionConfig(
     state,
@@ -120,7 +122,11 @@ export const Card = React.memo(function Card({
           whileTap={motionConfig.whileTap}
         >
           <CardFaces faceDown={!!faceDown} transition={motionConfig.transition}>
-            <CardFront data={cardData} fallbackLabel={overlays?.label} />
+            <CardFront
+              data={cardData}
+              fallbackLabel={overlays?.label}
+              imageUrlOverride={artUrl}
+            />
             <CardBack sleeveUrl={sleeveUrl} />
           </CardFaces>
 
@@ -177,7 +183,7 @@ export const Card = React.memo(function Card({
   if (!tooltipEligible) return cardElement;
 
   return (
-    <CardTooltip data={cardData} cardId={resolvedCardId} card={data.card}>
+    <CardTooltip data={cardData} cardId={resolvedCardId} card={data?.card}>
       {cardElement}
     </CardTooltip>
   );

@@ -31,7 +31,6 @@ interface BoardCardProps {
   style?: React.CSSProperties;
   onClick?: () => void;
   highlight?: boolean;
-  donCountAdjust?: number;
 }
 
 export const BoardCard = React.memo(function BoardCard({
@@ -50,11 +49,9 @@ export const BoardCard = React.memo(function BoardCard({
   style,
   onClick,
   highlight,
-  donCountAdjust,
 }: BoardCardProps) {
   const resolvedCardId = card?.cardId ?? cardIdOverride;
   const data = resolvedCardId ? cardDb[resolvedCardId] : null;
-  const donCount = (card?.attachedDon.length ?? 0) + (donCountAdjust ?? 0);
 
   if (empty) {
     return (
@@ -179,17 +176,6 @@ export const BoardCard = React.memo(function BoardCard({
           </div>
         )}
       </div>
-
-      {donCount > 0 && (
-        <div
-          className="absolute z-10 text-center bg-gb-board-dark/75 py-1"
-          style={{ bottom: 0, left: 0, width }}
-        >
-          <span className="text-xs font-extrabold text-white leading-none">
-            +{donCount} DON
-          </span>
-        </div>
-      )}
     </div>
   );
 
