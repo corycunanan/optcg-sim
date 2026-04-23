@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-23 (OPT-269 merged)
+last-updated: 2026-04-23 (OPT-270 opened)
 ---
 
 # Card Animations — Handoff Doc
@@ -20,7 +20,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2 | OPT-267 | Migrate `field-card.tsx` to `<Card>` (pilot) | Medium | OPT-266 | Done (2026-04-22) | [#102](https://github.com/corycunanan/optcg-sim/pull/102) merged | Pilot — API tuned: added `motionDelay`. Ring semantics deferred to OPT-273. |
 | 3 | OPT-268 | Migrate `hand-layer.tsx` to `<Card>` | Medium | OPT-267 | Done (2026-04-22) | [#103](https://github.com/corycunanan/optcg-sim/pull/103) merged | Face-up + face-down both on primitive; in-flight placeholder preserved. Pattern re-validated — no primitive API changes needed. |
 | 4 | OPT-269 | Migrate passive zones (DON active + life + trash) | Medium | OPT-267 | Done (2026-04-23) | [#108](https://github.com/corycunanan/optcg-sim/pull/108) merged | Primitive grew a `"don"` variant + `artUrl` prop for DON tokens; `data` now optional. VQA surfaced a pre-existing tooltip regression (PerspectiveContainer wasn't spreading Radix props) + attacker DragOverlay still on `<BoardCard>` — both fixed in the same PR. |
-| 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | Backlog | — | Must compose with 3D flip for OPT-276 |
+| 5 | OPT-270 | Migrate `card-animation-layer.tsx` (flying cards) | Medium | OPT-267 | In Review (2026-04-23) | TBD | Must compose with 3D flip for OPT-276 |
 | 6 | OPT-271 | Migrate modal cards + unify `CardTooltip` | Medium | OPT-267 | Backlog | — | Consolidates the two tooltip paths |
 | 7 | OPT-272 | Delete `BoardCard` + design-system cleanup | Low | OPT-267..271 | Backlog | — | Capstone — migration gate |
 | 8 | OPT-275 | Balatro-style passive motion | Medium | OPT-267 | Backlog | — | Can start once field-card is on primitive |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-270 — `card-animation-layer.tsx` (flying cards) migration.
+**Next up:** OPT-271 — Migrate modal cards + unify `CardTooltip`.
 
 ---
 
@@ -111,3 +111,20 @@ Follow-up polish on the merged primitive, still under OPT-266 scope. Public API 
   - **`data` now optional on `CardProps`** — if any consumer *should* pass data but accidentally doesn't, the primitive will silently render the empty/blank card face instead of the intended card. TypeScript won't catch it. Something to keep in mind when reviewing OPT-270 and OPT-271.
   - `BoardCard` is still alive for deck/empty placeholders/drag-overlay/flight. OPT-272 remains the deletion gate.
 - **Why this matters for OPT-270:** The flight layer at `card-animation-layer.tsx` is the last frequently-rendered consumer of `BoardCard` before the deletion gate. It's also structurally different — the consumer owns *all* positioning (the primitive's `state="in-flight"` explicitly cedes position/scale to an external driver). Expect the migration to look more like "swap the inner render from `<BoardCard>` to `<Card state="in-flight">` while keeping the outer flight `motion.div` untouched" rather than a structural overhaul. One judgment call: whether to pass `state="in-flight"` unconditionally, or only when the card is mid-flight vs. settled — check how the flight layer distinguishes those today.
+
+### OPT-270 → OPT-271
+**From:** session on 2026-04-23 · **Commit:** `940b408` · **PR:** TBD (open after merge)
+
+- **Primer:** `card-animation-layer.tsx` now renders flying ghosts through `<Card state="in-flight">`. Zero primitive API changes — the `in-flight` state preset was already wired (rotate 0, brightness 1, opacity 1, suppressed hover/tap, `cardActivate` spring). The migration was purely a consumer swap: the outer flight `motion.div` still owns `x/y/width/height` interpolation from `ZonePositionRegistry` DOMRects; the inner render is `<Card variant={isHandBound ? "hand" : "field"} state="in-flight" data={…} faceDown={…} sleeveUrl={…} interaction={{ tooltipDisabled: true }} />`. Face-down deck draws route through `faceDown + sleeveUrl` (not `artUrl`, per OPT-269 guidance).
+- **Read first:** `src/components/game/use-card-tooltip.tsx` (the Card primitive's current tooltip path — wraps in Radix `<TooltipRoot>`), `src/components/game/board-card.tsx` (still exports `CardTooltipContent` used by `deck-preview-modal.tsx:18` and `use-card-tooltip.tsx:6` — the consolidation target), `src/components/game/deck-preview-modal.tsx` (the first modal-card consumer to migrate — currently uses `BoardCard` via `CardTooltipContent` import). `grep -rn '<BoardCard' src/components/game` — after OPT-270, remaining consumers are `board-layout.tsx` (DragOverlay for attacker), `player-field.tsx`, `opponent-field.tsx`, `drop-zones.tsx` (all empty/placeholder paths), plus wherever modal cards render today.
+- **Gotchas / do NOT touch:**
+  - **Tooltip consolidation is the hard part of OPT-271, not the modal render.** The modal path (`variant="modal"`, `size="modal"` → 120×168) is already wired in `CardProps` / `CARD_SIZES`. The real work is extracting `CardTooltipContent` out of `board-card.tsx` into its own module (e.g. `src/components/game/card/card-tooltip-content.tsx`) so both `use-card-tooltip.tsx` and any remaining legacy consumer reach for the same source. Don't leave two divergent tooltip bodies — if OPT-271 ships with both still live, OPT-272 (the `BoardCard` deletion gate) will trip.
+  - **`data` is optional on `CardProps`** (OPT-269 change). If a modal consumer passes no `data` while expecting the card face, the primitive silently renders the empty/blank placeholder. TypeScript won't flag it. Double-check every migrated modal render actually has `data: { cardId, cardDb }`.
+  - **`interaction.tooltipDisabled` is now a real lever.** OPT-270 set it on flying cards even though `pointer-events: none` would make tooltip mounting moot — belt-and-suspenders. Use the same lever when you don't want a tooltip (e.g. modal grid items where the whole modal IS the detail view), rather than routing around it with custom wrappers.
+  - **Don't touch `board-layout.tsx:~440-455` DragOverlay yet.** That's the `attacker` drag type rendering a `<BoardCard>` inside dnd-kit's `<DragOverlay>`. It's structurally different from modal cards (drag ghost, no registry, no flight) and belongs with the drag/drop cleanup in OPT-272 or a dedicated follow-up, not OPT-271's tooltip consolidation.
+- **Unresolved:**
+  - **No visual VQA on OPT-270 yet.** Auto-mode session, no browser. Behaviors (hand→field, deck→hand, field→trash, life reveal flip composition) are type-checked and the existing 28 tests pass, but no manual verification. First thing when picking up OPT-271: run a 2-player lobby and walk through at least one zone→zone flight per transition type. The `state="in-flight"` preset should be identical visually to pre-migration since the outer motion.div still owns all position/size interpolation — if something looks different, suspect the inner size (variant resolution) first.
+  - **`data` optionality risk** (see gotcha above) remains a silent-failure vector across all remaining migrations.
+  - **`BoardCard` still alive.** Used by `deck-preview-modal.tsx` (via `CardTooltipContent` import), `board-layout.tsx` (DragOverlay), `player-field.tsx`, `opponent-field.tsx`, `drop-zones.tsx` (placeholder paths). OPT-272 is still the deletion gate — don't front-run.
+  - **Ring semantics** still deferred to OPT-273. Modal target-picker rings, if any, stay as consumer className on the outer wrapper.
+- **Why this matters for OPT-271:** modal cards are the *easiest* structurally (no dnd-kit, no flight, no zone registration — just a larger static render with a tooltip), but the *tooltip consolidation* is the OPT-272 gate. If `CardTooltipContent` is extracted cleanly and both code paths converge on it, OPT-272's `BoardCard` deletion becomes a find-and-delete exercise. If they diverge, OPT-272 turns into a feature-parity audit. Treat the tooltip extract as load-bearing, not a side quest.
