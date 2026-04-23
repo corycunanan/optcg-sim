@@ -1,17 +1,9 @@
 "use client";
 
 import React from "react";
-import type { CardData, CardDb, CardInstance } from "@shared/game-types";
+import type { CardDb, CardInstance } from "@shared/game-types";
 import { cn } from "@/lib/utils";
-import { TooltipRoot, TooltipTrigger, TooltipContent } from "@/components/ui";
-import { TooltipStat } from "./game-ui";
-import {
-  useActiveEffects,
-  getPowerModDirection,
-  getCostModDirection,
-  computeEffectivePower,
-  computeEffectiveCost,
-} from "@/contexts/active-effects-context";
+import { CardTooltip } from "./use-card-tooltip";
 
 const DEFAULT_SLEEVE_IMG = "/images/card-sleeves/ulti.jpg";
 
@@ -182,111 +174,9 @@ export const BoardCard = React.memo(function BoardCard({
   if (!data) return cardElement;
 
   return (
-    <TooltipRoot delayDuration={0}>
-      <TooltipTrigger asChild>{cardElement}</TooltipTrigger>
-      <TooltipContent
-        side="right"
-        sideOffset={8}
-        className="bg-gb-surface border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg text-gb-text"
-      >
-        <CardTooltipContent data={data} cardId={resolvedCardId} card={card} />
-      </TooltipContent>
-    </TooltipRoot>
-  );
-});
-
-export const CardTooltipContent = React.memo(function CardTooltipContent({
-  data,
-  cardId,
-  card,
-}: {
-  data: CardData | null;
-  cardId: string | undefined;
-  card?: CardInstance | null;
-}) {
-  const activeEffects = useActiveEffects();
-
-  if (!data) return <span className="text-gb-text-muted text-xs">Unknown card</span>;
-  const isFieldCard = data.type === "Leader" || data.type === "Character";
-  const donCount = card?.attachedDon.length ?? 0;
-  const basePower = data.power ?? 0;
-  const instanceId = card?.instanceId ?? "";
-
-  // Compute power including effect modifications and DON bonus
-  const effectivePower = instanceId
-    ? computeEffectivePower(activeEffects, instanceId, basePower, donCount)
-    : basePower + donCount * 1000;
-
-  // Compute effective cost including effect modifications
-  const baseCost = data.cost ?? 0;
-  const effectiveCost = instanceId
-    ? computeEffectiveCost(activeEffects, instanceId, baseCost)
-    : baseCost;
-
-  // Detect effect-based modifications (separate from DON bonus)
-  const powerMod = instanceId ? getPowerModDirection(activeEffects, instanceId, basePower) : null;
-  const costMod = instanceId ? getCostModDirection(activeEffects, instanceId) : null;
-
-  return (
-    <>
-      <div className="font-bold text-gb-text-bright text-sm">
-        {data.name}
-      </div>
-      <div className="text-xs text-gb-text-subtle mb-3">
-        {data.type} &middot; {cardId}
-      </div>
-
-      {isFieldCard ? (
-        <div className="flex gap-5 flex-wrap mb-3 text-xs">
-          {data.type === "Leader" ? (
-            <TooltipStat
-              label="Life"
-              value={data.life ?? data.cost ?? 0}
-            />
-          ) : (
-            <TooltipStat
-              label="Cost"
-              value={effectiveCost}
-              modified={costMod}
-            />
-          )}
-          <TooltipStat
-            label="Power"
-            value={effectivePower.toLocaleString()}
-            modified={powerMod}
-          />
-          {data.type !== "Leader" && (
-            <TooltipStat
-              label="Counter"
-              value={data.counter != null ? `+${data.counter}` : "—"}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="flex gap-3 flex-wrap mb-3 text-xs">
-          {data.cost != null && (
-            <TooltipStat
-              label="Cost"
-              value={data.cost}
-            />
-          )}
-          {data.life != null && (
-            <TooltipStat
-              label="Life"
-              value={data.life}
-            />
-          )}
-        </div>
-      )}
-
-      {data.effectText && (
-        <div className="text-xs text-gb-text leading-relaxed border-t border-gb-border-strong pt-3 flex flex-col gap-2">
-          {data.effectText.split(/\n{2,}/).map((paragraph, i) => (
-            <p key={i} className="whitespace-pre-wrap">{paragraph}</p>
-          ))}
-        </div>
-      )}
-    </>
+    <CardTooltip data={data} cardId={resolvedCardId} card={card}>
+      {cardElement}
+    </CardTooltip>
   );
 });
 

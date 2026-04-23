@@ -3,7 +3,7 @@
 import React from "react";
 import type { CardData, CardInstance } from "@shared/game-types";
 import { TooltipRoot, TooltipTrigger, TooltipContent } from "@/components/ui";
-import { CardTooltipContent } from "./board-card";
+import { CardTooltipContent } from "./card/card-tooltip-content";
 
 /**
  * Wrapper component that renders a shadcn Tooltip around a card element.
