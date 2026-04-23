@@ -416,11 +416,12 @@ function BoardLayoutInner({
       {activeDrag && (
         <motion.div
           style={{
-            // Parent perspective so the rotateX/rotateY reads as depth rather
-            // than orthographic skew. The inner <Card> owns its own
-            // perspective stack; this one lives on the DragOverlay wrapper
-            // specifically to give the drag tilt physical volume.
-            transformPerspective: 1000,
+            // Perspective moved to the inner scaled div (VQA experiment). The
+            // rotateX/rotateY on this element render without depth — CSS
+            // `perspective` affects descendants, not ancestors — so drag tilt
+            // is an orthographic skew here. Keeping the arrangement while we
+            // confirm whether the earlier `transformPerspective` on this
+            // element was interfering with the inner scale + 3D stack.
             rotateX: dragTilt.tiltX,
             rotateY: dragTilt.tiltY,
           }}
@@ -428,6 +429,7 @@ function BoardLayoutInner({
           {activeDrag.type === "hand-card" && (
             <div
               style={{
+                perspective: "1000px",
                 transform: `scale(${boardScale})`,
                 transformOrigin: "top left",
               }}
@@ -442,6 +444,7 @@ function BoardLayoutInner({
           {activeDrag.type === "active-don" && (
             <div
               style={{
+                perspective: "1000px",
                 transform: `scale(${boardScale})`,
                 transformOrigin: "top left",
               }}
@@ -452,6 +455,7 @@ function BoardLayoutInner({
           {activeDrag.type === "redistribute-don" && (
             <div
               style={{
+                perspective: "1000px",
                 transform: `scale(${boardScale})`,
                 transformOrigin: "top left",
               }}
@@ -462,6 +466,7 @@ function BoardLayoutInner({
           {activeDrag.type === "attacker" && (
             <div
               style={{
+                perspective: "1000px",
                 transform: `scale(${boardScale})`,
                 transformOrigin: "top left",
               }}
