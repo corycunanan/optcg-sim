@@ -1,6 +1,7 @@
 "use client";
 
 import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
+import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
 import {
@@ -67,6 +68,16 @@ export function PlayerField({
   attackerInstanceId,
   counterPulseIds,
 }: PlayerFieldProps) {
+  // Detect newly-arrived cards so the summon-entry pop plays on mount
+  // (OPT-274). `useFieldArrivals` compares against the previous render's
+  // instanceIds and seeds empty on the first render.
+  const fieldIds: string[] = [];
+  if (me?.leader) fieldIds.push(me.leader.instanceId);
+  for (const c of me?.characters ?? []) {
+    if (c) fieldIds.push(c.instanceId);
+  }
+  const arrivals = useFieldArrivals(fieldIds);
+
   return (
     <>
       {/* Zone 1 (left): Life */}
@@ -116,6 +127,7 @@ export function PlayerField({
             redistributeSource={redistributeSourceIds?.has(char.instanceId)}
             pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
+            entering={arrivals.has(char.instanceId)}
             style={{ position: "absolute", left: pos.left, top: playerCharTop }}
           />
         );
@@ -146,6 +158,7 @@ export function PlayerField({
           redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
           pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
           donCountAdjust={donCountAdjustments?.get(me.leader.instanceId)}
+          entering={arrivals.has(me.leader.instanceId)}
         />
       ) : (
         <EmptySlot

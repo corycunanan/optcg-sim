@@ -15,19 +15,78 @@ export interface CardTransition {
   playerIndex: 0 | 1;
   startedAt: number;
   /** Marks the flight as originating from a KO event — flight layer plays
-   *  the KO shrink preset at the source zone before the trash flight. */
-  kind?: "ko";
+   *  the KO shrink preset at the source zone before the trash flight.
+   *  `"don-attach"` (OPT-274) renders a DON token flying from the DON pool
+   *  onto the destination card. */
+  kind?: "ko" | "don-attach";
+  /** Flight start delay in seconds (OPT-274). Used to stagger multi-card
+   *  draws (`~60ms` between arrivals) and multi-DON attachments so they
+   *  fan out sequentially instead of landing in a single instant. */
+  delay?: number;
+  /** For `kind: "don-attach"`, the target character's instanceId (used by
+   *  consumers to offset the displayed DON count until the token lands).
+   *  Mirrors `instanceId` for character-flight kinds — split out so a
+   *  DON-attach target is distinguishable from a target-zone card. */
+  targetInstanceId?: string;
 }
 
-const MAX_CONCURRENT = 5;
-const AUTO_EXPIRE_MS = 800;
+const MAX_CONCURRENT = 8;
+// Covers the worst case: `MAX_CONCURRENT * STAGGER_MS` of start-time offset +
+// the longest flight path (arc + bouncy landing) before `onAnimationComplete`
+// fires. `onComplete` is the normal cleanup path; this timer is a safety net.
+const AUTO_EXPIRE_MS = 1500;
+/** Per-batch stagger between arrivals (OPT-274). Keeps multi-card draws
+ *  (e.g. "draw 2", Perona peek, search-and-draw effects) from landing in a
+ *  single instant. Also used for the per-token delay inside a DON attach. */
+const STAGGER_MS = 60;
 
 let transitionCounter = 0;
 function nextId() {
   return `ct-${++transitionCounter}`;
 }
 
-/** Map game event types to source/destination zone key patterns. */
+/** Map game event types to source/destination zone key patterns. Returns
+ *  one or more transitions (multi-DON attachments produce `count` entries).
+ *  Exported for unit testing. */
+export function eventToTransitions(
+  event: GameEvent,
+  myIndex: 0 | 1 | null,
+  zoneRegistry: ZonePositionRegistry | null,
+): CardTransition[] {
+  const single = eventToTransition(event, myIndex, zoneRegistry);
+  if (single) return [single];
+
+  // DON_GIVEN_TO_CARD fans out into `count` staggered token flights.
+  if (event.type === "DON_GIVEN_TO_CARD") {
+    const { playerIndex } = event;
+    const prefix = playerIndex === myIndex ? "p" : "o";
+    const targetId = event.payload.targetInstanceId;
+    if (!targetId || !zoneRegistry) return [];
+    const toZoneKey = zoneRegistry.getCardZone(targetId);
+    if (!toZoneKey) return [];
+    const count = Math.max(1, event.payload.count ?? 1);
+    const startedAt = Date.now();
+    const out: CardTransition[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push({
+        id: nextId(),
+        cardId: null,
+        instanceId: null,
+        fromZoneKey: `${prefix}-don`,
+        toZoneKey,
+        playerIndex,
+        startedAt,
+        kind: "don-attach",
+        delay: (i * STAGGER_MS) / 1000,
+        targetInstanceId: targetId,
+      });
+    }
+    return out;
+  }
+
+  return [];
+}
+
 function eventToTransition(
   event: GameEvent,
   myIndex: 0 | 1 | null,
@@ -143,6 +202,23 @@ function eventToTransition(
   };
 }
 
+/**
+ * Apply a per-index stagger to a batch of transitions so multi-card arrivals
+ * fan out sequentially instead of landing in a single instant. The first
+ * transition keeps its original delay; each subsequent sibling gets an extra
+ * `STAGGER_MS` delay added on top of whatever per-transition delay already
+ * existed (e.g. DON-attach token offsets within the batch).
+ *
+ * Pure helper — exported for unit tests.
+ */
+export function applyBatchStagger(batch: CardTransition[]): CardTransition[] {
+  if (batch.length <= 1) return batch;
+  return batch.map((t, i) => ({
+    ...t,
+    delay: (t.delay ?? 0) + (i * STAGGER_MS) / 1000,
+  }));
+}
+
 export function useCardTransitions(
   eventLog: GameEvent[],
   myIndex: 0 | 1 | null,
@@ -195,14 +271,21 @@ export function useCardTransitions(
 
     const newTransitions: CardTransition[] = [];
     for (const event of newEvents) {
-      const t = eventToTransition(event, myIndex, zoneRegistry ?? null);
-      if (t) newTransitions.push(t);
+      const produced = eventToTransitions(event, myIndex, zoneRegistry ?? null);
+      for (const t of produced) newTransitions.push(t);
     }
 
     if (newTransitions.length === 0) return;
 
+    // Stagger a batch of new arrivals (OPT-274). Each transition carries its
+    // own delay — DON-attach delays are already assigned per-token inside
+    // `eventToTransitions`; others stagger by their position in the batch so
+    // multi-card draws fan out sequentially. The stagger rides on top of any
+    // existing delay (e.g. DON-attach tokens inside a bigger batch).
+    const staggered = applyBatchStagger(newTransitions);
+
     setTransitions((prev) => {
-      const combined = [...prev, ...newTransitions];
+      const combined = [...prev, ...staggered];
       return combined.slice(-MAX_CONCURRENT);
     });
   }, [eventLog, myIndex, isDragging, zoneRegistry]);

@@ -2,15 +2,23 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
+import { cardEntry } from "@/lib/motion";
 import { Card } from "../card";
 import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
+
+/** Initial transform for the summon-entry pop (OPT-274). Field card mounts
+ *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
+ *  render when `entering` is set. Reduced-motion consumers pass `entering={false}`
+ *  so the card just appears. */
+const ENTRY_INITIAL = { scale: 0.9, opacity: 0 } as const;
+const ENTRY_ANIMATE = { scale: 1, opacity: 1 } as const;
 
 // Pilot migration onto `<Card>` primitive (OPT-267). The primitive owns the
 // 3D face stack, rest/active rotation, hover/tap springs, DON corner badge,
@@ -37,6 +45,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   redistributeSource,
   pendingTransferDonIds,
   donCountAdjust,
+  entering,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -56,9 +65,14 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   redistributeSource?: boolean;
   pendingTransferDonIds?: Set<string>;
   donCountAdjust?: number;
+  /** If true, plays a one-shot summon-entry pop on mount (OPT-274). Parent
+   *  (PlayerField) only sets this for instanceIds that weren't in the
+   *  previous render, so the effect doesn't fire on page-level rehydrates. */
+  entering?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const zonePos = useZonePosition();
+  const reducedMotion = useReducedMotion();
 
   const {
     attributes,
@@ -155,6 +169,16 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           ? ("blocker" as const)
           : undefined;
 
+  // Entry pop (OPT-274): only triggers on first render when the parent
+  // flagged this card as newly-arrived. `isDragging` opacity still wins
+  // (composes via `animate` overriding scale/opacity post-mount).
+  const shouldEnter = !!entering && !reducedMotion;
+  const initialTarget = shouldEnter ? ENTRY_INITIAL : false;
+  const animateTarget = { scale: 1, opacity: isDragging ? 0.3 : 1 };
+  const wrapperTransition = shouldEnter
+    ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
+    : { duration: 0.15, ease: "easeOut" as const };
+
   return (
     <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
       <DropdownMenuTrigger asChild>
@@ -164,9 +188,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           {...listeners}
           onClick={onSelect}
           onContextMenu={handleContextMenu}
-          initial={false}
-          animate={{ opacity: isDragging ? 0.3 : 1 }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
+          initial={initialTarget}
+          animate={animateTarget}
+          transition={wrapperTransition}
           style={{
             ...style,
             width: SQUARE,
@@ -226,6 +250,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   zoneKey,
   style,
   animationDelay,
+  donCountAdjust,
+  entering,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -235,8 +261,14 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   zoneKey?: string;
   style: React.CSSProperties;
   animationDelay?: number;
+  /** Signed offset merged into displayed DON count (OPT-274). Negative
+   *  while a DON token is in-flight onto this card. */
+  donCountAdjust?: number;
+  /** Entry pop on first render (OPT-274). See PlayerFieldCard. */
+  entering?: boolean;
 }) {
   const zonePos = useZonePosition();
+  const reducedMotion = useReducedMotion();
   const accepts = activeDragType === "attacker";
   const { setNodeRef, isOver } = useDroppable({
     id: `attack-target-${card.instanceId}`,
@@ -275,9 +307,15 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
       ? ("attacker" as const)
       : undefined;
 
+  const shouldEnter = !!entering && !reducedMotion;
+  const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
+
   return (
-    <div
+    <motion.div
       ref={ref}
+      initial={shouldEnter ? ENTRY_INITIAL : false}
+      animate={ENTRY_ANIMATE}
+      transition={shouldEnter ? cardEntry : { duration: 0 }}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className="relative flex items-center justify-center rounded-md"
     >
@@ -286,10 +324,10 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         data={{ card, cardDb }}
         variant="field"
         state={cardState}
-        overlays={{ donCount: card.attachedDon.length, highlightRing }}
+        overlays={{ donCount, highlightRing }}
         motionDelay={animationDelay}
         className="relative z-[1]"
       />
-    </div>
+    </motion.div>
   );
 });

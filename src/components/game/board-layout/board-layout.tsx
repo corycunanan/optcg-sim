@@ -215,6 +215,34 @@ function BoardLayoutInner({
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
 
+  // While a DON token is flying onto a target card, the displayed count is
+  // held back by the number of in-flight tokens so the counter doesn't
+  // increment before the token lands (OPT-274). Merged with redistribute
+  // adjustments below.
+  const inFlightDonAdjustByCard = useMemo(() => {
+    if (cardAnimations.length === 0) return null;
+    const m = new Map<string, number>();
+    for (const t of cardAnimations) {
+      if (t.kind !== "don-attach" || !t.targetInstanceId) continue;
+      m.set(t.targetInstanceId, (m.get(t.targetInstanceId) ?? 0) - 1);
+    }
+    return m.size > 0 ? m : null;
+  }, [cardAnimations]);
+
+  const mergedDonCountAdjustments = useMemo(() => {
+    if (!inFlightDonAdjustByCard && !donCountAdjustments) return undefined;
+    const out = new Map<string, number>();
+    if (donCountAdjustments) {
+      for (const [k, v] of donCountAdjustments) out.set(k, v);
+    }
+    if (inFlightDonAdjustByCard) {
+      for (const [k, v] of inFlightDonAdjustByCard) {
+        out.set(k, (out.get(k) ?? 0) + v);
+      }
+    }
+    return out.size > 0 ? out : undefined;
+  }, [donCountAdjustments, inFlightDonAdjustByCard]);
+
   const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
   const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
 
@@ -223,6 +251,10 @@ function BoardLayoutInner({
   const sleeveUrls: [string | null, string | null] = myIndex === 0
     ? [me?.sleeveUrl ?? null, opp?.sleeveUrl ?? null]
     : [opp?.sleeveUrl ?? null, me?.sleeveUrl ?? null];
+
+  const donArtUrls: [string | null, string | null] = myIndex === 0
+    ? [me?.donArtUrl ?? null, opp?.donArtUrl ?? null]
+    : [opp?.donArtUrl ?? null, me?.donArtUrl ?? null];
 
   /* ── Refresh phase stagger detection ────────────────────────── */
 
@@ -341,6 +373,7 @@ function BoardLayoutInner({
             onPreviewZone={setZonePreview}
             attackerInstanceId={attackerInstanceId}
             counterPulseIds={counterPulseIds}
+            donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
           />
 
           <MidZone
@@ -383,7 +416,7 @@ function BoardLayoutInner({
             onPreviewZone={setZonePreview}
             redistributeSourceIds={redistributeSourceIds}
             pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
-            donCountAdjustments={donCountAdjustments}
+            donCountAdjustments={mergedDonCountAdjustments}
             attackerInstanceId={attackerInstanceId}
             counterPulseIds={counterPulseIds}
           />
@@ -502,6 +535,7 @@ function BoardLayoutInner({
       cardDb={cardDb}
       onComplete={removeTransition}
       sleeveUrls={sleeveUrls}
+      donArtUrls={donArtUrls}
     />
 
     </DndContext>

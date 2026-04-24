@@ -1,6 +1,7 @@
 "use client";
 
 import type { CardDb, PlayerState } from "@shared/game-types";
+import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
 import {
@@ -32,6 +33,10 @@ interface OpponentFieldProps {
   onPreviewZone: (preview: { type: "deck" | "trash"; owner: "opp" }) => void;
   attackerInstanceId?: string | null;
   counterPulseIds?: Set<string>;
+  /** Signed offsets merged into displayed DON count per target card
+   *  (OPT-274). Negative while a DON token is in-flight so the counter
+   *  doesn't increment before the token lands. */
+  donCountAdjustments?: Map<string, number>;
 }
 
 export function OpponentField({
@@ -42,9 +47,20 @@ export function OpponentField({
   onPreviewZone,
   attackerInstanceId,
   counterPulseIds,
+  donCountAdjustments,
 }: OpponentFieldProps) {
   const hasTrash = !!opp && opp.trash.length > 0;
   const topTrash = hasTrash ? opp.trash[0] : undefined;
+
+  // Detect newly-arrived cards so the summon-entry pop plays on mount
+  // (OPT-274). `useFieldArrivals` compares against the previous render's
+  // instanceIds and seeds empty on the first render.
+  const fieldIds: string[] = [];
+  if (opp?.leader) fieldIds.push(opp.leader.instanceId);
+  for (const c of opp?.characters ?? []) {
+    if (c) fieldIds.push(c.instanceId);
+  }
+  const arrivals = useFieldArrivals(fieldIds);
 
   return (
     <>
@@ -102,6 +118,8 @@ export function OpponentField({
           zoneKey="o-leader"
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
+          donCountAdjust={donCountAdjustments?.get(opp.leader.instanceId)}
+          entering={arrivals.has(opp.leader.instanceId)}
         />
       ) : (
         <EmptySlot
@@ -132,6 +150,8 @@ export function OpponentField({
             zoneKey={`o-char-${i}`}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
+            donCountAdjust={donCountAdjustments?.get(char.instanceId)}
+            entering={arrivals.has(char.instanceId)}
           />
         ) : (
           <EmptySlot

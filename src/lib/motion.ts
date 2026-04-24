@@ -144,6 +144,17 @@ const board = {
         times: [0, 0.35, 1] as number[],
       },
     },
+    /** Summon entry (OPT-274). Pop-in after a card lands in its destination
+     *  zone — scale up from 0.9 and fade from 0 with a short bouncy spring.
+     *  Composes with whatever ambient state (active/rest/attacking) the
+     *  destination renders in; the consumer wraps its outer motion.div with
+     *  `initial={{ scale: 0.9, opacity: 0 }}`. Reduced-motion consumers omit
+     *  the `initial` so the card just appears. */
+    entry: {
+      type: "spring" as const,
+      stiffness: 360,
+      damping: 18,
+    },
     /** Hand card hover: lift + scale, same spring-in / tween-out shape,
      *  same wiggle. */
     handHover: {
@@ -164,6 +175,20 @@ const board = {
     zoneEnter: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Card leaving a zone (fade out) */
     zoneExit: { duration: 0.1, ease: "easeIn" as const },
+    /** Deck→hand arrival spring (OPT-274). Bouncier than `zoneMove` so the
+     *  card overshoots slightly on landing, pairing with the arc trajectory
+     *  in `card-animation-layer.tsx`. Used as the *scale* spring while the
+     *  arc's x/y path runs as tweened keyframes — per-property transitions
+     *  let us combine a curve-in-space with a bounce-on-arrival. */
+    toHand: { type: "spring" as const, stiffness: 320, damping: 14 },
+    /** Arc tween used for the x/y path of a deck→hand (or zone→hand) flight.
+     *  Duration pairs with `toHand`'s spring natural frequency so the arrival
+     *  bounce lands around the same time the path completes. */
+    toHandArc: { duration: 0.55, ease: "easeOut" as const },
+    /** DON token flight from DON pool onto a target card (OPT-274). Short,
+     *  snappy tween — DON tokens are small and travel a shorter distance
+     *  than cards, so a tight curve reads better than a full spring bounce. */
+    donAttach: { duration: 0.32, ease: "easeOut" as const },
   },
   stateChange: {
     /** Resting (attack/block/cost): decisive, snappy */
@@ -194,6 +219,7 @@ export const cardAttackerPulse = board.card.attackerPulse;
 export const cardBlockerHighlight = board.card.blockerHighlight;
 export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
+export const cardEntry = board.card.entry;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
 export const cardRest = board.stateChange.rest;
