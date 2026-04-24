@@ -169,26 +169,17 @@ const board = {
     },
   },
   flight: {
-    /** Card flying between zones */
-    zoneMove: { type: "spring" as const, stiffness: 250, damping: 28 },
+    /** Card flying between zones (OPT-274 tuned). Short easeOut tween —
+     *  straight line, ~220ms. The arrival pop lives on the destination card
+     *  (`cardEntry` spring on mount) so the flight itself stays snappy. */
+    zoneMove: { duration: 0.22, ease: "easeOut" as const },
     /** Card entering a zone (scale in) */
     zoneEnter: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Card leaving a zone (fade out) */
     zoneExit: { duration: 0.1, ease: "easeIn" as const },
-    /** Deck→hand arrival spring (OPT-274). Bouncier than `zoneMove` so the
-     *  card overshoots slightly on landing, pairing with the arc trajectory
-     *  in `card-animation-layer.tsx`. Used as the *scale* spring while the
-     *  arc's x/y path runs as tweened keyframes — per-property transitions
-     *  let us combine a curve-in-space with a bounce-on-arrival. */
-    toHand: { type: "spring" as const, stiffness: 320, damping: 14 },
-    /** Arc tween used for the x/y path of a deck→hand (or zone→hand) flight.
-     *  Duration pairs with `toHand`'s spring natural frequency so the arrival
-     *  bounce lands around the same time the path completes. */
-    toHandArc: { duration: 0.55, ease: "easeOut" as const },
-    /** DON token flight from DON pool onto a target card (OPT-274). Short,
-     *  snappy tween — DON tokens are small and travel a shorter distance
-     *  than cards, so a tight curve reads better than a full spring bounce. */
-    donAttach: { duration: 0.32, ease: "easeOut" as const },
+    /** DON token flight from DON pool onto a target card (OPT-274). Matches
+     *  `zoneMove` timing so multi-flight batches read as a coherent set. */
+    donAttach: { duration: 0.22, ease: "easeOut" as const },
   },
   stateChange: {
     /** Resting (attack/block/cost): decisive, snappy */

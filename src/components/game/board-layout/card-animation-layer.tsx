@@ -11,10 +11,6 @@ import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constant
 
 const DON_TOKEN_W = 50;
 const DON_TOKEN_H = 70;
-/** Peak lift of the arc trajectory for hand-bound flights (pixels). The arc's
- *  midpoint sits this far above the higher of source/destination so the card
- *  follows a readable curve even for short deck→hand distances. */
-const HAND_ARC_RISE = 56;
 
 interface CardAnimationLayerProps {
   transitions: CardTransition[];
@@ -82,9 +78,11 @@ function FlyingCard({
   // KO flights get a two-phase sequence: pause at source with a shrink +
   // opacity dip (cardKO preset), then fly to trash. `times` places the dip
   // at ~30% of the total duration so the "shrink" reads before the flight
-  // starts. Normal flights use the existing spring for continuity. Hand-
-  // bound flights follow an arc path with a bouncier arrival spring on
-  // scale so the card overshoots slightly on landing (OPT-274).
+  // starts. All other flights (including hand-bound + DON-attach) share a
+  // straight-line, fast easeOut tween for consistency — the arrival pop is
+  // delivered by the destination card's `cardEntry` mount animation, not by
+  // the flight layer. The entry animation composes with the flight
+  // `onAnimationComplete` cleanly via `AnimatePresence`.
   let animateTarget: Record<string, number | number[]>;
   let transitionConfig: Record<string, unknown>;
 
@@ -98,67 +96,32 @@ function FlyingCard({
       opacity: cardKO.opacity as number[],
     };
     transitionConfig = {
-      duration: 0.65,
+      duration: 0.45,
       times: [0, 0.3, 1],
       ease: "easeOut",
       delay,
     };
   } else if (isDonAttach) {
-    // Short, snappy curve — DON tokens travel under their own cadence (the
-    // per-token stagger is set upstream in `useCardTransitions`).
-    const midX = (fromX + toX) / 2;
-    const midY = Math.min(fromY, toY) - 32;
     animateTarget = {
-      x: [fromX, midX, toX],
-      y: [fromY, midY, toY],
-      width: toW,
-      height: toH,
-      opacity: [0, 1, 1],
-      scale: [0.9, 1, 0.95],
-    };
-    transitionConfig = {
-      ...cardTransitions.donAttach,
-      times: [0, 0.5, 1],
-      delay,
-    };
-  } else if (isHandBound) {
-    // Subtle arc — midY rises above the higher of source/destination so the
-    // card flies up-and-over instead of sliding in a straight line. Scale
-    // animates 0.96 → 1 with the under-damped `toHand` spring so the card
-    // overshoots past 1 on arrival and settles (two-keyframe spring — motion.dev
-    // does not support 3-keyframe springs, so we let the spring's natural
-    // oscillation do the "bounce" rather than baking it into keyframes).
-    const midX = (fromX + toX) / 2;
-    const midY = Math.min(fromY, toY) - HAND_ARC_RISE;
-    animateTarget = {
-      x: [fromX, midX, toX],
-      y: [fromY, midY, toY],
+      x: toX,
+      y: toY,
       width: toW,
       height: toH,
       opacity: 1,
       scale: 1,
     };
-    transitionConfig = {
-      // Per-property transitions: the arc path tweens, the arrival scale
-      // springs with a touch of overshoot. Motion.dev merges these onto the
-      // matching animated properties.
-      x: { ...cardTransitions.toHandArc, times: [0, 0.5, 1], delay },
-      y: { ...cardTransitions.toHandArc, times: [0, 0.5, 1], delay },
-      width: { duration: 0.3, ease: "easeOut" as const, delay },
-      height: { duration: 0.3, ease: "easeOut" as const, delay },
-      scale: { ...cardTransitions.toHand, delay },
-      opacity: { duration: 0.15, ease: "easeOut" as const, delay },
-    };
+    transitionConfig = { ...cardTransitions.donAttach, delay };
   } else {
-    animateTarget = { x: toX, y: toY, width: toW, height: toH, opacity: 1, scale: 1 };
+    animateTarget = {
+      x: toX,
+      y: toY,
+      width: toW,
+      height: toH,
+      opacity: 1,
+      scale: 1,
+    };
     transitionConfig = { ...cardTransitions.zoneMove, delay };
   }
-
-  // Hand-bound flights start slightly scaled-down so the `toHand` spring has
-  // a delta to work with — the under-damped spring will overshoot past 1 on
-  // arrival, producing the ticket's "bouncier arrival" feel without needing
-  // a 3-keyframe scale (unsupported on springs).
-  const initialScale = isHandBound ? 0.96 : 1;
 
   return (
     <motion.div
@@ -168,7 +131,7 @@ function FlyingCard({
         width: fromW,
         height: fromH,
         opacity: isDonAttach ? 0 : 1,
-        scale: initialScale,
+        scale: 1,
       }}
       animate={animateTarget}
       exit={{ opacity: 0, scale: 0.95 }}

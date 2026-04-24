@@ -230,6 +230,27 @@ function BoardLayoutInner({
     return m.size > 0 ? m : null;
   }, [cardAnimations]);
 
+  // Cards currently flying *into* the trash zones. The trash rendering on
+  // both sides uses these sets to hide the card until its flight completes —
+  // otherwise the server-confirmed top card appears in the trash instantly
+  // while the flight ghost is still mid-air, which reads as "teleport then
+  // animation" (OPT-274 follow-up).
+  const pTrashArrivingIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of cardAnimations) {
+      if (t.toZoneKey === "p-trash" && t.instanceId) s.add(t.instanceId);
+    }
+    return s;
+  }, [cardAnimations]);
+
+  const oTrashArrivingIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of cardAnimations) {
+      if (t.toZoneKey === "o-trash" && t.instanceId) s.add(t.instanceId);
+    }
+    return s;
+  }, [cardAnimations]);
+
   const mergedDonCountAdjustments = useMemo(() => {
     if (!inFlightDonAdjustByCard && !donCountAdjustments) return undefined;
     const out = new Map<string, number>();
@@ -376,6 +397,7 @@ function BoardLayoutInner({
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
+            trashArrivingIds={oTrashArrivingIds}
           />
 
           <MidZone
@@ -422,6 +444,7 @@ function BoardLayoutInner({
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
+            trashArrivingIds={pTrashArrivingIds}
           />
         </div>
       </div>

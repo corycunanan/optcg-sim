@@ -38,6 +38,9 @@ interface OpponentFieldProps {
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
   donCountAdjustments?: Map<string, number>;
+  /** Instance IDs currently flying *into* the opponent's trash — hides them
+   *  from the top/count until their flight lands (OPT-274). */
+  trashArrivingIds?: Set<string>;
 }
 
 export function OpponentField({
@@ -50,9 +53,15 @@ export function OpponentField({
   defenderInstanceId,
   counterPulseIds,
   donCountAdjustments,
+  trashArrivingIds,
 }: OpponentFieldProps) {
-  const hasTrash = !!opp && opp.trash.length > 0;
-  const topTrash = hasTrash ? opp.trash[0] : undefined;
+  const oppTrash = opp?.trash ?? [];
+  const visibleTrash =
+    trashArrivingIds && trashArrivingIds.size > 0
+      ? oppTrash.filter((c) => !trashArrivingIds.has(c.instanceId))
+      : oppTrash;
+  const hasTrash = visibleTrash.length > 0;
+  const topTrash = hasTrash ? visibleTrash[0] : undefined;
 
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
@@ -74,8 +83,8 @@ export function OpponentField({
           empty={!hasTrash}
           emptyLabel="TRASH"
           overlays={
-            hasTrash && opp.trash.length > 1
-              ? { countBadge: opp.trash.length }
+            hasTrash && visibleTrash.length > 1
+              ? { countBadge: visibleTrash.length }
               : undefined
           }
           interaction={{ clickable: hasTrash }}

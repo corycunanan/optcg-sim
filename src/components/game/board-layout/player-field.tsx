@@ -48,6 +48,9 @@ interface PlayerFieldProps {
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
+  /** Instance IDs currently flying *into* the player's trash — hides them
+   *  from the trash top/count until their flight lands (OPT-274). */
+  trashArrivingIds?: Set<string>;
 }
 
 export function PlayerField({
@@ -69,6 +72,7 @@ export function PlayerField({
   attackerInstanceId,
   defenderInstanceId,
   counterPulseIds,
+  trashArrivingIds,
 }: PlayerFieldProps) {
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
@@ -200,6 +204,7 @@ export function PlayerField({
         battleSubPhase={turn?.battleSubPhase ?? null}
         onClickTrash={() => me && me.trash.length > 0 && onPreviewZone({ type: "trash", owner: "me" })}
         zoneKey="p-trash"
+        arrivingInstanceIds={trashArrivingIds}
         style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
       />
     </>
