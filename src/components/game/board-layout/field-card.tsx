@@ -130,17 +130,26 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           zonePos.registerCard(card.instanceId, zoneKey);
         } else {
           zonePos.unregister(zoneKey);
-          zonePos.unregisterCard(card.instanceId);
+          // Intentionally NOT unregistering the card→zone mapping here.
+          // `useCardTransitions` looks up the source zone for events like
+          // CARD_KO / CARD_TRASHED *after* the card has already left the
+          // field (the field-card unmounts when the server state drops
+          // the character from its slot). Keeping the last known zone in
+          // the registry lets the KO flight originate from the character's
+          // actual slot instead of falling back to a hardcoded center tile.
+          // New registrations overwrite via Map.set, so cross-zone moves
+          // still land on the current zone.
         }
       }
     },
     [setDragRef, setDropRef, zoneKey, zonePos, card.instanceId],
   );
 
-  // Keep card→zone mapping up to date if instanceId changes while mounted
+  // Keep card→zone mapping up to date if instanceId changes while mounted.
+  // No cleanup: same rationale as `mergedRef` — we want the last known zone
+  // to survive unmount so in-flight transitions can resolve it.
   useEffect(() => {
     if (zoneKey) zonePos.registerCard(card.instanceId, zoneKey);
-    return () => { zonePos.unregisterCard(card.instanceId); };
   }, [card.instanceId, zoneKey, zonePos]);
 
   const handleContextMenu = useCallback(
