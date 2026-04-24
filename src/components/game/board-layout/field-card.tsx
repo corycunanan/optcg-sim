@@ -25,6 +25,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   canAttack,
   blockerSelectable,
   selected,
+  isAttacker,
+  counterPulse,
   onSelect,
   onAction,
   zoneKey,
@@ -42,6 +44,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   canAttack: boolean;
   blockerSelectable?: boolean;
   selected?: boolean;
+  isAttacker?: boolean;
+  counterPulse?: boolean;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
   zoneKey?: string;
@@ -130,7 +134,26 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   );
 
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
-  const cardState = card.state === "RESTED" ? "rest" : "active";
+  const baseState = card.state === "RESTED" ? "rest" : "active";
+  // Battle states take precedence: attacker while attacking, selected blocker
+  // gets `blocking`. Otherwise fall through to the game-state rotation.
+  const cardState: "attacking" | "blocking" | "rest" | "active" = isAttacker
+    ? "attacking"
+    : selected
+      ? "blocking"
+      : baseState;
+  // Ring consolidation (OPT-273): formerly consumer className `ring-2 ring-gb-accent-*`.
+  // Now routed through the primitive's highlightRing overlay so ring semantics
+  // live in one place and can compose with motion presets.
+  const highlightRing = counterPulse
+    ? ("counter" as const)
+    : isAttacker
+      ? ("attacker" as const)
+      : selected
+        ? ("selected" as const)
+        : blockerSelectable
+          ? ("blocker" as const)
+          : undefined;
 
   return (
     <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
@@ -150,18 +173,14 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             height: SQUARE,
             cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
           }}
-          className={cn(
-            "relative flex items-center justify-center rounded-md transition-shadow",
-            selected && "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]",
-            blockerSelectable && !selected && "ring-2 ring-gb-accent-blue/40",
-          )}
+          className="relative flex items-center justify-center rounded-md"
         >
           <DropOverlay active={acceptsDon || acceptsHandCard} hovered={isOver && (acceptsDon || acceptsHandCard)} color={acceptsHandCard ? "red" : "amber"} />
           <Card
             data={{ card, cardDb }}
             variant="field"
             state={cardState}
-            overlays={{ donCount }}
+            overlays={{ donCount, highlightRing }}
             motionDelay={animationDelay}
             className="relative z-[1]"
           />
@@ -202,6 +221,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card,
   cardDb,
   activeDragType,
+  isAttacker,
+  counterPulse,
   zoneKey,
   style,
   animationDelay,
@@ -209,6 +230,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
+  isAttacker?: boolean;
+  counterPulse?: boolean;
   zoneKey?: string;
   style: React.CSSProperties;
   animationDelay?: number;
@@ -242,7 +265,15 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     return () => { zonePos.unregisterCard(card.instanceId); };
   }, [card.instanceId, zoneKey, zonePos]);
 
-  const cardState = card.state === "RESTED" ? "rest" : "active";
+  const baseState = card.state === "RESTED" ? "rest" : "active";
+  const cardState: "attacking" | "rest" | "active" = isAttacker
+    ? "attacking"
+    : baseState;
+  const highlightRing = counterPulse
+    ? ("counter" as const)
+    : isAttacker
+      ? ("attacker" as const)
+      : undefined;
 
   return (
     <div
@@ -255,7 +286,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         data={{ card, cardDb }}
         variant="field"
         state={cardState}
-        overlays={{ donCount: card.attachedDon.length }}
+        overlays={{ donCount: card.attachedDon.length, highlightRing }}
         motionDelay={animationDelay}
         className="relative z-[1]"
       />

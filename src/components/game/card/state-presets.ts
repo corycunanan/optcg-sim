@@ -1,9 +1,11 @@
 import type { Transition, TargetAndTransition } from "motion/react";
 import {
   cardActivate,
+  cardBlockerHighlight,
   cardBreathing,
   cardFlip,
   cardHover,
+  cardKO,
   cardRest,
   cardTap,
   cardTapReduced,
@@ -102,6 +104,57 @@ export function stateToMotionConfig(
         whileHover: undefined,
         whileTap: undefined,
       };
+    case "attacking":
+      // Attacker is always game-RESTED (declaring an attack rests the card).
+      // Rotation matches `rest`; the ring pulse is handled via
+      // `overlays.highlightRing="attacker"` on a separate layer so motion
+      // composes cleanly with the rotation.
+      return {
+        animate: { rotate: 90, opacity: 1, filter: "brightness(1)" },
+        transition: withDelay(cardActivate),
+        whileHover: reducedMotion ? undefined : hover,
+        whileTap: tap,
+      };
+    case "blocking":
+      // Blocker selected by the defender. Card must be ACTIVE to block,
+      // so rotation is 0°. A brief spring pop (cardBlockerHighlight) rides
+      // the transition in; under reduced-motion it collapses to the plain
+      // activate spring.
+      return {
+        animate: reducedMotion
+          ? { rotate: 0, opacity: 1, filter: "brightness(1)" }
+          : {
+              rotate: 0,
+              opacity: 1,
+              filter: "brightness(1.08)",
+              scale: cardBlockerHighlight.scale,
+              y: cardBlockerHighlight.y,
+            },
+        transition: withDelay(
+          reducedMotion ? cardActivate : cardBlockerHighlight.transition,
+        ),
+        whileHover: reducedMotion ? undefined : hover,
+        whileTap: tap,
+      };
+    case "kod":
+      // KO shrink — applied to the flight ghost at the source zone before
+      // the flight layer animates it away. Scale + opacity keyframes dip
+      // and recover. Reduced-motion collapses to an instant swap.
+      return {
+        animate: reducedMotion
+          ? { rotate: 0, opacity: 1, filter: "brightness(1)", scale: 1 }
+          : {
+              rotate: 0,
+              opacity: cardKO.opacity,
+              filter: "brightness(1)",
+              scale: cardKO.scale,
+            },
+        transition: withDelay(
+          reducedMotion ? { duration: 0 } : cardKO.transition,
+        ),
+        whileHover: undefined,
+        whileTap: undefined,
+      };
   }
 }
 
@@ -135,6 +188,11 @@ export function idleBreathingConfig(
 ): { animate: TargetAndTransition; transition: Transition } | undefined {
   if (reducedMotion) return undefined;
   if (faceDown) return undefined;
+  // Non-idle states skip breathing. `attacking` is rested (90°) so its
+  // breathing y-axis would translate horizontally — the attacker ring pulse
+  // carries the "alive" feel instead. `blocking` has its own one-shot pop
+  // on transition and reverts to the standard idle once settled, so it
+  // stays out here too to avoid stacking motion on top of a spring pop.
   if (state !== "active" && state !== "selected") return undefined;
   if (variant === "trash" || variant === "life" || variant === "don") {
     return undefined;

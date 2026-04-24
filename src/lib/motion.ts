@@ -99,6 +99,51 @@ const board = {
      *  before a follow-up state change overlays its own transition. Reduced
      *  motion fallback is instant — see `flipTransition` in state-presets. */
     flip: { type: "spring" as const, stiffness: 260, damping: 22 },
+    /** Attacker ring pulse (OPT-273). Sustained loop on the highlight ring
+     *  while a card is the designated attacker — opacity + scale breathe
+     *  together so the ring reads as a pulse rather than a blinking stroke. */
+    attackerPulse: {
+      opacity: [0.6, 1, 0.6] as number[],
+      scale: [1, 1.03, 1] as number[],
+      transition: {
+        duration: 1.4,
+        ease: "easeInOut" as const,
+        repeat: Infinity,
+        repeatType: "loop" as const,
+      },
+    },
+    /** Blocker-selection pop (OPT-273). One-shot scale+lift spring when a
+     *  card enters `state="blocking"`. Matches the existing board spring feel
+     *  — quick to register, no overshoot. */
+    blockerHighlight: {
+      scale: 1.04,
+      y: -2,
+      transition: { type: "spring" as const, stiffness: 360, damping: 22 },
+    },
+    /** KO shrink (OPT-273). Applied to the flight ghost when a card flies
+     *  to trash after a `CARD_KO` event — scale dips + opacity blips so the
+     *  vanish reads as "shrinks before flying", not "instant teleport". */
+    ko: {
+      scale: [1, 0.82, 0.95] as number[],
+      opacity: [1, 0.7, 1] as number[],
+      transition: {
+        duration: 0.5,
+        ease: "easeOut" as const,
+        times: [0, 0.3, 1] as number[],
+      },
+    },
+    /** Counter pulse (OPT-273). Transient ring flash on the defender when
+     *  a counter is used — single fade-in / fade-out, no loop. Clears after
+     *  ~480ms so the card returns to its normal battle state. */
+    counterPulse: {
+      opacity: [0, 1, 0] as number[],
+      scale: [0.98, 1.06, 1.02] as number[],
+      transition: {
+        duration: 0.48,
+        ease: "easeOut" as const,
+        times: [0, 0.35, 1] as number[],
+      },
+    },
     /** Hand card hover: lift + scale, same spring-in / tween-out shape,
      *  same wiggle. */
     handHover: {
@@ -145,6 +190,10 @@ export const cardTap = board.card.tap;
 export const cardTapReduced = board.card.tapReduced;
 export const cardBreathing = board.card.breathing;
 export const cardFlip = board.card.flip;
+export const cardAttackerPulse = board.card.attackerPulse;
+export const cardBlockerHighlight = board.card.blockerHighlight;
+export const cardKO = board.card.ko;
+export const cardCounterPulse = board.card.counterPulse;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
 export const cardRest = board.stateChange.rest;

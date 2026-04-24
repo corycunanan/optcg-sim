@@ -38,6 +38,7 @@ import { PlayerField } from "./player-field";
 import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
 import { ActiveEffectsProvider } from "@/contexts/active-effects-context";
 import { useCardTransitions } from "@/hooks/use-card-transitions";
+import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type { RedistributeTransfer } from "../redistribute-don-overlay";
 
@@ -211,6 +212,9 @@ function BoardLayoutInner({
     zoneRegistry,
   );
 
+  const counterPulseIds = useCounterPulse(eventLog, bs.battle);
+  const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
+
   const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
   const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
 
@@ -335,6 +339,8 @@ function BoardLayoutInner({
             activeDragType={activeDragType}
             refreshWave={refreshWave}
             onPreviewZone={setZonePreview}
+            attackerInstanceId={attackerInstanceId}
+            counterPulseIds={counterPulseIds}
           />
 
           <MidZone
@@ -378,6 +384,8 @@ function BoardLayoutInner({
             redistributeSourceIds={redistributeSourceIds}
             pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
             donCountAdjustments={donCountAdjustments}
+            attackerInstanceId={attackerInstanceId}
+            counterPulseIds={counterPulseIds}
           />
         </div>
       </div>

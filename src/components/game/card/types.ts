@@ -29,11 +29,20 @@ export type CardState =
   | "selected"
   | "invalid"
   | "dragging"
-  | "in-flight";
+  | "in-flight"
+  | "attacking"
+  | "blocking"
+  | "kod";
 
 export type CardSize = "field" | "hand" | "modal" | "preview" | "don";
 
-export type HighlightRingColor = "selected" | "valid" | "invalid";
+export type HighlightRingColor =
+  | "selected"
+  | "valid"
+  | "invalid"
+  | "blocker"
+  | "attacker"
+  | "counter";
 
 export interface CardOverlays {
   /** +N DON badge (attached DON counter) — rendered along the bottom edge. */

@@ -105,6 +105,9 @@ const STATES: CardState[] = [
   "invalid",
   "dragging",
   "in-flight",
+  "attacking",
+  "blocking",
+  "kod",
 ];
 
 const VARIANTS: CardVariant[] = ["field", "hand", "modal", "life", "trash"];
@@ -186,7 +189,11 @@ export default function CardPreviewPage() {
                           ? "selected"
                           : state === "invalid"
                             ? "invalid"
-                            : undefined,
+                            : state === "attacking"
+                              ? "attacker"
+                              : state === "blocking"
+                                ? "selected"
+                                : undefined,
                     }}
                   />
                 </Labeled>
@@ -275,6 +282,60 @@ export default function CardPreviewPage() {
                   variant="life"
                   empty
                   emptyLabel="LIFE"
+                />
+              </Labeled>
+            </Row>
+          </Section>
+
+          {/* OPT-273: battle-state rings layered on top of the game rotation
+              the card would have during that battle phase. Attacker uses a
+              sustained pulse, counter uses a one-shot fade, blocker is static. */}
+          <Section title="Battle-state rings (OPT-273)">
+            <Row>
+              <Labeled label="attacker (rested)">
+                <div className="flex h-28 w-28 items-center justify-center">
+                  <Card
+                    data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
+                    variant="field"
+                    state="attacking"
+                    faceDown={flip(false)}
+                    overlays={{ donCount: 2, highlightRing: "attacker" }}
+                  />
+                </div>
+              </Labeled>
+              <Labeled label="blocker-eligible">
+                <Card
+                  data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
+                  variant="field"
+                  state="active"
+                  faceDown={flip(false)}
+                  overlays={{ highlightRing: "blocker" }}
+                />
+              </Labeled>
+              <Labeled label="blocker-selected">
+                <Card
+                  data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
+                  variant="field"
+                  state="blocking"
+                  faceDown={flip(false)}
+                  overlays={{ highlightRing: "selected" }}
+                />
+              </Labeled>
+              <Labeled label="counter pulse">
+                <Card
+                  data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
+                  variant="field"
+                  state="rest"
+                  faceDown={flip(false)}
+                  overlays={{ highlightRing: "counter" }}
+                />
+              </Labeled>
+              <Labeled label="KO (shrink)">
+                <Card
+                  data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
+                  variant="field"
+                  state="kod"
+                  faceDown={flip(false)}
                 />
               </Labeled>
             </Row>

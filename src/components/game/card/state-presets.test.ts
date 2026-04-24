@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   cardActivate,
+  cardBlockerHighlight,
   cardBreathing,
   cardFlip,
   cardHover,
+  cardKO,
   cardRest,
   cardTap,
   cardTapReduced,
@@ -24,6 +26,9 @@ const ALL_STATES: CardState[] = [
   "invalid",
   "dragging",
   "in-flight",
+  "attacking",
+  "blocking",
+  "kod",
 ];
 
 describe("stateToMotionConfig", () => {
@@ -110,6 +115,46 @@ describe("stateToMotionConfig", () => {
       }
     }
   });
+
+  it("attacking is game-rested (90°) + keeps hover/tap so the attacker reads as interactive", () => {
+    const cfg = stateToMotionConfig("attacking", "field", false);
+    expect(cfg.animate.rotate).toBe(90);
+    expect(cfg.animate.opacity).toBe(1);
+    expect(cfg.whileHover).toEqual(cardHover);
+    expect(cfg.whileTap).toEqual(cardTap);
+  });
+
+  it("blocking plays the blocker spring pop + lift + brightness bump when allowed", () => {
+    const cfg = stateToMotionConfig("blocking", "field", false);
+    expect(cfg.animate.rotate).toBe(0);
+    expect(cfg.animate.scale).toBe(cardBlockerHighlight.scale);
+    expect(cfg.animate.y).toBe(cardBlockerHighlight.y);
+    expect(cfg.transition).toEqual(cardBlockerHighlight.transition);
+  });
+
+  it("blocking under reduced-motion collapses to a flat activate (no pop, no lift)", () => {
+    const cfg = stateToMotionConfig("blocking", "field", true);
+    expect(cfg.animate.scale).toBeUndefined();
+    expect(cfg.animate.y).toBeUndefined();
+    expect(cfg.transition).toEqual(cardActivate);
+    expect(cfg.whileHover).toBeUndefined();
+  });
+
+  it("kod runs the KO shrink keyframes + suppresses hover/tap", () => {
+    const cfg = stateToMotionConfig("kod", "field", false);
+    expect(cfg.animate.scale).toBe(cardKO.scale);
+    expect(cfg.animate.opacity).toBe(cardKO.opacity);
+    expect(cfg.transition).toEqual(cardKO.transition);
+    expect(cfg.whileHover).toBeUndefined();
+    expect(cfg.whileTap).toBeUndefined();
+  });
+
+  it("kod under reduced-motion collapses to an instant swap with no keyframes", () => {
+    const cfg = stateToMotionConfig("kod", "field", true);
+    expect(cfg.animate.scale).toBe(1);
+    expect(cfg.animate.opacity).toBe(1);
+    expect(cfg.transition).toEqual({ duration: 0 });
+  });
 });
 
 describe("idleBreathingConfig", () => {
@@ -133,8 +178,16 @@ describe("idleBreathingConfig", () => {
     }
   });
 
-  it("skips non-idle states (rest / invalid / dragging / in-flight)", () => {
-    for (const s of ["rest", "invalid", "dragging", "in-flight"] as const) {
+  it("skips non-idle states (rest / invalid / dragging / in-flight / attacking / blocking / kod)", () => {
+    for (const s of [
+      "rest",
+      "invalid",
+      "dragging",
+      "in-flight",
+      "attacking",
+      "blocking",
+      "kod",
+    ] as const) {
       expect(idleBreathingConfig(s, "field", false, false)).toBeUndefined();
     }
   });
