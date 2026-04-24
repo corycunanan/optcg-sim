@@ -30,6 +30,8 @@ interface OpponentFieldProps {
   activeDragType: string | null;
   refreshWave: boolean;
   onPreviewZone: (preview: { type: "deck" | "trash"; owner: "opp" }) => void;
+  attackerInstanceId?: string | null;
+  counterPulseIds?: Set<string>;
 }
 
 export function OpponentField({
@@ -38,6 +40,8 @@ export function OpponentField({
   activeDragType,
   refreshWave,
   onPreviewZone,
+  attackerInstanceId,
+  counterPulseIds,
 }: OpponentFieldProps) {
   const hasTrash = !!opp && opp.trash.length > 0;
   const topTrash = hasTrash ? opp.trash[0] : undefined;
@@ -93,6 +97,8 @@ export function OpponentField({
           card={opp.leader}
           cardDb={cardDb}
           activeDragType={activeDragType}
+          isAttacker={attackerInstanceId === opp.leader.instanceId}
+          counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
           zoneKey="o-leader"
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
@@ -121,6 +127,8 @@ export function OpponentField({
             card={char}
             cardDb={cardDb}
             activeDragType={activeDragType}
+            isAttacker={attackerInstanceId === char.instanceId}
+            counterPulse={counterPulseIds?.has(char.instanceId)}
             zoneKey={`o-char-${i}`}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}

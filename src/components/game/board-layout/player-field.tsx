@@ -44,6 +44,8 @@ interface PlayerFieldProps {
   redistributeSourceIds?: Set<string>;
   pendingTransferDonIdsByCard?: Map<string, Set<string>>;
   donCountAdjustments?: Map<string, number>;
+  attackerInstanceId?: string | null;
+  counterPulseIds?: Set<string>;
 }
 
 export function PlayerField({
@@ -62,6 +64,8 @@ export function PlayerField({
   redistributeSourceIds,
   pendingTransferDonIdsByCard,
   donCountAdjustments,
+  attackerInstanceId,
+  counterPulseIds,
 }: PlayerFieldProps) {
   return (
     <>
@@ -101,6 +105,8 @@ export function PlayerField({
             canAttack={canInteract && char.state === "ACTIVE"}
             blockerSelectable={isBlockerEligible}
             selected={selectedBlockerId === char.instanceId}
+            isAttacker={attackerInstanceId === char.instanceId}
+            counterPulse={counterPulseIds?.has(char.instanceId)}
             onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
             onAction={onAction}
             zoneKey={`p-char-${i}`}
@@ -131,6 +137,8 @@ export function PlayerField({
           cardDb={cardDb}
           activeDragType={activeDragType}
           canAttack={canInteract && me.leader.state === "ACTIVE"}
+          isAttacker={attackerInstanceId === me.leader.instanceId}
+          counterPulse={counterPulseIds?.has(me.leader.instanceId)}
           onAction={onAction}
           zoneKey="p-leader"
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}

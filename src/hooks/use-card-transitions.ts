@@ -14,6 +14,9 @@ export interface CardTransition {
   toZoneKey: string;
   playerIndex: 0 | 1;
   startedAt: number;
+  /** Marks the flight as originating from a KO event — flight layer plays
+   *  the KO shrink preset at the source zone before the trash flight. */
+  kind?: "ko";
 }
 
 const MAX_CONCURRENT = 5;
@@ -64,7 +67,16 @@ function eventToTransition(
         : null;
       from = resolvedZone ?? `${prefix}-char-2`;
       to = `${prefix}-trash`;
-      break;
+      return {
+        id: nextId(),
+        cardId,
+        instanceId: cardInstanceId,
+        fromZoneKey: from,
+        toZoneKey: to,
+        playerIndex,
+        startedAt: Date.now(),
+        kind: "ko",
+      };
     }
     case "CARD_TRASHED": {
       const p = event.payload;

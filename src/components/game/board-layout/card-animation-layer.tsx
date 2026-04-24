@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { cardTransitions } from "@/lib/motion";
+import { cardKO, cardTransitions } from "@/lib/motion";
 import { Card } from "../card";
 import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constants";
 
@@ -48,6 +48,8 @@ function FlyingCard({
   const toW = isHandBound ? HAND_CARD_W : BOARD_CARD_W;
   const toH = isHandBound ? HAND_CARD_H : BOARD_CARD_H;
 
+  const fromX = fromRect.left + (fromRect.width - fromW) / 2;
+  const fromY = fromRect.top + (fromRect.height - fromH) / 2;
   // Cards arriving in hand target the right edge (end of hand fan)
   const toX = isHandBound
     ? toRect.right - toW
@@ -60,26 +62,33 @@ function FlyingCard({
   const variant = isHandBound ? "hand" : "field";
   const isFaceDown = !transition.cardId;
 
+  const isKO = transition.kind === "ko";
+
+  // KO flights get a two-phase sequence: pause at source with a shrink +
+  // opacity dip (cardKO preset), then fly to trash. `times` places the dip
+  // at ~30% of the total duration so the "shrink" reads before the flight
+  // starts. Normal flights use the existing spring for continuity.
+  const animateTarget = isKO
+    ? {
+        x: [fromX, fromX, toX] as number[],
+        y: [fromY, fromY, toY] as number[],
+        width: [fromW, fromW, toW] as number[],
+        height: [fromH, fromH, toH] as number[],
+        scale: cardKO.scale,
+        opacity: cardKO.opacity,
+      }
+    : { x: toX, y: toY, width: toW, height: toH, opacity: 1, scale: 1 };
+
+  const transitionConfig = isKO
+    ? { duration: 0.65, times: [0, 0.3, 1] as number[], ease: "easeOut" as const }
+    : cardTransitions.zoneMove;
+
   return (
     <motion.div
-      initial={{
-        x: fromRect.left + (fromRect.width - fromW) / 2,
-        y: fromRect.top + (fromRect.height - fromH) / 2,
-        width: fromW,
-        height: fromH,
-        opacity: 1,
-        scale: 1,
-      }}
-      animate={{
-        x: toX,
-        y: toY,
-        width: toW,
-        height: toH,
-        opacity: 1,
-        scale: 1,
-      }}
+      initial={{ x: fromX, y: fromY, width: fromW, height: fromH, opacity: 1, scale: 1 }}
+      animate={animateTarget}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={cardTransitions.zoneMove}
+      transition={transitionConfig}
       onAnimationComplete={onComplete}
       style={{
         position: "fixed",
