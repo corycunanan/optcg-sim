@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
@@ -242,24 +243,32 @@ export function ArrangeTopCardsModal({
               )}
             </div>
 
-            <DragOverlay dropAnimation={null}>
-              {activeCard && (
-                <motion.div
-                  style={{
-                    transformPerspective: 1000,
-                    rotateX: dragTilt.tiltX,
-                    rotateY: dragTilt.tiltY,
-                  }}
-                >
-                  <Card
-                    variant="modal"
-                    size="field"
-                    data={{ card: activeCard, cardId: activeCard.cardId, cardDb }}
-                    interaction={{ tooltipDisabled: true }}
-                  />
-                </motion.div>
+            {/* Portal the overlay to document.body so Radix Dialog's
+                translate(-50%,-50%) centering transform doesn't break
+                DragOverlay's position:fixed tracking. React context is
+                preserved through portals, so DndContext still sees it. */}
+            {typeof document !== "undefined" &&
+              createPortal(
+                <DragOverlay dropAnimation={null}>
+                  {activeCard && (
+                    <motion.div
+                      style={{
+                        transformPerspective: 1000,
+                        rotateX: dragTilt.tiltX,
+                        rotateY: dragTilt.tiltY,
+                      }}
+                    >
+                      <Card
+                        variant="modal"
+                        size="field"
+                        data={{ card: activeCard, cardId: activeCard.cardId, cardDb }}
+                        interaction={{ tooltipDisabled: true }}
+                      />
+                    </motion.div>
+                  )}
+                </DragOverlay>,
+                document.body,
               )}
-            </DragOverlay>
           </DndContext>
         </TooltipProvider>
 
