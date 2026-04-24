@@ -123,8 +123,11 @@ function FlyingCard({
     };
   } else if (isHandBound) {
     // Subtle arc — midY rises above the higher of source/destination so the
-    // card flies up-and-over instead of sliding in a straight line. Pairs
-    // with `toHand` as the scale spring for the bouncy arrival (OPT-274).
+    // card flies up-and-over instead of sliding in a straight line. Scale
+    // animates 0.96 → 1 with the under-damped `toHand` spring so the card
+    // overshoots past 1 on arrival and settles (two-keyframe spring — motion.dev
+    // does not support 3-keyframe springs, so we let the spring's natural
+    // oscillation do the "bounce" rather than baking it into keyframes).
     const midX = (fromX + toX) / 2;
     const midY = Math.min(fromY, toY) - HAND_ARC_RISE;
     animateTarget = {
@@ -133,7 +136,7 @@ function FlyingCard({
       width: toW,
       height: toH,
       opacity: 1,
-      scale: [1, 1.06, 1],
+      scale: 1,
     };
     transitionConfig = {
       // Per-property transitions: the arc path tweens, the arrival scale
@@ -151,6 +154,12 @@ function FlyingCard({
     transitionConfig = { ...cardTransitions.zoneMove, delay };
   }
 
+  // Hand-bound flights start slightly scaled-down so the `toHand` spring has
+  // a delta to work with — the under-damped spring will overshoot past 1 on
+  // arrival, producing the ticket's "bouncier arrival" feel without needing
+  // a 3-keyframe scale (unsupported on springs).
+  const initialScale = isHandBound ? 0.96 : 1;
+
   return (
     <motion.div
       initial={{
@@ -159,7 +168,7 @@ function FlyingCard({
         width: fromW,
         height: fromH,
         opacity: isDonAttach ? 0 : 1,
-        scale: 1,
+        scale: initialScale,
       }}
       animate={animateTarget}
       exit={{ opacity: 0, scale: 0.95 }}
