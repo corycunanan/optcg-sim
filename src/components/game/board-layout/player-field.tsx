@@ -1,6 +1,7 @@
 "use client";
 
 import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
+import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
 import {
@@ -45,7 +46,11 @@ interface PlayerFieldProps {
   pendingTransferDonIdsByCard?: Map<string, Set<string>>;
   donCountAdjustments?: Map<string, number>;
   attackerInstanceId?: string | null;
+  defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
+  /** Instance IDs currently flying *into* the player's trash — hides them
+   *  from the trash top/count until their flight lands (OPT-274). */
+  trashArrivingIds?: Set<string>;
 }
 
 export function PlayerField({
@@ -65,8 +70,20 @@ export function PlayerField({
   pendingTransferDonIdsByCard,
   donCountAdjustments,
   attackerInstanceId,
+  defenderInstanceId,
   counterPulseIds,
+  trashArrivingIds,
 }: PlayerFieldProps) {
+  // Detect newly-arrived cards so the summon-entry pop plays on mount
+  // (OPT-274). `useFieldArrivals` compares against the previous render's
+  // instanceIds and seeds empty on the first render.
+  const fieldIds: string[] = [];
+  if (me?.leader) fieldIds.push(me.leader.instanceId);
+  for (const c of me?.characters ?? []) {
+    if (c) fieldIds.push(c.instanceId);
+  }
+  const arrivals = useFieldArrivals(fieldIds);
+
   return (
     <>
       {/* Zone 1 (left): Life */}
@@ -106,6 +123,7 @@ export function PlayerField({
             blockerSelectable={isBlockerEligible}
             selected={selectedBlockerId === char.instanceId}
             isAttacker={attackerInstanceId === char.instanceId}
+            isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
             onAction={onAction}
@@ -116,6 +134,7 @@ export function PlayerField({
             redistributeSource={redistributeSourceIds?.has(char.instanceId)}
             pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
+            entering={arrivals.has(char.instanceId)}
             style={{ position: "absolute", left: pos.left, top: playerCharTop }}
           />
         );
@@ -138,6 +157,7 @@ export function PlayerField({
           activeDragType={activeDragType}
           canAttack={canInteract && me.leader.state === "ACTIVE"}
           isAttacker={attackerInstanceId === me.leader.instanceId}
+          isDefender={defenderInstanceId === me.leader.instanceId}
           counterPulse={counterPulseIds?.has(me.leader.instanceId)}
           onAction={onAction}
           zoneKey="p-leader"
@@ -146,6 +166,7 @@ export function PlayerField({
           redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
           pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
           donCountAdjust={donCountAdjustments?.get(me.leader.instanceId)}
+          entering={arrivals.has(me.leader.instanceId)}
         />
       ) : (
         <EmptySlot
@@ -183,6 +204,7 @@ export function PlayerField({
         battleSubPhase={turn?.battleSubPhase ?? null}
         onClickTrash={() => me && me.trash.length > 0 && onPreviewZone({ type: "trash", owner: "me" })}
         zoneKey="p-trash"
+        arrivingInstanceIds={trashArrivingIds}
         style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
       />
     </>

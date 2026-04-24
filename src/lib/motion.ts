@@ -144,6 +144,17 @@ const board = {
         times: [0, 0.35, 1] as number[],
       },
     },
+    /** Summon entry (OPT-274). Pop-in after a card lands in its destination
+     *  zone — scale up from 0.9 and fade from 0 with a short bouncy spring.
+     *  Composes with whatever ambient state (active/rest/attacking) the
+     *  destination renders in; the consumer wraps its outer motion.div with
+     *  `initial={{ scale: 0.9, opacity: 0 }}`. Reduced-motion consumers omit
+     *  the `initial` so the card just appears. */
+    entry: {
+      type: "spring" as const,
+      stiffness: 360,
+      damping: 18,
+    },
     /** Hand card hover: lift + scale, same spring-in / tween-out shape,
      *  same wiggle. */
     handHover: {
@@ -158,12 +169,17 @@ const board = {
     },
   },
   flight: {
-    /** Card flying between zones */
-    zoneMove: { type: "spring" as const, stiffness: 250, damping: 28 },
+    /** Card flying between zones (OPT-274 tuned). Short easeOut tween —
+     *  straight line, ~220ms. The arrival pop lives on the destination card
+     *  (`cardEntry` spring on mount) so the flight itself stays snappy. */
+    zoneMove: { duration: 0.22, ease: "easeOut" as const },
     /** Card entering a zone (scale in) */
     zoneEnter: { type: "spring" as const, stiffness: 300, damping: 25 },
     /** Card leaving a zone (fade out) */
     zoneExit: { duration: 0.1, ease: "easeIn" as const },
+    /** DON token flight from DON pool onto a target card (OPT-274). Matches
+     *  `zoneMove` timing so multi-flight batches read as a coherent set. */
+    donAttach: { duration: 0.22, ease: "easeOut" as const },
   },
   stateChange: {
     /** Resting (attack/block/cost): decisive, snappy */
@@ -194,6 +210,7 @@ export const cardAttackerPulse = board.card.attackerPulse;
 export const cardBlockerHighlight = board.card.blockerHighlight;
 export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
+export const cardEntry = board.card.entry;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
 export const cardRest = board.stateChange.rest;

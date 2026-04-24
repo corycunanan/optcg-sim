@@ -238,17 +238,19 @@ export const Card = React.memo(function Card({
 
       {/* DON badge lives outside the rotating layer so it can track the
           card's *visible* bottom-right — not a card-local corner that
-          spins with the card. For rest (90° CW), the visible BR sits at
-          container-local ((W+H)/2, (W+H)/2), so the right/bottom insets
-          shift by (W-H)/2 and (H-W)/2. No counter-rotation needed —
-          the badge is never rotated in the first place. */}
+          spins with the card. For any state that rotates the card 90° CW
+          (`rest`, `attacking`), the visible BR sits at container-local
+          ((W+H)/2, (W+H)/2), so the right/bottom insets shift by (W-H)/2
+          and (H-W)/2. Keyed off the rotation angle — not the state label —
+          so new 90°-rotated states (e.g. `attacking` from OPT-273) inherit
+          the offset without a switch update. */}
       {overlays?.donCount != null && (
         <motion.div
           className="absolute z-10"
           initial={false}
           animate={{
-            right: state === "rest" ? (width - height) / 2 + 4 : 4,
-            bottom: state === "rest" ? (height - width) / 2 + 4 : 4,
+            right: cardRotate === 90 ? (width - height) / 2 + 4 : 4,
+            bottom: cardRotate === 90 ? (height - width) / 2 + 4 : 4,
           }}
           transition={motionConfig.transition}
         >

@@ -39,6 +39,8 @@ function SortableHandCard({
   hidden,
   reducedMotion,
   style,
+  enableLayout,
+  layoutDep,
 }: {
   card: CardInstance;
   cardDb: CardDb;
@@ -48,6 +50,15 @@ function SortableHandCard({
   hidden?: boolean;
   reducedMotion: boolean;
   style?: React.CSSProperties;
+  /** Enables motion-layout reflow when the hand composition changes (OPT-274).
+   *  Disabled during a sortable drag so motion-layout doesn't fight sortable's
+   *  `transform` — sortable shifts neighbors via transform which doesn't
+   *  change layout box, but the dragged card itself would double-animate. */
+  enableLayout: boolean;
+  /** Dependency value for motion's layout diffing (OPT-274). Layout measurement
+   *  only runs when this changes, scoping reflow to true composition events
+   *  (card added/removed/reordered) instead of every render. */
+  layoutDep: number;
 }) {
   const {
     attributes,
@@ -69,33 +80,44 @@ function SortableHandCard({
     ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
     : undefined;
 
+  // Outer layer owns flex position + motion-layout reflow on hand-composition
+  // changes (OPT-274 — card added/removed by draw/play/discard). Inner layer
+  // owns the sortable drag/reorder transform + its CSS transition. Separating
+  // them keeps motion layout's box-measurement pure (no competing inline
+  // transform) while sortable still handles its own drag-follow + drop-back.
   return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      style={{
-        ...style,
-        transform: sortableTransform,
-        transition: reducedMotion ? "none" : (transition ?? undefined),
-        cursor: disabled || hidden ? "default" : "grab",
-        visibility: hidden ? "hidden" : undefined,
-        touchAction: "none",
-      }}
+    <motion.div
+      layout={enableLayout ? "position" : false}
+      layoutDependency={enableLayout ? layoutDep : undefined}
+      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+      style={style}
     >
-      <motion.div
-        initial={false}
-        animate={{ opacity }}
-        transition={{ duration: 0.15, ease: "easeOut" }}
+      <div
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        style={{
+          transform: sortableTransform,
+          transition: reducedMotion ? "none" : (transition ?? undefined),
+          cursor: disabled || hidden ? "default" : "grab",
+          visibility: hidden ? "hidden" : undefined,
+          touchAction: "none",
+        }}
       >
-        <Card
-          data={{ card, cardDb }}
-          variant="hand"
-          state={cardState}
-          interaction={isDragging ? { tooltipDisabled: true } : undefined}
-        />
-      </motion.div>
-    </div>
+        <motion.div
+          initial={false}
+          animate={{ opacity }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+        >
+          <Card
+            data={{ card, cardDb }}
+            variant="hand"
+            state={cardState}
+            interaction={isDragging ? { tooltipDisabled: true } : undefined}
+          />
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -190,6 +212,8 @@ export const HandLayer = React.memo(function HandLayer({
         hidden={isInFlight}
         reducedMotion={reducedMotion}
         style={marginStyle}
+        enableLayout={!reducedMotion}
+        layoutDep={count}
       />
     );
   };
