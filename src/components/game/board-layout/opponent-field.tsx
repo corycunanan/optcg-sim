@@ -32,6 +32,7 @@ interface OpponentFieldProps {
   refreshWave: boolean;
   onPreviewZone: (preview: { type: "deck" | "trash"; owner: "opp" }) => void;
   attackerInstanceId?: string | null;
+  defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
   /** Signed offsets merged into displayed DON count per target card
    *  (OPT-274). Negative while a DON token is in-flight so the counter
@@ -46,6 +47,7 @@ export function OpponentField({
   refreshWave,
   onPreviewZone,
   attackerInstanceId,
+  defenderInstanceId,
   counterPulseIds,
   donCountAdjustments,
 }: OpponentFieldProps) {
@@ -114,6 +116,7 @@ export function OpponentField({
           cardDb={cardDb}
           activeDragType={activeDragType}
           isAttacker={attackerInstanceId === opp.leader.instanceId}
+          isDefender={defenderInstanceId === opp.leader.instanceId}
           counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
           zoneKey="o-leader"
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
@@ -146,6 +149,7 @@ export function OpponentField({
             cardDb={cardDb}
             activeDragType={activeDragType}
             isAttacker={attackerInstanceId === char.instanceId}
+            isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             zoneKey={`o-char-${i}`}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}

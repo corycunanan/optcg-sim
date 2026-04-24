@@ -16,6 +16,10 @@ import type { HighlightRingColor } from "../types";
  *   valid    → amber static (drop-target affordance)
  *   blocker  → blue static (eligible but not yet chosen)
  *   attacker → amber pulse (OPT-273 attacker glow, sustained loop)
+ *   defender → amber pulse (OPT-274 defender glow — same treatment as
+ *              attacker so both participants in the active battle read as
+ *              linked; kept as a separate color so future divergence
+ *              doesn't require retrofitting consumers)
  *   counter  → amber flash (OPT-273 counter pulse, one-shot fade)
  *   invalid  → no ring (opacity dim lives in the state preset instead)
  */
@@ -30,7 +34,7 @@ export function CardHighlightRing({
 
   if (color === "invalid") return null;
 
-  if (color === "attacker") {
+  if (color === "attacker" || color === "defender") {
     return (
       <motion.div
         aria-hidden

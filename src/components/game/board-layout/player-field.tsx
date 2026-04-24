@@ -46,6 +46,7 @@ interface PlayerFieldProps {
   pendingTransferDonIdsByCard?: Map<string, Set<string>>;
   donCountAdjustments?: Map<string, number>;
   attackerInstanceId?: string | null;
+  defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
 }
 
@@ -66,6 +67,7 @@ export function PlayerField({
   pendingTransferDonIdsByCard,
   donCountAdjustments,
   attackerInstanceId,
+  defenderInstanceId,
   counterPulseIds,
 }: PlayerFieldProps) {
   // Detect newly-arrived cards so the summon-entry pop plays on mount
@@ -117,6 +119,7 @@ export function PlayerField({
             blockerSelectable={isBlockerEligible}
             selected={selectedBlockerId === char.instanceId}
             isAttacker={attackerInstanceId === char.instanceId}
+            isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
             onAction={onAction}
@@ -150,6 +153,7 @@ export function PlayerField({
           activeDragType={activeDragType}
           canAttack={canInteract && me.leader.state === "ACTIVE"}
           isAttacker={attackerInstanceId === me.leader.instanceId}
+          isDefender={defenderInstanceId === me.leader.instanceId}
           counterPulse={counterPulseIds?.has(me.leader.instanceId)}
           onAction={onAction}
           zoneKey="p-leader"

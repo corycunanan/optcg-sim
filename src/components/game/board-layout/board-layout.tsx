@@ -214,6 +214,7 @@ function BoardLayoutInner({
 
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
+  const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
 
   // While a DON token is flying onto a target card, the displayed count is
   // held back by the number of in-flight tokens so the counter doesn't
@@ -372,6 +373,7 @@ function BoardLayoutInner({
             refreshWave={refreshWave}
             onPreviewZone={setZonePreview}
             attackerInstanceId={attackerInstanceId}
+            defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
           />
@@ -418,6 +420,7 @@ function BoardLayoutInner({
             pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
             donCountAdjustments={mergedDonCountAdjustments}
             attackerInstanceId={attackerInstanceId}
+            defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
           />
         </div>

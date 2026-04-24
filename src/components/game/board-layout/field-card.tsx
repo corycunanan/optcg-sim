@@ -34,6 +34,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   blockerSelectable,
   selected,
   isAttacker,
+  isDefender,
   counterPulse,
   onSelect,
   onAction,
@@ -54,6 +55,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   blockerSelectable?: boolean;
   selected?: boolean;
   isAttacker?: boolean;
+  /** True when this card is `battle.targetInstanceId` — the current defender.
+   *  Moves with the battle: leader at declare-attack, then the blocker once
+   *  block is declared. Drives the amber pulse ring (OPT-274). */
+  isDefender?: boolean;
   counterPulse?: boolean;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
@@ -158,16 +163,21 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       : baseState;
   // Ring consolidation (OPT-273): formerly consumer className `ring-2 ring-gb-accent-*`.
   // Now routed through the primitive's highlightRing overlay so ring semantics
-  // live in one place and can compose with motion presets.
+  // live in one place and can compose with motion presets. Precedence (top
+  // wins): counter flash (transient) > attacker (current aggressor) > defender
+  // (OPT-274 — current battle target, same amber pulse as attacker) > selected
+  // (user-chosen blocker) > blockerSelectable (eligible candidate).
   const highlightRing = counterPulse
     ? ("counter" as const)
     : isAttacker
       ? ("attacker" as const)
-      : selected
-        ? ("selected" as const)
-        : blockerSelectable
-          ? ("blocker" as const)
-          : undefined;
+      : isDefender
+        ? ("defender" as const)
+        : selected
+          ? ("selected" as const)
+          : blockerSelectable
+            ? ("blocker" as const)
+            : undefined;
 
   // Entry pop (OPT-274): only triggers on first render when the parent
   // flagged this card as newly-arrived. `isDragging` opacity still wins
@@ -246,6 +256,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   cardDb,
   activeDragType,
   isAttacker,
+  isDefender,
   counterPulse,
   zoneKey,
   style,
@@ -257,6 +268,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   cardDb: CardDb;
   activeDragType: string | null;
   isAttacker?: boolean;
+  /** See `PlayerFieldCard.isDefender` — identical semantics on the opposing
+   *  side. */
+  isDefender?: boolean;
   counterPulse?: boolean;
   zoneKey?: string;
   style: React.CSSProperties;
@@ -305,7 +319,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     ? ("counter" as const)
     : isAttacker
       ? ("attacker" as const)
-      : undefined;
+      : isDefender
+        ? ("defender" as const)
+        : undefined;
 
   const shouldEnter = !!entering && !reducedMotion;
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
