@@ -1,8 +1,12 @@
 "use client";
 
 import React, { useCallback, useRef } from "react";
-import { useDraggable } from "@dnd-kit/core";
-import { motion } from "motion/react";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { Card } from "../card";
@@ -13,6 +17,12 @@ import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
 // Consumer wrapper keeps: dnd-kit refs, zone registration, drag-origin
 // opacity ghost (0.3), counter-mode dim (0.35), in-flight hidden placeholder,
 // and the newly-arrived hide-until-transition-registered trick.
+//
+// OPT-282: draggable hand cards upgraded from `useDraggable` to `useSortable`.
+// A `SortableContext` wraps the row so neighbors shift out of the way as a
+// card is dragged over them — the drop indicator is the gap itself. Dragging
+// a card onto a field zone still plays it (sortable coexists with the board's
+// existing droppables).
 
 function isCounterEligible(data: CardData | undefined): boolean {
   if (!data) return false;
@@ -21,12 +31,13 @@ function isCounterEligible(data: CardData | undefined): boolean {
   return false;
 }
 
-function DraggableHandCard({
+function SortableHandCard({
   card,
   cardDb,
   disabled,
   dimmed,
   hidden,
+  reducedMotion,
   style,
 }: {
   card: CardInstance;
@@ -35,9 +46,17 @@ function DraggableHandCard({
   dimmed?: boolean;
   /** When true the card reserves layout space but is invisible (in-flight placeholder). */
   hidden?: boolean;
+  reducedMotion: boolean;
   style?: React.CSSProperties;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: `hand-${card.instanceId}`,
     data: { type: "hand-card", card } satisfies HandCardDrag,
     disabled: disabled || hidden,
@@ -46,27 +65,37 @@ function DraggableHandCard({
   const cardState = isDragging ? "dragging" : "active";
   const opacity = isDragging ? 0.3 : dimmed ? 0.35 : 1;
 
+  const sortableTransform = transform
+    ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+    : undefined;
+
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      initial={false}
-      animate={{ opacity }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
       style={{
         ...style,
+        transform: sortableTransform,
+        transition: reducedMotion ? "none" : (transition ?? undefined),
         cursor: disabled || hidden ? "default" : "grab",
         visibility: hidden ? "hidden" : undefined,
+        touchAction: "none",
       }}
     >
-      <Card
-        data={{ card, cardDb }}
-        variant="hand"
-        state={cardState}
-        interaction={isDragging ? { tooltipDisabled: true } : undefined}
-      />
-    </motion.div>
+      <motion.div
+        initial={false}
+        animate={{ opacity }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
+      >
+        <Card
+          data={{ card, cardDb }}
+          variant="hand"
+          state={cardState}
+          interaction={isDragging ? { tooltipDisabled: true } : undefined}
+        />
+      </motion.div>
+    </div>
   );
 }
 
@@ -92,6 +121,7 @@ export const HandLayer = React.memo(function HandLayer({
 }) {
   const count = cards.length;
   const zonePos = useZonePosition();
+  const reducedMotion = useReducedMotion() ?? false;
 
   // Track which instanceIds existed in the previous render so we can
   // detect newly-arrived cards and hide them before the transition
@@ -124,46 +154,65 @@ export const HandLayer = React.memo(function HandLayer({
   const rawGap = count > 1 ? (maxWidth - totalCardsW) / (count - 1) : 0;
   const gap = Math.min(12, rawGap);
 
+  const renderCard = (card: CardInstance, i: number) => {
+    const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
+    // Hide if the transition system says in-flight, OR if the card just
+    // appeared this render (transition hasn't been created yet).
+    const isInFlight =
+      (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
+      newlyArrived.has(card.instanceId);
+
+    if (faceDown) {
+      return (
+        <Card
+          key={card.instanceId}
+          data={{ card, cardDb }}
+          variant="hand"
+          faceDown
+          sleeveUrl={sleeveUrl}
+          style={marginStyle}
+        />
+      );
+    }
+
+    const eligible = counterMode
+      ? isCounterEligible(cardDb[card.cardId])
+      : true;
+    const disabled = !enableDrag || (counterMode && !eligible);
+
+    return (
+      <SortableHandCard
+        key={card.instanceId}
+        card={card}
+        cardDb={cardDb}
+        disabled={disabled}
+        dimmed={counterMode && !eligible}
+        hidden={isInFlight}
+        reducedMotion={reducedMotion}
+        style={marginStyle}
+      />
+    );
+  };
+
+  // Opponent (face-down) hand has no reorder interaction — render without
+  // SortableContext. Player hand wraps in SortableContext so neighbors shift
+  // when a card is dragged over them.
+  if (faceDown) {
+    return (
+      <div ref={handRef} className="flex items-center pointer-events-auto">
+        {cards.map(renderCard)}
+      </div>
+    );
+  }
+
   return (
     <div ref={handRef} className="flex items-center pointer-events-auto">
-      {cards.map((card, i) => {
-        const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
-        // Hide if the transition system says in-flight, OR if the card just
-        // appeared this render (transition hasn't been created yet).
-        const isInFlight =
-          (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
-          newlyArrived.has(card.instanceId);
-
-        if (faceDown) {
-          return (
-            <Card
-              key={card.instanceId}
-              data={{ card, cardDb }}
-              variant="hand"
-              faceDown
-              sleeveUrl={sleeveUrl}
-              style={marginStyle}
-            />
-          );
-        }
-
-        const eligible = counterMode
-          ? isCounterEligible(cardDb[card.cardId])
-          : true;
-        const disabled = !enableDrag || (counterMode && !eligible);
-
-        return (
-          <DraggableHandCard
-            key={card.instanceId}
-            card={card}
-            cardDb={cardDb}
-            disabled={disabled}
-            dimmed={counterMode && !eligible}
-            hidden={isInFlight}
-            style={marginStyle}
-          />
-        );
-      })}
+      <SortableContext
+        items={cards.map((c) => `hand-${c.instanceId}`)}
+        strategy={horizontalListSortingStrategy}
+      >
+        {cards.map(renderCard)}
+      </SortableContext>
     </div>
   );
 });
