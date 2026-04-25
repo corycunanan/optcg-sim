@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-289 done — OPT-290 ready now; OPT-287/OPT-288 still parallel)
+last-updated: 2026-04-25 (OPT-288 in review — OPT-290 still critical path; OPT-287 still parallel)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -18,7 +18,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | Done | [#129](https://github.com/corycunanan/optcg-sim/pull/129) | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. |
 | 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Backlog | — | Independent of everything else — can be done in parallel with the gate ticket if anyone wants to split. ~20 hand-picked `CardData` snapshots covering Blocker, Counter, Double Attack, Rush, On-Play, On-KO, Trigger event, Stage, plus per-color leaders. |
-| 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | Backlog | — | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
+| 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | In Review | [#135](https://github.com/corycunanan/optcg-sim/pull/135) | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
 | 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Done | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
 | 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Done | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
 | 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Backlog | — | Wraps `sendAction`. Try the `interactionMode` prop on `BoardLayout` first; fall back to a pointer-events overlay only if prop addition touches >6 files. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-290 (critical path) — ready now. OPT-287 and OPT-288 are still parallel and pickable now.
+**Next up:** OPT-290 (critical path) — ready now. OPT-287 still parallel and pickable now.
 
 ---
 
@@ -92,4 +92,18 @@ Copy this block when writing a new handoff:
   - `pause()` while `playing` and `pause()` while `awaiting-response` both notify, but `pause()` from `idle`/`paused`/`ended` is a no-op without notify. If callers rely on `pause` to ping a listener, that's surprising; flag if OPT-290 hits it.
   - The runner exposes `dispose` but `useScenarioRunner` only calls it on unmount. If OPT-291 ever needs to swap scenarios in-place, add a scenario-change effect that disposes + creates fresh.
 - **Why this matters for OPT-290:** OPT-290 wraps `session.sendAction` so interactive scenarios route the user's action through `expectedResponse.predicate` and, on match, call `runner.resolvePrompt(action)`. Spectator scenarios should disable input entirely (the ticket suggests trying `interactionMode` prop on `BoardLayout` first; pointer-events overlay is the fallback). The runner does not own input — only playback — so the gate is the single point that decides "did the user satisfy the prompt yet?"
+
+### OPT-288 → OPT-291
+**From:** session on 2026-04-25 · **Commit:** `fde8a3f` · **PR:** [#135](https://github.com/corycunanan/optcg-sim/pull/135)
+
+- **Primer:** The `/sandbox` route surface is in place. Hub at `/sandbox` reads `scenarios` from the manifest and renders one section per `ScenarioCategory` (currently all "No scenarios yet"). `/sandbox/scaffold` is the migrated `BoardScaffold` host. `/sandbox/[scenarioId]/page.tsx` is the placeholder OPT-291 will replace — it already does the manifest lookup and `notFound()` for unknown ids. `/game/scaffold` is now a `permanentRedirect` (308). Navbar has a top-level "Sandbox" link.
+- **Read first:** `src/app/sandbox/[scenarioId]/page.tsx` (the surface OPT-291 replaces — keep the param shape `Promise<{ scenarioId: string }>` and the `notFound()` branch), `src/app/sandbox/page.tsx` (hub — references `CATEGORY_ORDER`/`CATEGORY_LABELS` you may want to extract if scenario tiles need to share them), `src/components/nav/navbar.tsx` (Sandbox link + the `/game/` skip rule that intentionally does **not** apply to `/sandbox/*`).
+- **Gotchas / do NOT touch:**
+  - The navbar's `pathname.startsWith("/game/")` skip rule must stay for `/game/*` and must **not** be widened to `/sandbox/*` — the ticket explicitly calls this out as a default. If we later want to hide the nav during scenario playback, scope it to `inputMode === "interactive"` so spectator scenarios still show navigation.
+  - `permanentRedirect` (308) was chosen over `redirect` (307) on `/game/scaffold` so search engines and bookmarks transfer cleanly. Don't downgrade.
+  - Hub categories render even when empty by design — removing empty sections would hide which categories OPT-292+ scenarios should land in. Keep the `CATEGORY_ORDER` loop unconditional.
+- **Unresolved:**
+  - Found uncommitted OPT-290-flavored work in the tree (`src/components/game/board-layout/interaction-mode.ts` and a `board-layout.tsx` modification adding an `interactionMode` prop). Left it untouched on disk — it looks like an in-progress sketch from a prior session. OPT-290's owner should decide whether to adopt or discard before pushing.
+  - `[scenarioId]` placeholder hard-codes the OPT-291 reference in copy. Update or remove that line as part of OPT-291.
+- **Why this matters for OPT-291:** OPT-291 turns the placeholder into the real player. Reuse the existing `params: Promise<{ scenarioId: string }>` signature and the `notFound()` branch — only the JSX body changes. The hub's tile click already routes to `/sandbox/<id>`, so once a scenario is in the manifest the only friction is rendering the player. Pull provider (OPT-286), runner (OPT-289), and gate (OPT-290) into this page; nothing else in the route tree should need to move.
 
