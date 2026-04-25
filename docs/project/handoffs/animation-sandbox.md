@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-293 merged — OPT-294/295/296 + OPT-297 all parallelizable now)
+last-updated: 2026-04-25 (OPT-294 in review — OPT-295/296 still parallelizable, OPT-297 polish remains)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -25,14 +25,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Done | [#138](https://github.com/corycunanan/optcg-sim/pull/138) | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Done | [#139](https://github.com/corycunanan/optcg-sim/pull/139) | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** Wiring held — no upstream patches needed. |
 | 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | Done | [#140](https://github.com/corycunanan/optcg-sim/pull/140) | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. `redistribute-don` authored as interactive (overlay is fundamentally interactive). |
-| 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Counter-from-hand is the only interactive one in the batch; exercises `use-counter-pulse`. |
+| 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | In Review | [#142](https://github.com/corycunanan/optcg-sim/pull/142) | Parallelizable. Counter-from-hand pre-populates `turn.battle` so use-counter-pulse can key the pulse to the defender's leader. |
 | 11 | [OPT-295](https://linear.app/optcg-sim/issue/OPT-295) | Scenario batch: KO + Life (4 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. All spectator. Exercises the `kind: "ko"` flight branch and `LIFE_TRASH_REASONS` routing. |
 | 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
 | 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | Backlog | — | Closeout. Mute toggle + persistence + the `docs/sandbox/clock-determinism.md` doc. Can be done any time after OPT-291; suggest doing it last so the determinism doc reflects what was actually built. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-294 (critical path) — ready now. OPT-295, OPT-296 are parallelizable batches, also ready now. OPT-297 (polish) is the recommended closeout — save for last so the determinism doc reflects what actually shipped.
+**Next up:** OPT-295 (critical path) and OPT-296 (parallel) — both ready now (their only dep is OPT-292, already Done). OPT-297 (polish) is the recommended closeout — save for last so the determinism doc reflects what actually shipped.
 
 ---
 
@@ -152,6 +152,22 @@ Copy this block when writing a new handoff:
   - Yellow/Black leaders are still out of scope per OPT-287. If a batch scenario (OPT-294/295/296) needs one, extend `SANDBOX_CARD_DB` in the same PR rather than reaching for the live API.
   - The OPT-287 follow-up (sweep `cardsUsed` across all scenarios for unknown IDs) is now satisfied by `manifest.test.ts`'s "references only cardIds present in `SANDBOX_CARD_DB`" check. Future scenarios get this guarantee for free.
 - **Why this matters for OPT-293+ (and parallel batches OPT-294/295/296):** The two templates here are the shape every future scenario follows. Spectator scenarios mostly compose `CARD_*` events and lean on the production animation hooks; interactive scenarios author a single prompt step + a tight predicate. Both templates inline `TURN`/initial-state setup — when that grows tedious across a batch, lift it into a `_shared.ts` next to the batch's files. Don't preemptively factor it; let the second batch tell you what's actually shared.
+
+### OPT-294 → OPT-295 (and parallel batch OPT-296)
+**From:** session on 2026-04-25 · **Commit:** `de3519b` · **PR:** [#142](https://github.com/corycunanan/optcg-sim/pull/142)
+
+- **Primer:** Five Combat scenarios shipped under `src/lib/sandbox/scenarios/combat/`. Four spectator (event-driven), one interactive (`counter-from-hand`). Templates from OPT-292/293 held — no upstream patches and no `SANDBOX_CARD_DB` additions needed; the existing bundle already covered Blocker / Counter / Double Attack / Rush.
+- **Read first:** `src/lib/sandbox/scenarios/combat/counter-from-hand.ts` (the only interactive one in this batch — shows the `turn.battle` pre-population pattern), `src/lib/sandbox/scenarios/combat/blocker-intercepts.ts` (the multi-CARD_STATE_CHANGED + CARD_KO chain — direct template for any KO-driven scenario), `workers/game/src/engine/battle.ts` (still the canonical reference for what events fire during combat — useful even though we're authoring the visible-delta subset).
+- **Gotchas / do NOT touch:**
+  - **Counter-from-hand uses `SELECT_TARGET`, not `USE_COUNTER`.** The runner only enters `awaiting-response` on a `prompt` step, and only `SELECT_TARGET` (and the other prompt-modal types) actually open a modal. `USE_COUNTER` exists as a `GameAction` but is a free drag-action in production with no prompt. The sandbox uses the prompt as the gating mechanism; `COUNTER_USED` fires from a script event after resolve to drive `use-counter-pulse`. Don't try to fix this by inventing a `USE_COUNTER`-typed prompt — the modal contract doesn't support it.
+  - **`use-counter-pulse` reads `battle.targetInstanceId`.** If a scenario emits `COUNTER_USED` without `turn.battle` populated in `initialState`, the pulse silently no-ops (the `if (!defenderId) return` early exit). Always pre-populate `turn.battle` for any combat scenario that fires `COUNTER_USED`.
+  - **`applyEvent` does not modify `turn.battle` or `turn.battleSubPhase`.** Battle context is whatever `initialState.turn` declared. There's no engine running. Spectator combat scenarios in this batch deliberately leave `turn.battle = null` because the BattleInfo banner would persist for the full scenario otherwise (no event clears it). Reserve banner-on for scenarios where battle metadata is the load-bearing visual.
+  - **`CARD_TRASHED` payload requires `reason: string`.** The shared event-payload map types `reason` as required. The engine emits things like `"COUNTER"` / `"EFFECT"`; the sandbox just needs *any* string. Don't omit it — TypeScript will yell.
+  - **`CARD_ADDED_TO_HAND_FROM_LIFE` resolves by `cardInstanceId` if provided, else takes `life[0]`.** For multi-flip scenarios (`double-attack-vs-life`) author each event with the explicit `cardInstanceId` of the life card you intend to remove — otherwise the second event's payload would still target what was originally `life[0]` after the first removal renumbered the array. (The reducer handles this either way; explicit ids are about keeping the flying-card art correct in `card-animation-layer`.)
+- **Unresolved:**
+  - Browser verification on the five new `/sandbox/<id>` pages was not run by this session (non-interactive). Type-check, lint, and 157 unit tests pass; the manifest test asserts the thirteen registered scenarios are unique and resolve in `SANDBOX_CARD_DB`. **Run a manual smoke before merge** — the two acceptance bullets ("counter pulse fires distinctly" + "double-attack shows two life-flip arcs") only the eyes can confirm.
+  - `counter-from-hand` is intentionally authored with a single `[Counter]` card in hand. Multi-counter would require the runner to template post-prompt events from the resolved action, which is out of scope for the static-script model. If a future scenario truly needs "pick from N", file a follow-up to add response-templated events to `ScenarioStep`.
+- **Why this matters for OPT-295 (KO + Life) and OPT-296 (Prompts):** OPT-295's 4 scenarios are all spectator and lean heavily on `CARD_KO` (`kind: "ko"` flight) and `CARD_ADDED_TO_HAND_FROM_LIFE` / `CARD_TRASHED` (the `LIFE_TRASH_REASONS` routing in the production handler). `blocker-intercepts` is the directly reusable template — copy its event chain shape, swap the trigger. OPT-296's 4 prompt scenarios should use `select-target` and `redistribute-don` as templates plus the new `counter-from-hand` one — same one-step prompt + tight predicate, with `ARRANGE_TOP_CARDS` already proven in `peek-top-3`. Cross-batch: `_shared.ts` still hasn't earned its keep — three batches in and the inline `TURN` consts + deck/hand stubs stay readable.
 
 ### OPT-291 → OPT-292
 **From:** session on 2026-04-25 · **Commit:** `5665e83` · **PR:** [#138](https://github.com/corycunanan/optcg-sim/pull/138)
