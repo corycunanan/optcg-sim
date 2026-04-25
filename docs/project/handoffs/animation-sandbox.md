@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-293 in review — OPT-294/295/296 + OPT-297 all parallelizable now)
+last-updated: 2026-04-25 (OPT-293 merged — OPT-294/295/296 + OPT-297 all parallelizable now)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -24,7 +24,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Done | [#136](https://github.com/corycunanan/optcg-sim/pull/136) | Picked option #1 — `interactionMode` prop on `BoardLayout` via a small context. Touched 6 files; pointer-events overlay was rejected because BoardModals render inline (z-index would fight). |
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Done | [#138](https://github.com/corycunanan/optcg-sim/pull/138) | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Done | [#139](https://github.com/corycunanan/optcg-sim/pull/139) | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** Wiring held — no upstream patches needed. |
-| 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | In Review | [#140](https://github.com/corycunanan/optcg-sim/pull/140) | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. `redistribute-don` authored as interactive (overlay is fundamentally interactive). |
+| 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | Done | [#140](https://github.com/corycunanan/optcg-sim/pull/140) | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. `redistribute-don` authored as interactive (overlay is fundamentally interactive). |
 | 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Counter-from-hand is the only interactive one in the batch; exercises `use-counter-pulse`. |
 | 11 | [OPT-295](https://linear.app/optcg-sim/issue/OPT-295) | Scenario batch: KO + Life (4 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. All spectator. Exercises the `kind: "ko"` flight branch and `LIFE_TRASH_REASONS` routing. |
 | 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
