@@ -127,6 +127,7 @@ For cross-session context transfer. See the `Handoff Docs` section below.
 2. Update the Action Plan row for this ticket: status → **In Review**, PR link, date.
 3. Append a new handoff section at the bottom keyed to the **next ticket** in the action plan (not the one just finished). Keep it tight — see the template.
 4. Commit the handoff doc update **on the same branch** as the ticket work (single commit, message: `Add OPT-XXX → OPT-YYY handoff (OPT-XXX)`). This keeps the handoff bundled with the PR so reviewers see it.
+5. **Surface what's next** (see `Conclusion — surface what's next` below).
 
 ---
 
@@ -137,6 +138,27 @@ If the user returns after the PR merges and asks you to close out:
 2. Update Linear status → **Done**.
 3. Update the Action Plan row in the handoff doc: status → Done, date.
 4. Delete the local branch (`git branch -d`) and optionally the remote (`git push origin --delete`). Confirm before deleting remote.
+5. **Surface what's next** (see `Conclusion — surface what's next` below).
+
+---
+
+## Conclusion — surface what's next
+
+At the end of Phase 7 **and** Phase 8, end your reply with a short "Next up" line drawn from the Action Plan in the handoff doc. This runs unconditionally — even if the user didn't ask. The point is the user always knows what to pick up next.
+
+Format:
+```
+Next up:
+- OPT-YYY — <title> (critical path, <ready now | blocked on this PR merging | blocked on OPT-ZZZ>)
+- OPT-WWW — <title> (parallel, <ready now | blocked on …>)
+```
+
+Rules:
+- **Critical path** = the immediate successor whose dependencies satisfied by this ticket (or whose deps were already satisfied and is next by Order in the Action Plan).
+- **Parallel** = any other Backlog/Todo ticket in the project whose deps are also now satisfied and can be picked up alongside the critical-path one. Skip this line if there's nothing parallel.
+- After Phase 7, a successor strictly dependent on this ticket is "blocked on this PR merging" — say so. After Phase 8, that gate is gone — say "ready now."
+- If the project has no remaining Backlog/Todo tickets, say "Project complete — no follow-up tickets in the Action Plan."
+- Pull titles and statuses from the handoff doc's Action Plan table, not from memory.
 
 ---
 
