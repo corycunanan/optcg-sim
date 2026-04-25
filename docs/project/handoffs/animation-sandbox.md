@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-290 in review — OPT-291 blocked on OPT-290 (#136) merging; OPT-287 still parallel)
+last-updated: 2026-04-25 (OPT-287/OPT-288/OPT-290 in review — OPT-291 unblocks once all three merge)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -17,7 +17,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | Done | [#129](https://github.com/corycunanan/optcg-sim/pull/129) | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. |
-| 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Backlog | — | Independent of everything else — can be done in parallel with the gate ticket if anyone wants to split. ~20 hand-picked `CardData` snapshots covering Blocker, Counter, Double Attack, Rush, On-Play, On-KO, Trigger event, Stage, plus per-color leaders. |
+| 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | In Review | [#137](https://github.com/corycunanan/optcg-sim/pull/137) | 18 real-card snapshots in `src/lib/sandbox/sandbox-card-data.ts`. Coverage matrix is locked by a unit test — adding cards is fine, dropping a slot fails the suite. |
 | 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | In Review | [#135](https://github.com/corycunanan/optcg-sim/pull/135) | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
 | 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Done | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
 | 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Done | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-291 (critical path) — blocked on OPT-290 (#136) merging. OPT-287 is the only ticket still pickable in parallel right now.
+**Next up:** OPT-291 (critical path) — blocked on OPT-287 (#137), OPT-288 (#135), and OPT-290 (#136) all merging. No remaining parallel work in the project.
 
 ---
 
@@ -121,4 +121,19 @@ Copy this block when writing a new handoff:
   - No DOM-level integration test of `BoardLayout interactionMode` — same constraint as OPT-286 (vitest `environment: "node"`, no JSDOM). The behavioral guarantees are covered by the gate contract tests + the existing `useBoardDnd disabled` parameter; if scenario authoring uncovers field-level issues, file a follow-up that adds `@testing-library/react` + `happy-dom` for sandbox-specific render tests only.
   - `expectedResponse.hint` is per-scenario but rendered the same way regardless of `promptType`. If OPT-296's prompt-modal scenarios need prompt-type-specific styling (e.g., "Arrange the top 3 cards" vs "Pick a target"), the right place is the `hint` field — extend the type union there, not in BoardLayout.
 - **Why this matters for OPT-291:** OPT-291 is the assembly. The `[scenarioId]` page should call `useScenarioRunner(scenario)` → `useScenarioInputGate({ scenario, playbackState: state.playbackState, resolvePrompt: state.resolvePrompt })` → `useSandboxGameSession({ initialState, events: state.eventLog, cardDb, activePrompt: state.activePrompt, onAction: gate.sendAction })`. Then pass `gate.interactionMode` to `<BoardLayout interactionMode={...} />` and render `gate.hint` in the info panel. The runner is the brain, the provider is the body, the gate is the nervous system — OPT-291 is the skeleton that holds them together.
+
+### OPT-287 → OPT-291
+**From:** session on 2026-04-25 · **Commit:** `3e4c28d` · **PR:** [#137](https://github.com/corycunanan/optcg-sim/pull/137)
+
+- **Primer:** `SANDBOX_CARD_DB: Record<string, CardData>` is now exported from `src/lib/sandbox/sandbox-card-data.ts`. 18 real-card snapshots covering the OPT-287 acceptance matrix (R/B/G leaders + per-keyword characters + Event-with-Trigger + Stage + 10-cost). `SANDBOX_CARD_IDS` is exported alongside if a scenario needs to enumerate.
+- **Read first:** `src/lib/sandbox/sandbox-card-data.ts` (the bundle), `src/lib/sandbox/__tests__/sandbox-card-data.test.ts` (the coverage lock — read it before adding cards so you know what slots are tested).
+- **Gotchas / do NOT touch:**
+  - Keywords are derived through `extractKeywords` from `src/lib/game/keywords.ts` so the sandbox sees what the live engine sees. Do not hand-set keyword booleans on entries — let the helper compute them, otherwise sandbox and prod will drift.
+  - `effectSchema` is `null` for every entry. The sandbox bypasses the engine, so this is intentional. If a future scenario needs to render an effect-driven prompt that *reads* the schema, that's a deeper change — file a follow-up rather than papering over it here.
+  - The bundle uses `imageUrl` defaults from the public CDN (`optcg-images.corymcunanan.workers.dev/cards/<id>.webp`). All current entries have art on the CDN; if you add a card without art, override `imageUrl` explicitly.
+  - When adding a card to satisfy a *new* coverage requirement, also add a corresponding `it(...)` to the coverage matrix — the lock pattern is what keeps this bundle honest.
+- **Unresolved:**
+  - The acceptance criterion "resolves every card ID referenced by scenarios in OPT-X (Vertical slice) and the bulk batches" can't be enforced yet because OPT-292..OPT-296 don't exist. When OPT-292 lands, sweep `cardsUsed: []` against `SANDBOX_CARD_IDS` and add a sandbox-build test that fails if any scenario references an unknown card.
+  - Yellow/Black leaders are intentionally out of scope for v1 (per the ticket). Add them when a scenario actually needs one.
+- **Why this matters for OPT-291:** OPT-291 wires the provider with `cardDb={SANDBOX_CARD_DB}`. No fetch, no `useCardDatabase`, no loading state to render around. Scenarios can hard-reference any ID from `SANDBOX_CARD_IDS` and trust the resolution. If a scenario needs a card outside the bundle, extend the bundle in the same PR — don't reach for the live API.
 
