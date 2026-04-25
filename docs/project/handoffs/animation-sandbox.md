@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-296 in review — OPT-297 polish is the only remaining ticket)
+last-updated: 2026-04-25 (OPT-297 in review — project complete pending PR merges)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -28,11 +28,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Done | [#142](https://github.com/corycunanan/optcg-sim/pull/142) | Parallelizable. Counter-from-hand pre-populates `turn.battle` so use-counter-pulse can key the pulse to the defender's leader. |
 | 11 | [OPT-295](https://linear.app/optcg-sim/issue/OPT-295) | Scenario batch: KO + Life (4 scenarios) | 2 | OPT-292 | In Review | [#144](https://github.com/corycunanan/optcg-sim/pull/144) | Parallelizable. All spectator. Exercises the `kind: "ko"` flight branch and `LIFE_TRASH_REASONS` routing. |
 | 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | In Review | [#145](https://github.com/corycunanan/optcg-sim/pull/145) | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
-| 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | Backlog | — | Closeout. Mute toggle + persistence + the `docs/sandbox/clock-determinism.md` doc. Can be done any time after OPT-291; suggest doing it last so the determinism doc reflects what was actually built. |
+| 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | In Review | [#146](https://github.com/corycunanan/optcg-sim/pull/146) | Closeout. `useSandboxMute` hook + `docs/sandbox/clock-determinism.md`. Determinism doc reflects what shipped (setTimeout-based runner, static-script fold). |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-297 (closeout polish) — the only remaining ticket. Mute toggle persistence + the `docs/sandbox/clock-determinism.md` doc. No file overlap with OPT-296's PR — can start while #145 is in review.
+**Next up:** Project complete. With OPT-297 in review, there are no remaining Backlog/Todo tickets in the Animation Sandbox project. Once #144 / #145 / #146 merge, file new tickets under a separate project for any post-launch polish (e.g., the snapshot-test infrastructure outlined in `docs/sandbox/clock-determinism.md` if that ever becomes load-bearing).
 
 ---
 
@@ -230,4 +230,19 @@ Copy this block when writing a new handoff:
   - Browser verification on the four new `/sandbox/<id>` pages was not run by this session (non-interactive). Type-check, lint, and 163 unit tests pass; the manifest test asserts the twenty-one registered scenarios are unique and resolve in `SANDBOX_CARD_DB`. **Run a manual smoke before merge** — the per-modal acceptance bullets ("each prompt modal renders correctly", "info panel hint reads naturally") only the eyes can confirm, especially for `reveal-trigger` where the life-flip-then-modal sequencing is the load-bearing visual.
   - Five batches in (`combat`, `draws`, `movement`, `ko+life`, `prompts`) and `_shared.ts` *still* hasn't earned its keep — `TURN` consts and deck/hand stubs are 6–10 lines per file and stay readable. With OPT-296 closing out scenario authoring, this stays a non-event unless a future surface (post-OPT-297) emerges.
 - **Why this matters for OPT-297:** OPT-297 is closeout polish — mute toggle persistence (currently a UI stub in `playback-control-bar.tsx`) and the `docs/sandbox/clock-determinism.md` doc. No file overlap with this PR. The mute stub state lives in `scenario-runner.tsx`; per the OPT-291 handoff, persistence belongs to OPT-297 and shouldn't have been touched here. The `useSandboxMute()` hook the ticket specifies should default to muted, key on `localStorage["sandbox:muted"]`, and expose the value via context for any future audio-emitting components. The determinism doc should reflect what actually shipped — the runner's `setTimeout` model, the static-script (no engine fork) decision, and the per-frame `applyEvent` fold — *not* speculate about a different design. If anything in this batch surprised you, that's the cue to capture it in the doc.
+
+### OPT-297 → (project complete)
+**From:** session on 2026-04-25 · **Commits:** `7b20778` (mute) · `8cb05ac` (doc) · **PR:** [#146](https://github.com/corycunanan/optcg-sim/pull/146)
+
+- **Primer:** Closeout shipped. `useSandboxMute` (in `src/components/sandbox/use-sandbox-mute.tsx`) replaces the local-state stub in `playback-control-bar.tsx` — defaults to muted, persists under `localStorage["sandbox:muted"]`, exposed via context for any future audio-emitting component. `SandboxMuteProvider` wraps the entire `ScenarioRunner` shell. The clock-determinism doc lives at `docs/sandbox/clock-determinism.md`. With this in review, the Animation Sandbox project's Action Plan has no remaining Backlog/Todo tickets.
+- **Read first (only if returning later):** `src/components/sandbox/use-sandbox-mute.tsx` (the hook + pure helpers split, mirroring the OPT-286/289 pattern), `docs/sandbox/clock-determinism.md` (the snapshot-test deferral analysis), `src/components/sandbox/__tests__/use-sandbox-mute.test.ts` (the pure-helper test pattern using `vi.stubGlobal("localStorage", ...)` — the one way to test localStorage logic under vitest's `environment: "node"`).
+- **Gotchas / do NOT touch:**
+  - **`useSandboxMute` throws if used outside `<SandboxMuteProvider>`.** This is intentional — silent default would let an audio component "work" without ever respecting the user's preference. If a new entry point in `/sandbox/*` ever renders audio components without going through `ScenarioRunner`, wrap it in the provider rather than relaxing the hook.
+  - **The provider hydrates from storage in a mount-time `useEffect`, not in `useState(() => ...)`.** This is the SSR contract — `localStorage` is undefined on the server, so the first paint is always the muted default. Lazy-initializing `useState` from `localStorage` would crash SSR. Don't "optimize" this.
+  - **Pure helpers swallow `localStorage` errors silently.** `setItem` rejects in private mode / quota exceeded; `getItem` rejects in some sandboxed iframes. The toggle stays responsive in-memory either way. Don't wrap with try/catch loggers — the error path is correct as-is.
+  - **No code change to `use-card-transitions.ts`** per the OPT-297 acceptance bullet. The doc inventories what's there but doesn't refactor it.
+- **Unresolved:**
+  - Browser verification on the mute toggle (icon state, persistence across reload, sharing across two scenarios) was not run by this session (non-interactive). The pure helpers are unit-tested; the React surface is wired but unmounted in tests. **Run a manual smoke before merge** — the page-reload acceptance bullet only the eyes can confirm.
+  - The clock-determinism doc names `happy-dom` + `@testing-library/react` as the DOM-test path if a future ticket wants snapshot tests. Neither dep is installed today; the OPT-286 / OPT-290 / OPT-291 handoffs all flagged this as the cue to add them. Still deferred — file as a separate ticket if/when needed.
+- **Why this matters for whoever returns to this project:** The Animation Sandbox project is functionally complete after OPT-297 lands. Five batches of scenarios (`combat`, `draws`, `movement`, `ko+life`, `prompts`) plus the closeout polish ship a `/sandbox` surface that exercises every visible game-state animation in isolation. If you're picking this up months from now: the `docs/project/ANIMATION-SANDBOX-SCOPE.md` document is the source of truth for original scope; `docs/sandbox/clock-determinism.md` is the only "explicitly deferred" surface from the project (snapshot-test infrastructure). Anything else surfaced as a follow-up is in the prior handoff entries' "Unresolved" sections — five batches in, `_shared.ts` for scenario boilerplate still hasn't earned its keep, and there's no DOM-level integration test of the runner shell.
 

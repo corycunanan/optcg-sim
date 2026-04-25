@@ -24,6 +24,7 @@ import { useScenarioInputGate } from "./scenario-input-gate";
 import { useSandboxGameSession } from "./sandbox-session-provider";
 import { ScenarioInfoPanel } from "./scenario-info-panel";
 import { PlaybackControlBar } from "./playback-control-bar";
+import { SandboxMuteProvider } from "./use-sandbox-mute";
 
 export interface ScenarioRunnerProps {
   scenario: Scenario;
@@ -56,56 +57,58 @@ export function ScenarioRunner({ scenario }: ScenarioRunnerProps) {
   const session = useSandboxGameSession(sessionInput);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-gb-board">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-1 px-5 py-2">
-        <Link
-          href="/sandbox"
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-content-secondary hover:bg-surface-2 hover:text-content-primary"
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          <span>Back to Sandbox</span>
-        </Link>
-        <span aria-hidden className="text-content-disabled">·</span>
-        <h1 className="truncate text-sm font-bold text-content-primary">
-          {scenario.title}
-        </h1>
-      </header>
+    <SandboxMuteProvider>
+      <div className="flex h-full flex-col overflow-hidden bg-gb-board">
+        <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-1 px-5 py-2">
+          <Link
+            href="/sandbox"
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-content-secondary hover:bg-surface-2 hover:text-content-primary"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            <span>Back to Sandbox</span>
+          </Link>
+          <span aria-hidden className="text-content-disabled">·</span>
+          <h1 className="truncate text-sm font-bold text-content-primary">
+            {scenario.title}
+          </h1>
+        </header>
 
-      <div className="flex flex-1 min-h-0">
-        <div className="relative flex-1 min-w-0">
-          <BoardLayout
-            me={session.game.me}
-            opp={session.game.opp}
-            myIndex={session.game.myIndex}
-            turn={session.game.turn}
-            cardDb={session.game.cardDb}
-            isMyTurn={session.game.isMyTurn}
-            battlePhase={session.game.battlePhase}
-            connectionStatus={session.game.connectionStatus}
-            eventLog={session.game.gameState.eventLog}
-            activeEffects={session.game.gameState.activeEffects}
-            activePrompt={session.game.activePrompt}
-            onAction={session.game.sendAction}
-            onLeave={session.navigation.handleBackToLobbies}
-            matchClosed={session.game.matchClosed}
-            canUndo={session.game.canUndo}
-            interactionMode={gate.interactionMode}
-          />
+        <div className="flex flex-1 min-h-0">
+          <div className="relative flex-1 min-w-0">
+            <BoardLayout
+              me={session.game.me}
+              opp={session.game.opp}
+              myIndex={session.game.myIndex}
+              turn={session.game.turn}
+              cardDb={session.game.cardDb}
+              isMyTurn={session.game.isMyTurn}
+              battlePhase={session.game.battlePhase}
+              connectionStatus={session.game.connectionStatus}
+              eventLog={session.game.gameState.eventLog}
+              activeEffects={session.game.gameState.activeEffects}
+              activePrompt={session.game.activePrompt}
+              onAction={session.game.sendAction}
+              onLeave={session.navigation.handleBackToLobbies}
+              matchClosed={session.game.matchClosed}
+              canUndo={session.game.canUndo}
+              interactionMode={gate.interactionMode}
+            />
+          </div>
+          <aside className="hidden w-80 shrink-0 border-l border-border bg-surface-1 lg:block">
+            <ScenarioInfoPanel scenario={scenario} hint={gate.hint} />
+          </aside>
         </div>
-        <aside className="hidden w-80 shrink-0 border-l border-border bg-surface-1 lg:block">
-          <ScenarioInfoPanel scenario={scenario} hint={gate.hint} />
-        </aside>
-      </div>
 
-      <PlaybackControlBar
-        playbackState={runner.playbackState}
-        currentStepIndex={runner.currentStepIndex}
-        totalSteps={runner.totalSteps}
-        onPlay={runner.play}
-        onPause={runner.pause}
-        onReset={runner.reset}
-        onStep={runner.stepForward}
-      />
-    </div>
+        <PlaybackControlBar
+          playbackState={runner.playbackState}
+          currentStepIndex={runner.currentStepIndex}
+          totalSteps={runner.totalSteps}
+          onPlay={runner.play}
+          onPause={runner.pause}
+          onReset={runner.reset}
+          onStep={runner.stepForward}
+        />
+      </div>
+    </SandboxMuteProvider>
   );
 }
