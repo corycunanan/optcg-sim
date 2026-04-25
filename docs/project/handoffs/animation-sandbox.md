@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-286 in review — OPT-289 blocked on this PR merging; OPT-287/OPT-288 still parallel)
+last-updated: 2026-04-25 (OPT-289 in review — OPT-290 blocked on this PR merging; OPT-287/OPT-288 still parallel)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -19,8 +19,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | Done | [#129](https://github.com/corycunanan/optcg-sim/pull/129) | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. |
 | 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Backlog | — | Independent of everything else — can be done in parallel with the gate ticket if anyone wants to split. ~20 hand-picked `CardData` snapshots covering Blocker, Counter, Double Attack, Rush, On-Play, On-KO, Trigger event, Stage, plus per-color leaders. |
 | 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | Backlog | — | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
-| 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | In Review | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
-| 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Backlog | — | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — note this in the file's top comment. |
+| 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Done | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
+| 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | In Review | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
 | 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Backlog | — | Wraps `sendAction`. Try the `interactionMode` prop on `BoardLayout` first; fall back to a pointer-events overlay only if prop addition touches >6 files. |
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Backlog | — | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Backlog | — | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-289 (critical path) — blocked on OPT-286 (#132) merging. OPT-287 and OPT-288 are still parallel and pickable now.
+**Next up:** OPT-290 (critical path) — blocked on OPT-289 (#133) merging. OPT-287 and OPT-288 are still parallel and pickable now.
 
 ---
 
@@ -77,4 +77,19 @@ Copy this block when writing a new handoff:
   - No DOM-level smoke render test: vitest is configured for `environment: "node"` and the project doesn't ship JSDOM or `@testing-library/react`. The contract test in `sandbox-session-provider.test.ts` covers field drift via `BoardLayoutProps` assignment — sufficient for now, but if scenario authoring uncovers actual render-time issues, consider adding `@testing-library/react` + `happy-dom` and a real `<BoardLayout>` mount.
   - `applyEvent` only handles the eight scoped event types. The reducer-scope-creep risk remains live for OPT-289 — when authoring the runner, only add a new case if a scenario forces it.
 - **Why this matters for OPT-289:** the runner owns the `(events, currentIndex)` state and calls `buildSandboxSession({ events: events.slice(0, currentIndex), ... })` per frame. Step-backward as a non-goal still applies — the docstring you'll write at the top of the runner file should say so. The reducer is "fold-friendly" by design; expect to call it repeatedly for play/stepForward and not at all for resolvePrompt.
+
+### OPT-289 → OPT-290
+**From:** session on 2026-04-25 · **Commit:** `701d047` · **PR:** [#133](https://github.com/corycunanan/optcg-sim/pull/133)
+
+- **Primer:** The runner exists. `createScenarioRunner(scenario)` is the pure controller — owns the `setTimeout`, exposes `getState`/`subscribe`/`play`/`pause`/`reset`/`stepForward`/`resolvePrompt`/`dispose`. `useScenarioRunner` is the React hook over it via `useSyncExternalStore`. Derived state is recomputed (and cached per change) by folding `applyEvent` over `script[0..currentStepIndex]`'s events from `scenario.initialState`. `resumeTo` (`"playing" | "paused"`) records where to land after `resolvePrompt`.
+- **Read first:** `src/components/sandbox/use-scenario-runner.ts` (controller + hook in one file), `src/components/sandbox/__tests__/use-scenario-runner.test.ts` (the playback contract — 14 tests covering all five acceptance scenarios plus pause-during-awaiting-response edges).
+- **Gotchas / do NOT touch:**
+  - `resolvePrompt(response)` accepts a `GameAction` for API symmetry but does not validate against `scenario.expectedResponse.predicate` — that's the gate's job (this is OPT-290's surface). The runner just advances. If you tighten this, do it in the gate, not the runner.
+  - `useScenarioRunner` creates the controller exactly once via `useState(() => createScenarioRunner(scenario))`. Scenario reference changes after mount are silently ignored. Each scenario gets its own `[scenarioId]` page, so this is fine for now — file a follow-up if that assumption breaks.
+  - The runner schedules timers with `setTimeout`, so vitest fake timers work transparently. Keep it that way; don't reach for `requestAnimationFrame` or `performance.now()` for delays — that breaks the test path.
+  - Step-backward is a documented v1 non-goal — see top comment. Don't bolt it on without the Motion-timeline reset story; it'll desync `card-animation-layer`.
+- **Unresolved:**
+  - `pause()` while `playing` and `pause()` while `awaiting-response` both notify, but `pause()` from `idle`/`paused`/`ended` is a no-op without notify. If callers rely on `pause` to ping a listener, that's surprising; flag if OPT-290 hits it.
+  - The runner exposes `dispose` but `useScenarioRunner` only calls it on unmount. If OPT-291 ever needs to swap scenarios in-place, add a scenario-change effect that disposes + creates fresh.
+- **Why this matters for OPT-290:** OPT-290 wraps `session.sendAction` so interactive scenarios route the user's action through `expectedResponse.predicate` and, on match, call `runner.resolvePrompt(action)`. Spectator scenarios should disable input entirely (the ticket suggests trying `interactionMode` prop on `BoardLayout` first; pointer-events overlay is the fallback). The runner does not own input — only playback — so the gate is the single point that decides "did the user satisfy the prompt yet?"
 
