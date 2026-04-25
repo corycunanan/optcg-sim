@@ -147,3 +147,127 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
     expect(out[0].kind).toBeUndefined();
   });
 });
+
+describe("eventToTransitions — CARD_RETURNED_TO_DECK (OPT-121)", () => {
+  const instanceId = "i-7";
+  const registry = mkRegistry({
+    getCardZone: (id) => (id === instanceId ? "p-char-1" : null),
+  });
+
+  it("flies from the registered card zone to the owner's deck", () => {
+    const ev = {
+      type: "CARD_RETURNED_TO_DECK",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardInstanceId: instanceId, cardId: "OP01-001", position: "TOP" },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, registry);
+    expect(t.fromZoneKey).toBe("p-char-1");
+    expect(t.toZoneKey).toBe("p-deck");
+    expect(t.cardId).toBe("OP01-001");
+    expect(t.instanceId).toBe(instanceId);
+    expect(t.kind).toBeUndefined();
+  });
+
+  it("falls back to a character slot when the source zone isn't registered", () => {
+    const ev = {
+      type: "CARD_RETURNED_TO_DECK",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardInstanceId: "unknown", cardId: "OP01-002" },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, mkRegistry());
+    expect(t.fromZoneKey).toBe("p-char-2");
+    expect(t.toZoneKey).toBe("p-deck");
+  });
+
+  it("uses opponent prefix when the event originated from the other player", () => {
+    const oppRegistry = mkRegistry({
+      getCardZone: (id) => (id === instanceId ? "o-leader" : null),
+    });
+    const ev = {
+      type: "CARD_RETURNED_TO_DECK",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { cardInstanceId: instanceId, cardId: "OP01-003" },
+    } as unknown as GameEvent;
+    const [t] = eventToTransitions(ev, 0, oppRegistry);
+    expect(t.fromZoneKey).toBe("o-leader");
+    expect(t.toZoneKey).toBe("o-deck");
+    expect(t.playerIndex).toBe(1);
+  });
+});
+
+describe("eventToTransitions — LIFE_CARD_TO_DECK (OPT-121)", () => {
+  it("fans out a count-N event into N face-down life→deck flights", () => {
+    const ev = {
+      type: "LIFE_CARD_TO_DECK",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { count: 2 },
+    } as unknown as GameEvent;
+    const out = eventToTransitions(ev, 0, mkRegistry());
+    expect(out).toHaveLength(2);
+    for (const t of out) {
+      expect(t.fromZoneKey).toBe("p-life");
+      expect(t.toZoneKey).toBe("p-deck");
+      expect(t.cardId).toBeNull();
+      expect(t.instanceId).toBeNull();
+      expect(t.kind).toBeUndefined();
+    }
+    expect(out[0].delay).toBe(0);
+    expect(out[1].delay).toBeCloseTo(0.06, 5);
+  });
+
+  it("treats an omitted count as 1 token and uses opponent prefix when needed", () => {
+    const ev = {
+      type: "LIFE_CARD_TO_DECK",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { count: 0 },
+    } as unknown as GameEvent;
+    const out = eventToTransitions(ev, 0, mkRegistry());
+    expect(out).toHaveLength(1);
+    expect(out[0].fromZoneKey).toBe("o-life");
+    expect(out[0].toZoneKey).toBe("o-deck");
+    expect(out[0].playerIndex).toBe(1);
+  });
+});
+
+describe("eventToTransitions — life-source CARD_TRASHED (OPT-121)", () => {
+  function lifeTrashEvent(reason: string, count = 1): GameEvent {
+    return {
+      type: "CARD_TRASHED",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { count, reason },
+    } as unknown as GameEvent;
+  }
+
+  it("life_trash fans out into face-down life→trash flights", () => {
+    const out = eventToTransitions(lifeTrashEvent("life_trash", 2), 0, mkRegistry());
+    expect(out).toHaveLength(2);
+    for (const t of out) {
+      expect(t.fromZoneKey).toBe("p-life");
+      expect(t.toZoneKey).toBe("p-trash");
+      expect(t.cardId).toBeNull();
+      expect(t.instanceId).toBeNull();
+    }
+    expect(out[0].delay).toBe(0);
+    expect(out[1].delay).toBeCloseTo(0.06, 5);
+  });
+
+  it("face_up_life uses the same life→trash route", () => {
+    const out = eventToTransitions(lifeTrashEvent("face_up_life", 1), 0, mkRegistry());
+    expect(out).toHaveLength(1);
+    expect(out[0].fromZoneKey).toBe("p-life");
+    expect(out[0].toZoneKey).toBe("p-trash");
+  });
+
+  it("non-life CARD_TRASHED with only count still returns nothing (existing behavior)", () => {
+    // search_trash, hand_wheel, mill, etc. — these emit count without a cardId
+    // and don't have a single source rect, so the flight layer skips them.
+    const out = eventToTransitions(lifeTrashEvent("mill", 3), 0, mkRegistry());
+    expect(out).toEqual([]);
+  });
+});
