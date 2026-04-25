@@ -16,6 +16,11 @@ export function useBoardDnd(
   onAction: (action: GameAction) => void,
   onRedistributeDrop?: (fromCardId: string, donId: string, toCardId: string) => void,
   onHandReorder?: (activeInstanceId: string, overInstanceId: string) => void,
+  /** When true, drop handlers are no-ops. Sandbox spectator/responseOnly
+   *  modes (OPT-290) pass this so that a stray drag can't fire an action.
+   *  The drag start still tracks `activeDrag` so DragOverlay rendering stays
+   *  consistent — only the resolution is suppressed. */
+  disabled = false,
 ) {
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
 
@@ -30,6 +35,7 @@ export function useBoardDnd(
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveDrag(null);
+    if (disabled) return;
     if (!over) return;
 
     const dragData = active.data.current as DragPayload;

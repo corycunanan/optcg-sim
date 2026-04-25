@@ -12,6 +12,7 @@ import { Card } from "../card";
 import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
+import { useInteractionMode } from "./interaction-mode";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
  *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
@@ -78,6 +79,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
+  const interactionMode = useInteractionMode();
+  const inputSuppressed = interactionMode !== "full";
 
   const {
     attributes,
@@ -87,7 +90,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   } = useDraggable({
     id: `attacker-${card.instanceId}`,
     data: { type: "attacker", card } satisfies AttackerDrag,
-    disabled: !canAttack,
+    disabled: !canAttack || inputSuppressed,
   });
 
   const acceptsDon = activeDragType === "active-don" || activeDragType === "redistribute-don";
@@ -156,9 +159,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (inputSuppressed) return;
       setMenuOpen(true);
     },
-    [],
+    [inputSuppressed],
   );
 
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
