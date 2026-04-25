@@ -1,10 +1,13 @@
-// Sandbox scenario manifest. Scenarios are appended in OPT-292 onward;
-// this file ships the empty array + barrel re-exports so consumers can
-// import everything from one path.
+// Sandbox scenario manifest. Scenarios are appended here; the hub
+// (`/sandbox`) and the player route (`/sandbox/[scenarioId]`) both read this
+// array. Adding a scenario is a one-line registration here plus a new file
+// under `scenarios/<category>/`.
 
 import type { Scenario } from "./types";
+import { drawTwoScenario } from "./draws/draw-2";
+import { selectTargetScenario } from "./prompts/select-target";
 
-export const scenarios: Scenario[] = [];
+export const scenarios: Scenario[] = [drawTwoScenario, selectTargetScenario];
 
 export type {
   ExpectedResponse,
