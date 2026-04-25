@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-24 (OPT-285 merged — OPT-286 + OPT-288 unblocked)
+last-updated: 2026-04-25 (OPT-286 in review — OPT-289 blocked on this PR merging; OPT-287/OPT-288 still parallel)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -19,7 +19,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | Done | [#129](https://github.com/corycunanan/optcg-sim/pull/129) | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. |
 | 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Backlog | — | Independent of everything else — can be done in parallel with the gate ticket if anyone wants to split. ~20 hand-picked `CardData` snapshots covering Blocker, Counter, Double Attack, Rush, On-Play, On-KO, Trigger event, Stage, plus per-color leaders. |
 | 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | Backlog | — | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
-| 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Backlog | — | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Includes a smoke render test against `BoardLayout` to catch field drift. |
+| 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | In Review | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
 | 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Backlog | — | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — note this in the file's top comment. |
 | 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Backlog | — | Wraps `sendAction`. Try the `interactionMode` prop on `BoardLayout` first; fall back to a pointer-events overlay only if prop addition touches >6 files. |
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Backlog | — | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-286 (critical path) and OPT-288 (parallel) — both are unblocked once OPT-285 merges. OPT-287 also still parallelizable.
+**Next up:** OPT-289 (critical path) — blocked on OPT-286 (#132) merging. OPT-287 and OPT-288 are still parallel and pickable now.
 
 ---
 
@@ -62,4 +62,19 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** `ExpectedResponse.allowedActionTypes` is typed as `GameAction["type"][]`, not `string[]` — keep it that way; widening to `string[]` defeats the typo guard. `PartialGameState.players` is a tuple `[PartialPlayerState, PartialPlayerState]` — preserve the tuple-ness when hydrating so `players[0]` / `players[1]` stay non-null.
 - **Unresolved:** None blocking. The reducer scope creep risk in `apply-event.ts` is real — the scope doc's "Risks" section calls it out; resist the urge to handle every event type up front.
 - **Why this matters for OPT-286:** OPT-286's `apply-event.ts` reducer and `SandboxSessionProvider` consume `PartialGameState` and need to produce a value that satisfies `BoardLayout`'s `me`/`opp`/`turn`/`myIndex`/`cardDb`/`activePrompt` props. The provider is the field-drift surface — wire the smoke render test the scope doc calls for so this gets caught at PR time, not at runtime.
+
+### OPT-286 → OPT-289
+**From:** session on 2026-04-25 · **Commit:** `42a3fac` · **PR:** [#132](https://github.com/corycunanan/optcg-sim/pull/132)
+
+- **Primer:** The fake `useGameSession` exists. `buildSandboxSession({ initialState, events, cardDb, activePrompt?, onAction?, onBackToLobbies? })` is the pure derivation; the runner can call it directly for replay-frame `i` without going through React. `useSandboxGameSession` is the hook that wraps it (adds router-based handleBackToLobbies + memoization). `applyEvent(state, event)` handles the eight visible-delta event types; everything else returns the state unchanged.
+- **Read first:** `src/components/sandbox/sandbox-session-provider.tsx` (the public surface — start with `SandboxSessionInput` and `SandboxGameSession`), `src/lib/sandbox/apply-event.ts` (the reducer the runner folds), `src/components/sandbox/sandbox-session-provider.test.ts` (the field-drift contract — break it intentionally to see what fails).
+- **Gotchas / do NOT touch:**
+  - `eventLog` is exposed on **both** `session.game.eventLog` and `session.game.gameState.eventLog` and they share a reference. The runner should pass `events.slice(0, i)` for the current frame; do not mutate the array in place — `useMemo` deps rely on referential identity.
+  - `applyEvent` is `(state, event) => state` for unhandled events. Returning the same reference is intentional — `mapPlayer` does the same when nothing changed. Keep this when adding cases; do not always allocate a new state.
+  - Trashing / KO'ing / returning a field card with attached DON returns those DON to the cost area as **active and unattached**. If you add a new "leave the field" event in the future, mirror this — otherwise tokens disappear.
+  - `applyEvent` does not search the leader slot for `locateAndRemove`. Leader card movements are not legal in current scenario scope; if a future case needs it, audit whether you actually want it.
+- **Unresolved:**
+  - No DOM-level smoke render test: vitest is configured for `environment: "node"` and the project doesn't ship JSDOM or `@testing-library/react`. The contract test in `sandbox-session-provider.test.ts` covers field drift via `BoardLayoutProps` assignment — sufficient for now, but if scenario authoring uncovers actual render-time issues, consider adding `@testing-library/react` + `happy-dom` and a real `<BoardLayout>` mount.
+  - `applyEvent` only handles the eight scoped event types. The reducer-scope-creep risk remains live for OPT-289 — when authoring the runner, only add a new case if a scenario forces it.
+- **Why this matters for OPT-289:** the runner owns the `(events, currentIndex)` state and calls `buildSandboxSession({ events: events.slice(0, currentIndex), ... })` per frame. Step-backward as a non-goal still applies — the docstring you'll write at the top of the runner file should say so. The reducer is "fold-friendly" by design; expect to call it repeatedly for play/stepForward and not at all for resolvePrompt.
 
