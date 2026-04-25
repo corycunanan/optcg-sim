@@ -37,6 +37,10 @@ import { OpponentField } from "./opponent-field";
 import { PlayerField } from "./player-field";
 import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
 import { ActiveEffectsProvider } from "@/contexts/active-effects-context";
+import {
+  InteractionModeProvider,
+  type InteractionMode,
+} from "./interaction-mode";
 import { useCardTransitions } from "@/hooks/use-card-transitions";
 import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
@@ -58,13 +62,20 @@ export interface BoardLayoutProps {
   onLeave: () => void;
   matchClosed: boolean;
   canUndo: boolean;
+  /** Suppresses board-driven user input. Default `"full"` (production game).
+   *  `"spectator"` and `"responseOnly"` are sandbox-only modes (OPT-290) that
+   *  disable drag and right-click menus while leaving prompt modals usable. */
+  interactionMode?: InteractionMode;
 }
 
 export function BoardLayout(props: BoardLayoutProps) {
+  const interactionMode = props.interactionMode ?? "full";
   return (
     <ZonePositionProvider>
       <ActiveEffectsProvider value={props.activeEffects}>
-        <BoardLayoutInner {...props} />
+        <InteractionModeProvider value={interactionMode}>
+          <BoardLayoutInner {...props} interactionMode={interactionMode} />
+        </InteractionModeProvider>
       </ActiveEffectsProvider>
     </ZonePositionProvider>
   );
@@ -85,7 +96,9 @@ function BoardLayoutInner({
   onLeave,
   matchClosed,
   canUndo,
-}: BoardLayoutProps) {
+  interactionMode = "full",
+}: BoardLayoutProps & { interactionMode?: InteractionMode }) {
+  const dndDisabled = interactionMode !== "full";
   const zoneRegistry = useZonePosition();
   const [viewport, setViewport] = useState(getViewportSize);
   const [isPromptHidden, setIsPromptHidden] = useState(false);
@@ -189,6 +202,7 @@ function BoardLayoutInner({
     onAction,
     handleRedistributeDrop,
     reorderPlayerHand,
+    dndDisabled,
   );
 
   const reducedMotion = useReducedMotion();
@@ -339,6 +353,22 @@ function BoardLayoutInner({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
+          {interactionMode === "spectator" && (
+            <span
+              data-testid="board-spectator-badge"
+              className="rounded px-2 py-1 text-xs font-bold tracking-widest uppercase bg-gb-accent-amber/20 text-gb-accent-amber border border-gb-accent-amber/40"
+            >
+              Watching
+            </span>
+          )}
+          {interactionMode === "responseOnly" && (
+            <span
+              data-testid="board-respond-badge"
+              className="rounded px-2 py-1 text-xs font-bold tracking-widest uppercase bg-gb-accent-blue/20 text-gb-accent-blue border border-gb-accent-blue/40"
+            >
+              Respond
+            </span>
+          )}
           {myIndex !== null && (
             <span className="text-xs text-gb-text-dim">
               P{myIndex + 1}
@@ -466,8 +496,8 @@ function BoardLayoutInner({
           <HandLayer
             cards={playerOrderedHand}
             cardDb={cardDb}
-            enableDrag={bs.canInteract || bs.canDragCounter}
-            counterMode={bs.canDragCounter}
+            enableDrag={!dndDisabled && (bs.canInteract || bs.canDragCounter)}
+            counterMode={!dndDisabled && bs.canDragCounter}
             zoneKey="p-hand"
             inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
             sleeveUrl={me?.sleeveUrl}

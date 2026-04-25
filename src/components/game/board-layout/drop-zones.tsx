@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { Card } from "../card";
 import { SQUARE } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
+import { useInteractionMode } from "./interaction-mode";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
 export function DropOverlay({
@@ -113,6 +114,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const zonePos = useZonePosition();
+  const interactionMode = useInteractionMode();
+  const inputSuppressed = interactionMode !== "full";
   const accepts = activeDragType === "hand-card";
   const { setNodeRef, isOver } = useDroppable({
     id: `stage-zone-${zoneKey}`,
@@ -132,9 +135,10 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (inputSuppressed) return;
       setMenuOpen(true);
     },
-    [],
+    [inputSuppressed],
   );
 
   return (
