@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-287/OPT-288/OPT-290 in review — OPT-291 unblocks once all three merge)
+last-updated: 2026-04-25 (OPT-291 in review — OPT-292 unblocks once it merges)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -17,12 +17,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | Done | [#129](https://github.com/corycunanan/optcg-sim/pull/129) | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. |
-| 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | In Review | [#137](https://github.com/corycunanan/optcg-sim/pull/137) | 18 real-card snapshots in `src/lib/sandbox/sandbox-card-data.ts`. Coverage matrix is locked by a unit test — adding cards is fine, dropping a slot fails the suite. |
-| 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | In Review | [#135](https://github.com/corycunanan/optcg-sim/pull/135) | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
+| 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Done | [#137](https://github.com/corycunanan/optcg-sim/pull/137) | 18 real-card snapshots in `src/lib/sandbox/sandbox-card-data.ts`. Coverage matrix is locked by a unit test — adding cards is fine, dropping a slot fails the suite. |
+| 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | Done | [#135](https://github.com/corycunanan/optcg-sim/pull/135) | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
 | 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Done | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
 | 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Done | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
-| 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | In Review | [#136](https://github.com/corycunanan/optcg-sim/pull/136) | Picked option #1 — `interactionMode` prop on `BoardLayout` via a small context. Touched 6 files; pointer-events overlay was rejected because BoardModals render inline (z-index would fight). |
-| 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Backlog | — | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
+| 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Done | [#136](https://github.com/corycunanan/optcg-sim/pull/136) | Picked option #1 — `interactionMode` prop on `BoardLayout` via a small context. Touched 6 files; pointer-events overlay was rejected because BoardModals render inline (z-index would fight). |
+| 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | In Review | [#138](https://github.com/corycunanan/optcg-sim/pull/138) | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Backlog | — | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** |
 | 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. |
 | 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Counter-from-hand is the only interactive one in the batch; exercises `use-counter-pulse`. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-291 (critical path) — blocked on OPT-287 (#137), OPT-288 (#135), and OPT-290 (#136) all merging. No remaining parallel work in the project.
+**Next up:** OPT-292 (critical path) — blocked on OPT-291 (#138) merging. No remaining parallel work in the project.
 
 ---
 
@@ -136,4 +136,20 @@ Copy this block when writing a new handoff:
   - The acceptance criterion "resolves every card ID referenced by scenarios in OPT-X (Vertical slice) and the bulk batches" can't be enforced yet because OPT-292..OPT-296 don't exist. When OPT-292 lands, sweep `cardsUsed: []` against `SANDBOX_CARD_IDS` and add a sandbox-build test that fails if any scenario references an unknown card.
   - Yellow/Black leaders are intentionally out of scope for v1 (per the ticket). Add them when a scenario actually needs one.
 - **Why this matters for OPT-291:** OPT-291 wires the provider with `cardDb={SANDBOX_CARD_DB}`. No fetch, no `useCardDatabase`, no loading state to render around. Scenarios can hard-reference any ID from `SANDBOX_CARD_IDS` and trust the resolution. If a scenario needs a card outside the bundle, extend the bundle in the same PR — don't reach for the live API.
+
+### OPT-291 → OPT-292
+**From:** session on 2026-04-25 · **Commit:** `5665e83` · **PR:** [#138](https://github.com/corycunanan/optcg-sim/pull/138)
+
+- **Primer:** The scenario player route is real. `src/app/sandbox/[scenarioId]/page.tsx` is a server component that resolves the manifest entry (404s if unknown) and renders `<ScenarioRunner scenario={...} />`. `ScenarioRunner` (client) wires runner → gate → session → `<BoardLayout>` in the order the OPT-290 handoff prescribed, and adds two pieces of chrome: `ScenarioInfoPanel` (right) and `PlaybackControlBar` (bottom). Mute is a UI stub — local state only, persistence belongs to OPT-297.
+- **Read first:** `src/components/sandbox/scenario-runner.tsx` (the wire-up — every layer of the architecture meets here), `src/components/sandbox/scenario-info-panel.tsx` (consumes `gate.hint` + `scenario.cardsUsed` against `SANDBOX_CARD_DB`), `src/components/sandbox/playback-control-bar.tsx` (transport — Pause replaces Play while playing; Step is hidden when ended; mute toggle is a stub).
+- **Gotchas / do NOT touch:**
+  - The session input passed to `useSandboxGameSession` is **memoized on the caller side**. `useSandboxGameSession`'s internal `useMemo` keys on input identity, so an inline object literal would invalidate the memo every render. If a new field is added to the wiring, extend the `useMemo` in `scenario-runner.tsx` — don't drop back to inline construction.
+  - The provider receives `initialState: scenario.initialState` and `events: runner.eventLog` — **not** `runner.derivedGameState`. The provider folds events itself via `applyEvent`, and `BoardLayout`'s `useCardTransitions` keys flight animations off the `eventLog` array growing over time. Pre-folding the state would silence the animations.
+  - `BoardLayout` uses `window.visualViewport` for its absolute geometry math. On the sandbox player page it lives inside a flex column with header + control bar above/below, so the math thinks it has more vertical room than it actually does. On typical desktop (≥1080p) the field still fits comfortably, but if OPT-292's smoke scenarios surface clipping on smaller viewports, the right fix is **inside `board-geometry.ts`** (let the layout consult its container) — don't paper over with extra padding in the runner shell.
+  - The info panel renders only at `lg:` and up (`hidden lg:block`). Below `lg`, the board takes the full width. If you author a scenario whose `expectedResponse.hint` is critical to the test, OPT-292 should either (a) author for `lg+` viewports, or (b) hoist the hint into the in-board navbar badge — the gate already exposes `hint.text`.
+- **Unresolved:**
+  - No DOM-level integration test of the runner shell — same vitest-`environment: "node"` constraint flagged in the OPT-286 and OPT-290 handoffs. The wiring is type-checked end-to-end (`BoardLayoutProps` is a real surface), and the runner/gate/provider have unit coverage individually. OPT-292's vertical-slice scenarios are the first true smoke; if they reveal a wiring bug, that's the cue to add `@testing-library/react` + `happy-dom` for sandbox render tests.
+  - Mute toggle is local state only. OPT-297 wires localStorage + the global default. Don't touch the mute stub from OPT-292 — adding persistence here would step on OPT-297's diff.
+  - `useScenarioRunner` creates the controller exactly once via `useState(() => createScenarioRunner(scenario))`. If OPT-292 introduces hot-swappable scenarios in tests, that assumption breaks — but each scenario has its own `[scenarioId]` page, so this is fine for now.
+- **Why this matters for OPT-292:** OPT-292's two scenarios (`Draw 2` spectator + `SELECT_TARGET` interactive) plug straight into this assembly. Each goes in `src/lib/sandbox/scenarios/<batch>.ts` and registers itself in `src/lib/sandbox/scenarios/index.ts`. Visit `/sandbox/<id>` to verify play/pause/reset/step + the gate's predicate gate for the interactive case. Per the ticket: **if anything feels off, patch the earlier ticket — don't paper over.** The mid-stack location to look first is the input-gate predicate or the runner's `awaiting-response` transition; the assembly itself is thin.
 
