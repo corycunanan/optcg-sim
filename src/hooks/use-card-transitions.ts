@@ -40,6 +40,11 @@ const AUTO_EXPIRE_MS = 1500;
  *  single instant. Also used for the per-token delay inside a DON attach. */
 const STAGGER_MS = 60;
 
+/** CARD_TRASHED `reason` values that originate from the life zone. The engine
+ *  emits these without `from`, so the visual layer infers the source from the
+ *  reason. Sandbox scenarios may set `from: "LIFE"` explicitly instead. */
+const LIFE_TRASH_REASONS = new Set(["face_up_life", "life_trash"]);
+
 let transitionCounter = 0;
 function nextId() {
   return `ct-${++transitionCounter}`;
@@ -144,6 +149,8 @@ function eventToTransition(
       if (!cardId && p.count) return null;
       if (p.from === "HAND") {
         from = `${prefix}-hand`;
+      } else if (p.from === "LIFE" || LIFE_TRASH_REASONS.has(p.reason)) {
+        from = `${prefix}-life`;
       } else {
         const resolvedZone = cardInstanceId && zoneRegistry
           ? zoneRegistry.getCardZone(cardInstanceId)

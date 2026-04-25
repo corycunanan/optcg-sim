@@ -12,6 +12,10 @@ import { rushAttackScenario } from "./combat/rush-attack";
 import { drawOneScenario } from "./draws/draw-1";
 import { drawTwoScenario } from "./draws/draw-2";
 import { peekTopThreeScenario } from "./draws/peek-top-3";
+import { characterKoedByDamageScenario } from "./ko/character-koed-by-damage";
+import { characterKoedByEffectScenario } from "./ko/character-koed-by-effect";
+import { lifeToHandScenario } from "./life/life-to-hand";
+import { lifeToTrashScenario } from "./life/life-to-trash";
 import { attachOneDonScenario } from "./movement/attach-1-don";
 import { attachThreeDonStaggeredScenario } from "./movement/attach-3-don-staggered";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
@@ -31,6 +35,10 @@ export const scenarios: Scenario[] = [
   counterFromHandScenario,
   doubleAttackVsLifeScenario,
   rushAttackScenario,
+  characterKoedByDamageScenario,
+  characterKoedByEffectScenario,
+  lifeToHandScenario,
+  lifeToTrashScenario,
   selectTargetScenario,
 ];
 
