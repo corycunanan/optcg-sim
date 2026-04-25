@@ -4,14 +4,14 @@
 // Bound to the scenario runner's controls (OPT-289). Pure presentation —
 // callers pass `playbackState` and the four runner control callbacks.
 //
-// Mute toggle is a deliberate UI stub: the button toggles local state so
-// scenarios can author for the eventual on/off pair, but the actual audio
-// plumbing + localStorage persistence lands in OPT-297.
+// Mute state is sourced from `useSandboxMute` (OPT-297) so the toggle
+// persists across page reloads and any future audio-emitting component
+// can read the same value through context.
 
-import { useState } from "react";
 import { Pause, Play, RotateCcw, StepForward, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { useSandboxMute } from "./use-sandbox-mute";
 import type { PlaybackState } from "./use-scenario-runner";
 
 export interface PlaybackControlBarProps {
@@ -33,7 +33,7 @@ export function PlaybackControlBar({
   onReset,
   onStep,
 }: PlaybackControlBarProps) {
-  const [muted, setMuted] = useState(false);
+  const { muted, toggle: toggleMute } = useSandboxMute();
 
   const isPlaying = playbackState === "playing";
   const isEnded = playbackState === "ended";
@@ -108,11 +108,10 @@ export function PlaybackControlBar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => setMuted((m) => !m)}
+        onClick={toggleMute}
         aria-label={muted ? "Unmute" : "Mute"}
         aria-pressed={muted}
         data-testid="playback-mute"
-        title="Audio toggle (persistence lands in OPT-297)"
       >
         {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
       </Button>
