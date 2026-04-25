@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-294 in review — OPT-295/296 still parallelizable, OPT-297 polish remains)
+last-updated: 2026-04-25 (OPT-294 merged — OPT-295/296 ready now, OPT-297 polish remains)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -25,7 +25,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Done | [#138](https://github.com/corycunanan/optcg-sim/pull/138) | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Done | [#139](https://github.com/corycunanan/optcg-sim/pull/139) | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** Wiring held — no upstream patches needed. |
 | 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | Done | [#140](https://github.com/corycunanan/optcg-sim/pull/140) | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. `redistribute-don` authored as interactive (overlay is fundamentally interactive). |
-| 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | In Review | [#142](https://github.com/corycunanan/optcg-sim/pull/142) | Parallelizable. Counter-from-hand pre-populates `turn.battle` so use-counter-pulse can key the pulse to the defender's leader. |
+| 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Done | [#142](https://github.com/corycunanan/optcg-sim/pull/142) | Parallelizable. Counter-from-hand pre-populates `turn.battle` so use-counter-pulse can key the pulse to the defender's leader. |
 | 11 | [OPT-295](https://linear.app/optcg-sim/issue/OPT-295) | Scenario batch: KO + Life (4 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. All spectator. Exercises the `kind: "ko"` flight branch and `LIFE_TRASH_REASONS` routing. |
 | 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
 | 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | Backlog | — | Closeout. Mute toggle + persistence + the `docs/sandbox/clock-determinism.md` doc. Can be done any time after OPT-291; suggest doing it last so the determinism doc reflects what was actually built. |
