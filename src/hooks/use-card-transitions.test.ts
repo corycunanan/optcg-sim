@@ -147,3 +147,83 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
     expect(out[0].kind).toBeUndefined();
   });
 });
+
+describe("eventToTransitions — CARD_TRASHED life→trash routing", () => {
+  const registry = mkRegistry();
+
+  function trashEvent(
+    payload: Record<string, unknown>,
+    playerIndex: 0 | 1 = 0,
+  ): GameEvent {
+    return {
+      type: "CARD_TRASHED",
+      playerIndex,
+      timestamp: 1,
+      payload,
+    } as unknown as GameEvent;
+  }
+
+  it("routes from the life zone when payload.from is LIFE", () => {
+    const out = eventToTransitions(
+      trashEvent({ cardInstanceId: "p0-life-1", from: "LIFE", reason: "x" }),
+      0,
+      registry,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].fromZoneKey).toBe("p-life");
+    expect(out[0].toZoneKey).toBe("p-trash");
+    expect(out[0].cardId).toBeNull();
+  });
+
+  it("routes from the life zone when reason is face_up_life (engine shape)", () => {
+    const out = eventToTransitions(
+      trashEvent({ cardInstanceId: "p0-life-1", reason: "face_up_life" }),
+      0,
+      registry,
+    );
+    expect(out[0].fromZoneKey).toBe("p-life");
+  });
+
+  it("routes from the life zone when reason is life_trash", () => {
+    const out = eventToTransitions(
+      trashEvent({ cardInstanceId: "p0-life-1", reason: "life_trash" }),
+      0,
+      registry,
+    );
+    expect(out[0].fromZoneKey).toBe("p-life");
+  });
+
+  it("uses opponent prefix when the event originated from the other player", () => {
+    const out = eventToTransitions(
+      trashEvent(
+        { cardInstanceId: "p1-life-1", from: "LIFE", reason: "face_up_life" },
+        1,
+      ),
+      0,
+      registry,
+    );
+    expect(out[0].fromZoneKey).toBe("o-life");
+    expect(out[0].toZoneKey).toBe("o-trash");
+  });
+
+  it("falls back to char-2 when neither from nor a life-trash reason is set", () => {
+    const out = eventToTransitions(
+      trashEvent({ cardInstanceId: "x", reason: "EFFECT" }),
+      0,
+      registry,
+    );
+    expect(out[0].fromZoneKey).toBe("p-char-2");
+  });
+
+  it("returns no transitions for the engine's count-only emission shape", () => {
+    // Matches the production engine: { count: N, reason: "face_up_life" }.
+    // Without a cardId or cardInstanceId, the per-card flight is suppressed —
+    // sandbox scenarios emit per-card events explicitly to render the flight.
+    const out = eventToTransitions(
+      trashEvent({ count: 2, reason: "face_up_life" }),
+      0,
+      registry,
+    );
+    expect(out).toEqual([]);
+  });
+});
