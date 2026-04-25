@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-288 in review — OPT-290 still critical path; OPT-287 still parallel)
+last-updated: 2026-04-25 (OPT-290 in review — OPT-291 blocked on OPT-290 (#136) merging; OPT-287 still parallel)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -21,7 +21,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | In Review | [#135](https://github.com/corycunanan/optcg-sim/pull/135) | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
 | 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Done | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
 | 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Done | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
-| 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Backlog | — | Wraps `sendAction`. Try the `interactionMode` prop on `BoardLayout` first; fall back to a pointer-events overlay only if prop addition touches >6 files. |
+| 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | In Review | [#136](https://github.com/corycunanan/optcg-sim/pull/136) | Picked option #1 — `interactionMode` prop on `BoardLayout` via a small context. Touched 6 files; pointer-events overlay was rejected because BoardModals render inline (z-index would fight). |
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Backlog | — | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Backlog | — | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** |
 | 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-290 (critical path) — ready now. OPT-287 still parallel and pickable now.
+**Next up:** OPT-291 (critical path) — blocked on OPT-290 (#136) merging. OPT-287 is the only ticket still pickable in parallel right now.
 
 ---
 
@@ -103,7 +103,22 @@ Copy this block when writing a new handoff:
   - `permanentRedirect` (308) was chosen over `redirect` (307) on `/game/scaffold` so search engines and bookmarks transfer cleanly. Don't downgrade.
   - Hub categories render even when empty by design — removing empty sections would hide which categories OPT-292+ scenarios should land in. Keep the `CATEGORY_ORDER` loop unconditional.
 - **Unresolved:**
-  - Found uncommitted OPT-290-flavored work in the tree (`src/components/game/board-layout/interaction-mode.ts` and a `board-layout.tsx` modification adding an `interactionMode` prop). Left it untouched on disk — it looks like an in-progress sketch from a prior session. OPT-290's owner should decide whether to adopt or discard before pushing.
+  - The "uncommitted OPT-290-flavored work" this entry originally flagged was the in-progress OPT-290 branch — now committed and shipped as PR #136 (see the OPT-290 → OPT-291 entry below).
   - `[scenarioId]` placeholder hard-codes the OPT-291 reference in copy. Update or remove that line as part of OPT-291.
 - **Why this matters for OPT-291:** OPT-291 turns the placeholder into the real player. Reuse the existing `params: Promise<{ scenarioId: string }>` signature and the `notFound()` branch — only the JSX body changes. The hub's tile click already routes to `/sandbox/<id>`, so once a scenario is in the manifest the only friction is rendering the player. Pull provider (OPT-286), runner (OPT-289), and gate (OPT-290) into this page; nothing else in the route tree should need to move.
+
+### OPT-290 → OPT-291
+**From:** session on 2026-04-25 · **Commit:** `b671657` · **PR:** [#136](https://github.com/corycunanan/optcg-sim/pull/136)
+
+- **Primer:** The input gate exists. `useScenarioInputGate({ scenario, playbackState, resolvePrompt })` returns `{ interactionMode, sendAction, hint }`. Spectator scenarios are read-only; interactive scenarios forward an action only when `playbackState === "awaiting-response"` and the action satisfies `expectedResponse` (allowed type + predicate), then call `resolvePrompt`. `BoardLayout` accepts an optional `interactionMode` prop (`"full" | "spectator" | "responseOnly"`) that masks drag/menu via a small `InteractionModeContext`.
+- **Read first:** `src/components/sandbox/scenario-input-gate.tsx` (the public surface — `buildScenarioInputGate` is the pure form, `useScenarioInputGate` the hook), `src/components/game/board-layout/interaction-mode.ts` (the context the prop is plumbed through), `src/components/sandbox/__tests__/scenario-input-gate.test.ts` (10 tests covering every cell of the spectator/interactive × playback-state matrix).
+- **Gotchas / do NOT touch:**
+  - `BoardLayout`'s `interactionMode` defaults to `"full"`. **Do not make it required** — production callers (`/game/[id]`) omit it on purpose. The optional default is what guarantees "no regressions in production game."
+  - The gate's hint and `BoardLayout`'s navbar badge are two separate surfaces, both intentional. The badge is global ("Watching" / "Respond" in the navbar's right cluster). The hint is per-prompt context for the info panel — `hint.text` defaults to "Respond to continue" but uses `expectedResponse.hint` when scenarios author one.
+  - `useBoardDnd` now accepts a `disabled` flag. When set, `handleDragStart` still tracks `activeDrag` (so DragOverlay renders during the drag) but `handleDragEnd` is a no-op. This is intentional: visual feedback ok, action commit suppressed. Don't suppress `handleDragStart` — that breaks the visual-feedback contract for spectators.
+  - Hand-layer drag is gated via the existing `enableDrag` path (`!dndDisabled && (bs.canInteract || bs.canDragCounter)`) — not via context. Field-card and drop-zones use the context. Two paths, both load-bearing — don't try to unify before OPT-291 ships, the existing leaf API is what kept the file count at 6.
+- **Unresolved:**
+  - No DOM-level integration test of `BoardLayout interactionMode` — same constraint as OPT-286 (vitest `environment: "node"`, no JSDOM). The behavioral guarantees are covered by the gate contract tests + the existing `useBoardDnd disabled` parameter; if scenario authoring uncovers field-level issues, file a follow-up that adds `@testing-library/react` + `happy-dom` for sandbox-specific render tests only.
+  - `expectedResponse.hint` is per-scenario but rendered the same way regardless of `promptType`. If OPT-296's prompt-modal scenarios need prompt-type-specific styling (e.g., "Arrange the top 3 cards" vs "Pick a target"), the right place is the `hint` field — extend the type union there, not in BoardLayout.
+- **Why this matters for OPT-291:** OPT-291 is the assembly. The `[scenarioId]` page should call `useScenarioRunner(scenario)` → `useScenarioInputGate({ scenario, playbackState: state.playbackState, resolvePrompt: state.resolvePrompt })` → `useSandboxGameSession({ initialState, events: state.eventLog, cardDb, activePrompt: state.activePrompt, onAction: gate.sendAction })`. Then pass `gate.interactionMode` to `<BoardLayout interactionMode={...} />` and render `gate.hint` in the info panel. The runner is the brain, the provider is the body, the gate is the nervous system — OPT-291 is the skeleton that holds them together.
 
