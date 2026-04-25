@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-289 in review — OPT-290 blocked on this PR merging; OPT-287/OPT-288 still parallel)
+last-updated: 2026-04-25 (OPT-289 done — OPT-290 ready now; OPT-287/OPT-288 still parallel)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -20,7 +20,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Backlog | — | Independent of everything else — can be done in parallel with the gate ticket if anyone wants to split. ~20 hand-picked `CardData` snapshots covering Blocker, Counter, Double Attack, Rush, On-Play, On-KO, Trigger event, Stage, plus per-color leaders. |
 | 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | Backlog | — | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
 | 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Done | [#132](https://github.com/corycunanan/optcg-sim/pull/132) | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Smoke test asserts `BoardLayoutProps` has no undefined fields (no JSDOM needed). |
-| 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | In Review | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
+| 5 | [OPT-289](https://linear.app/optcg-sim/issue/OPT-289) | Scenario runner controller + playback model | 3 | OPT-285, OPT-286 | Done | [#133](https://github.com/corycunanan/optcg-sim/pull/133) | The brain. Folds `apply-event` over events 0..i. Exposes play/pause/reset/stepForward/resolvePrompt. Step-backward is a documented non-goal — noted in the file's top comment. |
 | 6 | [OPT-290](https://linear.app/optcg-sim/issue/OPT-290) | Input gate: spectator vs interactive | 2 | OPT-286, OPT-289 | Backlog | — | Wraps `sendAction`. Try the `interactionMode` prop on `BoardLayout` first; fall back to a pointer-events overlay only if prop addition touches >6 files. |
 | 7 | [OPT-291](https://linear.app/optcg-sim/issue/OPT-291) | Scenario player page: board + control bar + info panel | 3 | OPT-287, OPT-288, OPT-289, OPT-290 | Backlog | — | Assembly point. Wires provider + runner + gate + UI into the `[scenarioId]` route. After this lands, the architecture is fully observable. |
 | 8 | [OPT-292](https://linear.app/optcg-sim/issue/OPT-292) | Vertical slice: Draw 2 (spectator) + SELECT_TARGET (interactive) | 1 | OPT-291 | Backlog | — | The architecture's smoke test. Two scenarios that exercise the full pipeline. **If anything feels off here, patch the earlier ticket — don't paper over.** |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-290 (critical path) — blocked on OPT-289 (#133) merging. OPT-287 and OPT-288 are still parallel and pickable now.
+**Next up:** OPT-290 (critical path) — ready now. OPT-287 and OPT-288 are still parallel and pickable now.
 
 ---
 
