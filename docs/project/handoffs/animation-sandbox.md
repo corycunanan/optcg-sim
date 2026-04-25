@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-295 in review — OPT-296 ready now, OPT-297 polish remains)
+last-updated: 2026-04-25 (OPT-296 in review — OPT-297 polish is the only remaining ticket)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -27,12 +27,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 9 | [OPT-293](https://linear.app/optcg-sim/issue/OPT-293) | Scenario batch: Draws & Movement (6 scenarios) | 2 | OPT-292 | Done | [#140](https://github.com/corycunanan/optcg-sim/pull/140) | Parallelizable with OPT-294/295/296. Exercises `use-field-arrivals` and the multi-DON fan-out. `redistribute-don` authored as interactive (overlay is fundamentally interactive). |
 | 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Done | [#142](https://github.com/corycunanan/optcg-sim/pull/142) | Parallelizable. Counter-from-hand pre-populates `turn.battle` so use-counter-pulse can key the pulse to the defender's leader. |
 | 11 | [OPT-295](https://linear.app/optcg-sim/issue/OPT-295) | Scenario batch: KO + Life (4 scenarios) | 2 | OPT-292 | In Review | [#144](https://github.com/corycunanan/optcg-sim/pull/144) | Parallelizable. All spectator. Exercises the `kind: "ko"` flight branch and `LIFE_TRASH_REASONS` routing. |
-| 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | Backlog | — | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
+| 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | In Review | [#145](https://github.com/corycunanan/optcg-sim/pull/145) | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
 | 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | Backlog | — | Closeout. Mute toggle + persistence + the `docs/sandbox/clock-determinism.md` doc. Can be done any time after OPT-291; suggest doing it last so the determinism doc reflects what was actually built. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-296 (critical path) — ready now (only dep is OPT-292, already Done; doesn't share files with OPT-295's PR). OPT-297 (polish) is the recommended closeout — save for last so the determinism doc reflects what actually shipped.
+**Next up:** OPT-297 (closeout polish) — the only remaining ticket. Mute toggle persistence + the `docs/sandbox/clock-determinism.md` doc. No file overlap with OPT-296's PR — can start while #145 is in review.
 
 ---
 
@@ -215,4 +215,19 @@ Copy this block when writing a new handoff:
   - Browser verification on the four new `/sandbox/<id>` pages was not run by this session (non-interactive). Type-check, lint, and 163 unit tests pass; the manifest test asserts the seventeen registered scenarios are unique and resolve in `SANDBOX_CARD_DB`. **Run a manual smoke before merge** — the two acceptance bullets ("KO shrink + trash flight" + "life-to-trash uses face-down token from life zone, distinct from life-to-hand") only the eyes can confirm.
   - The `LIFE_TRASH_REASONS` constant currently covers `face_up_life` and `life_trash`. If new reason strings get added on the engine side (e.g., a future `top_life_to_trash` for some effect path), the set needs to grow — grep `actions/life.ts` for `reason:` to keep parity.
 - **Why this matters for OPT-296 (Prompts):** OPT-296's four prompt scenarios (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`) all share the same one-step prompt + tight predicate template as `select-target` and `counter-from-hand`. Use `peek-top-3.ts` (already in the manifest) as the `ARRANGE_TOP_CARDS` template — it's permissive about both Skip and a real pick. Cross-batch: `_shared.ts` still hasn't earned its keep across four batches; keep `TURN` consts and helper boilerplate inline per file unless OPT-296 surfaces a *third* identical block.
+
+### OPT-296 → OPT-297
+**From:** session on 2026-04-25 · **Commit:** `04d0e90` · **PR:** [#145](https://github.com/corycunanan/optcg-sim/pull/145)
+
+- **Primer:** Four interactive scenarios shipped under `src/lib/sandbox/scenarios/prompts/`: `arrange-top-4`, `player-choice-3-options`, `optional-effect`, `reveal-trigger`. Together with the OPT-292 `select-target`, the manifest now exercises every prompt modal type the sandbox supports. No upstream patches; no `SANDBOX_CARD_DB` additions. The architecture held across all five batches (vertical slice + four batches).
+- **Read first:** `src/lib/sandbox/scenarios/prompts/optional-effect.ts` (the only scenario whose modal emits *two distinct action types* — `PLAYER_CHOICE { choiceId: "activate" }` for Activate, `PASS` for Skip; `allowedActionTypes` lists both), `src/lib/sandbox/scenarios/prompts/reveal-trigger.ts` (pre-prompt `CARD_ADDED_TO_HAND_FROM_LIFE` event so the trigger card visibly flips from life before the modal opens), `src/components/game/optional-effect-modal.tsx` (the surprising emit shape — *not* a dedicated `OPTIONAL_EFFECT` action type).
+- **Gotchas / do NOT touch:**
+  - **`OPTIONAL_EFFECT` modal does not emit an `OPTIONAL_EFFECT` action.** It emits either `PLAYER_CHOICE { choiceId: "activate" }` or `PASS`. If you ever extend the prompt-action mapping, the action-type narrowing in the input gate (`expectedResponse.allowedActionTypes`) is what prevents typo'd shapes; keep that surface honest.
+  - **`arrange-top-4` deliberately omits `validTargets`** — the modal hides the Skip/"Keep None" button in this branch and any of the four cards is a valid keep. `peek-top-3` is the constrained sister scenario that does provide `validTargets`. Don't unify them; they cover distinct UI paths.
+  - **`reveal-trigger` puts `OP01-030` (Event-with-trigger) at `life[0]` and emits `CARD_ADDED_TO_HAND_FROM_LIFE` for it.** This is the only Event-with-trigger card in `SANDBOX_CARD_DB`. If a future scenario needs a different trigger card, extend the bundle in the same PR (and add a coverage test entry, per the OPT-287 contract). The life zone already mixes face-up trigger and face-down vanilla life cards inline, since `makeLifeStack` only handles uniform stacks; the existing helper is fine — don't add a "mixed life" helper for this one case.
+  - **Predicates accept both `top` and `bottom` for `ARRANGE_TOP_CARDS` destinations** even when `canSendToBottom` forces the modal to emit only one. This matches the `peek-top-3` template's forgiving stance — keep it; tightening to a single destination would couple the predicate to modal-button copy.
+- **Unresolved:**
+  - Browser verification on the four new `/sandbox/<id>` pages was not run by this session (non-interactive). Type-check, lint, and 163 unit tests pass; the manifest test asserts the twenty-one registered scenarios are unique and resolve in `SANDBOX_CARD_DB`. **Run a manual smoke before merge** — the per-modal acceptance bullets ("each prompt modal renders correctly", "info panel hint reads naturally") only the eyes can confirm, especially for `reveal-trigger` where the life-flip-then-modal sequencing is the load-bearing visual.
+  - Five batches in (`combat`, `draws`, `movement`, `ko+life`, `prompts`) and `_shared.ts` *still* hasn't earned its keep — `TURN` consts and deck/hand stubs are 6–10 lines per file and stay readable. With OPT-296 closing out scenario authoring, this stays a non-event unless a future surface (post-OPT-297) emerges.
+- **Why this matters for OPT-297:** OPT-297 is closeout polish — mute toggle persistence (currently a UI stub in `playback-control-bar.tsx`) and the `docs/sandbox/clock-determinism.md` doc. No file overlap with this PR. The mute stub state lives in `scenario-runner.tsx`; per the OPT-291 handoff, persistence belongs to OPT-297 and shouldn't have been touched here. The `useSandboxMute()` hook the ticket specifies should default to muted, key on `localStorage["sandbox:muted"]`, and expose the value via context for any future audio-emitting components. The determinism doc should reflect what actually shipped — the runner's `setTimeout` model, the static-script (no engine fork) decision, and the per-frame `applyEvent` fold — *not* speculate about a different design. If anything in this batch surprised you, that's the cue to capture it in the doc.
 
