@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-24 (project created — all 13 tickets in Backlog; OPT-285 is the gate ticket)
+last-updated: 2026-04-24 (OPT-285 in review — unblocks OPT-286 + OPT-288)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -16,7 +16,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | Backlog | — | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. No runtime code — should land in half a day. |
+| 1 | [OPT-285](https://linear.app/optcg-sim/issue/OPT-285) | Sandbox foundation: scenario types + manifest + helpers | 1 | — | In Review | [#129](https://github.com/corycunanan/optcg-sim/pull/129) | Gate ticket. Pure types + empty manifest + helper stubs. Unblocks OPT-286 and OPT-288. |
 | 2 | [OPT-287](https://linear.app/optcg-sim/issue/OPT-287) | Curated card-data bundle for sandbox | 1 | — | Backlog | — | Independent of everything else — can be done in parallel with the gate ticket if anyone wants to split. ~20 hand-picked `CardData` snapshots covering Blocker, Counter, Double Attack, Rush, On-Play, On-KO, Trigger event, Stage, plus per-color leaders. |
 | 3 | [OPT-288](https://linear.app/optcg-sim/issue/OPT-288) | Sandbox routes + navbar entry + scaffold migration | 2 | OPT-285 | Backlog | — | New top-level routes (`/sandbox`, `/sandbox/scaffold`, `/sandbox/[scenarioId]` placeholder), navbar entry, redirect from `/game/scaffold`. Hub UI reads the (initially empty) manifest. Independent of provider/runner work — can run in parallel with OPT-286/289. |
 | 4 | [OPT-286](https://linear.app/optcg-sim/issue/OPT-286) | Sandbox session provider + apply-event reducer | 3 | OPT-285 | Backlog | — | The fake `useGameSession`. Critical path. Reducer is intentionally minimal — visible deltas only, no engine fork. Includes a smoke render test against `BoardLayout` to catch field drift. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-285 — the gate ticket. OPT-287 can be picked up in parallel (no dependency) if anyone wants to split foundation work.
+**Next up:** OPT-286 (critical path) and OPT-288 (parallel) — both are unblocked once OPT-285 merges. OPT-287 also still parallelizable.
 
 ---
 
@@ -53,3 +53,13 @@ Copy this block when writing a new handoff:
 - **Why this matters for OPT-YYY:** <1–2 sentences tying the above to the next ticket's surface>
 
 -->
+
+### OPT-285 → OPT-286
+**From:** session on 2026-04-24 · **Commit:** `1ac7208` · **PR:** [#129](https://github.com/corycunanan/optcg-sim/pull/129)
+
+- **Primer:** Scenario authoring contract is in place. `src/lib/sandbox/scenarios/{types,helpers,index}.ts` ship `Scenario`, `ScenarioStep`, `ExpectedResponse`, `PartialGameState`/`PartialPlayerState`, plus `makeCard` / `makeLifeStack` / `makeDonStack` / `playerSlot` helpers. The manifest exports `scenarios: Scenario[] = []`.
+- **Read first:** `src/lib/sandbox/scenarios/types.ts` (the contract), `src/components/game/board-layout/board-layout.tsx` (props the provider must satisfy), `shared/game-types.ts` (full `GameState` shape — provider hydrates `PartialGameState` into this).
+- **Gotchas / do NOT touch:** `ExpectedResponse.allowedActionTypes` is typed as `GameAction["type"][]`, not `string[]` — keep it that way; widening to `string[]` defeats the typo guard. `PartialGameState.players` is a tuple `[PartialPlayerState, PartialPlayerState]` — preserve the tuple-ness when hydrating so `players[0]` / `players[1]` stay non-null.
+- **Unresolved:** None blocking. The reducer scope creep risk in `apply-event.ts` is real — the scope doc's "Risks" section calls it out; resist the urge to handle every event type up front.
+- **Why this matters for OPT-286:** OPT-286's `apply-event.ts` reducer and `SandboxSessionProvider` consume `PartialGameState` and need to produce a value that satisfies `BoardLayout`'s `me`/`opp`/`turn`/`myIndex`/`cardDb`/`activePrompt` props. The provider is the field-drift surface — wire the smoke render test the scope doc calls for so this gets caught at PR time, not at runtime.
+
