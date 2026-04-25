@@ -1,9 +1,5 @@
-import { BoardScaffold } from "@/components/game/board-scaffold";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata = {
-  title: "Board Scaffold — OPTCG Simulator",
-};
-
-export default function ScaffoldPage() {
-  return <BoardScaffold />;
+export default function GameScaffoldRedirect() {
+  permanentRedirect("/sandbox/scaffold");
 }
