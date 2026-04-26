@@ -56,7 +56,7 @@ export default function SandboxHubPage() {
   const grouped = groupByCategory(scenarios);
 
   return (
-    <>
+    <div className="flex-1 min-h-0 overflow-y-auto">
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderTitle>Sandbox</PageHeaderTitle>
@@ -114,7 +114,7 @@ export default function SandboxHubPage() {
           );
         })}
       </div>
-    </>
+    </div>
   );
 }
 
