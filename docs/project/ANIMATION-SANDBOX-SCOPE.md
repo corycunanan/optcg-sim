@@ -125,6 +125,37 @@ The architecture is deliberately split between **production code the sandbox ren
 
 **Implication for debugging:** if you reproduce an animation glitch in the sandbox, the fix is almost always in shared code — that's the whole point of the harness. If you can't reproduce a production bug in the sandbox, it's likely engine-domain (state the sandbox can't legally reach without an engine), not animation-domain.
 
+### Phase 2: engine-driven playground
+
+Phase 1 (OPT-285 → OPT-297) shipped a scripted-event harness — every scenario pre-bakes a `GameEvent[]` and the runner plays them on a timer. Phase 2 (OPT-304 → OPT-307) adds a parallel **playground** mode where the user drives real `GameAction`s and the engine produces events, alongside the existing scripted scenarios. Scripted scenarios stay; the two modes coexist via a `mode: "scripted" | "playground"` discriminator on `Scenario` (defaulting to `scripted` so existing scenarios are unaffected).
+
+**Architecture extension:**
+
+```
+ScenarioRunner (controller)
+  ├─ scripted mode  → SandboxSessionProvider feeds apply-event reducer over scripted events  (Phase 1)
+  └─ playground mode → SandboxEngineSessionProvider feeds runPipeline output through the same provider shape  (Phase 2)
+                          ├─ user drag → GameAction → runPipeline(state, action, cardDb, pi)
+                          ├─ result.state → next render
+                          └─ result.events → existing card-animation pipeline (eventToTransitions)
+```
+
+Both modes converge at the provider boundary: `BoardLayout`, the animation hooks, and the prompt modals don't know which mode produced their inputs. The engine is reached via the `@engine/*` path alias added in OPT-304 — no engine refactor; the engine code is identical to what the worker runs.
+
+**Caveats:**
+
+- **Bundle size.** `engine/schema-registry.ts` does a top-level static import of all 51 effect schema files (`workers/game/src/engine/schemas/*.ts`). Importing it from `/sandbox/*` pulls every schema into the sandbox client chunks. Acceptable for a dev-only tool route; if `/sandbox/*` ever ships to public users, that's a separate optimization ticket (likely lazy-loading per scenario's `cardsUsed`).
+- **`effectSchema: null` in `SANDBOX_CARD_DB`.** The curated card bundle was built for Phase 1 where authored `GameEvent`s do all the work — the engine isn't consulted, so cards' effect schemas were intentionally stubbed. Vanilla cards (no [On Play], no [On K.O.], no triggers) work in playground mode unmodified. Effect cards need their schema injected via `injectSchemasIntoCardDb` from `engine/schema-registry`; that wiring is deferred to a later Phase 2 ticket — playground scenarios start with vanilla-only.
+- **Engine-driven setup is a hard floor.** Playground scenarios cannot start mid-turn or with arbitrary mid-game state the engine wouldn't accept. If a scenario needs an exotic starting position, author it as a scripted scenario instead — that's why the two modes are kept side-by-side.
+
+**Bug blast radius — Phase 2 row:**
+
+| Layer | Real or sandbox-only? | Lives in |
+|---|---|---|
+| Engine, effect resolver, triggers, action pipeline (in **playground** mode) | **Real — same code production runs** | `workers/game/src/engine/**`, reached via `@engine/*` alias |
+
+In playground mode the engine moves out of "sandbox-only — bypassed entirely" and into the "real, shared with prod" column. A bug in `runPipeline` reproduced from a playground scenario fixes production too. Scripted scenarios still bypass the engine and remain in the original row.
+
 ---
 
 ## Scenario contract
