@@ -102,6 +102,29 @@ The provider exposes the same shape `useGameSession` returns so `BoardLayout` is
 - **One bespoke React component per scenario.** Doesn't scale past ~5 scenarios; loses the manifest-driven hub; can't batch-author. The declarative format is more upfront work but pays off as scenarios grow.
 - **Extend `BoardScaffold` to render state.** `BoardScaffold` is labeled placeholder boxes — it does not consume game state. The right surface to render state is `BoardLayout`. Scaffold becomes a sibling sandbox tool ("Layout Reference"), not the foundation.
 
+### Real vs sandbox-only — bug blast radius
+
+The architecture is deliberately split between **production code the sandbox renders** and **sandbox-only code that drives it**. This determines where a fix lives and what else it affects.
+
+| Layer | Real or sandbox-only? | Lives in |
+|---|---|---|
+| Engine, effect resolver, triggers, action pipeline | **Sandbox-only — bypassed entirely** | (sandbox does not touch `workers/game/`) |
+| Session, WebSocket, Durable Object | **Sandbox-only — fake provider** | `src/components/sandbox/sandbox-session-provider.tsx` |
+| State derivation (folding events) | **Sandbox-only — minimal reducer, ~8 visible-delta events** | `src/lib/sandbox/apply-event.ts` |
+| Scenario authoring (initial state + scripted events) | **Sandbox-only** | `src/lib/sandbox/scenarios/**` |
+| `BoardLayout` and all child components | **Real — same code production renders** | `src/components/game/board-layout/**` |
+| Animation hooks (`use-card-transitions`, `use-field-arrivals`, `use-counter-pulse`, `use-hand-animation-state`) | **Real — same code production runs** | `src/hooks/use-*` |
+| Prompt modals (`SelectTarget`, `ArrangeTopCards`, `PlayerChoice`, `OptionalEffect`, `RevealTrigger`) | **Real** | `src/components/game/*-modal.tsx` |
+| `interactionMode` gating on `BoardLayout` / `useBoardDnd` / `card-action-menu` | **Real, but optional** — defaults to `"full"`; production callers omit it | `src/components/game/board-layout/interaction-mode.ts` |
+
+**Bug blast radius rule:**
+
+- A bug visible in the sandbox whose fix lives in `BoardLayout` / animation hooks / prompt modals → **fixing it fixes production too.** These files are shared. The OPT-295 patch to `use-card-transitions.ts` is the canonical example: the sandbox surfaced a routing miss, and the fix landed in shared code that production also benefits from.
+- A bug whose fix lives in `apply-event.ts` or a scenario file → **production is unaffected.** Production's state comes from the real engine in `workers/game/`, which has no dependency on the sandbox reducer.
+- A bug in the `interactionMode` plumbing → **could affect production** if the optional default or prop signature changes. Keep `interactionMode` optional with a `"full"` default; production callers (`/game/[id]`) intentionally omit it.
+
+**Implication for debugging:** if you reproduce an animation glitch in the sandbox, the fix is almost always in shared code — that's the whole point of the harness. If you can't reproduce a production bug in the sandbox, it's likely engine-domain (state the sandbox can't legally reach without an engine), not animation-domain.
+
 ---
 
 ## Scenario contract
