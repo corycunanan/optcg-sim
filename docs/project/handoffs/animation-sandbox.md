@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-26 (Phase 2 filed — OPT-304/305/306/307 to add engine-driven playground scenarios alongside scripted ones)
+last-updated: 2026-04-26 (OPT-304 in review — engine portability foundation landed, Phase 2 unblocked)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -36,7 +36,7 @@ Filed 2026-04-26 to add an interactive-playground mode alongside the scripted sc
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 14 | [OPT-304](https://linear.app/optcg-sim/issue/OPT-304) | Engine portability foundation: tsconfig + path alias + smoke test | 1 | — | Backlog | — | Phase 2 gate. Adds `@engine/*` alias, includes `workers/game/src` in main tsconfig, smoke test that imports `runPipeline` from app code. Updates scope doc with the Phase 2 architecture section + bug-blast-radius table extension. |
+| 14 | [OPT-304](https://linear.app/optcg-sim/issue/OPT-304) | Engine portability foundation: tsconfig + path alias + smoke test | 1 | — | In Review | [#148](https://github.com/corycunanan/optcg-sim/pull/148) | Phase 2 gate. Adds `@engine/*` alias, smoke test that imports `runPipeline` from app code. Updates scope doc with the Phase 2 architecture section + bug-blast-radius table extension. Engine `validate`/`execute` switches gained a missing `UNDO` case (the change scoped beyond pure config — see handoff). |
 | 15 | [OPT-305](https://linear.app/optcg-sim/issue/OPT-305) | Engine-driven sandbox session adapter | 3 | OPT-304 | Backlog | — | New `useSandboxEngineSession` hook. Same surface shape as `useSandboxGameSession` so `BoardLayout` is unchanged. Action → `runPipeline` → events feed existing animation pipeline. Reset = re-hydrate from `initialState`. |
 | 16 | [OPT-306](https://linear.app/optcg-sim/issue/OPT-306) | Playground scenario mode + first scenario (play character) | 2 | OPT-305 | Backlog | — | Adds `mode: "scripted" \| "playground"` to `Scenario` (default `scripted`, no regression to existing 21). Runner branches on mode. First playground scenario: `play-character` — vanilla 2-cost char + 2 active DON, user plays via real drag. |
 | 17 | [OPT-307](https://linear.app/optcg-sim/issue/OPT-307) | Playback chrome adjustments for playground mode | 1 | OPT-306 | Backlog | — | PlaybackControlBar branches on `mode`: hides Play/Pause/Step/progress in playground, promotes Reset. Info panel shows "Playground" badge instead of "Watching"/"Respond". |
@@ -45,7 +45,7 @@ Filed 2026-04-26 to add an interactive-playground mode alongside the scripted sc
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-304 is the gate. Foundational config-only work (tsconfig + alias + smoke test + scope doc update) — should land as a small clean PR before any of the behavioral tickets start.
+**Next up:** OPT-305 — engine-driven sandbox session adapter. The `@engine/*` alias and a working `runPipeline` smoke test are in (#148). OPT-305 wraps `runPipeline` in a `useSandboxEngineSession` hook that mirrors the existing `useSandboxGameSession` surface so `BoardLayout` is unchanged.
 
 ---
 
@@ -258,4 +258,26 @@ Copy this block when writing a new handoff:
   - Browser verification on the mute toggle (icon state, persistence across reload, sharing across two scenarios) was not run by this session (non-interactive). The pure helpers are unit-tested; the React surface is wired but unmounted in tests. **Run a manual smoke before merge** — the page-reload acceptance bullet only the eyes can confirm.
   - The clock-determinism doc names `happy-dom` + `@testing-library/react` as the DOM-test path if a future ticket wants snapshot tests. Neither dep is installed today; the OPT-286 / OPT-290 / OPT-291 handoffs all flagged this as the cue to add them. Still deferred — file as a separate ticket if/when needed.
 - **Why this matters for whoever returns to this project:** The Animation Sandbox project is functionally complete after OPT-297 lands. Five batches of scenarios (`combat`, `draws`, `movement`, `ko+life`, `prompts`) plus the closeout polish ship a `/sandbox` surface that exercises every visible game-state animation in isolation. If you're picking this up months from now: the `docs/project/ANIMATION-SANDBOX-SCOPE.md` document is the source of truth for original scope; `docs/sandbox/clock-determinism.md` is the only "explicitly deferred" surface from the project (snapshot-test infrastructure). Anything else surfaced as a follow-up is in the prior handoff entries' "Unresolved" sections — five batches in, `_shared.ts` for scenario boilerplate still hasn't earned its keep, and there's no DOM-level integration test of the runner shell.
+
+### OPT-304 → OPT-305
+**From:** session on 2026-04-26 · **Commits:** `6ea8335` (alias + shim) · `3371221` (engine UNDO) · `2e712cf` (smoke + docs) · **PR:** [#148](https://github.com/corycunanan/optcg-sim/pull/148) (stacked on [#147](https://github.com/corycunanan/optcg-sim/pull/147))
+
+- **Primer:** App code can now `import { runPipeline } from "@engine/engine/pipeline"` and call it against a real `GameState`. The `@engine/*` alias maps to `workers/game/src/*` in both `tsconfig.json` (paths) and `vitest.config.ts` (resolve.alias). A one-line ambient stub at `src/types/cloudflare-shim.d.ts` declares `DurableObjectNamespace = unknown` so the worker's `Env` interface compiles without `@cloudflare/workers-types`. Engine `validate` and `execute` switches gained the missing `UNDO` case (no runtime change — UNDO is intercepted by `GameSession` before the pipeline; the worker baseline previously carried this as 2 of its ~129 tsc errors).
+- **Read first:** `src/lib/sandbox/__tests__/engine-portability.test.ts` (the smoke — also the cleanest example of building a real `GameState` from the app side via `buildInitialState` + a stub payload), `tsconfig.json` + `vitest.config.ts` (the alias surface), `docs/project/ANIMATION-SANDBOX-SCOPE.md` (Phase 2 section now lays out playground architecture and the bundle/`effectSchema: null` caveats).
+- **Gotchas / do NOT touch:**
+  - **Don't widen `tsconfig.json`'s `include` to `workers/game/src/**/*.ts`.** The original ticket spec called for that. Empirically, doing so surfaces ~127 pre-existing worker-baseline errors plus DOM-vs-Workers-runtime conflicts (e.g., `Uint8Array<ArrayBufferLike>` vs `BufferSource` in `util/auth.ts`, `DurableObject*` types in `GameSession.ts`). The minimal alternative — alias-only resolution — works because TS pulls only what the smoke test transitively imports. Keep it that way unless a future ticket actually needs broad worker type-checking from the app.
+  - **The Cloudflare shim is `unknown`, not `any`.** This avoids accidentally allowing app code to *use* `DurableObjectNamespace` as a real type (e.g., calling methods on it). The engine never instantiates it; the worker's own tsconfig loads the real type via `@cloudflare/workers-types`.
+  - **`engine/schema-registry.ts` static-imports all 51 effect schema files.** Any app file that imports from `@engine/engine/setup` (which calls `injectSchemasIntoCardDb`) pulls all 51 into its bundle. This is fine for `/sandbox/*` (dev tool), but `useSandboxEngineSession` should defer importing `setup.ts` until first scenario load if OPT-305 cares about the hub page chunk size. Otherwise the entire `/sandbox` route gets the 51-schema payload.
+  - **The smoke test passes `new Map()` as `cardDb` to `runPipeline` even though `buildInitialState` returns a populated cardDb.** This was deliberate per the ticket spec — PASS doesn't access cardDb so it's a tighter smoke. OPT-305 must pass the *real* cardDb (the one returned by `buildInitialState`), otherwise PLAY_CARD validation will hard-fail.
+- **Unresolved:**
+  - **`SANDBOX_CARD_DB` ships every entry with `effectSchema: null`** (per the OPT-287 contract). Vanilla cards work in playground mode unmodified. Effect cards need their schema injected via `injectSchemasIntoCardDb` from `@engine/engine/schema-registry`. The first playground scenario (OPT-306's `play-character`) is intentionally vanilla so this can be deferred; if OPT-305 wants to build the adapter against an effect card too, wire `injectSchemasIntoCardDb(SANDBOX_CARD_DB)` once at provider construction and confirm the card's effectSchema is non-null after.
+  - **Worker tsc baseline is ~127 errors** (down from 129 after the UNDO fix). Most are unused-imports in `__tests__/*` and a few real type holes in tests / `replacement-scenarios.test.ts`. Not OPT-304's surface; flag if it grows.
+  - **No follow-up filed for the count-only `face_up_life` `CARD_TRASHED` shape** referenced in the OPT-295 → OPT-296 handoff. That deferral is independent of Phase 2 — playground mode emits per-card events the same way scripted mode does.
+- **Why this matters for OPT-305:** OPT-305's `useSandboxEngineSession` hook drives the engine on a real loop:
+  1. Hold `state` and `cardDb` from `buildInitialState(scenario.initialState as GameInitPayload)` (or a thinner builder if the partial-state shape doesn't fit `GameInitPayload`).
+  2. On `sendAction(action)`, call `runPipeline(state, action, cardDb, myIndex)` and update `state` from `result.state`.
+  3. Feed `result.events` (well — the events emitted via the `eventLog` delta in `result.state.eventLog`) into the existing animation pipeline. `useCardTransitions`, `use-field-arrivals`, etc. already consume `eventLog` deltas; the adapter's job is to keep the same input shape so `BoardLayout` stays unchanged.
+  4. Reset = re-run `buildInitialState` from `scenario.initialState`. Surface this through the same `reset()` API the scripted runner exposes.
+  
+  The session shape (`game.gameState`, `game.activePrompt`, `game.eventLog`, `game.sendAction`, etc.) is set by `src/components/sandbox/sandbox-session-provider.tsx`. Mirror it field-by-field — the field-drift smoke test pattern from OPT-286 is the right safety net.
 
