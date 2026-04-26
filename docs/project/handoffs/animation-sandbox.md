@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-25 (OPT-297 in review — project complete pending PR merges)
+last-updated: 2026-04-26 (Phase 2 filed — OPT-304/305/306/307 to add engine-driven playground scenarios alongside scripted ones)
 ---
 
 # Animation Sandbox — Handoff Doc
@@ -28,11 +28,24 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 10 | [OPT-294](https://linear.app/optcg-sim/issue/OPT-294) | Scenario batch: Combat (5 scenarios) | 2 | OPT-292 | Done | [#142](https://github.com/corycunanan/optcg-sim/pull/142) | Parallelizable. Counter-from-hand pre-populates `turn.battle` so use-counter-pulse can key the pulse to the defender's leader. |
 | 11 | [OPT-295](https://linear.app/optcg-sim/issue/OPT-295) | Scenario batch: KO + Life (4 scenarios) | 2 | OPT-292 | In Review | [#144](https://github.com/corycunanan/optcg-sim/pull/144) | Parallelizable. All spectator. Exercises the `kind: "ko"` flight branch and `LIFE_TRASH_REASONS` routing. |
 | 12 | [OPT-296](https://linear.app/optcg-sim/issue/OPT-296) | Scenario batch: Prompts (4 interactive scenarios) | 2 | OPT-292 | In Review | [#145](https://github.com/corycunanan/optcg-sim/pull/145) | Parallelizable. Covers the four remaining prompt modals (`ARRANGE_TOP_CARDS`, `PLAYER_CHOICE`, `OPTIONAL_EFFECT`, `REVEAL_TRIGGER`). |
-| 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | In Review | [#146](https://github.com/corycunanan/optcg-sim/pull/146) | Closeout. `useSandboxMute` hook + `docs/sandbox/clock-determinism.md`. Determinism doc reflects what shipped (setTimeout-based runner, static-script fold). |
+| 13 | [OPT-297](https://linear.app/optcg-sim/issue/OPT-297) | Polish: global mute default + clock determinism notes | 1 | OPT-291 | Done | [#146](https://github.com/corycunanan/optcg-sim/pull/146) | Closeout for Phase 1. `useSandboxMute` hook + `docs/sandbox/clock-determinism.md`. Determinism doc reflects what shipped (setTimeout-based runner, static-script fold). |
+
+### Phase 2 — engine-driven playground scenarios
+
+Filed 2026-04-26 to add an interactive-playground mode alongside the scripted scenarios. Phase 1 (OPT-285 → OPT-297) shipped a scripted-event harness; Phase 2 adds a parallel mode where the user drives real actions and the engine emits events. Scripted scenarios stay; the two modes coexist via a `mode` discriminator on `Scenario`. The spike that decided this is summarized in OPT-304's description.
+
+| Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
+|-------|--------|-------|----------|------------|--------|----|-------|
+| 14 | [OPT-304](https://linear.app/optcg-sim/issue/OPT-304) | Engine portability foundation: tsconfig + path alias + smoke test | 1 | — | Backlog | — | Phase 2 gate. Adds `@engine/*` alias, includes `workers/game/src` in main tsconfig, smoke test that imports `runPipeline` from app code. Updates scope doc with the Phase 2 architecture section + bug-blast-radius table extension. |
+| 15 | [OPT-305](https://linear.app/optcg-sim/issue/OPT-305) | Engine-driven sandbox session adapter | 3 | OPT-304 | Backlog | — | New `useSandboxEngineSession` hook. Same surface shape as `useSandboxGameSession` so `BoardLayout` is unchanged. Action → `runPipeline` → events feed existing animation pipeline. Reset = re-hydrate from `initialState`. |
+| 16 | [OPT-306](https://linear.app/optcg-sim/issue/OPT-306) | Playground scenario mode + first scenario (play character) | 2 | OPT-305 | Backlog | — | Adds `mode: "scripted" \| "playground"` to `Scenario` (default `scripted`, no regression to existing 21). Runner branches on mode. First playground scenario: `play-character` — vanilla 2-cost char + 2 active DON, user plays via real drag. |
+| 17 | [OPT-307](https://linear.app/optcg-sim/issue/OPT-307) | Playback chrome adjustments for playground mode | 1 | OPT-306 | Backlog | — | PlaybackControlBar branches on `mode`: hides Play/Pause/Step/progress in playground, promotes Reset. Info panel shows "Playground" badge instead of "Watching"/"Respond". |
+
+**Phase 2 critical path:** OPT-304 → OPT-305 → OPT-306 → OPT-307 (fully sequential; no parallelizable batches like Phase 1's scenario tickets).
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** Project complete. With OPT-297 in review, there are no remaining Backlog/Todo tickets in the Animation Sandbox project. Once #144 / #145 / #146 merge, file new tickets under a separate project for any post-launch polish (e.g., the snapshot-test infrastructure outlined in `docs/sandbox/clock-determinism.md` if that ever becomes load-bearing).
+**Next up:** OPT-304 is the gate. Foundational config-only work (tsconfig + alias + smoke test + scope doc update) — should land as a small clean PR before any of the behavioral tickets start.
 
 ---
 
