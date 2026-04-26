@@ -15,5 +15,5 @@ export default async function SandboxScenarioPage({
   const scenario = scenarios.find((s) => s.id === scenarioId);
   if (!scenario) notFound();
 
-  return <ScenarioRunner scenario={scenario} />;
+  return <ScenarioRunner scenarioId={scenario.id} />;
 }

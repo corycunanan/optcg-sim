@@ -18,7 +18,7 @@ import { useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
 import { BoardLayout } from "@/components/game/board-layout";
 import { SANDBOX_CARD_DB } from "@/lib/sandbox/sandbox-card-data";
-import type { Scenario } from "@/lib/sandbox/scenarios";
+import { scenarios } from "@/lib/sandbox/scenarios";
 import { useScenarioRunner } from "./use-scenario-runner";
 import { useScenarioInputGate } from "./scenario-input-gate";
 import { useSandboxGameSession } from "./sandbox-session-provider";
@@ -27,10 +27,17 @@ import { PlaybackControlBar } from "./playback-control-bar";
 import { SandboxMuteProvider } from "./use-sandbox-mute";
 
 export interface ScenarioRunnerProps {
-  scenario: Scenario;
+  // Accept the id and look up the scenario client-side. Passing the full
+  // Scenario object across the server/client boundary fails because
+  // expectedResponse.predicate is a function and Next.js cannot serialize it.
+  scenarioId: string;
 }
 
-export function ScenarioRunner({ scenario }: ScenarioRunnerProps) {
+export function ScenarioRunner({ scenarioId }: ScenarioRunnerProps) {
+  const scenario = scenarios.find((s) => s.id === scenarioId);
+  if (!scenario) {
+    throw new Error(`Unknown scenario: ${scenarioId}`);
+  }
   const runner = useScenarioRunner(scenario);
   const gate = useScenarioInputGate({
     scenario,
