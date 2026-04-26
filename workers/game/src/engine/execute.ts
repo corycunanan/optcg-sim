@@ -57,11 +57,12 @@ export function execute(
       return executeManualEffect(state, action.description);
     case "ACTIVATE_EFFECT":
       return executeActivateEffect(state, action.cardInstanceId, action.effectId, cardDb, actingPlayerIndex);
-    // Prompt responses — handled by GameSession before reaching the pipeline
+    // Prompt responses and UNDO — handled by GameSession before reaching the pipeline
     case "SELECT_TARGET":
     case "REDISTRIBUTE_DON":
     case "PLAYER_CHOICE":
     case "ARRANGE_TOP_CARDS":
+    case "UNDO":
       return { state, events: [] };
   }
 }
