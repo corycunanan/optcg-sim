@@ -88,7 +88,7 @@ export const DroppableCharSlot = React.memo(function DroppableCharSlot({
       className="relative flex items-center justify-center rounded-md border border-gb-border-strong/30"
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="blue" />
-      <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none relative z-[1]">
+      <span className="text-sm font-bold text-gb-text-dim/40 leading-none select-none relative z-[1]">
         {label}
       </span>
     </div>
@@ -173,7 +173,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
           )}
         </DropdownMenu>
       ) : (
-        <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
+        <span className="text-sm font-bold text-gb-text-dim/40 leading-none select-none">
           STG
         </span>
       )}

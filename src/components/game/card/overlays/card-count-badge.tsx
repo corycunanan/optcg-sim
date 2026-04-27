@@ -19,7 +19,7 @@ export function CardCountBadge({
   return (
     <span
       className={cn(
-        "rounded px-1 text-center text-xs font-bold",
+        "rounded px-1 text-center text-sm font-bold",
         "bg-gb-board-dark/80 text-gb-text-bright",
         className,
       )}

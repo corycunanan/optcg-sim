@@ -140,7 +140,7 @@ export const DonZone = React.memo(function DonZone({
       style={style}
     >
       {!hasAny && (
-        <span className="text-xs font-bold text-gb-accent-amber/40 leading-none select-none">
+        <span className="text-sm font-bold text-gb-accent-amber/40 leading-none select-none">
           DON!!
         </span>
       )}

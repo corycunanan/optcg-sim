@@ -113,7 +113,7 @@ export function OpponentField({
             motionDelay={refreshWave ? 0.18 : undefined}
           />
         ) : (
-          <span className="text-xs font-bold text-gb-text-dim/40 leading-none select-none">
+          <span className="text-sm font-bold text-gb-text-dim/40 leading-none select-none">
             STG
           </span>
         )}
