@@ -1,7 +1,7 @@
 ---
 linear-project: Responsive Game Board
 linear-project-url: https://linear.app/optcg-sim/project/responsive-game-board-e42dfec537cc
-last-updated: 2026-04-27 (OPT-308 in review; OPT-309 / OPT-313 / OPT-319 ready in parallel)
+last-updated: 2026-04-27 (OPT-308 + OPT-309 in review; OPT-313 / OPT-319 ready in parallel)
 ---
 
 # Responsive Game Board — Handoff Doc
@@ -17,7 +17,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | [OPT-308](https://linear.app/optcg-sim/issue/OPT-308) | Build `<ScaledBoard>` primitive: viewport measurement, transform-scale, initial-render handling | 3 | — | In Review | [#153](https://github.com/corycunanan/optcg-sim/pull/153) | Gate ticket for PR 1. Establishes `BoardScaleContext`. Initial render: opacity-0 until first measure, fade-in respects reduced-motion. Resize re-scaling always snaps. |
-| 2 | [OPT-309](https://linear.app/optcg-sim/issue/OPT-309) | Build `<PortalRoot>` for tooltip/modal/popover targets outside scaled subtree | 1 | — | Backlog | — | Independent. Can run in parallel with OPT-308. Establishes the rule "always portal overlays" for the audit later. |
+| 2 | [OPT-309](https://linear.app/optcg-sim/issue/OPT-309) | Build `<PortalRoot>` for tooltip/modal/popover targets outside scaled subtree | 1 | — | In Review | _(this PR)_ | Independent. Establishes the rule "always portal overlays" for the audit later. |
 | 3 | [OPT-313](https://linear.app/optcg-sim/issue/OPT-313) | Audit zone CSS: remove responsive logic, port to design pixels at 1920×1080 | 5 | — | Backlog | — | The migration heavyweight. Independent of primitives — can start in parallel. **Will touch M5d-modified files** (transform-based motion survives intact; only `vh`/`vw`/`%`/`clamp`/`position: fixed` need rework). |
 | 4 | [OPT-319](https://linear.app/optcg-sim/issue/OPT-319) | Verify card image source resolution ≥ 2x design size | 2 | — | Backlog | — | Fully independent. Run anytime. If sources are < 2x, file follow-up but don't block migration — slightly soft 4K cards is acceptable for v1. |
 | 5 | [OPT-310](https://linear.app/optcg-sim/issue/OPT-310) | Build `useBoardScale()` hook | 1 | OPT-308 | Backlog | — | Reads from `BoardScaleContext` set up by `<ScaledBoard>`. Throws if used outside one. |
@@ -35,7 +35,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-309 — `<PortalRoot>` (independent, ready now). OPT-313 (zone CSS audit) and OPT-319 (image asset verification) are also ready now and can run in parallel with OPT-309. OPT-310 / OPT-311 / OPT-312 unblock once PR #153 merges.
+**Next up:** OPT-313 — zone CSS audit (independent, ready now). OPT-319 (image asset verification) is also ready now and can run in parallel. OPT-310 / OPT-311 / OPT-312 unblock once PR #153 merges; OPT-317 (portal audit) is now unblocked by OPT-309 but the action plan defers it to PR 3 because it needs the migrated zone CSS (PR 2) to audit against.
 
 ### PR phasing
 
@@ -88,3 +88,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Don't widen the `scaled-board/index.ts` barrel — `BoardScaleContext` must stay private to the folder; OPT-310 will import it from inside. `<PortalRoot>` must mount **outside** any future `<ScaledBoard>` ancestor (the whole point: `position: fixed` does not escape a transformed parent — see scope doc Risks §High).
 - **Unresolved:** No Storybook entries yet (OPT-312); manual verification of fade-in / snap-on-resize / equal letterboxing is deferred to OPT-312's Storybook, not done in PR #153. No consumers of `<ScaledBoard>` yet — first consumer lands with OPT-314/315 shells.
 - **Why this matters for OPT-309:** OPT-309 is independent of `<ScaledBoard>` (deps: none) but is the *paired* primitive — `<PortalRoot>` is the only correct way to render overlays once the board sits inside `<ScaledBoard>`. The two together are PR 1's reviewable unit alongside OPT-310/311/312.
+
+### OPT-309 → OPT-313
+**From:** session on 2026-04-27 · **Commit:** `cad5aac` · **PR:** _(opened from this branch)_
+
+- **Primer:** `<PortalRoot>` + SSR-safe `getPortalContainer()` helper landed in `src/components/game/scaled-board/portal-root.tsx`. Render-only `<div id={id}>` (default `id="overlay-root"`). Folder gained a `README.md` documenting the portal rule for downstream OPT-317. Barrel now exports `PortalRoot`, `PortalRootProps`, and `getPortalContainer`; `BoardScaleContext` still intentionally private.
+- **Read first:** `docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md` §"What scales vs what doesn't" (the table is the migration spec); the M5d motion files in `src/components/game/zones/` (transform-based motion survives, but `vh`/`vw`/`%`/`clamp`/`position: fixed` need rework — see scope doc Risks §Medium).
+- **Gotchas / do NOT touch:** OPT-313 is the migration heavyweight, not a primitive change — do **not** edit `src/components/game/scaled-board/`; `<PortalRoot>` and `<ScaledBoard>` are stable. M5d motion code is in scope to *re-test*, not to rewrite. Only Tailwind utilities backed by tokens (per `CLAUDE.md` styling rules) — no inline `oklch`/hex/`text-[Xpx]`/`p-2.5` etc.
+- **Unresolved:** Manual verification of `<PortalRoot>` (does Radix `Portal container={getPortalContainer()}` actually escape a transformed parent at runtime?) is deferred to OPT-312's Storybook + OPT-317's portal audit — neither component nor helper has runtime tests in PR 1. No shells consume `<PortalRoot>` yet — first consumer is OPT-314/315.
+- **Why this matters for OPT-313:** OPT-313 doesn't import `<PortalRoot>` directly, but its audit must replace any `position: fixed` *inside* zone CSS with portaled overlays (per the scope doc table). Knowing the portal target exists and is keyed by `#overlay-root` is the contract OPT-313 codes against — when it removes a `position: fixed`, the replacement is "portal to `#overlay-root`," not "use `position: absolute`."
