@@ -1,9 +1,11 @@
 // Declarative scenario authoring contract for the Animation Sandbox.
 //
-// A scenario describes an initial board state and a script of GameEvents
-// that play back through the production BoardLayout via the sandbox session
-// provider (OPT-286) and runner (OPT-289). The engine is intentionally
-// bypassed — scenarios drive the visible delta only.
+// A scenario describes an initial board state and either a script of GameEvents
+// (scripted mode) or a free-play playground (playground mode) that runs through
+// the production BoardLayout. Scripted scenarios use the sandbox session
+// provider (OPT-286) + runner (OPT-289) and bypass the engine. Playground
+// scenarios use the engine-driven session adapter (OPT-305) so user actions
+// flow through the real `runPipeline`.
 
 import type {
   CardInstance,
@@ -16,6 +18,7 @@ import type {
 } from "@shared/game-types";
 
 export type ScenarioCategory =
+  | "playground"
   | "draws"
   | "movement"
   | "combat"
@@ -24,6 +27,8 @@ export type ScenarioCategory =
   | "effects"
   | "prompts"
   | "phase";
+
+export type ScenarioMode = "scripted" | "playground";
 
 // Subset of PlayerState that scenarios author. Mirrors the slice BoardLayout
 // reads from `me`/`opp` in board-layout.tsx; the sandbox provider hydrates
@@ -74,7 +79,12 @@ export interface Scenario {
   description: string;
   initialState: PartialGameState;
   cardsUsed: string[];
-  script: ScenarioStep[];
+  // Scripted scenarios fold a `script` of events through `applyEvent`.
+  // Playground scenarios drive the engine directly — `script` and
+  // `expectedResponse` are ignored. Default is "scripted" so the 21
+  // existing scenarios remain unchanged.
+  mode?: ScenarioMode;
+  script?: ScenarioStep[];
   inputMode: "spectator" | "interactive";
   expectedResponse?: ExpectedResponse;
 }

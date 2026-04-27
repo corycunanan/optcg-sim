@@ -70,7 +70,11 @@ export const DEFAULT_EVENT_DELAY_MS = 800;
 // ─── Pure controller ───────────────────────────────────────────────────
 
 export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
-  const totalSteps = scenario.script.length;
+  // `script` is optional on Scenario (playground mode omits it). The runner is
+  // only constructed for scripted scenarios, but defaulting here keeps the
+  // call site type-safe without a non-null assertion.
+  const script = scenario.script ?? [];
+  const totalSteps = script.length;
 
   let playbackState: PlaybackState = "idle";
   let currentStepIndex = 0;
@@ -117,7 +121,7 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
       playbackState = "ended";
       return;
     }
-    const step = scenario.script[currentStepIndex];
+    const step = script[currentStepIndex];
     if (step.type === "prompt") {
       playbackState = "awaiting-response";
       resumeTo = mode;
@@ -191,7 +195,7 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
       return;
     }
     clearTimer();
-    const step = scenario.script[currentStepIndex];
+    const step = script[currentStepIndex];
     if (step.type === "prompt") {
       // "Applying" a prompt transitions to awaiting-response without
       // advancing past it. resolvePrompt does the advance.
@@ -222,7 +226,7 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
 
   function getState(): ScenarioRunnerState {
     if (cachedSnapshot !== null) return cachedSnapshot;
-    const eventLog = collectEventLog(scenario.script, currentStepIndex);
+    const eventLog = collectEventLog(script, currentStepIndex);
     const derivedGameState = eventLog.reduce<PartialGameState>(
       (s, e) => applyEvent(s, e),
       scenario.initialState,
@@ -230,8 +234,8 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
     const activePrompt =
       playbackState === "awaiting-response" &&
       currentStepIndex < totalSteps &&
-      scenario.script[currentStepIndex].type === "prompt"
-        ? (scenario.script[currentStepIndex] as Extract<
+      script[currentStepIndex].type === "prompt"
+        ? (script[currentStepIndex] as Extract<
             ScenarioStep,
             { type: "prompt" }
           >).prompt

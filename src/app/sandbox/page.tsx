@@ -14,6 +14,7 @@ export const metadata = {
 };
 
 const CATEGORY_ORDER: ScenarioCategory[] = [
+  "playground",
   "draws",
   "movement",
   "combat",
@@ -25,6 +26,7 @@ const CATEGORY_ORDER: ScenarioCategory[] = [
 ];
 
 const CATEGORY_LABELS: Record<ScenarioCategory, string> = {
+  playground: "Playground",
   draws: "Draws",
   movement: "Movement",
   combat: "Combat",
@@ -39,6 +41,7 @@ function groupByCategory(
   list: Scenario[],
 ): Record<ScenarioCategory, Scenario[]> {
   const out = {
+    playground: [],
     draws: [],
     movement: [],
     combat: [],
