@@ -1081,17 +1081,35 @@ describe("PLAY_SELF action", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
 
-    // Use a hand card as the source
-    const handCard = state.players[0].hand[0];
-    const origCharCount = state.players[0].characters.filter(Boolean).length;
-    const origHandLen = state.players[0].hand.length;
+    // Inject a known Character at hand[0]. The shuffled opening hand could
+    // otherwise put a Stage/Event card here, which PLAY_SELF rejects (only
+    // Character cards play to the field) — making the test ~8% flaky.
+    const handCard: CardInstance = {
+      instanceId: "play-self-hand",
+      cardId: CARDS.VANILLA.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 0,
+      owner: 0,
+    };
+    const modState = {
+      ...state,
+      players: [
+        { ...state.players[0], hand: [handCard, ...state.players[0].hand] },
+        state.players[1],
+      ] as [typeof state.players[0], typeof state.players[1]],
+    };
+    const origCharCount = modState.players[0].characters.filter(Boolean).length;
+    const origHandLen = modState.players[0].hand.length;
 
     const block = makeEffectBlock({
       trigger: { keyword: "TRIGGER" },
       actions: [{ type: "PLAY_SELF" }],
     });
 
-    const result = resolveEffect(state, block, handCard.instanceId, 0, cardDb);
+    const result = resolveEffect(modState, block, handCard.instanceId, 0, cardDb);
     expect(result.resolved).toBe(true);
 
     // Card moved from hand to characters
