@@ -20,6 +20,7 @@ import { attachOneDonScenario } from "./movement/attach-1-don";
 import { attachThreeDonStaggeredScenario } from "./movement/attach-3-don-staggered";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
 import { redistributeDonScenario } from "./movement/redistribute-don";
+import { playCharacterScenario } from "./playground/play-character";
 import { arrangeTopFourScenario } from "./prompts/arrange-top-4";
 import { optionalEffectScenario } from "./prompts/optional-effect";
 import { playerChoiceThreeOptionsScenario } from "./prompts/player-choice-3-options";
@@ -27,6 +28,7 @@ import { revealTriggerScenario } from "./prompts/reveal-trigger";
 import { selectTargetScenario } from "./prompts/select-target";
 
 export const scenarios: Scenario[] = [
+  playCharacterScenario,
   drawOneScenario,
   drawTwoScenario,
   peekTopThreeScenario,
@@ -56,6 +58,7 @@ export type {
   PartialPlayerState,
   Scenario,
   ScenarioCategory,
+  ScenarioMode,
   ScenarioStep,
 } from "./types";
 
