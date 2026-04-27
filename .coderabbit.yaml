@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+    - "!**/.vercel/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/coverage/**"
+    - "!**/pnpm-lock.yaml"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/*.snap"
+    - "!**/*.svg"
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.jpeg"
+    - "!**/*.webp"
+    - "!**/*.ico"
+    - "!data/**"
+    - "!public/**"
+    - "!docs/cards/**"
+    - "!docs/.obsidian/**"
+    - "!prisma/migrations/**"
+  path_instructions:
+    - path: "src/app/**/*.tsx"
+      instructions: |
+        Next.js 16 App Router pages. Server components by default — flag unnecessary `"use client"` at the page level when interactivity could live in a child component.
+        Auth via `await auth()` from `@/auth`. DB via `prisma` from `@/lib/db`.
+    - path: "src/components/**/*.tsx"
+      instructions: |
+        Enforce the styling rules from CLAUDE.md:
+        - No inline `style={{}}` for design properties (colors, borders, backgrounds).
+        - No hardcoded oklch/hex values — use CSS tokens defined in `src/app/globals.css`.
+        - No custom font sizes like `text-[9px]`, `text-[10px]`, `text-[11px]`. Minimum is `text-xs` (12px).
+        - Spacing scale only: 1/2/3/4/5/6/8/10/12/16. No `p-2.5`, `px-3 py-1.5`, etc.
+        - Border radius limited to `rounded`, `rounded-md`, `rounded-lg`, `rounded-full`.
+        - No JS style manipulation (`element.style.X =`, `onMouseOver` setting inline). Use Tailwind state utilities.
+        - Use `cn()` from `@/lib/utils` for all conditional classes — never string concatenation.
+    - path: "src/app/api/**/*.ts"
+      instructions: |
+        API route handlers. Validate input with the Zod schemas in `src/lib/validators/`.
+        Always check `const session = await auth()` before mutating data unless the route is explicitly public.
+    - path: "workers/game/**/*.ts"
+      instructions: |
+        Cloudflare Worker / Durable Object game engine. State mutations must go through the 7-step action pipeline in `workers/game/src/engine/pipeline.ts`.
+        Effect handlers live in `workers/game/src/engine/effect-resolver/resolver.ts`. New card schemas must be added to the schema registry.
+    - path: "prisma/schema.prisma"
+      instructions: |
+        Schema changes require a corresponding migration. Flag schema edits that don't have a matching migration in `prisma/migrations/`.
+    - path: "**/*.test.ts"
+      instructions: |
+        Vitest tests. Game engine tests should not mock the database — integration tests run against a real Postgres instance.
+  tools:
+    eslint:
+      enabled: true
+    prisma:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 90000
+
+chat:
+  art: false
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
