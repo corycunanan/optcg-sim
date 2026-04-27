@@ -20,9 +20,7 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-5">
       <header className="space-y-2">
-        <Badge variant={scenario.inputMode === "interactive" ? "default" : "outline"}>
-          {scenario.inputMode === "interactive" ? "Interactive" : "Spectator"}
-        </Badge>
+        <Badge variant={badgeVariant(scenario)}>{badgeLabel(scenario)}</Badge>
         <h2 className="font-display text-lg font-bold tracking-tight text-content-primary">
           {scenario.title}
         </h2>
@@ -45,6 +43,19 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
       )}
     </div>
   );
+}
+
+// Playground takes precedence over inputMode: playground scenarios always
+// set inputMode: "interactive" for type safety, but the user-facing label
+// should reflect the mode split (per OPT-307).
+function badgeLabel(scenario: Scenario): string {
+  if (scenario.mode === "playground") return "Playground";
+  return scenario.inputMode === "interactive" ? "Interactive" : "Spectator";
+}
+
+function badgeVariant(scenario: Scenario): "default" | "outline" {
+  if (scenario.mode === "playground") return "default";
+  return scenario.inputMode === "interactive" ? "default" : "outline";
 }
 
 function HintBanner({ hint }: { hint: ScenarioInputHint }) {

@@ -164,10 +164,11 @@ function PlaygroundScenarioBody({ scenario }: { scenario: Scenario }) {
         />
       }
       controlBar={
-        // Playback transport is reused as-is for OPT-306. Only Reset is
-        // meaningful in playground mode; Play/Pause/Step are no-ops here
-        // and will be removed when OPT-307 ships playground-mode chrome.
+        // Playground chrome (OPT-307): PlaybackControlBar branches on
+        // `mode="playground"` to hide Play/Pause/Step + the step counter
+        // and promote Reset. Mute stays available in both modes.
         <PlaybackControlBar
+          mode="playground"
           playbackState="idle"
           currentStepIndex={0}
           totalSteps={0}
