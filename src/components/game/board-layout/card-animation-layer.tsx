@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { cardKO, cardTransitions } from "@/lib/motion";
+import { getPortalContainer } from "../scaled-board";
 import { Card } from "../card";
 import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constants";
 
@@ -174,7 +176,13 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   if (reducedMotion) return null;
   if (transitions.length === 0) return null;
 
-  return (
+  // The layer must escape any transformed parent so `position: fixed` resolves
+  // to the viewport, not the scaled subtree (`<ScaledBoard>` applies
+  // `transform: scale()`, which makes `fixed` behave like `absolute`). When a
+  // `<PortalRoot>` is mounted by the shell (OPT-314/315), portal there;
+  // otherwise render in place — the current layout has no transformed
+  // ancestor for this layer, so this preserves today's behavior.
+  const layer = (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
       <AnimatePresence>
         {transitions.map((t) => (
@@ -190,4 +198,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
       </AnimatePresence>
     </div>
   );
+
+  const container = getPortalContainer();
+  return container ? createPortal(layer, container) : layer;
 });
