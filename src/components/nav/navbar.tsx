@@ -26,6 +26,7 @@ export function Navbar() {
   const decksActive = pathname.startsWith("/decks");
   const playActive =
     pathname.startsWith("/lobbies") || pathname.startsWith("/game");
+  const sandboxActive = pathname.startsWith("/sandbox");
 
   const triggerStyles =
     "bg-transparent text-content-inverse/70 hover:bg-white/10 hover:text-content-inverse focus:bg-white/10 focus:text-content-inverse data-popup-open:bg-white/10 data-popup-open:text-content-inverse data-popup-open:hover:bg-white/15 data-open:bg-white/10 data-open:text-content-inverse data-open:hover:bg-white/15";
@@ -103,6 +104,21 @@ export function Navbar() {
                 )}
               >
                 Play
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
+
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild>
+              <Link
+                href="/sandbox"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  triggerStyles,
+                  sandboxActive && activeTriggerStyles,
+                )}
+              >
+                Sandbox
               </Link>
             </NavigationMenuLink>
           </NavigationMenuItem>
