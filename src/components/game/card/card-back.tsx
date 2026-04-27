@@ -36,7 +36,7 @@ export function CardBack({
         draggable={false}
       />
       {label && (
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-gb-text-dim/40 select-none uppercase tracking-wider">
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gb-text-dim/40 select-none uppercase tracking-wider">
           {label}
         </span>
       )}

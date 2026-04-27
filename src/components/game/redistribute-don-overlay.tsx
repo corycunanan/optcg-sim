@@ -3,6 +3,11 @@
 import type { GameAction } from "@shared/game-types";
 import { GameButton } from "./game-button";
 
+/** Inside-scaled-subtree override for `GameButton` (OPT-316). Same rationale
+ *  as `mid-zone`'s constant — buttons rendered inside the scaled board need
+ *  `text-sm`/`ring-3` to stay legible at the 1280×720 floor scale. */
+const IN_BOARD_BTN = "text-sm focus-visible:ring-3";
+
 export interface RedistributeTransfer {
   fromCardInstanceId: string;
   donInstanceId: string;
@@ -32,13 +37,13 @@ export function RedistributeDonOverlay({
         className="pointer-events-auto flex items-center gap-4 rounded-lg border border-gb-border-strong bg-gb-surface/95 px-4 py-3 shadow-lg backdrop-blur"
       >
         <div className="flex flex-col gap-1 max-w-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gb-text-subtle">
+          <span className="text-sm font-semibold uppercase tracking-wider text-gb-text-subtle">
             Redistribute DON
           </span>
-          <span className="text-sm text-gb-text leading-snug">
+          <span className="text-base text-gb-text leading-snug">
             {effectDescription || "Drag DON from your cards to redistribute."}
           </span>
-          <span className="text-xs text-gb-text-dim">
+          <span className="text-sm text-gb-text-dim">
             {transfers.length} moved · {remaining} remaining
           </span>
         </div>
@@ -47,6 +52,7 @@ export function RedistributeDonOverlay({
           <GameButton
             variant="ghost"
             size="sm"
+            className={IN_BOARD_BTN}
             onClick={onUndo}
             disabled={transfers.length === 0}
           >
@@ -55,6 +61,7 @@ export function RedistributeDonOverlay({
           <GameButton
             variant="secondary"
             size="sm"
+            className={IN_BOARD_BTN}
             onClick={() => onAction({ type: "REDISTRIBUTE_DON", transfers: [] })}
           >
             Skip
@@ -62,6 +69,7 @@ export function RedistributeDonOverlay({
           <GameButton
             variant="primary"
             size="sm"
+            className={IN_BOARD_BTN}
             onClick={() => onAction({ type: "REDISTRIBUTE_DON", transfers })}
             disabled={transfers.length === 0}
           >

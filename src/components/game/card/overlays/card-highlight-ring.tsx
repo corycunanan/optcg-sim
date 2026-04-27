@@ -40,7 +40,7 @@ export function CardHighlightRing({
         aria-hidden
         className={cn(
           "pointer-events-none absolute inset-0 z-10 rounded",
-          "ring-2 ring-gb-accent-amber",
+          "ring-3 ring-gb-accent-amber",
           "shadow-[0_0_14px_var(--gb-accent-amber)]",
           className,
         )}
@@ -64,7 +64,7 @@ export function CardHighlightRing({
         aria-hidden
         className={cn(
           "pointer-events-none absolute inset-0 z-10 rounded",
-          "ring-2 ring-gb-accent-amber",
+          "ring-3 ring-gb-accent-amber",
           "shadow-[0_0_18px_var(--gb-accent-amber)]",
           className,
         )}
@@ -84,10 +84,10 @@ export function CardHighlightRing({
 
   const staticRingClass =
     color === "selected"
-      ? "ring-2 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]"
+      ? "ring-3 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]"
       : color === "blocker"
-        ? "ring-2 ring-gb-accent-blue/60"
-        : "ring-2 ring-gb-accent-amber/70";
+        ? "ring-3 ring-gb-accent-blue/60"
+        : "ring-3 ring-gb-accent-amber/70";
 
   return (
     <div

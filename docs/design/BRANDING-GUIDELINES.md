@@ -241,6 +241,7 @@ Following Riftbound's 3-breakpoint responsive reduction:
 2. Display italic is reserved for **featured callouts, pull-quotes, and hero subtitles** — never for regular section headers
 3. Body text max line-length: 65-75 characters (`max-w-prose` or `max-w-[65ch]`)
 4. Minimum font size: 12px (`text-xs`). Never use `text-[10px]` or `text-[11px]`.
+   - **Inside-board exception (OPT-316):** the scaled game-board subtree renders at scale `0.67` at the 1280×720 floor viewport, which collapses chrome's 12px floor to ~8px effective. Inside any element rendered within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-sm` (14px)** for labels/counters/badges and **`text-base` (16px)** for body / paragraph text. Chrome (navbar, modals, tooltips, popovers, side panels) keeps the 12px floor unchanged. See §13 for the full inside-board override set.
 5. Use `font-display: swap` for web font loading
 6. Use `tabular-nums` for any numeric data (costs, power, life counts)
 
@@ -653,7 +654,7 @@ import { useReducedMotion } from "motion/react";
 |-------------|----------|----------------|
 | Text contrast | 4.5:1 minimum | All token pairings pre-validated |
 | Large text contrast | 3:1 minimum | Display text on all surface variants |
-| Focus visible | 2px solid ring | `--border-focus` (navy-900), 2px offset |
+| Focus visible | 2px solid ring (chrome); **3px ring inside `<ScaledBoard>`** (OPT-316) | `--border-focus` (navy-900), 2px offset; in-board uses `ring-3` so the focus indicator still renders ~2px at floor scale |
 | Touch targets | 44x44px minimum | All interactive elements |
 | Keyboard navigation | Full tab support | Logical tab order, visible focus |
 | Screen reader | Semantic HTML | ARIA labels, roles, live regions |
@@ -729,6 +730,26 @@ When building game board components, follow these rules to ensure theme portabil
 | Icons/accents | Use `--gb-accent-*` tokens | Hardcode accent colors that only work on dark |
 
 This ensures that swapping the `--gb-*` token set (e.g., a light beach theme, a Wano-themed board) will produce a coherent result without component-level changes.
+
+### Inside-Board Floor Overrides (Responsive Game Board, OPT-316)
+
+The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×720 minimum viewport the scale floor is ~0.67, which compresses chrome's 12px text into ~8px effective and a 2px focus ring into ~1.34px — both below the legibility floor.
+
+Inside the scaled subtree only — anything that renders within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers (zones, on-board cards, in-board CTAs, on-board overlays such as the DON redistribute bar) — apply these overrides:
+
+| Element | Chrome floor | Inside-board floor | Rationale |
+|---------|--------------|--------------------|-----------|
+| Labels, counters, badges | `text-xs` (12px) | **`text-sm` (14px)** | ~9.4px effective at floor scale |
+| Body / paragraph text | `text-xs` (12px) | **`text-base` (16px)** | ~10.7px effective at floor scale |
+| Focus rings | `ring-2` (2px) | **`ring-3` (3px)** | ~2px effective at floor scale |
+
+**What stays as chrome (12px / `ring-2`):**
+
+- The board navbar (rendered at design pixels, not inside the scaled wrapper).
+- All Radix-portaled overlays — modals, tooltips, popovers, dropdown menus — because Radix `Portal` renders them outside the transformed parent (see `<PortalRoot>` in OPT-309).
+- Side panels and chat sidebars consumed by the `<LiveGameShell>`.
+
+**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (mid-zone, redistribute overlay) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-xs` / `ring-2`); in-board call sites pass `className="text-sm focus-visible:ring-3"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
 
 ---
 

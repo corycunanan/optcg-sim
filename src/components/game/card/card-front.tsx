@@ -45,18 +45,18 @@ export function CardFront({
         />
       ) : (
         <>
-          <div className="px-1 pt-1 text-xs leading-tight font-bold text-gb-text-bright line-clamp-2">
+          <div className="px-1 pt-1 text-sm leading-tight font-bold text-gb-text-bright line-clamp-2">
             {data?.name ?? fallbackLabel ?? "?"}
           </div>
           {data?.type && (
             <div className="px-1">
-              <span className="text-xs text-gb-text-dim">{data.type}</span>
+              <span className="text-sm text-gb-text-dim">{data.type}</span>
             </div>
           )}
           <div className="flex-1" />
           <div className="px-1 pb-1 flex items-end justify-between">
             {data?.power != null && (
-              <span className="text-xs font-bold leading-none text-gb-accent-green">
+              <span className="text-sm font-bold leading-none text-gb-accent-green">
                 {data.power >= 1000
                   ? `${(data.power / 1000).toFixed(0)}K`
                   : data.power}

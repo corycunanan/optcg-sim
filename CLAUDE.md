@@ -143,6 +143,7 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 5. **Three border-radius values** — `rounded` (4px, badges), `rounded-md` (8px, inputs/buttons), `rounded-lg` (12px, panels/modals), `rounded-full` (pills). Nothing else.
 6. **No JS style manipulation** — no `element.style.X =` or `onMouseOver` setting inline properties. Use CSS state (Tailwind `group-hover:`, `data-[state]:`)
 7. **`cn()` for all conditional classes** — use clsx + tailwind-merge, never string concatenation
+8. **Inside-board floor (scaled game board)** — anything rendered inside `<ScaledBoard>` / `BoardLayout`'s transformed subtree (zones, on-board cards, in-board CTAs, on-board overlays) lifts the floor: **`text-sm` (14px)** for labels/counters/badges, **`text-base` (16px)** for body text, **`ring-3`** for focus indicators. Chrome (navbar, modals, tooltips, popovers, side panels — anything portaled or outside the scaled wrapper) keeps `text-xs`/`ring-2`. Background: at the 1280×720 floor viewport the board scales to ~0.67, which collapses chrome's defaults below the legibility floor. Full table in `docs/design/BRANDING-GUIDELINES.md` §13.
 
 ### Design Principles
 

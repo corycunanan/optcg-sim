@@ -47,7 +47,7 @@ function Slot({
       style={style}
     >
       {label && (
-        <span className="text-xs text-gb-text-dim text-center leading-tight select-none">
+        <span className="text-sm text-gb-text-dim text-center leading-tight select-none">
           {label}
         </span>
       )}
@@ -283,7 +283,7 @@ export function BoardScaffold() {
               height: MID_ZONE_H,
             }}
           >
-            <span className="text-xs uppercase tracking-widest text-gb-text-dim">
+            <span className="text-sm uppercase tracking-widest text-gb-text-dim">
               Controls &middot; Prompts &middot; Phase Info
             </span>
           </div>

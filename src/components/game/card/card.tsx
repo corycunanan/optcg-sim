@@ -133,7 +133,7 @@ export const Card = React.memo(function Card({
         style={{ width, height, ...style }}
       >
         {(emptyLabel ?? overlays?.label) && (
-          <span className="select-none text-xs uppercase tracking-wider leading-tight text-center text-gb-text-dim/50">
+          <span className="select-none text-sm uppercase tracking-wider leading-tight text-center text-gb-text-dim/50">
             {emptyLabel ?? overlays?.label}
           </span>
         )}
