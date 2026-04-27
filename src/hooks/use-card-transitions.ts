@@ -89,7 +89,66 @@ export function eventToTransitions(
     return out;
   }
 
+  // LIFE_CARD_TO_DECK: face-down life cards travel to the bottom of the
+  // owner's deck. Mirror the count-N expansion so it reads like a small
+  // sequence rather than a single ghost.
+  if (event.type === "LIFE_CARD_TO_DECK") {
+    const { playerIndex } = event;
+    const prefix = playerIndex === myIndex ? "p" : "o";
+    const count = Math.max(1, event.payload.count ?? 1);
+    return makeFaceDownBurst(
+      count,
+      `${prefix}-life`,
+      `${prefix}-deck`,
+      playerIndex,
+    );
+  }
+
+  // CARD_TRASHED with a life-zone reason. The engine emits these with only
+  // a `count` (no individual instanceIds), so consumers fly face-down tokens
+  // from life to trash.
+  if (event.type === "CARD_TRASHED") {
+    const { playerIndex } = event;
+    const prefix = playerIndex === myIndex ? "p" : "o";
+    const reason = event.payload.reason;
+    if (LIFE_TRASH_REASONS.has(reason)) {
+      const count = Math.max(1, event.payload.count ?? 1);
+      return makeFaceDownBurst(
+        count,
+        `${prefix}-life`,
+        `${prefix}-trash`,
+        playerIndex,
+      );
+    }
+  }
+
   return [];
+}
+
+/** Helper for count-N face-down flights between two static zones. Each
+ *  token gets its own per-token delay so the sequence fans out instead of
+ *  landing in a single instant; a later `applyBatchStagger` may add more. */
+function makeFaceDownBurst(
+  count: number,
+  fromZoneKey: string,
+  toZoneKey: string,
+  playerIndex: 0 | 1,
+): CardTransition[] {
+  const startedAt = Date.now();
+  const out: CardTransition[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push({
+      id: nextId(),
+      cardId: null,
+      instanceId: null,
+      fromZoneKey,
+      toZoneKey,
+      playerIndex,
+      startedAt,
+      delay: (i * STAGGER_MS) / 1000,
+    });
+  }
+  return out;
 }
 
 function eventToTransition(
@@ -189,7 +248,20 @@ function eventToTransition(
       to = `${prefix}-hand`;
       break;
     }
+    case "CARD_RETURNED_TO_DECK": {
+      const p = event.payload;
+      cardId = p.cardId ?? null;
+      cardInstanceId = p.cardInstanceId;
+      const resolvedZone = cardInstanceId && zoneRegistry
+        ? zoneRegistry.getCardZone(cardInstanceId)
+        : null;
+      from = resolvedZone ?? `${prefix}-char-2`;
+      to = `${prefix}-deck`;
+      break;
+    }
     case "DON_PLACED_ON_FIELD": {
+      // No flight — DON arrival is handled by `DonZone` via a `useFieldArrivals`
+      // entry pop (no logical board source for DON tokens to fly from).
       return null;
     }
     default:
