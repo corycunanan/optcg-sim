@@ -1,7 +1,7 @@
 ---
 linear-project: Animation Sandbox
 linear-project-url: https://linear.app/optcg-sim/project/animation-sandbox-c2c60d216612
-last-updated: 2026-04-26 (OPT-304 in review — engine portability foundation landed, Phase 2 unblocked)
+last-updated: 2026-04-26 (OPT-305 in review — engine-driven session adapter shipped; OPT-306/307 still backlog)
 ---
 
 # Animation Sandbox — Handoff Doc
