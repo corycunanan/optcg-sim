@@ -4,6 +4,7 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { getPortalContainer } from "@/components/game/scaled-board"
 
 function Popover({
   ...props
@@ -24,7 +25,7 @@ function PopoverContent({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={getPortalContainer() ?? undefined}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}

@@ -21,7 +21,7 @@ CSS spec gotcha: `position: fixed` does **not** escape a transformed parent. Any
 import { Portal } from "@radix-ui/react-portal";
 import { getPortalContainer } from "@/components/game/scaled-board";
 
-<Portal container={getPortalContainer()}>
+<Portal container={getPortalContainer() ?? undefined}>
   <Tooltip />
 </Portal>
 ```
@@ -36,16 +36,58 @@ const container = getPortalContainer();
 return container ? createPortal(<Tooltip />, container) : null;
 ```
 
+The `?? undefined` (or `?? document.body`) fallback matters: `<PortalRoot>` is mounted by shells (OPT-314/315), and until those land, `getPortalContainer()` returns `null`. Without a fallback, the overlay renders nowhere.
+
 ## Layout shape
 
 ```tsx
 // In <LiveGameShell> / <SandboxShell>:
 <>
+  <PortalRoot />
   <ScaledBoard designWidth={1920} designHeight={1080}>
     <Board ... />
   </ScaledBoard>
-  <PortalRoot />
 </>
 ```
 
-Both shells mount one `<PortalRoot>` instance, outside the `<ScaledBoard>` wrapper but inside the page layout.
+`<PortalRoot>` mounts **before** `<ScaledBoard>` so `#overlay-root` exists in the DOM when the first scaled descendant tries to portal into it. Both shells mount one `<PortalRoot>` instance, outside the `<ScaledBoard>` wrapper but inside the page layout.
+
+## Audited overlays (OPT-317)
+
+The `getPortalContainer()` default is wired into every overlay primitive in the repo. Callers don't need to opt in — using the wrapper is enough.
+
+**Radix primitives (`src/components/ui/`)** — `container` defaults to `getPortalContainer() ?? undefined`, falls back to `document.body`:
+
+| Primitive | File |
+|-----------|------|
+| AlertDialog | `alert-dialog.tsx` (`AlertDialogPortal` wrapper) |
+| Dialog | `dialog.tsx` (`DialogPortal` wrapper, used by `command.tsx`) |
+| DropdownMenu | `dropdown-menu.tsx` (`DropdownMenuPortal` wrapper) |
+| HoverCard | `hover-card.tsx` (inline portal in `HoverCardContent`) |
+| Popover | `popover.tsx` (inline portal in `PopoverContent`) |
+| Select | `select.tsx` (inline portal in `SelectContent`) |
+| Sheet | `sheet.tsx` (`SheetPortal` wrapper) |
+| Tooltip | `tooltip.tsx` (inline portal in `TooltipContent`) |
+
+**Custom overlays (`src/components/game/`)** — explicit `createPortal` calls:
+
+| File | Purpose |
+|------|---------|
+| `board-layout/card-animation-layer.tsx` | Card flight overlay (settled in OPT-313) |
+| `arrange-top-cards-modal.tsx` | dnd-kit `DragOverlay` |
+
+**Chrome (`position: fixed` outside the scaled subtree — intentionally not portaled):**
+
+These render at the page-layout level, *outside* any `<ScaledBoard>`, so `position: fixed` resolves against the viewport correctly today. Shell authors (OPT-314/315) must keep them outside the scaled wrapper:
+
+- `src/app/layout.tsx` — Sonner `<Toaster />` (app root)
+- `src/app/game/layout.tsx` — game-route bg wrapper
+- `src/components/ui/sidebar.tsx` — chrome
+- `src/components/game/event-log.tsx` — sibling of `BoardLayout`
+- `src/components/game/game-board-visual.tsx` — opponent-away banner + dev modal-test panel (siblings of `BoardLayout`)
+
+If a future shell wraps any of these inside `<ScaledBoard>`, they must move into the portal subtree (or stop using `position: fixed`).
+
+## Overriding the default
+
+A consumer can pass `container={null}` (or any `HTMLElement`) to a `*Portal` wrapper to opt out of `#overlay-root` and target Radix's body fallback (or a custom container). This is rare — chrome consumers should still portal to `#overlay-root` so behavior is uniform.

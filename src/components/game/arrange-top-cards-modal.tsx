@@ -29,6 +29,7 @@ import {
   DialogFooter,
   TooltipProvider,
 } from "@/components/ui";
+import { getPortalContainer } from "./scaled-board";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
 
@@ -243,9 +244,10 @@ export function ArrangeTopCardsModal({
               )}
             </div>
 
-            {/* Portal the overlay to document.body so Radix Dialog's
-                translate(-50%,-50%) centering transform doesn't break
-                DragOverlay's position:fixed tracking. React context is
+            {/* Portal the overlay outside Radix Dialog's translate(-50%,-50%)
+                wrapper so DragOverlay's position:fixed tracking isn't broken by
+                a transformed ancestor. Targets `<PortalRoot>` when shells mount
+                it (OPT-309/317); falls back to body until then. React context is
                 preserved through portals, so DndContext still sees it. */}
             {typeof document !== "undefined" &&
               createPortal(
@@ -267,7 +269,7 @@ export function ArrangeTopCardsModal({
                     </motion.div>
                   )}
                 </DragOverlay>,
-                document.body,
+                getPortalContainer() ?? document.body,
               )}
           </DndContext>
         </TooltipProvider>
