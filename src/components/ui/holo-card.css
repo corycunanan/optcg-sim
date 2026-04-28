@@ -1,0 +1,108 @@
+/*
+ * Holo card spike — clean-room implementation of pointer-driven holofoil.
+ *
+ * Technique: layered gradients (rainbow shine + radial glare) with mix-blend-modes,
+ * positioned by CSS custom properties driven by useCardTilt. The 3D tilt comes
+ * from the same custom properties (--tilt-x, --tilt-y) on a perspective parent.
+ *
+ * No assets — entirely procedural. Effect names are scoped via [data-effect].
+ * Add new tiers by adding `.holo-card[data-effect="<name>"] .holo-card__shine { ... }`
+ * blocks below.
+ */
+
+.holo-card {
+  --pointer-x: 50%;
+  --pointer-y: 50%;
+  --pointer-from-center: 0;
+  --pointer-from-center-x: 0;
+  --pointer-from-center-y: 0;
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --active: 0;
+
+  position: relative;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.holo-card__inner {
+  position: relative;
+  display: block;
+  border-radius: inherit;
+  overflow: hidden;
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.holo-card[data-active="true"] .holo-card__inner {
+  transition: transform 80ms linear;
+}
+
+.holo-card__inner > :not(.holo-card__shine):not(.holo-card__glare) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.holo-card__shine,
+.holo-card__glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--active);
+  transition: opacity 280ms ease-out;
+  will-change: opacity, background-position, filter;
+}
+
+/* -------- regular-holo -------- */
+
+.holo-card[data-effect="regular-holo"] .holo-card__shine {
+  background-image:
+    repeating-linear-gradient(
+      115deg,
+      hsl(0 95% 62% / 0.55) 0%,
+      hsl(40 95% 62% / 0.55) 8%,
+      hsl(120 90% 60% / 0.55) 16%,
+      hsl(180 90% 60% / 0.55) 24%,
+      hsl(220 95% 62% / 0.55) 32%,
+      hsl(280 90% 62% / 0.55) 40%,
+      hsl(330 95% 62% / 0.55) 48%,
+      hsl(0 95% 62% / 0.55) 56%
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsl(0 0% 100% / 0.45) 8%,
+      hsl(0 0% 50% / 0.25) 35%,
+      hsl(0 0% 0% / 0.6) 80%
+    );
+  background-size: 220% 220%, 180% 180%;
+  background-position:
+    calc(50% + var(--pointer-from-center-x) * -1.6%) calc(50% + var(--pointer-from-center-y) * -1.6%),
+    var(--pointer-x) var(--pointer-y);
+  background-blend-mode: overlay;
+  mix-blend-mode: color-dodge;
+  filter: brightness(calc(0.85 + 0.4 * var(--active))) contrast(1.4) saturate(1.4);
+}
+
+.holo-card[data-effect="regular-holo"] .holo-card__glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(0 0% 100% / 0.7) 6%,
+    hsl(0 0% 100% / 0.4) 22%,
+    hsl(0 0% 0% / 0.85) 90%
+  );
+  mix-blend-mode: overlay;
+  opacity: calc(var(--active) * 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .holo-card__inner {
+    transform: none;
+    transition: none;
+  }
+  .holo-card[data-active="true"] .holo-card__inner {
+    transform: none;
+  }
+}

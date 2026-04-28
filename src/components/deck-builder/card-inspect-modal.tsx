@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { HoloCard } from "@/components/ui/holo-card";
+import { holoEffectForRarity, HOLO_FEATURE_ENABLED } from "@/lib/cards/holo";
 import { cn } from "@/lib/utils";
 
 interface ArtVariant {
@@ -156,7 +158,10 @@ export function CardInspectModal({
             {/* Left: Card image + art variants */}
             <div className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border p-4">
               {/* Main image */}
-              <div className="overflow-hidden rounded">
+              <HoloCard
+                effect={HOLO_FEATURE_ENABLED ? holoEffectForRarity(card.rarity) : "none"}
+                className="overflow-hidden rounded"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={displayImage}
@@ -164,7 +169,7 @@ export function CardInspectModal({
                   className="w-full"
                   key={displayImage}
                 />
-              </div>
+              </HoloCard>
 
               {/* Art variant selector */}
               {allArtworks.length > 1 && (
