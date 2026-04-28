@@ -56,7 +56,7 @@ export function CardImageGallery({
   return (
     <div>
       {/* Main image */}
-      <HoloCard effect={effect} className="overflow-hidden rounded-lg border border-border">
+      <HoloCard effect={effect} className="overflow-hidden rounded-lg">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={selectedImage}
