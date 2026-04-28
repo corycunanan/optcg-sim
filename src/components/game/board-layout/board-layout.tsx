@@ -71,6 +71,13 @@ export interface BoardLayoutProps {
    *  designWidth/designHeight so the inner board sizes against design pixels
    *  while `<ScaledBoard>` owns the viewport-fit transform. */
   viewportSize?: { width: number; height: number };
+  /** Scale factor applied by an ancestor transform (e.g. `<ScaledBoard>`).
+   *  The dnd-kit `<DragOverlay>` portals to `document.body`, escaping that
+   *  ancestor transform — so to render dragged cards at the same on-screen
+   *  size as on-board cards, the overlay multiplies its inner `boardScale`
+   *  by this value. Defaults to `1` for the legacy path where BoardLayout
+   *  sits directly under the window. */
+  outerScale?: number;
 }
 
 export function BoardLayout(props: BoardLayoutProps) {
@@ -103,6 +110,7 @@ function BoardLayoutInner({
   canUndo,
   interactionMode = "full",
   viewportSize,
+  outerScale = 1,
 }: BoardLayoutProps & { interactionMode?: InteractionMode }) {
   const dndDisabled = interactionMode !== "full";
   const zoneRegistry = useZonePosition();
@@ -191,6 +199,16 @@ function BoardLayoutInner({
   /* ── Derived state from extracted hooks ───────────────────────────── */
 
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
+
+  // The dnd-kit DragOverlay portals to `document.body`, which sits outside
+  // any ancestor `<ScaledBoard>` transform. To render dragged cards at the
+  // same on-screen size as cards already on the board, the overlay must
+  // recreate the user's perceived scale: the inner `boardScale` (BoardLayout's
+  // own zone-wrapper transform) times the outer ScaledBoard scale. Inside a
+  // `<ScaledBoard>` `boardScale === 1` (viewport matches design canvas), so
+  // the product collapses to `outerScale`; on the legacy window-fit path
+  // `outerScale === 1` and the product collapses to `boardScale`.
+  const dragOverlayScale = outerScale * boardScale;
 
   const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
 
@@ -544,7 +562,7 @@ function BoardLayoutInner({
           {activeDrag.type === "hand-card" && (
             <div
               style={{
-                transform: `scale(${boardScale})`,
+                transform: `scale(${dragOverlayScale})`,
                 transformOrigin: "top left",
               }}
             >
@@ -558,7 +576,7 @@ function BoardLayoutInner({
           {activeDrag.type === "active-don" && (
             <div
               style={{
-                transform: `scale(${boardScale})`,
+                transform: `scale(${dragOverlayScale})`,
                 transformOrigin: "top left",
               }}
             >
@@ -568,7 +586,7 @@ function BoardLayoutInner({
           {activeDrag.type === "redistribute-don" && (
             <div
               style={{
-                transform: `scale(${boardScale})`,
+                transform: `scale(${dragOverlayScale})`,
                 transformOrigin: "top left",
               }}
             >
@@ -578,7 +596,7 @@ function BoardLayoutInner({
           {activeDrag.type === "attacker" && (
             <div
               style={{
-                transform: `scale(${boardScale})`,
+                transform: `scale(${dragOverlayScale})`,
                 transformOrigin: "top left",
               }}
             >
