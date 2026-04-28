@@ -21,6 +21,8 @@
     "db:promote-admin": "tsx scripts/promote-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
     "pipeline:import": "tsx pipeline/import.ts",
     "pipeline:migrate-images": "tsx pipeline/migrate-images.ts",
     "worker:deploy": "cd workers/images && pnpm install && pnpm run deploy",
@@ -61,6 +63,8 @@
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1011.0",
+    "@storybook/addon-docs": "9.1.20",
+    "@storybook/nextjs-vite": "9.1.20",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
@@ -71,9 +75,11 @@
     "prettier": "^3",
     "prettier-plugin-tailwindcss": "^0.6",
     "prisma": "^6.19.2",
+    "storybook": "9.1.20",
     "tailwindcss": "^4",
     "tsx": "^4",
     "typescript": "^5",
+    "vite": "^7.3.2",
     "vitest": "^4.1.1"
   },
   "pnpm": {
