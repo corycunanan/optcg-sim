@@ -419,6 +419,25 @@ Images download successfully via `--with-images` flag:
 - Storage: local `images/` directory within the output folder
 - Production plan: download locally, then upload to Cloudflare R2 for CDN serving
 
+### Resolution Headroom (OPT-319 verification, 2026-04-27)
+
+Confirmed source resolution is sufficient for the Responsive Game Board project's 4K crispness goal (decision #6 in [`RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). No re-ingest required.
+
+**Source dimensions:** 600×838 PNG.
+
+**Design floor** (board authored at 1920×1080):
+
+| Card | Design size | 2× crispness floor (4K) | Source / 2× floor |
+|------|-------------|-------------------------|-------------------|
+| Board card (`BOARD_CARD_W` × `BOARD_CARD_H` × 1.5) | 120×168 | 240×336 | 2.50× |
+| Hand card (`HAND_CARD_W` × `HAND_CARD_H` × 1.5) | 126×177 | 252×354 | 2.38× |
+
+Source 600×838 is ~5× the design size on both axes — comfortably above the 2× floor with ~2.4–2.5× headroom on top. Crisp at 4K (2× scale) and still adequate at hypothetical 5K/ultra-wide upscales.
+
+**Verification sample:** 9 base cards from R2 across ST-01, OP-01, OP-05, OP-09, OP-10, EB-01, P-001 — all 600×838 PNG, ~120–225 KB each. Variant entries (`_p1`, `_p2`) sampled directly from the official source — also 600×838 PNG. Variants in R2 follow the same pipeline (no transcoding step), so the same dimensions apply once migrated.
+
+**Cross-references:** acceptance criterion #6 in [`RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md), board card constants in `src/components/game/board-layout/constants.ts`.
+
 ---
 
 ## Updated Pipeline Design
