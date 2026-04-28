@@ -10,3 +10,5 @@ export type {
   UseScaledDragResult,
   ScaledDragInfo,
 } from "./use-scaled-drag";
+export { MinViewportGate } from "./min-viewport-gate";
+export type { MinViewportGateProps } from "./min-viewport-gate";

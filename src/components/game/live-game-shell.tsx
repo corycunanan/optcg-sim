@@ -16,7 +16,11 @@ import {
   type BoardState,
   type BoardDispatch,
 } from "@/components/game/board";
-import { PortalRoot, ScaledBoard } from "@/components/game/scaled-board";
+import {
+  MinViewportGate,
+  PortalRoot,
+  ScaledBoard,
+} from "@/components/game/scaled-board";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +39,17 @@ export interface LiveGameShellProps {
   workerUrl: string;
 }
 
-export function LiveGameShell({ gameId, workerUrl }: LiveGameShellProps) {
+export function LiveGameShell(props: LiveGameShellProps) {
+  // Gate at the wrapper level so `useGameSession` (which opens a websocket)
+  // doesn't run for users below the 1280×720 desktop floor.
+  return (
+    <MinViewportGate>
+      <LiveGameShellContent {...props} />
+    </MinViewportGate>
+  );
+}
+
+function LiveGameShellContent({ gameId, workerUrl }: LiveGameShellProps) {
   const { game, opponent, navigation, endState } = useGameSession(
     gameId,
     workerUrl,
