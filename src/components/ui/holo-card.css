@@ -1,0 +1,107 @@
+/*
+ * Holo card spike — clean-room implementation of pointer-driven holofoil.
+ *
+ * Technique: layered gradients (rainbow shine + radial glare) with mix-blend-modes,
+ * positioned by CSS custom properties driven by useCardTilt. The 3D tilt comes
+ * from the same custom properties (--tilt-x, --tilt-y) on a perspective parent.
+ *
+ * No assets — entirely procedural. Effect names are scoped via [data-effect].
+ * Add new tiers by adding `.holo-card[data-effect="<name>"] .holo-card__shine { ... }`
+ * blocks below.
+ */
+
+.holo-card {
+  --pointer-x: 50%;
+  --pointer-y: 50%;
+  --pointer-from-center: 0;
+  --pointer-from-center-x: 0;
+  --pointer-from-center-y: 0;
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --active: 0;
+
+  position: relative;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.holo-card__inner {
+  position: relative;
+  display: block;
+  border-radius: inherit;
+  overflow: hidden;
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.holo-card[data-active="true"] .holo-card__inner {
+  transition: transform 80ms linear;
+}
+
+.holo-card__inner > :not(.holo-card__shine):not(.holo-card__glare) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.holo-card__shine,
+.holo-card__glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--active);
+  transition: opacity 280ms ease-out;
+  will-change: opacity, background-position, filter;
+}
+
+/* -------- regular-holo --------
+ *
+ * Tuning goal: highlight the art, don't obscure it. Pearlescent shimmer +
+ * a soft cursor-anchored highlight, not a saturated rainbow wash.
+ *
+ *   - mix-blend-mode: soft-light (gentle shift) instead of color-dodge
+ *     (aggressive brightening).
+ *   - Pointer-anchored conic gradient gives a subtle iridescent sweep.
+ *     Per-stop alpha is intentionally low (0.18-0.22).
+ *   - No saturate/contrast amplification — leaves the printed art's own
+ *     colors intact.
+ *   - Shine peaks at 0.55 of --active and glare at 0.7, so even at full
+ *     hover the artwork reads cleanly through both layers.
+ */
+
+.holo-card[data-effect="regular-holo"] .holo-card__shine {
+  background-image: conic-gradient(
+    from calc(var(--pointer-from-center-x) * 1deg) at var(--pointer-x) var(--pointer-y),
+    hsl(0 70% 70% / 0.18),
+    hsl(45 75% 72% / 0.22),
+    hsl(160 60% 70% / 0.20),
+    hsl(220 65% 72% / 0.22),
+    hsl(290 60% 72% / 0.20),
+    hsl(0 70% 70% / 0.18)
+  );
+  mix-blend-mode: soft-light;
+  opacity: calc(var(--active) * 0.55);
+}
+
+.holo-card[data-effect="regular-holo"] .holo-card__glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(0 0% 100% / 0.32) 0%,
+    hsl(0 0% 100% / 0.12) 28%,
+    hsl(0 0% 100% / 0) 55%
+  );
+  mix-blend-mode: overlay;
+  opacity: calc(var(--active) * 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .holo-card__inner {
+    transform: none;
+    transition: none;
+  }
+  .holo-card[data-active="true"] .holo-card__inner {
+    transform: none;
+  }
+}
