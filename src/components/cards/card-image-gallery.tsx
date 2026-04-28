@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { HoloCard, type HoloEffect } from "@/components/ui/holo-card";
 
 interface ArtVariant {
   id: string;
@@ -19,6 +20,8 @@ interface CardImageGalleryProps {
   // Controlled mode — when provided, selected image is managed externally
   controlledImage?: string;
   onImageSelect?: (imageUrl: string, isBase: boolean) => void;
+  /** Holo effect tier for the main image. Defaults to "none". */
+  effect?: HoloEffect;
 }
 
 export function CardImageGallery({
@@ -27,6 +30,7 @@ export function CardImageGallery({
   artVariants,
   controlledImage,
   onImageSelect,
+  effect = "none",
 }: CardImageGalleryProps) {
   const [internalImage, setInternalImage] = useState(baseImageUrl);
   const selectedImage = controlledImage ?? internalImage;
@@ -52,7 +56,7 @@ export function CardImageGallery({
   return (
     <div>
       {/* Main image */}
-      <div className="overflow-hidden rounded-lg border border-border">
+      <HoloCard effect={effect} className="overflow-hidden rounded-lg border border-border">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={selectedImage}
@@ -60,7 +64,7 @@ export function CardImageGallery({
           className="w-full"
           key={selectedImage}
         />
-      </div>
+      </HoloCard>
 
       {/* Artwork selector — only show if there are variants */}
       {artVariants.length > 0 && (
