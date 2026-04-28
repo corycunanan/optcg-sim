@@ -66,6 +66,11 @@ export interface BoardLayoutProps {
    *  `"spectator"` and `"responseOnly"` are sandbox-only modes (OPT-290) that
    *  disable drag and right-click menus while leaving prompt modals usable. */
   interactionMode?: InteractionMode;
+  /** When provided, BoardLayout authors against this design canvas instead of
+   *  measuring the window. Set by `<Board>` to the parent `<ScaledBoard>`'s
+   *  designWidth/designHeight so the inner board sizes against design pixels
+   *  while `<ScaledBoard>` owns the viewport-fit transform. */
+  viewportSize?: { width: number; height: number };
 }
 
 export function BoardLayout(props: BoardLayoutProps) {
@@ -97,10 +102,12 @@ function BoardLayoutInner({
   matchClosed,
   canUndo,
   interactionMode = "full",
+  viewportSize,
 }: BoardLayoutProps & { interactionMode?: InteractionMode }) {
   const dndDisabled = interactionMode !== "full";
   const zoneRegistry = useZonePosition();
-  const [viewport, setViewport] = useState(getViewportSize);
+  const [windowViewport, setWindowViewport] = useState(getViewportSize);
+  const viewport = viewportSize ?? windowViewport;
   const [isPromptHidden, setIsPromptHidden] = useState(false);
   const [zonePreview, setZonePreview] = useState<
     | { type: "deck"; owner: "me" | "opp" }
@@ -168,8 +175,9 @@ function BoardLayoutInner({
   }, [redistributePrompt, redistributeTransfers]);
 
   useLayoutEffect(() => {
+    if (viewportSize) return;
     function update() {
-      setViewport(getViewportSize());
+      setWindowViewport(getViewportSize());
     }
     update();
     window.addEventListener("resize", update);
@@ -178,7 +186,7 @@ function BoardLayoutInner({
       window.removeEventListener("resize", update);
       window.visualViewport?.removeEventListener("resize", update);
     };
-  }, []);
+  }, [viewportSize]);
 
   /* ── Derived state from extracted hooks ───────────────────────────── */
 

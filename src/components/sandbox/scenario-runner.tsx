@@ -1,25 +1,22 @@
 "use client";
 
-// Animation Sandbox scenario player shell. Branches on `scenario.mode`:
+// Animation Sandbox scenario player. Branches on `scenario.mode`:
 //
 //   - "scripted" (default): runner controller (OPT-289) + input gate (OPT-290)
 //     + applyEvent-folded session (OPT-286). Plays a hand-authored event
-//     script through the production BoardLayout.
+//     script through the production Board.
 //   - "playground" (OPT-306): engine-driven session (OPT-305). User actions
 //     flow through `runPipeline`; the runner has no script and no playback
-//     timer. Only Reset is meaningful in the transport — the rest of the
-//     control bar is no-op'd here and will be replaced with playground-mode
-//     chrome in OPT-307.
+//     timer.
 //
-// The two paths intentionally do not share a hook chain. They share only the
-// outer chrome (header, board container, info panel slot, control bar slot)
-// via `ScenarioRunnerShell`. Per OPT-306: don't unify the runner branches.
+// Both modes hand the BoardState/BoardDispatch they synthesize to
+// `<SandboxShell>` (OPT-314), which composes the chrome and wraps `<Board>`
+// in `<ScaledBoard>` + `<PortalRoot>`. Sandbox chrome (header, info panel,
+// playback control bar) lives outside the scaled subtree as required by the
+// shell contract.
 
-import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useMemo, useCallback } from "react";
 import type { CardData } from "@shared/game-types";
-import { BoardLayout } from "@/components/game/board-layout";
 import { SANDBOX_CARD_DB } from "@/lib/sandbox/sandbox-card-data";
 import { scenarios } from "@/lib/sandbox/scenarios";
 import type { Scenario } from "@/lib/sandbox/scenarios";
@@ -27,10 +24,13 @@ import { useScenarioRunner } from "./use-scenario-runner";
 import { useScenarioInputGate } from "./scenario-input-gate";
 import { useSandboxGameSession } from "./sandbox-session-provider";
 import { useSandboxEngineSession } from "./sandbox-engine-session-provider";
-import { ScenarioInfoPanel } from "./scenario-info-panel";
-import type { ScenarioInputHint } from "./scenario-input-gate";
 import { PlaybackControlBar } from "./playback-control-bar";
 import { SandboxMuteProvider } from "./use-sandbox-mute";
+import { SandboxShell } from "./sandbox-shell";
+import type {
+  BoardState,
+  BoardDispatch,
+} from "@/components/game/board";
 
 export interface ScenarioRunnerProps {
   // Accept the id and look up the scenario client-side. Passing the full
@@ -84,30 +84,39 @@ function ScriptedScenarioBody({ scenario }: { scenario: Scenario }) {
 
   const session = useSandboxGameSession(sessionInput);
 
+  const onLeave = useCallback(
+    () => void session.navigation.handleBackToLobbies(),
+    [session.navigation],
+  );
+
+  const state: BoardState = {
+    me: session.game.me,
+    opp: session.game.opp,
+    myIndex: session.game.myIndex,
+    turn: session.game.turn,
+    cardDb: session.game.cardDb,
+    isMyTurn: session.game.isMyTurn,
+    battlePhase: session.game.battlePhase,
+    connectionStatus: session.game.connectionStatus,
+    eventLog: session.game.gameState.eventLog,
+    activeEffects: session.game.gameState.activeEffects,
+    activePrompt: session.game.activePrompt,
+    matchClosed: session.game.matchClosed,
+    canUndo: session.game.canUndo,
+    interactionMode: gate.interactionMode,
+  };
+
+  const dispatch: BoardDispatch = {
+    onAction: session.game.sendAction,
+    onLeave,
+  };
+
   return (
-    <ScenarioRunnerShell
+    <SandboxShell
       scenario={scenario}
       hint={gate.hint}
-      board={
-        <BoardLayout
-          me={session.game.me}
-          opp={session.game.opp}
-          myIndex={session.game.myIndex}
-          turn={session.game.turn}
-          cardDb={session.game.cardDb}
-          isMyTurn={session.game.isMyTurn}
-          battlePhase={session.game.battlePhase}
-          connectionStatus={session.game.connectionStatus}
-          eventLog={session.game.gameState.eventLog}
-          activeEffects={session.game.gameState.activeEffects}
-          activePrompt={session.game.activePrompt}
-          onAction={session.game.sendAction}
-          onLeave={session.navigation.handleBackToLobbies}
-          matchClosed={session.game.matchClosed}
-          canUndo={session.game.canUndo}
-          interactionMode={gate.interactionMode}
-        />
-      }
+      state={state}
+      dispatch={dispatch}
       controlBar={
         <PlaybackControlBar
           playbackState={runner.playbackState}
@@ -139,30 +148,39 @@ function PlaygroundScenarioBody({ scenario }: { scenario: Scenario }) {
     cardDb: cardDbMap,
   });
 
+  const onLeave = useCallback(
+    () => void session.navigation.handleBackToLobbies(),
+    [session.navigation],
+  );
+
+  const state: BoardState = {
+    me: session.game.me,
+    opp: session.game.opp,
+    myIndex: session.game.myIndex,
+    turn: session.game.turn,
+    cardDb: session.game.cardDb,
+    isMyTurn: session.game.isMyTurn,
+    battlePhase: session.game.battlePhase,
+    connectionStatus: session.game.connectionStatus,
+    eventLog: session.game.gameState.eventLog,
+    activeEffects: session.game.gameState.activeEffects,
+    activePrompt: session.game.activePrompt,
+    matchClosed: session.game.matchClosed,
+    canUndo: session.game.canUndo,
+    interactionMode: "full",
+  };
+
+  const dispatch: BoardDispatch = {
+    onAction: session.game.sendAction,
+    onLeave,
+  };
+
   return (
-    <ScenarioRunnerShell
+    <SandboxShell
       scenario={scenario}
       hint={null}
-      board={
-        <BoardLayout
-          me={session.game.me}
-          opp={session.game.opp}
-          myIndex={session.game.myIndex}
-          turn={session.game.turn}
-          cardDb={session.game.cardDb}
-          isMyTurn={session.game.isMyTurn}
-          battlePhase={session.game.battlePhase}
-          connectionStatus={session.game.connectionStatus}
-          eventLog={session.game.gameState.eventLog}
-          activeEffects={session.game.gameState.activeEffects}
-          activePrompt={session.game.activePrompt}
-          onAction={session.game.sendAction}
-          onLeave={session.navigation.handleBackToLobbies}
-          matchClosed={session.game.matchClosed}
-          canUndo={session.game.canUndo}
-          interactionMode="full"
-        />
-      }
+      state={state}
+      dispatch={dispatch}
       controlBar={
         // Playground chrome (OPT-307): PlaybackControlBar branches on
         // `mode="playground"` to hide Play/Pause/Step + the step counter
@@ -179,47 +197,6 @@ function PlaygroundScenarioBody({ scenario }: { scenario: Scenario }) {
         />
       }
     />
-  );
-}
-
-// ─── Shared chrome ─────────────────────────────────────────────────────
-
-function ScenarioRunnerShell({
-  scenario,
-  board,
-  hint,
-  controlBar,
-}: {
-  scenario: Scenario;
-  board: ReactNode;
-  hint: ScenarioInputHint | null;
-  controlBar: ReactNode;
-}) {
-  return (
-    <div className="flex h-full flex-col overflow-hidden bg-gb-board">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-1 px-5 py-2">
-        <Link
-          href="/sandbox"
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-content-secondary hover:bg-surface-2 hover:text-content-primary"
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          <span>Back to Sandbox</span>
-        </Link>
-        <span aria-hidden className="text-content-disabled">·</span>
-        <h1 className="truncate text-sm font-bold text-content-primary">
-          {scenario.title}
-        </h1>
-      </header>
-
-      <div className="flex flex-1 min-h-0">
-        <div className="relative flex-1 min-w-0">{board}</div>
-        <aside className="hidden w-80 shrink-0 border-l border-border bg-surface-1 lg:block">
-          <ScenarioInfoPanel scenario={scenario} hint={hint} />
-        </aside>
-      </div>
-
-      {controlBar}
-    </div>
   );
 }
 
