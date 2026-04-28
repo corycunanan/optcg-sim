@@ -3,23 +3,18 @@ import type { HoloEffect } from "@/components/ui/holo-card";
 /**
  * Rarity → effect tier mapping for the holo-card spike.
  *
+ * The current `regular-holo` is intentionally subtle (pearlescent shimmer +
+ * cursor-anchored highlight) — too soft to function as a rarity differentiator
+ * on its own — so every card gets it. Future iterations will introduce more
+ * pronounced tiers (e.g. iridescent rainbow for SecretRare, cosmos for Leader)
+ * and reintroduce a rarity gate at that point.
+ *
  * Vegapull rarity strings as stored: Common, Uncommon, Rare, SuperRare,
  * SecretRare, Promo, Leader (no spaces — verified against the live DB).
- * The first pass assigns a single shared effect to the "premium" tier; later
- * iterations should split SecretRare / Leader / Promo into their own effects
- * (e.g. rainbow, cosmos).
  */
-const HOLO_RARITIES = new Set<string>([
-  "SuperRare",
-  "SecretRare",
-  "Leader",
-  "Promo",
-]);
-
 export function holoEffectForRarity(rarity: string | null | undefined): HoloEffect {
   if (!rarity) return "none";
-  if (HOLO_RARITIES.has(rarity)) return "regular-holo";
-  return "none";
+  return "regular-holo";
 }
 
 /**
