@@ -52,6 +52,10 @@ The `?? undefined` (or `?? document.body`) fallback matters: `<PortalRoot>` is m
 
 `<PortalRoot>` mounts **before** `<ScaledBoard>` so `#overlay-root` exists in the DOM when the first scaled descendant tries to portal into it. Both shells mount one `<PortalRoot>` instance, outside the `<ScaledBoard>` wrapper but inside the page layout.
 
+## Shell contract: shells inject state, never internals (OPT-321)
+
+`<Board>` (in `@/components/game/board`) is the only authorized consumer of zone internals (`board-layout/*`). Shells (`<LiveGameShell>`, `<SandboxShell>`), the page files that host them (`src/app/game/**`, `src/app/sandbox/**`), and shell-adjacent live-only chrome (`event-log.tsx`, `game-button.tsx`, `game-error-boundary.tsx`, `game-ui.tsx`) must compose `<Board>` and inject only `state` + `dispatch`. Reaching into `board-layout/` from these files is structurally forbidden — an ESLint rule (`@typescript-eslint/no-restricted-imports`, see `eslint.config.mjs` → `shell-injects-state-only-contract`) reports value imports of `board-layout/*` from any of those files as an error. Type-only imports are allowed so shared types (`InteractionMode`, `BoardLayoutProps`) can flow across the boundary without dragging in zone components.
+
 ## Audited overlays (OPT-317)
 
 The `getPortalContainer()` default is wired into every overlay primitive in the repo. Callers don't need to opt in — using the wrapper is enough.
