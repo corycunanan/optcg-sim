@@ -2,10 +2,10 @@
 
 import dynamic from "next/dynamic";
 
-const GameBoardVisual = dynamic(
+const LiveGameShell = dynamic(
   () =>
-    import("@/components/game/game-board-visual").then(
-      (mod) => mod.GameBoardVisual
+    import("@/components/game/live-game-shell").then(
+      (mod) => mod.LiveGameShell
     ),
   { ssr: false }
 );
@@ -17,5 +17,5 @@ export function GameBoardLoader({
   gameId: string;
   workerUrl: string;
 }) {
-  return <GameBoardVisual gameId={gameId} workerUrl={workerUrl} />;
+  return <LiveGameShell gameId={gameId} workerUrl={workerUrl} />;
 }

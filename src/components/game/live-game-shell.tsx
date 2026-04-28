@@ -1,8 +1,22 @@
 "use client";
 
+// Live game shell. Mirrors `<SandboxShell>`'s contract: composes the shared
+// scaled-board primitives and renders live-only chrome (opponent-away banner,
+// EventLog, dev modal-test panel, match-end Dialog, connectivity/loading
+// states) as siblings of `<ScaledBoard>`, outside the scaled subtree.
+//
+// Per the OPT-321 shell contract, this shell may inject only `state` and
+// `dispatch` into `<Board>` and MUST NOT customize anything inside it.
+
 import { useState } from "react";
 import { useGameSession } from "@/hooks/use-game-session";
 import { cn } from "@/lib/utils";
+import {
+  Board,
+  type BoardState,
+  type BoardDispatch,
+} from "@/components/game/board";
+import { PortalRoot, ScaledBoard } from "@/components/game/scaled-board";
 import {
   Dialog,
   DialogContent,
@@ -11,19 +25,21 @@ import {
 } from "@/components/ui";
 import { Spinner } from "@/components/ui/spinner";
 import { GameButton } from "./game-button";
-import { BoardLayout } from "./board-layout/index";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
 import type { PromptOptions } from "@shared/game-types";
 
-interface GameBoardVisualProps {
+export interface LiveGameShellProps {
   gameId: string;
   workerUrl: string;
 }
 
-export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
-  const { game, opponent, navigation, endState } = useGameSession(gameId, workerUrl);
+export function LiveGameShell({ gameId, workerUrl }: LiveGameShellProps) {
+  const { game, opponent, navigation, endState } = useGameSession(
+    gameId,
+    workerUrl,
+  );
   const [devPrompt, setDevPrompt] = useState<PromptOptions | null>(null);
   const activePrompt = devPrompt ?? game.activePrompt;
 
@@ -85,7 +101,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                   className="font-mono"
                 >
                   {navigation.fallbackSubmitting
-                    ? "Conceding\u2026"
+                    ? "Conceding…"
                     : "Concede Match"}
                 </GameButton>
               </div>
@@ -101,10 +117,10 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
           <Spinner className="size-6 text-gb-text-bright" />
           <div className="text-sm text-gb-text-bright font-bold">
             {game.connectionStatus === "connecting"
-              ? "Connecting\u2026"
+              ? "Connecting…"
               : !game.gameState
-                ? "Loading game\u2026"
-                : "Loading card data\u2026"}
+                ? "Loading game…"
+                : "Loading card data…"}
           </div>
           {game.lastError && (
             <div className="text-xs text-gb-accent-red">
@@ -130,7 +146,7 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
                 className="font-mono"
               >
                 {navigation.fallbackSubmitting
-                  ? "Conceding\u2026"
+                  ? "Conceding…"
                   : "Concede Match"}
               </GameButton>
             </div>
@@ -148,9 +164,43 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
     );
   }
 
+  const state: BoardState = {
+    me: game.me,
+    opp: game.opp,
+    myIndex: game.myIndex,
+    turn: game.turn,
+    cardDb: game.cardDb,
+    isMyTurn: game.isMyTurn,
+    battlePhase: game.battlePhase,
+    connectionStatus: game.connectionStatus,
+    eventLog: game.gameState.eventLog,
+    activeEffects: game.gameState.activeEffects,
+    activePrompt,
+    matchClosed: game.matchClosed,
+    canUndo: game.canUndo,
+  };
+
+  const dispatch: BoardDispatch = {
+    onAction: (action) => {
+      if (
+        action.type === "ARRANGE_TOP_CARDS" ||
+        action.type === "PLAYER_CHOICE" ||
+        action.type === "REVEAL_TRIGGER" ||
+        action.type === "PASS"
+      ) {
+        setDevPrompt(null);
+      }
+      game.sendAction(action);
+    },
+    onLeave: () => {
+      void navigation.handleBackToLobbies();
+    },
+  };
+
   return (
     <GameErrorBoundary>
-      {/* Opponent away / disconnect banner */}
+      <PortalRoot />
+
       {!game.matchClosed && opponent.opponentAway && (
         <div
           className={cn(
@@ -185,33 +235,10 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         </div>
       )}
 
-      <BoardLayout
-        me={game.me}
-        opp={game.opp}
-        myIndex={game.myIndex}
-        turn={game.turn}
-        cardDb={game.cardDb}
-        isMyTurn={game.isMyTurn}
-        battlePhase={game.battlePhase}
-        connectionStatus={game.connectionStatus}
-        eventLog={game.gameState.eventLog}
-        activeEffects={game.gameState.activeEffects}
-        activePrompt={activePrompt}
-        onAction={(action) => {
-          if (
-            action.type === "ARRANGE_TOP_CARDS" ||
-            action.type === "PLAYER_CHOICE" ||
-            action.type === "REVEAL_TRIGGER" ||
-            action.type === "PASS"
-          ) setDevPrompt(null);
-          game.sendAction(action);
-        }}
-        onLeave={navigation.handleBackToLobbies}
-        matchClosed={game.matchClosed}
-        canUndo={game.canUndo}
-      />
+      <ScaledBoard designWidth={1920} designHeight={1080}>
+        <Board state={state} dispatch={dispatch} />
+      </ScaledBoard>
 
-      {/* ── Dev: modal test panel ── only in development ──────────────── */}
       {process.env.NODE_ENV === "development" && game.me && (
         <div className="fixed bottom-4 right-4 z-[300] flex items-center gap-2">
           {devPrompt && (
@@ -302,14 +329,12 @@ export function GameBoardVisual({ gameId, workerUrl }: GameBoardVisualProps) {
         </div>
       )}
 
-      {/* Event Log — bottom left */}
       <EventLog
         events={game.gameState.eventLog}
         cardDb={game.cardDb}
         myIndex={game.myIndex}
       />
 
-      {/* Match ended overlay */}
       <Dialog open={game.matchClosed}>
         <DialogContent
           showCloseButton={false}
