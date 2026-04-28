@@ -56,45 +56,44 @@
   will-change: opacity, background-position, filter;
 }
 
-/* -------- regular-holo -------- */
+/* -------- regular-holo --------
+ *
+ * Tuning goal: highlight the art, don't obscure it. Pearlescent shimmer +
+ * a soft cursor-anchored highlight, not a saturated rainbow wash.
+ *
+ *   - mix-blend-mode: soft-light (gentle shift) instead of color-dodge
+ *     (aggressive brightening).
+ *   - Pointer-anchored conic gradient gives a subtle iridescent sweep.
+ *     Per-stop alpha is intentionally low (0.18-0.22).
+ *   - No saturate/contrast amplification — leaves the printed art's own
+ *     colors intact.
+ *   - Shine peaks at 0.55 of --active and glare at 0.7, so even at full
+ *     hover the artwork reads cleanly through both layers.
+ */
 
 .holo-card[data-effect="regular-holo"] .holo-card__shine {
-  background-image:
-    repeating-linear-gradient(
-      115deg,
-      hsl(0 95% 62% / 0.55) 0%,
-      hsl(40 95% 62% / 0.55) 8%,
-      hsl(120 90% 60% / 0.55) 16%,
-      hsl(180 90% 60% / 0.55) 24%,
-      hsl(220 95% 62% / 0.55) 32%,
-      hsl(280 90% 62% / 0.55) 40%,
-      hsl(330 95% 62% / 0.55) 48%,
-      hsl(0 95% 62% / 0.55) 56%
-    ),
-    radial-gradient(
-      farthest-corner circle at var(--pointer-x) var(--pointer-y),
-      hsl(0 0% 100% / 0.45) 8%,
-      hsl(0 0% 50% / 0.25) 35%,
-      hsl(0 0% 0% / 0.6) 80%
-    );
-  background-size: 220% 220%, 180% 180%;
-  background-position:
-    calc(50% + var(--pointer-from-center-x) * -1.6%) calc(50% + var(--pointer-from-center-y) * -1.6%),
-    var(--pointer-x) var(--pointer-y);
-  background-blend-mode: overlay;
-  mix-blend-mode: color-dodge;
-  filter: brightness(calc(0.85 + 0.4 * var(--active))) contrast(1.4) saturate(1.4);
+  background-image: conic-gradient(
+    from calc(var(--pointer-from-center-x) * 1deg) at var(--pointer-x) var(--pointer-y),
+    hsl(0 70% 70% / 0.18),
+    hsl(45 75% 72% / 0.22),
+    hsl(160 60% 70% / 0.20),
+    hsl(220 65% 72% / 0.22),
+    hsl(290 60% 72% / 0.20),
+    hsl(0 70% 70% / 0.18)
+  );
+  mix-blend-mode: soft-light;
+  opacity: calc(var(--active) * 0.55);
 }
 
 .holo-card[data-effect="regular-holo"] .holo-card__glare {
   background-image: radial-gradient(
     farthest-corner circle at var(--pointer-x) var(--pointer-y),
-    hsl(0 0% 100% / 0.7) 6%,
-    hsl(0 0% 100% / 0.4) 22%,
-    hsl(0 0% 0% / 0.85) 90%
+    hsl(0 0% 100% / 0.32) 0%,
+    hsl(0 0% 100% / 0.12) 28%,
+    hsl(0 0% 100% / 0) 55%
   );
   mix-blend-mode: overlay;
-  opacity: calc(var(--active) * 0.85);
+  opacity: calc(var(--active) * 0.7);
 }
 
 @media (prefers-reduced-motion: reduce) {

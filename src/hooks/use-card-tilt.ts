@@ -21,7 +21,7 @@ interface UseCardTiltOptions {
  * Honors `prefers-reduced-motion`: pointer tracking still runs (so the static
  * shine still slides), but the 3D rotation is held at 0.
  */
-export function useCardTilt({ enabled = true, maxTiltDeg = 14 }: UseCardTiltOptions = {}) {
+export function useCardTilt({ enabled = true, maxTiltDeg = 9 }: UseCardTiltOptions = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingRef = useRef<{ x: number; y: number } | null>(null);
