@@ -41,13 +41,14 @@ export interface BoardProps {
 }
 
 export function Board({ state, dispatch }: BoardProps) {
-  const { designWidth, designHeight } = useBoardScale();
+  const { scale, designWidth, designHeight } = useBoardScale();
   return (
     <BoardLayout
       {...state}
       onAction={dispatch.onAction}
       onLeave={dispatch.onLeave}
       viewportSize={{ width: designWidth, height: designHeight }}
+      outerScale={scale}
     />
   );
 }
