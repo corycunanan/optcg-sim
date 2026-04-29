@@ -10,6 +10,11 @@ import { ClientMessageSchema } from "../../../../shared/validators/client-messag
 import type { GameInitPayload, PlayerInitData, DeckCardData } from "../types.js";
 import type { ClientMessage } from "../types.js";
 
+export type NotifyEndPayload = {
+  winnerIndex: 0 | 1;
+  reason: string;
+};
+
 // ─── GameInitPayload ─────────────────────────────────────────────────────────
 
 function isString(v: unknown): v is string {
@@ -68,6 +73,20 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
   }
 
   return obj as unknown as GameInitPayload;
+}
+
+export function validateNotifyEndPayload(raw: unknown): NotifyEndPayload {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error("NotifyEndPayload must be a non-null object");
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj.winnerIndex !== 0 && obj.winnerIndex !== 1) {
+    throw new Error("NotifyEndPayload.winnerIndex must be 0 or 1");
+  }
+  if (!isString(obj.reason)) {
+    throw new Error("NotifyEndPayload.reason must be a non-empty string");
+  }
+  return { winnerIndex: obj.winnerIndex, reason: obj.reason };
 }
 
 // ─── ClientMessage ───────────────────────────────────────────────────────────
