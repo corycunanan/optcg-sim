@@ -18,6 +18,12 @@ import { buildGameInitPayload } from "@/lib/game/init-payload";
 import { JoinLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
+import {
+  DECK_INVALID_CODE,
+  DeckInvalidError,
+  DeckNotFoundError,
+  requirePlayableDeck,
+} from "@/lib/decks/playable";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
@@ -47,20 +53,12 @@ export async function POST(request: NextRequest) {
       return apiError("Invalid lobby code", 400);
     }
 
-    // Verify guest's deck belongs to them
-    const guestDeck = await prisma.deck.findFirst({
-      where: { id: deckId, userId },
-      include: { cards: { include: { card: true } } },
-    });
-    if (!guestDeck) {
-      return apiError("Deck not found", 404);
-    }
+    const guestPlayableDeck = await requirePlayableDeck(deckId, userId);
 
     // Find the lobby by join code
     const lobby = await prisma.lobby.findFirst({
       where: { joinCode: normalizedCode, status: "WAITING" },
       include: {
-        hostDeck: { include: { cards: { include: { card: true } } } },
         guest: true,
       },
     });
@@ -77,15 +75,10 @@ export async function POST(request: NextRequest) {
       return apiError("Lobby already has a guest", 409);
     }
 
-    // Fetch leader cards (leaders are NOT in DeckCard)
-    const [hostLeader, guestLeader] = await Promise.all([
-      prisma.card.findUnique({ where: { id: lobby.hostDeck.leaderId } }),
-      prisma.card.findUnique({ where: { id: guestDeck.leaderId } }),
-    ]);
-
-    if (!hostLeader || !guestLeader) {
-      return apiError("Leader card not found", 404);
-    }
+    const hostPlayableDeck = await requirePlayableDeck(
+      lobby.hostDeckId,
+      lobby.hostUserId,
+    );
 
     // Atomically create LobbyGuest + GameSession + mark lobby IN_GAME.
     // Uses array-based $transaction (single round-trip, PgBouncer-safe)
@@ -119,13 +112,13 @@ export async function POST(request: NextRequest) {
       format: lobby.format,
       player1: {
         userId: lobby.hostUserId,
-        leader: hostLeader,
-        deck: lobby.hostDeck,
+        leader: hostPlayableDeck.leader,
+        deck: hostPlayableDeck.deck,
       },
       player2: {
         userId,
-        leader: guestLeader,
-        deck: guestDeck,
+        leader: guestPlayableDeck.leader,
+        deck: guestPlayableDeck.deck,
       },
     });
 
@@ -153,6 +146,15 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess({ gameId: gameSession.id });
   } catch (error) {
+    if (error instanceof DeckNotFoundError) {
+      return apiError("Deck not found", 404);
+    }
+    if (error instanceof DeckInvalidError) {
+      return apiError("Deck is not playable", 422, {
+        code: DECK_INVALID_CODE,
+        details: error.details,
+      });
+    }
     console.error("Lobby join error:", error);
     return apiError("Failed to join lobby", 500);
   }

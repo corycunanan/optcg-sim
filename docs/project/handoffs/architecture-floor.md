@@ -1,7 +1,7 @@
 ---
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-last-updated: 2026-04-29 (OPT-331 in review)
+last-updated: 2026-04-29 (OPT-330 in review)
 ---
 
 # Architecture Floor — Handoff Doc
@@ -21,8 +21,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 3 | [OPT-328](https://linear.app/optcg-sim/issue/OPT-328) | Normalize worker test/type-check execution from repo root and CI | 2 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Workspace already declared in `pnpm-workspace.yaml`. Adds root scripts via `pnpm --filter optcg-game ...` and replaces CI's `cd workers/game && npx vitest run`. |
 | 4 | [OPT-262](https://linear.app/optcg-sim/issue/OPT-262) | Reconcile Prisma migration drift (`testOrder` column + modified `simplify_lobby_for_m3`) | 3 | OPT-326 (PR 1 first) | Done | [#172](https://github.com/corycunanan/optcg-sim/pull/172) | **Blocks OPT-298** (Solitaire schema). Two issues: undocumented `testOrder` column, modified `simplify_lobby_for_m3`. Add CI drift guard. |
 | 5 | [OPT-329](https://linear.app/optcg-sim/issue/OPT-329) | App↔Worker contract tests: game init, tokens, result callback, hidden-zone filtering | 5 | OPT-327 | Done | [#173](https://github.com/corycunanan/optcg-sim/pull/173) | New `src/__tests__/contracts/`. Pin init payload, token verify, result callback (`GameResultSchema`), notify-end fallback, hidden-zone filtering. |
-| 6 | [OPT-330](https://linear.app/optcg-sim/issue/OPT-330) | Enforce playable deck legality server-side before lobby/solitaire game start | 5 | OPT-326 (PR 1 first) | Backlog | — | **Blocks OPT-298**. Extracts `requirePlayableDeck(deckId, userId)` to `src/lib/decks/`. Wires into `lobbies/route.ts` and `lobbies/join/route.ts`. Returns 422 with structured `details`. |
-| 7 | [OPT-331](https://linear.app/optcg-sim/issue/OPT-331) | Centralize idempotent game result finalization across worker callback and fallback concede | 3 | OPT-329 | In Review | [#174](https://github.com/corycunanan/optcg-sim/pull/174) | New `src/lib/game/finalize.ts` with `finalizeGameResult()`. Conditional update on non-terminal state. Adds `reasonCode` enum. Tests cover three idempotency races. |
+| 6 | [OPT-330](https://linear.app/optcg-sim/issue/OPT-330) | Enforce playable deck legality server-side before lobby/solitaire game start | 5 | OPT-326 (PR 1 first) | In Review | [#175](https://github.com/corycunanan/optcg-sim/pull/175) | **Blocks OPT-298**. Extracts `requirePlayableDeck(deckId, userId)` to `src/lib/decks/`. Wires into `lobbies/route.ts` and `lobbies/join/route.ts`. Returns 422 with structured `details`. |
+| 7 | [OPT-331](https://linear.app/optcg-sim/issue/OPT-331) | Centralize idempotent game result finalization across worker callback and fallback concede | 3 | OPT-329 | Done | [#174](https://github.com/corycunanan/optcg-sim/pull/174) | New `src/lib/game/finalize.ts` with `finalizeGameResult()`. Conditional update on non-terminal state. Adds `reasonCode` enum. Tests cover three idempotency races. |
 | 8 | [OPT-332](https://linear.app/optcg-sim/issue/OPT-332) | Triage React lint warnings; fix board correctness warnings (refs-during-render, set-state-in-effect) | 5 | — | Backlog | — | Targets ~6 correctness-class warnings: `board-layout.tsx:127, 137, 330`, `hand-layer.tsx:157`, `card-detail-modal.tsx:100`, two more at `:84`/`:52`. Total warning count target: <350 (from 413). |
 | 9 | [OPT-333](https://linear.app/optcg-sim/issue/OPT-333) | Worker WebSocket security audit: token replay, action spam, payload limits, reconnect abuse | 3 | OPT-327 | Backlog | — | Audit-and-triage ticket. Output: `docs/architecture/WORKER-SECURITY-AUDIT.md` + 3–5 follow-up tickets + ≥1 quick-win fix (likely payload cap). |
 | 10 | [OPT-324](https://linear.app/optcg-sim/issue/OPT-324) | Flaky test: opt-243 Leader-vs-Leader battle termination intermittently emits 0 END_OF_BATTLE | 3 | OPT-328 | Backlog | — | **Cross-project: lives in Game Board Reliability.** Tracked here as part of PR 8. Root-cause non-determinism in trigger ordering. 20/20 clean runs before close. |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-330** — Enforce playable deck legality server-side before lobby/solitaire game start. Ready now after PR 1.
+**Next up:** **OPT-332** — Triage React lint warnings; fix board correctness warnings. Ready now.
 
 ### PR phasing
 
@@ -123,3 +123,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** `finalizeGameResult` only accepts terminal statuses; `GameResultSchema` still parses `IN_PROGRESS` for compatibility, but `/api/game/result` rejects it.
 - **Unresolved:** Worker reason-code inference is text-based for now in `workers/game/src/util/result.ts`; avoid coupling OPT-330 deck legality to finalization behavior.
 - **Why this matters for OPT-330:** Deck legality can reject invalid starts before game creation while finalization idempotency now protects the separate post-start end paths.
+
+### OPT-330 → OPT-332
+**From:** session on 2026-04-29 · **Commit:** `6a922a5` · **PR:** #175
+
+- **Primer:** Lobby creation and lobby join now call `requirePlayableDeck(deckId, userId)` at the game-start boundary; draft deck saves remain permissive and no cached `Deck.isPlayable` column was added.
+- **Read first:** `src/lib/decks/playable.ts`, `src/lib/deck-builder/validation.ts`, `src/app/api/lobbies/route.ts`, `src/app/api/lobbies/join/route.ts`, `src/lib/decks/playable.test.ts`
+- **Gotchas / do NOT touch:** `requirePlayableDeck` fetches deck rows and cards separately so missing card IDs can produce structured `DECK_INVALID` details; both guest and host decks are checked before worker init.
+- **Unresolved:** OPT-298 should reuse `requirePlayableDeck` for solitaire game start; UI-specific rendering of the structured 422 details is still deferred.
+- **Why this matters for OPT-332:** The lint warning baseline is still 410 warnings with 0 errors after `pnpm verify`; OPT-332 can focus on the board correctness warnings without carrying deck legality work.
