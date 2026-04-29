@@ -1,12 +1,12 @@
 ---
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-last-updated: 2026-04-29 (OPT-332 in review)
+last-updated: 2026-04-29 (OPT-333 in review)
 ---
 
 # Architecture Floor — Handoff Doc
 
-Tighten the runtime safety floor around the game engine, the app↔worker boundary, deck legality, CI, and board correctness. Ten tickets, eight PRs. Floor first; new features after. Full scope: [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../ARCHITECTURE-FLOOR-SCOPE.md).
+Tighten the runtime safety floor around the game engine, the app↔worker boundary, deck legality, CI, board correctness, and worker WebSocket security. Original floor first; audit follow-ups before new features. Full scope: [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../ARCHITECTURE-FLOOR-SCOPE.md).
 
 ---
 
@@ -23,15 +23,19 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 5 | [OPT-329](https://linear.app/optcg-sim/issue/OPT-329) | App↔Worker contract tests: game init, tokens, result callback, hidden-zone filtering | 5 | OPT-327 | Done | [#173](https://github.com/corycunanan/optcg-sim/pull/173) | New `src/__tests__/contracts/`. Pin init payload, token verify, result callback (`GameResultSchema`), notify-end fallback, hidden-zone filtering. |
 | 6 | [OPT-330](https://linear.app/optcg-sim/issue/OPT-330) | Enforce playable deck legality server-side before lobby/solitaire game start | 5 | OPT-326 (PR 1 first) | Done | [#175](https://github.com/corycunanan/optcg-sim/pull/175) | **Blocks OPT-298**. Extracts `requirePlayableDeck(deckId, userId)` to `src/lib/decks/`. Wires into `lobbies/route.ts` and `lobbies/join/route.ts`. Returns 422 with structured `details`. |
 | 7 | [OPT-331](https://linear.app/optcg-sim/issue/OPT-331) | Centralize idempotent game result finalization across worker callback and fallback concede | 3 | OPT-329 | Done | [#174](https://github.com/corycunanan/optcg-sim/pull/174) | New `src/lib/game/finalize.ts` with `finalizeGameResult()`. Conditional update on non-terminal state. Adds `reasonCode` enum. Tests cover three idempotency races. |
-| 8 | [OPT-332](https://linear.app/optcg-sim/issue/OPT-332) | Triage React lint warnings; fix board correctness warnings (refs-during-render, set-state-in-effect) | 5 | — | In Review | [#176](https://github.com/corycunanan/optcg-sim/pull/176) | Clears all `react-hooks/refs` and `react-hooks/set-state-in-effect` warnings. Lint warning count: 344. |
-| 9 | [OPT-333](https://linear.app/optcg-sim/issue/OPT-333) | Worker WebSocket security audit: token replay, action spam, payload limits, reconnect abuse | 3 | OPT-327 | Backlog | — | Audit-and-triage ticket. Output: `docs/architecture/WORKER-SECURITY-AUDIT.md` + 3–5 follow-up tickets + ≥1 quick-win fix (likely payload cap). |
-| 10 | [OPT-324](https://linear.app/optcg-sim/issue/OPT-324) | Flaky test: opt-243 Leader-vs-Leader battle termination intermittently emits 0 END_OF_BATTLE | 3 | OPT-328 | Backlog | — | **Cross-project: lives in Game Board Reliability.** Tracked here as part of PR 8. Root-cause non-determinism in trigger ordering. 20/20 clean runs before close. |
+| 8 | [OPT-332](https://linear.app/optcg-sim/issue/OPT-332) | Triage React lint warnings; fix board correctness warnings (refs-during-render, set-state-in-effect) | 5 | — | Done | [#176](https://github.com/corycunanan/optcg-sim/pull/176) | Clears all `react-hooks/refs` and `react-hooks/set-state-in-effect` warnings. Lint warning count: 344. |
+| 9 | [OPT-333](https://linear.app/optcg-sim/issue/OPT-333) | Worker WebSocket security audit: token replay, action spam, payload limits, reconnect abuse | 3 | OPT-327 | In Review | [#178](https://github.com/corycunanan/optcg-sim/pull/178) | Adds `docs/architecture/WORKER-SECURITY-AUDIT.md`, creates OPT-334–OPT-337 follow-ups, and lands an 8 KiB WS payload cap. |
+| 10 | [OPT-337](https://linear.app/optcg-sim/issue/OPT-337) | Enforce one active WebSocket per player in each game session | 3 | OPT-333 | Backlog | — | First WS audit follow-up. Fix duplicate-socket/stale-close presence and prompt delivery risk. |
+| 11 | [OPT-334](https://linear.app/optcg-sim/issue/OPT-334) | Bind worker game tokens to gameId and track replay identifiers | 3 | OPT-333 | Backlog | — | Require game-scoped tokens; add `jti` replay policy or explicitly document short-TTL reuse. |
+| 12 | [OPT-335](https://linear.app/optcg-sim/issue/OPT-335) | Add per-player WebSocket action rate limiting in the game worker | 3 | OPT-333 | Backlog | — | Token bucket per `(gameId, playerIndex)` before expensive action handling. |
+| 13 | [OPT-336](https://linear.app/optcg-sim/issue/OPT-336) | Throttle WebSocket upgrade and reconnect attempts per game player | 2 | OPT-333 | Backlog | — | Protect upgrade/close churn separately from action spam. |
+| 14 | [OPT-324](https://linear.app/optcg-sim/issue/OPT-324) | Flaky test: opt-243 Leader-vs-Leader battle termination intermittently emits 0 END_OF_BATTLE | 3 | OPT-328 | Backlog | — | **Cross-project: lives in Game Board Reliability.** Tracked here after WS security follow-ups. Root-cause non-determinism in trigger ordering. 20/20 clean runs before close. |
 
-**Total estimate:** 36 points (33 in Architecture Floor + 3 from cross-project OPT-324).
+**Total estimate:** 47 points (44 in Architecture Floor + 3 from cross-project OPT-324).
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-333** — Worker WebSocket security audit. Ready now.
+**Next up:** **OPT-337** — enforce one active WebSocket per player. Blocked on #178 merging.
 
 ### PR phasing
 
@@ -44,9 +48,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | PR 5 | OPT-331 | Idempotent finalization. Depends on PR 3. |
 | PR 6 | OPT-332 | Board lint correctness. Independent. |
 | PR 7 | OPT-333 | WS security audit + quick-win fix. |
-| PR 8 | OPT-324 | Engine flake. Cross-project (Game Board Reliability). |
+| PR 8 | OPT-337 | Single authoritative player socket after WS audit lands. |
+| PR 9 | OPT-334 | Game-scoped worker tokens + replay policy. |
+| PR 10 | OPT-335 | Per-player WS action rate limiting. |
+| PR 11 | OPT-336 | WS upgrade/reconnect throttling. |
+| PR 12 | OPT-324 | Engine flake. Cross-project (Game Board Reliability). |
 
-PRs 2–8 can land in any order after their dependencies clear.
+PRs 2–7 can land in any order after their dependencies clear. PRs 8–11 depend on OPT-333 because they implement findings from the audit.
 
 ### Pre-merge gate
 
@@ -63,7 +71,7 @@ None — this initiative starts on a clean main. CI is green for app tests; work
 - Card effect support matrix + feature gates — product roadmap.
 - Route-aware shell split — lower leverage.
 - Testing strategy doc, runtime boundaries doc, solo-dev runbook — defer until floor settles.
-- Request IDs / end-to-end observability — defer to follow-up after WS audit.
+- Request IDs / end-to-end observability — defer until after WS security follow-ups.
 - Lint cleanup beyond correctness class (~400 remaining warnings) — separate ticket after OPT-332.
 
 See [`docs/project/ARCHITECTURE-FLOOR-SCOPE.md`](../ARCHITECTURE-FLOOR-SCOPE.md) §"Deferred / tech debt" for full detail.
@@ -141,3 +149,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** `workers/game/.wrangler/**` and `workers/game/coverage/**` are now ignored as generated lint artifacts; remaining warnings are mostly worker `any`/unused-var cleanup, not React hook correctness.
 - **Unresolved:** Local smoke check was HTTP-only because the in-app browser tool was unavailable; `/sandbox` returned HTTP 200 from the Next dev server.
 - **Why this matters for OPT-333:** The WebSocket security audit can focus on worker token/reconnect/payload behavior without being distracted by React Compiler warning debt.
+
+### OPT-333 → OPT-337
+**From:** session on 2026-04-29 · **Commit:** `0ae4299` · **PR:** #178
+
+- **Primer:** The worker WebSocket security audit is documented, OPT-334–OPT-337 were created as follow-ups, and OPT-333 landed the narrow 8 KiB inbound message cap.
+- **Read first:** `docs/architecture/WORKER-SECURITY-AUDIT.md`, `workers/game/src/GameSession.ts`, `workers/game/src/__tests__/opt-333-message-size.test.ts`, `src/hooks/use-game-ws.ts`
+- **Gotchas / do NOT touch:** Keep OPT-337 scoped to authoritative socket semantics; token `gameId`/`jti` work belongs to OPT-334, action buckets to OPT-335, reconnect throttling to OPT-336.
+- **Unresolved:** Duplicate player sockets can still desync presence: `getWebSocketForPlayer()` returns the first tagged socket, while `webSocketClose()` marks the player disconnected when any tagged socket closes.
+- **Why this matters for OPT-337:** OPT-337 should fix the highest-risk correctness/security overlap from the audit before layering token replay and rate-limit policies on top.
