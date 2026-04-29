@@ -13,9 +13,11 @@ const LiveGameShell = dynamic(
 export function GameBoardLoader({
   gameId,
   workerUrl,
+  playerIndex,
 }: {
   gameId: string;
   workerUrl: string;
+  playerIndex?: 0 | 1;
 }) {
-  return <LiveGameShell gameId={gameId} workerUrl={workerUrl} />;
+  return <LiveGameShell gameId={gameId} workerUrl={workerUrl} playerIndex={playerIndex} />;
 }

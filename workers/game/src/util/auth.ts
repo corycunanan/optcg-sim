@@ -12,6 +12,7 @@ export interface VerifiedGameToken {
   exp: number;
   gameId: string;
   jti: string;
+  playerIndex?: 0 | 1;
 }
 
 export async function verifyGameToken(
@@ -44,6 +45,13 @@ export async function verifyGameToken(
     if (typeof payload.exp !== "number") return null;
     if (typeof payload.gameId !== "string") return null;
     if (typeof payload.jti !== "string") return null;
+    if (
+      payload.playerIndex !== undefined &&
+      payload.playerIndex !== 0 &&
+      payload.playerIndex !== 1
+    ) {
+      return null;
+    }
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
     if (expectedGameId && payload.gameId !== expectedGameId) return null;
 
@@ -53,6 +61,7 @@ export async function verifyGameToken(
       exp: payload.exp,
       gameId: payload.gameId,
       jti: payload.jti,
+      ...(payload.playerIndex !== undefined ? { playerIndex: payload.playerIndex } : {}),
     };
   } catch {
     return null;

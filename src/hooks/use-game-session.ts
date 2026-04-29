@@ -67,17 +67,22 @@ export interface GameSessionEndState {
 export function useGameSession(
   gameId: string,
   workerUrl: string,
+  requestedPlayerIndex?: 0 | 1,
 ) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
 
   const getToken = useCallback(async () => {
-    const r = await fetch(`/api/game/token?gameId=${encodeURIComponent(gameId)}`);
+    const params = new URLSearchParams({ gameId });
+    if (requestedPlayerIndex !== undefined) {
+      params.set("playerIndex", String(requestedPlayerIndex));
+    }
+    const r = await fetch(`/api/game/token?${params.toString()}`);
     if (!r.ok) throw new Error(`Token fetch: ${r.status}`);
     const d = (await r.json()) as { data?: { token?: string } };
     if (!d.data?.token) throw new Error("No token");
     return d.data.token;
-  }, [gameId]);
+  }, [gameId, requestedPlayerIndex]);
 
   /* ── WebSocket ────────────────────────────────────────────────────── */
 
@@ -130,8 +135,17 @@ export function useGameSession(
 
   /* ── Player derivation ────────────────────────────────────────────── */
 
+  const isSameUserSolitairePerspective = Boolean(
+    gameState &&
+      requestedPlayerIndex !== undefined &&
+      gameState.players[0].playerId === userId &&
+      gameState.players[1].playerId === userId,
+  );
+  const explicitPlayerIndex = isSameUserSolitairePerspective
+    ? requestedPlayerIndex
+    : undefined;
   const myIndex = gameState
-    ? ((gameState.players[0].playerId === userId ? 0 : 1) as 0 | 1)
+    ? explicitPlayerIndex ?? ((gameState.players[0].playerId === userId ? 0 : 1) as 0 | 1)
     : null;
   const oppIndex: 0 | 1 | null =
     myIndex !== null ? (myIndex === 0 ? 1 : 0) : null;
