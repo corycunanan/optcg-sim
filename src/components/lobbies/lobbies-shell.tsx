@@ -1,17 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useLobbySession } from "@/hooks/use-lobby-session";
+import { ArrowRight, Gamepad2, Loader2, Plus } from "lucide-react";
+import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,23 +17,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import {
   PageHeader,
-  PageHeaderContent,
-  PageHeaderTitle,
-  PageHeaderDescription,
   PageHeaderActions,
+  PageHeaderContent,
+  PageHeaderDescription,
+  PageHeaderTitle,
 } from "@/components/ui/page-header";
-import { DeckPreviewModal } from "./deck-preview-modal";
 
 interface LobbiesShellProps {
   user: {
@@ -49,119 +36,148 @@ interface LobbiesShellProps {
   };
 }
 
+type ActiveGameResponse = {
+  data: { id: string } | null;
+};
+
+type CreateLobbyResponse = {
+  data: {
+    lobbyId: string;
+    joinCode: string;
+  };
+};
+
+type JoinLobbyResponse = {
+  data: {
+    lobbyId: string;
+  };
+};
+
 export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
-  const {
-    userDecks,
-    selectedDeckId,
-    activeLobby,
-    activeGameId,
-    activeGameLoading,
-    creating,
-    conceding,
-    concedeError,
-    joinOpen,
-    setJoinOpen,
-    joinCode,
-    setJoinCode,
-    joining,
-    joinError,
-    copied,
-    previewDeckId,
-    setPreviewDeckId,
-    hasDecks,
-    isWaiting,
-    selectedDeck,
-    joinLobby,
-    copyCode,
-    concedeGame,
-    handleDeckChange,
-  } = useLobbySession();
+  const [activeGameId, setActiveGameId] = useState<string | null>(null);
+  const [activeGameLoading, setActiveGameLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [conceding, setConceding] = useState(false);
+  const [concedeError, setConcedeError] = useState<string | null>(null);
 
-  // ─── Loading state ────────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<ActiveGameResponse>("/api/game/active")
+      .then((json) => {
+        if (!cancelled) setActiveGameId(json.data?.id ?? null);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setActiveGameLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) setJoinCode(code.toUpperCase());
+  }, []);
+
+  const createLobby = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const json = await apiPost<CreateLobbyResponse>("/api/lobbies", {
+        format: "Standard",
+      });
+      router.push(`/lobbies/${json.data.lobbyId}`);
+    } catch (err) {
+      setCreateError(
+        err instanceof ApiError ? err.message : "Could not create lobby"
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const joinLobby = async () => {
+    if (joinCode.length < 4) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const json = await apiPost<JoinLobbyResponse>("/api/lobbies/join", {
+        code: joinCode,
+      });
+      router.push(`/lobbies/${json.data.lobbyId}`);
+    } catch (err) {
+      setJoinError(
+        err instanceof ApiError ? err.message : "Could not join lobby"
+      );
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const concedeGame = async () => {
+    if (!activeGameId) return;
+    setConceding(true);
+    setConcedeError(null);
+    try {
+      await apiPost(`/api/game/${activeGameId}`, { action: "CONCEDE" });
+      setActiveGameId(null);
+    } catch (err) {
+      setConcedeError(err instanceof ApiError ? err.message : "Network error");
+    } finally {
+      setConceding(false);
+    }
+  };
 
   if (activeGameLoading) {
     return (
-      <div className="flex-1 overflow-y-auto bg-surface-base">
-        <div className="mx-auto max-w-xl px-6 py-10">
-          <div className="flex items-center gap-2 text-sm text-text-secondary">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
-            Loading...
-          </div>
+      <div className="bg-surface-base flex-1 overflow-y-auto">
+        <div className="text-text-secondary mx-auto flex max-w-xl items-center gap-2 px-6 py-10 text-sm">
+          <span className="bg-text-tertiary h-2 w-2 animate-pulse rounded-full" />
+          Loading...
         </div>
       </div>
     );
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-
   return (
-    <div className="flex-1 overflow-y-auto bg-surface-base">
-      {/* Header */}
+    <div className="bg-surface-base flex-1 overflow-y-auto">
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderTitle>Play</PageHeaderTitle>
           <PageHeaderDescription>
-            {activeGameId
-              ? "You have a game in progress."
-              : isWaiting
-                ? "Waiting for an opponent to join your lobby."
-                : "Setting up your lobby..."}
+            Create a room, invite an opponent, or enter a code.
           </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
-          {!activeGameId && (
-            <Popover open={joinOpen} onOpenChange={setJoinOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="secondary">Join Lobby</Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-auto">
-                <div className="flex flex-col gap-4 p-2">
-                  <p className="text-sm font-medium text-text-primary">
-                    Enter lobby code
-                  </p>
-                  <InputOTP
-                    maxLength={6}
-                    value={joinCode}
-                    onChange={(value) => setJoinCode(value.toUpperCase())}
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                  {joinError && (
-                    <p className="text-xs text-error">{joinError}</p>
-                  )}
-                  <Button
-                    onClick={joinLobby}
-                    disabled={joining || joinCode.length < 6 || !selectedDeckId}
-                    className="w-full"
-                  >
-                    {joining ? "Joining..." : "Join"}
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+          <Button
+            onClick={createLobby}
+            disabled={creating || Boolean(activeGameId)}
+          >
+            {creating ? (
+              <Loader2 data-icon="inline-start" className="animate-spin" />
+            ) : (
+              <Plus data-icon="inline-start" />
+            )}
+            Create Lobby
+          </Button>
         </PageHeaderActions>
       </PageHeader>
 
-      {/* Main content */}
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        {/* Active game guard */}
-        {activeGameId && (
-          <div className="rounded-lg border border-gold-500/30 bg-gold-100 p-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
+      <div className="mx-auto grid max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1fr_0.8fr]">
+        {activeGameId ? (
+          <section className="border-gold-500/30 bg-gold-100 rounded-lg border p-6 md:col-span-2">
+            <p className="text-text-secondary text-xs font-semibold tracking-widest uppercase">
               Game In Progress
             </p>
-            <p className="mt-2 text-sm text-text-primary">
+            <p className="text-text-primary mt-2 text-sm">
               You have an ongoing game that needs to be resolved before you can
-              start a new one.
+              start a new lobby.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <Button onClick={() => router.push(`/game/${activeGameId}`)}>
@@ -195,174 +211,78 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
               </AlertDialog>
             </div>
             {concedeError && (
-              <p className="mt-3 text-sm text-error">{concedeError}</p>
+              <p className="text-error mt-3 text-sm">{concedeError}</p>
             )}
-          </div>
-        )}
-
-        {/* No decks state */}
-        {!activeGameId && !hasDecks && (
-          <div className="rounded-lg border border-border bg-surface-1 p-6 text-center">
-            <p className="text-sm text-text-secondary">
-              You need to build a deck before you can play.
-            </p>
-            <Button
-              className="mt-4"
-              onClick={() => router.push("/decks")}
-            >
-              Build a Deck
-            </Button>
-          </div>
-        )}
-
-        {/* Lobby layout */}
-        {!activeGameId && hasDecks && (
-          <div className="flex flex-col gap-6">
-            {/* Players row */}
-            <div className="flex justify-center gap-6">
-              {/* Player */}
-              <div className="flex min-h-[420px] min-w-60 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-surface-1 p-6">
-                {selectedDeck?.leaderImageUrl ? (
-                  <button
-                    onClick={() => setPreviewDeckId(selectedDeckId)}
-                    className="cursor-pointer transition-transform hover:scale-105"
-                  >
-                    <img
-                      src={selectedDeck.leaderImageUrl}
-                      alt={selectedDeck.leaderName ?? "Leader"}
-                      className="w-48 rounded-lg shadow-[var(--shadow-md)]"
-                    />
-                  </button>
-                ) : (
-                  <div className="flex h-64 w-48 items-center justify-center rounded-lg bg-surface-2">
-                    <span className="text-xs text-text-tertiary">
-                      No leader
-                    </span>
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-text-primary">
-                    {selectedDeck?.name ?? "No deck selected"}
-                  </p>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    {user.name}
-                  </p>
-                </div>
-                {userDecks.length > 1 && (
-                  <Select
-                    value={selectedDeckId}
-                    onValueChange={handleDeckChange}
-                  >
-                    <SelectTrigger className="w-full max-w-48">
-                      <SelectValue placeholder="Select a deck" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {userDecks.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+          </section>
+        ) : (
+          <>
+            <section className="border-border bg-surface-1 flex min-h-72 flex-col justify-between rounded-lg border p-6">
+              <div>
+                <Gamepad2 />
+                <h2 className="font-display text-text-primary mt-5 text-3xl uppercase">
+                  Room First
+                </h2>
+                <p className="text-text-secondary mt-3 max-w-xl text-sm leading-relaxed">
+                  Hi {user.name}. Create a pre-game room first, then pick decks
+                  and ready up with the full table present.
+                </p>
               </div>
-
-              {/* Opponent */}
-              <div className="flex min-h-[420px] min-w-60 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-surface-1 p-6">
-                {activeLobby?.guest ? (
-                  <>
-                    {activeLobby.guest.deck?.leaderImageUrl ? (
-                      <button
-                        onClick={() => {
-                          if (activeLobby.guest?.deck?.id)
-                            setPreviewDeckId(activeLobby.guest.deck.id);
-                        }}
-                        className="cursor-pointer transition-transform hover:scale-105"
-                      >
-                        <img
-                          src={activeLobby.guest.deck.leaderImageUrl}
-                          alt={activeLobby.guest.deck.leaderName ?? "Leader"}
-                          className="w-48 rounded-lg shadow-[var(--shadow-md)]"
-                        />
-                      </button>
-                    ) : (
-                      <div className="flex h-64 w-48 items-center justify-center rounded-lg bg-surface-2">
-                        <span className="text-xs text-text-tertiary">
-                          No leader
-                        </span>
-                      </div>
-                    )}
-                    <div className="text-center">
-                      <p className="text-lg font-semibold text-text-primary">
-                        {activeLobby.guest.deck?.name ?? "Deck"}
-                      </p>
-                      <p className="mt-1 text-sm text-text-secondary">
-                        {activeLobby.guest.user.username ??
-                          activeLobby.guest.user.name ??
-                          "Opponent"}
-                      </p>
-                    </div>
-                  </>
+              <Button
+                className="mt-8 w-fit"
+                onClick={createLobby}
+                disabled={creating}
+              >
+                {creating ? (
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
                 ) : (
-                  <button
-                    className={cn(
-                      "flex h-16 w-16 items-center justify-center rounded-full",
-                      "border-2 border-dashed border-border-strong",
-                      "text-text-tertiary transition-colors",
-                      "hover:border-navy-500 hover:text-navy-500",
-                    )}
-                    onClick={() => setJoinOpen(true)}
-                    aria-label="Invite opponent"
-                  >
-                    <Plus className="h-6 w-6" />
-                  </button>
+                  <Plus data-icon="inline-start" />
                 )}
-              </div>
-            </div>
+                Create Lobby
+              </Button>
+              {createError && (
+                <p className="text-error mt-3 text-sm">{createError}</p>
+              )}
+            </section>
 
-            {/* Lobby info */}
-            {isWaiting && activeLobby && (
-              <div className="flex flex-col items-center gap-3">
-                <code className="rounded-md bg-surface-1 border border-border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em] text-text-primary">
-                  {activeLobby.joinCode}
-                </code>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={copyCode}
+            <section className="border-border bg-surface-1 rounded-lg border p-6">
+              <p className="text-text-tertiary text-xs font-semibold tracking-widest uppercase">
+                Join by Code
+              </p>
+              <div className="mt-5 flex flex-col gap-4">
+                <InputOTP
+                  maxLength={6}
+                  value={joinCode}
+                  onChange={(value) => setJoinCode(value.toUpperCase())}
                 >
-                  {copied ? (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Copied
-                    </>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+                {joinError && <p className="text-error text-sm">{joinError}</p>}
+                <Button
+                  onClick={joinLobby}
+                  disabled={joining || joinCode.length < 4}
+                >
+                  {joining ? (
+                    <Loader2
+                      data-icon="inline-start"
+                      className="animate-spin"
+                    />
                   ) : (
-                    <>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy Code
-                    </>
+                    <ArrowRight data-icon="inline-start" />
                   )}
+                  Enter Room
                 </Button>
               </div>
-            )}
-
-            {creating && !isWaiting && (
-              <div className="flex items-center justify-center gap-2 text-sm text-text-secondary">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
-                Creating lobby...
-              </div>
-            )}
-          </div>
+            </section>
+          </>
         )}
       </div>
-
-      <DeckPreviewModal
-        deckId={previewDeckId}
-        open={previewDeckId !== null}
-        onOpenChange={(open) => {
-          if (!open) setPreviewDeckId(null);
-        }}
-      />
     </div>
   );
 }

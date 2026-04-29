@@ -4,27 +4,15 @@
  * Body: { code: string, deckId?: string }
  *
  * Creates a LobbyGuest record, marks the lobby READY, and returns { lobbyId }.
- * Temporary transition shim: ?autoStart=true preserves the old game-starting
- * behavior until the lobby room UI removes it in OPT-342.
  */
 
 import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { normalizeLobbyCode } from "@/lib/lobbies";
-import { buildGameInitPayload } from "@/lib/game/init-payload";
 import { JoinLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
-import {
-  DECK_INVALID_CODE,
-  DeckInvalidError,
-  DeckNotFoundError,
-  requirePlayableDeck,
-} from "@/lib/decks/playable";
-
-const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
-const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
@@ -37,7 +25,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const autoStart = request.nextUrl.searchParams.get("autoStart") === "true";
     const parsed = await parseBody(request, JoinLobbySchema);
     if (isErrorResponse(parsed)) return parsed;
     const { code, deckId } = parsed;
@@ -72,122 +59,26 @@ export async function POST(request: NextRequest) {
     }
 
     if (lobby.mode === "PVCOMPUTER") {
-      return apiError("This lobby is in computer mode and cannot be joined", 409);
+      return apiError(
+        "This lobby is in computer mode and cannot be joined",
+        409
+      );
     }
 
-    if (!autoStart) {
-      // Enter the room only. Deck slots are mutable in the lobby room; deck
-      // legality moves to the explicit start boundary in OPT-341.
-      await prisma.$transaction([
-        prisma.lobbyGuest.create({
-          data: { lobbyId: lobby.id, userId, deckId },
-        }),
-        prisma.lobby.update({
-          where: { id: lobby.id },
-          data: { status: "READY" },
-        }),
-      ]);
-
-      return apiSuccess({ lobbyId: lobby.id });
-    }
-
-    if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
-      console.error("GAME_WORKER_URL or GAME_WORKER_SECRET not configured");
-      return apiError("Game server not configured", 503);
-    }
-
-    if (!deckId) {
-      return apiError("deckId is required to auto-start a lobby", 400);
-    }
-
-    if (!lobby.hostDeckId) {
-      return apiError("Host has not selected a deck", 409);
-    }
-
-    const guestPlayableDeck = await requirePlayableDeck(deckId, userId);
-    const hostPlayableDeck = await requirePlayableDeck(
-      lobby.hostDeckId,
-      lobby.hostUserId,
-    );
-
-    // Temporary auto-start shim for the pre-room UI.
-    // Atomically create LobbyGuest + GameSession + mark lobby IN_GAME.
-    // Uses array-based $transaction (single round-trip, PgBouncer-safe)
-    // so a concurrent join attempt fails on the unique lobbyId constraint
-    // instead of creating orphaned records.
-    const [, gameSession] = await prisma.$transaction([
+    // Enter the room only. Deck slots are mutable in the lobby room; deck
+    // legality belongs to POST /api/lobbies/[id]/start.
+    await prisma.$transaction([
       prisma.lobbyGuest.create({
         data: { lobbyId: lobby.id, userId, deckId },
       }),
-      prisma.gameSession.upsert({
-        where: { lobbyId: lobby.id },
-        create: {
-          lobbyId: lobby.id,
-          player1Id: lobby.hostUserId,
-          player2Id: userId,
-          player1DeckId: lobby.hostDeckId,
-          player2DeckId: deckId,
-          format: lobby.format,
-          mode: lobby.mode,
-          status: "IN_PROGRESS",
-        },
-        update: { status: "IN_PROGRESS" },
-      }),
       prisma.lobby.update({
         where: { id: lobby.id },
-        data: { status: "IN_GAME" },
+        data: { status: "READY" },
       }),
     ]);
 
-    const payload = buildGameInitPayload({
-      gameId: gameSession.id,
-      format: lobby.format,
-      mode: lobby.mode,
-      player1: {
-        userId: lobby.hostUserId,
-        leader: hostPlayableDeck.leader,
-        deck: hostPlayableDeck.deck,
-      },
-      player2: {
-        userId,
-        leader: guestPlayableDeck.leader,
-        deck: guestPlayableDeck.deck,
-      },
-    });
-
-    // Initialize the Durable Object
-    const workerRes = await fetch(`${GAME_WORKER_URL}/game/${gameSession.id}/init`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GAME_WORKER_SECRET}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!workerRes.ok) {
-      const workerErr = await workerRes.text().catch(() => "unknown");
-      console.error("Worker init failed:", workerRes.status, workerErr);
-      // Roll back all 3 records so the lobby returns to WAITING and can be re-joined.
-      await prisma.$transaction([
-        prisma.gameSession.delete({ where: { id: gameSession.id } }),
-        prisma.lobbyGuest.delete({ where: { lobbyId: lobby.id } }),
-        prisma.lobby.update({ where: { id: lobby.id }, data: { status: "WAITING" } }),
-      ]).catch((e) => console.error("Rollback failed:", e));
-      return apiError("Failed to initialize game server", 502);
-    }
-
-    return apiSuccess({ gameId: gameSession.id });
+    return apiSuccess({ lobbyId: lobby.id });
   } catch (error) {
-    if (error instanceof DeckNotFoundError) {
-      return apiError("Deck not found", 404);
-    }
-    if (error instanceof DeckInvalidError) {
-      return apiError("Deck is not playable", 422, {
-        code: DECK_INVALID_CODE,
-        details: error.details,
-      });
-    }
     console.error("Lobby join error:", error);
     return apiError("Failed to join lobby", 500);
   }
