@@ -41,10 +41,37 @@ import { configureLogger, log } from "./lib/log.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 export const MAX_CLIENT_MESSAGE_BYTES = 8 * 1024;
+const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
+const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
+
+interface PlayerSocketAttachment {
+  type: "game-session-player-socket";
+  playerIndex: 0 | 1;
+  connectionId: string;
+  acceptedAt: number;
+}
 
 export function getClientMessageByteLength(message: string | ArrayBuffer): number {
   if (typeof message !== "string") return message.byteLength;
   return new TextEncoder().encode(message).byteLength;
+}
+
+function isPlayerSocketAttachment(value: unknown): value is PlayerSocketAttachment {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Partial<PlayerSocketAttachment>;
+  return candidate.type === "game-session-player-socket"
+    && (candidate.playerIndex === 0 || candidate.playerIndex === 1)
+    && typeof candidate.connectionId === "string"
+    && typeof candidate.acceptedAt === "number";
+}
+
+function getPlayerSocketAttachment(ws: WebSocket): PlayerSocketAttachment | null {
+  try {
+    const attachment = ws.deserializeAttachment();
+    return isPlayerSocketAttachment(attachment) ? attachment : null;
+  } catch {
+    return null;
+  }
 }
 
 // Stored in DO persistent storage
@@ -64,6 +91,7 @@ export class GameSession implements DurableObject {
   private cardDb: Map<string, CardData> | null = null;
   private mulliganDone: [boolean, boolean] = [false, false];
   private undoHistory: GameState[] = [];
+  private nextWebSocketSequence = 0;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -218,7 +246,7 @@ export class GameSession implements DurableObject {
     }
 
     const { 0: client, 1: server } = new WebSocketPair();
-    this.state.acceptWebSocket(server, [`player-${playerIndex}`]);
+    this.acceptAuthoritativePlayerSocket(playerIndex as 0 | 1, server);
 
     // Mark player as connected
     this.gameState = this.setPlayerPresence(this.gameState!, playerIndex as 0 | 1, {
@@ -269,6 +297,10 @@ export class GameSession implements DurableObject {
     const parsed = parseInt(playerTag.replace("player-", ""));
     if (parsed !== 0 && parsed !== 1) return;
     const playerIndex = parsed as 0 | 1;
+    if (!this.isAuthoritativePlayerSocket(ws, playerIndex)) {
+      try { ws.close(SUPERSEDED_SOCKET_CLOSE_CODE, SUPERSEDED_SOCKET_CLOSE_REASON); } catch { /* ignore */ }
+      return;
+    }
 
     let clientMsg: ClientMessage;
     try {
@@ -305,6 +337,7 @@ export class GameSession implements DurableObject {
     const parsed = parseInt(playerTag.replace("player-", ""));
     if (parsed !== 0 && parsed !== 1) return;
     const playerIndex = parsed as 0 | 1;
+    if (!this.isAuthoritativePlayerSocket(ws, playerIndex)) return;
     if (!this.gameState.players[playerIndex].connected) return;
     await this.handlePlayerAway(playerIndex, "DISCONNECTED", ws);
   }
@@ -825,6 +858,7 @@ export class GameSession implements DurableObject {
     const sockets = this.state.getWebSockets();
     const payload = JSON.stringify(msg);
     for (const ws of sockets) {
+      if (!this.shouldSendToSocket(ws)) continue;
       try { ws.send(payload); } catch { /* closed */ }
     }
   }
@@ -867,6 +901,7 @@ export class GameSession implements DurableObject {
     const payload = JSON.stringify(msg);
     for (const ws of sockets) {
       if (ws !== exclude) {
+        if (!this.shouldSendToSocket(ws)) continue;
         try { ws.send(payload); } catch { /* closed */ }
       }
     }
@@ -878,7 +913,58 @@ export class GameSession implements DurableObject {
 
   private getWebSocketForPlayer(playerIndex: 0 | 1): WebSocket | null {
     const sockets = this.state.getWebSockets(`player-${playerIndex}`);
+    let newest: { ws: WebSocket; attachment: PlayerSocketAttachment } | null = null;
+    for (const ws of sockets) {
+      const attachment = getPlayerSocketAttachment(ws);
+      if (!attachment || attachment.playerIndex !== playerIndex) continue;
+      if (
+        !newest
+        || attachment.acceptedAt > newest.attachment.acceptedAt
+        || (
+          attachment.acceptedAt === newest.attachment.acceptedAt
+          && attachment.connectionId > newest.attachment.connectionId
+        )
+      ) {
+        newest = { ws, attachment };
+      }
+    }
+    if (newest) return newest.ws;
+
     return sockets[0] ?? null;
+  }
+
+  private closeStaleSocketsForPlayer(playerIndex: 0 | 1, authoritativeWs: WebSocket): void {
+    const sockets = this.state.getWebSockets(`player-${playerIndex}`);
+    for (const ws of sockets) {
+      if (ws === authoritativeWs) continue;
+      try { ws.close(SUPERSEDED_SOCKET_CLOSE_CODE, SUPERSEDED_SOCKET_CLOSE_REASON); } catch { /* ignore */ }
+    }
+  }
+
+  private acceptAuthoritativePlayerSocket(playerIndex: 0 | 1, ws: WebSocket): void {
+    this.state.acceptWebSocket(ws, [`player-${playerIndex}`]);
+    const acceptedAt = Date.now();
+    ws.serializeAttachment({
+      type: "game-session-player-socket",
+      playerIndex,
+      connectionId: `${acceptedAt}-${this.nextWebSocketSequence++}`,
+      acceptedAt,
+    } satisfies PlayerSocketAttachment);
+    this.closeStaleSocketsForPlayer(playerIndex, ws);
+  }
+
+  private isAuthoritativePlayerSocket(ws: WebSocket, playerIndex: 0 | 1): boolean {
+    return this.getWebSocketForPlayer(playerIndex) === ws;
+  }
+
+  private shouldSendToSocket(ws: WebSocket): boolean {
+    const tags = this.state.getTags(ws);
+    const playerTag = tags.find((t) => t.startsWith("player-"));
+    if (!playerTag) return true;
+
+    const parsed = parseInt(playerTag.replace("player-", ""));
+    if (parsed !== 0 && parsed !== 1) return false;
+    return this.isAuthoritativePlayerSocket(ws, parsed as 0 | 1);
   }
 
   private setPlayerPresence(
