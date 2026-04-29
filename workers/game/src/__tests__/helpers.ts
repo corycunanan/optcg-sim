@@ -77,6 +77,22 @@ function makePlayerInit(userId: string): GameInitPayload["player1"] {
       { cardId: CARDS.EVENT_COUNTER.id, quantity: 2, cardData: CARDS.EVENT_COUNTER },
       { cardId: CARDS.STAGE.id, quantity: 2, cardData: CARDS.STAGE },
     ],
+    testOrder: {
+      life: [
+        CARDS.VANILLA.id,
+        CARDS.VANILLA.id,
+        CARDS.VANILLA.id,
+        CARDS.VANILLA.id,
+        CARDS.VANILLA.id,
+      ],
+      hand: [
+        CARDS.VANILLA.id,
+        CARDS.RUSH.id,
+        CARDS.DOUBLE_ATK.id,
+        CARDS.BLOCKER.id,
+        CARDS.COUNTER.id,
+      ],
+    },
   };
 }
 
