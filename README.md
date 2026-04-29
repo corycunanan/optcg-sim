@@ -65,8 +65,12 @@ cd workers/game && npm run dev    # Game server on :8787
 |--------|-------------|
 | `pnpm dev` | Start Next.js dev server |
 | `pnpm build` | Production build |
+| `pnpm verify` | Run the full local/CI verification chain |
 | `pnpm lint` | Run ESLint |
 | `pnpm type-check` | TypeScript type checking |
+| `pnpm test` | Run app test suite |
+| `pnpm test:worker` | Run game worker test suite from the repo root |
+| `pnpm type-check:worker` | Type-check the game worker from the repo root |
 | `pnpm format` | Format with Prettier |
 | `pnpm db:generate` | Generate Prisma client |
 | `pnpm db:migrate` | Run Prisma migrations |
@@ -77,7 +81,20 @@ cd workers/game && npm run dev    # Game server on :8787
 | `pnpm pipeline:migrate-images` | Upload card images to Cloudflare R2 |
 | `pnpm worker:deploy` | Deploy images worker to Cloudflare |
 
-Game worker scripts (run from `workers/game/`):
+### Game Worker
+
+`workers/game` is a pnpm workspace package named `optcg-game`, so day-to-day checks run from the repo root:
+
+| Script | Description |
+|--------|-------------|
+| `pnpm test` | Run app tests |
+| `pnpm test:worker` | Run worker tests |
+| `pnpm type-check` | Type-check the Next.js app |
+| `pnpm type-check:worker` | Type-check the game worker |
+
+`pnpm verify` is the local shipping ritual and mirrors CI: lint, app type-check, worker type-check, app tests, worker tests, then production build.
+
+Game worker scripts are still available from `workers/game/` for focused development:
 
 | Script | Description |
 |--------|-------------|
