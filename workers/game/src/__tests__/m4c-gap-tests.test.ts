@@ -452,7 +452,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
       });
       cardDb.set(drawCard.id, drawCard);
 
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       // Place card in hand and ensure enough DON
       const handCard = makeInstance(drawCard.id, "HAND", 0, { instanceId: "hand-draw" });
       state.players[0].hand = [handCard];
@@ -491,7 +491,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
         [CARDS.VANILLA.id, CARDS.VANILLA],
       ]);
 
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       state.players[0].leader = makeInstance(multiLeader.id, "LEADER", 0, { instanceId: "leader-0" });
 
       const ctx: ConditionContext = {
@@ -548,7 +548,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
   describe("PLAY_METHOD condition", () => {
     it("FROM_HAND: true when card was played from hand", () => {
       const cardDb = createTestCardDb();
-      let state = buildMinimalState();
+      const state = buildMinimalState();
 
       // Play a character from hand
       const handCard = makeInstance(CARDS.VANILLA.id, "HAND", 0, { instanceId: "hand-pm" });
@@ -622,7 +622,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       });
       cardDb.set(playFromTrashCard.id, playFromTrashCard);
 
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       const handCard = makeInstance(playFromTrashCard.id, "HAND", 0, { instanceId: "hand-pft" });
       const trashTarget = makeInstance(CARDS.VANILLA.id, "TRASH", 0, { instanceId: "trash-target" });
       state.players[0].hand = [handCard];
@@ -968,7 +968,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const costCard = makeCard("COST-5", { cost: 5 });
       cardDb.set(costCard.id, costCard);
 
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       const revealedInstance = makeInstance(costCard.id, "HAND", 0, { instanceId: "revealed-inst" });
       state.players[0].hand = [revealedInstance];
 
@@ -990,7 +990,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
   describe("DON_GIVEN_TO_TARGET DynamicValue", () => {
     it("resolves from target card's attachedDon count", () => {
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       // Target card with 3 attached DON
       const target = makeInstance("TARGET-CARD", "CHARACTER", 0, {
         instanceId: "target-inst",
@@ -1125,7 +1125,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
         [CARDS.LEADER.id, CARDS.LEADER],
       ]);
 
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       const causeInstance = makeInstance(causeCard.id, "CHARACTER", 0, { instanceId: "cause-inst" });
       const targetInstance = makeInstance(targetCard.id, "TRASH", 1, { instanceId: "target-inst" });
       state.players[0].characters = padChars([causeInstance]);
@@ -1166,7 +1166,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
         [CARDS.LEADER.id, CARDS.LEADER],
       ]);
 
-      let state = buildMinimalState();
+      const state = buildMinimalState();
       const causeInstance = makeInstance(causeCard.id, "CHARACTER", 0, { instanceId: "cause-inst-2" });
       const targetInstance = makeInstance(targetCard.id, "TRASH", 1, { instanceId: "target-inst-2" });
       state.players[0].characters = padChars([causeInstance]);

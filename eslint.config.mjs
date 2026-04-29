@@ -65,6 +65,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "storybook-static/**",
+    "workers/game/.wrangler/**",
+    "workers/game/coverage/**",
   ]),
 ]);
 

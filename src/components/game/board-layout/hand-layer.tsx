@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef } from "react";
+import React, { useCallback } from "react";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -9,6 +9,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
+import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
 
@@ -145,19 +146,7 @@ export const HandLayer = React.memo(function HandLayer({
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
 
-  // Track which instanceIds existed in the previous render so we can
-  // detect newly-arrived cards and hide them before the transition
-  // system catches up (transitions are created in useEffect, one render late).
-  // Initialize with null so we can distinguish "first render" from "empty hand".
-  const prevIdsRef = useRef<Set<string> | null>(null);
-  const currentIds = new Set(cards.map((c) => c.instanceId));
-  const newlyArrived = new Set<string>();
-  if (prevIdsRef.current !== null) {
-    for (const id of currentIds) {
-      if (!prevIdsRef.current.has(id)) newlyArrived.add(id);
-    }
-  }
-  prevIdsRef.current = currentIds;
+  const newlyArrived = useFieldArrivals(cards.map((c) => c.instanceId));
 
   const handRef = useCallback(
     (node: HTMLDivElement | null) => {

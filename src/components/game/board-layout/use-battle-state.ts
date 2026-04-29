@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   CardDb,
   CardInstance,
@@ -45,11 +45,16 @@ export function useBattleState(
   const canInteract = isMyTurn && phase === "MAIN" && !inBattle && !matchClosed;
   const battle = turn?.battle ?? null;
 
-  const [selectedBlockerId, setSelectedBlockerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedBlockerId(null);
-  }, [battlePhase]);
+  const [selectedBlocker, setSelectedBlocker] = useState<{
+    battlePhase: string | null;
+    id: string | null;
+  }>({ battlePhase: null, id: null });
+  const selectedBlockerId =
+    selectedBlocker.battlePhase === battlePhase ? selectedBlocker.id : null;
+  const setSelectedBlockerId = useCallback(
+    (id: string | null) => setSelectedBlocker({ battlePhase, id }),
+    [battlePhase],
+  );
 
   const battleInfo: BattleInfo | null = useMemo(() => {
     if (!battle || !me || !opp) return null;

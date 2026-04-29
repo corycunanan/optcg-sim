@@ -363,9 +363,11 @@ export function useCardTransitions(
     // existing delay (e.g. DON-attach tokens inside a bigger batch).
     const staggered = applyBatchStagger(newTransitions);
 
-    setTransitions((prev) => {
-      const combined = [...prev, ...staggered];
-      return combined.slice(-MAX_CONCURRENT);
+    queueMicrotask(() => {
+      setTransitions((prev) => {
+        const combined = [...prev, ...staggered];
+        return combined.slice(-MAX_CONCURRENT);
+      });
     });
   }, [eventLog, myIndex, isDragging, zoneRegistry]);
 

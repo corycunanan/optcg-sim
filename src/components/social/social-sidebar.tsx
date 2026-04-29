@@ -76,7 +76,9 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   }, []);
 
   useEffect(() => {
-    fetchFriendsData();
+    queueMicrotask(() => {
+      void fetchFriendsData();
+    });
     const t = setInterval(fetchFriendsData, 30_000);
     return () => clearInterval(t);
   }, [fetchFriendsData]);

@@ -231,7 +231,7 @@ export function DeckBuilderList({
             <TooltipTrigger asChild>
               <div className="group/stack flex w-min flex-col items-center">
                 {/* Card stack */}
-                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+                { }
                 <div onClick={() => {
                   setInspectCardId(group.cardId);
                   setInspectIsLeader(group.isLeader);

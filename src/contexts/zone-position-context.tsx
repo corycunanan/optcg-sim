@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   type ReactNode,
 } from "react";
@@ -50,17 +51,17 @@ export function ZonePositionProvider({ children }: { children: ReactNode }) {
     return cardZonesRef.current.get(instanceId) ?? null;
   }, []);
 
-  const registry = useRef<ZonePositionRegistry>({
+  const registry = useMemo<ZonePositionRegistry>(() => ({
     register,
     unregister,
     getRect,
     registerCard,
     unregisterCard,
     getCardZone,
-  });
+  }), [register, unregister, getRect, registerCard, unregisterCard, getCardZone]);
 
   return (
-    <ZonePositionContext.Provider value={registry.current}>
+    <ZonePositionContext.Provider value={registry}>
       {children}
     </ZonePositionContext.Provider>
   );

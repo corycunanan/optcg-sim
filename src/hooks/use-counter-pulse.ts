@@ -65,11 +65,13 @@ export function useCounterPulse(
     // (new defender) before the pulse fades.
     const pulsedId = defenderId;
 
-    setPulsing((prev) => {
-      if (prev.has(pulsedId)) return prev;
-      const next = new Set(prev);
-      next.add(pulsedId);
-      return next;
+    queueMicrotask(() => {
+      setPulsing((prev) => {
+        if (prev.has(pulsedId)) return prev;
+        const next = new Set(prev);
+        next.add(pulsedId);
+        return next;
+      });
     });
 
     const timer = setTimeout(() => {

@@ -93,19 +93,32 @@ interface CardDetailModalProps {
 }
 
 export function CardDetailModal({ cardId, onClose, footer, controlledImage, onImageSelect }: CardDetailModalProps) {
-  const [card, setCard] = useState<CardDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [cardState, setCardState] = useState<{
+    cardId: string;
+    card: CardDetail | null;
+    loading: boolean;
+  }>({ cardId, card: null, loading: true });
+  const isStale = cardState.cardId !== cardId;
+  const card = isStale ? null : cardState.card;
+  const loading = isStale || cardState.loading;
 
   useEffect(() => {
-    setLoading(true);
-    setCard(null);
+    let cancelled = false;
     fetch(`/api/cards/${cardId}`)
       .then((r) => r.json())
       .then((json) => {
-        setCard(json.data);
-        setLoading(false);
+        if (!cancelled) {
+          setCardState({ cardId, card: json.data, loading: false });
+        }
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) {
+          setCardState({ cardId, card: null, loading: false });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [cardId]);
 
   const footerContent = footer?.(card);

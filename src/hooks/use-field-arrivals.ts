@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 
 /**
  * Pure helper — returns the subset of `current` not present in `prev`.
@@ -23,12 +23,31 @@ export function computeFieldArrivals(
 /**
  * Track which card `instanceId`s are new vs. the previous render.
  *
- * Pure bookkeeping: no effects, no state; safe to call during render.
+ * The previous-id snapshot is updated after commit so React Compiler does not
+ * see ref reads/writes during render.
  */
 export function useFieldArrivals(ids: Iterable<string>): Set<string> {
-  const prevRef = useRef<Set<string> | null>(null);
-  const current = new Set(ids);
-  const arrivals = computeFieldArrivals(prevRef.current, current);
-  prevRef.current = current;
-  return arrivals;
+  const idList = [...ids];
+  const key = idList.join("\u0000");
+  const current = useMemo(
+    () => new Set(key ? key.split("\u0000") : []),
+    [key],
+  );
+  const [state, update] = useReducer(
+    (
+      prev: { key: string; current: Set<string> | null; arrivals: Set<string> },
+      next: { key: string; current: Set<string> },
+    ) => ({
+      key: next.key,
+      current: next.current,
+      arrivals: computeFieldArrivals(prev.current, next.current),
+    }),
+    { key: "", current: null, arrivals: new Set<string>() },
+  );
+
+  useEffect(() => {
+    update({ key, current });
+  }, [key, current]);
+
+  return state.key === key ? state.arrivals : new Set();
 }

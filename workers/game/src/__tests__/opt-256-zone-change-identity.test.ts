@@ -455,7 +455,7 @@ describe("OPT-256: Marco [On K.O.] re-summon is a fresh instance", () => {
     // what GameSession.resumeFromPrompt does for PLAYER_CHOICE/SELECT_TARGET
     // responses — runPipeline is only for fresh GameActions).
     expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    let stepState = { ...result.state, pendingPrompt: null };
+    const stepState = { ...result.state, pendingPrompt: null };
     let step = resumeFromStack(stepState, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
 
     // If the cost did not auto-resolve, select the WBP hand card.
