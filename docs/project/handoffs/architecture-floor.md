@@ -1,7 +1,7 @@
 ---
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-last-updated: 2026-04-29 (OPT-262 in review)
+last-updated: 2026-04-29 (OPT-329 in review)
 ---
 
 # Architecture Floor — Handoff Doc
@@ -19,8 +19,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | [OPT-326](https://linear.app/optcg-sim/issue/OPT-326) | Add root `pnpm verify` and align CI with local verification | 2 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Gate ticket for PR 1. Adds `pnpm verify` running lint + app type-check + worker type-check + app tests + worker tests + build. CI mirrors verify. |
 | 2 | [OPT-327](https://linear.app/optcg-sim/issue/OPT-327) | Restore `workers/game` type-check and refresh stale engine test fixtures | 5 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Real type fixes at `GameSession.ts:856` (`ActiveEffect`/`RuntimeActiveEffect`) and `visibility.test.ts:16`. Add `@types/node` to worker. Build shared test factories module. **No `as any` patches.** |
 | 3 | [OPT-328](https://linear.app/optcg-sim/issue/OPT-328) | Normalize worker test/type-check execution from repo root and CI | 2 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Workspace already declared in `pnpm-workspace.yaml`. Adds root scripts via `pnpm --filter optcg-game ...` and replaces CI's `cd workers/game && npx vitest run`. |
-| 4 | [OPT-262](https://linear.app/optcg-sim/issue/OPT-262) | Reconcile Prisma migration drift (`testOrder` column + modified `simplify_lobby_for_m3`) | 3 | OPT-326 (PR 1 first) | In Review | [#172](https://github.com/corycunanan/optcg-sim/pull/172) | **Blocks OPT-298** (Solitaire schema). Two issues: undocumented `testOrder` column, modified `simplify_lobby_for_m3`. Add CI drift guard. |
-| 5 | [OPT-329](https://linear.app/optcg-sim/issue/OPT-329) | App↔Worker contract tests: game init, tokens, result callback, hidden-zone filtering | 5 | OPT-327 | Backlog | — | New `src/__tests__/contracts/`. Pin init payload, token verify, result callback (`GameResultSchema`), notify-end fallback, hidden-zone filtering. |
+| 4 | [OPT-262](https://linear.app/optcg-sim/issue/OPT-262) | Reconcile Prisma migration drift (`testOrder` column + modified `simplify_lobby_for_m3`) | 3 | OPT-326 (PR 1 first) | Done | [#172](https://github.com/corycunanan/optcg-sim/pull/172) | **Blocks OPT-298** (Solitaire schema). Two issues: undocumented `testOrder` column, modified `simplify_lobby_for_m3`. Add CI drift guard. |
+| 5 | [OPT-329](https://linear.app/optcg-sim/issue/OPT-329) | App↔Worker contract tests: game init, tokens, result callback, hidden-zone filtering | 5 | OPT-327 | In Review | [#173](https://github.com/corycunanan/optcg-sim/pull/173) | New `src/__tests__/contracts/`. Pin init payload, token verify, result callback (`GameResultSchema`), notify-end fallback, hidden-zone filtering. |
 | 6 | [OPT-330](https://linear.app/optcg-sim/issue/OPT-330) | Enforce playable deck legality server-side before lobby/solitaire game start | 5 | OPT-326 (PR 1 first) | Backlog | — | **Blocks OPT-298**. Extracts `requirePlayableDeck(deckId, userId)` to `src/lib/decks/`. Wires into `lobbies/route.ts` and `lobbies/join/route.ts`. Returns 422 with structured `details`. |
 | 7 | [OPT-331](https://linear.app/optcg-sim/issue/OPT-331) | Centralize idempotent game result finalization across worker callback and fallback concede | 3 | OPT-329 | Backlog | — | New `src/lib/game/finalize.ts` with `finalizeGameResult()`. Conditional update on non-terminal state. Adds `reasonCode` enum. Tests cover three idempotency races. |
 | 8 | [OPT-332](https://linear.app/optcg-sim/issue/OPT-332) | Triage React lint warnings; fix board correctness warnings (refs-during-render, set-state-in-effect) | 5 | — | Backlog | — | Targets ~6 correctness-class warnings: `board-layout.tsx:127, 137, 330`, `hand-layer.tsx:157`, `card-detail-modal.tsx:100`, two more at `:84`/`:52`. Total warning count target: <350 (from 413). |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-329** — App↔Worker contract tests. PR 3 pins the app/worker boundary now that the CI and migration floor are in place.
+**Next up:** **OPT-331** — Centralize idempotent game result finalization. PR 5 builds on the result callback contract from OPT-329.
 
 ### PR phasing
 
@@ -105,3 +105,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Neon dev already has `20260429054500_add_deck_test_order` marked applied; the old rolled-back `20260321120000_simplify_lobby_for_m3` row had its checksum repaired to match the successful file so `migrate dev` stops reporting history drift.
 - **Unresolved:** `prisma migrate dev --create-only` generated an empty migration after repair; it was removed. Trust `pnpm prisma migrate status`, DB-to-schema `migrate diff`, and `pnpm db:check-migration-drift` for this PR's verification.
 - **Why this matters for OPT-329:** Contract tests can now add app/worker boundary coverage without also carrying migration uncertainty; the CI floor should catch drift before those tests become the next source of truth.
+
+### OPT-329 → OPT-331
+**From:** session on 2026-04-29 · **Commit:** `a48c8ea` · **PR:** #173
+
+- **Primer:** App-built and worker-built boundary payloads now have a plain Vitest contract suite covering game init, WS tokens, result callbacks, notify-end fallback, and hidden-zone filtering.
+- **Read first:** `src/__tests__/contracts/app-worker-contracts.test.ts`, `src/lib/game/init-payload.ts`, `src/lib/game/token.ts`, `workers/game/src/util/result.ts`, `src/app/api/game/result/route.ts`
+- **Gotchas / do NOT touch:** `verifyGameToken` accepts an optional `expectedGameId`; legacy tokens without `gameId` still pass for compatibility, but tokens with a mismatched `gameId` fail.
+- **Unresolved:** Result finalization still lives in multiple routes/paths; OPT-331 owns centralizing the database update and idempotency semantics.
+- **Why this matters for OPT-331:** The result callback contract now pins the worker payload shape before finalization moves into a shared helper, so refactors should fail tests if they drift the callback schema.
