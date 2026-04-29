@@ -49,8 +49,10 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
   // Sync draft when selectedSets changes from outside (e.g., "Clear all filters")
   const selectedSetsKey = selectedSets.join(",");
   useEffect(() => {
-    setDraft(selectedSets);
-    draftRef.current = selectedSets;
+    queueMicrotask(() => {
+      setDraft(selectedSets);
+      draftRef.current = selectedSets;
+    });
   }, [selectedSetsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Commit draft → call onChange only if something actually changed

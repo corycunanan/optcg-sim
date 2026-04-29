@@ -86,7 +86,9 @@ export function SandboxMuteProvider({ children }: { children: ReactNode }) {
   // stored preference back on the client.
   useEffect(() => {
     const stored = readSandboxMutePreference();
-    setMutedState((prev) => (prev === stored ? prev : stored));
+    queueMicrotask(() => {
+      setMutedState((prev) => (prev === stored ? prev : stored));
+    });
   }, []);
 
   const setMuted = useCallback((next: boolean) => {

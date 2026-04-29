@@ -277,7 +277,7 @@ describe("OPT-245 D7: Blocker redirect persistence", () => {
       (c) => c?.state === "ACTIVE",
     )!;
 
-    let r = runPipeline(state,
+    const r = runPipeline(state,
       { type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: originalTarget.instanceId },
       cardDb, 0);
     expect(r.valid).toBe(true);

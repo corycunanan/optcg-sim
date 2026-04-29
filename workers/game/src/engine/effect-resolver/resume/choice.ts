@@ -103,7 +103,7 @@ export function handlePlayerChoiceStateDistribution(
       forcedFirstState: chosenState,
     },
   );
-  let nextState = actionResult.state;
+  const nextState = actionResult.state;
   events.push(...actionResult.events);
 
   if (actionResult.pendingPrompt) {

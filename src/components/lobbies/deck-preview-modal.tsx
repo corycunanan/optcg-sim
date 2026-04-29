@@ -185,12 +185,12 @@ export function DeckPreviewModal({
 
   useEffect(() => {
     if (!open || !deckId) {
-      setDeck(null);
+      queueMicrotask(() => setDeck(null));
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
+    queueMicrotask(() => setLoading(true));
 
     fetch(`/api/decks/${deckId}`)
       .then((res) => (res.ok ? res.json() : null))

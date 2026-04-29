@@ -79,7 +79,7 @@ function FlippingCard({ initialCard }: { initialCard: number }) {
       clearTimeout(delayTimerRef.current);
       clearTimeout(flipTimerRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   return (
     <div
@@ -169,15 +169,11 @@ function Column({
 }
 
 export function CardColumns() {
-  const [columns, setColumns] = useState<number[][]>([]);
-
-  useEffect(() => {
-    setColumns(
-      COLUMNS.map(() =>
-        Array.from({ length: CARDS_PER_COL }, () => getRandomCard())
-      )
-    );
-  }, []);
+  const [columns] = useState<number[][]>(() =>
+    COLUMNS.map(() =>
+      Array.from({ length: CARDS_PER_COL }, () => getRandomCard())
+    )
+  );
 
   if (columns.length === 0) return null;
 

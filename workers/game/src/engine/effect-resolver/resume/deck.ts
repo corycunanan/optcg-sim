@@ -176,7 +176,7 @@ export function handleArrangeSearchAndPlay(
   const { restOfDeck, arrangedCards, kept } = computeArrangeContext(p.deck, keptId, ordered);
 
   // Play kept card to field (CHARACTER or STAGE zone)
-  let newCharacters = [...p.characters] as (typeof p.characters);
+  const newCharacters = [...p.characters] as (typeof p.characters);
   let newStage = p.stage;
   let newTrash = [...p.trash];
   if (keptId && kept) {

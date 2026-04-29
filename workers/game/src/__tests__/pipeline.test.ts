@@ -82,7 +82,7 @@ describe("phase cycle", () => {
 describe("play card", () => {
   it("plays a Character: pays DON!! cost and places on board", () => {
     const cardDb = createTestCardDb();
-    let state = createBattleReadyState(cardDb);
+    const state = createBattleReadyState(cardDb);
 
     // Find a card in hand to play
     const charInHand = state.players[0].hand.find(
@@ -235,7 +235,7 @@ describe("battle", () => {
 
   it("blocker intercepts attack and replaces target", () => {
     const cardDb = createTestCardDb();
-    let state = createBattleReadyState(cardDb);
+    const state = createBattleReadyState(cardDb);
 
     const attacker = state.players[0].characters[0]!;
     const originalTarget = state.players[1].leader;
@@ -260,7 +260,7 @@ describe("battle", () => {
 
   it("rejects second blocker declaration in the same battle (§7-1-2-1)", () => {
     const cardDb = createTestCardDb();
-    let state = createBattleReadyState(cardDb);
+    const state = createBattleReadyState(cardDb);
 
     const attacker = state.players[0].characters[0]!;
     const originalTarget = state.players[1].leader;
@@ -597,7 +597,7 @@ describe("defeat conditions", () => {
     // Empty player 0's deck
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
     newPlayers[0] = { ...newPlayers[0], deck: [] };
-    let s: GameState = { ...state, players: newPlayers };
+    const s: GameState = { ...state, players: newPlayers };
 
     // Advance through REFRESH → DRAW (deck-out check happens in step 7)
     const r1 = runPipeline(s, { type: "ADVANCE_PHASE" }, cardDb, 0); // REFRESH → DRAW
@@ -681,7 +681,7 @@ describe("defeat conditions", () => {
       controller: 0,
       owner: 0,
     };
-    let newPlayers = [...state.players] as [PlayerState, PlayerState];
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
     newPlayers[0] = { ...newPlayers[0], characters: padChars([...newPlayers[0].characters.filter(Boolean) as CardInstance[], datkChar]) };
     // Pin to one non-[Trigger] life card so both DA damages resolve in-line.
     const loneLife = { ...newPlayers[1].life[0], cardId: CARDS.VANILLA.id };
@@ -1305,7 +1305,7 @@ describe("ON_KO effect stack resume flow", () => {
     const p1HandBefore = koResult.state.players[1].hand.length;
 
     // Clear pendingPrompt and resume with PASS (decline)
-    let state = { ...koResult.state, pendingPrompt: null };
+    const state = { ...koResult.state, pendingPrompt: null };
     const resumeResult = resumeFromStack(state, { type: "PASS" }, cardDb);
 
     // No draw should have happened, no cards trashed from hand
@@ -1318,7 +1318,7 @@ describe("ON_KO effect stack resume flow", () => {
     const koResult = setupMarcoKO(cardDb, marcoCard);
 
     // Clear pendingPrompt and resume with acceptance (PLAYER_CHOICE accept)
-    let state = { ...koResult.state, pendingPrompt: null };
+    const state = { ...koResult.state, pendingPrompt: null };
     const resumeResult = resumeFromStack(
       state,
       { type: "PLAYER_CHOICE", choiceId: "accept" },
@@ -1427,7 +1427,7 @@ describe("ON_KO effect stack resume flow", () => {
     expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
 
     // Accept the optional effect
-    let resumeState = { ...result.state, pendingPrompt: null };
+    const resumeState = { ...result.state, pendingPrompt: null };
     const acceptResult = resumeFromStack(
       resumeState,
       { type: "PLAYER_CHOICE", choiceId: "accept" },

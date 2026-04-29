@@ -81,9 +81,9 @@ export function CardBrowser({
       const edge = pendingEdgeRef.current;
       pendingEdgeRef.current = null;
       if (edge === "first" && cardIds.length > 0) {
-        setModalCardId(cardIds[0]);
+        queueMicrotask(() => setModalCardId(cardIds[0]));
       } else if (edge === "last" && cardIds.length > 0) {
-        setModalCardId(cardIds[cardIds.length - 1]);
+        queueMicrotask(() => setModalCardId(cardIds[cardIds.length - 1]));
       }
     }
   }, [cardIdsKey, cardIds]);

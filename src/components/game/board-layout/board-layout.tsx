@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type {
   ActiveEffect,
   CardDb,
@@ -116,26 +116,49 @@ function BoardLayoutInner({
   const zoneRegistry = useZonePosition();
   const [windowViewport, setWindowViewport] = useState(getViewportSize);
   const viewport = viewportSize ?? windowViewport;
-  const [isPromptHidden, setIsPromptHidden] = useState(false);
+  const promptType = activePrompt?.promptType ?? null;
+  const [hiddenPromptType, setHiddenPromptType] = useState<string | null>(null);
+  const isPromptHidden = hiddenPromptType === promptType;
   const [zonePreview, setZonePreview] = useState<
     | { type: "deck"; owner: "me" | "opp" }
     | { type: "trash"; owner: "me" | "opp" }
     | null
   >(null);
 
-  useEffect(() => {
-    setIsPromptHidden(false);
-  }, [activePrompt?.promptType]);
-
   /* ── Redistribute DON prompt state ───────────────────────────── */
 
   const redistributePrompt = activePrompt?.promptType === "REDISTRIBUTE_DON" ? activePrompt : null;
-  const [redistributeTransfers, setRedistributeTransfers] = useState<RedistributeTransfer[]>([]);
-
-  // Reset pending transfers when prompt identity changes (new prompt, or cleared).
-  useEffect(() => {
-    setRedistributeTransfers([]);
-  }, [redistributePrompt?.validSourceCardIds, redistributePrompt?.validTargetCardIds, redistributePrompt?.maxTransfers]);
+  const redistributePromptKey = redistributePrompt
+    ? [
+        redistributePrompt.validSourceCardIds.join(","),
+        redistributePrompt.validTargetCardIds.join(","),
+        redistributePrompt.maxTransfers,
+      ].join("|")
+    : null;
+  const [redistributeTransferState, setRedistributeTransferState] = useState<{
+    key: string | null;
+    transfers: RedistributeTransfer[];
+  }>({ key: null, transfers: [] });
+  const redistributeTransfers = useMemo(
+    () =>
+      redistributeTransferState.key === redistributePromptKey
+        ? redistributeTransferState.transfers
+        : [],
+    [redistributeTransferState, redistributePromptKey],
+  );
+  const updateRedistributeTransfers = useCallback(
+    (
+      updater: (prev: RedistributeTransfer[]) => RedistributeTransfer[],
+    ) => {
+      setRedistributeTransferState((prev) => ({
+        key: redistributePromptKey,
+        transfers: updater(
+          prev.key === redistributePromptKey ? prev.transfers : [],
+        ),
+      }));
+    },
+    [redistributePromptKey],
+  );
 
   const handleRedistributeDrop = useCallback(
     (fromCardId: string, donId: string, toCardId: string) => {
@@ -143,14 +166,14 @@ function BoardLayoutInner({
       if (fromCardId === toCardId) return;
       if (!redistributePrompt.validSourceCardIds.includes(fromCardId)) return;
       if (!redistributePrompt.validTargetCardIds.includes(toCardId)) return;
-      setRedistributeTransfers((prev) => {
+      updateRedistributeTransfers((prev) => {
         if (prev.length >= redistributePrompt.maxTransfers) return prev;
         // Each DON can only be moved once in one submission
         if (prev.some((t) => t.donInstanceId === donId)) return prev;
         return [...prev, { fromCardInstanceId: fromCardId, donInstanceId: donId, toCardInstanceId: toCardId }];
       });
     },
-    [redistributePrompt],
+    [redistributePrompt, updateRedistributeTransfers],
   );
 
   const redistributeSourceIds = useMemo(() => {
@@ -321,14 +344,15 @@ function BoardLayoutInner({
   /* ── Refresh phase stagger detection ────────────────────────── */
 
   const prevPhaseRef = useRef(turn?.phase);
-  const [refreshWave, setRefreshWave] = useState(false);
+  const [refreshWaveTick, bumpRefreshWaveTick] = useReducer((tick: number) => tick + 1, 0);
+  const refreshWave = refreshWaveTick % 2 === 1;
 
   useEffect(() => {
     const prevPhase = prevPhaseRef.current;
     prevPhaseRef.current = turn?.phase;
     if (!reducedMotion && prevPhase === "REFRESH" && turn?.phase === "DRAW") {
-      setRefreshWave(true);
-      const timer = setTimeout(() => setRefreshWave(false), 500);
+      bumpRefreshWaveTick();
+      const timer = setTimeout(() => bumpRefreshWaveTick(), 500);
       return () => clearTimeout(timer);
     }
   }, [turn?.phase, reducedMotion]);
@@ -475,7 +499,7 @@ function BoardLayoutInner({
               },
             } : undefined}
             isPromptHidden={isPromptHidden}
-            onShowPrompt={() => setIsPromptHidden(false)}
+            onShowPrompt={() => setHiddenPromptType(null)}
             canUndo={canUndo}
             onAction={onAction}
           />
@@ -534,7 +558,7 @@ function BoardLayoutInner({
       <BoardModals
         activePrompt={activePrompt}
         isPromptHidden={isPromptHidden}
-        onHide={() => setIsPromptHidden(true)}
+        onHide={() => setHiddenPromptType(promptType)}
         cardDb={cardDb}
         onAction={onAction}
         zonePreview={zonePreview}
@@ -542,7 +566,7 @@ function BoardLayoutInner({
         me={me}
         opp={opp}
         redistributeTransfers={redistributeTransfers}
-        onRedistributeUndo={() => setRedistributeTransfers((prev) => prev.slice(0, -1))}
+        onRedistributeUndo={() => updateRedistributeTransfers((prev) => prev.slice(0, -1))}
       />
     </div>
 
