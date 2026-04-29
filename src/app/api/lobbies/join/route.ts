@@ -1,13 +1,11 @@
 /**
- * POST /api/lobbies/join — Join a lobby by code and auto-start the game.
+ * POST /api/lobbies/join — Join a lobby by code and enter the lobby room.
  *
- * Body: { code: string, deckId: string }
+ * Body: { code: string, deckId?: string }
  *
- * Creates a LobbyGuest record, a GameSession in PostgreSQL,
- * initializes the Durable Object, and returns { gameId } so the
- * guest can navigate directly to /game/{gameId}.
- *
- * The host discovers the game started via polling GET /api/lobbies/[id].
+ * Creates a LobbyGuest record, marks the lobby READY, and returns { lobbyId }.
+ * Temporary transition shim: ?autoStart=true preserves the old game-starting
+ * behavior until the lobby room UI removes it in OPT-342.
  */
 
 import { NextRequest } from "next/server";
@@ -38,12 +36,8 @@ export async function POST(request: NextRequest) {
     return apiError("Too many requests. Try again later.", 429);
   }
 
-  if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
-    console.error("GAME_WORKER_URL or GAME_WORKER_SECRET not configured");
-    return apiError("Game server not configured", 503);
-  }
-
   try {
+    const autoStart = request.nextUrl.searchParams.get("autoStart") === "true";
     const parsed = await parseBody(request, JoinLobbySchema);
     if (isErrorResponse(parsed)) return parsed;
     const { code, deckId } = parsed;
@@ -52,8 +46,6 @@ export async function POST(request: NextRequest) {
     if (normalizedCode.length < 4) {
       return apiError("Invalid lobby code", 400);
     }
-
-    const guestPlayableDeck = await requirePlayableDeck(deckId, userId);
 
     // Find the lobby by join code
     const lobby = await prisma.lobby.findFirst({
@@ -75,15 +67,50 @@ export async function POST(request: NextRequest) {
       return apiError("Lobby already has a guest", 409);
     }
 
+    if (lobby.mode === "SOLITAIRE") {
+      return apiError("This lobby is in solo mode and cannot be joined", 409);
+    }
+
+    if (lobby.mode === "PVCOMPUTER") {
+      return apiError("This lobby is in computer mode and cannot be joined", 409);
+    }
+
+    if (!autoStart) {
+      // Enter the room only. Deck slots are mutable in the lobby room; deck
+      // legality moves to the explicit start boundary in OPT-341.
+      await prisma.$transaction([
+        prisma.lobbyGuest.create({
+          data: { lobbyId: lobby.id, userId, deckId },
+        }),
+        prisma.lobby.update({
+          where: { id: lobby.id },
+          data: { status: "READY" },
+        }),
+      ]);
+
+      return apiSuccess({ lobbyId: lobby.id });
+    }
+
+    if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
+      console.error("GAME_WORKER_URL or GAME_WORKER_SECRET not configured");
+      return apiError("Game server not configured", 503);
+    }
+
+    if (!deckId) {
+      return apiError("deckId is required to auto-start a lobby", 400);
+    }
+
     if (!lobby.hostDeckId) {
       return apiError("Host has not selected a deck", 409);
     }
 
+    const guestPlayableDeck = await requirePlayableDeck(deckId, userId);
     const hostPlayableDeck = await requirePlayableDeck(
       lobby.hostDeckId,
       lobby.hostUserId,
     );
 
+    // Temporary auto-start shim for the pre-room UI.
     // Atomically create LobbyGuest + GameSession + mark lobby IN_GAME.
     // Uses array-based $transaction (single round-trip, PgBouncer-safe)
     // so a concurrent join attempt fails on the unique lobbyId constraint
