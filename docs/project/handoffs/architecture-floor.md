@@ -1,7 +1,7 @@
 ---
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-last-updated: 2026-04-29 (OPT-335 done; OPT-336 ready)
+last-updated: 2026-04-29 (OPT-336 in review)
 ---
 
 # Architecture Floor — Handoff Doc
@@ -28,14 +28,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 10 | [OPT-337](https://linear.app/optcg-sim/issue/OPT-337) | Enforce one active WebSocket per player in each game session | 3 | OPT-333 | Done | [#179](https://github.com/corycunanan/optcg-sim/pull/179) | Newest socket wins; stale same-player sockets no-op for message/close and do not receive prompts or filtered state. |
 | 11 | [OPT-334](https://linear.app/optcg-sim/issue/OPT-334) | Bind worker game tokens to gameId and track replay identifiers | 3 | OPT-333 | Done | [#180](https://github.com/corycunanan/optcg-sim/pull/180) | Tokens are game-scoped, include `jti`, and are one-shot through Durable Object storage. |
 | 12 | [OPT-335](https://linear.app/optcg-sim/issue/OPT-335) | Add per-player WebSocket action rate limiting in the game worker | 3 | OPT-333 | Done | [#181](https://github.com/corycunanan/optcg-sim/pull/181) | Token bucket per `(gameId, playerIndex)` before expensive action handling. |
-| 13 | [OPT-336](https://linear.app/optcg-sim/issue/OPT-336) | Throttle WebSocket upgrade and reconnect attempts per game player | 2 | OPT-333 | Backlog | — | Protect upgrade/close churn separately from action spam. |
+| 13 | [OPT-336](https://linear.app/optcg-sim/issue/OPT-336) | Throttle WebSocket upgrade and reconnect attempts per game player | 2 | OPT-333 | In Review | [#183](https://github.com/corycunanan/optcg-sim/pull/183) | Per-player upgrade bucket before socket accept, presence writes, alarms, or broadcasts. |
 | 14 | [OPT-324](https://linear.app/optcg-sim/issue/OPT-324) | Flaky test: opt-243 Leader-vs-Leader battle termination intermittently emits 0 END_OF_BATTLE | 3 | OPT-328 | Backlog | — | **Cross-project: lives in Game Board Reliability.** Tracked here after WS security follow-ups. Root-cause non-determinism in trigger ordering. 20/20 clean runs before close. |
 
 **Total estimate:** 47 points (44 in Architecture Floor + 3 from cross-project OPT-324).
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-336** — throttle WebSocket upgrade and reconnect attempts per game player. Ready now.
+**Next up:** **OPT-324** — engine flake in Leader-vs-Leader battle termination. Blocked on #183 merging.
 
 ### PR phasing
 
@@ -185,3 +185,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Keep OPT-336 scoped to upgrade/reconnect churn; action-message throttling, token scoping, replay, and authoritative newest-socket behavior are already covered by OPT-335/334/337.
 - **Unresolved:** none for OPT-335. OPT-336 should decide retry-friendly rejection semantics for excessive upgrades without weakening one-shot token replay.
 - **Why this matters for OPT-336:** The hot message path is now protected, so the remaining WebSocket abuse surface is repeated valid-token acquisition, upgrade, close, alarm, and presence churn.
+
+### OPT-336 → OPT-324
+**From:** session on 2026-04-29 · **Commit:** `37b93b1` · **PR:** #183
+
+- **Primer:** Valid WebSocket reconnect loops now spend a per-game/player Durable Object-local upgrade bucket after one-shot token validation but before socket accept, connected-state writes, alarm churn, or broadcasts.
+- **Read first:** `workers/game/src/GameSession.ts`, `workers/game/src/__tests__/opt-336-upgrade-rate-limit.test.ts`, `docs/architecture/WORKER-SECURITY-AUDIT.md`, `workers/game/src/engine/triggers.ts`
+- **Gotchas / do NOT touch:** The WebSocket security follow-ups are now covered by OPT-333/337/334/335/336; OPT-324 should stay focused on the intermittent `END_OF_BATTLE` trigger-ordering failure.
+- **Unresolved:** none for OPT-336. OPT-324 still needs root-cause work and the requested 20/20 clean-run confidence pass.
+- **Why this matters for OPT-324:** With the worker WS security floor finished, the Architecture Floor critical path moves to the cross-project engine flake without carrying reconnect-abuse debt.
