@@ -5,7 +5,12 @@
  */
 
 import { NextRequest } from "next/server";
-import { requireAuth, apiSuccess, apiAction, apiError } from "@/lib/api-response";
+import {
+  requireAuth,
+  apiSuccess,
+  apiAction,
+  apiError,
+} from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { PatchLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -13,10 +18,7 @@ import { apiLimiter } from "@/lib/rate-limit";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(
-  _request: NextRequest,
-  { params }: RouteContext,
-) {
+export async function GET(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
 
@@ -33,12 +35,23 @@ export async function GET(
       hostReady: true,
       hostUserId: true,
       host: { select: { username: true, name: true, image: true } },
-      hostDeck: { select: { id: true, name: true, leaderId: true, leaderArtUrl: true } },
+      hostDeck: {
+        select: { id: true, name: true, leaderId: true, leaderArtUrl: true },
+      },
       guest: {
         select: {
           guestReady: true,
-          user: { select: { id: true, username: true, name: true, image: true } },
-          deck: { select: { id: true, name: true, leaderId: true, leaderArtUrl: true } },
+          user: {
+            select: { id: true, username: true, name: true, image: true },
+          },
+          deck: {
+            select: {
+              id: true,
+              name: true,
+              leaderId: true,
+              leaderArtUrl: true,
+            },
+          },
         },
       },
       gameSession: { select: { id: true } },
@@ -64,43 +77,49 @@ export async function GET(
     ? leaderMap.get(lobby.guest.deck.leaderId)
     : null;
 
-  return apiSuccess({
-    id: lobby.id,
-    status:
-      userIsEvictedFromLobby(lobby, authResult.userId) ? "EVICTED" : lobby.status,
-    joinCode: lobby.joinCode,
-    format: lobby.format,
-    mode: lobby.mode,
-    hostReady: lobby.hostReady,
-    host: lobby.host,
-    hostDeck: lobby.hostDeck
-      ? {
-          ...lobby.hostDeck,
-          leaderName: hostLeader?.name ?? null,
-          leaderImageUrl: lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
-        }
-      : null,
-    guest: lobby.guest
-      ? {
-          ...lobby.guest,
-          deck: lobby.guest.deck
-            ? {
-                ...lobby.guest.deck,
-                leaderName: guestLeader?.name ?? null,
-                leaderImageUrl:
-                  lobby.guest.deck.leaderArtUrl ?? guestLeader?.imageUrl ?? null,
-              }
-            : null,
-        }
-      : null,
-    gameId: lobby.gameSession?.id ?? null,
-  }, 200, { "Cache-Control": "no-store" });
+  return apiSuccess(
+    {
+      id: lobby.id,
+      status: userIsEvictedFromLobby(lobby, authResult.userId)
+        ? "EVICTED"
+        : lobby.status,
+      joinCode: lobby.joinCode,
+      format: lobby.format,
+      mode: lobby.mode,
+      hostReady: lobby.hostReady,
+      hostUserId: lobby.hostUserId,
+      host: lobby.host,
+      hostDeck: lobby.hostDeck
+        ? {
+            ...lobby.hostDeck,
+            leaderName: hostLeader?.name ?? null,
+            leaderImageUrl:
+              lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
+          }
+        : null,
+      guest: lobby.guest
+        ? {
+            ...lobby.guest,
+            deck: lobby.guest.deck
+              ? {
+                  ...lobby.guest.deck,
+                  leaderName: guestLeader?.name ?? null,
+                  leaderImageUrl:
+                    lobby.guest.deck.leaderArtUrl ??
+                    guestLeader?.imageUrl ??
+                    null,
+                }
+              : null,
+          }
+        : null,
+      gameId: lobby.gameSession?.id ?? null,
+    },
+    200,
+    { "Cache-Control": "no-store" }
+  );
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: RouteContext,
-) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
@@ -154,10 +173,16 @@ export async function PATCH(
       return apiError("PVComputer mode is not yet implemented", 501);
     }
     if (targetMode === "SOLITAIRE" && !isHost) {
-      return apiError("guestDeckId can only be changed by the host in Solitaire mode", 403);
+      return apiError(
+        "guestDeckId can only be changed by the host in Solitaire mode",
+        403
+      );
     }
     if (targetMode === "PVP" && !isGuest) {
-      return apiError("guestDeckId can only be changed by the guest in PVP mode", 403);
+      return apiError(
+        "guestDeckId can only be changed by the guest in PVP mode",
+        403
+      );
     }
   }
 
@@ -167,7 +192,10 @@ export async function PATCH(
   if (parsed.ready === true) {
     if (isHost) {
       if (hasHostControlledChange) {
-        return apiError("Ready cannot be set while changing host-controlled settings", 400);
+        return apiError(
+          "Ready cannot be set while changing host-controlled settings",
+          400
+        );
       }
       if (!lobby.hostDeckId) {
         return apiError("Select a deck before readying", 422, {
@@ -204,10 +232,10 @@ export async function PATCH(
     if (!deck) return apiError("Deck not found", 404);
   }
 
-  const switchingToSolitaire = lobby.mode === "PVP" && targetMode === "SOLITAIRE";
-  const realGuest = lobby.guest && lobby.guest.userId !== lobby.hostUserId
-    ? lobby.guest
-    : null;
+  const switchingToSolitaire =
+    lobby.mode === "PVP" && targetMode === "SOLITAIRE";
+  const realGuest =
+    lobby.guest && lobby.guest.userId !== lobby.hostUserId ? lobby.guest : null;
   if (switchingToSolitaire && realGuest && !force) {
     return apiError("Guest is present", 409, {
       code: "GUEST_PRESENT",
@@ -231,40 +259,62 @@ export async function PATCH(
 
   if (switchingToSolitaire) {
     operations.push(prisma.lobbyGuest.deleteMany({ where: { lobbyId: id } }));
-    operations.push(prisma.lobbyGuest.create({
-      data: {
-        lobbyId: id,
-        userId: lobby.hostUserId,
-        deckId: parsed.guestDeckId ?? null,
-        guestReady: false,
-      },
-    }));
+    operations.push(
+      prisma.lobbyGuest.upsert({
+        where: { lobbyId: id },
+        create: {
+          lobbyId: id,
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+        update: {
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+      })
+    );
     lobbyData.status = "READY";
   } else if (lobby.mode === "SOLITAIRE" && targetMode === "PVP") {
-    operations.push(prisma.lobbyGuest.deleteMany({
-      where: { lobbyId: id, userId: lobby.hostUserId },
-    }));
+    operations.push(
+      prisma.lobbyGuest.deleteMany({
+        where: { lobbyId: id, userId: lobby.hostUserId },
+      })
+    );
     lobbyData.status = "WAITING";
     lobbyData.hostReady = false;
   } else if (targetMode === "SOLITAIRE" && isHost && !lobby.guest) {
-    operations.push(prisma.lobbyGuest.create({
-      data: {
-        lobbyId: id,
-        userId: lobby.hostUserId,
-        deckId: parsed.guestDeckId ?? null,
-        guestReady: false,
-      },
-    }));
+    operations.push(
+      prisma.lobbyGuest.upsert({
+        where: { lobbyId: id },
+        create: {
+          lobbyId: id,
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+        update: {
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+      })
+    );
   } else if (parsed.guestDeckId !== undefined) {
-    operations.push(prisma.lobbyGuest.update({
-      where: { lobbyId: id },
-      data: { deckId: parsed.guestDeckId, guestReady: false },
-    }));
+    operations.push(
+      prisma.lobbyGuest.update({
+        where: { lobbyId: id },
+        data: { deckId: parsed.guestDeckId, guestReady: false },
+      })
+    );
   } else if (parsed.ready !== undefined && !isHost) {
-    operations.push(prisma.lobbyGuest.update({
-      where: { lobbyId: id },
-      data: { guestReady: parsed.ready },
-    }));
+    operations.push(
+      prisma.lobbyGuest.update({
+        where: { lobbyId: id },
+        data: { guestReady: parsed.ready },
+      })
+    );
   }
 
   if (Object.keys(lobbyData).length > 0) {
@@ -290,10 +340,7 @@ function userIsEvictedFromLobby(lobby: LobbyPollResult, userId: string) {
   return lobby.guest?.user.id !== userId;
 }
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: RouteContext,
-) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;

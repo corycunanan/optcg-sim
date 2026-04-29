@@ -10,12 +10,6 @@ import { generateLobbyCode } from "@/lib/lobbies";
 import { CreateLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
-import {
-  DECK_INVALID_CODE,
-  DeckInvalidError,
-  DeckNotFoundError,
-  requirePlayableDeck,
-} from "@/lib/decks/playable";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
@@ -32,7 +26,13 @@ export async function POST(request: NextRequest) {
     if (isErrorResponse(parsed)) return parsed;
     const { deckId, format } = parsed;
 
-    await requirePlayableDeck(deckId, userId);
+    if (deckId) {
+      const deck = await prisma.deck.findFirst({
+        where: { id: deckId, userId },
+        select: { id: true },
+      });
+      if (!deck) return apiError("Deck not found", 404);
+    }
 
     // Close any existing WAITING lobby by this host
     await prisma.lobby.updateMany({
@@ -48,8 +48,9 @@ export async function POST(request: NextRequest) {
         lobby = await prisma.lobby.create({
           data: {
             hostUserId: userId,
-            hostDeckId: deckId,
+            hostDeckId: deckId ?? null,
             format: format || "Standard",
+            mode: "PVP",
             joinCode: generateLobbyCode(),
           },
         });
@@ -71,15 +72,6 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess({ lobbyId: lobby.id, joinCode: lobby.joinCode }, 201);
   } catch (error) {
-    if (error instanceof DeckNotFoundError) {
-      return apiError("Deck not found", 404);
-    }
-    if (error instanceof DeckInvalidError) {
-      return apiError("Deck is not playable", 422, {
-        code: DECK_INVALID_CODE,
-        details: error.details,
-      });
-    }
     console.error("Lobby create error:", error);
     return apiError("Failed to create lobby", 500);
   }

@@ -8,6 +8,7 @@ const lobbyUpdateMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
 const lobbyGuestUpdateMock = vi.fn();
+const lobbyGuestUpsertMock = vi.fn();
 const deckFindFirstMock = vi.fn();
 const transactionMock = vi.fn();
 
@@ -22,6 +23,7 @@ vi.mock("@/lib/db", () => ({
       create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
       deleteMany: (...args: unknown[]) => lobbyGuestDeleteManyMock(...args),
       update: (...args: unknown[]) => lobbyGuestUpdateMock(...args),
+      upsert: (...args: unknown[]) => lobbyGuestUpsertMock(...args),
     },
     deck: {
       findFirst: (...args: unknown[]) => deckFindFirstMock(...args),
@@ -75,6 +77,7 @@ beforeEach(() => {
   lobbyGuestCreateMock.mockReset();
   lobbyGuestDeleteManyMock.mockReset();
   lobbyGuestUpdateMock.mockReset();
+  lobbyGuestUpsertMock.mockReset();
   deckFindFirstMock.mockReset();
   transactionMock.mockReset();
 
@@ -85,6 +88,7 @@ beforeEach(() => {
   lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
   lobbyGuestDeleteManyMock.mockReturnValue({ query: "delete-guests" });
   lobbyGuestUpdateMock.mockReturnValue({ query: "update-guest" });
+  lobbyGuestUpsertMock.mockReturnValue({ query: "upsert-guest" });
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
   transactionMock.mockResolvedValue([]);
 });
@@ -105,17 +109,26 @@ describe("PATCH /api/lobbies/[id]", () => {
 
   it("force-switches PVP to Solitaire by ejecting the real guest and creating the host side B row", async () => {
     const res = await PATCH(
-      buildRequest({ mode: "SOLITAIRE", guestDeckId: "side-b-deck" }, "?force=true"),
-      params,
+      buildRequest(
+        { mode: "SOLITAIRE", guestDeckId: "side-b-deck" },
+        "?force=true"
+      ),
+      params
     );
 
     expect(res.status).toBe(200);
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1" },
     });
-    expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
-      data: {
+    expect(lobbyGuestUpsertMock).toHaveBeenCalledWith({
+      where: { lobbyId: "lobby-1" },
+      create: {
         lobbyId: "lobby-1",
+        userId: "host-user",
+        deckId: "side-b-deck",
+        guestReady: false,
+      },
+      update: {
         userId: "host-user",
         deckId: "side-b-deck",
         guestReady: false,
@@ -127,21 +140,23 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
     expect(transactionMock).toHaveBeenCalledWith([
       { query: "delete-guests" },
-      { query: "create-guest" },
+      { query: "upsert-guest" },
       { query: "update-lobby" },
     ]);
   });
 
   it("cleans up host-as-guest state when switching Solitaire back to PVP", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
-      mode: "SOLITAIRE",
-      guest: {
-        userId: "host-user",
-        deckId: "side-b-deck",
-        guestReady: false,
-        user: { id: "host-user", username: "hosty", name: "Host Player" },
-      },
-    }));
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        guest: {
+          userId: "host-user",
+          deckId: "side-b-deck",
+          guestReady: false,
+          user: { id: "host-user", username: "hosty", name: "Host Player" },
+        },
+      })
+    );
 
     const res = await PATCH(buildRequest({ mode: "PVP" }), params);
 
@@ -158,7 +173,10 @@ describe("PATCH /api/lobbies/[id]", () => {
   it("lets the PVP guest change only their deck and clears guestReady", async () => {
     authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
 
-    const res = await PATCH(buildRequest({ guestDeckId: "new-guest-deck" }), params);
+    const res = await PATCH(
+      buildRequest({ guestDeckId: "new-guest-deck" }),
+      params
+    );
 
     expect(res.status).toBe(200);
     expect(deckFindFirstMock).toHaveBeenCalledWith({
@@ -171,7 +189,10 @@ describe("PATCH /api/lobbies/[id]", () => {
   });
 
   it("rejects host attempts to mutate the PVP guest deck slot", async () => {
-    const res = await PATCH(buildRequest({ guestDeckId: "new-guest-deck" }), params);
+    const res = await PATCH(
+      buildRequest({ guestDeckId: "new-guest-deck" }),
+      params
+    );
 
     expect(res.status).toBe(403);
     expect(transactionMock).not.toHaveBeenCalled();
