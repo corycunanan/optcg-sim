@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { CardData, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
-import { CARDS, createTestCardDb, createBattleReadyState, padChars } from "./factories.js";
+import { createTestCardDb, createBattleReadyState, padChars } from "./factories.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { moveCard } from "../engine/state.js";
 
@@ -186,11 +186,10 @@ describe("OPT-243 D5: Battle termination on mid-step removal", () => {
   it("does not re-emit CHARACTER_BATTLES when a Leader is the attacker", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
-    state.players[1].life = state.players[1].life.map((lifeCard, index) => ({
-      ...lifeCard,
-      cardId: CARDS.VANILLA.id,
-      instanceId: `leader-attack-life-${index}`,
-    }));
+    expect(state.players[1].life.every((lifeCard) => {
+      const cardData = cardDb.get(lifeCard.cardId);
+      return cardData?.keywords.trigger === false;
+    })).toBe(true);
     const leaderAttacker = state.players[0].leader;
 
     const midBattle = declareAttackAndPassBlock(
@@ -206,6 +205,7 @@ describe("OPT-243 D5: Battle termination on mid-step removal", () => {
       midBattle.turn.activePlayerIndex,
     );
     expect(afterPass.valid).toBe(true);
+    expect(afterPass.pendingPrompt).toBeUndefined();
 
     expect(findEvents(afterPass.state, "CHARACTER_BATTLES").length).toBe(0);
 
