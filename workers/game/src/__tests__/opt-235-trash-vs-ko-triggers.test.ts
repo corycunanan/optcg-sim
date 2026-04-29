@@ -105,6 +105,7 @@ describe("OPT-235 — CARD_TRASHED trigger matching (direct)", () => {
     const event: GameEvent = {
       type: "CARD_TRASHED",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardInstanceId: "victim", cardId: CARDS.VANILLA.id, reason: "effect" },
     };
 
@@ -143,6 +144,7 @@ describe("OPT-235 — CARD_TRASHED trigger matching (direct)", () => {
     const trashEvent: GameEvent = {
       type: "CARD_TRASHED",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardInstanceId: luccerInst.instanceId, cardId: luccer.id, reason: "effect" },
     };
     expect(matchTriggersForEvent(state, trashEvent, cardDb)).toHaveLength(0);
@@ -170,6 +172,7 @@ describe("OPT-235 — CARD_TRASHED trigger matching (direct)", () => {
     const oppTrash: GameEvent = {
       type: "CARD_TRASHED",
       playerIndex: 1,
+      timestamp: 0,
       payload: { cardInstanceId: "opp-victim", cardId: CARDS.VANILLA.id, reason: "effect" },
     };
     expect(matchTriggersForEvent(state, oppTrash, cardDb)).toHaveLength(1);
@@ -178,6 +181,7 @@ describe("OPT-235 — CARD_TRASHED trigger matching (direct)", () => {
     const selfTrash: GameEvent = {
       type: "CARD_TRASHED",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardInstanceId: "self-victim", cardId: CARDS.VANILLA.id, reason: "effect" },
     };
     expect(matchTriggersForEvent(state, selfTrash, cardDb)).toHaveLength(0);
@@ -643,4 +647,3 @@ describe("OPT-235 — Basil + Thatch interaction", () => {
     expect(matched.some((m) => m.trigger.sourceCardInstanceId === basilInst.instanceId)).toBe(true);
   });
 });
-

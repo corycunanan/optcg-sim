@@ -247,7 +247,7 @@ describe("OPT-236 — event class emission", () => {
     const lifeCard: LifeCard = {
       instanceId: "life-trigger-3",
       cardId: triggerEventCard.id,
-      faceUp: true,
+      face: "UP",
     };
     const newPlayers = [...state.players] as [PlayerState, PlayerState];
     // player 1 is the inactive player when player 0 is active — push life card there.
@@ -258,14 +258,15 @@ describe("OPT-236 — event class emission", () => {
       turn: {
         ...state.turn,
         battle: {
+          battleId: "battle-trigger-event",
           attackerInstanceId: state.players[0].leader.instanceId,
           targetInstanceId: state.players[1].leader.instanceId,
-          initialPower: 5000,
-          currentPower: 5000,
-          counters: [],
+          attackerPower: 5000,
+          defenderPower: 5000,
+          counterPowerAdded: 0,
           blockerActivated: false,
           pendingTriggerLifeCard: lifeCard,
-        } as NonNullable<GameState["turn"]["battle"]>,
+        },
       },
     };
 
@@ -284,7 +285,7 @@ describe("OPT-236 — event class emission", () => {
     const lifeCard: LifeCard = {
       instanceId: "life-char",
       cardId: CARDS.VANILLA.id,
-      faceUp: true,
+      face: "UP",
     };
 
     const state = createBattleReadyState(cardDb);
@@ -296,14 +297,15 @@ describe("OPT-236 — event class emission", () => {
       turn: {
         ...state.turn,
         battle: {
+          battleId: "battle-trigger-character",
           attackerInstanceId: state.players[0].leader.instanceId,
           targetInstanceId: state.players[1].leader.instanceId,
-          initialPower: 5000,
-          currentPower: 5000,
-          counters: [],
+          attackerPower: 5000,
+          defenderPower: 5000,
+          counterPowerAdded: 0,
           blockerActivated: false,
           pendingTriggerLifeCard: lifeCard,
-        } as NonNullable<GameState["turn"]["battle"]>,
+        },
       },
     };
 
@@ -337,6 +339,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 1, // opponent
+      timestamp: 0,
       payload: { cardId: "evt", cardInstanceId: "evt-hand" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);
@@ -350,6 +353,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
     const event: GameEvent = {
       type: "EVENT_MAIN_RESOLVED_FROM_TRASH",
       playerIndex: 1,
+      timestamp: 0,
       payload: { cardId: "evt", cardInstanceId: "evt-trash" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);
@@ -363,6 +367,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
     const event: GameEvent = {
       type: "EVENT_TRIGGER_RESOLVED",
       playerIndex: 1,
+      timestamp: 0,
       payload: { cardId: "evt", cardInstanceId: "evt-life" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);
@@ -376,6 +381,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0, // same as watcher's controller
+      timestamp: 0,
       payload: { cardId: "evt", cardInstanceId: "evt-hand" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);
@@ -390,6 +396,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
     const event: GameEvent = {
       type: "CARD_PLAYED",
       playerIndex: 1,
+      timestamp: 0,
       payload: { cardId: "char", cardInstanceId: "char-x", zone: "CHARACTER", source: "FROM_HAND" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);
@@ -418,6 +425,7 @@ describe("OPT-236 — class-3 watcher fires only on EVENT_TRIGGER_RESOLVED", () 
     const event: GameEvent = {
       type: "EVENT_TRIGGER_RESOLVED",
       playerIndex: 1,
+      timestamp: 0,
       payload: { cardId: "evt", cardInstanceId: "evt-life" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);

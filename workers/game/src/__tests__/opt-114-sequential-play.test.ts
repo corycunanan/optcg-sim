@@ -16,7 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { executePlayCard } from "../engine/effect-resolver/actions/play.js";
 import type { Action, EffectResult } from "../engine/effect-types.js";
-import type { CardData, CardInstance, GameState } from "../types.js";
+import type { CardData, CardInstance, GameState, ResumeContext } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 function trashChar(cardId: string, suffix: string): CardInstance {
@@ -255,7 +255,7 @@ describe("OPT-114: sequential multi-target PLAY_CARD (macro expansion)", () => {
     expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(5);
     // Frame 1's source-zone card was consumed; frames 2 and 3 still in trash.
     expect(result.state.players[0].trash).toHaveLength(2);
-    const ctx = result.pendingPrompt!.resumeContext!;
+    const ctx = result.pendingPrompt!.resumeContext as ResumeContext;
     expect(ctx.ruleTrashForPlay?.playTargetId).toBe("trash-m2");
     expect(ctx.ruleTrashForPlay?.batch?.remainingTargetIds).toEqual(["trash-m2", "trash-m3"]);
   });

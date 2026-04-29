@@ -6,8 +6,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../types.js";
-import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
+import type { CardData, CardInstance, DonInstance, GameAction, GameState, PlayerState } from "../types.js";
+import type { Action, Cost } from "../engine/effect-types.js";
+import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./factories.js";
 import { getEffectiveCost, getEffectivePower, consumeOneTimeModifiers } from "../engine/modifiers.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { resolveEffect, executeActionChain, executeEffectAction } from "../engine/effect-resolver/resolver.js";
@@ -70,7 +71,7 @@ function makeInstance(
 /** Build a minimal game state with customizable players. */
 function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
   const makePlayer = (idx: 0 | 1): PlayerState => ({
-    userId: `user-${idx}`,
+    playerId: `user-${idx}`,
     leader: makeInstance(CARDS.LEADER.id, "LEADER", idx, { instanceId: `leader-${idx}` }),
     characters: [null, null, null, null, null],
     stage: null,
@@ -95,10 +96,16 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
       state: "ACTIVE" as const,
       attachedTo: null,
     })),
+    deckList: [],
+    connected: true,
+    awayReason: null,
+    rejoinDeadlineAt: null,
+    sleeveUrl: null,
+    donArtUrl: null,
   });
 
   return {
-    gameId: "test-integration",
+    id: "test-integration",
     status: "IN_PROGRESS",
     winner: null,
     players: [makePlayer(0), makePlayer(1)],
@@ -111,6 +118,7 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
       actionsPerformedThisTurn: [],
       oncePerTurnUsed: {},
       extraTurnsPending: 0,
+      deckHitZeroThisTurn: [false, false],
     },
     activeEffects: [],
     prohibitions: [],
@@ -119,6 +127,8 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
     triggerRegistry: [],
     effectStack: [],
     pendingPrompt: null,
+    eventLog: [],
+    winReason: null,
     ...overrides,
   } as GameState;
 }
@@ -688,7 +698,7 @@ describe("5c–d. TURN_LIFE_FACE as Cost (cost-handler)", () => {
     const state = buildMinimalState();
     // All life starts face-down
 
-    const costs = [{ type: "TURN_LIFE_FACE_UP", amount: 1 }];
+    const costs: Cost[] = [{ type: "TURN_LIFE_FACE_UP", amount: 1 }];
     const result = payCosts(state, costs, 0, cardDb, "leader-0");
 
     expect(result).not.toBeNull();
@@ -703,7 +713,7 @@ describe("5c–d. TURN_LIFE_FACE as Cost (cost-handler)", () => {
     const state = buildMinimalState();
     // All life is face-down — cost should fail (returns null)
 
-    const costs = [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }];
+    const costs: Cost[] = [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }];
     const result = payCosts(state, costs, 0, cardDb, "leader-0");
     expect(result).toBeNull();
 
@@ -738,10 +748,10 @@ describe("6. Dynamic Values", () => {
     state.players[0].characters = padChars([char]);
 
     // SET_BASE_POWER with dynamic value = LEADER_BASE_POWER (5000)
-    const action = {
+    const action: Action = {
       type: "SET_BASE_POWER" as const,
       params: { value: { type: "GAME_STATE", source: "LEADER_BASE_POWER", controller: "SELF" } },
-      target: { type: "SELF_CHARACTERS", controller: "SELF", count: { mode: "ALL" } },
+      target: { type: "ALL_YOUR_CHARACTERS", controller: "SELF", count: { all: true } },
       duration: { type: "THIS_TURN" as const },
     };
 
@@ -796,7 +806,7 @@ describe("7. Stage Support in SEARCH_AND_PLAY", () => {
     };
 
     // Simulate the player picking the stage card
-    const resumeAction = {
+    const resumeAction: GameAction = {
       type: "ARRANGE_TOP_CARDS" as const,
       keptCardInstanceId: "stage-found",
       orderedInstanceIds: state.players[0].deck.slice(1, 5).map(c => c.instanceId),

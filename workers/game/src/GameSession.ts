@@ -35,6 +35,7 @@ import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
 import { recalculateBattlePowers } from "./engine/battle.js";
 import { isEffectConditionMet } from "./engine/modifiers.js";
+import type { RuntimeActiveEffect } from "./engine/effect-types.js";
 import { configureLogger, log } from "./lib/log.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
@@ -853,7 +854,8 @@ export class GameSession implements DurableObject {
    */
   private stripInactiveEffects(state: GameState): GameState {
     if (!this.cardDb) return state;
-    const active = state.activeEffects.filter((e) => isEffectConditionMet(e, state, this.cardDb!));
+    const effects = state.activeEffects as RuntimeActiveEffect[];
+    const active = effects.filter((e) => isEffectConditionMet(e, state, this.cardDb!));
     if (active.length === state.activeEffects.length) return state;
     return { ...state, activeEffects: active };
   }
@@ -978,5 +980,4 @@ export class GameSession implements DurableObject {
     return null;
   }
 }
-
 

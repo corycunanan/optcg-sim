@@ -21,7 +21,7 @@ import type {
   Zone,
 } from "../types.js";
 import type { EffectSchema, EffectBlock } from "../engine/effect-types.js";
-import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
+import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./factories.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
@@ -79,7 +79,7 @@ function makeInstance(
 
 function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
   const makePlayer = (idx: 0 | 1): PlayerState => ({
-    userId: `user-${idx}`,
+    playerId: `user-${idx}`,
     leader: makeInstance(CARDS.LEADER.id, "LEADER", idx, { instanceId: `leader-${idx}` }),
     characters: [null, null, null, null, null],
     stage: null,
@@ -104,10 +104,16 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
       state: "ACTIVE" as const,
       attachedTo: null,
     })),
+    deckList: [],
+    connected: true,
+    awayReason: null,
+    rejoinDeadlineAt: null,
+    sleeveUrl: null,
+    donArtUrl: null,
   });
 
   return {
-    gameId: "test-m4c",
+    id: "test-m4c",
     status: "IN_PROGRESS",
     winner: null,
     players: [makePlayer(0), makePlayer(1)],
@@ -120,6 +126,7 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
       actionsPerformedThisTurn: [],
       oncePerTurnUsed: {},
       extraTurnsPending: 0,
+      deckHitZeroThisTurn: [false, false],
     },
     activeEffects: [],
     prohibitions: [],
@@ -441,7 +448,7 @@ describe("OPT-108 Batch 1: Event Emissions", () => {
             trigger: { keyword: "ON_PLAY" },
             actions: [{ type: "DRAW", params: { amount: 1 } }],
           }],
-        } as EffectSchema,
+        },
       });
       cardDb.set(drawCard.id, drawCard);
 
@@ -611,7 +618,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
               params: { zone: "TRASH" },
             }],
           }],
-        } as EffectSchema,
+        },
       });
       cardDb.set(playFromTrashCard.id, playFromTrashCard);
 
@@ -827,7 +834,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
             category: "auto",
             trigger: {
               event: "CHARACTER_PLAYED",
-              filter: { controller: "SELF", attribute: "Strike" },
+              filter: { controller: "SELF", attribute: "STRIKE" },
             },
             actions: [{ type: "DRAW", params: { amount: 1 } }],
           }],
@@ -988,10 +995,10 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const target = makeInstance("TARGET-CARD", "CHARACTER", 0, {
         instanceId: "target-inst",
         attachedDon: [
-          { instanceId: "don-1", state: "ACTIVE", zone: "CHARACTER" },
-          { instanceId: "don-2", state: "ACTIVE", zone: "CHARACTER" },
-          { instanceId: "don-3", state: "ACTIVE", zone: "CHARACTER" },
-        ] as DonInstance[],
+          { instanceId: "don-1", state: "ACTIVE", attachedTo: "target-inst" },
+          { instanceId: "don-2", state: "ACTIVE", attachedTo: "target-inst" },
+          { instanceId: "don-3", state: "ACTIVE", attachedTo: "target-inst" },
+        ],
       });
       state.players[0].characters = padChars([target]);
 

@@ -1535,8 +1535,8 @@ describe("OPT-231 — real-schema round trip via registerReplacementsForCard", (
     // base power ≤ 7000 so her own filter catches her if she ends up in the
     // batch — the self-inclusion invariant riding on top of the round trip.
     const kobyData: CardData = {
-      id: OP15_009_KOBY.card_id,
-      name: OP15_009_KOBY.card_name,
+      id: OP15_009_KOBY.card_id ?? "OP15-009",
+      name: OP15_009_KOBY.card_name ?? "Koby",
       type: "Character",
       color: ["Blue"],
       cost: 4,

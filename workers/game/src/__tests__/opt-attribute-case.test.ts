@@ -59,7 +59,7 @@ function makeInstance(cardId: string, zone: string, owner: 0 | 1, overrides: Par
 
 function buildState(leaderCardId: string, deckCardIds: string[]): GameState {
   const makePlayer = (idx: 0 | 1, leaderId: string, deckIds: string[]): PlayerState => ({
-    userId: `user-${idx}`,
+    playerId: `user-${idx}`,
     leader: makeInstance(leaderId, "LEADER", idx, { instanceId: `leader-${idx}` }),
     characters: [null, null, null, null, null],
     stage: null,
@@ -72,10 +72,16 @@ function buildState(leaderCardId: string, deckCardIds: string[]): GameState {
     removedFromGame: [],
     donDeck: [],
     donCostArea: [],
+    deckList: [],
+    connected: true,
+    awayReason: null,
+    rejoinDeadlineAt: null,
+    sleeveUrl: null,
+    donArtUrl: null,
   });
 
   return {
-    gameId: "test-op12-034",
+    id: "test-op12-034",
     status: "IN_PROGRESS",
     winner: null,
     players: [
@@ -91,6 +97,7 @@ function buildState(leaderCardId: string, deckCardIds: string[]): GameState {
       actionsPerformedThisTurn: [],
       oncePerTurnUsed: {},
       extraTurnsPending: 0,
+      deckHitZeroThisTurn: [false, false],
     },
     activeEffects: [],
     prohibitions: [],
@@ -99,6 +106,8 @@ function buildState(leaderCardId: string, deckCardIds: string[]): GameState {
     triggerRegistry: [],
     effectStack: [],
     pendingPrompt: null,
+    eventLog: [],
+    winReason: null,
   } as GameState;
 }
 

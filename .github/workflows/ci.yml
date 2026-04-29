@@ -31,16 +31,7 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm db:generate
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Type check
-        run: pnpm type-check
-
-      - name: Game engine tests
-        run: cd workers/game && npx vitest run
-
-      - name: Build
-        run: pnpm build
+      - name: Verify
+        run: pnpm verify
         env:
           DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"

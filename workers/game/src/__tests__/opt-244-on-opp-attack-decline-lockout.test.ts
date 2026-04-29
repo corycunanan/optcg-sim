@@ -99,11 +99,12 @@ function attackEvent(): GameEvent {
   return {
     type: "ATTACK_DECLARED",
     playerIndex: 0,
+    timestamp: 0,
     payload: {
       attackerInstanceId: "char-0-v1",
       targetInstanceId: "leader-1",
       attackerPower: 5000,
-    } as unknown as GameEvent["payload"],
+    },
   };
 }
 

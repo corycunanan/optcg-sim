@@ -381,7 +381,7 @@ function deregisterLeftFieldTriggers(
 
 function recalculateModifiers(
   state: GameState,
-  action: GameAction,
+  _action: GameAction,
   cardDb: Map<string, CardData>,
 ): GameState {
   // Re-evaluate WHILE_CONDITION effects every step
@@ -523,4 +523,3 @@ function findNewlyPlayedCard(
   }
   return null;
 }
-

@@ -509,7 +509,7 @@ describe("OPT-261: a negated field Character stops granting hand-zone cost reduc
           target: {
             type: "CARD_IN_HAND",
             controller: "SELF",
-            filter: { color: "Blue", card_type: "EVENT" },
+            filter: { color: "BLUE", card_type: "EVENT" },
           },
           params: { amount: -1 },
         }],
@@ -518,13 +518,13 @@ describe("OPT-261: a negated field Character stops granting hand-zone cost reduc
 
     const fieldCard = makeCard("FIELD", {
       type: "Character",
-      color: ["Blue"],
+      color: ["BLUE"],
       effectText: "Your blue Events cost -1.",
       effectSchema: fieldSchema,
     });
     const handCard = makeCard("HAND-EVENT", {
       type: "Event",
-      color: ["Blue"],
+      color: ["BLUE"],
       cost: 3,
     });
     const cardDb = new Map<string, CardData>([

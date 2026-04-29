@@ -178,7 +178,7 @@ function validateUniquenessConstraint(
 
 function validateNamedDistribution(
   selectedIds: string[],
-  distribution: NamedCardDistribution,
+  _distribution: NamedCardDistribution,
   state: GameState,
   cardDb: Map<string, CardData>,
 ): boolean {
