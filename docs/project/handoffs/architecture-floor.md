@@ -1,7 +1,7 @@
 ---
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-last-updated: 2026-04-29 (OPT-334 in review)
+last-updated: 2026-04-29 (OPT-335 in review)
 ---
 
 # Architecture Floor — Handoff Doc
@@ -26,8 +26,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 8 | [OPT-332](https://linear.app/optcg-sim/issue/OPT-332) | Triage React lint warnings; fix board correctness warnings (refs-during-render, set-state-in-effect) | 5 | — | Done | [#176](https://github.com/corycunanan/optcg-sim/pull/176) | Clears all `react-hooks/refs` and `react-hooks/set-state-in-effect` warnings. Lint warning count: 344. |
 | 9 | [OPT-333](https://linear.app/optcg-sim/issue/OPT-333) | Worker WebSocket security audit: token replay, action spam, payload limits, reconnect abuse | 3 | OPT-327 | Done | [#178](https://github.com/corycunanan/optcg-sim/pull/178) | Adds `docs/architecture/WORKER-SECURITY-AUDIT.md`, creates OPT-334–OPT-337 follow-ups, and lands an 8 KiB WS payload cap. |
 | 10 | [OPT-337](https://linear.app/optcg-sim/issue/OPT-337) | Enforce one active WebSocket per player in each game session | 3 | OPT-333 | Done | [#179](https://github.com/corycunanan/optcg-sim/pull/179) | Newest socket wins; stale same-player sockets no-op for message/close and do not receive prompts or filtered state. |
-| 11 | [OPT-334](https://linear.app/optcg-sim/issue/OPT-334) | Bind worker game tokens to gameId and track replay identifiers | 3 | OPT-333 | In Review | [#180](https://github.com/corycunanan/optcg-sim/pull/180) | Tokens are game-scoped, include `jti`, and are one-shot through Durable Object storage. |
-| 12 | [OPT-335](https://linear.app/optcg-sim/issue/OPT-335) | Add per-player WebSocket action rate limiting in the game worker | 3 | OPT-333 | Backlog | — | Token bucket per `(gameId, playerIndex)` before expensive action handling. |
+| 11 | [OPT-334](https://linear.app/optcg-sim/issue/OPT-334) | Bind worker game tokens to gameId and track replay identifiers | 3 | OPT-333 | Done | [#180](https://github.com/corycunanan/optcg-sim/pull/180) | Tokens are game-scoped, include `jti`, and are one-shot through Durable Object storage. |
+| 12 | [OPT-335](https://linear.app/optcg-sim/issue/OPT-335) | Add per-player WebSocket action rate limiting in the game worker | 3 | OPT-333 | In Review | [#181](https://github.com/corycunanan/optcg-sim/pull/181) | Token bucket per `(gameId, playerIndex)` before expensive action handling. |
 | 13 | [OPT-336](https://linear.app/optcg-sim/issue/OPT-336) | Throttle WebSocket upgrade and reconnect attempts per game player | 2 | OPT-333 | Backlog | — | Protect upgrade/close churn separately from action spam. |
 | 14 | [OPT-324](https://linear.app/optcg-sim/issue/OPT-324) | Flaky test: opt-243 Leader-vs-Leader battle termination intermittently emits 0 END_OF_BATTLE | 3 | OPT-328 | Backlog | — | **Cross-project: lives in Game Board Reliability.** Tracked here after WS security follow-ups. Root-cause non-determinism in trigger ordering. 20/20 clean runs before close. |
 
@@ -35,7 +35,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-335** — add per-player WebSocket action rate limiting in the game worker. Blocked on #180 merging.
+**Next up:** **OPT-336** — throttle WebSocket upgrade and reconnect attempts per game player. Blocked on #181 merging.
 
 ### PR phasing
 
@@ -176,3 +176,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Keep OPT-335 scoped to action-message throttling after auth; reconnect/upgrade churn remains OPT-336, and token replay policy is already one-shot.
 - **Unresolved:** none for OPT-334. OPT-335 should rate-limit valid authenticated `game:action` messages before expensive turn/prompt/pipeline work.
 - **Why this matters for OPT-335:** Action buckets can key on the authenticated `(gameId, playerIndex)` path after token validation without also solving token scoping or replay.
+
+### OPT-335 → OPT-336
+**From:** session on 2026-04-29 · **Commit:** `2df8541` · **PR:** #181
+
+- **Primer:** Authenticated player actions now spend a Durable Object-local token bucket before validation or engine handling; malformed/unknown envelopes use a smaller abuse bucket, and `game:leave` stays available.
+- **Read first:** `workers/game/src/GameSession.ts`, `workers/game/src/__tests__/opt-335-action-rate-limit.test.ts`, `docs/architecture/WORKER-SECURITY-AUDIT.md`, `src/hooks/use-game-ws.ts`
+- **Gotchas / do NOT touch:** Keep OPT-336 scoped to upgrade/reconnect churn; action-message throttling, token scoping, replay, and authoritative newest-socket behavior are already covered by OPT-335/334/337.
+- **Unresolved:** none for OPT-335. OPT-336 should decide retry-friendly rejection semantics for excessive upgrades without weakening one-shot token replay.
+- **Why this matters for OPT-336:** The hot message path is now protected, so the remaining WebSocket abuse surface is repeated valid-token acquisition, upgrade, close, alarm, and presence churn.
