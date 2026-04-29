@@ -271,7 +271,7 @@ export function useLobbySession(): UseLobbySessionReturn {
     setJoining(true);
     setJoinError(null);
     try {
-      const json = await apiPost<{ data: { gameId: string } }>("/api/lobbies/join", { code: joinCode, deckId: selectedDeckId });
+      const json = await apiPost<{ data: { gameId: string } }>("/api/lobbies/join?autoStart=true", { code: joinCode, deckId: selectedDeckId });
       router.push(`/game/${json.data.gameId}`);
     } catch (error) {
       if (error instanceof ApiError) {

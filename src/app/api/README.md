@@ -66,13 +66,13 @@ The game result endpoint uses Bearer token auth (`GAME_WORKER_SECRET`) for worke
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
 | POST | `/api/lobbies` | Session | Create lobby (generates join code, closes previous WAITING lobbies) |
-| POST | `/api/lobbies/join` | Session | Join by code (creates GameSession, initializes DO) |
+| POST | `/api/lobbies/join` | Session | Join by code and enter the lobby room |
 | GET | `/api/lobbies/[id]` | Session | Poll lobby status (guest info, gameId) |
 | DELETE | `/api/lobbies/[id]` | Session (host) | Cancel WAITING lobby |
 
 **POST /api/lobbies** — Request: `{ deckId, format? }`. Returns `{ lobbyId, joinCode }`. Closes any existing WAITING lobbies for the host.
 
-**POST /api/lobbies/join** — Request: `{ code, deckId }`. Validates deck ownership, builds player deck data with leader + 50 cards, initializes Cloudflare Durable Object via `POST GAME_WORKER_URL/game/:id/init`, marks lobby IN_GAME. Returns `{ gameId }`.
+**POST /api/lobbies/join** — Request: `{ code, deckId? }`. Creates a guest seat, marks the PVP lobby `READY`, and returns `{ lobbyId }`. Temporary shim until OPT-342: `?autoStart=true` preserves the legacy flow, validates both decks, initializes Cloudflare Durable Object via `POST GAME_WORKER_URL/game/:id/init`, marks lobby `IN_GAME`, and returns `{ gameId }`.
 
 ### Game
 
