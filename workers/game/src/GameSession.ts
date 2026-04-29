@@ -46,9 +46,12 @@ export const ACTION_RATE_LIMIT_BURST = 24;
 export const ACTION_RATE_LIMIT_REFILL_PER_SECOND = 8;
 export const INVALID_MESSAGE_RATE_LIMIT_BURST = 6;
 export const INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND = 1;
+export const UPGRADE_RATE_LIMIT_BURST = 6;
+export const UPGRADE_RATE_LIMIT_REFILL_PER_SECOND = 0.2;
 export const RATE_LIMIT_CLOSE_CODE = 1008;
 export const ACTION_RATE_LIMIT_CLOSE_REASON = "action rate limit exceeded";
 export const INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON = "message rate limit exceeded";
+export const UPGRADE_RATE_LIMIT_RESPONSE_BODY = "Too many reconnect attempts";
 const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
 const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
 
@@ -82,6 +85,16 @@ export function consumeTokenBucket(
     return { allowed: false, bucket: { tokens, updatedAt: now } };
   }
   return { allowed: true, bucket: { tokens: tokens - 1, updatedAt: now } };
+}
+
+export function getTokenBucketRetryAfterSeconds(
+  bucket: TokenBucket,
+  capacity: number,
+  refillPerSecond: number,
+): number {
+  if (bucket.tokens >= 1) return 0;
+  if (refillPerSecond <= 0) return 1;
+  return Math.max(1, Math.ceil((1 - Math.min(capacity, bucket.tokens)) / refillPerSecond));
 }
 
 function isPlayerSocketAttachment(value: unknown): value is PlayerSocketAttachment {
@@ -122,6 +135,7 @@ export class GameSession implements DurableObject {
   private nextWebSocketSequence = 0;
   private readonly actionRateLimitBuckets = new Map<string, TokenBucket>();
   private readonly invalidMessageRateLimitBuckets = new Map<string, TokenBucket>();
+  private readonly upgradeRateLimitBuckets = new Map<string, TokenBucket>();
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -276,6 +290,16 @@ export class GameSession implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
 
+    const upgradeBudget = this.consumeUpgradeBudget(playerIndex);
+    if (!upgradeBudget.allowed) {
+      return new Response(UPGRADE_RATE_LIMIT_RESPONSE_BODY, {
+        status: 429,
+        headers: {
+          "Retry-After": String(upgradeBudget.retryAfterSeconds),
+        },
+      });
+    }
+
     const { 0: client, 1: server } = new WebSocketPair();
     this.acceptAuthoritativePlayerSocket(playerIndex as 0 | 1, server);
 
@@ -412,6 +436,30 @@ export class GameSession implements DurableObject {
       try { ws.close(RATE_LIMIT_CLOSE_CODE, INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON); } catch { /* ignore */ }
     }
     return false;
+  }
+
+  private consumeUpgradeBudget(playerIndex: 0 | 1): { allowed: boolean; retryAfterSeconds: number } {
+    const key = this.getPlayerBucketKey(playerIndex);
+    const result = consumeTokenBucket(
+      this.upgradeRateLimitBuckets.get(key),
+      Date.now(),
+      UPGRADE_RATE_LIMIT_BURST,
+      UPGRADE_RATE_LIMIT_REFILL_PER_SECOND,
+    );
+    this.upgradeRateLimitBuckets.set(key, result.bucket);
+    if (result.allowed) return { allowed: true, retryAfterSeconds: 0 };
+
+    const retryAfterSeconds = getTokenBucketRetryAfterSeconds(
+      result.bucket,
+      UPGRADE_RATE_LIMIT_BURST,
+      UPGRADE_RATE_LIMIT_REFILL_PER_SECOND,
+    );
+    log("ws.upgrade_rate_limited", {
+      gameId: this.gameState?.id,
+      playerIndex,
+      retryAfterSeconds,
+    });
+    return { allowed: false, retryAfterSeconds };
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
