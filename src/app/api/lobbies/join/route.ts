@@ -75,6 +75,10 @@ export async function POST(request: NextRequest) {
       return apiError("Lobby already has a guest", 409);
     }
 
+    if (!lobby.hostDeckId) {
+      return apiError("Host has not selected a deck", 409);
+    }
+
     const hostPlayableDeck = await requirePlayableDeck(
       lobby.hostDeckId,
       lobby.hostUserId,
@@ -97,6 +101,7 @@ export async function POST(request: NextRequest) {
           player1DeckId: lobby.hostDeckId,
           player2DeckId: deckId,
           format: lobby.format,
+          mode: lobby.mode,
           status: "IN_PROGRESS",
         },
         update: { status: "IN_PROGRESS" },

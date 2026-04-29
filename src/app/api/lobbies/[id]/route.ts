@@ -28,11 +28,14 @@ export async function GET(
       status: true,
       joinCode: true,
       format: true,
+      mode: true,
+      hostReady: true,
       hostUserId: true,
       host: { select: { username: true, name: true, image: true } },
       hostDeck: { select: { id: true, name: true, leaderId: true, leaderArtUrl: true } },
       guest: {
         select: {
+          guestReady: true,
           user: { select: { id: true, username: true, name: true, image: true } },
           deck: { select: { id: true, name: true, leaderId: true, leaderArtUrl: true } },
         },
@@ -45,7 +48,7 @@ export async function GET(
     return apiError("Lobby not found", 404);
   }
 
-  const leaderIds = [lobby.hostDeck.leaderId];
+  const leaderIds = lobby.hostDeck ? [lobby.hostDeck.leaderId] : [];
   if (lobby.guest?.deck?.leaderId) leaderIds.push(lobby.guest.deck.leaderId);
   const leaderCards = await prisma.card.findMany({
     where: { id: { in: leaderIds } },
@@ -53,7 +56,9 @@ export async function GET(
   });
   const leaderMap = new Map(leaderCards.map((c) => [c.id, c]));
 
-  const hostLeader = leaderMap.get(lobby.hostDeck.leaderId);
+  const hostLeader = lobby.hostDeck
+    ? leaderMap.get(lobby.hostDeck.leaderId)
+    : null;
   const guestLeader = lobby.guest?.deck
     ? leaderMap.get(lobby.guest.deck.leaderId)
     : null;
@@ -63,12 +68,16 @@ export async function GET(
     status: lobby.status,
     joinCode: lobby.joinCode,
     format: lobby.format,
+    mode: lobby.mode,
+    hostReady: lobby.hostReady,
     host: lobby.host,
-    hostDeck: {
-      ...lobby.hostDeck,
-      leaderName: hostLeader?.name ?? null,
-      leaderImageUrl: lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
-    },
+    hostDeck: lobby.hostDeck
+      ? {
+          ...lobby.hostDeck,
+          leaderName: hostLeader?.name ?? null,
+          leaderImageUrl: lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
+        }
+      : null,
     guest: lobby.guest
       ? {
           ...lobby.guest,

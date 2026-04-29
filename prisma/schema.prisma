@@ -242,8 +242,15 @@ enum FriendRequestStatus {
 
 enum LobbyStatus {
   WAITING
+  READY
   IN_GAME
   CLOSED
+}
+
+enum LobbyMode {
+  PVP
+  SOLITAIRE
+  PVCOMPUTER
 }
 
 model FriendRequest {
@@ -296,15 +303,17 @@ model Message {
 model Lobby {
   id         String      @id @default(uuid())
   hostUserId String
-  hostDeckId String
+  hostDeckId String?
   joinCode   String      @unique @map("join_code")
   format     String      @default("Standard")
+  mode       LobbyMode   @default(PVP)
   status     LobbyStatus @default(WAITING)
+  hostReady  Boolean     @default(false) @map("host_ready")
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   host        User         @relation("HostedLobbies", fields: [hostUserId], references: [id])
-  hostDeck    Deck         @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
+  hostDeck    Deck?        @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
   guest       LobbyGuest?
   gameSession GameSession?
 
@@ -313,14 +322,15 @@ model Lobby {
 }
 
 model LobbyGuest {
-  id      String @id @default(uuid())
-  lobbyId String @unique
-  userId  String
-  deckId  String
+  id         String  @id @default(uuid())
+  lobbyId    String  @unique
+  userId     String
+  deckId     String?
+  guestReady Boolean @default(false) @map("guest_ready")
 
   lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id])
-  deck  Deck  @relation(fields: [deckId], references: [id])
+  deck  Deck? @relation(fields: [deckId], references: [id])
 
   @@map("lobby_guests")
 }
@@ -351,6 +361,7 @@ model GameSession {
   player1DeckId String
   player2DeckId String
   format        String
+  mode          LobbyMode       @default(PVP)
   status        GameStatus      @default(IN_PROGRESS)
   winnerId      String?
   winReason     String?
