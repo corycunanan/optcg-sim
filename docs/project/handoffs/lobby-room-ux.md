@@ -1,7 +1,7 @@
 ---
 linear-project: Lobby Room UX
 linear-project-url: https://linear.app/optcg-sim/project/lobby-room-ux-7accc6912db3
-last-updated: 2026-04-29 (OPT-338 in review; schema gate PR open)
+last-updated: 2026-04-29 (OPT-339 in review; join route split PR open)
 ---
 
 # Lobby Room UX — Handoff Doc
@@ -16,8 +16,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | [OPT-338](https://linear.app/optcg-sim/issue/OPT-338) | Schema: `Lobby.mode`, ready flags, mutable deck slots, `game_sessions.mode` snapshot | 3 | — | In Review | [#186](https://github.com/corycunanan/optcg-sim/pull/186) | Gate ticket. Pure additive migration; existing rows backfill to `PVP`. No behavior change yet. Updated 2026-04-29. |
-| 2 | [OPT-339](https://linear.app/optcg-sim/issue/OPT-339) | Refactor `POST /api/lobbies/join` to enter-room only (strip start logic) | 2 | OPT-338 | Backlog | — | Adds temporary `?autoStart=true` shim so existing UI keeps working until OPT-342 ships. Drops `requirePlayableDeck` from join (moves to start). |
+| 1 | [OPT-338](https://linear.app/optcg-sim/issue/OPT-338) | Schema: `Lobby.mode`, ready flags, mutable deck slots, `game_sessions.mode` snapshot | 3 | — | Done | [#186](https://github.com/corycunanan/optcg-sim/pull/186) | Gate ticket. Pure additive migration; existing rows backfill to `PVP`. No behavior change yet. Updated 2026-04-29. |
+| 2 | [OPT-339](https://linear.app/optcg-sim/issue/OPT-339) | Refactor `POST /api/lobbies/join` to enter-room only (strip start logic) | 2 | OPT-338 | In Review | [#187](https://github.com/corycunanan/optcg-sim/pull/187) | Adds temporary `?autoStart=true` shim so existing UI keeps working until OPT-342 ships. Drops `requirePlayableDeck` from normal join (moves to start). Updated 2026-04-29. |
 | 3 | [OPT-340](https://linear.app/optcg-sim/issue/OPT-340) | `PATCH /api/lobbies/[id]`: mode/deck/ready mutations + guest-eject behavior | 3 | OPT-338 | Backlog | — | Single endpoint with permission-gated fields. PVP→Solitaire with guest present returns 409 unless `?force=true`. Mode change auto-clears `hostReady`. |
 | 4 | [OPT-341](https://linear.app/optcg-sim/issue/OPT-341) | `POST /api/lobbies/[id]/start`: host-only, mode-aware, runs deck legality + DO init | 3 | OPT-338 | Backlog | — | Migrates the GameSession + DO init transaction from join route. Reuses `requirePlayableDeck` (OPT-330) and `buildGameInitPayload`. Idempotent via `Lobby.status` lock. |
 | 5 | [OPT-342](https://linear.app/optcg-sim/issue/OPT-342) | Lobby room UI with three tabs (PVP/Solitaire/PVComputer-disabled), deck pickers, ready, host Start button | 5 | OPT-339, OPT-340, OPT-341 | Backlog | — | New `/lobbies/[id]` page. Polling MVP via `useLobbyRoom` hook — designed as the future swap point for OPT-88. Removes the `?autoStart=true` shim. |
@@ -28,7 +28,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-338** — schema gate ticket. Ready now; no upstream dependencies.
+**Next up:** **OPT-340** — mode/deck/ready mutation endpoint. Blocked on PR #187 merging only for a perfectly linear stack; can be developed from this branch if batching PR 2 work.
 
 ### PR phasing
 
@@ -99,3 +99,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Do not start the full room PATCH/start/UI work in OPT-339; keep its scope to converting join into enter-room with the temporary `?autoStart=true` shim.
 - **Unresolved:** `buildGameInitPayload` still does not carry `mode` to the Durable Object; that belongs with OPT-341/OPT-343 when `/start` and the trust gate are wired.
 - **Why this matters for OPT-339:** `POST /api/lobbies/join` now has the schema it needs to admit a guest without requiring an immediate `GameSession`, while the existing null-host-deck guard marks the boundary the new room flow must handle deliberately.
+
+### OPT-339 → OPT-340
+**From:** session on 2026-04-29 · **Commit:** `a88f007` · **PR:** #187
+
+- **Primer:** Normal `POST /api/lobbies/join` now only creates the guest seat, moves PVP lobbies to `READY`, and returns `{ lobbyId }`; the old game-start flow is isolated behind `?autoStart=true`.
+- **Read first:** `src/app/api/lobbies/join/route.ts`, `src/app/api/lobbies/[id]/route.ts`, `src/lib/validators/lobbies.ts`, `src/hooks/use-lobby-session.ts`
+- **Gotchas / do NOT touch:** Keep the `?autoStart=true` shim until OPT-342 removes it. Do not migrate game-session/DO init out of the shim until OPT-341 adds `/start`.
+- **Unresolved:** `buildGameInitPayload` still omits mode for the Durable Object; `requirePlayableDeck` still belongs at explicit start time in OPT-341, not in OPT-340 mutations.
+- **Why this matters for OPT-340:** The room can now exist before game start, so PATCH can safely focus on mode/deck/ready mutations against `WAITING`/`READY` lobbies without inheriting join-time deck legality or DO initialization.
