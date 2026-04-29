@@ -1,7 +1,7 @@
 ---
 linear-project: Lobby Room UX
 linear-project-url: https://linear.app/optcg-sim/project/lobby-room-ux-7accc6912db3
-last-updated: 2026-04-29 (OPT-344 closeout in progress)
+last-updated: 2026-04-29 (OPT-344 in review; PR #192 open)
 ---
 
 # Lobby Room UX — Handoff Doc
@@ -22,7 +22,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4 | [OPT-341](https://linear.app/optcg-sim/issue/OPT-341) | `POST /api/lobbies/[id]/start`: host-only, mode-aware, runs deck legality + DO init | 3 | OPT-338 | Done | [#189](https://github.com/corycunanan/optcg-sim/pull/189) | Migrates the GameSession + DO init transaction from join route. Reuses `requirePlayableDeck` (OPT-330) and `buildGameInitPayload`. Idempotent via `Lobby.status` lock. Updated 2026-04-29. |
 | 5 | [OPT-342](https://linear.app/optcg-sim/issue/OPT-342) | Lobby room UI with three tabs (PVP/Solitaire/PVComputer-disabled), deck pickers, ready, host Start button | 5 | OPT-339, OPT-340, OPT-341 | Done | [#190](https://github.com/corycunanan/optcg-sim/pull/190) | New `/lobbies/[id]` page. Polling MVP via `useLobbyRoom` hook — designed as the future swap point for OPT-88. Removes the `?autoStart=true` shim. Updated 2026-04-29. |
 | 6 | [OPT-343](https://linear.app/optcg-sim/issue/OPT-343) | Solitaire mode wire-through: `playerIndex` JWT claim + DO trust gate (subsumes most of OPT-298) | 3 | OPT-341 | Done | [#191](https://github.com/corycunanan/optcg-sim/pull/191) | Adds Solitaire-only `playerIndex` game-token claims, persists DO mode, and rejects explicit perspective claims outside `SOLITAIRE`. Replay remains keyed by `(jti)`. Updated 2026-04-29. |
-| 7 | [OPT-344](https://linear.app/optcg-sim/issue/OPT-344) | Migration backfill + e2e smoke + close out OPT-298/OPT-299 | 2 | OPT-342, OPT-343 | In Progress | — | Migration audit clean: no ambiguous lobby rows, `game_sessions.mode` has zero nulls, and migration drift reports no difference. Focused lobby/game token worker smoke is green. Updated 2026-04-29. |
+| 7 | [OPT-344](https://linear.app/optcg-sim/issue/OPT-344) | Migration backfill + e2e smoke + close out OPT-298/OPT-299 | 2 | OPT-342, OPT-343 | In Review | [#192](https://github.com/corycunanan/optcg-sim/pull/192) | Migration audit clean: no ambiguous lobby rows, `game_sessions.mode` has zero nulls, and migration drift reports no difference. Focused lobby/game token worker smoke is green. Updated 2026-04-29. |
 
 **Total estimate:** 21 points.
 
@@ -146,7 +146,7 @@ Copy this block when writing a new handoff:
 - **Why this matters for OPT-344:** The backend and token trust layers are now ready for closeout smoke; OPT-344 can focus on migration/backfill checks, manual PVP/Solitaire/ejection verification, and cross-linking the subsumed Solitaire tickets.
 
 ### OPT-344 → Project closeout
-**From:** session on 2026-04-29 · **Commit:** pending · **PR:** pending
+**From:** session on 2026-04-29 · **Commit:** `9705ca6` · **PR:** #192
 
 - **Primer:** The Lobby Room UX stack is complete through closeout: join enters a room, start is explicit and mode-aware, Solitaire sessions carry `mode`/`playerIndex` safely, and the old auto-start shim is absent from runtime code.
 - **Verification:** Database audit returned no ambiguous lobby rows and `game_sessions.mode` null count `0`; `pnpm db:check-migration-drift` passed with "No difference detected" against a disposable shadow database.
