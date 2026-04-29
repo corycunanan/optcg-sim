@@ -333,6 +333,16 @@ enum GameStatus {
   ABANDONED
 }
 
+enum GameEndReasonCode {
+  LEADER_KO
+  DECK_OUT
+  LIFE_LOSS
+  CONCEDE
+  DISCONNECT_TIMEOUT
+  FALLBACK_CONCEDE
+  UNKNOWN
+}
+
 model GameSession {
   id            String          @id @default(uuid())
   lobbyId       String          @unique
@@ -344,6 +354,7 @@ model GameSession {
   status        GameStatus      @default(IN_PROGRESS)
   winnerId      String?
   winReason     String?
+  reasonCode    GameEndReasonCode?
   startedAt     DateTime        @default(now())
   endedAt       DateTime?
 

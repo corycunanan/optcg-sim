@@ -1,16 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const updateMock = vi.fn();
+const finalizeGameResultMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 29 }));
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    gameSession: {
-      update: (...args: unknown[]) => updateMock(...args),
-    },
-  },
+vi.mock("@/lib/game/finalize", () => ({
+  finalizeGameResult: (...args: unknown[]) => finalizeGameResultMock(...args),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
@@ -26,6 +22,7 @@ const validBody = {
   status: "FINISHED",
   winnerId: "user-1",
   winReason: "Life-out",
+  reasonCode: "LIFE_LOSS",
 };
 
 function buildRequest(opts: { auth?: string; body?: unknown } = {}) {
@@ -41,7 +38,8 @@ function buildRequest(opts: { auth?: string; body?: unknown } = {}) {
 }
 
 beforeEach(() => {
-  updateMock.mockReset();
+  finalizeGameResultMock.mockReset();
+  finalizeGameResultMock.mockResolvedValue({ finalized: true, alreadyFinal: false });
   rateLimitMock.mockReset();
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 29 });
 });
@@ -51,13 +49,13 @@ describe("POST /api/game/result", () => {
     const res = await POST(buildRequest({ auth: "" }));
     expect(res.status).toBe(401);
     expect(rateLimitMock).not.toHaveBeenCalled();
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(finalizeGameResultMock).not.toHaveBeenCalled();
   });
 
   it("returns 401 when Bearer token does not match", async () => {
     const res = await POST(buildRequest({ auth: "Bearer wrong" }));
     expect(res.status).toBe(401);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(finalizeGameResultMock).not.toHaveBeenCalled();
   });
 
   it("returns 429 when rate limit is exceeded, keyed by gameId", async () => {
@@ -65,25 +63,30 @@ describe("POST /api/game/result", () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(429);
     expect(rateLimitMock).toHaveBeenCalledWith("game-result:game-1");
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(finalizeGameResultMock).not.toHaveBeenCalled();
   });
 
-  it("updates the game session and returns success on happy path", async () => {
-    updateMock.mockResolvedValue({ id: "game-1" });
+  it("finalizes the game session and returns success on happy path", async () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(200);
     expect(rateLimitMock).toHaveBeenCalledWith("game-result:game-1");
-    expect(updateMock).toHaveBeenCalledOnce();
-    const call = updateMock.mock.calls[0][0];
-    expect(call.where).toEqual({ id: "game-1" });
-    expect(call.data.status).toBe("FINISHED");
-    expect(call.data.winnerId).toBe("user-1");
-    expect(call.data.winReason).toBe("Life-out");
-    expect(call.data.endedAt).toBeInstanceOf(Date);
+    expect(finalizeGameResultMock).toHaveBeenCalledWith({
+      gameId: "game-1",
+      status: "FINISHED",
+      winnerId: "user-1",
+      winReason: "Life-out",
+      reasonCode: "LIFE_LOSS",
+    });
+  });
+
+  it("rejects non-terminal result payloads", async () => {
+    const res = await POST(buildRequest({ body: { ...validBody, status: "IN_PROGRESS" } }));
+    expect(res.status).toBe(400);
+    expect(finalizeGameResultMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 when the DB update throws", async () => {
-    updateMock.mockRejectedValue(new Error("boom"));
+    finalizeGameResultMock.mockRejectedValue(new Error("boom"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await POST(buildRequest());
     expect(res.status).toBe(500);

@@ -6,7 +6,7 @@
 
 import { NextRequest } from "next/server";
 import { apiAction, apiError } from "@/lib/api-response";
-import { prisma } from "@/lib/db";
+import { finalizeGameResult } from "@/lib/game/finalize";
 import { apiLimiter } from "@/lib/rate-limit";
 import { GameResultSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseBody(request, GameResultSchema);
   if (isErrorResponse(parsed)) return parsed;
-  const { gameId, status, winnerId, winReason } = parsed;
+  const { gameId, status, winnerId, winReason, reasonCode } = parsed;
 
   // Defense-in-depth if GAME_WORKER_SECRET leaks: cap writes per game.
   const { limited } = await apiLimiter.check(`game-result:${gameId}`);
@@ -31,14 +31,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await prisma.gameSession.update({
-      where: { id: gameId },
-      data: {
-        status,
-        winnerId: winnerId ?? null,
-        winReason: winReason ?? null,
-        endedAt: new Date(),
-      },
+    if (status === "IN_PROGRESS") {
+      return apiError("Game result must be terminal", 400);
+    }
+
+    await finalizeGameResult({
+      gameId,
+      status,
+      winnerId: winnerId ?? null,
+      winReason: winReason ?? null,
+      reasonCode: reasonCode ?? null,
     });
 
     return apiAction();
