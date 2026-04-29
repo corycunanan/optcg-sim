@@ -57,6 +57,10 @@ export function apiAction() {
   return NextResponse.json({ success: true });
 }
 
-export function apiError(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status });
+export function apiError(
+  message: string,
+  status: number,
+  extra?: Record<string, unknown>,
+) {
+  return NextResponse.json({ error: message, ...extra }, { status });
 }
