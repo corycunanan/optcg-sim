@@ -8,7 +8,7 @@ allowed-tools: Bash Read Write Edit Grep Glob mcp__linear-server__get_issue mcp_
 
 # Work a Linear Ticket
 
-End-to-end workflow for taking a Linear ticket from "I'm starting this" to "PR is open and Linear is in review," with a cross-session handoff trail.
+End-to-end workflow for taking a Linear ticket from "I'm starting this" to "PR is open, Linear is in review, and the next agent has a handoff in that same PR."
 
 ## Argument
 
@@ -90,16 +90,16 @@ Before edits:
   ```
 - Do **not** batch unrelated refactors, formatting passes, or tangential fixes into the ticket commit. Raise them as follow-ups in the handoff doc.
 - Never `--amend` a pushed commit. Never `--no-verify`. If a hook fails, fix the root cause.
-- Run project checks before the final commit: `npm run type-check`, `npm run lint`, `npm test`. If any fail, fix before PR.
+- Run project checks before the implementation commit. For this repo prefer `pnpm verify`; use focused checks first when useful, but the final gate should mirror the repo's CI contract. If any fail, fix before PR.
 
-**Always create a final commit before opening the PR** — do not let uncommitted work get stranded.
+**Always create an implementation commit before opening the PR** — do not let uncommitted work get stranded.
 
 ---
 
 ## Phase 6 — Open the PR
 
 1. `git push -u origin <branch>`.
-2. Title: same shape as the last commit — `<Imperative description> (OPT-XXX)`. Keep under 70 chars.
+2. Title: same shape as the implementation commit — `<Imperative description> (OPT-XXX)`. Keep under 70 chars.
 3. Body: use the repo's existing format (see recent merged PRs via `gh pr view <N> --json body`). Structure:
 
    ```
@@ -116,18 +116,21 @@ Before edits:
 
 4. Create via `gh pr create` with HEREDOC body.
 5. **Update Linear to "In Review"** and attach the PR URL to the issue (via `save_issue` comment or attachment).
+6. Continue immediately to Phase 7. The PR is not complete, and the user should not be told it is ready, until the handoff doc commit has been pushed to this same PR.
 
 ---
 
-## Phase 7 — Write the handoff entry
+## Phase 7 — Write the handoff entry in the same PR
 
-For cross-session context transfer. See the `Handoff Docs` section below.
+For cross-session context transfer. See the `Handoff Docs` section below. This phase is part of the ticket PR, not post-merge cleanup.
 
 1. Ensure `docs/project/handoffs/<project-slug>.md` exists. If not, create from `docs/project/handoffs/_TEMPLATE.md` and fill the Action Plan from the Linear project's issues (ordered by dependencies → estimate → priority).
 2. Update the Action Plan row for this ticket: status → **In Review**, PR link, date.
 3. Append a new handoff section at the bottom keyed to the **next ticket** in the action plan (not the one just finished). Keep it tight — see the template.
-4. Commit the handoff doc update **on the same branch** as the ticket work (single commit, message: `Add OPT-XXX → OPT-YYY handoff (OPT-XXX)`). This keeps the handoff bundled with the PR so reviewers see it.
-5. **Surface what's next** (see `Conclusion — surface what's next` below).
+4. Commit the handoff doc update **on the same branch** as the ticket work (single commit, message: `Add OPT-XXX to OPT-YYY handoff (OPT-XXX)`). This keeps the handoff bundled with the PR so reviewers see it.
+5. Push the handoff commit to the same branch/PR before giving the final status.
+6. Re-check PR status, Linear status, and `git status --short --branch`.
+7. **Surface what's next** (see `Conclusion — surface what's next` below).
 
 ---
 
@@ -136,9 +139,12 @@ For cross-session context transfer. See the `Handoff Docs` section below.
 If the user returns after the PR merges and asks you to close out:
 1. Verify the PR is merged: `gh pr view <N> --json state,mergeCommit`.
 2. Update Linear status → **Done**.
-3. Update the Action Plan row in the handoff doc: status → Done, date.
-4. Delete the local branch (`git branch -d`) and optionally the remote (`git push origin --delete`). Confirm before deleting remote.
-5. **Surface what's next** (see `Conclusion — surface what's next` below).
+3. Sync `main` by checking it out and pulling fast-forward.
+4. If immediately starting the next ticket, carry the previous ticket's **Done** Action Plan row update in the next ticket's PR. Do not create a standalone post-merge handoff-only PR unless the user explicitly asks for bookkeeping only.
+5. Delete the local branch (`git branch -d`) and optionally the remote (`git push origin --delete`). Confirm before deleting remote.
+6. **Surface what's next** (see `Conclusion — surface what's next` below).
+
+If a PR merges while the agent is still working the current session, treat it as already closed out: verify merge, ensure Linear is Done, fast-forward `main`, and continue from the next Action Plan ticket.
 
 ---
 
@@ -157,6 +163,7 @@ Rules:
 - **Critical path** = the immediate successor whose dependencies satisfied by this ticket (or whose deps were already satisfied and is next by Order in the Action Plan).
 - **Parallel** = any other Backlog/Todo ticket in the project whose deps are also now satisfied and can be picked up alongside the critical-path one. Skip this line if there's nothing parallel.
 - After Phase 7, a successor strictly dependent on this ticket is "blocked on this PR merging" — say so. After Phase 8, that gate is gone — say "ready now."
+- If the immediate Action Plan successor is already done/in review, skip to the next remaining Backlog/Todo ticket whose blockers are clear.
 - If the project has no remaining Backlog/Todo tickets, say "Project complete — no follow-up tickets in the Action Plan."
 - Pull titles and statuses from the handoff doc's Action Plan table, not from memory.
 
