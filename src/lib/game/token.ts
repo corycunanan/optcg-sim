@@ -2,6 +2,7 @@ export type GameTokenOptions = {
   now?: number;
   expiresInSeconds?: number;
   gameId?: string;
+  jti?: string;
 };
 
 export async function mintGameToken(
@@ -10,11 +11,13 @@ export async function mintGameToken(
   options: GameTokenOptions = {},
 ): Promise<string> {
   const now = options.now ?? Math.floor(Date.now() / 1000);
+  const jti = options.jti ?? crypto.randomUUID();
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = b64url(JSON.stringify({
     sub: userId,
     iat: now,
     exp: now + (options.expiresInSeconds ?? 300), // 5 minutes by default
+    jti,
     ...(options.gameId ? { gameId: options.gameId } : {}),
   }));
 
