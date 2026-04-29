@@ -10,6 +10,21 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: prisma_shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,6 +45,11 @@ jobs:
 
       - name: Generate Prisma Client
         run: pnpm db:generate
+
+      - name: Check Prisma migration drift
+        run: pnpm db:check-migration-drift
+        env:
+          SHADOW_DATABASE_URL: "postgresql://prisma:prisma@localhost:5432/prisma_shadow"
 
       - name: Verify
         run: pnpm verify
