@@ -25,8 +25,8 @@ The gaps are mostly around abuse controls after a token is valid:
 | F1 | Game tokens are not game-scoped by default and have no replay identifier | High | Fixed in OPT-334 |
 | F2 | No per-player WebSocket action rate limit | High | Fixed in OPT-335 |
 | F3 | No payload size cap before parsing client messages | Medium | Fixed in OPT-333 |
-| F4 | Reconnect and upgrade attempts are not throttled | Medium | Follow-up: [OPT-336](https://linear.app/optcg-sim/issue/OPT-336/throttle-websocket-upgrade-and-reconnect-attempts-per-game-player) |
-| F5 | Multiple sockets for one player can desync presence and prompt delivery | High | Follow-up: [OPT-337](https://linear.app/optcg-sim/issue/OPT-337/enforce-one-active-websocket-per-player-in-each-game-session) |
+| F4 | Reconnect and upgrade attempts are not throttled | Medium | Fixed in OPT-336 |
+| F5 | Multiple sockets for one player can desync presence and prompt delivery | High | Fixed in OPT-337 |
 
 ## Existing Controls
 
@@ -83,9 +83,9 @@ Severity: Medium
 
 Impact: a valid token holder can loop upgrades and disconnects to cause repeated writes, alarm churn, and broadcasts. Action rate limiting alone would not cover this path because the cost happens during upgrade and close.
 
-Recommendation: track upgrade attempts per `(gameId, playerIndex)` in the Durable Object, allow normal refresh/reconnect behavior, and reject excessive attempts with a retry-friendly policy.
+Resolution in OPT-336: `GameSession.handleWebSocket()` now spends a Durable Object-local upgrade bucket keyed by `(gameId, playerIndex)` after token validation and one-shot `jti` consumption, but before accepting the socket, writing connected state, syncing alarms, or broadcasting presence. Normal reconnect bursts are allowed and refill over time; exhausted buckets return HTTP `429` with `Retry-After` so the existing client reconnect loop can retry with a fresh token.
 
-Follow-up: [OPT-336](https://linear.app/optcg-sim/issue/OPT-336/throttle-websocket-upgrade-and-reconnect-attempts-per-game-player)
+Follow-up: none for reconnect throttling.
 
 ### F5. Multiple sockets for one player can desync presence and prompt delivery
 
@@ -95,9 +95,9 @@ The worker accepts multiple sockets with the same `player-N` tag. `getWebSocketF
 
 Impact: duplicate sockets can create stale prompt delivery, incorrect connected flags, and reconnect-abuse leverage. This is both a security hardening concern and a correctness risk for real reconnects.
 
-Recommendation: define one authoritative socket per player. Either reject duplicate upgrades while a socket is open, or make the newest socket win and close the old one. Stale close events must not mark the player disconnected while another player socket remains active.
+Resolution in OPT-337: player socket delivery is now newest-socket-wins. Accepted sockets carry hibernation attachment metadata, older same-player sockets close as superseded, and stale close/message events cannot mark the player away or receive filtered state and prompts.
 
-Follow-up: [OPT-337](https://linear.app/optcg-sim/issue/OPT-337/enforce-one-active-websocket-per-player-in-each-game-session)
+Follow-up: none for duplicate same-player sockets.
 
 ## Quick Win Landed In OPT-333
 
