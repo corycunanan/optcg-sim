@@ -40,6 +40,12 @@ import type { RuntimeActiveEffect } from "./engine/effect-types.js";
 import { configureLogger, log } from "./lib/log.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
+export const MAX_CLIENT_MESSAGE_BYTES = 8 * 1024;
+
+export function getClientMessageByteLength(message: string | ArrayBuffer): number {
+  if (typeof message !== "string") return message.byteLength;
+  return new TextEncoder().encode(message).byteLength;
+}
 
 // Stored in DO persistent storage
 interface StoredSession {
@@ -247,6 +253,12 @@ export class GameSession implements DurableObject {
   // ─── WebSocket message handler (Hibernation API) ───────────────────────────
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (getClientMessageByteLength(message) > MAX_CLIENT_MESSAGE_BYTES) {
+      log("ws.message_too_large", { maxBytes: MAX_CLIENT_MESSAGE_BYTES });
+      try { ws.close(1009, "message too big"); } catch { /* ignore */ }
+      return;
+    }
+
     if (!this.gameState || !this.cardDb) {
       await this.loadFromStorage();
     }
