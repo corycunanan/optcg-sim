@@ -180,11 +180,14 @@ export interface QueuedTrigger {
 
 // ─── Init payload (Next.js → DO on game start) ────────────────────────────────
 
+export type LobbyMode = "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+
 export interface GameInitPayload {
   gameId: string;
   player1: PlayerInitData;
   player2: PlayerInitData;
   format: string;
+  mode: LobbyMode;
 }
 
 export interface PlayerInitData {

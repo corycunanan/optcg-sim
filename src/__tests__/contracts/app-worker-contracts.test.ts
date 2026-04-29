@@ -74,6 +74,7 @@ describe("app ↔ worker contracts", () => {
     const payload = buildGameInitPayload({
       gameId: "game-contract-1",
       format: "Standard",
+      mode: "SOLITAIRE",
       player1: {
         userId: "host-user",
         leader: hostLeader,
@@ -93,6 +94,7 @@ describe("app ↔ worker contracts", () => {
     expect(payload).toMatchObject({
       gameId: "game-contract-1",
       format: "Standard",
+      mode: "SOLITAIRE",
       player1: {
         userId: "host-user",
         sleeveUrl: "https://example.test/sleeve.png",

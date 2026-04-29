@@ -47,6 +47,7 @@ function stubPayload(): GameInitPayload {
   return {
     gameId: "engine-portability-smoke",
     format: "standard",
+    mode: "PVP",
     player1: {
       userId: "u1",
       leader: { cardId: leader.id, quantity: 1, cardData: leader },

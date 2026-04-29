@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
     const payload = buildGameInitPayload({
       gameId: gameSession.id,
       format: lobby.format,
+      mode: lobby.mode,
       player1: {
         userId: lobby.hostUserId,
         leader: hostPlayableDeck.leader,

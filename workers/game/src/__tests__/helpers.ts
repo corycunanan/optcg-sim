@@ -102,6 +102,7 @@ export function createTestPayload(): GameInitPayload {
     player1: makePlayerInit("user-p1"),
     player2: makePlayerInit("user-p2"),
     format: "standard",
+    mode: "PVP",
   };
 }
 

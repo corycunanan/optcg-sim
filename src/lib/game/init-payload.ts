@@ -1,6 +1,6 @@
 import type { Card } from "@prisma/client";
 import { toCardData } from "@/lib/game/card-data";
-import type { GameInitPayload } from "../../../workers/game/src/types";
+import type { GameInitPayload, LobbyMode } from "../../../workers/game/src/types";
 
 type DeckCardWithCard = {
   card: Card;
@@ -19,6 +19,7 @@ type DeckForGameInit = {
 type BuildGameInitPayloadInput = {
   gameId: string;
   format: string;
+  mode: LobbyMode;
   player1: {
     userId: string;
     leader: Card;
@@ -76,6 +77,7 @@ export function buildGameInitPayload(input: BuildGameInitPayloadInput): GameInit
   return {
     gameId: input.gameId,
     format: input.format,
+    mode: input.mode,
     player1: buildPlayerInit(input.player1.userId, input.player1.leader, input.player1.deck),
     player2: buildPlayerInit(input.player2.userId, input.player2.leader, input.player2.deck),
   };
