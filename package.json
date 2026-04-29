@@ -22,6 +22,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:promote-admin": "tsx scripts/promote-admin.ts",
     "test": "vitest run",
+    "test:contracts": "vitest run src/__tests__/contracts",
     "test:worker": "pnpm --filter optcg-game test",
     "test:watch": "vitest",
     "verify": "pnpm lint && pnpm type-check && pnpm type-check:worker && pnpm test && pnpm test:worker && pnpm build",

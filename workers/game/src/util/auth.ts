@@ -6,7 +6,11 @@
  * A256CBC-HS512 encryption and would be non-trivial to verify here).
  */
 
-export async function verifyGameToken(token: string, secret: string): Promise<string | null> {
+export async function verifyGameToken(
+  token: string,
+  secret: string,
+  expectedGameId?: string,
+): Promise<string | null> {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -28,6 +32,7 @@ export async function verifyGameToken(token: string, secret: string): Promise<st
 
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64)));
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (expectedGameId && payload.gameId && payload.gameId !== expectedGameId) return null;
 
     return (payload.sub as string) ?? null;
   } catch {
@@ -35,9 +40,13 @@ export async function verifyGameToken(token: string, secret: string): Promise<st
   }
 }
 
-function base64urlDecode(str: string): Uint8Array {
+function base64urlDecode(str: string): Uint8Array<ArrayBuffer> {
   const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
   const binary = atob(padded);
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }

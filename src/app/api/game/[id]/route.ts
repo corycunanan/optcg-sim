@@ -6,6 +6,7 @@
 import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
+import { buildNotifyEndPayload } from "@/lib/game/notify-end";
 import { GameActionSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -191,10 +192,10 @@ async function handleConcede(gameId: string, userId: string) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${GAME_WORKER_SECRET}`,
       },
-      body: JSON.stringify({
+      body: JSON.stringify(buildNotifyEndPayload(
         winnerIndex,
-        reason: updated.winReason ?? "Player conceded while disconnected",
-      }),
+        updated.winReason ?? "Player conceded while disconnected",
+      )),
     }).catch(() => {});
   }
 

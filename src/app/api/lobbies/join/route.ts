@@ -14,7 +14,7 @@ import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { normalizeLobbyCode } from "@/lib/lobbies";
-import { toCardData } from "@/lib/game/card-data";
+import { buildGameInitPayload } from "@/lib/game/init-payload";
 import { JoinLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -114,57 +114,20 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
-    // Build init payload for the Durable Object
-    const hostTestOrder = lobby.hostDeck.testOrder as { life: string[]; hand: string[] } | null;
-    const guestTestOrder = guestDeck.testOrder as { life: string[]; hand: string[] } | null;
-    const payload = {
+    const payload = buildGameInitPayload({
       gameId: gameSession.id,
       format: lobby.format,
       player1: {
         userId: lobby.hostUserId,
-        sleeveUrl: lobby.hostDeck.sleeveUrl ?? null,
-        donArtUrl: lobby.hostDeck.donArtUrl ?? null,
-        testOrder: hostTestOrder ?? undefined,
-        leader: {
-          cardId: hostLeader.id,
-          quantity: 1,
-          cardData: {
-            ...toCardData(hostLeader),
-            imageUrl: lobby.hostDeck.leaderArtUrl ?? hostLeader.imageUrl,
-          },
-        },
-        deck: lobby.hostDeck.cards.map((dc) => ({
-          cardId: dc.card.id,
-          quantity: dc.quantity,
-          cardData: {
-            ...toCardData(dc.card),
-            imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
-          },
-        })),
+        leader: hostLeader,
+        deck: lobby.hostDeck,
       },
       player2: {
         userId,
-        sleeveUrl: guestDeck.sleeveUrl ?? null,
-        donArtUrl: guestDeck.donArtUrl ?? null,
-        testOrder: guestTestOrder ?? undefined,
-        leader: {
-          cardId: guestLeader.id,
-          quantity: 1,
-          cardData: {
-            ...toCardData(guestLeader),
-            imageUrl: guestDeck.leaderArtUrl ?? guestLeader.imageUrl,
-          },
-        },
-        deck: guestDeck.cards.map((dc) => ({
-          cardId: dc.card.id,
-          quantity: dc.quantity,
-          cardData: {
-            ...toCardData(dc.card),
-            imageUrl: dc.selectedArtUrl ?? dc.card.imageUrl,
-          },
-        })),
+        leader: guestLeader,
+        deck: guestDeck,
       },
-    };
+    });
 
     // Initialize the Durable Object
     const workerRes = await fetch(`${GAME_WORKER_URL}/game/${gameSession.id}/init`, {

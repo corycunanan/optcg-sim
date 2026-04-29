@@ -30,7 +30,8 @@ import {
 } from "./engine/replacements.js";
 import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
-import { validateGameInitPayload, validateClientMessage } from "./util/validate.js";
+import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayload } from "./util/validate.js";
+import { buildGameResultCallbackPayload } from "./util/result.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
 import { recalculateBattlePowers } from "./engine/battle.js";
@@ -127,18 +128,14 @@ export class GameSession implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    let body: { winnerIndex?: unknown; reason?: unknown };
+    let body: { winnerIndex: 0 | 1; reason: string };
     try {
-      body = await request.json() as { winnerIndex?: unknown; reason?: unknown };
+      body = validateNotifyEndPayload(await request.json());
     } catch {
-      return new Response("Invalid JSON", { status: 400 });
-    }
-
-    const winnerIndex = body.winnerIndex;
-    const reason = typeof body.reason === "string" ? body.reason : "";
-    if (winnerIndex !== 0 && winnerIndex !== 1 || !reason) {
       return new Response("Bad request", { status: 400 });
     }
+
+    const { winnerIndex, reason } = body;
 
     if (!this.gameState) {
       const loaded = await this.loadFromStorage();
@@ -745,7 +742,7 @@ export class GameSession implements DurableObject {
   // ─── Token validation ──────────────────────────────────────────────────────
 
   private async validateToken(token: string): Promise<0 | 1 | null> {
-    const userId = await verifyGameToken(token, this.env.GAME_WORKER_SECRET);
+    const userId = await verifyGameToken(token, this.env.GAME_WORKER_SECRET, this.gameState?.id);
     if (!userId) {
       log("auth.failure", { reason: "invalid_token", gameId: this.gameState?.id });
       return null;
@@ -789,14 +786,7 @@ export class GameSession implements DurableObject {
   private async writeResultToDb(): Promise<void> {
     if (!this.gameState) return;
     // POST the result back to the Next.js API so it can update game_sessions in PostgreSQL.
-    const body = {
-      gameId: this.gameState.id,
-      status: this.gameState.status,
-      winnerId: this.gameState.winner !== null
-        ? this.gameState.players[this.gameState.winner].playerId
-        : null,
-      winReason: this.gameState.winReason,
-    };
+    const body = buildGameResultCallbackPayload(this.gameState);
 
     const url = `${this.env.NEXTJS_URL}/api/game/result`;
     const res = await fetch(url, {
@@ -980,4 +970,3 @@ export class GameSession implements DurableObject {
     return null;
   }
 }
-
