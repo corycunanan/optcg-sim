@@ -13,8 +13,10 @@ const GAME_WORKER_URL =
 
 export default async function GamePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ playerIndex?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -22,5 +24,20 @@ export default async function GamePage({
   }
 
   const { id } = await params;
-  return <GameBoardLoader gameId={id} workerUrl={GAME_WORKER_URL} />;
+  const resolvedSearchParams = await searchParams;
+  const rawPlayerIndex = Array.isArray(resolvedSearchParams?.playerIndex)
+    ? resolvedSearchParams?.playerIndex[0]
+    : resolvedSearchParams?.playerIndex;
+  const playerIndex =
+    rawPlayerIndex === "0" || rawPlayerIndex === "1"
+      ? (Number(rawPlayerIndex) as 0 | 1)
+      : undefined;
+
+  return (
+    <GameBoardLoader
+      gameId={id}
+      workerUrl={GAME_WORKER_URL}
+      playerIndex={playerIndex}
+    />
+  );
 }

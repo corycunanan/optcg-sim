@@ -1,5 +1,6 @@
 /**
- * GET /api/game/token?gameId=<id> — Issues a short-lived HS256 game token for the caller.
+ * GET /api/game/token?gameId=<id>&playerIndex=<0|1> — Issues a short-lived
+ * HS256 game token for the caller.
  * Passed to the Cloudflare DO as ?token=<jwt> on WebSocket connect.
  *
  * We don't forward NextAuth's own JWE token to the worker because @auth/core
@@ -20,9 +21,18 @@ export async function GET(request: NextRequest) {
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
   const gameId = request.nextUrl.searchParams.get("gameId");
+  const playerIndexParam = request.nextUrl.searchParams.get("playerIndex");
 
   if (!gameId) {
     return apiError("gameId is required", 400);
+  }
+
+  let requestedPlayerIndex: 0 | 1 | undefined;
+  if (playerIndexParam !== null) {
+    if (playerIndexParam !== "0" && playerIndexParam !== "1") {
+      return apiError("playerIndex must be 0 or 1", 400);
+    }
+    requestedPlayerIndex = Number(playerIndexParam) as 0 | 1;
   }
 
   if (!GAME_WORKER_SECRET) {
@@ -34,13 +44,30 @@ export async function GET(request: NextRequest) {
       id: gameId,
       OR: [{ player1Id: userId }, { player2Id: userId }],
     },
-    select: { id: true },
+    select: {
+      id: true,
+      mode: true,
+      player1Id: true,
+      player2Id: true,
+    },
   });
 
   if (!game) {
     return apiError("Game not found", 404);
   }
 
-  const token = await mintGameToken(userId, GAME_WORKER_SECRET, { gameId: game.id });
+  const isOnlyUserOnGame =
+    game.player1Id === userId && game.player2Id === userId;
+  const playerIndex =
+    requestedPlayerIndex !== undefined &&
+    game.mode === "SOLITAIRE" &&
+    isOnlyUserOnGame
+      ? requestedPlayerIndex
+      : undefined;
+
+  const token = await mintGameToken(userId, GAME_WORKER_SECRET, {
+    gameId: game.id,
+    ...(playerIndex !== undefined ? { playerIndex } : {}),
+  });
   return apiSuccess({ token });
 }

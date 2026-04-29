@@ -115,12 +115,14 @@ describe("app ↔ worker contracts", () => {
     const token = await mintGameToken("user-1", secret, {
       gameId: "game-1",
       jti: "token-1",
+      playerIndex: 1,
     });
 
     await expect(verifyGameToken(token, secret, "game-1")).resolves.toMatchObject({
       sub: "user-1",
       gameId: "game-1",
       jti: "token-1",
+      playerIndex: 1,
     });
     await expect(verifyGameToken(token, "wrong-secret", "game-1")).resolves.toBeNull();
     await expect(verifyGameToken(token, secret, "other-game")).resolves.toBeNull();
@@ -167,6 +169,35 @@ describe("app ↔ worker contracts", () => {
     const freshPayload = await verifyGameToken(freshToken, secret, state.id);
     await expect(
       consumeGameTokenJti(storage, freshPayload!.jti, freshPayload!.exp),
+    ).resolves.toBe(true);
+  });
+
+  it("allows separate Solitaire playerIndex tokens for the same user and game", async () => {
+    const secret = "contract-secret";
+    const { state } = setupGame();
+    const storage = new MockJtiStorage();
+
+    const player0Token = await mintGameToken("user-p1", secret, {
+      gameId: state.id,
+      jti: "solitaire-side-a",
+      playerIndex: 0,
+    });
+    const player1Token = await mintGameToken("user-p1", secret, {
+      gameId: state.id,
+      jti: "solitaire-side-b",
+      playerIndex: 1,
+    });
+
+    const player0Payload = await verifyGameToken(player0Token, secret, state.id);
+    const player1Payload = await verifyGameToken(player1Token, secret, state.id);
+
+    expect(player0Payload).toMatchObject({ jti: "solitaire-side-a", playerIndex: 0 });
+    expect(player1Payload).toMatchObject({ jti: "solitaire-side-b", playerIndex: 1 });
+    await expect(
+      consumeGameTokenJti(storage, player0Payload!.jti, player0Payload!.exp),
+    ).resolves.toBe(true);
+    await expect(
+      consumeGameTokenJti(storage, player1Payload!.jti, player1Payload!.exp),
     ).resolves.toBe(true);
   });
 

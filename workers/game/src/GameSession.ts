@@ -15,6 +15,7 @@ import type {
   GameAction,
   GameInitPayload,
   GameState,
+  LobbyMode,
   LifeCard,
   ServerMessage,
   PendingPromptState,
@@ -120,6 +121,7 @@ interface StoredSession {
   state: GameState;
   cardDb: Record<string, CardData>; // serialized as plain object
   mulliganDone: [boolean, boolean];
+  mode?: LobbyMode;
   undoHistory?: GameState[]; // snapshot stack for undo (v1: max depth 1)
 }
 
@@ -129,6 +131,7 @@ export class GameSession implements DurableObject {
 
   // In-memory cache (rebuilt from storage on wake)
   private gameState: GameState | null = null;
+  private gameMode: LobbyMode = "PVP";
   private cardDb: Map<string, CardData> | null = null;
   private mulliganDone: [boolean, boolean] = [false, false];
   private undoHistory: GameState[] = [];
@@ -184,6 +187,7 @@ export class GameSession implements DurableObject {
     const { state, cardDb } = buildInitialState(payload);
 
     this.cardDb = cardDb;
+    this.gameMode = payload.mode;
     this.mulliganDone = [false, false];
 
     // Setup returns phase=REFRESH; auto-advance through the start-of-turn phases
@@ -939,10 +943,30 @@ export class GameSession implements DurableObject {
 
     const players = this.gameState!.players;
     const userId = payload.sub;
-    const playerIndex =
-      players[0].playerId === userId ? 0 :
-      players[1].playerId === userId ? 1 :
-      null;
+    const matchesPlayer1 = players[0].playerId === userId;
+    const matchesPlayer2 = players[1].playerId === userId;
+    let playerIndex: 0 | 1 | null = null;
+
+    if (matchesPlayer1 && matchesPlayer2) {
+      if (payload.playerIndex !== undefined) {
+        if (this.gameMode !== "SOLITAIRE") {
+          log("auth.failure", {
+            reason: "player_index_forbidden",
+            gameId: this.gameState.id,
+            mode: this.gameMode,
+            userId,
+          });
+          return null;
+        }
+        playerIndex = payload.playerIndex;
+      } else {
+        playerIndex = 0;
+      }
+    } else if (matchesPlayer1) {
+      playerIndex = 0;
+    } else if (matchesPlayer2) {
+      playerIndex = 1;
+    }
 
     if (playerIndex === null) {
       log("auth.failure", { reason: "user_not_in_game", gameId: this.gameState.id, userId });
@@ -970,6 +994,7 @@ export class GameSession implements DurableObject {
       state: this.gameState,
       cardDb: Object.fromEntries(this.cardDb),
       mulliganDone: this.mulliganDone,
+      mode: this.gameMode,
       undoHistory: this.undoHistory,
     };
     await this.state.storage.put("session", stored);
@@ -982,6 +1007,7 @@ export class GameSession implements DurableObject {
     this.gameState = stored.state;
     this.cardDb = new Map(Object.entries(stored.cardDb));
     this.mulliganDone = stored.mulliganDone;
+    this.gameMode = stored.mode ?? "PVP";
     this.undoHistory = stored.undoHistory ?? [];
     return true;
   }

@@ -3,6 +3,7 @@ export type GameTokenOptions = {
   expiresInSeconds?: number;
   gameId?: string;
   jti?: string;
+  playerIndex?: 0 | 1;
 };
 
 export async function mintGameToken(
@@ -19,6 +20,7 @@ export async function mintGameToken(
     exp: now + (options.expiresInSeconds ?? 300), // 5 minutes by default
     jti,
     ...(options.gameId ? { gameId: options.gameId } : {}),
+    ...(options.playerIndex !== undefined ? { playerIndex: options.playerIndex } : {}),
   }));
 
   const signingInput = `${header}.${payload}`;

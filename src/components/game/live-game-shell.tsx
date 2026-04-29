@@ -37,6 +37,7 @@ import type { PromptOptions } from "@shared/game-types";
 export interface LiveGameShellProps {
   gameId: string;
   workerUrl: string;
+  playerIndex?: 0 | 1;
 }
 
 export function LiveGameShell(props: LiveGameShellProps) {
@@ -49,10 +50,11 @@ export function LiveGameShell(props: LiveGameShellProps) {
   );
 }
 
-function LiveGameShellContent({ gameId, workerUrl }: LiveGameShellProps) {
+function LiveGameShellContent({ gameId, workerUrl, playerIndex }: LiveGameShellProps) {
   const { game, opponent, navigation, endState } = useGameSession(
     gameId,
     workerUrl,
+    playerIndex,
   );
   const [devPrompt, setDevPrompt] = useState<PromptOptions | null>(null);
   const activePrompt = devPrompt ?? game.activePrompt;

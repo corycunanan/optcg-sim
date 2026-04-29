@@ -18,9 +18,13 @@ vi.mock("@/lib/db", () => ({
 
 const { GET } = await import("./route");
 
-function buildRequest(gameId?: string) {
-  const url = gameId
-    ? `http://localhost/api/game/token?gameId=${encodeURIComponent(gameId)}`
+function buildRequest(gameId?: string, playerIndex?: string) {
+  const params = new URLSearchParams();
+  if (gameId) params.set("gameId", gameId);
+  if (playerIndex) params.set("playerIndex", playerIndex);
+  const query = params.toString();
+  const url = query
+    ? `http://localhost/api/game/token?${query}`
     : "http://localhost/api/game/token";
   return new NextRequest(url);
 }
@@ -30,7 +34,12 @@ beforeEach(() => {
   gameSessionFindFirstMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-1" } });
-  gameSessionFindFirstMock.mockResolvedValue({ id: "game-1" });
+  gameSessionFindFirstMock.mockResolvedValue({
+    id: "game-1",
+    mode: "PVP",
+    player1Id: "user-1",
+    player2Id: "user-2",
+  });
 });
 
 describe("GET /api/game/token", () => {
@@ -51,7 +60,12 @@ describe("GET /api/game/token", () => {
         id: "game-1",
         OR: [{ player1Id: "user-1" }, { player2Id: "user-1" }],
       },
-      select: { id: true },
+      select: {
+        id: true,
+        mode: true,
+        player1Id: true,
+        player2Id: true,
+      },
     });
     await expect(
       verifyGameToken(body.data.token, "route-secret", "game-1"),
@@ -60,6 +74,43 @@ describe("GET /api/game/token", () => {
       gameId: "game-1",
       jti: expect.any(String),
     });
+  });
+
+  it("adds a playerIndex claim for same-user Solitaire games", async () => {
+    gameSessionFindFirstMock.mockResolvedValue({
+      id: "game-1",
+      mode: "SOLITAIRE",
+      player1Id: "user-1",
+      player2Id: "user-1",
+    });
+
+    const res = await GET(buildRequest("game-1", "1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    await expect(
+      verifyGameToken(body.data.token, "route-secret", "game-1"),
+    ).resolves.toMatchObject({
+      sub: "user-1",
+      gameId: "game-1",
+      playerIndex: 1,
+    });
+  });
+
+  it("silently ignores playerIndex for PVP games", async () => {
+    const res = await GET(buildRequest("game-1", "1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    const payload = await verifyGameToken(body.data.token, "route-secret", "game-1");
+    expect(payload).not.toHaveProperty("playerIndex");
+  });
+
+  it("rejects malformed playerIndex values", async () => {
+    const res = await GET(buildRequest("game-1", "2"));
+
+    expect(res.status).toBe(400);
+    expect(gameSessionFindFirstMock).not.toHaveBeenCalled();
   });
 
   it("rejects non-participants", async () => {
