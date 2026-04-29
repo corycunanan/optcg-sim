@@ -74,6 +74,7 @@ function makePayload(leader0: CardData, leader1: CardData): GameInitPayload {
       deck: deckCards,
     },
     format: "standard",
+    mode: "PVP",
   };
 }
 

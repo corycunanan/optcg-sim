@@ -25,6 +25,10 @@ function isStringOrNullish(v: unknown): v is string | null | undefined {
   return v == null || typeof v === "string";
 }
 
+function isLobbyMode(v: unknown): v is GameInitPayload["mode"] {
+  return v === "PVP" || v === "SOLITAIRE" || v === "PVCOMPUTER";
+}
+
 function isDeckCardData(v: unknown): v is DeckCardData {
   if (typeof v !== "object" || v === null) return false;
   const d = v as Record<string, unknown>;
@@ -70,6 +74,9 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
   }
   if (!isString(obj.format)) {
     throw new Error("GameInitPayload.format must be a non-empty string");
+  }
+  if (!isLobbyMode(obj.mode)) {
+    throw new Error("GameInitPayload.mode must be a valid lobby mode");
   }
 
   return obj as unknown as GameInitPayload;
