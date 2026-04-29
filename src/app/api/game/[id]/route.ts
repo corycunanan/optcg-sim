@@ -6,8 +6,10 @@
 import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
+import { finalizeGameResult } from "@/lib/game/finalize";
 import { buildNotifyEndPayload } from "@/lib/game/notify-end";
 import { GameActionSchema } from "@/lib/validators/game";
+import type { GameEndReasonCode } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 
@@ -89,7 +91,7 @@ export async function POST(
 async function handleFinalize(
   gameId: string,
   userId: string,
-  body: { winnerId?: string | null; winReason?: string | null },
+  body: { winnerId?: string | null; winReason?: string | null; reasonCode?: GameEndReasonCode | null },
 ) {
   const game = await prisma.gameSession.findFirst({
     where: {
@@ -112,19 +114,15 @@ async function handleFinalize(
     return apiError("Invalid winnerId", 400);
   }
 
-  // Optimistic locking: only update if still IN_PROGRESS (first writer wins)
-  const result = await prisma.gameSession.updateMany({
-    where: { id: game.id, status: "IN_PROGRESS" },
-    data: {
-      status: "FINISHED",
-      winnerId: winnerId ?? null,
-      winReason: winReason ?? "Game ended",
-      endedAt: new Date(),
-    },
+  const finalization = await finalizeGameResult({
+    gameId: game.id,
+    status: "FINISHED",
+    winnerId: winnerId ?? null,
+    winReason: winReason ?? "Game ended",
+    reasonCode: body.reasonCode ?? null,
   });
 
-  if (result.count === 0) {
-    // Another request already finalized this game
+  if (finalization.alreadyFinal) {
     const current = await prisma.gameSession.findUnique({
       where: { id: game.id },
       select: { id: true, status: true },
@@ -164,19 +162,27 @@ async function handleConcede(gameId: string, userId: string) {
 
   const winnerId = game.player1Id === userId ? game.player2Id : game.player1Id;
 
-  // Optimistic locking: only update if still IN_PROGRESS
-  const result = await prisma.gameSession.updateMany({
-    where: { id: game.id, status: "IN_PROGRESS" },
-    data: {
-      status: "FINISHED",
-      winnerId,
-      winReason: "Player conceded while disconnected",
-      endedAt: new Date(),
-    },
+  const finalization = await finalizeGameResult({
+    gameId: game.id,
+    status: "FINISHED",
+    winnerId,
+    winReason: "Player conceded while disconnected",
+    reasonCode: "FALLBACK_CONCEDE",
   });
 
-  if (result.count === 0) {
-    return apiError("Game has already ended", 409);
+  if (finalization.alreadyFinal) {
+    const current = await prisma.gameSession.findUnique({
+      where: { id: game.id },
+      select: { id: true, status: true, winnerId: true, winReason: true },
+    });
+    return apiSuccess({
+      id: game.id,
+      status: current?.status ?? "FINISHED",
+      winnerId: current?.winnerId ?? null,
+      winReason: current?.winReason ?? null,
+      winnerPerspective: getWinnerPerspective(current?.winnerId ?? null, userId),
+      canFallbackConcede: false,
+    });
   }
 
   const updated = await prisma.gameSession.findUniqueOrThrow({

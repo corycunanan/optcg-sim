@@ -127,6 +127,7 @@ describe("app ↔ worker contracts", () => {
       status: "FINISHED",
       winnerId: finished.players[1].playerId,
       winReason: "Player 2 won",
+      reasonCode: "UNKNOWN",
     });
   });
 
