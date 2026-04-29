@@ -1,7 +1,7 @@
 ---
 linear-project: Architecture Floor
 linear-project-url: https://linear.app/optcg-sim/project/architecture-floor-869e59d8e7ce
-last-updated: 2026-04-28 (project kicked off, all tickets Backlog)
+last-updated: 2026-04-29 (OPT-262 in review)
 ---
 
 # Architecture Floor — Handoff Doc
@@ -16,10 +16,10 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | [OPT-326](https://linear.app/optcg-sim/issue/OPT-326) | Add root `pnpm verify` and align CI with local verification | 2 | — | In Review | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Gate ticket for PR 1. Adds `pnpm verify` running lint + app type-check + worker type-check + app tests + worker tests + build. CI mirrors verify. |
-| 2 | [OPT-327](https://linear.app/optcg-sim/issue/OPT-327) | Restore `workers/game` type-check and refresh stale engine test fixtures | 5 | — | In Review | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Real type fixes at `GameSession.ts:856` (`ActiveEffect`/`RuntimeActiveEffect`) and `visibility.test.ts:16`. Add `@types/node` to worker. Build shared test factories module. **No `as any` patches.** |
-| 3 | [OPT-328](https://linear.app/optcg-sim/issue/OPT-328) | Normalize worker test/type-check execution from repo root and CI | 2 | — | In Review | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Workspace already declared in `pnpm-workspace.yaml`. Adds root scripts via `pnpm --filter optcg-game ...` and replaces CI's `cd workers/game && npx vitest run`. |
-| 4 | [OPT-262](https://linear.app/optcg-sim/issue/OPT-262) | Reconcile Prisma migration drift (`testOrder` column + modified `simplify_lobby_for_m3`) | 3 | OPT-326 (PR 1 first) | Backlog | — | **Blocks OPT-298** (Solitaire schema). Two issues: undocumented `testOrder` column, modified `simplify_lobby_for_m3`. Add CI drift guard. |
+| 1 | [OPT-326](https://linear.app/optcg-sim/issue/OPT-326) | Add root `pnpm verify` and align CI with local verification | 2 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Gate ticket for PR 1. Adds `pnpm verify` running lint + app type-check + worker type-check + app tests + worker tests + build. CI mirrors verify. |
+| 2 | [OPT-327](https://linear.app/optcg-sim/issue/OPT-327) | Restore `workers/game` type-check and refresh stale engine test fixtures | 5 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Real type fixes at `GameSession.ts:856` (`ActiveEffect`/`RuntimeActiveEffect`) and `visibility.test.ts:16`. Add `@types/node` to worker. Build shared test factories module. **No `as any` patches.** |
+| 3 | [OPT-328](https://linear.app/optcg-sim/issue/OPT-328) | Normalize worker test/type-check execution from repo root and CI | 2 | — | Done | [#171](https://github.com/corycunanan/optcg-sim/pull/171) | Workspace already declared in `pnpm-workspace.yaml`. Adds root scripts via `pnpm --filter optcg-game ...` and replaces CI's `cd workers/game && npx vitest run`. |
+| 4 | [OPT-262](https://linear.app/optcg-sim/issue/OPT-262) | Reconcile Prisma migration drift (`testOrder` column + modified `simplify_lobby_for_m3`) | 3 | OPT-326 (PR 1 first) | In Review | [#172](https://github.com/corycunanan/optcg-sim/pull/172) | **Blocks OPT-298** (Solitaire schema). Two issues: undocumented `testOrder` column, modified `simplify_lobby_for_m3`. Add CI drift guard. |
 | 5 | [OPT-329](https://linear.app/optcg-sim/issue/OPT-329) | App↔Worker contract tests: game init, tokens, result callback, hidden-zone filtering | 5 | OPT-327 | Backlog | — | New `src/__tests__/contracts/`. Pin init payload, token verify, result callback (`GameResultSchema`), notify-end fallback, hidden-zone filtering. |
 | 6 | [OPT-330](https://linear.app/optcg-sim/issue/OPT-330) | Enforce playable deck legality server-side before lobby/solitaire game start | 5 | OPT-326 (PR 1 first) | Backlog | — | **Blocks OPT-298**. Extracts `requirePlayableDeck(deckId, userId)` to `src/lib/decks/`. Wires into `lobbies/route.ts` and `lobbies/join/route.ts`. Returns 422 with structured `details`. |
 | 7 | [OPT-331](https://linear.app/optcg-sim/issue/OPT-331) | Centralize idempotent game result finalization across worker callback and fallback concede | 3 | OPT-329 | Backlog | — | New `src/lib/game/finalize.ts` with `finalizeGameResult()`. Conditional update on non-terminal state. Adds `reasonCode` enum. Tests cover three idempotency races. |
@@ -31,7 +31,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-326** — Add root `pnpm verify` and align CI. PR 1 is the trio OPT-326 + OPT-327 + OPT-328 landing together.
+**Next up:** **OPT-329** — App↔Worker contract tests. PR 3 pins the app/worker boundary now that the CI and migration floor are in place.
 
 ### PR phasing
 
@@ -96,3 +96,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** `workers/game/tsconfig.json` intentionally disables TypeScript `noUnused*` so stale test scaffolding does not block structural worker type-check; ESLint still reports unused/no-explicit-any warnings separately.
 - **Unresolved:** Lint still reports 410 warnings; OPT-332 owns the correctness-class React warning pass. Worker schema validation logs many known authored-schema warnings during tests, but the suite passes.
 - **Why this matters for OPT-262:** Once #171 merges, migration drift work can rely on `pnpm verify` and CI to catch app, worker, and build regressions before schema changes land.
+
+### OPT-262 → OPT-329
+**From:** session on 2026-04-29 · **Commit:** `f17a914` · **PR:** #172
+
+- **Primer:** Prisma migration history is reconciled for `decks.testOrder`; CI now has a Postgres-backed `pnpm db:check-migration-drift` guard before the full `pnpm verify` gate.
+- **Read first:** `prisma/migrations/20260429054500_add_deck_test_order/migration.sql`, `package.json`, `.github/workflows/ci.yml`, `src/app/api/game/token/route.ts`, `workers/game/src/auth.ts`
+- **Gotchas / do NOT touch:** Neon dev already has `20260429054500_add_deck_test_order` marked applied; the old rolled-back `20260321120000_simplify_lobby_for_m3` row had its checksum repaired to match the successful file so `migrate dev` stops reporting history drift.
+- **Unresolved:** `prisma migrate dev --create-only` generated an empty migration after repair; it was removed. Trust `pnpm prisma migrate status`, DB-to-schema `migrate diff`, and `pnpm db:check-migration-drift` for this PR's verification.
+- **Why this matters for OPT-329:** Contract tests can now add app/worker boundary coverage without also carrying migration uncertainty; the CI floor should catch drift before those tests become the next source of truth.
