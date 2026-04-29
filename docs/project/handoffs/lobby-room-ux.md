@@ -1,7 +1,7 @@
 ---
 linear-project: Lobby Room UX
 linear-project-url: https://linear.app/optcg-sim/project/lobby-room-ux-7accc6912db3
-last-updated: 2026-04-29 (OPT-342 in review; lobby room PR open)
+last-updated: 2026-04-29 (OPT-343 in review; PR #191 open)
 ---
 
 # Lobby Room UX — Handoff Doc
@@ -20,15 +20,15 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2 | [OPT-339](https://linear.app/optcg-sim/issue/OPT-339) | Refactor `POST /api/lobbies/join` to enter-room only (strip start logic) | 2 | OPT-338 | Done | [#187](https://github.com/corycunanan/optcg-sim/pull/187) | Adds temporary `?autoStart=true` shim so existing UI keeps working until OPT-342 ships. Drops `requirePlayableDeck` from normal join (moves to start). Updated 2026-04-29. |
 | 3 | [OPT-340](https://linear.app/optcg-sim/issue/OPT-340) | `PATCH /api/lobbies/[id]`: mode/deck/ready mutations + guest-eject behavior | 3 | OPT-338 | Done | [#188](https://github.com/corycunanan/optcg-sim/pull/188) | Single endpoint with permission-gated fields. PVP→Solitaire with guest present returns 409 unless `?force=true`. Mode/deck changes clear ready state. Updated 2026-04-29. |
 | 4 | [OPT-341](https://linear.app/optcg-sim/issue/OPT-341) | `POST /api/lobbies/[id]/start`: host-only, mode-aware, runs deck legality + DO init | 3 | OPT-338 | Done | [#189](https://github.com/corycunanan/optcg-sim/pull/189) | Migrates the GameSession + DO init transaction from join route. Reuses `requirePlayableDeck` (OPT-330) and `buildGameInitPayload`. Idempotent via `Lobby.status` lock. Updated 2026-04-29. |
-| 5 | [OPT-342](https://linear.app/optcg-sim/issue/OPT-342) | Lobby room UI with three tabs (PVP/Solitaire/PVComputer-disabled), deck pickers, ready, host Start button | 5 | OPT-339, OPT-340, OPT-341 | In Review | [#190](https://github.com/corycunanan/optcg-sim/pull/190) | New `/lobbies/[id]` page. Polling MVP via `useLobbyRoom` hook — designed as the future swap point for OPT-88. Removes the `?autoStart=true` shim. Updated 2026-04-29. |
-| 6 | [OPT-343](https://linear.app/optcg-sim/issue/OPT-343) | Solitaire mode wire-through: `playerIndex` JWT claim + DO trust gate (subsumes most of OPT-298) | 3 | OPT-341 | Backlog | — | DO refuses `playerIndex` claim unless `gameSession.mode === "SOLITAIRE"`. Negative test required. Verify replay-tracker keys per `(jti)` not `(gameId, sub)`. |
+| 5 | [OPT-342](https://linear.app/optcg-sim/issue/OPT-342) | Lobby room UI with three tabs (PVP/Solitaire/PVComputer-disabled), deck pickers, ready, host Start button | 5 | OPT-339, OPT-340, OPT-341 | Done | [#190](https://github.com/corycunanan/optcg-sim/pull/190) | New `/lobbies/[id]` page. Polling MVP via `useLobbyRoom` hook — designed as the future swap point for OPT-88. Removes the `?autoStart=true` shim. Updated 2026-04-29. |
+| 6 | [OPT-343](https://linear.app/optcg-sim/issue/OPT-343) | Solitaire mode wire-through: `playerIndex` JWT claim + DO trust gate (subsumes most of OPT-298) | 3 | OPT-341 | In Review | [#191](https://github.com/corycunanan/optcg-sim/pull/191) | Adds Solitaire-only `playerIndex` game-token claims, persists DO mode, and rejects explicit perspective claims outside `SOLITAIRE`. Replay remains keyed by `(jti)`. Updated 2026-04-29. |
 | 7 | [OPT-344](https://linear.app/optcg-sim/issue/OPT-344) | Migration backfill + e2e smoke + close out OPT-298/OPT-299 | 2 | OPT-342, OPT-343 | Backlog | — | Manual smoke: PVP + Solitaire + mode-switch eviction. Closes OPT-298/OPT-299 with cross-links; refreshes OPT-300/301/302/303 descriptions. |
 
 **Total estimate:** 21 points.
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** **OPT-343** — Solitaire mode wire-through. Ready now because OPT-341 is merged; PR #190 should still be merged before OPT-344's full e2e closeout.
+**Next up:** **OPT-344** — Migration backfill + e2e smoke + close out OPT-298/OPT-299. Blocked on PR #191 merging.
 
 ### PR phasing
 
@@ -135,3 +135,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Do not re-add `?autoStart=true`; do not move deck legality into PATCH or UI; OPT-343 should add mode-gated Solitaire `playerIndex` JWT/DO trust behavior only. PVComputer stays disabled/unimplemented.
 - **Unresolved:** Browser-smoked single-user room creation, tab switching, host deck selection, ready, and Start gating. A full two-auth-context PVP join/start plus ejected-guest toast remains for pre-merge/OPT-344 smoke.
 - **Why this matters for OPT-343:** `/start` now snapshots `mode` and the room can create Solitaire sessions with `player1=host` and `player2=host`, so the token/DO work must disambiguate player perspective only in Solitaire while preserving normal PVP trust rules.
+
+### OPT-343 → OPT-344
+**From:** session on 2026-04-29 · **Commit:** `e0ae493` · **PR:** #191
+
+- **Primer:** Solitaire perspective now flows through `?playerIndex=0|1` game-token claims; the app only mints them for same-user `SOLITAIRE` sessions, and the Durable Object refuses explicit perspective claims for PVP.
+- **Read first:** `src/app/api/game/token/route.ts`, `src/hooks/use-game-session.ts`, `workers/game/src/GameSession.ts`, `workers/game/src/__tests__/opt-343-solitaire-player-index.test.ts`, `src/__tests__/contracts/app-worker-contracts.test.ts`
+- **Gotchas / do NOT touch:** Keep `/api/lobbies/[id]/start` as the only deck-legality boundary; do not re-add `/api/lobbies/join?autoStart=true`; PVComputer remains disabled. PVP trust still resolves seats by `sub` matching player IDs and ignores forged `playerIndex` claims for normal two-user games.
+- **Unresolved:** Full two-auth-context PVP join/start, ejected-guest toast, migration backfill verification, and OPT-298/OPT-299 closeout remain OPT-344. No token replay follow-up: replay tracking is still per `jti`, and separate Solitaire side tokens are covered by contract tests.
+- **Why this matters for OPT-344:** The backend and token trust layers are now ready for closeout smoke; OPT-344 can focus on migration/backfill checks, manual PVP/Solitaire/ejection verification, and cross-linking the subsumed Solitaire tickets.
