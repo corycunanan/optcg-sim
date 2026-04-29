@@ -23,7 +23,7 @@ The gaps are mostly around abuse controls after a token is valid:
 | ID | Finding | Severity | Status |
 |----|---------|----------|--------|
 | F1 | Game tokens are not game-scoped by default and have no replay identifier | High | Fixed in OPT-334 |
-| F2 | No per-player WebSocket action rate limit | High | Follow-up: [OPT-335](https://linear.app/optcg-sim/issue/OPT-335/add-per-player-websocket-action-rate-limiting-in-the-game-worker) |
+| F2 | No per-player WebSocket action rate limit | High | Fixed in OPT-335 |
 | F3 | No payload size cap before parsing client messages | Medium | Fixed in OPT-333 |
 | F4 | Reconnect and upgrade attempts are not throttled | Medium | Follow-up: [OPT-336](https://linear.app/optcg-sim/issue/OPT-336/throttle-websocket-upgrade-and-reconnect-attempts-per-game-player) |
 | F5 | Multiple sockets for one player can desync presence and prompt delivery | High | Follow-up: [OPT-337](https://linear.app/optcg-sim/issue/OPT-337/enforce-one-active-websocket-per-player-in-each-game-session) |
@@ -59,9 +59,9 @@ Severity: High
 
 Impact: an authenticated player can consume Durable Object CPU and storage writes by flooding messages, even if most actions are rejected as illegal turn actions.
 
-Recommendation: add a token bucket keyed by `(gameId, playerIndex)` inside the Durable Object. Apply it before expensive action handling, tune it for normal prompt bursts, and log throttle decisions.
+Resolution in OPT-335: `GameSession.webSocketMessage()` now applies a Durable Object-local token bucket keyed by `(gameId, playerIndex)` before validating or handling authenticated `game:action` envelopes. The gameplay bucket allows short bursts and refills over time; malformed or unknown envelopes use a smaller abuse bucket, while `game:leave` stays available so players can always exit. Exceeded buckets send a clear `game:error`, log the decision, and close the socket with code `1008`.
 
-Follow-up: [OPT-335](https://linear.app/optcg-sim/issue/OPT-335/add-per-player-websocket-action-rate-limiting-in-the-game-worker)
+Follow-up: none for action spam. Upgrade/reconnect churn remains separately tracked by [OPT-336](https://linear.app/optcg-sim/issue/OPT-336/throttle-websocket-upgrade-and-reconnect-attempts-per-game-player).
 
 ### F3. No payload size cap before parsing client messages
 

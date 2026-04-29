@@ -42,6 +42,13 @@ import { configureLogger, log } from "./lib/log.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 export const MAX_CLIENT_MESSAGE_BYTES = 8 * 1024;
+export const ACTION_RATE_LIMIT_BURST = 24;
+export const ACTION_RATE_LIMIT_REFILL_PER_SECOND = 8;
+export const INVALID_MESSAGE_RATE_LIMIT_BURST = 6;
+export const INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND = 1;
+export const RATE_LIMIT_CLOSE_CODE = 1008;
+export const ACTION_RATE_LIMIT_CLOSE_REASON = "action rate limit exceeded";
+export const INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON = "message rate limit exceeded";
 const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
 const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
 
@@ -52,9 +59,29 @@ interface PlayerSocketAttachment {
   acceptedAt: number;
 }
 
+interface TokenBucket {
+  tokens: number;
+  updatedAt: number;
+}
+
 export function getClientMessageByteLength(message: string | ArrayBuffer): number {
   if (typeof message !== "string") return message.byteLength;
   return new TextEncoder().encode(message).byteLength;
+}
+
+export function consumeTokenBucket(
+  bucket: TokenBucket | undefined,
+  now: number,
+  capacity: number,
+  refillPerSecond: number,
+): { allowed: boolean; bucket: TokenBucket } {
+  const current = bucket ?? { tokens: capacity, updatedAt: now };
+  const elapsedSeconds = Math.max(0, now - current.updatedAt) / 1000;
+  const tokens = Math.min(capacity, current.tokens + elapsedSeconds * refillPerSecond);
+  if (tokens < 1) {
+    return { allowed: false, bucket: { tokens, updatedAt: now } };
+  }
+  return { allowed: true, bucket: { tokens: tokens - 1, updatedAt: now } };
 }
 
 function isPlayerSocketAttachment(value: unknown): value is PlayerSocketAttachment {
@@ -93,6 +120,8 @@ export class GameSession implements DurableObject {
   private mulliganDone: [boolean, boolean] = [false, false];
   private undoHistory: GameState[] = [];
   private nextWebSocketSequence = 0;
+  private readonly actionRateLimitBuckets = new Map<string, TokenBucket>();
+  private readonly invalidMessageRateLimitBuckets = new Map<string, TokenBucket>();
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -304,9 +333,26 @@ export class GameSession implements DurableObject {
       return;
     }
 
+    let raw: unknown;
+    try {
+      raw = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
+    } catch {
+      if (!this.consumeInvalidMessageBudget(playerIndex)) return;
+      this.send(ws, { type: "game:error", message: "Invalid message format" });
+      return;
+    }
+
+    const rawType = typeof raw === "object" && raw !== null
+      ? (raw as { type?: unknown }).type
+      : undefined;
+
+    // Leave stays available; action-shaped messages spend gameplay budget before Zod validation.
+    // Unknown or malformed envelopes spend a smaller abuse budget.
+    if (rawType === "game:action" && !this.consumeActionBudget(playerIndex)) return;
+    if (rawType !== "game:action" && rawType !== "game:leave" && !this.consumeInvalidMessageBudget(playerIndex)) return;
+
     let clientMsg: ClientMessage;
     try {
-      const raw = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
       clientMsg = validateClientMessage(raw);
     } catch {
       this.send(ws, { type: "game:error", message: "Invalid message format" });
@@ -322,6 +368,50 @@ export class GameSession implements DurableObject {
     if (clientMsg.type === "game:action") {
       await this.handleAction(ws, playerIndex, clientMsg.action);
     }
+  }
+
+  private getPlayerBucketKey(playerIndex: 0 | 1): string {
+    return `${this.gameState?.id ?? "unknown"}:${playerIndex}`;
+  }
+
+  private consumeActionBudget(playerIndex: 0 | 1): boolean {
+    const key = this.getPlayerBucketKey(playerIndex);
+    const result = consumeTokenBucket(
+      this.actionRateLimitBuckets.get(key),
+      Date.now(),
+      ACTION_RATE_LIMIT_BURST,
+      ACTION_RATE_LIMIT_REFILL_PER_SECOND,
+    );
+    this.actionRateLimitBuckets.set(key, result.bucket);
+    if (result.allowed) return true;
+
+    log("ws.action_rate_limited", { gameId: this.gameState?.id, playerIndex });
+    const ws = this.getWebSocketForPlayer(playerIndex);
+    if (ws) {
+      this.send(ws, { type: "game:error", message: ACTION_RATE_LIMIT_CLOSE_REASON });
+      try { ws.close(RATE_LIMIT_CLOSE_CODE, ACTION_RATE_LIMIT_CLOSE_REASON); } catch { /* ignore */ }
+    }
+    return false;
+  }
+
+  private consumeInvalidMessageBudget(playerIndex: 0 | 1): boolean {
+    const key = this.getPlayerBucketKey(playerIndex);
+    const result = consumeTokenBucket(
+      this.invalidMessageRateLimitBuckets.get(key),
+      Date.now(),
+      INVALID_MESSAGE_RATE_LIMIT_BURST,
+      INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND,
+    );
+    this.invalidMessageRateLimitBuckets.set(key, result.bucket);
+    if (result.allowed) return true;
+
+    log("ws.invalid_message_rate_limited", { gameId: this.gameState?.id, playerIndex });
+    const ws = this.getWebSocketForPlayer(playerIndex);
+    if (ws) {
+      this.send(ws, { type: "game:error", message: INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON });
+      try { ws.close(RATE_LIMIT_CLOSE_CODE, INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON); } catch { /* ignore */ }
+    }
+    return false;
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
