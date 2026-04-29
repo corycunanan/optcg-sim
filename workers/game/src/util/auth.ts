@@ -6,11 +6,19 @@
  * A256CBC-HS512 encryption and would be non-trivial to verify here).
  */
 
+export interface VerifiedGameToken {
+  sub: string;
+  iat: number;
+  exp: number;
+  gameId: string;
+  jti: string;
+}
+
 export async function verifyGameToken(
   token: string,
   secret: string,
   expectedGameId?: string,
-): Promise<string | null> {
+): Promise<VerifiedGameToken | null> {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -31,10 +39,21 @@ export async function verifyGameToken(
     if (!valid) return null;
 
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64)));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-    if (expectedGameId && payload.gameId && payload.gameId !== expectedGameId) return null;
+    if (typeof payload.sub !== "string") return null;
+    if (typeof payload.iat !== "number") return null;
+    if (typeof payload.exp !== "number") return null;
+    if (typeof payload.gameId !== "string") return null;
+    if (typeof payload.jti !== "string") return null;
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (expectedGameId && payload.gameId !== expectedGameId) return null;
 
-    return (payload.sub as string) ?? null;
+    return {
+      sub: payload.sub,
+      iat: payload.iat,
+      exp: payload.exp,
+      gameId: payload.gameId,
+      jti: payload.jti,
+    };
   } catch {
     return null;
   }

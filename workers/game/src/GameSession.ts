@@ -30,6 +30,7 @@ import {
 } from "./engine/replacements.js";
 import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
+import { CONSUMED_TOKEN_JTIS_STORAGE_KEY, consumeGameTokenJti } from "./util/token-replay.js";
 import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayload } from "./util/validate.js";
 import { buildGameResultCallbackPayload } from "./util/result.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
@@ -148,6 +149,7 @@ export class GameSession implements DurableObject {
 
     // Persist to DO storage so state survives hibernation
     await this.persist();
+    await this.state.storage.put(CONSUMED_TOKEN_JTIS_STORAGE_KEY, {});
 
     return new Response(JSON.stringify({ ok: true, gameId: state.id }), {
       headers: { "Content-Type": "application/json" },
@@ -787,8 +789,8 @@ export class GameSession implements DurableObject {
   // ─── Token validation ──────────────────────────────────────────────────────
 
   private async validateToken(token: string): Promise<0 | 1 | null> {
-    const userId = await verifyGameToken(token, this.env.GAME_WORKER_SECRET, this.gameState?.id);
-    if (!userId) {
+    const payload = await verifyGameToken(token, this.env.GAME_WORKER_SECRET, this.gameState?.id);
+    if (!payload) {
       log("auth.failure", { reason: "invalid_token", gameId: this.gameState?.id });
       return null;
     }
@@ -798,10 +800,28 @@ export class GameSession implements DurableObject {
     }
 
     const players = this.gameState!.players;
-    if (players[0].playerId === userId) return 0;
-    if (players[1].playerId === userId) return 1;
-    log("auth.failure", { reason: "user_not_in_game", gameId: this.gameState.id, userId });
-    return null;
+    const userId = payload.sub;
+    const playerIndex =
+      players[0].playerId === userId ? 0 :
+      players[1].playerId === userId ? 1 :
+      null;
+
+    if (playerIndex === null) {
+      log("auth.failure", { reason: "user_not_in_game", gameId: this.gameState.id, userId });
+      return null;
+    }
+
+    const consumed = await consumeGameTokenJti(
+      this.state.storage,
+      payload.jti,
+      payload.exp,
+    );
+    if (!consumed) {
+      log("auth.failure", { reason: "token_replay", gameId: this.gameState.id, userId });
+      return null;
+    }
+
+    return playerIndex;
   }
 
   // ─── Storage ───────────────────────────────────────────────────────────────

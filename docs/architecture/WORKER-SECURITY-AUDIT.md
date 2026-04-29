@@ -22,7 +22,7 @@ The gaps are mostly around abuse controls after a token is valid:
 
 | ID | Finding | Severity | Status |
 |----|---------|----------|--------|
-| F1 | Game tokens are not game-scoped by default and have no replay identifier | High | Follow-up: [OPT-334](https://linear.app/optcg-sim/issue/OPT-334/bind-worker-game-tokens-to-gameid-and-track-replay-identifiers) |
+| F1 | Game tokens are not game-scoped by default and have no replay identifier | High | Fixed in OPT-334 |
 | F2 | No per-player WebSocket action rate limit | High | Follow-up: [OPT-335](https://linear.app/optcg-sim/issue/OPT-335/add-per-player-websocket-action-rate-limiting-in-the-game-worker) |
 | F3 | No payload size cap before parsing client messages | Medium | Fixed in OPT-333 |
 | F4 | Reconnect and upgrade attempts are not throttled | Medium | Follow-up: [OPT-336](https://linear.app/optcg-sim/issue/OPT-336/throttle-websocket-upgrade-and-reconnect-attempts-per-game-player) |
@@ -47,9 +47,9 @@ Severity: High
 
 Impact: a captured token can be reused for any active game containing that user during its five-minute TTL. It can also be reused for repeated same-game upgrades during the TTL.
 
-Recommendation: issue tokens for a specific `gameId` after checking membership in the app, require `gameId` in worker validation, and either add one-shot `jti` tracking in the Durable Object or explicitly document short-TTL token reuse as an accepted policy.
+Resolution in OPT-334: `/api/game/token` now requires a `gameId`, verifies the caller is `player1Id` or `player2Id` on that game session, and mints tokens with `gameId` plus `jti`. Worker validation rejects tokens missing `gameId`/`jti`, rejects mismatched `gameId`, and consumes each `jti` once through Durable Object storage. Replays fail even within the token TTL; expired consumed identifiers are pruned by token expiration.
 
-Follow-up: [OPT-334](https://linear.app/optcg-sim/issue/OPT-334/bind-worker-game-tokens-to-gameid-and-track-replay-identifiers)
+Follow-up: none for token scoping/replay. Action spam and reconnect churn remain separately tracked by OPT-335 and OPT-336.
 
 ### F2. No per-player WebSocket action rate limit
 

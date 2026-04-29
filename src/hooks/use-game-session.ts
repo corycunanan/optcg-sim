@@ -72,12 +72,12 @@ export function useGameSession(
   const userId = session?.user?.id ?? "";
 
   const getToken = useCallback(async () => {
-    const r = await fetch("/api/game/token");
+    const r = await fetch(`/api/game/token?gameId=${encodeURIComponent(gameId)}`);
     if (!r.ok) throw new Error(`Token fetch: ${r.status}`);
     const d = (await r.json()) as { data?: { token?: string } };
     if (!d.data?.token) throw new Error("No token");
     return d.data.token;
-  }, []);
+  }, [gameId]);
 
   /* ── WebSocket ────────────────────────────────────────────────────── */
 

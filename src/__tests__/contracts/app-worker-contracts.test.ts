@@ -6,10 +6,23 @@ import { GameResultSchema } from "@/lib/validators/game";
 import { mintGameToken } from "@/lib/game/token";
 import { validateGameInitPayload, validateNotifyEndPayload } from "@engine/util/validate.js";
 import { verifyGameToken } from "@engine/util/auth.js";
+import { consumeGameTokenJti } from "@engine/util/token-replay.js";
 import { buildGameResultCallbackPayload } from "@engine/util/result.js";
 import { filterStateForPlayer } from "@engine/engine/state.js";
 import { setupGame } from "@engine/__tests__/factories.js";
 import type { CardInstance, GameState } from "@engine/types.js";
+
+class MockJtiStorage {
+  private storageMap = new Map<string, unknown>();
+
+  async put(key: string, value: unknown): Promise<void> {
+    this.storageMap.set(key, value);
+  }
+
+  async get<T>(key: string): Promise<T | undefined> {
+    return this.storageMap.get(key) as T | undefined;
+  }
+}
 
 function makeCard(id: string, overrides: Partial<Card> = {}): Card {
   return {
@@ -97,18 +110,62 @@ describe("app ↔ worker contracts", () => {
 
   it("mints app game tokens that the worker accepts and rejects invalid variants", async () => {
     const secret = "contract-secret";
-    const token = await mintGameToken("user-1", secret, { gameId: "game-1" });
+    const token = await mintGameToken("user-1", secret, {
+      gameId: "game-1",
+      jti: "token-1",
+    });
 
-    await expect(verifyGameToken(token, secret, "game-1")).resolves.toBe("user-1");
+    await expect(verifyGameToken(token, secret, "game-1")).resolves.toMatchObject({
+      sub: "user-1",
+      gameId: "game-1",
+      jti: "token-1",
+    });
     await expect(verifyGameToken(token, "wrong-secret", "game-1")).resolves.toBeNull();
     await expect(verifyGameToken(token, secret, "other-game")).resolves.toBeNull();
+
+    const missingGameId = await mintGameToken("user-1", secret, { jti: "token-2" });
+    await expect(verifyGameToken(missingGameId, secret, "game-1")).resolves.toBeNull();
 
     const expired = await mintGameToken("user-1", secret, {
       now: Math.floor(Date.now() / 1000) - 600,
       expiresInSeconds: 1,
       gameId: "game-1",
+      jti: "token-3",
     });
     await expect(verifyGameToken(expired, secret, "game-1")).resolves.toBeNull();
+  });
+
+  it("treats worker game tokens as one-shot per Durable Object jti", async () => {
+    const secret = "contract-secret";
+    const { state } = setupGame();
+    const storage = new MockJtiStorage();
+
+    const token = await mintGameToken("user-p1", secret, {
+      gameId: state.id,
+      jti: "one-shot-token",
+    });
+    const payload = await verifyGameToken(token, secret, state.id);
+    expect(payload).toMatchObject({
+      sub: state.players[0].playerId,
+      gameId: state.id,
+      jti: "one-shot-token",
+    });
+
+    await expect(
+      consumeGameTokenJti(storage, payload!.jti, payload!.exp),
+    ).resolves.toBe(true);
+    await expect(
+      consumeGameTokenJti(storage, payload!.jti, payload!.exp),
+    ).resolves.toBe(false);
+
+    const freshToken = await mintGameToken("user-p1", secret, {
+      gameId: state.id,
+      jti: "fresh-token",
+    });
+    const freshPayload = await verifyGameToken(freshToken, secret, state.id);
+    await expect(
+      consumeGameTokenJti(storage, freshPayload!.jti, freshPayload!.exp),
+    ).resolves.toBe(true);
   });
 
   it("builds worker result callbacks accepted by the app result schema", () => {
