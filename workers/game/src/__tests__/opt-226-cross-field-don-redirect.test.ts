@@ -99,7 +99,7 @@ function makeState(p0: PlayerState, p1: PlayerState): GameState {
   return {
     id: "g",
     players: [p0, p1],
-    turn: { number: 1, activePlayerIndex: 0, phase: "MAIN", battleSubPhase: null, battle: null, oncePerTurnUsed: {}, actionsPerformedThisTurn: [] },
+    turn: { number: 1, activePlayerIndex: 0, phase: "MAIN", battleSubPhase: null, battle: null, oncePerTurnUsed: {}, actionsPerformedThisTurn: [], deckHitZeroThisTurn: [false, false] },
     activeEffects: [],
     prohibitions: [],
     scheduledActions: [],

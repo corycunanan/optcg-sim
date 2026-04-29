@@ -161,7 +161,7 @@ describe("OPT-240 D2: CARD_REMOVED_FROM_LIFE ordering vs [Trigger]", () => {
   const vanillaLifeCard: LifeCard = {
     instanceId: "life-vanilla-top",
     cardId: CARDS.VANILLA.id,
-    faceUp: false,
+    face: "DOWN",
   };
 
   it("normal damage path: Bonney fires after life card is removed", () => {
@@ -196,7 +196,7 @@ describe("OPT-240 D2: CARD_REMOVED_FROM_LIFE ordering vs [Trigger]", () => {
     const triggerLifeCard: LifeCard = {
       instanceId: "life-trigger-decline",
       cardId: CARDS.TRIGGER.id, // keyword: trigger true
-      faceUp: false,
+      face: "DOWN",
     };
     const { state, cardDb } = setupBonneyWithOppLifeCard(triggerLifeCard);
     const attacker = state.players[0].leader;

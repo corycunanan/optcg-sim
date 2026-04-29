@@ -305,7 +305,7 @@ describe("OPT-251: CANNOT_BE_KO is narrow — K.O. only, not non-K.O. removal", 
         makeProhibition({
           prohibitionType: "CANNOT_BE_KO",
           appliesTo: ["tgt-LUFFY-CLONE"],
-          scope: { cause: "BATTLE", source_filter: { attribute: "Strike" } },
+          scope: { cause: "BATTLE", source_filter: { attribute: "STRIKE" } },
         }),
       ],
     });

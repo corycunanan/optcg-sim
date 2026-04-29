@@ -58,6 +58,9 @@ export interface BattleContext {
   // 1 otherwise. Decremented each time a damage is dealt to Leader life, so
   // the [Trigger] resume path knows whether another damage is still owed.
   damagesRemaining?: number;
+  // Battle damage that reveals a Life card with [Trigger] pauses the battle
+  // until the damaged player accepts or declines that trigger.
+  pendingTriggerLifeCard?: LifeCard;
 }
 
 export type BattleSubPhase =

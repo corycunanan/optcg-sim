@@ -18,7 +18,7 @@ import {
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
 import { expireBattleEffects } from "./duration-tracker.js";
-import { hasDoubleAttack, hasBanish, hasTrigger, hasEffectiveKeyword } from "./keywords.js";
+import { hasTrigger, hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
@@ -890,7 +890,6 @@ function executeDamageStep(
 ): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
-  const inactiveIdx = getInactivePlayerIndex(state);
 
   // OPT-243: guard against mid-step removal before we recalc powers or emit
   // CHARACTER_BATTLES. If either combatant left the field during Block /

@@ -52,7 +52,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
     const oppCost5 = makeInstance("COST5", "CHARACTER", 1, { instanceId: "opp-cost5" });
 
     const makePlayer = (idx: 0 | 1): PlayerState => ({
-      userId: `user-${idx}`, playerId: `user-${idx}`,
+      playerId: `user-${idx}`,
       leader: makeInstance("LEADER-T", "LEADER", idx, { instanceId: `leader-${idx}` }),
       characters: (() => { const c: (CardInstance | null)[] = [null,null,null,null,null]; const arr = idx === 0 ? [sabo] : [oppCost2, oppCost5]; arr.forEach((x,i) => c[i] = x); return c; })(),
       stage: null,
@@ -69,6 +69,12 @@ describe("OP07-118 Sabo dual-target KO", () => {
       donCostArea: Array.from({ length: 6 }, (_, i) => ({
         instanceId: `don-${idx}-${i}`, state: "ACTIVE" as const, attachedTo: null,
       })),
+      deckList: [],
+      connected: true,
+      awayReason: null,
+      rejoinDeadlineAt: null,
+      sleeveUrl: null,
+      donArtUrl: null,
     });
 
     const state: GameState = {
@@ -81,6 +87,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
         battleSubPhase: null, battle: null,
         actionsPerformedThisTurn: [], oncePerTurnUsed: {},
         extraTurnsPending: 0,
+        deckHitZeroThisTurn: [false, false],
       },
       activeEffects: [], prohibitions: [], scheduledActions: [],
       oneTimeModifiers: [], triggerRegistry: [], effectStack: [],

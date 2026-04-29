@@ -104,6 +104,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-1", costReducedAmount: 1 },
     };
 
@@ -118,6 +119,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-1", costReducedAmount: 0 },
     };
 
@@ -134,6 +136,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-1" },
     };
 
@@ -148,6 +151,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 1,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-1", costReducedAmount: 2 },
     };
 
@@ -162,6 +166,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_MAIN_RESOLVED_FROM_TRASH",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-trash-1" },
     };
 
@@ -176,6 +181,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-1", costReducedAmount: 3 },
     };
 
@@ -190,6 +196,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-2", costReducedAmount: 2 },
     };
 
@@ -215,6 +222,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
+      timestamp: 0,
       payload: { cardId: "EVT-X", cardInstanceId: "evt-hand-3", costReducedAmount: 1 },
     };
 

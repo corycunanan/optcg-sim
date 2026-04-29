@@ -119,8 +119,8 @@ function declareThroughCounter(
 describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () => {
   it("baseline: DA into 2 non-trigger Life cards removes both in one attack", () => {
     const cardDb = createTestCardDb();
-    const top: LifeCard = { instanceId: "life-top-v1", cardId: CARDS.VANILLA.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-v1", cardId: CARDS.VANILLA.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-v1", cardId: CARDS.VANILLA.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-v1", cardId: CARDS.VANILLA.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
     const lifeBefore = state.players[1].life.length;
 
@@ -133,8 +133,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
 
   it("decline 1st [Trigger]: 2nd damage still resolves and removes the 2nd Life", () => {
     const cardDb = createTestCardDb();
-    const top: LifeCard = { instanceId: "life-top-trig", cardId: CARDS.TRIGGER.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-v", cardId: CARDS.VANILLA.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-trig", cardId: CARDS.TRIGGER.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-v", cardId: CARDS.VANILLA.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
 
     const paused = declareThroughCounter(state, attackerId, targetId, cardDb);
@@ -158,8 +158,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
 
   it("decline 1st trigger, 2nd Life is ALSO [Trigger]: defender gets a 2nd prompt", () => {
     const cardDb = createTestCardDb();
-    const top: LifeCard = { instanceId: "life-top-trig-a", cardId: CARDS.TRIGGER.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-trig-b", cardId: CARDS.TRIGGER.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-trig-a", cardId: CARDS.TRIGGER.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-trig-b", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
 
     const paused1 = declareThroughCounter(state, attackerId, targetId, cardDb);
@@ -182,8 +182,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
   it("accept 1st [Trigger] (no effect schema): 2nd damage still resolves", () => {
     // CARDS.TRIGGER has no effectSchema, so activating just sends it to trash.
     const cardDb = createTestCardDb();
-    const top: LifeCard = { instanceId: "life-top-trig-acc", cardId: CARDS.TRIGGER.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-v-acc", cardId: CARDS.VANILLA.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-trig-acc", cardId: CARDS.TRIGGER.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-v-acc", cardId: CARDS.VANILLA.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
 
     const paused = declareThroughCounter(state, attackerId, targetId, cardDb);
@@ -203,8 +203,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     // from the field between the REVEAL_TRIGGER pause and its resume. The
     // continuation must detect the attacker is gone and not deal damage #2.
     const cardDb = createTestCardDb();
-    const top: LifeCard = { instanceId: "life-top-trig-ko", cardId: CARDS.TRIGGER.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-v-ko", cardId: CARDS.VANILLA.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-trig-ko", cardId: CARDS.TRIGGER.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-v-ko", cardId: CARDS.VANILLA.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
 
     const paused = declareThroughCounter(state, attackerId, targetId, cardDb);
@@ -268,8 +268,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
       controller: 0,
       owner: 0,
     };
-    const top: LifeCard = { instanceId: "life-top-lock", cardId: CARDS.VANILLA.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-lock", cardId: CARDS.VANILLA.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-lock", cardId: CARDS.VANILLA.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-lock", cardId: CARDS.VANILLA.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot, attacker);
 
     // Strip DA from the card data BEFORE the damage step: damage count is
@@ -333,8 +333,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
       controller: 0,
       owner: 0,
     };
-    const top: LifeCard = { instanceId: "life-top-btrig", cardId: CARDS.TRIGGER.id, faceUp: false };
-    const bot: LifeCard = { instanceId: "life-bot-btrig", cardId: CARDS.TRIGGER.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-btrig", cardId: CARDS.TRIGGER.id, face: "DOWN" };
+    const bot: LifeCard = { instanceId: "life-bot-btrig", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot, attacker);
 
     const final = declareThroughCounter(state, attackerId, targetId, cardDb);
@@ -353,7 +353,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     // during REVEAL_TRIGGER, so defeat never fired. Post-OPT-239, the 2nd
     // damage sees life.length === 0 and triggers the defeat condition.
     const cardDb = createTestCardDb();
-    const top: LifeCard = { instanceId: "life-lethal-trig", cardId: CARDS.TRIGGER.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-lethal-trig", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, null);
 
     // Give p0 enough power to blow past leader — rely on DON attachments the
@@ -395,7 +395,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     }));
     const withDons: CardInstance = { ...vanillaAttacker, attachedDon: attachedDons };
 
-    const top: LifeCard = { instanceId: "life-top-nonda", cardId: CARDS.TRIGGER.id, faceUp: false };
+    const top: LifeCard = { instanceId: "life-top-nonda", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const p0Chars = [
       ...(state0.players[0].characters.filter(Boolean) as CardInstance[]),
       withDons,

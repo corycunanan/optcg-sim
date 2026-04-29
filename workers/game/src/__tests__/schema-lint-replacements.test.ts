@@ -84,18 +84,20 @@ interface LintFailure {
 
 function lintSchema(schema: EffectSchema, cardText: string): LintFailure[] {
   const failures: LintFailure[] = [];
+  const cardId = schema.card_id ?? "UNKNOWN";
+  const cardName = schema.card_name ?? cardId;
   for (const block of schema.effects as EffectBlock[]) {
     if (block.category !== "replacement") continue;
     const filter = block.replaces?.target_filter;
     if (!filter) continue; // "self only" fallback — safe by construction
-    if (!textRequiresSelfExclusion(cardText, schema.card_name)) continue;
-    if (ALLOWLIST.some((a) => a.cardId === schema.card_id && a.blockId === block.id)) continue;
-    if (filterExcludesSelf(filter, schema.card_name)) continue;
+    if (!textRequiresSelfExclusion(cardText, cardName)) continue;
+    if (ALLOWLIST.some((a) => a.cardId === cardId && a.blockId === block.id)) continue;
+    if (filterExcludesSelf(filter, cardName)) continue;
     failures.push({
-      cardId: schema.card_id,
-      cardName: schema.card_name,
+      cardId,
+      cardName,
       blockId: block.id,
-      reason: `Card text says "other than [${schema.card_name}]" but target_filter omits exclude_self / exclude_name.`,
+      reason: `Card text says "other than [${cardName}]" but target_filter omits exclude_self / exclude_name.`,
     });
   }
   return failures;

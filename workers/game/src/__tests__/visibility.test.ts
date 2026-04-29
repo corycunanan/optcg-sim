@@ -8,12 +8,12 @@
 
 import { describe, it, expect } from "vitest";
 import { filterStateForPlayer } from "../engine/state.js";
-import { setupGame, advanceToPhase } from "./helpers.js";
+import { setupGame, advanceToPhase } from "./factories.js";
 
 describe("filterStateForPlayer", () => {
   function getMainPhaseState() {
     const { state, cardDb } = setupGame();
-    return advanceToPhase(state, cardDb, "MAIN");
+    return advanceToPhase(state, "MAIN", cardDb);
   }
 
   it("preserves the receiving player's own hand card identities", () => {

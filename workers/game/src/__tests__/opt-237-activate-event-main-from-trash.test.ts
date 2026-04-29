@@ -67,7 +67,7 @@ function counterOnlyEventSchema(): EffectSchema {
     effects: [
       {
         id: "counter-only",
-        category: "counter",
+        category: "activate",
         trigger: { keyword: "COUNTER_EVENT" },
         actions: [
           {
