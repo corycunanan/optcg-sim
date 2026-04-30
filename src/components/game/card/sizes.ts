@@ -1,24 +1,16 @@
-import {
-  BOARD_CARD_H,
-  BOARD_CARD_W,
-  DON_CARD_H,
-  DON_CARD_W,
-  HAND_CARD_H,
-  HAND_CARD_W,
-} from "../board-layout/constants";
 import type { CardSize, CardVariant } from "./types";
 
 /**
- * Card footprint for each size token. Gameplay card sizes are sourced from
- * `board-layout/constants.ts` so the board grid, hand layout, animations, and
- * primitive rendering stay in sync.
+ * Card footprint for each size token. Values align with the existing geometry
+ * constants in `board-layout/constants.ts` so the primitive drops into the
+ * current board without visual regressions during migration.
  */
 export const CARD_SIZES: Record<CardSize, { width: number; height: number }> = {
-  field: { width: BOARD_CARD_W, height: BOARD_CARD_H },
-  hand: { width: HAND_CARD_W, height: HAND_CARD_H },
+  field: { width: 80, height: 112 },   // BOARD_CARD_W × BOARD_CARD_H (= SQUARE)
+  hand: { width: 84, height: 118 },    // HAND_CARD_W × HAND_CARD_H
   modal: { width: 120, height: 168 },  // modal target picker / trash grid
   preview: { width: 200, height: 280 }, // preview page showcase + large callouts
-  don: { width: DON_CARD_W, height: DON_CARD_H },
+  don: { width: 50, height: 70 },      // DON!! token in the cost area
 };
 
 /** Default size token for a given variant. Consumers can override via `size`. */
