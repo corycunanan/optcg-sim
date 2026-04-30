@@ -1,7 +1,7 @@
 ---
 linear-project: Responsive Game Board
 linear-project-url: https://linear.app/optcg-sim/project/responsive-game-board-e42dfec537cc
-last-updated: 2026-04-30 (OPT-347 in review; OPT-348 filed)
+last-updated: 2026-04-30 (OPT-349 in progress; OPT-348 still backlog)
 ---
 
 # Responsive Game Board — Handoff Doc
@@ -35,12 +35,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 17 | [OPT-346](https://linear.app/optcg-sim/issue/OPT-346) | Bump inside-board legibility floor one step for the 1280×640 viewport | 2 | OPT-345 | In Review | [#194](https://github.com/corycunanan/optcg-sim/pull/194) | Promotes inside-board labels/body/focus rings one step (`text-base` / `text-lg` / `ring-4`) while keeping chrome at `text-xs` / `ring-2`. |
 | 18 | [OPT-347](https://linear.app/optcg-sim/issue/OPT-347) | QA pass: solitaire walkthrough at 1280×640 floor | 1 | OPT-345, OPT-346 | In Review | [#195](https://github.com/corycunanan/optcg-sim/pull/195) | QA found a scaled dnd-kit droppable miss at 1280×640; follow-up filed as OPT-348 with screenshots. Gate/layout/prompt checks passed. |
 | 19 | [OPT-348](https://linear.app/optcg-sim/issue/OPT-348) | Fix scaled-board dnd-kit droppable hit testing at 1280×640 | 1 | OPT-347 | Backlog | — | At `/sandbox/play-character` 1280×640, hand-card drag starts but drop over lower C1 does not resolve over `char-slot-0`; same normalized path works at 1920×1080. |
+| 20 | [OPT-349](https://linear.app/optcg-sim/issue/OPT-349) | Board doesn't fill viewport: collapse legacy `computeBoardScaling` into `<ScaledBoard>` | 5 | OPT-314, OPT-315, OPT-318 | In Progress | — | Removes the `Math.min(1, …)` cap in `computeBoardScaling` so `boardScale` fills the design canvas (smaller-axis ratio wins). Promotes `viewportSize` + `outerScale` from opt-in to required on `BoardLayout` and removes the legacy `getViewportSize()` window-fallback (no remaining consumers — both shells go through `<Board>`). DragOverlay still multiplies `outerScale × boardScale`. |
 
-**Total estimate:** 40 points.
+**Total estimate:** 45 points.
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-348 to fix the 1280×640 scaled drag/drop miss surfaced by OPT-347.
+**Next up:** OPT-349 in flight (this branch); OPT-348 still backlog.
 
 ### PR phasing
 
@@ -246,3 +247,12 @@ Copy this block when writing a new handoff:
 - **Evidence:** `docs/project/handoffs/assets/opt-347-drag-1280x640-fail.png`, `docs/project/handoffs/assets/opt-347-drag-1920x1080-control.png`, and `docs/project/handoffs/assets/opt-347-reveal-trigger-1280x640.png`.
 - **Gotchas / do NOT touch:** Do not change min-viewport constants or chrome typography/rings while fixing OPT-348. Focus on dnd-kit collision/hit-testing under the scaled board at the floor; the gate and inside-board legibility floor held.
 - **Unresolved:** Match-end dialog was not reached in sandbox and the live route requires auth/game setup; verify it with OPT-348 or a live-shell QA follow-up once drag is fixed.
+
+### OPT-347 → OPT-349
+**From:** session on 2026-04-30 · **Commit:** `<pending>` · **PR:** _(opened from this branch)_
+
+- **Primer:** Approach A from the OPT-349 ticket. `computeBoardScaling` no longer caps `boardScale` at 1× — at the 1920×1080 design canvas the smaller-axis (height) ratio wins, so the board's intrinsic 888×788 content fills the canvas height (~1.27× scale) instead of rendering at 46% of the design canvas width. `<ScaledBoard>` continues to map 1920×1080 to the actual viewport. `BoardLayout`'s `viewportSize` and `outerScale` props are now required (both shells already supply them via `<Board>`); the dead `getViewportSize()` + window/visualViewport listener fallback inside `BoardLayout` is gone. DragOverlay still multiplies `outerScale × boardScale`.
+- **Read first:** `src/components/game/board-layout/board-geometry.ts` (the `Math.min(1, …)` removal + new docstring on `computeBoardScaling`); `src/components/game/board-layout/board-geometry.test.ts` (smaller-axis-fit assertions at 1280×720 / 1920×1080 / 2560×1440); `src/components/game/board-layout/board-layout.tsx` (props now required, no window-measure fallback); `src/components/game/board/board.tsx` is unchanged — already passed `viewportSize` / `outerScale` from the `<ScaledBoard>` context.
+- **Gotchas / do NOT touch:** (1) **Approach B is out of scope.** The ticket explicitly defers any rewrite of the board's intrinsic `SQUARE` / `CHAR_ROW_GAP` / `ZONE_GAP` / hand constants. The board's natural aspect (888/788 ≈ 1.13) is squarer than 16:9, so a horizontal letterbox remains at the design canvas — accepted by the AC ("aspect-ratio letterbox lives on the wider axis only"). Do not chase "fills the viewport horizontally too" by inflating gaps; that's Approach B and would require rebalancing every zone position constant. File a follow-up if A reveals architectural issues that B would solve. (2) **DragOverlay scale math is load-bearing** — `dragOverlayScale = outerScale × boardScale` is what keeps dragged cards the same on-screen size as on-board cards (OPT-318). Don't simplify it to just `outerScale` even though `boardScale` is now usually >1; the product is what compensates for the body-portaled overlay escaping the `<ScaledBoard>` transform. (3) **`board-scaffold.tsx` (`/sandbox/scaffold`) is intentionally untouched.** It's a static `<Slot>`-based layout reference, not a `<Board>` consumer, and runs its own copy of the old `Math.min(1, …)` math against the window. If the scaffold needs the same fix to better mirror the production board, file separately. (4) **`getViewportSize()` in `board-layout/constants.ts` is still imported by `board-scaffold.tsx`.** Do not delete it as part of this ticket.
+- **Unresolved:** (1) **Manual viewport QA is the remaining AC item.** The ticket's three-viewport check (1280×720, 1920×1080, 2560×1440) plus the dnd-kit DragOverlay sizing check needs a browser session — `pnpm verify` and the new geometry tests confirm the math, but visual confirmation that "board fills the viewport's smaller axis at all three" and that the drag overlay matches on-board card size still wants a real session. (2) **OPT-348 (1280×640 drag/drop miss) is independent and still backlog** — that bug is a dnd-kit collision/hit-test issue under the scaled board, unrelated to the cap removal here. (3) Carry-overs from earlier handoffs still open: R2 variant images appear unmigrated (`/variants/<id>_p1.webp` 404s); `pipeline/migrate-images.ts` writes PNG bytes with `image/webp` content-type; `card-animation-layer.tsx` `FlyingCard` size mismatch at non-1.0 scale. All unrelated to OPT-349.
+- **Why this matters for project close-out:** OPT-349 was the implicit cleanup that every previous handoff (OPT-315, OPT-318, OPT-320, OPT-321) called out as "the natural project close-out — both shells consume `<Board>`, the legacy fallback has no remaining users." With this ticket landed there is one less branch in `BoardLayout`, one less measurement loop, and the actual visible regression (board at 46% width) is gone. Combined with OPT-348's drag/drop fix, the Responsive Game Board project is structurally closed.

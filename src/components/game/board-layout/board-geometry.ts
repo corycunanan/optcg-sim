@@ -38,7 +38,7 @@ export const leaderLeft = zone2Left + (CHAR_ROW_W - SQUARE) / 2;
 export const stgDonWidth = (CHAR_ROW_W - SQUARE - 2 * LEADER_GAP) / 2;
 export const sideCardOffsetX = CARD_OFFSET_X;
 
-/* ── Viewport-dependent scaling ────────────────────────────────────── */
+/* ── Design-canvas fit ─────────────────────────────────────────────── */
 
 export interface BoardScaling {
   boardScale: number;
@@ -46,11 +46,20 @@ export interface BoardScaling {
   playerHandTop: number;
 }
 
+/**
+ * Fits the board's intrinsic content (FIELD_W × BOARD_CONTENT_H plus the two
+ * hand strips) into the design canvas supplied by the surrounding
+ * `<ScaledBoard>`. The smaller-axis ratio wins; `<ScaledBoard>` then maps the
+ * design canvas to the viewport. There is no `Math.min(1, …)` cap — at the
+ * 1920×1080 design canvas the board's intrinsic ~888×788 content is smaller
+ * than the canvas on both axes, so capping at 1× left ~46% horizontal empty
+ * space (OPT-349). Letting the scale grow above 1 fills the smaller axis;
+ * letterbox lives on the wider axis only.
+ */
 export function computeBoardScaling(viewport: { width: number; height: number }): BoardScaling {
   const boardScale = Math.max(
     0,
     Math.min(
-      1,
       viewport.width / FIELD_W,
       (viewport.height -
         PLAYER_HAND_VIEWPORT_MARGIN -
