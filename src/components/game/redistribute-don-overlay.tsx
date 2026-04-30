@@ -3,10 +3,10 @@
 import type { GameAction } from "@shared/game-types";
 import { GameButton } from "./game-button";
 
-/** Inside-scaled-subtree override for `GameButton` (OPT-316). Same rationale
+/** Inside-scaled-subtree override for `GameButton` (OPT-346). Same rationale
  *  as `mid-zone`'s constant — buttons rendered inside the scaled board need
- *  `text-sm`/`ring-3` to stay legible at the 1280×640 floor scale. */
-const IN_BOARD_BTN = "text-sm focus-visible:ring-3";
+ *  `text-base`/`ring-4` to stay legible at the 1280×640 floor scale. */
+const IN_BOARD_BTN = "text-base focus-visible:ring-4";
 
 export interface RedistributeTransfer {
   fromCardInstanceId: string;
@@ -37,13 +37,13 @@ export function RedistributeDonOverlay({
         className="pointer-events-auto flex items-center gap-4 rounded-lg border border-gb-border-strong bg-gb-surface/95 px-4 py-3 shadow-lg backdrop-blur"
       >
         <div className="flex flex-col gap-1 max-w-sm">
-          <span className="text-sm font-semibold uppercase tracking-wider text-gb-text-subtle">
+          <span className="text-base font-semibold uppercase tracking-wider text-gb-text-subtle">
             Redistribute DON
           </span>
-          <span className="text-base text-gb-text leading-snug">
+          <span className="text-lg text-gb-text leading-snug">
             {effectDescription || "Drag DON from your cards to redistribute."}
           </span>
-          <span className="text-sm text-gb-text-dim">
+          <span className="text-base text-gb-text-dim">
             {transfers.length} moved · {remaining} remaining
           </span>
         </div>

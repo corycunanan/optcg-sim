@@ -19,7 +19,7 @@ export function CardDonBadge({
   return (
     <span
       className={cn(
-        "rounded px-1 text-center text-sm font-bold",
+        "rounded px-1 text-center text-base font-bold",
         "bg-gb-board-dark/80 text-gb-text-bright",
         className,
       )}
