@@ -55,7 +55,7 @@ This is the same pattern used by Hearthstone, Legends of Runeterra, TFT, Yu-Gi-O
 | 7 | **Two shells**: `<LiveGameShell>` and `<SandboxShell>` compose shared primitives in `src/components/game/scaled-board/`. Shells inject only `state` and `dispatch` into `<Board>` — they MUST NOT customize board internals. |
 | 8 | ESLint import restriction enforces the shell contract. Visual regression test deferred as tech debt. |
 | 9 | Migration plan **B**: PR 1 (primitives in isolation) → PR 2 (zone CSS audit + both shells together, atomic) → PRs 3–6 (portal audit, drag refactor, asset verification, gate UI + ESLint). Initial render: opacity-zero until first measure, fade-in (respects `prefers-reduced-motion`). |
-| 10 | **Inside-board text floor:** `text-sm` (14px) minimum for labels, `text-base` (16px) minimum for body text. **Chrome text floor:** `text-xs` (12px). At the 1280×640 floor the scale is ~0.59, so inside-board text is accepted as slightly softer until OPT-346 bumps the tokens one step. Reduced-motion respected on fade-in; resize re-scaling always snaps. **Focus rings inside board:** `ring-3` (3px proportional). Text inputs always live in chrome, never inside the scaled board. |
+| 10 | **Inside-board text floor:** `text-base` (16px) minimum for labels, `text-lg` (18px) minimum for body text. **Chrome text floor:** `text-xs` (12px). At the 1280×640 floor the scale is ~0.59, so labels render ~9.5px effective and body text renders ~10.7px effective. Reduced-motion respected on fade-in; resize re-scaling always snaps. **Focus rings inside board:** `ring-4` (4px proportional). Text inputs always live in chrome, never inside the scaled board. |
 
 ### Layout shell
 
@@ -114,7 +114,7 @@ All in `src/components/game/scaled-board/`:
 | Counters and life totals | Popovers (portaled) |
 | Drag indicators and hover states | Toast notifications |
 | Animations (motion.dev inside the board) | Chat sidebar (live shell) |
-| Focus rings (`ring-3` proportional) | Game log / event history (live shell) |
+| Focus rings (`ring-4` proportional) | Game log / event history (live shell) |
 |  | Scenario picker, playback controls (sandbox shell) |
 |  | Debug overlays (sandbox shell) |
 |  | Min-viewport gate UI |
@@ -136,8 +136,8 @@ All in `src/components/game/scaled-board/`:
 
 ### Low
 
-- **Text rasterization at extreme upscale (4K).** Browsers re-rasterize text on transformed layers in most static cases, but heavy upscale of small text can look slightly soft. Mitigated by stricter inside-board text floor (`text-sm`/`text-base`) and `will-change: transform` on the scale wrapper.
-- **Focus ring visibility at minimum viewport.** A 3-design-pixel ring renders as ~1.8px at the 1280×640 floor — visible but tight. Acceptable with the slightly softer inside-board text until OPT-346 raises the floor tokens; revisit if QA flags.
+- **Text rasterization at extreme upscale (4K).** Browsers re-rasterize text on transformed layers in most static cases, but heavy upscale of small text can look slightly soft. Mitigated by stricter inside-board text floor (`text-base`/`text-lg`) and `will-change: transform` on the scale wrapper.
+- **Focus ring visibility at minimum viewport.** A 4-design-pixel ring renders as ~2.4px at the 1280×640 floor, preserving visible focus treatment inside the scaled board. Revisit if OPT-347 QA flags edge cases.
 - **Initial render flash.** Mitigated by opacity-zero until first measure + 150ms fade-in (skip fade if reduced-motion).
 
 ---

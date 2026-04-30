@@ -21,10 +21,10 @@ function formatPower(power: number): string {
 }
 
 /** Inside-scaled-subtree override for the shared `GameButton` primitive
- *  (OPT-316). Lifts the button text to the in-board `text-sm` floor and the
- *  focus ring to `ring-3` so both stay legible at the 1280×640 floor scale.
+ *  (OPT-346). Lifts the button text to the in-board `text-base` floor and the
+ *  focus ring to `ring-4` so both stay legible at the 1280×640 floor scale.
  *  Chrome consumers (modals) keep the primitive's `text-xs`/`ring-2`. */
-const IN_BOARD_BTN = "text-sm focus-visible:ring-3";
+const IN_BOARD_BTN = "text-base focus-visible:ring-4";
 
 const BattleDisplay = React.memo(function BattleDisplay({
   info,
@@ -37,7 +37,7 @@ const BattleDisplay = React.memo(function BattleDisplay({
     <div className="flex items-center gap-3 shrink-0">
       <span
         className={cn(
-          "text-sm uppercase tracking-wider font-bold",
+          "text-base uppercase tracking-wider font-bold",
           info.battleSubPhase === "COUNTER_STEP"
             ? "text-gb-accent-red"
             : info.battleSubPhase === "BLOCK_STEP"
@@ -49,31 +49,31 @@ const BattleDisplay = React.memo(function BattleDisplay({
       </span>
 
       <div className="flex items-center gap-1">
-        <span className="text-sm text-gb-text-subtle truncate max-w-[80px]">
+        <span className="text-base text-gb-text-subtle truncate max-w-[80px]">
           {info.attackerName}
         </span>
-        <span className="text-sm font-bold text-gb-text-bright tabular-nums">
+        <span className="text-base font-bold text-gb-text-bright tabular-nums">
           {formatPower(info.attackerPower)}
         </span>
       </div>
 
-      <span className="text-sm font-bold text-gb-text-dim">VS</span>
+      <span className="text-base font-bold text-gb-text-dim">VS</span>
 
       <div className="flex items-center gap-1">
         <span
           className={cn(
-            "text-sm font-bold tabular-nums",
+            "text-base font-bold tabular-nums",
             boosted ? "text-gb-accent-green" : "text-gb-text-bright",
           )}
         >
           {formatPower(info.defenderPower)}
         </span>
         {boosted && (
-          <span className="text-sm font-bold text-gb-accent-green/70 tabular-nums">
+          <span className="text-base font-bold text-gb-accent-green/70 tabular-nums">
             +{formatPower(info.counterPowerAdded)}
           </span>
         )}
-        <span className="text-sm text-gb-text-subtle truncate max-w-[80px]">
+        <span className="text-base text-gb-text-subtle truncate max-w-[80px]">
           {info.defenderName}
         </span>
       </div>
@@ -139,7 +139,7 @@ export const MidZone = React.memo(function MidZone({
       {/* Hidden modal prompt indicator */}
       {activePrompt && isPromptHidden && (
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm text-gb-accent-amber font-bold">
+          <span className="text-base text-gb-accent-amber font-bold">
             &#x26A1; ACTION REQUIRED
           </span>
           <GameButton variant="green" size="sm" className={IN_BOARD_BTN} onClick={onShowPrompt ?? (() => {})}>
@@ -151,7 +151,7 @@ export const MidZone = React.memo(function MidZone({
       {/* Active prompt (suppressed when blockerMode or modal handles the UI) */}
       {activePrompt && !blockerMode && !isPromptHidden && (
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm text-gb-accent-amber font-bold">
+          <span className="text-base text-gb-accent-amber font-bold">
             &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
           </span>
           {activePrompt.promptType === "REVEAL_TRIGGER" &&
