@@ -1,6 +1,5 @@
 import {
   SQUARE,
-  HAND_CARD_W,
   HAND_CARD_H,
   MID_ZONE_H,
   CHAR_ROW_GAP,
@@ -13,7 +12,6 @@ import {
   BOARD_CONTENT_H,
   MIN_HAND_BOARD_GAP,
   PLAYER_HAND_VIEWPORT_MARGIN,
-  BOARD_CARD_W,
   CARD_OFFSET_X,
 } from "./constants";
 
@@ -38,7 +36,7 @@ export const leaderLeft = zone2Left + (CHAR_ROW_W - SQUARE) / 2;
 export const stgDonWidth = (CHAR_ROW_W - SQUARE - 2 * LEADER_GAP) / 2;
 export const sideCardOffsetX = CARD_OFFSET_X;
 
-/* ── Viewport-dependent scaling ────────────────────────────────────── */
+/* ── Design-canvas scaling ─────────────────────────────────────────── */
 
 export interface BoardScaling {
   boardScale: number;
@@ -50,7 +48,6 @@ export function computeBoardScaling(viewport: { width: number; height: number })
   const boardScale = Math.max(
     0,
     Math.min(
-      1,
       viewport.width / FIELD_W,
       (viewport.height -
         PLAYER_HAND_VIEWPORT_MARGIN -

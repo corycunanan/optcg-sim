@@ -237,6 +237,8 @@ describe("buildEngineSessionGame", () => {
       onLeave: () => {},
       matchClosed: game.matchClosed,
       canUndo: game.canUndo,
+      viewportSize: { width: 1920, height: 1080 },
+      outerScale: 1,
     };
     for (const [key, value] of Object.entries(props)) {
       expect(value, `BoardLayoutProps.${key}`).not.toBeUndefined();

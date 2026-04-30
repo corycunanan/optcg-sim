@@ -198,6 +198,8 @@ describe("buildSandboxSession", () => {
       onLeave: () => session.navigation.handleBackToLobbies(),
       matchClosed: session.game.matchClosed,
       canUndo: session.game.canUndo,
+      viewportSize: { width: 1920, height: 1080 },
+      outerScale: 1,
     };
     for (const [key, value] of Object.entries(props)) {
       expect(value, `BoardLayoutProps.${key}`).not.toBeUndefined();

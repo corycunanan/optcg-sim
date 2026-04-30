@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type {
   ActiveEffect,
   CardDb,
@@ -21,7 +21,6 @@ import {
   HAND_CARD_H,
   FIELD_W,
   BOARD_CONTENT_H,
-  getViewportSize,
 } from "./constants";
 import { midTop, computeBoardScaling } from "./board-geometry";
 import { useBoardDnd } from "./use-board-dnd";
@@ -66,18 +65,16 @@ export interface BoardLayoutProps {
    *  `"spectator"` and `"responseOnly"` are sandbox-only modes (OPT-290) that
    *  disable drag and right-click menus while leaving prompt modals usable. */
   interactionMode?: InteractionMode;
-  /** When provided, BoardLayout authors against this design canvas instead of
-   *  measuring the window. Set by `<Board>` to the parent `<ScaledBoard>`'s
-   *  designWidth/designHeight so the inner board sizes against design pixels
-   *  while `<ScaledBoard>` owns the viewport-fit transform. */
-  viewportSize?: { width: number; height: number };
+  /** The design canvas supplied by `<Board>` from `<ScaledBoard>`.
+   *  BoardLayout fits its intrinsic board composition within these design
+   *  pixels while `<ScaledBoard>` owns the viewport-fit transform. */
+  viewportSize: { width: number; height: number };
   /** Scale factor applied by an ancestor transform (e.g. `<ScaledBoard>`).
    *  The dnd-kit `<DragOverlay>` portals to `document.body`, escaping that
    *  ancestor transform — so to render dragged cards at the same on-screen
    *  size as on-board cards, the overlay multiplies its inner `boardScale`
-   *  by this value. Defaults to `1` for the legacy path where BoardLayout
-   *  sits directly under the window. */
-  outerScale?: number;
+   *  by this value. */
+  outerScale: number;
 }
 
 export function BoardLayout(props: BoardLayoutProps) {
@@ -110,12 +107,11 @@ function BoardLayoutInner({
   canUndo,
   interactionMode = "full",
   viewportSize,
-  outerScale = 1,
+  outerScale,
 }: BoardLayoutProps & { interactionMode?: InteractionMode }) {
   const dndDisabled = interactionMode !== "full";
   const zoneRegistry = useZonePosition();
-  const [windowViewport, setWindowViewport] = useState(getViewportSize);
-  const viewport = viewportSize ?? windowViewport;
+  const viewport = viewportSize;
   const promptType = activePrompt?.promptType ?? null;
   const [hiddenPromptType, setHiddenPromptType] = useState<string | null>(null);
   const isPromptHidden = hiddenPromptType === promptType;
@@ -205,20 +201,6 @@ function BoardLayoutInner({
     return map;
   }, [redistributePrompt, redistributeTransfers]);
 
-  useLayoutEffect(() => {
-    if (viewportSize) return;
-    function update() {
-      setWindowViewport(getViewportSize());
-    }
-    update();
-    window.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("resize", update);
-    };
-  }, [viewportSize]);
-
   /* ── Derived state from extracted hooks ───────────────────────────── */
 
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
@@ -227,10 +209,7 @@ function BoardLayoutInner({
   // any ancestor `<ScaledBoard>` transform. To render dragged cards at the
   // same on-screen size as cards already on the board, the overlay must
   // recreate the user's perceived scale: the inner `boardScale` (BoardLayout's
-  // own zone-wrapper transform) times the outer ScaledBoard scale. Inside a
-  // `<ScaledBoard>` `boardScale === 1` (viewport matches design canvas), so
-  // the product collapses to `outerScale`; on the legacy window-fit path
-  // `outerScale === 1` and the product collapses to `boardScale`.
+  // own zone-wrapper transform) times the outer ScaledBoard scale.
   const dragOverlayScale = outerScale * boardScale;
 
   const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
