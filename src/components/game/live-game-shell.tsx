@@ -42,7 +42,7 @@ export interface LiveGameShellProps {
 
 export function LiveGameShell(props: LiveGameShellProps) {
   // Gate at the wrapper level so `useGameSession` (which opens a websocket)
-  // doesn't run for users below the 1280×720 desktop floor.
+  // doesn't run for users below the 1280×640 desktop floor.
   return (
     <MinViewportGate>
       <LiveGameShellContent {...props} />

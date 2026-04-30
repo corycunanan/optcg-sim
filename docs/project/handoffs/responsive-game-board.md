@@ -1,7 +1,7 @@
 ---
 linear-project: Responsive Game Board
 linear-project-url: https://linear.app/optcg-sim/project/responsive-game-board-e42dfec537cc
-last-updated: 2026-04-28 (OPT-308 + OPT-309 + OPT-310 + OPT-311 + OPT-313 + OPT-314 + OPT-315 + OPT-316 + OPT-317 + OPT-319 + OPT-325 merged; OPT-312 + OPT-318 + OPT-320 + OPT-321 in review)
+last-updated: 2026-04-30 (OPT-345 in review; OPT-346 + OPT-347 added for 1280×640 floor follow-through)
 ---
 
 # Responsive Game Board — Handoff Doc
@@ -31,12 +31,15 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 13 | [OPT-318](https://linear.app/optcg-sim/issue/OPT-318) | Migrate hand-to-board (and other) drag interactions to `useScaledDrag` | 3 | OPT-311, OPT-314, OPT-315 | In Review | [#166](https://github.com/corycunanan/optcg-sim/pull/166) | Audit found zero `motion.div drag={}` callsites — all drag is dnd-kit, whose pointer math is naturally scale-correct. Real fix was the DragOverlay rendering size: thread `outerScale` from `<Board>` so the overlay applies `outerScale × boardScale`. Manual QA at 1280×720 / 1920×1080 / 2560×1440 still pending. |
 | 14 | [OPT-320](https://linear.app/optcg-sim/issue/OPT-320) | Min-viewport gate UI: "use a larger screen" below 1280×720 | 1 | OPT-314, OPT-315 | In Review | [#167](https://github.com/corycunanan/optcg-sim/pull/167) | Game routes only (live + sandbox). `<MinViewportGate>` wraps both shells; on live the gate sits above `useGameSession` so small viewports don't open a websocket. |
 | 15 | [OPT-321](https://linear.app/optcg-sim/issue/OPT-321) | ESLint rule: enforce shell-injects-state-only contract | 2 | OPT-314, OPT-315 | In Review | [#169](https://github.com/corycunanan/optcg-sim/pull/169) | `@typescript-eslint/no-restricted-imports` scoped to page files, shells, and live-only chrome. `<Board>` is the only authorized consumer of `board-layout/*`. Type-only imports allowed (`allowTypeImports: true`). Contract documented in `src/components/game/scaled-board/README.md`. |
+| 16 | [OPT-345](https://linear.app/optcg-sim/issue/OPT-345) | Lower min-viewport floor to 1280×640 to support 13" MacBook Air | 1 | — | In Review | [#193](https://github.com/corycunanan/optcg-sim/pull/193) | Width floor stays 1280; height gate drops to 640. Docs explicitly accept softer inside-board text at the new ~0.59 floor until OPT-346 lands. |
+| 17 | [OPT-346](https://linear.app/optcg-sim/issue/OPT-346) | Bump inside-board legibility floor one step for the 1280×640 viewport | 2 | OPT-345 | Backlog | — | Promote inside-board labels/body/focus rings one step (`text-base` / `text-lg` / `ring-4`) while keeping chrome at `text-xs` / `ring-2`. |
+| 18 | [OPT-347](https://linear.app/optcg-sim/issue/OPT-347) | QA pass: solitaire walkthrough at 1280×640 floor | 1 | OPT-345, OPT-346 | Backlog | — | Manual smoke at exactly 1280×640 plus failure boundaries 1280×639 and 1279×640; includes overlays, tooltips, drag, and match end. |
 
-**Total estimate:** 35 points.
+**Total estimate:** 39 points.
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** Action Plan complete — once PRs #163, #166, #167, #169 merge, all 15 tickets are Done. The only remaining work is the implicit follow-up (`BoardLayout`'s `viewportSize` + `outerScale` cleanup, see Deferred / tech debt) which has not been ticketed.
+**Next up:** OPT-346 once PR #193 lands, then OPT-347 after both OPT-345 and OPT-346 are merged.
 
 ### PR phasing
 
@@ -215,3 +218,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** (1) **Don't widen scope to all of `src/components/game/**`** — the flat zone-internal modals (`select-target-modal.tsx`, `optional-effect-modal.tsx`, `card-action-menu.tsx`, `redistribute-don-overlay.tsx`, `use-card-tooltip.tsx`, etc.) live there and are consumed by `board-layout/board-modals.tsx` / `field-card.tsx` / `drop-zones.tsx`. They're zone internals, not chrome — they need to import from board-layout. The current allowlist of explicit chrome filenames is intentional. (2) **`allowTypeImports: true` is load-bearing** — `scenario-input-gate.tsx` imports `InteractionMode` as a type, and the sandbox tests import `BoardLayoutProps` as a type. Removing it breaks existing files. If you need to ban types too, hoist `InteractionMode` to a non-restricted location first. (3) **Story files are not in scope today** — `src/components/game/scaled-board/__stories__/` doesn't import from `board-layout/`; if a future Storybook entry for `<Board>` is added inside the rule's scope, the story will need to live outside the glob (e.g., under a story-specific path) or use `import type` only.
 - **Unresolved:** (1) **`BoardLayout` `viewportSize` + `outerScale` cleanup** is now the project's only remaining surface — both shells consume `<Board>`, the legacy `getViewportSize()` window-fallback inside `BoardLayout` has no consumers, and the props can be promoted from opt-in to required. Not yet ticketed; file as a chore once PRs #163, #166, #167, #169 all merge. (2) Carry-overs unrelated to this ticket: R2 variant images unmigrated (`/variants/<id>_p1.webp` 404s); `pipeline/migrate-images.ts` writes PNG bytes with `image/webp` content-type; `card-animation-layer.tsx` `FlyingCard` size mismatch at non-1.0 scale. (3) Manual QA wasn't walked this session (config-only change; the lint rule itself was smoke-tested both directions in the session — value-import errors, type-only passes — and `pnpm type-check` + `pnpm lint` + 211/211 tests all pass).
 - **Why this matters for project close-out:** OPT-321 was the final row in the Action Plan. Once #169 merges (alongside the other in-review PRs), every ticket OPT-308 through OPT-321 is Done. The lint rule is the structural backstop preventing future regressions of the shell contract; the visual regression test stays deferred per the action plan and is only worth building if drift recurs despite the lint. The natural follow-up chore is the `viewportSize`/`outerScale` cleanup noted above — it's unrelated to the responsive-board scope but has been queued by every handoff in this project.
+
+### OPT-345 → OPT-346
+**From:** session on 2026-04-30 · **Commit:** `b0b4363` · **PR:** [#193](https://github.com/corycunanan/optcg-sim/pull/193)
+
+- **Primer:** The min-viewport gate now accepts 1280×640 while preserving the 1280px width floor. User-facing gate copy, gate tests, and the responsive-board docs all reference the new ~0.59 floor and explicitly defer the legibility recovery to OPT-346.
+- **Read first:** `src/components/game/scaled-board/meets-min-viewport.ts`, `src/components/game/scaled-board/meets-min-viewport.test.ts`, `docs/design/BRANDING-GUIDELINES.md` §13, `docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md` decisions #5/#10.
+- **Gotchas / do NOT touch:** Chrome stays outside the scaled subtree and remains `text-xs` / `ring-2`; OPT-346 should only touch inside-board UI rendered within `<ScaledBoard>` / `BoardLayout`. The 1280×720 Storybook frames and compute-scale tests are still valid scale examples, not the gate floor.
+- **Unresolved:** Manual QA is deferred to OPT-347. OPT-345 intentionally leaves inside-board labels/body/focus rings at their current values even though they are softer at 0.593×.
+- **Why this matters for OPT-346:** OPT-346 is the paired legibility bump: promote inside-board labels/body/focus rings to `text-base` / `text-lg` / `ring-4`, then update the same docs from "accepted until OPT-346" to the final 1280×640 floor math.

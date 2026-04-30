@@ -241,7 +241,7 @@ Following Riftbound's 3-breakpoint responsive reduction:
 2. Display italic is reserved for **featured callouts, pull-quotes, and hero subtitles** — never for regular section headers
 3. Body text max line-length: 65-75 characters (`max-w-prose` or `max-w-[65ch]`)
 4. Minimum font size: 12px (`text-xs`). Never use `text-[10px]` or `text-[11px]`.
-   - **Inside-board exception (OPT-316):** the scaled game-board subtree renders at scale `0.67` at the 1280×720 floor viewport, which collapses chrome's 12px floor to ~8px effective. Inside any element rendered within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-sm` (14px)** for labels/counters/badges and **`text-base` (16px)** for body / paragraph text. Chrome (navbar, modals, tooltips, popovers, side panels) keeps the 12px floor unchanged. See §13 for the full inside-board override set.
+   - **Inside-board exception (OPT-316):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside any element rendered within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-sm` (14px)** for labels/counters/badges and **`text-base` (16px)** for body / paragraph text. Chrome (navbar, modals, tooltips, popovers, side panels) keeps the 12px floor unchanged. Text at the new floor is accepted as slightly softer until OPT-346 raises the inside-board tokens one step. See §13 for the full inside-board override set.
 5. Use `font-display: swap` for web font loading
 6. Use `tabular-nums` for any numeric data (costs, power, life counts)
 
@@ -654,7 +654,7 @@ import { useReducedMotion } from "motion/react";
 |-------------|----------|----------------|
 | Text contrast | 4.5:1 minimum | All token pairings pre-validated |
 | Large text contrast | 3:1 minimum | Display text on all surface variants |
-| Focus visible | 2px solid ring (chrome); **3px ring inside `<ScaledBoard>`** (OPT-316) | `--border-focus` (navy-900), 2px offset; in-board uses `ring-3` so the focus indicator still renders ~2px at floor scale |
+| Focus visible | 2px solid ring (chrome); **3px ring inside `<ScaledBoard>`** (OPT-316) | `--border-focus` (navy-900), 2px offset; in-board uses `ring-3` so the focus indicator still renders ~1.8px at the 1280×640 floor scale |
 | Touch targets | 44x44px minimum | All interactive elements |
 | Keyboard navigation | Full tab support | Logical tab order, visible focus |
 | Screen reader | Semantic HTML | ARIA labels, roles, live regions |
@@ -733,15 +733,15 @@ This ensures that swapping the `--gb-*` token set (e.g., a light beach theme, a 
 
 ### Inside-Board Floor Overrides (Responsive Game Board, OPT-316)
 
-The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×720 minimum viewport the scale floor is ~0.67, which compresses chrome's 12px text into ~8px effective and a 2px focus ring into ~1.34px — both below the legibility floor.
+The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×640 minimum viewport the scale floor is ~0.59, which compresses chrome's 12px text into ~7px effective and a 2px focus ring into ~1.2px — both below the legibility floor. The softer inside-board text at this lower floor is an explicit tradeoff for 13" MacBook Air support; OPT-346 raises the inside-board tokens one step.
 
 Inside the scaled subtree only — anything that renders within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers (zones, on-board cards, in-board CTAs, on-board overlays such as the DON redistribute bar) — apply these overrides:
 
 | Element | Chrome floor | Inside-board floor | Rationale |
 |---------|--------------|--------------------|-----------|
-| Labels, counters, badges | `text-xs` (12px) | **`text-sm` (14px)** | ~9.4px effective at floor scale |
-| Body / paragraph text | `text-xs` (12px) | **`text-base` (16px)** | ~10.7px effective at floor scale |
-| Focus rings | `ring-2` (2px) | **`ring-3` (3px)** | ~2px effective at floor scale |
+| Labels, counters, badges | `text-xs` (12px) | **`text-sm` (14px)** | ~8.3px effective at floor scale; accepted until OPT-346 |
+| Body / paragraph text | `text-xs` (12px) | **`text-base` (16px)** | ~9.5px effective at floor scale; accepted until OPT-346 |
+| Focus rings | `ring-2` (2px) | **`ring-3` (3px)** | ~1.8px effective at floor scale |
 
 **What stays as chrome (12px / `ring-2`):**
 
