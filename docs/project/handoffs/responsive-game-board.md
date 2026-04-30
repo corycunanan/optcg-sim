@@ -1,7 +1,7 @@
 ---
 linear-project: Responsive Game Board
 linear-project-url: https://linear.app/optcg-sim/project/responsive-game-board-e42dfec537cc
-last-updated: 2026-04-30 (OPT-347 in review; OPT-348 filed)
+last-updated: 2026-04-30 (OPT-349 in review; OPT-348 ready)
 ---
 
 # Responsive Game Board — Handoff Doc
@@ -33,10 +33,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 15 | [OPT-321](https://linear.app/optcg-sim/issue/OPT-321) | ESLint rule: enforce shell-injects-state-only contract | 2 | OPT-314, OPT-315 | In Review | [#169](https://github.com/corycunanan/optcg-sim/pull/169) | `@typescript-eslint/no-restricted-imports` scoped to page files, shells, and live-only chrome. `<Board>` is the only authorized consumer of `board-layout/*`. Type-only imports allowed (`allowTypeImports: true`). Contract documented in `src/components/game/scaled-board/README.md`. |
 | 16 | [OPT-345](https://linear.app/optcg-sim/issue/OPT-345) | Lower min-viewport floor to 1280×640 to support 13" MacBook Air | 1 | — | In Review | [#193](https://github.com/corycunanan/optcg-sim/pull/193) | Width floor stays 1280; height gate drops to 640. Docs explicitly accept softer inside-board text at the new ~0.59 floor until OPT-346 lands. |
 | 17 | [OPT-346](https://linear.app/optcg-sim/issue/OPT-346) | Bump inside-board legibility floor one step for the 1280×640 viewport | 2 | OPT-345 | In Review | [#194](https://github.com/corycunanan/optcg-sim/pull/194) | Promotes inside-board labels/body/focus rings one step (`text-base` / `text-lg` / `ring-4`) while keeping chrome at `text-xs` / `ring-2`. |
-| 18 | [OPT-347](https://linear.app/optcg-sim/issue/OPT-347) | QA pass: solitaire walkthrough at 1280×640 floor | 1 | OPT-345, OPT-346 | In Review | [#195](https://github.com/corycunanan/optcg-sim/pull/195) | QA found a scaled dnd-kit droppable miss at 1280×640; follow-up filed as OPT-348 with screenshots. Gate/layout/prompt checks passed. |
+| 18 | [OPT-347](https://linear.app/optcg-sim/issue/OPT-347) | QA pass: solitaire walkthrough at 1280×640 floor | 1 | OPT-345, OPT-346 | Done | [#195](https://github.com/corycunanan/optcg-sim/pull/195) | QA found a scaled dnd-kit droppable miss at 1280×640; follow-up filed as OPT-348 with screenshots. Gate/layout/prompt checks passed. |
 | 19 | [OPT-348](https://linear.app/optcg-sim/issue/OPT-348) | Fix scaled-board dnd-kit droppable hit testing at 1280×640 | 1 | OPT-347 | Backlog | — | At `/sandbox/play-character` 1280×640, hand-card drag starts but drop over lower C1 does not resolve over `char-slot-0`; same normalized path works at 1920×1080. |
+| 20 | [OPT-349](https://linear.app/optcg-sim/issue/OPT-349) | Board doesn't fill viewport: collapse legacy `computeBoardScaling` into `<ScaledBoard>` | 5 | OPT-314, OPT-315, OPT-318 | In Review | [#196](https://github.com/corycunanan/optcg-sim/pull/196) | Removed the 1× inner cap and made `BoardLayout` consume the design canvas + outer scale as required props from `<Board>`. Manual desktop viewport QA still needs a resizable browser pass. |
 
-**Total estimate:** 40 points.
+**Total estimate:** 45 points.
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
@@ -246,3 +247,12 @@ Copy this block when writing a new handoff:
 - **Evidence:** `docs/project/handoffs/assets/opt-347-drag-1280x640-fail.png`, `docs/project/handoffs/assets/opt-347-drag-1920x1080-control.png`, and `docs/project/handoffs/assets/opt-347-reveal-trigger-1280x640.png`.
 - **Gotchas / do NOT touch:** Do not change min-viewport constants or chrome typography/rings while fixing OPT-348. Focus on dnd-kit collision/hit-testing under the scaled board at the floor; the gate and inside-board legibility floor held.
 - **Unresolved:** Match-end dialog was not reached in sandbox and the live route requires auth/game setup; verify it with OPT-348 or a live-shell QA follow-up once drag is fixed.
+
+### OPT-349 → OPT-348
+**From:** session on 2026-04-30 · **Commit:** `73aaf53` · **PR:** [#196](https://github.com/corycunanan/optcg-sim/pull/196)
+
+- **Primer:** `BoardLayout` now fits its intrinsic board stack inside the 1920×1080 design canvas instead of capping at 1×, and the dead window-measure fallback is gone; `<Board>` remains the only runtime consumer and passes both the design canvas and outer scale.
+- **Read first:** `src/components/game/board-layout/board-geometry.ts`, `src/components/game/board-layout/board-layout.tsx`, `src/components/game/board/board.tsx`, and `src/components/game/board-layout/use-board-dnd.ts`.
+- **Gotchas / do NOT touch:** Keep `dragOverlayScale = outerScale * boardScale`; the overlay portals outside `<ScaledBoard>` and still needs the composed perceived scale. OPT-348 should focus on dnd-kit hit-testing at the 1280×640 floor, not on constants, min-viewport gates, or chrome typography.
+- **Unresolved:** Manual desktop viewport QA for OPT-349 is still listed in PR #196 because the in-app browser could not be resized during this session; `pnpm verify` passed and the small browser viewport correctly showed the 1280×640 gate.
+- **Why this matters for OPT-348:** The board is now larger inside the same scaled canvas, so OPT-348 should verify droppable rect math against the current post-OPT-349 geometry at 1280×640 before changing collision logic.
