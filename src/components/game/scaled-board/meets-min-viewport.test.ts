@@ -6,8 +6,9 @@ import {
 } from "./meets-min-viewport";
 
 describe("meetsMinViewport", () => {
-  it("returns true at exactly the 1280x720 floor (inclusive)", () => {
+  it("returns true at exactly the 1280x640 floor (inclusive)", () => {
     expect(meetsMinViewport(MIN_VIEWPORT_WIDTH, MIN_VIEWPORT_HEIGHT)).toBe(true);
+    expect(meetsMinViewport(1280, 640)).toBe(true);
   });
 
   it("returns false one pixel below the width floor", () => {
@@ -20,6 +21,7 @@ describe("meetsMinViewport", () => {
     expect(
       meetsMinViewport(MIN_VIEWPORT_WIDTH, MIN_VIEWPORT_HEIGHT - 1),
     ).toBe(false);
+    expect(meetsMinViewport(1280, 639)).toBe(false);
   });
 
   it("returns true above the floor on both axes", () => {

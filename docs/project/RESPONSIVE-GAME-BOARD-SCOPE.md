@@ -15,7 +15,7 @@ handoff-doc: docs/project/handoffs/responsive-game-board.md
 
 ## Summary
 
-Make the game board fully responsive across desktop viewports (1280×720 and up) using a fixed-composition + uniform-scale approach. The board is authored once at a fixed design resolution (1920×1080) and rendered through a `<ScaledBoard>` wrapper that measures the viewport, computes a single scale factor, and applies a CSS `transform: scale()` to the whole composition. Every zone, card, on-board UI element, and animation scales together — there is no per-zone responsive logic. Chrome (navbar, tooltips, modals, side panels, sandbox controls) lives outside the scaled subtree and stays at fixed pixel sizes.
+Make the game board fully responsive across desktop viewports (1280×640 and up) using a fixed-composition + uniform-scale approach. The board is authored once at a fixed design resolution (1920×1080) and rendered through a `<ScaledBoard>` wrapper that measures the viewport, computes a single scale factor, and applies a CSS `transform: scale()` to the whole composition. Every zone, card, on-board UI element, and animation scales together — there is no per-zone responsive logic. Chrome (navbar, tooltips, modals, side panels, sandbox controls) lives outside the scaled subtree and stays at fixed pixel sizes.
 
 This is the same pattern used by Hearthstone, Legends of Runeterra, TFT, Yu-Gi-Oh! Master Duel, and Pokémon TCG Live — translated from Unity's `CanvasScaler` to CSS/React.
 
@@ -32,7 +32,7 @@ This is the same pattern used by Hearthstone, Legends of Runeterra, TFT, Yu-Gi-O
 
 ## Non-goals (v1)
 
-- Tablet support — gated with a "use a larger screen" message below 1280×720. Future work.
+- Tablet support — gated with a "use a larger screen" message below 1280×640. Future work.
 - Mobile support — gated. Future work.
 - Cross-boundary animations (e.g., card flying from board into a portaled modal). Out of scope; YAGNI until concrete need.
 - Layout reflow at narrow viewports (no zone re-arrangement). The composition is fixed; only the scale changes.
@@ -47,15 +47,15 @@ This is the same pattern used by Hearthstone, Legends of Runeterra, TFT, Yu-Gi-O
 | # | Decision |
 |---|---|
 | 1 | Design resolution: **1920×1080**, 16:9 |
-| 2 | Board aspect: **16:9 commit**. Letterbox anything narrower (industry standard — same as Hearthstone, LoR, Master Duel) |
+| 2 | Board aspect: **16:9 commit**. Letterbox anything narrower; the supported width floor stays **1280px** while the height floor drops to **640px** for small desktop browser chrome (industry standard — same as Hearthstone, LoR, Master Duel). |
 | 3 | **Inside scaled subtree:** board zones + on-board UI (life, don, end-turn, action prompts, counters). **Outside:** navbar, side panels, modals, tooltips, popovers, sandbox controls, toast notifications. Side panels overlay the letterbox area; they do not push the board inward. |
 | 4 | Animations stay inside the scaled subtree. Project-wide `useScaledDrag` hook for any drag interaction. Cross-boundary animations explicitly deferred. |
-| 5 | **Min viewport floor: 1280×720.** Below the floor → "use a larger screen" gate. Browser zoom: accept default behavior (chrome scales with zoom; board stays fitted). |
+| 5 | **Min viewport floor: 1280×640.** Below the floor → "use a larger screen" gate. Browser zoom: accept default behavior (chrome scales with zoom; board stays fitted). |
 | 6 | Card images served at **2x design size** for crisp 4K rendering. Source asset resolution must be ≥ 2x design size — verified before commit. |
 | 7 | **Two shells**: `<LiveGameShell>` and `<SandboxShell>` compose shared primitives in `src/components/game/scaled-board/`. Shells inject only `state` and `dispatch` into `<Board>` — they MUST NOT customize board internals. |
 | 8 | ESLint import restriction enforces the shell contract. Visual regression test deferred as tech debt. |
 | 9 | Migration plan **B**: PR 1 (primitives in isolation) → PR 2 (zone CSS audit + both shells together, atomic) → PRs 3–6 (portal audit, drag refactor, asset verification, gate UI + ESLint). Initial render: opacity-zero until first measure, fade-in (respects `prefers-reduced-motion`). |
-| 10 | **Inside-board text floor:** `text-sm` (14px) minimum for labels, `text-base` (16px) minimum for body text. **Chrome text floor:** `text-xs` (12px). Reduced-motion respected on fade-in; resize re-scaling always snaps. **Focus rings inside board:** `ring-3` (3px proportional). Text inputs always live in chrome, never inside the scaled board. |
+| 10 | **Inside-board text floor:** `text-sm` (14px) minimum for labels, `text-base` (16px) minimum for body text. **Chrome text floor:** `text-xs` (12px). At the 1280×640 floor the scale is ~0.59, so inside-board text is accepted as slightly softer until OPT-346 bumps the tokens one step. Reduced-motion respected on fade-in; resize re-scaling always snaps. **Focus rings inside board:** `ring-3` (3px proportional). Text inputs always live in chrome, never inside the scaled board. |
 
 ### Layout shell
 
@@ -137,7 +137,7 @@ All in `src/components/game/scaled-board/`:
 ### Low
 
 - **Text rasterization at extreme upscale (4K).** Browsers re-rasterize text on transformed layers in most static cases, but heavy upscale of small text can look slightly soft. Mitigated by stricter inside-board text floor (`text-sm`/`text-base`) and `will-change: transform` on the scale wrapper.
-- **Focus ring visibility at minimum viewport.** A 3-design-pixel ring renders as 2px at the floor — visible but tight. Acceptable; revisit if QA flags.
+- **Focus ring visibility at minimum viewport.** A 3-design-pixel ring renders as ~1.8px at the 1280×640 floor — visible but tight. Acceptable with the slightly softer inside-board text until OPT-346 raises the floor tokens; revisit if QA flags.
 - **Initial render flash.** Mitigated by opacity-zero until first measure + 150ms fade-in (skip fade if reduced-motion).
 
 ---

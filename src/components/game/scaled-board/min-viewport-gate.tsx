@@ -35,7 +35,7 @@ function MinViewportMessage() {
           OPTCG Sim is designed for desktop.
         </h1>
         <p className="text-sm text-gb-text leading-relaxed">
-          Please use a larger screen &mdash; at least 1280&times;720 &mdash; to
+          Please use a larger screen &mdash; at least 1280&times;640 &mdash; to
           play.
         </p>
         <p className="text-sm text-gb-text-subtle leading-relaxed">

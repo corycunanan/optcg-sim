@@ -22,7 +22,7 @@ function formatPower(power: number): string {
 
 /** Inside-scaled-subtree override for the shared `GameButton` primitive
  *  (OPT-316). Lifts the button text to the in-board `text-sm` floor and the
- *  focus ring to `ring-3` so both stay legible at the 1280×720 floor scale.
+ *  focus ring to `ring-3` so both stay legible at the 1280×640 floor scale.
  *  Chrome consumers (modals) keep the primitive's `text-xs`/`ring-2`. */
 const IN_BOARD_BTN = "text-sm focus-visible:ring-3";
 

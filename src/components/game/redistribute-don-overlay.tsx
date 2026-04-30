@@ -5,7 +5,7 @@ import { GameButton } from "./game-button";
 
 /** Inside-scaled-subtree override for `GameButton` (OPT-316). Same rationale
  *  as `mid-zone`'s constant — buttons rendered inside the scaled board need
- *  `text-sm`/`ring-3` to stay legible at the 1280×720 floor scale. */
+ *  `text-sm`/`ring-3` to stay legible at the 1280×640 floor scale. */
 const IN_BOARD_BTN = "text-sm focus-visible:ring-3";
 
 export interface RedistributeTransfer {
