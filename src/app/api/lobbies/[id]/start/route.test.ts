@@ -285,6 +285,25 @@ describe("POST /api/lobbies/[id]/start", () => {
     });
   });
 
+  it("rolls back GameSession and lobby status when worker init cannot connect", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }));
+
+    const res = await POST(buildRequest(), params);
+
+    expect(res.status).toBe(502);
+    expect(transactionMock).toHaveBeenNthCalledWith(2, [
+      { query: "delete-game" },
+      { query: "update-lobby" },
+    ]);
+    expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+    expect(lobbyUpdateMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1" },
+      data: { status: "READY" },
+    });
+  });
+
   it("rejects PVComputer start attempts until implemented", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({ mode: "PVCOMPUTER" }));
 

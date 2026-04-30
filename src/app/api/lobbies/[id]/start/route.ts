@@ -153,14 +153,27 @@ export async function POST(
       },
     });
 
-    const workerRes = await fetch(`${GAME_WORKER_URL}/game/${startResult.gameSession.id}/init`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GAME_WORKER_SECRET}`,
-      },
-      body: JSON.stringify(payload),
-    });
+    let workerRes: Response;
+    try {
+      workerRes = await fetch(`${GAME_WORKER_URL}/game/${startResult.gameSession.id}/init`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GAME_WORKER_SECRET}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.error("Worker init request failed:", error);
+      await prisma.$transaction([
+        prisma.gameSession.delete({ where: { id: startResult.gameSession.id } }),
+        prisma.lobby.update({
+          where: { id: lobby.id },
+          data: { status: lobby.status },
+        }),
+      ]).catch((e) => console.error("Rollback failed:", e));
+      return apiError("Failed to initialize game server", 502);
+    }
 
     if (!workerRes.ok) {
       const workerErr = await workerRes.text().catch(() => "unknown");

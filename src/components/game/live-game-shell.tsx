@@ -59,6 +59,29 @@ function LiveGameShellContent({ gameId, workerUrl, playerIndex }: LiveGameShellP
   const [devPrompt, setDevPrompt] = useState<PromptOptions | null>(null);
   const activePrompt = devPrompt ?? game.activePrompt;
 
+  if (navigation.remoteGameNotFound) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gb-board px-4">
+        <div className="flex max-w-md flex-col items-center gap-4 text-center">
+          <div className="font-bold text-lg text-gb-text-bright">
+            Game not found
+          </div>
+          <div className="text-sm leading-relaxed text-gb-text">
+            This game is no longer available. It may have been cleaned up after
+            a failed local start attempt.
+          </div>
+          <GameButton
+            variant="primary"
+            size="sm"
+            onClick={navigation.handleBackToLobbies}
+          >
+            Back to Lobbies
+          </GameButton>
+        </div>
+      </div>
+    );
+  }
+
   if (!game.gameState || !game.cardDbReady) {
     if (game.connectivityFailed) {
       return (
