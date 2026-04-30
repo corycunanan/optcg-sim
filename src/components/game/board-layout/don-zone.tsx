@@ -9,12 +9,14 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { cardEntry } from "@/lib/motion";
 import { Card } from "../card";
-import { type ActiveDonDrag } from "./constants";
+import {
+  DON_ACTIVE_OVERLAP,
+  DON_CARD_H,
+  DON_CARD_W,
+  DON_RESTED_OVERLAP,
+  type ActiveDonDrag,
+} from "./constants";
 
-const DON_CARD_W = 50;
-const DON_CARD_H = 70;
-const DON_ACTIVE_OVERLAP = 35;
-const DON_RESTED_OVERLAP = 60;
 const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
 
 // DON entry pop on turn-start (OPT-121). New tokens scale + fade in; existing

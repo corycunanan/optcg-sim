@@ -9,10 +9,14 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { cardKO, cardTransitions } from "@/lib/motion";
 import { getPortalContainer } from "../scaled-board";
 import { Card } from "../card";
-import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constants";
-
-const DON_TOKEN_W = 50;
-const DON_TOKEN_H = 70;
+import {
+  BOARD_CARD_H,
+  BOARD_CARD_W,
+  DON_CARD_H,
+  DON_CARD_W,
+  HAND_CARD_H,
+  HAND_CARD_W,
+} from "./constants";
 
 interface CardAnimationLayerProps {
   transitions: CardTransition[];
@@ -55,10 +59,10 @@ function FlyingCard({
   // Flight footprint depends on kind. DON tokens are smaller than cards and
   // stay DON-sized for the entire flight; card flights size to their
   // source/destination zone.
-  const fromW = isDonAttach ? DON_TOKEN_W : isFromHand ? HAND_CARD_W : BOARD_CARD_W;
-  const fromH = isDonAttach ? DON_TOKEN_H : isFromHand ? HAND_CARD_H : BOARD_CARD_H;
-  const toW = isDonAttach ? DON_TOKEN_W : isHandBound ? HAND_CARD_W : BOARD_CARD_W;
-  const toH = isDonAttach ? DON_TOKEN_H : isHandBound ? HAND_CARD_H : BOARD_CARD_H;
+  const fromW = isDonAttach ? DON_CARD_W : isFromHand ? HAND_CARD_W : BOARD_CARD_W;
+  const fromH = isDonAttach ? DON_CARD_H : isFromHand ? HAND_CARD_H : BOARD_CARD_H;
+  const toW = isDonAttach ? DON_CARD_W : isHandBound ? HAND_CARD_W : BOARD_CARD_W;
+  const toH = isDonAttach ? DON_CARD_H : isHandBound ? HAND_CARD_H : BOARD_CARD_H;
 
   const fromX = fromRect.left + (fromRect.width - fromW) / 2;
   const fromY = fromRect.top + (fromRect.height - fromH) / 2;
