@@ -1,7 +1,7 @@
 ---
 linear-project: Responsive Game Board
 linear-project-url: https://linear.app/optcg-sim/project/responsive-game-board-e42dfec537cc
-last-updated: 2026-04-30 (OPT-345 in review; OPT-346 + OPT-347 added for 1280×640 floor follow-through)
+last-updated: 2026-04-30 (OPT-346 in review; OPT-347 ready after PR #194 merges)
 ---
 
 # Responsive Game Board — Handoff Doc
@@ -32,14 +32,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 14 | [OPT-320](https://linear.app/optcg-sim/issue/OPT-320) | Min-viewport gate UI: "use a larger screen" below 1280×720 | 1 | OPT-314, OPT-315 | In Review | [#167](https://github.com/corycunanan/optcg-sim/pull/167) | Game routes only (live + sandbox). `<MinViewportGate>` wraps both shells; on live the gate sits above `useGameSession` so small viewports don't open a websocket. |
 | 15 | [OPT-321](https://linear.app/optcg-sim/issue/OPT-321) | ESLint rule: enforce shell-injects-state-only contract | 2 | OPT-314, OPT-315 | In Review | [#169](https://github.com/corycunanan/optcg-sim/pull/169) | `@typescript-eslint/no-restricted-imports` scoped to page files, shells, and live-only chrome. `<Board>` is the only authorized consumer of `board-layout/*`. Type-only imports allowed (`allowTypeImports: true`). Contract documented in `src/components/game/scaled-board/README.md`. |
 | 16 | [OPT-345](https://linear.app/optcg-sim/issue/OPT-345) | Lower min-viewport floor to 1280×640 to support 13" MacBook Air | 1 | — | In Review | [#193](https://github.com/corycunanan/optcg-sim/pull/193) | Width floor stays 1280; height gate drops to 640. Docs explicitly accept softer inside-board text at the new ~0.59 floor until OPT-346 lands. |
-| 17 | [OPT-346](https://linear.app/optcg-sim/issue/OPT-346) | Bump inside-board legibility floor one step for the 1280×640 viewport | 2 | OPT-345 | Backlog | — | Promote inside-board labels/body/focus rings one step (`text-base` / `text-lg` / `ring-4`) while keeping chrome at `text-xs` / `ring-2`. |
+| 17 | [OPT-346](https://linear.app/optcg-sim/issue/OPT-346) | Bump inside-board legibility floor one step for the 1280×640 viewport | 2 | OPT-345 | In Review | [#194](https://github.com/corycunanan/optcg-sim/pull/194) | Promotes inside-board labels/body/focus rings one step (`text-base` / `text-lg` / `ring-4`) while keeping chrome at `text-xs` / `ring-2`. |
 | 18 | [OPT-347](https://linear.app/optcg-sim/issue/OPT-347) | QA pass: solitaire walkthrough at 1280×640 floor | 1 | OPT-345, OPT-346 | Backlog | — | Manual smoke at exactly 1280×640 plus failure boundaries 1280×639 and 1279×640; includes overlays, tooltips, drag, and match end. |
 
 **Total estimate:** 39 points.
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-346 once PR #193 lands, then OPT-347 after both OPT-345 and OPT-346 are merged.
+**Next up:** OPT-347 after PR #194 merges.
 
 ### PR phasing
 
@@ -227,3 +227,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Chrome stays outside the scaled subtree and remains `text-xs` / `ring-2`; OPT-346 should only touch inside-board UI rendered within `<ScaledBoard>` / `BoardLayout`. The 1280×720 Storybook frames and compute-scale tests are still valid scale examples, not the gate floor.
 - **Unresolved:** Manual QA is deferred to OPT-347. OPT-345 intentionally leaves inside-board labels/body/focus rings at their current values even though they are softer at 0.593×.
 - **Why this matters for OPT-346:** OPT-346 is the paired legibility bump: promote inside-board labels/body/focus rings to `text-base` / `text-lg` / `ring-4`, then update the same docs from "accepted until OPT-346" to the final 1280×640 floor math.
+
+### OPT-346 → OPT-347
+**From:** session on 2026-04-30 · **Commit:** `0e47514` · **PR:** [#194](https://github.com/corycunanan/optcg-sim/pull/194)
+
+- **Primer:** Inside-board labels/counters/badges now use `text-base`, body text uses `text-lg`, and inside-board visual/focus rings use `ring-4`; chrome surfaces remain at `text-xs` / `ring-2`.
+- **Read first:** `src/components/game/board-layout/mid-zone.tsx`, `src/components/game/redistribute-don-overlay.tsx`, `src/components/game/card/overlays/card-highlight-ring.tsx`, `docs/design/BRANDING-GUIDELINES.md` §13.
+- **Gotchas / do NOT touch:** OPT-347 is manual QA only. Do not change the min-viewport gate constants, the 1280×720 Storybook scale examples, or chrome typography/rings unless QA finds a separate bug and a new ticket is created.
+- **Unresolved:** Manual smoke at exactly 1280×640 plus failure boundaries 1280×639 and 1279×640 is still pending under OPT-347.
+- **Why this matters for OPT-347:** The code/docs now encode the final 1280×640 legibility floor; OPT-347 should verify the floor in product surfaces, including overlays, tooltips, drag, and match-end behavior.
