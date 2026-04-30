@@ -104,7 +104,7 @@ All in `src/components/game/scaled-board/`:
 
 **Rule:** shells inject only `state` and `dispatch`. All animations, drag behaviors, hover states, zone rendering, and on-board UI live inside `<Board>` and its descendants — shared between both shells. Sandbox-only chrome (scenario picker, playback controls, debug overlays) and live-only chrome (chat sidebar, opponent info, connection status) live in the shell, **outside** the `<ScaledBoard>` wrapper.
 
-`<Board>` is the only runtime consumer of `BoardLayout`; it passes the `<ScaledBoard>` design canvas and measured outer scale down so `BoardLayout` can fit its intrinsic board composition inside 1920×1080 without measuring the browser window itself.
+`<Board>` is the only runtime consumer of `BoardLayout`; it passes the `<ScaledBoard>` design canvas and measured outer scale down so `BoardLayout` can fit its widened intrinsic board composition inside 1920×1080 without measuring the browser window itself.
 
 ### What scales vs what doesn't
 
