@@ -48,6 +48,7 @@ export interface GameSessionOpponent {
 
 export interface GameSessionNavigation {
   remoteGameStatus: RemoteGameStatus | null;
+  remoteGameNotFound: boolean;
   fallbackConcedeAvailable: boolean;
   fallbackSubmitting: boolean;
   fallbackError: string | null;
@@ -72,8 +73,20 @@ export function useGameSession(
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
 
+  /* ── Remote game status polling ───────────────────────────────────── */
+
+  const {
+    remoteGameStatus,
+    remoteGameNotFound,
+    setRemoteGameStatus,
+  } = useRemoteGameStatus(gameId);
+  const liveGameId = remoteGameNotFound ? "" : gameId;
+
   const getToken = useCallback(async () => {
-    const params = new URLSearchParams({ gameId });
+    if (remoteGameNotFound) {
+      throw new Error("Game not found");
+    }
+    const params = new URLSearchParams({ gameId: liveGameId });
     if (requestedPlayerIndex !== undefined) {
       params.set("playerIndex", String(requestedPlayerIndex));
     }
@@ -82,7 +95,7 @@ export function useGameSession(
     const d = (await r.json()) as { data?: { token?: string } };
     if (!d.data?.token) throw new Error("No token");
     return d.data.token;
-  }, [gameId, requestedPlayerIndex]);
+  }, [liveGameId, remoteGameNotFound, requestedPlayerIndex]);
 
   /* ── WebSocket ────────────────────────────────────────────────────── */
 
@@ -96,7 +109,7 @@ export function useGameSession(
     sendAction: rawSendAction,
     leaveGame,
     retryConnection,
-  } = useGameWs(gameId, workerUrl, getToken);
+  } = useGameWs(liveGameId, workerUrl, getToken);
 
   // Suppress duplicate identical actions fired within a short window. Rapid
   // clicks (or double-trigger from keyboard + click) can otherwise send the
@@ -116,7 +129,7 @@ export function useGameSession(
   /* ── Card DB ──────────────────────────────────────────────────────── */
 
   const { cardDb, cardDbReady, cardDbError, retryFetchCards } = useCardDatabase(
-    gameId,
+    liveGameId,
     workerUrl,
     getToken,
   );
@@ -127,11 +140,6 @@ export function useGameSession(
     if (cardDbError) retryFetchCards();
     retryConnection();
   }, [cardDbError, retryFetchCards, retryConnection]);
-
-  /* ── Remote game status polling ───────────────────────────────────── */
-
-  const { remoteGameStatus, setRemoteGameStatus } =
-    useRemoteGameStatus(gameId);
 
   /* ── Player derivation ────────────────────────────────────────────── */
 
@@ -291,6 +299,7 @@ export function useGameSession(
     },
     navigation: {
       remoteGameStatus,
+      remoteGameNotFound,
       fallbackConcedeAvailable,
       fallbackSubmitting,
       fallbackError,

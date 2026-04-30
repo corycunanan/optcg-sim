@@ -15,12 +15,14 @@ export interface RemoteGameStatus {
 
 export interface UseRemoteGameStatusReturn {
   remoteGameStatus: RemoteGameStatus | null;
+  remoteGameNotFound: boolean;
   setRemoteGameStatus: Dispatch<SetStateAction<RemoteGameStatus | null>>;
 }
 
 export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
   const [remoteGameStatus, setRemoteGameStatus] =
     useState<RemoteGameStatus | null>(null);
+  const [remoteGameNotFound, setRemoteGameNotFound] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,18 +31,26 @@ export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
       const response = await fetch(`/api/game/${gameId}`, {
         cache: "no-store",
       }).catch(() => null);
-      if (!response?.ok || cancelled) return;
+      if (cancelled || !response) return;
+      if (response.status === 404) {
+        setRemoteGameStatus(null);
+        setRemoteGameNotFound(true);
+        return;
+      }
+      if (!response.ok) return;
 
       const json = (await response.json().catch(() => null)) as {
         data?: RemoteGameStatus;
       } | null;
       if (!cancelled && json?.data) {
         setRemoteGameStatus(json.data);
+        setRemoteGameNotFound(false);
       }
     };
 
     void loadGameStatus();
     const interval = setInterval(() => {
+      if (remoteGameNotFound) return;
       void loadGameStatus();
     }, 2000);
 
@@ -48,7 +58,7 @@ export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [gameId]);
+  }, [gameId, remoteGameNotFound]);
 
-  return { remoteGameStatus, setRemoteGameStatus };
+  return { remoteGameStatus, remoteGameNotFound, setRemoteGameStatus };
 }

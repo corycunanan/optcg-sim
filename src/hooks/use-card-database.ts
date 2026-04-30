@@ -24,6 +24,7 @@ export function useCardDatabase(
   const fetchedRef = useRef(false);
 
   useEffect(() => {
+    if (!gameId || !workerUrl) return;
     if (fetchedRef.current) return;
 
     let cancelled = false;
