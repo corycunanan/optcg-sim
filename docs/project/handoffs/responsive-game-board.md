@@ -239,7 +239,7 @@ Copy this block when writing a new handoff:
 - **Why this matters for OPT-347:** The code/docs now encode the final 1280×640 legibility floor; OPT-347 should verify the floor in product surfaces, including overlays, tooltips, drag, and match-end behavior.
 
 ### OPT-347 → OPT-348
-**From:** session on 2026-04-30 · **Commit:** pending · **PR:** —
+**From:** session on 2026-04-30 · **Commit:** `b42afa9` · **PR:** —
 
 - **Primer:** Exact-viewport QA verified the lowered gate (`1280×640` passes; `1280×639` and `1279×640` block), no document scroll, all board zones visible, readable inside-board labels/counters/phase controls, readable card hover/zoom text, and portaled prompt modals at chrome scale for ARRANGE_TOP_CARDS, SELECT_TARGET, PLAYER_CHOICE, OPTIONAL_EFFECT, and REVEAL_TRIGGER.
 - **Failure:** At `1280×640` on `/sandbox/play-character`, dragging the hand card to the lower C1 character slot starts and follows the pointer, but the drop does not resolve over the droppable. The same normalized pointer path at `1920×1080` resolves over `char-slot-0` and plays the card. Follow-up filed as [OPT-348](https://linear.app/optcg-sim/issue/OPT-348/fix-scaled-board-dnd-kit-droppable-hit-testing-at-1280640).
