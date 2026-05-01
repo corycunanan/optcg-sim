@@ -64,5 +64,5 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 - **Primer:** The global active-game query now filters to PVP so Solitaire sessions do not surface as competitive lobby blockers; code audit found no separate history/feed/stats/ranking queries yet.
 - **Read first:** `src/app/api/game/active/route.ts`, `src/app/api/game/active/route.test.ts`, `src/hooks/use-solitaire-session.test.ts`.
 - **Gotchas / do NOT touch:** Keep Solitaire re-entry owned by direct `/game/[id]` board routing and the lobby room flow; do not reintroduce Solitaire into `/api/game/active` unless a dedicated solo rejoin surface is designed.
-- **Unresolved:** Manual browser dogfood was attempted against local `/lobbies` but blocked by login/no authenticated seeded session; PR #202 leaves that manual checklist item visible for reviewer QA.
+- **Unresolved:** Local browser QA used seed account `Luffy_D` to create a Solitaire lobby, select decks, ready, start a game, and verify `/lobbies` still excludes the active Solitaire game from the PVP rejoin blocker; board-level refresh/concede dogfood is still blocked by the in-app browser being below the 1280x640 desktop gate.
 - **Pointer:** Run `git show 53dcdca` for the implementation diff.
