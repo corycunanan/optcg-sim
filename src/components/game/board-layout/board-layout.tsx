@@ -345,7 +345,10 @@ function BoardLayoutInner({
       onDragMove={dragTilt.handleDragMove}
       onDragEnd={(e) => { handleDragEnd(e); dragTilt.handleDragEnd(e); }}
     >
-    <div className="relative h-full w-full overflow-hidden bg-gb-board">
+    {/* DEBUG (OPT-349): outer green = the 1920×1080 design canvas <ScaledBoard>
+        fits to the viewport. Should fill the viewport's smaller axis at any
+        size. Revert `bg-green-500/40` → `bg-gb-board` to remove. */}
+    <div className="relative h-full w-full overflow-hidden bg-green-500/40">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
       <nav
         className="absolute inset-x-0 top-0 z-30 flex items-center px-4 bg-gb-navbar"
@@ -434,12 +437,17 @@ function BoardLayoutInner({
       </div>
 
       {/* ── Board Layer ────────────────────────────────────────────── */}
+      {/* DEBUG (OPT-349): inner red = FIELD_W × BOARD_CONTENT_H, the board
+          content the inner `boardScale` fits inside the green design canvas.
+          Post-OPT-349 it should grow until red fills green on the smaller
+          axis. Pre-fix it stayed at intrinsic 888×552 (~46% of canvas width).
+          Revert by removing the `bg-red-500/40` class. */}
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{ top: boardTop }}
       >
         <div
-          className="relative shrink-0"
+          className="relative shrink-0 bg-red-500/40"
           style={{
             width: FIELD_W,
             height: BOARD_CONTENT_H,
