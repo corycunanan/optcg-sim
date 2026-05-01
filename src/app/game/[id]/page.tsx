@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
 import { GameBoardLoader } from "./game-board-loader";
 
 export const metadata = {
@@ -7,9 +8,7 @@ export const metadata = {
 };
 
 const GAME_WORKER_URL =
-  process.env.NEXT_PUBLIC_GAME_WORKER_URL ??
-  process.env.GAME_WORKER_URL ??
-  "";
+  process.env.NEXT_PUBLIC_GAME_WORKER_URL ?? process.env.GAME_WORKER_URL ?? "";
 
 export default async function GamePage({
   params,
@@ -32,12 +31,20 @@ export default async function GamePage({
     rawPlayerIndex === "0" || rawPlayerIndex === "1"
       ? (Number(rawPlayerIndex) as 0 | 1)
       : undefined;
+  const game = await prisma.gameSession.findFirst({
+    where: {
+      id,
+      OR: [{ player1Id: session.user.id }, { player2Id: session.user.id }],
+    },
+    select: { mode: true },
+  });
 
   return (
     <GameBoardLoader
       gameId={id}
       workerUrl={GAME_WORKER_URL}
       playerIndex={playerIndex}
+      gameMode={game?.mode}
     />
   );
 }

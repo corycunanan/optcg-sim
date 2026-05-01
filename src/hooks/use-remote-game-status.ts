@@ -5,6 +5,7 @@ import type { Dispatch, SetStateAction } from "react";
 
 export interface RemoteGameStatus {
   id: string;
+  mode: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
   winnerId: string | null;
   winReason: string | null;
