@@ -243,7 +243,7 @@ function LiveGameShellContent({ gameId, workerUrl, playerIndex }: LiveGameShellP
       {!game.matchClosed && opponent.opponentAway && (
         <div
           className={cn(
-            "fixed inset-x-0 top-0 z-[60] flex gap-3 items-center px-4 py-2 flex-wrap",
+            "fixed inset-x-0 top-0 z-[60] flex min-h-12 gap-3 items-center px-4 py-2 flex-wrap",
             opponent.gamePausedForOpponent
               ? "bg-gb-prompt-bg border-b border-gb-accent-amber/25"
               : "bg-gb-surface border-b border-gb-border-strong",
