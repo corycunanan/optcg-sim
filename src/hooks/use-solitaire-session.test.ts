@@ -266,6 +266,29 @@ describe("useSolitaireSession", () => {
     expect(session.perspective.myIndex).toBe(1);
   });
 
+  it("restores the prompted side from an inactive-side active prompt after refresh", () => {
+    mocks.sessions = [
+      createSession(0, { gameState: createGameState(0) }),
+      createSession(1, {
+        gameState: createGameState(0),
+        activePrompt: {
+          promptType: "SELECT_TARGET",
+          cards: [],
+          validTargets: [],
+          countMin: 0,
+          countMax: 1,
+          effectDescription: "Choose a target",
+          ctaLabel: "Choose",
+        },
+      }),
+    ];
+
+    const session = renderSolitaireSession();
+
+    expect(session.perspective.promptedIndex).toBe(1);
+    expect(session.perspective.myIndex).toBe(1);
+  });
+
   it("resets to the active side when refreshed into an already-running game", () => {
     mocks.sessions = [
       createSession(0, { gameState: createGameState(1) }),
