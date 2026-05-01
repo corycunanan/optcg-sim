@@ -24,6 +24,7 @@ import {
 } from "./constants";
 import { midTop, computeBoardScaling } from "./board-geometry";
 import { useBoardDnd } from "./use-board-dnd";
+import { boardCollisionDetection } from "./board-collision";
 import { useHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
@@ -341,6 +342,7 @@ function BoardLayoutInner({
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
       sensors={sensors}
+      collisionDetection={boardCollisionDetection}
       onDragStart={(e) => { handleDragStart(e); dragTilt.handleDragStart(e); }}
       onDragMove={dragTilt.handleDragMove}
       onDragEnd={(e) => { handleDragEnd(e); dragTilt.handleDragEnd(e); }}
