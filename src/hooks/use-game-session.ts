@@ -65,6 +65,21 @@ export interface GameSessionEndState {
   endReason: string;
 }
 
+/**
+ * Composes the client-side game session for one player perspective.
+ *
+ * Solitaire may mount this hook twice for the same `gameId`, but only when
+ * each instance has a distinct `requestedPlayerIndex` (`0` and `1`). Each
+ * instance owns an independent WebSocket, token fetch, send debounce, and
+ * opponent-presence ticker. Finalization is single-owner at this layer: the
+ * normal PVP instance and the Solitaire player-0 instance can finalize, while
+ * the Solitaire player-1 instance exposes inert navigation handlers so
+ * `POST /api/game/{id}` only fires once per closed match.
+ *
+ * Card database loading and remote-status polling intentionally remain
+ * per-instance here. Consumers that mount both Solitaire perspectives should
+ * de-duplicate those reads in the composite layer introduced by OPT-301.
+ */
 export function useGameSession(
   gameId: string,
   workerUrl: string,
@@ -219,6 +234,18 @@ export function useGameSession(
 
   /* ── Finalize / leave handlers ────────────────────────────────────── */
 
+  const finalizerEnabled =
+    requestedPlayerIndex === undefined || requestedPlayerIndex === 0;
+  const noopNavigationHandler = useCallback(async () => {}, []);
+
+  const finalizerNavigation = useGameFinalizer({
+    gameId,
+    gameState,
+    gameOver,
+    matchClosed: finalizerEnabled && matchClosed,
+    leaveGame,
+    setRemoteGameStatus,
+  });
   const {
     leavingGame,
     leaveError,
@@ -227,14 +254,17 @@ export function useGameSession(
     handleBackToLobbies,
     handleLeaveGame,
     handleFallbackConcede,
-  } = useGameFinalizer({
-    gameId,
-    gameState,
-    gameOver,
-    matchClosed,
-    leaveGame,
-    setRemoteGameStatus,
-  });
+  } = finalizerEnabled
+    ? finalizerNavigation
+    : {
+        leavingGame: false,
+        leaveError: null,
+        fallbackSubmitting: false,
+        fallbackError: null,
+        handleBackToLobbies: noopNavigationHandler,
+        handleLeaveGame: noopNavigationHandler,
+        handleFallbackConcede: noopNavigationHandler,
+      };
 
   /* ── End-of-match display values ──────────────────────────────────── */
 
@@ -300,7 +330,7 @@ export function useGameSession(
     navigation: {
       remoteGameStatus,
       remoteGameNotFound,
-      fallbackConcedeAvailable,
+      fallbackConcedeAvailable: finalizerEnabled && fallbackConcedeAvailable,
       fallbackSubmitting,
       fallbackError,
       handleFallbackConcede,
