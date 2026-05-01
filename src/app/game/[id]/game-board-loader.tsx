@@ -14,10 +14,19 @@ export function GameBoardLoader({
   gameId,
   workerUrl,
   playerIndex,
+  gameMode,
 }: {
   gameId: string;
   workerUrl: string;
   playerIndex?: 0 | 1;
+  gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
 }) {
-  return <LiveGameShell gameId={gameId} workerUrl={workerUrl} playerIndex={playerIndex} />;
+  return (
+    <LiveGameShell
+      gameId={gameId}
+      workerUrl={workerUrl}
+      playerIndex={playerIndex}
+      gameMode={gameMode}
+    />
+  );
 }

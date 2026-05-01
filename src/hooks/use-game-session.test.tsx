@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   wsCallIndex: 0,
   cardDbError: null as string | null,
   remoteGameStatus: {
+    mode: "PVP",
     status: "IN_PROGRESS",
     canFallbackConcede: false,
   },
@@ -122,6 +123,7 @@ beforeEach(() => {
   mocks.wsCallIndex = 0;
   mocks.cardDbError = null;
   mocks.remoteGameStatus = {
+    mode: "PVP",
     status: "IN_PROGRESS",
     canFallbackConcede: false,
   };

@@ -18,14 +18,17 @@ const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 
 type WinnerPerspective = "SELF" | "OPPONENT" | "NONE";
 
-function getWinnerPerspective(winnerId: string | null, userId: string): WinnerPerspective {
+function getWinnerPerspective(
+  winnerId: string | null,
+  userId: string
+): WinnerPerspective {
   if (!winnerId) return "NONE";
   return winnerId === userId ? "SELF" : "OPPONENT";
 }
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
@@ -40,6 +43,7 @@ export async function GET(
     },
     select: {
       id: true,
+      mode: true,
       status: true,
       winnerId: true,
       winReason: true,
@@ -52,20 +56,25 @@ export async function GET(
     return apiError("Game not found", 404);
   }
 
-  return apiSuccess({
-    id: game.id,
-    status: game.status,
-    winnerId: game.winnerId,
-    winReason: game.winReason,
-    winnerPerspective: getWinnerPerspective(game.winnerId, userId),
-    canFallbackConcede: game.status === "IN_PROGRESS",
-    playerIndex: game.player1Id === userId ? 0 : 1,
-  }, 200, { "Cache-Control": "no-store" });
+  return apiSuccess(
+    {
+      id: game.id,
+      mode: game.mode,
+      status: game.status,
+      winnerId: game.winnerId,
+      winReason: game.winReason,
+      winnerPerspective: getWinnerPerspective(game.winnerId, userId),
+      canFallbackConcede: game.status === "IN_PROGRESS",
+      playerIndex: game.player1Id === userId ? 0 : 1,
+    },
+    200,
+    { "Cache-Control": "no-store" }
+  );
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
@@ -91,7 +100,11 @@ export async function POST(
 async function handleFinalize(
   gameId: string,
   userId: string,
-  body: { winnerId?: string | null; winReason?: string | null; reasonCode?: GameEndReasonCode | null },
+  body: {
+    winnerId?: string | null;
+    winReason?: string | null;
+    reasonCode?: GameEndReasonCode | null;
+  }
 ) {
   const game = await prisma.gameSession.findFirst({
     where: {
@@ -110,7 +123,11 @@ async function handleFinalize(
   }
 
   const { winnerId, winReason } = body;
-  if (winnerId != null && winnerId !== game.player1Id && winnerId !== game.player2Id) {
+  if (
+    winnerId != null &&
+    winnerId !== game.player1Id &&
+    winnerId !== game.player2Id
+  ) {
     return apiError("Invalid winnerId", 400);
   }
 
@@ -127,7 +144,11 @@ async function handleFinalize(
       where: { id: game.id },
       select: { id: true, status: true },
     });
-    return apiSuccess({ id: game.id, status: current?.status ?? "FINISHED", finalized: false });
+    return apiSuccess({
+      id: game.id,
+      status: current?.status ?? "FINISHED",
+      finalized: false,
+    });
   }
 
   // Re-read to get the full updated record for the response
@@ -180,7 +201,10 @@ async function handleConcede(gameId: string, userId: string) {
       status: current?.status ?? "FINISHED",
       winnerId: current?.winnerId ?? null,
       winReason: current?.winReason ?? null,
-      winnerPerspective: getWinnerPerspective(current?.winnerId ?? null, userId),
+      winnerPerspective: getWinnerPerspective(
+        current?.winnerId ?? null,
+        userId
+      ),
       canFallbackConcede: false,
     });
   }
@@ -198,10 +222,12 @@ async function handleConcede(gameId: string, userId: string) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${GAME_WORKER_SECRET}`,
       },
-      body: JSON.stringify(buildNotifyEndPayload(
-        winnerIndex,
-        updated.winReason ?? "Player conceded while disconnected",
-      )),
+      body: JSON.stringify(
+        buildNotifyEndPayload(
+          winnerIndex,
+          updated.winReason ?? "Player conceded while disconnected"
+        )
+      ),
     }).catch(() => {});
   }
 

@@ -19,13 +19,13 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 | 1 | OPT-298 | Solitaire backend: init endpoint + token playerIndex claim + mode column | 3 | - | Done | - | Foundation for mode and token claims; superseded by Lobby Room UX flow for creation. |
 | 2 | OPT-299 | Solitaire entry page: /solitaire route + dual deck picker | 2 | OPT-298 | Done | - | Historical entry-page scope; Lobby Room UX is now the creation surface. |
 | 3 | OPT-300 | Refactor use-game-session to support multiple instances per tab | 2 | OPT-298, OPT-299 | Done | [#199](https://github.com/corycunanan/optcg-sim/pull/199) | Gates finalization to one owner while preserving the hook surface. |
-| 4 | OPT-301 | useSolitaireSession composite hook + perspective state machine | 3 | OPT-300 | In Review | [#200](https://github.com/corycunanan/optcg-sim/pull/200) | Composite hook owns both live side sessions and perspective behavior. |
-| 5 | OPT-302 | Wire game board to perspective + Flip button + fade-to-black transition | 3 | OPT-301 | Backlog | - | UI layer after the composite contract exists. |
+| 4 | OPT-301 | useSolitaireSession composite hook + perspective state machine | 3 | OPT-300 | Done | [#200](https://github.com/corycunanan/optcg-sim/pull/200) | Composite hook owns both live side sessions and perspective behavior. |
+| 5 | OPT-302 | Wire game board to perspective + Flip button + fade-to-black transition | 3 | OPT-301 | In Review | [#201](https://github.com/corycunanan/optcg-sim/pull/201) | 2026-05-01: Board chooses Solitaire mode and exposes perspective chrome. |
 | 6 | OPT-303 | Solitaire polish: history filter, lobby/feed exclusion, refresh QA | 2 | OPT-302 | Backlog | - | Final product cleanup and QA pass. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-302.
+**Next up:** OPT-303.
 
 ---
 
@@ -48,3 +48,12 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 - **Gotchas / do NOT touch:** Keep standard PVP on `useGameSession`; OPT-302 should choose `useSolitaireSession` only for Solitaire mode/board wiring and avoid changing worker socket semantics.
 - **Unresolved:** Shared leave/finalize/card/status de-duplication is still not hoisted; track separately if OPT-302 needs it for UX correctness.
 - **Why this matters for OPT-302:** The board can now render from `session.game.myIndex`, call `session.perspective.flipPerspective()`, and dispatch through `session.game.sendAction()` without manually deciding which WebSocket owns the action.
+
+### OPT-302 -> OPT-303
+**From:** session on 2026-05-01 - **Commit:** `f9c52a4` - **PR:** #201
+
+- **Primer:** `/game/[id]` now reads `game_sessions.mode` server-side, keeps PVP on `useGameSession`, and sends Solitaire games through `useSolitaireSession` with side-aware board chrome.
+- **Read first:** `src/app/game/[id]/page.tsx`, `src/components/game/live-game-shell.tsx`, `src/hooks/use-solitaire-session.ts`, `src/app/api/game/[id]/route.ts`.
+- **Gotchas / do NOT touch:** The Solitaire badge/Flip control is shell chrome outside `<ScaledBoard>`; keep board internals and worker socket semantics unchanged unless OPT-303 explicitly needs them.
+- **Unresolved:** Manual browser QA against a real lobby-created Solitaire game is still the main remaining polish check; no separate tracking ticket beyond OPT-303.
+- **Why this matters for OPT-303:** Polish can assume Solitaire board entry works, PVP stays on the old hook path, and the remaining work is history/feed exclusion plus refresh and UX QA.
