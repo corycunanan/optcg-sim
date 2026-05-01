@@ -18,14 +18,14 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-298 | Solitaire backend: init endpoint + token playerIndex claim + mode column | 3 | - | Done | - | Foundation for mode and token claims; superseded by Lobby Room UX flow for creation. |
 | 2 | OPT-299 | Solitaire entry page: /solitaire route + dual deck picker | 2 | OPT-298 | Done | - | Historical entry-page scope; Lobby Room UX is now the creation surface. |
-| 3 | OPT-300 | Refactor use-game-session to support multiple instances per tab | 2 | OPT-298, OPT-299 | In Review | [#199](https://github.com/corycunanan/optcg-sim/pull/199) | Gates finalization to one owner while preserving the hook surface. |
-| 4 | OPT-301 | useSolitaireSession composite hook + perspective state machine | 3 | OPT-300 | Backlog | - | Owns shared card DB/status polling and perspective behavior. |
+| 3 | OPT-300 | Refactor use-game-session to support multiple instances per tab | 2 | OPT-298, OPT-299 | Done | [#199](https://github.com/corycunanan/optcg-sim/pull/199) | Gates finalization to one owner while preserving the hook surface. |
+| 4 | OPT-301 | useSolitaireSession composite hook + perspective state machine | 3 | OPT-300 | In Review | [#200](https://github.com/corycunanan/optcg-sim/pull/200) | Composite hook owns both live side sessions and perspective behavior. |
 | 5 | OPT-302 | Wire game board to perspective + Flip button + fade-to-black transition | 3 | OPT-301 | Backlog | - | UI layer after the composite contract exists. |
 | 6 | OPT-303 | Solitaire polish: history filter, lobby/feed exclusion, refresh QA | 2 | OPT-302 | Backlog | - | Final product cleanup and QA pass. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-301.
+**Next up:** OPT-302.
 
 ---
 
@@ -39,3 +39,12 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 - **Gotchas / do NOT touch:** Do not de-duplicate `useCardDatabase` or `useRemoteGameStatus` inside `useGameSession`; OPT-301 should do that at the composite layer where both perspectives are visible.
 - **Unresolved:** Build `useSolitaireSession`, own shared leave/finalize behavior at the composite layer, and decide when to hoist `useGameFinalizer` out of `useGameSession`.
 - **Why this matters for OPT-301:** OPT-301 can mount `useGameSession(gameId, workerUrl, 0)` and `useGameSession(gameId, workerUrl, 1)` without duplicate finalize POSTs, then layer shared card/status reads and perspective state on top.
+
+### OPT-301 -> OPT-302
+**From:** session on 2026-05-01 - **Commit:** `9d4d77f` - **PR:** #200
+
+- **Primer:** `useSolitaireSession(gameId, workerUrl)` now mounts both `useGameSession` sides and returns a perspective-aware surface shaped like the current side, plus `perspective` controls and a `sides` escape hatch.
+- **Read first:** `src/hooks/use-solitaire-session.ts`, `src/hooks/use-solitaire-session.test.ts`, `src/components/game/live-game-shell.tsx`, `src/components/game/board.tsx`.
+- **Gotchas / do NOT touch:** Keep standard PVP on `useGameSession`; OPT-302 should choose `useSolitaireSession` only for Solitaire mode/board wiring and avoid changing worker socket semantics.
+- **Unresolved:** Shared leave/finalize/card/status de-duplication is still not hoisted; track separately if OPT-302 needs it for UX correctness.
+- **Why this matters for OPT-302:** The board can now render from `session.game.myIndex`, call `session.perspective.flipPerspective()`, and dispatch through `session.game.sendAction()` without manually deciding which WebSocket owns the action.
