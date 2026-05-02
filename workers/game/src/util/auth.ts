@@ -1,9 +1,14 @@
 /**
- * Game token verification
+ * HS256 token verification.
  *
- * Verifies the short-lived HS256 token minted by /api/game/token.
- * Signed with GAME_WORKER_SECRET (not NextAuth's JWE token, which uses
- * A256CBC-HS512 encryption and would be non-trivial to verify here).
+ * Both kinds of token are signed with the same shared secret (the worker's
+ * `GAME_WORKER_SECRET`). Game tokens carry a `gameId` claim and are scoped
+ * to a single GameSession DO. User tokens have no `gameId` and are used for
+ * the per-user UserChannel DO.
+ *
+ * NextAuth's own JWE token uses A256CBC-HS512 encryption and would be
+ * non-trivial to verify in a Cloudflare Worker, so the app mints these
+ * lightweight HS256 tokens as a sidecar.
  */
 
 export interface VerifiedGameToken {
@@ -15,11 +20,26 @@ export interface VerifiedGameToken {
   playerIndex?: 0 | 1;
 }
 
-export async function verifyGameToken(
+export interface VerifiedUserToken {
+  sub: string;
+  iat: number;
+  exp: number;
+  jti: string;
+}
+
+interface RawTokenPayload {
+  sub: unknown;
+  iat: unknown;
+  exp: unknown;
+  jti: unknown;
+  gameId?: unknown;
+  playerIndex?: unknown;
+}
+
+async function verifySignatureAndDecode(
   token: string,
   secret: string,
-  expectedGameId?: string,
-): Promise<VerifiedGameToken | null> {
+): Promise<RawTokenPayload | null> {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -39,33 +59,75 @@ export async function verifyGameToken(
     const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(signingInput));
     if (!valid) return null;
 
-    const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64)));
-    if (typeof payload.sub !== "string") return null;
-    if (typeof payload.iat !== "number") return null;
-    if (typeof payload.exp !== "number") return null;
-    if (typeof payload.gameId !== "string") return null;
-    if (typeof payload.jti !== "string") return null;
-    if (
-      payload.playerIndex !== undefined &&
-      payload.playerIndex !== 0 &&
-      payload.playerIndex !== 1
-    ) {
-      return null;
-    }
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
-    if (expectedGameId && payload.gameId !== expectedGameId) return null;
-
-    return {
-      sub: payload.sub,
-      iat: payload.iat,
-      exp: payload.exp,
-      gameId: payload.gameId,
-      jti: payload.jti,
-      ...(payload.playerIndex !== undefined ? { playerIndex: payload.playerIndex } : {}),
-    };
+    return JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64))) as RawTokenPayload;
   } catch {
     return null;
   }
+}
+
+function isExpired(exp: number, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
+  return exp < nowSeconds;
+}
+
+export async function verifyGameToken(
+  token: string,
+  secret: string,
+  expectedGameId?: string,
+): Promise<VerifiedGameToken | null> {
+  const payload = await verifySignatureAndDecode(token, secret);
+  if (!payload) return null;
+
+  if (typeof payload.sub !== "string") return null;
+  if (typeof payload.iat !== "number") return null;
+  if (typeof payload.exp !== "number") return null;
+  if (typeof payload.gameId !== "string") return null;
+  if (typeof payload.jti !== "string") return null;
+  if (
+    payload.playerIndex !== undefined &&
+    payload.playerIndex !== 0 &&
+    payload.playerIndex !== 1
+  ) {
+    return null;
+  }
+  if (isExpired(payload.exp)) return null;
+  if (expectedGameId && payload.gameId !== expectedGameId) return null;
+
+  return {
+    sub: payload.sub,
+    iat: payload.iat,
+    exp: payload.exp,
+    gameId: payload.gameId,
+    jti: payload.jti,
+    ...(payload.playerIndex !== undefined ? { playerIndex: payload.playerIndex as 0 | 1 } : {}),
+  };
+}
+
+/**
+ * Verify a user-channel token. Same shared secret as game tokens, but no
+ * `gameId` claim is required. A token that *also* carries `gameId` is
+ * rejected — it would be a misrouted game token, and minting endpoints
+ * should produce one or the other shape, not both.
+ */
+export async function verifyUserToken(
+  token: string,
+  secret: string,
+): Promise<VerifiedUserToken | null> {
+  const payload = await verifySignatureAndDecode(token, secret);
+  if (!payload) return null;
+
+  if (typeof payload.sub !== "string") return null;
+  if (typeof payload.iat !== "number") return null;
+  if (typeof payload.exp !== "number") return null;
+  if (typeof payload.jti !== "string") return null;
+  if (payload.gameId !== undefined) return null;
+  if (isExpired(payload.exp)) return null;
+
+  return {
+    sub: payload.sub,
+    iat: payload.iat,
+    exp: payload.exp,
+    jti: payload.jti,
+  };
 }
 
 function base64urlDecode(str: string): Uint8Array<ArrayBuffer> {

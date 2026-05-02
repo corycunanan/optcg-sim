@@ -21,6 +21,14 @@ NEXTJS_URL = "https://optcg-sim.vercel.app"
 name = "GAME_SESSION"
 class_name = "GameSession"
 
+[[durable_objects.bindings]]
+name = "USER_CHANNEL"
+class_name = "UserChannel"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameSession"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserChannel"]

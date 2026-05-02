@@ -210,6 +210,7 @@ export interface DeckCardData {
 
 export interface Env {
   GAME_SESSION: DurableObjectNamespace;
+  USER_CHANNEL: DurableObjectNamespace;
   NEXTJS_URL: string;
   GAME_WORKER_SECRET: string;
   LOG_URL?: string;

@@ -1,12 +1,18 @@
 export const CONSUMED_TOKEN_JTIS_STORAGE_KEY = "consumedTokenJtis";
 
-export interface GameTokenJtiStorage {
+export interface TokenJtiStorage {
   get<T>(key: string): Promise<T | undefined>;
   put(key: string, value: unknown): Promise<void>;
 }
 
-export async function consumeGameTokenJti(
-  storage: GameTokenJtiStorage,
+/**
+ * Single-use token consumption keyed by `jti`. Each Durable Object has its
+ * own storage namespace — game tokens land in the GameSession DO and user
+ * tokens land in the UserChannel DO, so a `jti` collision across kinds is
+ * impossible. Within a single DO, replaying the same `jti` returns false.
+ */
+export async function consumeTokenJti(
+  storage: TokenJtiStorage,
   jti: string,
   expiresAt: number,
   now = Math.floor(Date.now() / 1000),
