@@ -16,6 +16,8 @@ const gameSessionCreateMock = vi.fn();
 const gameSessionFindUniqueMock = vi.fn();
 const gameSessionDeleteMock = vi.fn();
 const transactionMock = vi.fn();
+const buildLobbyRoomStateMock = vi.fn();
+const notifyLobbyMock = vi.fn();
 
 class TestDeckNotFoundError extends Error {}
 class TestDeckInvalidError extends Error {
@@ -33,6 +35,29 @@ class TestDeckInvalidError extends Error {
 
 vi.stubEnv("GAME_WORKER_URL", "https://worker.example.test");
 vi.stubEnv("GAME_WORKER_SECRET", "secret");
+
+// Track `after()` callbacks so tests can deterministically flush them before
+// asserting on fanout side effects.
+const afterCalls = vi.hoisted(() => ({
+  pending: [] as Promise<void>[],
+}));
+
+async function flushAfter(): Promise<void> {
+  while (afterCalls.pending.length) {
+    const batch = afterCalls.pending.splice(0);
+    await Promise.all(batch);
+  }
+}
+
+vi.mock("next/server", async (importActual) => {
+  const actual = await importActual<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      afterCalls.pending.push(Promise.resolve().then(cb));
+    },
+  };
+});
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
@@ -61,6 +86,12 @@ vi.mock("@/lib/decks/playable", () => ({
 }));
 vi.mock("@/lib/game/init-payload", () => ({
   buildGameInitPayload: (input: unknown) => buildGameInitPayloadMock(input),
+}));
+vi.mock("@/lib/lobbies/build-state", () => ({
+  buildLobbyRoomState: (...args: unknown[]) => buildLobbyRoomStateMock(...args),
+}));
+vi.mock("@/lib/realtime/fanout-lobby", () => ({
+  notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
 
 const { POST } = await import("./route");
@@ -104,6 +135,15 @@ beforeEach(() => {
   gameSessionFindUniqueMock.mockReset();
   gameSessionDeleteMock.mockReset();
   transactionMock.mockReset();
+  buildLobbyRoomStateMock.mockReset();
+  notifyLobbyMock.mockReset();
+  buildLobbyRoomStateMock.mockResolvedValue({
+    id: "lobby-1",
+    status: "IN_GAME",
+    hostUserId: "host-user",
+  });
+  notifyLobbyMock.mockResolvedValue(undefined);
+  afterCalls.pending.length = 0;
 
   authMock.mockResolvedValue({ user: { id: "host-user" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
@@ -311,5 +351,28 @@ describe("POST /api/lobbies/[id]/start", () => {
 
     expect(res.status).toBe(501);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("fans out lobby:state_changed to other members after a successful start", async () => {
+    const res = await POST(buildRequest(), params);
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("lobby-1");
+    expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
+    expect(notifyLobbyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "lobby-1" }),
+      { actorUserId: "host-user" },
+    );
+  });
+
+  it("does not fan out when worker init fails and the start is rolled back", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+
+    const res = await POST(buildRequest(), params);
+    await flushAfter();
+
+    expect(res.status).toBe(502);
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 });

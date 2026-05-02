@@ -2,49 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
+import type {
+  LobbyRoomDeck,
+  LobbyRoomMode,
+  LobbyRoomState,
+  LobbyRoomStatus,
+} from "@/lib/lobbies/state";
 
-export type LobbyRoomMode = "PVP" | "SOLITAIRE" | "PVCOMPUTER";
-export type LobbyRoomStatus =
-  | "WAITING"
-  | "READY"
-  | "IN_GAME"
-  | "CLOSED"
-  | "EVICTED";
+export type { LobbyRoomDeck, LobbyRoomMode, LobbyRoomState, LobbyRoomStatus };
 
-export interface LobbyRoomDeck {
-  id: string;
-  name: string;
-  leaderId: string;
-  leaderName: string | null;
-  leaderImageUrl: string | null;
-}
-
-export interface LobbyRoomState {
-  id: string;
-  status: LobbyRoomStatus;
-  joinCode: string;
-  format: string;
-  mode: LobbyRoomMode;
-  hostReady: boolean;
-  hostUserId: string;
-  host: {
-    username: string | null;
-    name: string | null;
-    image: string | null;
-  } | null;
-  hostDeck: LobbyRoomDeck | null;
-  guest: {
-    guestReady: boolean;
-    user: {
-      id: string;
-      username: string | null;
-      name: string | null;
-      image: string | null;
-    };
-    deck: LobbyRoomDeck | null;
-  } | null;
-  gameId: string | null;
-}
+// Reconciliation backstop interval — replaces the 1.5s poll until OPT-361
+// drops it after a soak window. Cadence is much lower than P1/P2 because the
+// room flow has explicit terminal states (Start → game route, Close → home)
+// and lobby drift between events is rare.
+const RECONCILE_INTERVAL_MS = 30_000;
 
 type LobbyRoomResponse = {
   data: LobbyRoomState;
@@ -67,6 +39,7 @@ export function useLobbyRoom(
   const [starting, setStarting] = useState(false);
   const cancelledRef = useRef(false);
   const refreshInFlightRef = useRef(false);
+  const { subscribe } = useUserChannelEvents();
 
   const refresh = useCallback(async () => {
     if (refreshInFlightRef.current) return null;
@@ -95,40 +68,21 @@ export function useLobbyRoom(
   }, [refresh]);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
+    return subscribe("lobby:state_changed", (event) => {
+      if (event.lobby.id !== lobbyId) return;
+      setLobby(event.lobby);
+      // A successful push proves the lobby is reachable; clear any stale
+      // "Lobby unavailable" left from a prior `refresh()` failure so the
+      // banner doesn't linger after the room recovers.
+      setError(null);
+    });
+  }, [subscribe, lobbyId]);
 
-    const tick = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-
-    const start = () => {
-      if (!timer) timer = setInterval(tick, 1500);
-    };
-
-    const stop = () => {
-      if (!timer) return;
-      clearInterval(timer);
-      timer = null;
-    };
-
-    const syncVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void refresh();
-        start();
-      } else {
-        stop();
-      }
-    };
-
-    // OPT-88 can replace this polling loop with push updates while preserving
-    // the hook's state/action surface for the room UI.
-    syncVisibility();
-    document.addEventListener("visibilitychange", syncVisibility);
-
-    return () => {
-      document.removeEventListener("visibilitychange", syncVisibility);
-      stop();
-    };
+  useEffect(() => {
+    const t = setInterval(() => {
+      void refresh();
+    }, RECONCILE_INTERVAL_MS);
+    return () => clearInterval(t);
   }, [refresh]);
 
   const patchLobby = useCallback(

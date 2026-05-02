@@ -4,7 +4,7 @@
  * DELETE /api/lobbies/[id] — Cancel lobby (host only)
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import {
   requireAuth,
   apiSuccess,
@@ -15,6 +15,10 @@ import { prisma } from "@/lib/db";
 import { PatchLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
+import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import { viewerIsEvicted } from "@/lib/lobbies/state";
+import { notifyUser } from "@/lib/realtime/fan-out";
+import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,96 +28,15 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
 
-  const lobby = await prisma.lobby.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      status: true,
-      joinCode: true,
-      format: true,
-      mode: true,
-      hostReady: true,
-      hostUserId: true,
-      host: { select: { username: true, name: true, image: true } },
-      hostDeck: {
-        select: { id: true, name: true, leaderId: true, leaderArtUrl: true },
-      },
-      guest: {
-        select: {
-          guestReady: true,
-          user: {
-            select: { id: true, username: true, name: true, image: true },
-          },
-          deck: {
-            select: {
-              id: true,
-              name: true,
-              leaderId: true,
-              leaderArtUrl: true,
-            },
-          },
-        },
-      },
-      gameSession: { select: { id: true } },
-    },
-  });
-
-  if (!lobby) {
+  const state = await buildLobbyRoomState(id);
+  if (!state) {
     return apiError("Lobby not found", 404);
   }
 
-  const leaderIds = lobby.hostDeck ? [lobby.hostDeck.leaderId] : [];
-  if (lobby.guest?.deck?.leaderId) leaderIds.push(lobby.guest.deck.leaderId);
-  const leaderCards = await prisma.card.findMany({
-    where: { id: { in: leaderIds } },
-    select: { id: true, name: true, imageUrl: true },
-  });
-  const leaderMap = new Map(leaderCards.map((c) => [c.id, c]));
-
-  const hostLeader = lobby.hostDeck
-    ? leaderMap.get(lobby.hostDeck.leaderId)
-    : null;
-  const guestLeader = lobby.guest?.deck
-    ? leaderMap.get(lobby.guest.deck.leaderId)
-    : null;
-
   return apiSuccess(
-    {
-      id: lobby.id,
-      status: userIsEvictedFromLobby(lobby, authResult.userId)
-        ? "EVICTED"
-        : lobby.status,
-      joinCode: lobby.joinCode,
-      format: lobby.format,
-      mode: lobby.mode,
-      hostReady: lobby.hostReady,
-      hostUserId: lobby.hostUserId,
-      host: lobby.host,
-      hostDeck: lobby.hostDeck
-        ? {
-            ...lobby.hostDeck,
-            leaderName: hostLeader?.name ?? null,
-            leaderImageUrl:
-              lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
-          }
-        : null,
-      guest: lobby.guest
-        ? {
-            ...lobby.guest,
-            deck: lobby.guest.deck
-              ? {
-                  ...lobby.guest.deck,
-                  leaderName: guestLeader?.name ?? null,
-                  leaderImageUrl:
-                    lobby.guest.deck.leaderArtUrl ??
-                    guestLeader?.imageUrl ??
-                    null,
-                }
-              : null,
-          }
-        : null,
-      gameId: lobby.gameSession?.id ?? null,
-    },
+    viewerIsEvicted(state, authResult.userId)
+      ? { ...state, status: "EVICTED" as const }
+      : state,
     200,
     { "Cache-Control": "no-store" }
   );
@@ -325,19 +248,27 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     await prisma.$transaction(operations);
   }
 
+  // Capture the ejected guest (if any) so the post-transaction fanout can
+  // tell them their lobby is gone — switchingToSolitaire wipes them off the
+  // freshly-built state.
+  const ejectedGuestUserId =
+    switchingToSolitaire && realGuest ? realGuest.userId : null;
+
+  after(async () => {
+    const state = await buildLobbyRoomState(id);
+    if (!state) return;
+
+    await notifyLobby(state, { actorUserId: userId });
+
+    if (ejectedGuestUserId) {
+      await notifyUser(ejectedGuestUserId, {
+        type: "lobby:state_changed",
+        lobby: { ...state, status: "EVICTED" },
+      });
+    }
+  });
+
   return apiAction();
-}
-
-type LobbyPollResult = {
-  status: string;
-  hostUserId: string;
-  guest: { user: { id: string } } | null;
-};
-
-function userIsEvictedFromLobby(lobby: LobbyPollResult, userId: string) {
-  if (lobby.hostUserId === userId) return false;
-  if (lobby.status !== "WAITING" && lobby.status !== "READY") return false;
-  return lobby.guest?.user.id !== userId;
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
@@ -363,6 +294,26 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   await prisma.lobby.update({
     where: { id },
     data: { status: "CLOSED" },
+  });
+
+  after(async () => {
+    const state = await buildLobbyRoomState(id);
+    if (!state) return;
+
+    // Today, DELETE only operates on `WAITING` lobbies — which by definition
+    // have no guest, so this branch is dormant. Kept so a future broadening
+    // of DELETE (e.g. host can also close a `READY` lobby) automatically
+    // notifies the guest without re-discovering the fanout site.
+    const guestUserId =
+      state.guest && state.guest.user.id !== state.hostUserId
+        ? state.guest.user.id
+        : null;
+    if (!guestUserId) return;
+
+    await notifyUser(guestUserId, {
+      type: "lobby:state_changed",
+      lobby: { ...state, status: "CLOSED" },
+    });
   });
 
   return apiAction();

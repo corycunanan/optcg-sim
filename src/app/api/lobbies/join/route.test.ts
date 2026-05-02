@@ -7,6 +7,31 @@ const lobbyFindFirstMock = vi.fn();
 const lobbyUpdateMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const transactionMock = vi.fn();
+const buildLobbyRoomStateMock = vi.fn();
+const notifyLobbyMock = vi.fn();
+
+// Track `after()` callbacks so tests can deterministically flush them before
+// asserting on fanout side effects.
+const afterCalls = vi.hoisted(() => ({
+  pending: [] as Promise<void>[],
+}));
+
+async function flushAfter(): Promise<void> {
+  while (afterCalls.pending.length) {
+    const batch = afterCalls.pending.splice(0);
+    await Promise.all(batch);
+  }
+}
+
+vi.mock("next/server", async (importActual) => {
+  const actual = await importActual<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      afterCalls.pending.push(Promise.resolve().then(cb));
+    },
+  };
+});
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
@@ -23,6 +48,12 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
+}));
+vi.mock("@/lib/lobbies/build-state", () => ({
+  buildLobbyRoomState: (...args: unknown[]) => buildLobbyRoomStateMock(...args),
+}));
+vi.mock("@/lib/realtime/fanout-lobby", () => ({
+  notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
 
 const { POST } = await import("./route");
@@ -42,6 +73,8 @@ beforeEach(() => {
   lobbyUpdateMock.mockReset();
   lobbyGuestCreateMock.mockReset();
   transactionMock.mockReset();
+  buildLobbyRoomStateMock.mockReset();
+  notifyLobbyMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "guest-user" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
@@ -58,6 +91,13 @@ beforeEach(() => {
   lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
   lobbyUpdateMock.mockReturnValue({ query: "update-lobby" });
   transactionMock.mockResolvedValue([]);
+  buildLobbyRoomStateMock.mockResolvedValue({
+    id: "lobby-1",
+    status: "READY",
+    hostUserId: "host-user",
+  });
+  notifyLobbyMock.mockResolvedValue(undefined);
+  afterCalls.pending.length = 0;
 });
 
 describe("POST /api/lobbies/join", () => {
@@ -145,5 +185,28 @@ describe("POST /api/lobbies/join", () => {
 
     expect(res.status).toBe(409);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("fans out lobby:state_changed to the host (skipping the joining guest)", async () => {
+    const res = await POST(buildRequest());
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("lobby-1");
+    expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
+    expect(notifyLobbyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "lobby-1" }),
+      { actorUserId: "guest-user" },
+    );
+  });
+
+  it("does not fan out when the join is rejected", async () => {
+    lobbyFindFirstMock.mockResolvedValueOnce(null);
+
+    const res = await POST(buildRequest());
+    await flushAfter();
+
+    expect(res.status).toBe(404);
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 });
