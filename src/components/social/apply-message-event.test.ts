@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SerializedMessage } from "@/types/realtime";
-import { applyMessageEvent, type ChatMessage } from "./apply-message-event";
+import {
+  applyMessageEvent,
+  mergeInitialHistory,
+  type ChatMessage,
+} from "./apply-message-event";
 
 const makeIncoming = (
   overrides: Partial<SerializedMessage> = {},
@@ -65,5 +69,46 @@ describe("applyMessageEvent", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("msg-new");
+  });
+});
+
+describe("mergeInitialHistory", () => {
+  const history: ChatMessage[] = [
+    { id: "h1", body: "old", createdAt: "2026-05-02T11:00:00.000Z", fromUserId: "user-other" },
+    { id: "h2", body: "older", createdAt: "2026-05-02T11:30:00.000Z", fromUserId: "user-me" },
+  ];
+
+  it("returns history unchanged when nothing was pushed during fetch", () => {
+    expect(mergeInitialHistory(history, [])).toBe(history);
+  });
+
+  it("appends pushed-during-fetch messages absent from history", () => {
+    const pushed: ChatMessage[] = [
+      { id: "p1", body: "pushed", createdAt: "2026-05-02T12:00:00.000Z", fromUserId: "user-other" },
+    ];
+
+    const result = mergeInitialHistory(history, pushed);
+
+    expect(result).toHaveLength(3);
+    expect(result[2].id).toBe("p1");
+  });
+
+  it("returns history when every pushed message is already in history", () => {
+    const pushed: ChatMessage[] = [
+      { id: "h1", body: "old", createdAt: "2026-05-02T11:00:00.000Z", fromUserId: "user-other" },
+    ];
+
+    expect(mergeInitialHistory(history, pushed)).toBe(history);
+  });
+
+  it("only appends pushed messages whose id isn't already in history", () => {
+    const pushed: ChatMessage[] = [
+      { id: "h2", body: "older", createdAt: "2026-05-02T11:30:00.000Z", fromUserId: "user-me" },
+      { id: "p1", body: "pushed", createdAt: "2026-05-02T12:00:00.000Z", fromUserId: "user-other" },
+    ];
+
+    const result = mergeInitialHistory(history, pushed);
+
+    expect(result.map((m) => m.id)).toEqual(["h1", "h2", "p1"]);
   });
 });

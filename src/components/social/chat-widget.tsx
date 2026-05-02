@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { X, Minus, ChevronUp } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
-import { applyMessageEvent, type ChatMessage } from "./apply-message-event";
+import {
+  applyMessageEvent,
+  mergeInitialHistory,
+  type ChatMessage,
+} from "./apply-message-event";
 
 type Message = ChatMessage;
 
@@ -49,7 +53,8 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     setLoading(true);
     apiGet<{ data: Message[] }>(`/api/messages/${user.id}`)
       .then((json) => {
-        setMessages(json.data || []);
+        const history = json.data || [];
+        setMessages((prev) => mergeInitialHistory(history, prev));
         setLoading(false);
       })
       .catch(() => setLoading(false));

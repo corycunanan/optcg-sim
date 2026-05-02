@@ -30,3 +30,19 @@ export function applyMessageEvent(
     },
   ];
 }
+
+/**
+ * Merge the initial history GET response with whatever pushed-during-fetch
+ * messages already landed in component state. Without this, a push that
+ * arrives before the GET resolves would be erased by `setMessages(history)`
+ * and only reappear when the 60s reconciliation backstop runs.
+ */
+export function mergeInitialHistory(
+  history: ChatMessage[],
+  pushedDuringFetch: ChatMessage[],
+): ChatMessage[] {
+  if (pushedDuringFetch.length === 0) return history;
+  const seen = new Set(history.map((m) => m.id));
+  const fresh = pushedDuringFetch.filter((m) => !seen.has(m.id));
+  return fresh.length === 0 ? history : [...history, ...fresh];
+}
