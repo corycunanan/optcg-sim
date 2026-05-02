@@ -249,10 +249,11 @@ describe("createAuthedWebSocketController", () => {
     expect(harness.statuses[harness.statuses.length - 1]).toBe("failed");
   });
 
-  it("ignores onclose from an orphan socket (OPT-350 supersede invariant)", async () => {
-    // Drive two parallel connect() calls so the second socket overwrites the
-    // first as the live ws while the first still has its onclose attached —
-    // the exact race the OPT-350 fix protects against.
+  it("retry() invalidates a pending connect — only the latest attempt installs a socket", async () => {
+    // Two parallel connect() calls: start() → A, then retry() → B. With the
+    // generation guard, whichever resolves last aborts in its post-await
+    // check; only the latest attempt installs its socket. (Without the guard,
+    // a slow-A / fast-B order would let A overwrite ws with a stale socket.)
     let resolveTokenA: (t: string) => void = () => {};
     let resolveTokenB: (t: string) => void = () => {};
     const tokenAPromise = new Promise<string>((r) => {
@@ -266,35 +267,110 @@ describe("createAuthedWebSocketController", () => {
       .mockReturnValueOnce(tokenAPromise)
       .mockReturnValueOnce(tokenBPromise);
 
-    const { controller, harness } = makeController({ getToken });
+    const { controller } = makeController({ getToken });
     controller.start();
-    await Promise.resolve(); // first connect now awaiting tokenAPromise
+    await Promise.resolve(); // A awaiting
 
     controller.retry();
-    await Promise.resolve(); // second connect now awaiting tokenBPromise
+    await Promise.resolve(); // B awaiting
 
+    // Resolve B first (the intended winner).
+    resolveTokenB("tok-b");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(FakeWebSocket.instances[0]!.url).toContain("token=tok-b");
+
+    // Resolve A second. The generation guard must abort A's post-await path;
+    // ws must NOT be overwritten with a stale socket.
     resolveTokenA("tok-a");
     await Promise.resolve();
     await Promise.resolve();
     expect(FakeWebSocket.instances).toHaveLength(1);
-    const orphanSocket = FakeWebSocket.instances[0]!;
+    expect(FakeWebSocket.instances[0]!.url).toContain("token=tok-b");
+  });
+
+  it("retry() invalidates pending connect even when the older fetch resolves first", async () => {
+    // Mirror of the above with A-then-B resolution order. A still aborts
+    // because by the time A resolves, retry() has already bumped the
+    // generation. Without the guard, A would install socketA and B would
+    // install socketB on top — leaving socketA as an orphan with onclose
+    // attached (the original OPT-350 supersede shape).
+    let resolveTokenA: (t: string) => void = () => {};
+    let resolveTokenB: (t: string) => void = () => {};
+    const tokenAPromise = new Promise<string>((r) => {
+      resolveTokenA = r;
+    });
+    const tokenBPromise = new Promise<string>((r) => {
+      resolveTokenB = r;
+    });
+    const getToken = vi
+      .fn()
+      .mockReturnValueOnce(tokenAPromise)
+      .mockReturnValueOnce(tokenBPromise);
+
+    const { controller } = makeController({ getToken });
+    controller.start();
+    await Promise.resolve();
+
+    controller.retry();
+    await Promise.resolve();
+
+    resolveTokenA("tok-a");
+    await Promise.resolve();
+    await Promise.resolve();
+    // A aborted → no socket yet.
+    expect(FakeWebSocket.instances).toHaveLength(0);
 
     resolveTokenB("tok-b");
     await Promise.resolve();
     await Promise.resolve();
-    expect(FakeWebSocket.instances).toHaveLength(2);
-    // orphanSocket's onclose is still attached (retry() runs before either
-    // socket is constructed, so retry's null-out had nothing to null).
-    expect(orphanSocket.onclose).not.toBeNull();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(FakeWebSocket.instances[0]!.url).toContain("token=tok-b");
+  });
 
-    const statusesBefore = [...harness.statuses];
-    const scheduledBefore = [...harness.scheduledDelays];
+  it("close() during a pending connect prevents the socket from opening afterward", async () => {
+    let resolveToken: (t: string) => void = () => {};
+    const tokenPromise = new Promise<string>((r) => {
+      resolveToken = r;
+    });
+    const getToken = vi.fn().mockReturnValueOnce(tokenPromise);
 
-    // Fire the orphan's onclose. The supersede guard must make this a no-op.
-    orphanSocket.simulateClose();
+    const { controller, harness } = makeController({ getToken });
+    controller.start();
+    await Promise.resolve(); // connect awaiting token
 
-    expect(harness.statuses).toEqual(statusesBefore);
-    expect(harness.scheduledDelays).toEqual(scheduledBefore);
+    await controller.close();
+    expect(harness.statuses[harness.statuses.length - 1]).toBe("disconnected");
+    expect(FakeWebSocket.instances).toHaveLength(0);
+
+    // Resolve the token AFTER close. Without the generation guard, the pending
+    // connect() would happily construct a socket here.
+    resolveToken("tok-late");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(harness.statuses[harness.statuses.length - 1]).toBe("disconnected");
+  });
+
+  it("dispose() during a pending connect prevents the socket from opening afterward", async () => {
+    let resolveToken: (t: string) => void = () => {};
+    const tokenPromise = new Promise<string>((r) => {
+      resolveToken = r;
+    });
+    const getToken = vi.fn().mockReturnValueOnce(tokenPromise);
+
+    const { controller } = makeController({ getToken });
+    controller.start();
+    await Promise.resolve();
+
+    controller.dispose();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+
+    resolveToken("tok-late");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(FakeWebSocket.instances).toHaveLength(0);
   });
 
   it("retry() resets attempts and reconnects after 'failed'", async () => {

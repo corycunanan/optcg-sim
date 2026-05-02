@@ -110,6 +110,14 @@ export function createAuthedWebSocketController<TServerMessage>(
   let attempts = 0;
   let stopped = false;
   let manuallyClosed = false;
+  // Connection generation. Every `connect()` captures the current value, then
+  // re-checks it after `await getToken()` returns. Any in-flight attempt whose
+  // generation has been bumped (by retry, close, dispose, or another connect)
+  // aborts before installing its socket. Without this guard, a slow token
+  // fetch from an earlier attempt can resolve last and overwrite the live ws
+  // with a stale socket — and `close()` during a pending fetch can race a
+  // socket open past the close.
+  let generation = 0;
 
   function scheduleReconnect() {
     const delay = computeReconnectDelay(attempts);
@@ -125,11 +133,14 @@ export function createAuthedWebSocketController<TServerMessage>(
     if (stopped) return;
     manuallyClosed = false;
 
+    generation += 1;
+    const myGen = generation;
+
     let token: string;
     try {
       token = await opts.getToken();
     } catch {
-      if (stopped) return;
+      if (stopped || myGen !== generation) return;
       opts.onErrorChange("Failed to get auth token");
       if (attempts >= MAX_RECONNECT_ATTEMPTS) {
         opts.onStatusChange("failed");
@@ -140,7 +151,7 @@ export function createAuthedWebSocketController<TServerMessage>(
       return;
     }
 
-    if (stopped) return;
+    if (stopped || myGen !== generation || manuallyClosed) return;
 
     const separator = opts.url.includes("?") ? "&" : "?";
     const wsUrl = `${opts.url}${separator}token=${encodeURIComponent(token)}`.replace(
@@ -230,6 +241,7 @@ export function createAuthedWebSocketController<TServerMessage>(
 
     async close() {
       manuallyClosed = true;
+      generation += 1; // invalidate any pending connect()
       if (reconnectTimerId !== null) {
         clearTimeoutImpl(reconnectTimerId);
         reconnectTimerId = null;
@@ -244,6 +256,7 @@ export function createAuthedWebSocketController<TServerMessage>(
 
     dispose() {
       stopped = true;
+      generation += 1; // invalidate any pending connect()
       if (reconnectTimerId !== null) {
         clearTimeoutImpl(reconnectTimerId);
         reconnectTimerId = null;
