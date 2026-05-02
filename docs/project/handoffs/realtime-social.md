@@ -1,7 +1,7 @@
 ---
 linear-project: Realtime Social
 linear-project-url: https://linear.app/optcg-sim/project/realtime-social-bf3d7344f863
-last-updated: 2026-05-02 · OPT-352 in review (#207); OPT-351 + #206 follow-up merged
+last-updated: 2026-05-02 · OPT-353 in review; OPT-352 (#207) merged
 ---
 
 # Realtime Social — Handoff Doc
@@ -17,8 +17,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | [OPT-351](https://linear.app/optcg-sim/issue/OPT-351) | Extract `useAuthedWebSocket` shared hook | 3 | — | Done | [#205](https://github.com/corycunanan/optcg-sim/pull/205) + [#206](https://github.com/corycunanan/optcg-sim/pull/206) merged | Pure refactor. Follow-up #206 landed a generation counter fix Codex flagged after #205 merged — guards two pending-`connect()` races. |
-| 2 | [OPT-352](https://linear.app/optcg-sim/issue/OPT-352) | `UserChannel` DO scaffold + `/api/realtime/token` | 5 | — | In Review | [#207](https://github.com/corycunanan/optcg-sim/pull/207) | Server-only foundation. Adds `UserChannel` DO + 3 worker routes + Next.js token mint endpoint. Dev game flow unchanged. |
-| 3 | [OPT-353](https://linear.app/optcg-sim/issue/OPT-353) | `notifyUser` helper + `useUserChannel` + app-shell wiring | 3 | OPT-351 ✓, OPT-352 (in review) | Backlog | — | Last foundation ticket; no events yet. Unblocks once #207 merges. |
+| 2 | [OPT-352](https://linear.app/optcg-sim/issue/OPT-352) | `UserChannel` DO scaffold + `/api/realtime/token` | 5 | — | Done | [#207](https://github.com/corycunanan/optcg-sim/pull/207) merged | Server-only foundation. Adds `UserChannel` DO + 3 worker routes + Next.js token mint endpoint. Dev game flow unchanged. |
+| 3 | [OPT-353](https://linear.app/optcg-sim/issue/OPT-353) | `notifyUser` helper + `useUserChannel` + app-shell wiring | 3 | OPT-351 ✓, OPT-352 ✓ | In Review | [#208](https://github.com/corycunanan/optcg-sim/pull/208) | Last foundation ticket. `notifyUser` server helper + `useUserChannel` hook + `<UserChannelProvider>` mounted in root layout. No events sent yet — OPT-354 lands the first one. |
 | 4 | [OPT-354](https://linear.app/optcg-sim/issue/OPT-354) | Chat push (P1) — delete 5s chat poll | 3 | OPT-353 | Backlog | — | First polling loop deleted; +60s backstop |
 | 5 | [OPT-355](https://linear.app/optcg-sim/issue/OPT-355) | Friends push (P2) — delete 30s sidebar poll | 3 | OPT-353 | Backlog | — | Four event types; +60s backstop |
 | 6 | [OPT-356](https://linear.app/optcg-sim/issue/OPT-356) | Lobby push (P3a) — delete 1.5s lobby poll | 3 | OPT-353 | Backlog | — | Replaces poll with the inline OPT-88 breadcrumb at `use-lobby-room.ts:123` |
@@ -30,7 +30,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-353 (last foundation ticket — `notifyUser` helper, `useUserChannel` hook, app-shell wiring). Blocked on #207 merging. Once it lands, OPT-354–358 (the polling-replacement layer) all unblock and can run in parallel.
+**Next up:** OPT-354 (chat push, P1 — first polling loop deleted). Blocked on the OPT-353 PR merging. Once it lands, OPT-354–358 (the polling-replacement layer) all unblock and can run in parallel.
 
 **Total:** ~35 points.
 
@@ -80,3 +80,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** Wire OPT-353's `useUserChannel` on top of `useAuthedWebSocket` (OPT-351's hook) — do **not** fork transport. The token URL contract is `?token=<jwt>` (query param, single-use JTI). The DO's `notify` endpoint accepts an opaque body — OPT-353's `notifyUser(userId, payload)` server helper should `JSON.stringify(payload)` and POST it; the DO fans the raw bytes out unchanged. No event vocabulary is defined here; OPT-353 lands `notifyUser`, OPT-354 sends the first event. Idle reap is 10 minutes of zero sockets — exposed via the `alarm()` handler, not a timer.
 - **Unresolved:** None. The "split vs parameterize verifier" question from OPT-351's handoff is resolved — went with parallel `verifyUserToken` for clarity (gameId-bearing tokens are rejected, not silently accepted). The cosmetic `GAME_WORKER_SECRET` → `WORKER_SECRET` rename is still deferred; not required for any current ticket.
 - **Why this matters for OPT-353:** OPT-353 is the first ticket to **consume** OPT-352's surface. The hook should mint via `POST /api/realtime/token`, dial `wss://<worker>/user/<userId>/ws?token=<jwt>` via `useAuthedWebSocket`, and ignore inbound messages until OPT-354 defines the first one. The server-side `notifyUser` helper goes against `POST /user/<userId>/notify` with `Authorization: Bearer ${process.env.GAME_WORKER_SECRET}` — same pattern Next.js already uses for `POST /game/.../notify-end`. OPT-358's presence work depends on `getConnectionCount()`, which is already exposed as a public method on the DO.
+
+### OPT-353 → OPT-354
+**From:** session on 2026-05-02 · **Commit:** `623b340` · **PR:** [#208](https://github.com/corycunanan/optcg-sim/pull/208)
+
+- **Primer:** Foundation phase complete. The bridge between server routes and the per-user `UserChannel` DO is wired end-to-end but inert — `RealtimeServerEvent` is `never` and no events flow until OPT-354. New code: `notifyUser()` (server helper, 2s timeout, best-effort, structured warn logs); `useUserChannel()` (client hook composing `useAuthedWebSocket`, mints via `POST /api/realtime/token` on every reconnect, dispatches by `type` through a typed `Map<eventType, Set<handler>>`); `<UserChannelProvider>` mounted in the root layout to enforce single-socket-per-tab.
+- **Read first:** `src/types/realtime.ts` (the empty discriminated union OPT-354 extends — add `{ type: "message:new"; ...payload }`), `src/lib/realtime/fan-out.ts` (call `notifyUser(recipientId, { type: "message:new", ... })` from the chat POST route), `src/lib/realtime/event-dispatcher.ts` (the dispatcher; note the `[T] extends [never]` non-distributive guards — once OPT-354 adds the first variant, the conditional flips and `EventType`/`EventOf<T>` narrow to the real union), `src/components/realtime/user-channel-provider.tsx` (subscribers call `useUserChannelEvents().subscribe("message:new", handler)`).
+- **Gotchas / do NOT touch:** The provider is mounted **once** in `src/app/layout.tsx` inside `<SessionProvider>`. Do not mount a second one and do not call `useUserChannel()` directly outside the provider — every direct call opens its own socket. The `subscribe` function identity is stable across re-renders (memoized on the dispatcher), so it's safe in `useEffect` deps. Don't add retry logic to `notifyUser` — the 60s reconciliation backstop polls (still in place in T4–T7) are the safety net until OPT-361 removes them. The hook intentionally surfaces `disconnected` (not `connecting`) when signed-out so the future status indicator doesn't flicker on logout.
+- **Unresolved:** No connection-status UI surfaced — deferred to T8 (presence) and T11 (cleanup) per the ticket. Manual E2E (real Cloudflare worker, "Offline" throttle, multi-tab) **not run** in this session — verified locally via unit tests + type-check only. Would be worth a 5-minute browser pass before merging the first migration ticket lands events on top.
+- **Why this matters for OPT-354:** OPT-354 is the first ticket to **send** an event through the channel. Pattern: extend the union in `src/types/realtime.ts` with `{ type: "message:new"; messageId: string; conversationId: string; from: string; body: string; sentAt: string }`; from the chat POST route, after the DB insert, call `notifyUser(recipientUserId, { type: "message:new", ... })`; in the chat widget, replace the 5s poll with `useUserChannelEvents().subscribe("message:new", ...)` to refetch / append. Keep the 60s reconciliation poll in place (per project plan) — OPT-361 deletes all backstops together after a 7-day soak.
