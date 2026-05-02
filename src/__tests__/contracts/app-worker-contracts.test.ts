@@ -6,7 +6,7 @@ import { GameResultSchema } from "@/lib/validators/game";
 import { mintGameToken } from "@/lib/game/token";
 import { validateGameInitPayload, validateNotifyEndPayload } from "@engine/util/validate.js";
 import { verifyGameToken } from "@engine/util/auth.js";
-import { consumeGameTokenJti } from "@engine/util/token-replay.js";
+import { consumeTokenJti } from "@engine/util/token-replay.js";
 import { buildGameResultCallbackPayload } from "@engine/util/result.js";
 import { filterStateForPlayer } from "@engine/engine/state.js";
 import { setupGame } from "@engine/__tests__/factories.js";
@@ -156,10 +156,10 @@ describe("app ↔ worker contracts", () => {
     });
 
     await expect(
-      consumeGameTokenJti(storage, payload!.jti, payload!.exp),
+      consumeTokenJti(storage, payload!.jti, payload!.exp),
     ).resolves.toBe(true);
     await expect(
-      consumeGameTokenJti(storage, payload!.jti, payload!.exp),
+      consumeTokenJti(storage, payload!.jti, payload!.exp),
     ).resolves.toBe(false);
 
     const freshToken = await mintGameToken("user-p1", secret, {
@@ -168,7 +168,7 @@ describe("app ↔ worker contracts", () => {
     });
     const freshPayload = await verifyGameToken(freshToken, secret, state.id);
     await expect(
-      consumeGameTokenJti(storage, freshPayload!.jti, freshPayload!.exp),
+      consumeTokenJti(storage, freshPayload!.jti, freshPayload!.exp),
     ).resolves.toBe(true);
   });
 
@@ -194,10 +194,10 @@ describe("app ↔ worker contracts", () => {
     expect(player0Payload).toMatchObject({ jti: "solitaire-side-a", playerIndex: 0 });
     expect(player1Payload).toMatchObject({ jti: "solitaire-side-b", playerIndex: 1 });
     await expect(
-      consumeGameTokenJti(storage, player0Payload!.jti, player0Payload!.exp),
+      consumeTokenJti(storage, player0Payload!.jti, player0Payload!.exp),
     ).resolves.toBe(true);
     await expect(
-      consumeGameTokenJti(storage, player1Payload!.jti, player1Payload!.exp),
+      consumeTokenJti(storage, player1Payload!.jti, player1Payload!.exp),
     ).resolves.toBe(true);
   });
 

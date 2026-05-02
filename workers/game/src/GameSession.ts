@@ -31,7 +31,7 @@ import {
 } from "./engine/replacements.js";
 import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
 import { verifyGameToken } from "./util/auth.js";
-import { CONSUMED_TOKEN_JTIS_STORAGE_KEY, consumeGameTokenJti } from "./util/token-replay.js";
+import { CONSUMED_TOKEN_JTIS_STORAGE_KEY, consumeTokenJti } from "./util/token-replay.js";
 import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayload } from "./util/validate.js";
 import { buildGameResultCallbackPayload } from "./util/result.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
@@ -998,7 +998,7 @@ export class GameSession implements DurableObject {
       return null;
     }
 
-    const consumed = await consumeGameTokenJti(
+    const consumed = await consumeTokenJti(
       this.state.storage,
       payload.jti,
       payload.exp,
