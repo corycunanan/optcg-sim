@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import {
   useAuthedWebSocket,
@@ -47,8 +47,6 @@ export function useUserChannel(): UseUserChannelResult {
   // identity is stable across re-renders — important for downstream
   // `useEffect` deps in feature subscribers (OPT-354+).
   const dispatcher = useMemo(() => createEventDispatcher(), []);
-  const dispatcherRef = useRef(dispatcher);
-  dispatcherRef.current = dispatcher;
 
   const url = useMemo(() => {
     if (!userId || !WORKER_URL) return null;
@@ -75,9 +73,9 @@ export function useUserChannel(): UseUserChannelResult {
       && "type" in msg
       && typeof (msg as { type: unknown }).type === "string"
     ) {
-      dispatcherRef.current.dispatch(msg as { type: string } & Record<string, unknown>);
+      dispatcher.dispatch(msg as { type: string } & Record<string, unknown>);
     }
-  }, []);
+  }, [dispatcher]);
 
   const { connectionStatus, close } = useAuthedWebSocket<unknown>({
     url,
