@@ -23,7 +23,14 @@ export type RealtimeServerEvent =
     }
   | { type: "friend:request_declined"; requestId: string; toUserId: string }
   | { type: "friend:removed"; userId: string }
-  | { type: "lobby:state_changed"; lobby: LobbyRoomState };
+  | { type: "lobby:state_changed"; lobby: LobbyRoomState }
+  | {
+      type: "game:status";
+      gameId: string;
+      status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
+      winnerId: string | null;
+      winReason: string | null;
+    };
 
 export interface SerializedMessage {
   id: string;

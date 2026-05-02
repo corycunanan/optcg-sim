@@ -4,10 +4,11 @@
  * Protected by the GAME_WORKER_SECRET shared secret.
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { apiAction, apiError } from "@/lib/api-response";
 import { finalizeGameResult } from "@/lib/game/finalize";
 import { apiLimiter } from "@/lib/rate-limit";
+import { notifyGame } from "@/lib/realtime/fanout-game";
 import { GameResultSchema } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 
@@ -35,13 +36,23 @@ export async function POST(request: NextRequest) {
       return apiError("Game result must be terminal", 400);
     }
 
-    await finalizeGameResult({
+    const finalization = await finalizeGameResult({
       gameId,
       status,
       winnerId: winnerId ?? null,
       winReason: winReason ?? null,
       reasonCode: reasonCode ?? null,
     });
+
+    if (finalization.finalized) {
+      after(() =>
+        notifyGame(gameId, {
+          status,
+          winnerId: winnerId ?? null,
+          winReason: winReason ?? null,
+        }),
+      );
+    }
 
     return apiAction();
   } catch (error) {

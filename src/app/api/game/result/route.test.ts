@@ -3,6 +3,30 @@ import { NextRequest } from "next/server";
 
 const finalizeGameResultMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 29 }));
+const notifyGameMock = vi.fn();
+
+// Track `after()` callbacks so tests can deterministically wait for them
+// before asserting on fanout side effects (mirrors the lobbies route tests).
+const afterCalls = vi.hoisted(() => ({
+  pending: [] as Promise<void>[],
+}));
+
+async function flushAfter(): Promise<void> {
+  while (afterCalls.pending.length) {
+    const batch = afterCalls.pending.splice(0);
+    await Promise.all(batch);
+  }
+}
+
+vi.mock("next/server", async (importActual) => {
+  const actual = await importActual<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      afterCalls.pending.push(Promise.resolve().then(cb));
+    },
+  };
+});
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/game/finalize", () => ({
@@ -10,6 +34,9 @@ vi.mock("@/lib/game/finalize", () => ({
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
+}));
+vi.mock("@/lib/realtime/fanout-game", () => ({
+  notifyGame: (...args: unknown[]) => notifyGameMock(...args),
 }));
 
 const SECRET = "test-secret";
@@ -42,6 +69,9 @@ beforeEach(() => {
   finalizeGameResultMock.mockResolvedValue({ finalized: true, alreadyFinal: false });
   rateLimitMock.mockReset();
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 29 });
+  notifyGameMock.mockReset();
+  notifyGameMock.mockResolvedValue(undefined);
+  afterCalls.pending.length = 0;
 });
 
 describe("POST /api/game/result", () => {
@@ -91,5 +121,31 @@ describe("POST /api/game/result", () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(500);
     errSpy.mockRestore();
+  });
+
+  it("fans out game:status to both players after a successful finalize", async () => {
+    const res = await POST(buildRequest());
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(notifyGameMock).toHaveBeenCalledTimes(1);
+    expect(notifyGameMock).toHaveBeenCalledWith("game-1", {
+      status: "FINISHED",
+      winnerId: "user-1",
+      winReason: "Life-out",
+    });
+  });
+
+  it("does not fan out when the row was already terminal (idempotent re-call)", async () => {
+    finalizeGameResultMock.mockResolvedValueOnce({
+      finalized: false,
+      alreadyFinal: true,
+    });
+
+    const res = await POST(buildRequest());
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(notifyGameMock).not.toHaveBeenCalled();
   });
 });

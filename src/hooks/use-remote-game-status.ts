@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { useSession } from "next-auth/react";
+import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 
 export interface RemoteGameStatus {
   id: string;
@@ -20,10 +22,21 @@ export interface UseRemoteGameStatusReturn {
   setRemoteGameStatus: Dispatch<SetStateAction<RemoteGameStatus | null>>;
 }
 
+function deriveWinnerPerspective(
+  winnerId: string | null,
+  userId: string,
+): RemoteGameStatus["winnerPerspective"] {
+  if (!winnerId) return "NONE";
+  return winnerId === userId ? "SELF" : "OPPONENT";
+}
+
 export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
   const [remoteGameStatus, setRemoteGameStatus] =
     useState<RemoteGameStatus | null>(null);
   const [remoteGameNotFound, setRemoteGameNotFound] = useState(false);
+  const { subscribe } = useUserChannelEvents();
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? "";
 
   useEffect(() => {
     let cancelled = false;
@@ -50,16 +63,36 @@ export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
     };
 
     void loadGameStatus();
-    const interval = setInterval(() => {
-      if (remoteGameNotFound) return;
-      void loadGameStatus();
-    }, 2000);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
     };
-  }, [gameId, remoteGameNotFound]);
+  }, [gameId]);
+
+  // Push-based status updates from the UserChannel. Replaces the 2s poll —
+  // status only transitions to terminal (FINISHED/ABANDONED) at game end, so
+  // there's no backstop. A missed push is recovered by the one-shot fetch on
+  // the next mount.
+  useEffect(() => {
+    return subscribe("game:status", (event) => {
+      if (event.gameId !== gameId) return;
+      setRemoteGameStatus((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: event.status,
+          winnerId: event.winnerId,
+          winReason: event.winReason,
+          // Preserve the prior perspective if the session hasn't hydrated yet —
+          // an empty `userId` would misclassify a SELF win as OPPONENT.
+          winnerPerspective: userId
+            ? deriveWinnerPerspective(event.winnerId, userId)
+            : prev.winnerPerspective,
+          canFallbackConcede: event.status === "IN_PROGRESS",
+        };
+      });
+    });
+  }, [subscribe, gameId, userId]);
 
   return { remoteGameStatus, remoteGameNotFound, setRemoteGameStatus };
 }
