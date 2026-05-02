@@ -3,12 +3,14 @@
  * POST /api/friends/requests — Send a friend request
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { SendFriendRequestSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
+import { notifyUser } from "@/lib/realtime/fan-out";
+import { serializeFriendRequestForEvent } from "@/lib/realtime/serialize-friend";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -91,9 +93,17 @@ export async function POST(request: NextRequest) {
     const req = await prisma.friendRequest.create({
       data: { fromUserId: userId, toUserId },
       include: {
+        fromUser: { select: { id: true, username: true, name: true, image: true } },
         toUser: { select: { id: true, username: true, name: true, image: true } },
       },
     });
+
+    after(() =>
+      notifyUser(toUserId, {
+        type: "friend:request_received",
+        request: serializeFriendRequestForEvent(req),
+      }),
+    );
 
     return apiSuccess(req, 201);
   } catch (error) {

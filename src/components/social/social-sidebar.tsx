@@ -29,25 +29,19 @@ import {
 import { UserPlus, Check, X, MoreHorizontal, ChevronsUpDown, LogOut, Search } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
+import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
+import {
+  applyFriendEvent,
+  type FriendEntry,
+  type FriendRequestEntry,
+  type SidebarUser,
+} from "./apply-friend-event";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Reconciliation backstop interval — replaces the 30s poll until OPT-361
+// drops it after a soak window.
+const RECONCILE_INTERVAL_MS = 60_000;
 
-export interface SidebarUser {
-  id: string;
-  username: string | null;
-  name: string | null;
-  image: string | null;
-}
-
-interface FriendEntry {
-  friendshipId: string;
-  user: SidebarUser;
-}
-
-interface FriendRequest {
-  id: string;
-  fromUser?: SidebarUser;
-}
+export type { SidebarUser };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -60,16 +54,17 @@ interface SocialSidebarProps {
 export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const { data: session } = useSession();
   const [friends, setFriends] = useState<FriendEntry[]>([]);
-  const [incoming, setIncoming] = useState<FriendRequest[]>([]);
+  const [incoming, setIncoming] = useState<FriendRequestEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SidebarUser[]>([]);
   const [pendingSent, setPendingSent] = useState<Set<string>>(new Set());
+  const { subscribe } = useUserChannelEvents();
 
   const fetchFriendsData = useCallback(async () => {
     const [friendsJson, requestsJson] = await Promise.all([
       apiGet<{ data: FriendEntry[] }>("/api/friends").catch(() => null),
-      apiGet<{ data: { incoming: FriendRequest[] } }>("/api/friends/requests").catch(() => null),
+      apiGet<{ data: { incoming: FriendRequestEntry[] } }>("/api/friends/requests").catch(() => null),
     ]);
     if (friendsJson) setFriends(friendsJson.data || []);
     if (requestsJson) setIncoming(requestsJson.data?.incoming || []);
@@ -79,9 +74,36 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
     queueMicrotask(() => {
       void fetchFriendsData();
     });
-    const t = setInterval(fetchFriendsData, 30_000);
+    const t = setInterval(fetchFriendsData, RECONCILE_INTERVAL_MS);
     return () => clearInterval(t);
   }, [fetchFriendsData]);
+
+  useEffect(() => {
+    const unsubReceived = subscribe("friend:request_received", (event) => {
+      setIncoming((prev) =>
+        applyFriendEvent({ friends: [], incoming: prev }, event).incoming,
+      );
+    });
+    const unsubAccepted = subscribe("friend:request_accepted", (event) => {
+      setFriends((prev) =>
+        applyFriendEvent({ friends: prev, incoming: [] }, event).friends,
+      );
+    });
+    const unsubDeclined = subscribe("friend:request_declined", () => {
+      // No outgoing-requests UI today; no-op on the recipient sidebar.
+    });
+    const unsubRemoved = subscribe("friend:removed", (event) => {
+      setFriends((prev) =>
+        applyFriendEvent({ friends: prev, incoming: [] }, event).friends,
+      );
+    });
+    return () => {
+      unsubReceived();
+      unsubAccepted();
+      unsubDeclined();
+      unsubRemoved();
+    };
+  }, [subscribe]);
 
   const search = useCallback(async (q: string) => {
     setSearchQ(q);
