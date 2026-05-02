@@ -83,7 +83,11 @@ export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
           status: event.status,
           winnerId: event.winnerId,
           winReason: event.winReason,
-          winnerPerspective: deriveWinnerPerspective(event.winnerId, userId),
+          // Preserve the prior perspective if the session hasn't hydrated yet —
+          // an empty `userId` would misclassify a SELF win as OPPONENT.
+          winnerPerspective: userId
+            ? deriveWinnerPerspective(event.winnerId, userId)
+            : prev.winnerPerspective,
           canFallbackConcede: event.status === "IN_PROGRESS",
         };
       });

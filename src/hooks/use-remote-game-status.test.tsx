@@ -150,6 +150,32 @@ describe("useRemoteGameStatus subscribe behavior", () => {
     });
   });
 
+  it("preserves prev winnerPerspective when the session hasn't hydrated yet", () => {
+    // Simulate a push that lands before next-auth resolves the session.
+    mocks.session = { data: null };
+    useRemoteGameStatus("game-1");
+
+    const updater = invokeHandlerAndCaptureUpdater({
+      type: "game:status",
+      gameId: "game-1",
+      status: "FINISHED",
+      winnerId: "user-a",
+      winReason: "Life-out",
+    });
+
+    // `prev` claimed the viewer was the winner; without a hydrated userId,
+    // recomputing would default to OPPONENT (winnerId !== "") — so we keep
+    // the previous value instead.
+    const prev: RemoteGameStatus = { ...baseStatus, winnerPerspective: "SELF" };
+    const next = updater(prev);
+    expect(next).toMatchObject({
+      status: "FINISHED",
+      winnerId: "user-a",
+      winnerPerspective: "SELF",
+      canFallbackConcede: false,
+    });
+  });
+
   it("treats null winnerId (abandoned) as winnerPerspective=NONE", () => {
     useRemoteGameStatus("game-1");
 

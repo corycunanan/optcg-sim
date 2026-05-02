@@ -58,7 +58,11 @@ export async function notifyGame(
   // gets at most one fanout per status change.
   const targets = Array.from(new Set([game.player1Id, game.player2Id]));
 
-  await Promise.all(
+  // `allSettled` so a single recipient failure can't reject the whole fanout.
+  // `notifyUser` is already exception-safe (logs + swallows), but this guards
+  // future behavior changes from accidentally turning the fanout into all-or-
+  // nothing.
+  await Promise.allSettled(
     targets.map((userId) => notifyUser(userId, event, options.deps)),
   );
 }
