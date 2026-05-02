@@ -9,6 +9,8 @@ import { prisma } from "@/lib/db";
 import { SendMessageSchema } from "@/lib/validators/messages";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
+import { notifyUser } from "@/lib/realtime/fan-out";
+import { serializeMessageForEvent } from "@/lib/realtime/serialize-message";
 
 export async function GET(
   request: NextRequest,
@@ -113,6 +115,11 @@ export async function POST(
       include: {
         fromUser: { select: { id: true, username: true, name: true, image: true } },
       },
+    });
+
+    void notifyUser(toUserId, {
+      type: "message:new",
+      message: serializeMessageForEvent(message),
     });
 
     return apiSuccess(message, 201);

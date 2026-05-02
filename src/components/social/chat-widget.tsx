@@ -7,6 +7,10 @@ import { apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { X, Minus, ChevronUp } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
+import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
+import { applyMessageEvent, type ChatMessage } from "./apply-message-event";
+
+type Message = ChatMessage;
 
 interface User {
   id: string;
@@ -15,19 +19,16 @@ interface User {
   image: string | null;
 }
 
-interface Message {
-  id: string;
-  body: string;
-  createdAt: string;
-  fromUserId: string;
-}
-
 interface Props {
   user: User;
   currentUserId: string;
   sidebarCollapsed: boolean;
   onClose: () => void;
 }
+
+// Reconciliation backstop interval — replaces the 5s poll until OPT-361
+// drops it after a soak window.
+const RECONCILE_INTERVAL_MS = 60_000;
 
 export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -38,6 +39,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
+  const { subscribe } = useUserChannelEvents();
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -54,6 +56,12 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
   }, [user.id]);
 
   useEffect(() => {
+    return subscribe("message:new", (event) => {
+      setMessages((prev) => applyMessageEvent(prev, event.message, user.id));
+    });
+  }, [subscribe, user.id]);
+
+  useEffect(() => {
     if (loading) return;
     const interval = setInterval(async () => {
       if (minimized) return;
@@ -63,12 +71,16 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       try {
         const json = await apiGet<{ data: Message[] }>(`/api/messages/${user.id}?after=${encodeURIComponent(after)}`);
         if (json.data?.length > 0) {
-          setMessages((prev) => [...prev, ...json.data]);
+          setMessages((prev) => {
+            const seen = new Set(prev.map((m) => m.id));
+            const fresh = json.data.filter((m) => !seen.has(m.id));
+            return fresh.length > 0 ? [...prev, ...fresh] : prev;
+          });
         }
       } catch {
         // ignore poll errors silently
       }
-    }, 5_000);
+    }, RECONCILE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [user.id, loading, minimized]);
 

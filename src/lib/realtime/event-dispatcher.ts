@@ -48,11 +48,11 @@ export function createEventDispatcher(): EventDispatcher {
         set = new Set();
         handlers.set(type, set);
       }
-      set.add(handler as Handler<EventType>);
+      set.add(handler as unknown as Handler<EventType>);
       return () => {
         const current = handlers.get(type);
         if (!current) return;
-        current.delete(handler as Handler<EventType>);
+        current.delete(handler as unknown as Handler<EventType>);
         if (current.size === 0) handlers.delete(type);
       };
     },
