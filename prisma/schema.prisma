@@ -37,6 +37,7 @@ model User {
   username      String?   @unique // Game profile username (set during onboarding)
   password      String?   // Bcrypt hash; null for OAuth-only accounts
   isAdmin       Boolean   @default(false) @map("is_admin")
+  lastSeen      DateTime? @map("last_seen")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
