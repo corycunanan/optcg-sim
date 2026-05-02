@@ -11,19 +11,23 @@ const mocks = vi.hoisted(() => ({
   setterIndex: 0,
   subscribeHandler: null as ((event: LobbyEvent) => void) | null,
   subscribeUnsub: vi.fn(),
+  effectCleanups: [] as Array<() => void>,
 }));
 
 // Mock React's hooks to run synchronously and capture per-`useState` setter
 // calls in declaration order. The hook declares state in this order:
 //   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting
-// Tests assert on the lobby setter (index 0).
+// Tests assert on the lobby setter (index 0) and the error setter (index 2).
 vi.mock("react", async (importActual) => {
   const actual = await importActual<typeof import("react")>();
   return {
     ...actual,
     useCallback: (cb: unknown) => cb,
     useEffect: (effect: () => void | (() => void)) => {
-      effect();
+      const cleanup = effect();
+      if (typeof cleanup === "function") {
+        mocks.effectCleanups.push(cleanup);
+      }
     },
     useRef: (initial: unknown) => ({ current: initial }),
     useState: (initial: unknown) => {
@@ -87,6 +91,7 @@ beforeEach(() => {
   mocks.subscribeHandler = null;
   mocks.setterCalls = [];
   mocks.setterIndex = 0;
+  mocks.effectCleanups = [];
 
   // Default API responses so the initial refresh doesn't blow up the tests
   // that exercise subscribe behavior.
@@ -123,13 +128,30 @@ describe("useLobbyRoom subscribe behavior", () => {
   });
 
   it("returns the unsubscribe function from the subscribe effect cleanup", () => {
-    // The hook's subscribe useEffect returns the dispatcher's unsubscribe.
-    // The mocked `useEffect` invokes the effect synchronously and discards the
-    // cleanup return value, so we verify by checking that subscribe was wired
-    // to the same unsub our mock owns.
     useLobbyRoom("lobby-1", lobbyState());
 
     expect(mocks.subscribeHandler).toBeTypeOf("function");
-    expect(mocks.subscribeUnsub).toHaveBeenCalledTimes(0);
+    expect(mocks.subscribeUnsub).not.toHaveBeenCalled();
+
+    // Run every captured cleanup; the dispatcher unsub must be one of them.
+    for (const cleanup of mocks.effectCleanups) {
+      cleanup();
+    }
+
+    expect(mocks.subscribeUnsub).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears stale error state when a matching event arrives", () => {
+    useLobbyRoom("lobby-1", lobbyState());
+
+    mocks.subscribeHandler?.({
+      type: "lobby:state_changed",
+      lobby: lobbyState({ format: "Eternal" }),
+    });
+
+    // setterCalls[2] is the error setter (declaration order: lobby, loading,
+    // error, mutating, starting). The push handler must reset it to null so
+    // a stale "Lobby unavailable" doesn't linger after the room recovers.
+    expect(mocks.setterCalls[2]).toContain(null);
   });
 });

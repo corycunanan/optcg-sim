@@ -35,9 +35,7 @@ vi.mock("next/server", async (importActual) => {
   return {
     ...actual,
     after: (cb: () => void | Promise<void>) => {
-      afterCalls.pending.push(
-        Promise.resolve().then(cb).catch(() => undefined),
-      );
+      afterCalls.pending.push(Promise.resolve().then(cb));
     },
   };
 });

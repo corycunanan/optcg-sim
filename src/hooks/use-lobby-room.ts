@@ -71,6 +71,10 @@ export function useLobbyRoom(
     return subscribe("lobby:state_changed", (event) => {
       if (event.lobby.id !== lobbyId) return;
       setLobby(event.lobby);
+      // A successful push proves the lobby is reachable; clear any stale
+      // "Lobby unavailable" left from a prior `refresh()` failure so the
+      // banner doesn't linger after the room recovers.
+      setError(null);
     });
   }, [subscribe, lobbyId]);
 
