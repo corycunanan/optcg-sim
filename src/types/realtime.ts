@@ -1,3 +1,5 @@
+import type { LobbyRoomState } from "@/lib/lobbies/state";
+
 /**
  * UserChannel server → client event vocabulary.
  *
@@ -20,7 +22,8 @@ export type RealtimeServerEvent =
       friendship: SerializedFriendship;
     }
   | { type: "friend:request_declined"; requestId: string; toUserId: string }
-  | { type: "friend:removed"; userId: string };
+  | { type: "friend:removed"; userId: string }
+  | { type: "lobby:state_changed"; lobby: LobbyRoomState };
 
 export interface SerializedMessage {
   id: string;

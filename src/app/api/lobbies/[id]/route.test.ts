@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindUniqueMock = vi.fn();
+const lobbyFindFirstMock = vi.fn();
 const lobbyUpdateMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
@@ -11,12 +12,42 @@ const lobbyGuestUpdateMock = vi.fn();
 const lobbyGuestUpsertMock = vi.fn();
 const deckFindFirstMock = vi.fn();
 const transactionMock = vi.fn();
+const buildLobbyRoomStateMock = vi.fn();
+const notifyLobbyMock = vi.fn();
+const notifyUserMock = vi.fn();
+
+// Track `after()` callbacks so tests can deterministically wait for them
+// before asserting on fanout side effects. The cb chain has multiple awaits
+// (build state → notify), so a bare `void cb()` would race the assertions.
+const afterCalls = vi.hoisted(() => ({
+  pending: [] as Promise<void>[],
+}));
+
+async function flushAfter(): Promise<void> {
+  while (afterCalls.pending.length) {
+    const batch = afterCalls.pending.splice(0);
+    await Promise.all(batch);
+  }
+}
+
+vi.mock("next/server", async (importActual) => {
+  const actual = await importActual<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      afterCalls.pending.push(
+        Promise.resolve().then(cb).catch(() => undefined),
+      );
+    },
+  };
+});
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     lobby: {
       findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args),
+      findFirst: (...args: unknown[]) => lobbyFindFirstMock(...args),
       update: (...args: unknown[]) => lobbyUpdateMock(...args),
     },
     lobbyGuest: {
@@ -37,8 +68,17 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
 }));
+vi.mock("@/lib/lobbies/build-state", () => ({
+  buildLobbyRoomState: (...args: unknown[]) => buildLobbyRoomStateMock(...args),
+}));
+vi.mock("@/lib/realtime/fanout-lobby", () => ({
+  notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
+}));
+vi.mock("@/lib/realtime/fan-out", () => ({
+  notifyUser: (...args: unknown[]) => notifyUserMock(...args),
+}));
 
-const { PATCH } = await import("./route");
+const { PATCH, DELETE } = await import("./route");
 
 function buildRequest(body: unknown, search = "") {
   return new NextRequest(`http://localhost/api/lobbies/lobby-1${search}`, {
@@ -73,6 +113,7 @@ beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   lobbyFindUniqueMock.mockReset();
+  lobbyFindFirstMock.mockReset();
   lobbyUpdateMock.mockReset();
   lobbyGuestCreateMock.mockReset();
   lobbyGuestDeleteManyMock.mockReset();
@@ -80,10 +121,18 @@ beforeEach(() => {
   lobbyGuestUpsertMock.mockReset();
   deckFindFirstMock.mockReset();
   transactionMock.mockReset();
+  buildLobbyRoomStateMock.mockReset();
+  notifyLobbyMock.mockReset();
+  notifyUserMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "host-user" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   lobbyFindUniqueMock.mockResolvedValue(baseLobby());
+  lobbyFindFirstMock.mockResolvedValue({
+    id: "lobby-1",
+    hostUserId: "host-user",
+    status: "WAITING",
+  });
   lobbyUpdateMock.mockReturnValue({ query: "update-lobby" });
   lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
   lobbyGuestDeleteManyMock.mockReturnValue({ query: "delete-guests" });
@@ -91,6 +140,15 @@ beforeEach(() => {
   lobbyGuestUpsertMock.mockReturnValue({ query: "upsert-guest" });
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
   transactionMock.mockResolvedValue([]);
+  buildLobbyRoomStateMock.mockResolvedValue({
+    id: "lobby-1",
+    status: "READY",
+    hostUserId: "host-user",
+    guest: null,
+  });
+  notifyLobbyMock.mockResolvedValue(undefined);
+  notifyUserMock.mockResolvedValue(undefined);
+  afterCalls.pending.length = 0;
 });
 
 describe("PATCH /api/lobbies/[id]", () => {
@@ -226,5 +284,132 @@ describe("PATCH /api/lobbies/[id]", () => {
 
     expect(res.status).toBe(501);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("fans out lobby:state_changed to other members after a successful PATCH", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      id: "lobby-1",
+      status: "READY",
+      hostUserId: "host-user",
+      guest: { user: { id: "guest-user" } },
+    });
+
+    const res = await PATCH(buildRequest({ ready: true }), params);
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("lobby-1");
+    expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
+    expect(notifyLobbyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "lobby-1" }),
+      { actorUserId: "guest-user" },
+    );
+    // No eject in this scenario, so the EVICTED single-user notify is silent.
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("notifies the ejected guest with status=EVICTED on a forced PVP→Solitaire flip", async () => {
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      id: "lobby-1",
+      status: "READY",
+      hostUserId: "host-user",
+      guest: {
+        user: { id: "host-user", username: "hosty", name: null, image: null },
+      },
+    });
+
+    const res = await PATCH(
+      buildRequest(
+        { mode: "SOLITAIRE", guestDeckId: "side-b-deck" },
+        "?force=true",
+      ),
+      params,
+    );
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
+    expect(notifyLobbyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "lobby-1" }),
+      { actorUserId: "host-user" },
+    );
+    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+    expect(notifyUserMock).toHaveBeenCalledWith("guest-user", {
+      type: "lobby:state_changed",
+      lobby: expect.objectContaining({ status: "EVICTED" }),
+    });
+  });
+
+  it("does not fan out when PATCH is rejected before the transaction", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(null);
+
+    const res = await PATCH(buildRequest({ ready: true }), params);
+    await flushAfter();
+
+    expect(res.status).toBe(404);
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/lobbies/[id]", () => {
+  it("closes the lobby without fanning out when there is no guest", async () => {
+    const res = await DELETE(
+      new NextRequest("http://localhost/api/lobbies/lobby-1", {
+        method: "DELETE",
+      }),
+      params,
+    );
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(lobbyUpdateMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1" },
+      data: { status: "CLOSED" },
+    });
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("notifies the guest with status=CLOSED if a guest is present", async () => {
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      id: "lobby-1",
+      status: "CLOSED",
+      hostUserId: "host-user",
+      guest: {
+        user: { id: "guest-user", username: "guesty", name: null, image: null },
+      },
+    });
+
+    const res = await DELETE(
+      new NextRequest("http://localhost/api/lobbies/lobby-1", {
+        method: "DELETE",
+      }),
+      params,
+    );
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+    expect(notifyUserMock).toHaveBeenCalledWith("guest-user", {
+      type: "lobby:state_changed",
+      lobby: expect.objectContaining({ status: "CLOSED" }),
+    });
+  });
+
+  it("returns 404 without notifying when the lobby cannot be found", async () => {
+    lobbyFindFirstMock.mockResolvedValueOnce(null);
+
+    const res = await DELETE(
+      new NextRequest("http://localhost/api/lobbies/lobby-1", {
+        method: "DELETE",
+      }),
+      params,
+    );
+    await flushAfter();
+
+    expect(res.status).toBe(404);
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,7 @@
  * creates the GameSession, and initializes the Durable Object.
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -16,6 +16,8 @@ import {
   DeckNotFoundError,
   requirePlayableDeck,
 } from "@/lib/decks/playable";
+import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
@@ -187,6 +189,14 @@ export async function POST(
       ]).catch((e) => console.error("Rollback failed:", e));
       return apiError("Failed to initialize game server", 502);
     }
+
+    after(async () => {
+      const state = await buildLobbyRoomState(lobby.id);
+      if (!state) return;
+      // Host (actor) navigates to the game from this route's response;
+      // the guest learns from the push that gameId is set.
+      await notifyLobby(state, { actorUserId: userId });
+    });
 
     return apiSuccess({ gameId: startResult.gameSession.id });
   } catch (error) {

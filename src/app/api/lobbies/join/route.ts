@@ -6,13 +6,15 @@
  * Creates a LobbyGuest record, marks the lobby READY, and returns { lobbyId }.
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { normalizeLobbyCode } from "@/lib/lobbies";
 import { JoinLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
+import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
@@ -76,6 +78,14 @@ export async function POST(request: NextRequest) {
         data: { status: "READY" },
       }),
     ]);
+
+    after(async () => {
+      const state = await buildLobbyRoomState(lobby.id);
+      if (!state) return;
+      // Actor (the new guest) sees the join via the route response; only the
+      // host needs the push.
+      await notifyLobby(state, { actorUserId: userId });
+    });
 
     return apiSuccess({ lobbyId: lobby.id });
   } catch (error) {
