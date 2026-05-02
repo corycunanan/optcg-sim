@@ -1,7 +1,7 @@
 ---
 linear-project: Realtime Social
 linear-project-url: https://linear.app/optcg-sim/project/realtime-social-bf3d7344f863
-last-updated: 2026-05-01 · OPT-351 in review
+last-updated: 2026-05-02 · OPT-351 merged (gen-counter follow-up #206 open)
 ---
 
 # Realtime Social — Handoff Doc
@@ -16,7 +16,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | [OPT-351](https://linear.app/optcg-sim/issue/OPT-351) | Extract `useAuthedWebSocket` shared hook | 3 | — | In Review | [#205](https://github.com/corycunanan/optcg-sim/pull/205) | Pure refactor; unblocks every other ticket |
+| 1 | [OPT-351](https://linear.app/optcg-sim/issue/OPT-351) | Extract `useAuthedWebSocket` shared hook | 3 | — | Done | [#205](https://github.com/corycunanan/optcg-sim/pull/205) merged · [#206](https://github.com/corycunanan/optcg-sim/pull/206) open | Pure refactor. Follow-up #206 lands a generation counter fix Codex flagged after #205 merged — guards two pending-`connect()` races. |
 | 2 | [OPT-352](https://linear.app/optcg-sim/issue/OPT-352) | `UserChannel` DO scaffold + `/api/realtime/token` | 5 | — | Backlog | — | Server-only; can land in parallel with OPT-351 |
 | 3 | [OPT-353](https://linear.app/optcg-sim/issue/OPT-353) | `notifyUser` helper + `useUserChannel` + app-shell wiring | 3 | OPT-351, OPT-352 | Backlog | — | Last foundation ticket; no events yet |
 | 4 | [OPT-354](https://linear.app/optcg-sim/issue/OPT-354) | Chat push (P1) — delete 5s chat poll | 3 | OPT-353 | Backlog | — | First polling loop deleted; +60s backstop |
@@ -30,7 +30,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-352 (server-only foundation, ready now). OPT-353 unblocks once both OPT-351 (in review) and OPT-352 land.
+**Next up:** OPT-352 (server-only foundation, ready now). OPT-353 unblocks once both OPT-351 (merged; #206 follow-up open) and OPT-352 land.
 
 **Total:** ~35 points.
 
