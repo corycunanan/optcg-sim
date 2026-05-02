@@ -12,7 +12,15 @@
  * The discriminator is always `type`. Keep names `<feature>:<verb>`.
  */
 export type RealtimeServerEvent =
-  | { type: "message:new"; message: SerializedMessage };
+  | { type: "message:new"; message: SerializedMessage }
+  | { type: "friend:request_received"; request: SerializedFriendRequest }
+  | {
+      type: "friend:request_accepted";
+      request: SerializedFriendRequest;
+      friendship: SerializedFriendship;
+    }
+  | { type: "friend:request_declined"; requestId: string; toUserId: string }
+  | { type: "friend:removed"; userId: string };
 
 export interface SerializedMessage {
   id: string;
@@ -20,12 +28,29 @@ export interface SerializedMessage {
   toUserId: string;
   body: string;
   createdAt: string;
-  fromUser: {
-    id: string;
-    username: string | null;
-    name: string | null;
-    image: string | null;
-  };
+  fromUser: SerializedUser;
+}
+
+export interface SerializedFriendRequest {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  createdAt: string;
+  fromUser: SerializedUser;
+}
+
+export interface SerializedFriendship {
+  id: string;
+  createdAt: string;
+  /** The "other" user, from the recipient's perspective. */
+  user: SerializedUser;
+}
+
+export interface SerializedUser {
+  id: string;
+  username: string | null;
+  name: string | null;
+  image: string | null;
 }
 
 export { type ConnectionStatus } from "@/hooks/use-authed-websocket";

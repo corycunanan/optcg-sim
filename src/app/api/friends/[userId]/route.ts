@@ -2,10 +2,11 @@
  * DELETE /api/friends/[userId] — Remove a friend
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { requireAuth, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { socialLimiter } from "@/lib/rate-limit";
+import { notifyUser } from "@/lib/realtime/fan-out";
 
 export async function DELETE(
   _request: NextRequest,
@@ -37,6 +38,13 @@ export async function DELETE(
     }
 
     await prisma.friendship.delete({ where: { id: friendship.id } });
+
+    after(() =>
+      notifyUser(friendId, {
+        type: "friend:removed",
+        userId,
+      }),
+    );
 
     return apiAction();
   } catch (error) {
