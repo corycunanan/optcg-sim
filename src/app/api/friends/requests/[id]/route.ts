@@ -80,6 +80,9 @@ export async function PUT(
         notifyUser(req.fromUserId, {
           type: "friend:request_declined",
           requestId: id,
+          // Sender's `pendingSent` Set is keyed by user id, not request id —
+          // include the decliner so the "Sent" badge can clear in realtime.
+          toUserId: req.toUserId,
         }),
       );
 

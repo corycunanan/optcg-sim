@@ -41,6 +41,13 @@ import {
 // drops it after a soak window.
 const RECONCILE_INTERVAL_MS = 60_000;
 
+function removeFromSet<T>(set: Set<T>, value: T): Set<T> {
+  if (!set.has(value)) return set;
+  const next = new Set(set);
+  next.delete(value);
+  return next;
+}
+
 export type { SidebarUser };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -88,9 +95,15 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       setFriends((prev) =>
         applyFriendEvent({ friends: prev, incoming: [] }, event).friends,
       );
+      // The user we sent a request to is now a friend — drop the "Sent" badge.
+      // `isFriend` already takes precedence in the search dropdown, but
+      // keeping `pendingSent` in sync avoids a stale entry leaking out later.
+      setPendingSent((prev) => removeFromSet(prev, event.friendship.user.id));
     });
-    const unsubDeclined = subscribe("friend:request_declined", () => {
-      // No outgoing-requests UI today; no-op on the recipient sidebar.
+    const unsubDeclined = subscribe("friend:request_declined", (event) => {
+      // Without this, the sender keeps seeing "Sent" until a full reload —
+      // the 60s reconcile fetches `friends`/`incoming` but never `pendingSent`.
+      setPendingSent((prev) => removeFromSet(prev, event.toUserId));
     });
     const unsubRemoved = subscribe("friend:removed", (event) => {
       setFriends((prev) =>

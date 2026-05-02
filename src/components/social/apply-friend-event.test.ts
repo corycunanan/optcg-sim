@@ -126,6 +126,7 @@ describe("applyFriendEvent — friend:request_declined", () => {
     const next = applyFriendEvent(state, {
       type: "friend:request_declined",
       requestId: "req-1",
+      toUserId: "user-other",
     });
 
     expect(next).toBe(state);

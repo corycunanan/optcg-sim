@@ -152,7 +152,7 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
 });
 
 describe("PUT /api/friends/requests/[id] — decline", () => {
-  it("notifies the original sender with friend:request_declined", async () => {
+  it("notifies the original sender with friend:request_declined including the decliner's id", async () => {
     friendRequestDeleteMock.mockResolvedValueOnce({});
     const { request, params } = buildRequest({ action: "decline" });
 
@@ -164,6 +164,7 @@ describe("PUT /api/friends/requests/[id] — decline", () => {
     expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
       type: "friend:request_declined",
       requestId: "req-1",
+      toUserId: "user-accepter",
     });
   });
 });

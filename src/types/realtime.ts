@@ -19,7 +19,7 @@ export type RealtimeServerEvent =
       request: SerializedFriendRequest;
       friendship: SerializedFriendship;
     }
-  | { type: "friend:request_declined"; requestId: string }
+  | { type: "friend:request_declined"; requestId: string; toUserId: string }
   | { type: "friend:removed"; userId: string };
 
 export interface SerializedMessage {
