@@ -155,11 +155,11 @@ export class UserChannel implements DurableObject {
     log("user_channel.message_dropped", { reason: "no_vocabulary_yet" });
   }
 
-  async webSocketClose(_ws: WebSocket, _code: number, _reason: string): Promise<void> {
+  async webSocketClose(): Promise<void> {
     await this.scheduleIdleReap();
   }
 
-  async webSocketError(_ws: WebSocket, _err: unknown): Promise<void> {
+  async webSocketError(): Promise<void> {
     await this.scheduleIdleReap();
   }
 
