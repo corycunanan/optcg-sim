@@ -56,6 +56,13 @@ export const UPGRADE_RATE_LIMIT_RESPONSE_BODY = "Too many reconnect attempts";
 const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
 const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
 
+// Debounce DISCONNECTED broadcasts so a quick supersede / mid-handshake race /
+// short network hiccup does not surface OPPONENT AWAY before the client gets
+// a chance to attach a replacement socket. 500ms covers Strict Mode supersede
+// races (typically <50ms) and short hiccups while staying well under the
+// existing ~5min rejoin window.
+export const DISCONNECT_BROADCAST_DEBOUNCE_MS = 500;
+
 interface PlayerSocketAttachment {
   type: "game-session-player-socket";
   playerIndex: 0 | 1;
@@ -139,6 +146,7 @@ export class GameSession implements DurableObject {
   private readonly actionRateLimitBuckets = new Map<string, TokenBucket>();
   private readonly invalidMessageRateLimitBuckets = new Map<string, TokenBucket>();
   private readonly upgradeRateLimitBuckets = new Map<string, TokenBucket>();
+  private readonly pendingDisconnectTimers = new Map<0 | 1, ReturnType<typeof setTimeout>>();
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -483,7 +491,24 @@ export class GameSession implements DurableObject {
     const playerIndex = parsed as 0 | 1;
     if (!this.isAuthoritativePlayerSocket(ws, playerIndex)) return;
     if (!this.gameState.players[playerIndex].connected) return;
-    await this.handlePlayerAway(playerIndex, "DISCONNECTED", ws);
+    this.scheduleDisconnectBroadcast(playerIndex);
+  }
+
+  private scheduleDisconnectBroadcast(playerIndex: 0 | 1): void {
+    this.cancelPendingDisconnect(playerIndex);
+    const timer = setTimeout(() => {
+      this.pendingDisconnectTimers.delete(playerIndex);
+      void this.handlePlayerAway(playerIndex, "DISCONNECTED");
+    }, DISCONNECT_BROADCAST_DEBOUNCE_MS);
+    this.pendingDisconnectTimers.set(playerIndex, timer);
+  }
+
+  private cancelPendingDisconnect(playerIndex: 0 | 1): void {
+    const existing = this.pendingDisconnectTimers.get(playerIndex);
+    if (existing !== undefined) {
+      clearTimeout(existing);
+      this.pendingDisconnectTimers.delete(playerIndex);
+    }
   }
 
   async alarm(): Promise<void> {
@@ -1126,6 +1151,10 @@ export class GameSession implements DurableObject {
   }
 
   private acceptAuthoritativePlayerSocket(playerIndex: 0 | 1, ws: WebSocket): void {
+    // A pending DISCONNECTED broadcast from a recent close on this slot is
+    // now obsolete: the player is back. Drop the timer before accepting so
+    // the broadcast never goes out.
+    this.cancelPendingDisconnect(playerIndex);
     this.state.acceptWebSocket(ws, [`player-${playerIndex}`]);
     const acceptedAt = Date.now();
     ws.serializeAttachment({

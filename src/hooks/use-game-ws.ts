@@ -156,6 +156,12 @@ export function useGameWs(
     };
 
     ws.onclose = () => {
+      // Server-initiated supersedes (Strict Mode double-mount, mid-handshake
+      // duplicates) close the orphan ws after a newer one has already become
+      // authoritative. The orphan's onclose must not null `wsRef.current` —
+      // it points at the live socket — and must not schedule a reconnect, or
+      // we kick off a runaway loop.
+      if (wsRef.current !== ws) return;
       if (unmountedRef.current || manualCloseRef.current) return;
       wsRef.current = null;
 
