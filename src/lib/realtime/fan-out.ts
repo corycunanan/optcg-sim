@@ -30,11 +30,7 @@ export async function notifyUser(
   const workerSecret = deps.workerSecret ?? process.env.GAME_WORKER_SECRET ?? "";
   const log = deps.logger ?? defaultLogger;
 
-  // The discriminator on every variant of `RealtimeServerEvent` is `type`. We
-  // read it via index access rather than `.type` so this file still compiles
-  // while the union is `never` (OPT-353 ships the scaffold; events arrive
-  // from OPT-354 onward).
-  const eventType = (event as { type?: string }).type ?? "unknown";
+  const eventType = event.type;
 
   if (!workerUrl || !workerSecret) {
     log("realtime fanout misconfigured", {

@@ -2,9 +2,7 @@
  * UserChannel server → client event vocabulary.
  *
  * Discriminated union extended one variant at a time as polling loops are
- * replaced with push events (OPT-354 onward). Empty in OPT-353 — the
- * foundation ticket lands the transport, types, and dispatch wiring without
- * sending any events yet.
+ * replaced with push events.
  *
  * Adding an event:
  *   1. Add a new member: `{ type: "feature:event_name"; ...payload }`
@@ -13,6 +11,21 @@
  *
  * The discriminator is always `type`. Keep names `<feature>:<verb>`.
  */
-export type RealtimeServerEvent = never;
+export type RealtimeServerEvent =
+  | { type: "message:new"; message: SerializedMessage };
+
+export interface SerializedMessage {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  body: string;
+  createdAt: string;
+  fromUser: {
+    id: string;
+    username: string | null;
+    name: string | null;
+    image: string | null;
+  };
+}
 
 export { type ConnectionStatus } from "@/hooks/use-authed-websocket";

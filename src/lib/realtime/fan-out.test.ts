@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { notifyUser } from "./fan-out";
 
-// `RealtimeServerEvent` is `never` in OPT-353 (the union is empty until
-// OPT-354 lands the first event). We bypass the type with an unknown cast to
-// exercise the runtime — the wire shape is what tests need to lock down.
+// Use an off-vocabulary event to exercise generic runtime behavior (URL,
+// auth, abort, error handling) without coupling these tests to whatever
+// variants `RealtimeServerEvent` happens to carry.
 const fakeEvent = { type: "test:event", payload: 1 } as unknown as never;
 
 const baseDeps = {

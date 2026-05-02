@@ -3,12 +3,14 @@
  * POST /api/messages/[userId] — Send a message
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { SendMessageSchema } from "@/lib/validators/messages";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
+import { notifyUser } from "@/lib/realtime/fan-out";
+import { serializeMessageForEvent } from "@/lib/realtime/serialize-message";
 
 export async function GET(
   request: NextRequest,
@@ -114,6 +116,15 @@ export async function POST(
         fromUser: { select: { id: true, username: true, name: true, image: true } },
       },
     });
+
+    // `after` keeps the fanout alive past the response on Vercel Fluid Compute;
+    // a bare `void notifyUser()` can be cancelled when the runtime terminates.
+    after(() =>
+      notifyUser(toUserId, {
+        type: "message:new",
+        message: serializeMessageForEvent(message),
+      }),
+    );
 
     return apiSuccess(message, 201);
   } catch (error) {
