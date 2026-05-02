@@ -102,6 +102,20 @@ describe("notifyUser", () => {
     }
   });
 
+  it("percent-encodes the targetUserId in the URL path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+
+    await notifyUser("user/with/slashes & spaces", fakeEvent, {
+      ...baseDeps,
+      fetch: fetchMock,
+    });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://worker.example/user/user%2Fwith%2Fslashes%20%26%20spaces/notify",
+    );
+  });
+
   it("returns silently when worker URL or secret is missing", async () => {
     const fetchMock = vi.fn();
     const logger = vi.fn();

@@ -50,7 +50,7 @@ export async function notifyUser(
   const timeoutId = setTimeout(() => controller.abort(), NOTIFY_TIMEOUT_MS);
 
   try {
-    const res = await fetchImpl(`${workerUrl}/user/${targetUserId}/notify`, {
+    const res = await fetchImpl(`${workerUrl}/user/${encodeURIComponent(targetUserId)}/notify`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

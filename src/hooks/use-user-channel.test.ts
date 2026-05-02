@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionStatus } from "@/hooks/use-authed-websocket";
 
 const mocks = vi.hoisted(() => ({
@@ -58,6 +58,9 @@ vi.mock("@/hooks/use-authed-websocket", async (importActual) => {
   };
 });
 
+const originalFetch = globalThis.fetch;
+const originalWorkerUrl = process.env.NEXT_PUBLIC_GAME_WORKER_URL;
+
 beforeEach(() => {
   mocks.authedCalls.length = 0;
   mocks.close.mockReset();
@@ -67,6 +70,15 @@ beforeEach(() => {
   mocks.session = { data: null, status: "loading" };
   mocks.fetch.mockReset();
   globalThis.fetch = mocks.fetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  if (originalWorkerUrl === undefined) {
+    delete process.env.NEXT_PUBLIC_GAME_WORKER_URL;
+  } else {
+    process.env.NEXT_PUBLIC_GAME_WORKER_URL = originalWorkerUrl;
+  }
 });
 
 async function importHook() {
@@ -164,7 +176,10 @@ describe("useUserChannel", () => {
     expect(() => dispatch({ type: 123 })).not.toThrow();
   });
 
-  it("closes the socket on session loss", async () => {
+  it("closes the socket when initialized unauthenticated", async () => {
+    // Shallow-render mock pattern can't simulate a true authed→unauthed
+    // rerender (that would need jsdom + testing-library); this test pins the
+    // contract that an unauthenticated call to the hook triggers `close()`.
     process.env.NEXT_PUBLIC_GAME_WORKER_URL = "https://worker.example";
     mocks.session = { data: null, status: "unauthenticated" };
 

@@ -50,7 +50,7 @@ export function useUserChannel(): UseUserChannelResult {
 
   const url = useMemo(() => {
     if (!userId || !WORKER_URL) return null;
-    return `${WORKER_URL}/user/${userId}/ws`;
+    return `${WORKER_URL}/user/${encodeURIComponent(userId)}/ws`;
   }, [userId]);
 
   const getToken = useCallback(async () => {
