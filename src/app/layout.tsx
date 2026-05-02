@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Navbar } from "@/components/nav/navbar";
 import { SocialShell } from "@/components/social/social-shell";
+import { UserChannelProvider } from "@/components/realtime/user-channel-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -42,17 +43,19 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${dmSerifDisplay.variable} antialiased`}
       >
         <SessionProvider>
-          <SidebarProvider>
-            <div className="flex h-screen w-full overflow-hidden">
-              {/* Left column: navbar + content */}
-              <div className="flex flex-1 flex-col min-w-0">
-                <Navbar />
-                <main className="flex flex-1 flex-col overflow-hidden min-w-0 min-h-0">{children}</main>
+          <UserChannelProvider>
+            <SidebarProvider>
+              <div className="flex h-screen w-full overflow-hidden">
+                {/* Left column: navbar + content */}
+                <div className="flex flex-1 flex-col min-w-0">
+                  <Navbar />
+                  <main className="flex flex-1 flex-col overflow-hidden min-w-0 min-h-0">{children}</main>
+                </div>
+                {/* Right column: sidebar (full viewport height) */}
+                <SocialShell />
               </div>
-              {/* Right column: sidebar (full viewport height) */}
-              <SocialShell />
-            </div>
-          </SidebarProvider>
+            </SidebarProvider>
+          </UserChannelProvider>
         </SessionProvider>
         <Toaster />
       </body>
