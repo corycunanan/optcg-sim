@@ -66,7 +66,8 @@ async function verifySignatureAndDecode(
 }
 
 function isExpired(exp: number, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
-  return exp < nowSeconds;
+  // RFC 7519 §4.1.4: `exp` is exclusive — reject as soon as `now >= exp`.
+  return exp <= nowSeconds;
 }
 
 export async function verifyGameToken(

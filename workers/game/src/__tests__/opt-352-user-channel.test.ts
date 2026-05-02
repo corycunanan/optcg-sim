@@ -56,11 +56,11 @@ function b64urlBytes(bytes: Uint8Array): string {
 }
 
 class MockWebSocket {
-  sent: string[] = [];
+  sent: (string | ArrayBuffer)[] = [];
   closeCalls: { code?: number; reason?: string }[] = [];
   private attachment: unknown = null;
 
-  send(payload: string): void { this.sent.push(payload); }
+  send(payload: string | ArrayBuffer): void { this.sent.push(payload); }
   close(code?: number, reason?: string): void { this.closeCalls.push({ code, reason }); }
   serializeAttachment(value: unknown): void { this.attachment = value; }
   deserializeAttachment(): unknown { return this.attachment; }
@@ -188,12 +188,26 @@ function buildWsRequest(userId: string, token: string): Request {
   return new Request(url, { headers: { Upgrade: "websocket" } });
 }
 
-function buildNotifyRequest(userId: string, body: string, options: { auth?: string } = {}): Request {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+function buildNotifyRequest(
+  userId: string,
+  body: BodyInit,
+  options: { auth?: string; contentType?: string } = {},
+): Request {
+  const headers: Record<string, string> = {
+    "Content-Type": options.contentType ?? "application/json",
+  };
   if (options.auth !== undefined) headers.Authorization = options.auth;
   return new Request(`https://worker.example.test/user/${encodeURIComponent(userId)}/notify`, {
     method: "POST",
     body,
+    headers,
+  });
+}
+
+function buildHealthRequest(userId: string, options: { auth?: string } = {}): Request {
+  const headers: Record<string, string> = {};
+  if (options.auth !== undefined) headers.Authorization = options.auth;
+  return new Request(`https://worker.example.test/user/${encodeURIComponent(userId)}/health`, {
     headers,
   });
 }
@@ -315,7 +329,7 @@ describe("OPT-352 UserChannel notify", () => {
     expect(res.status).toBe(401);
   });
 
-  it("fans out a notify body to every attached socket", async () => {
+  it("fans out a JSON notify body as a text frame to every attached socket", async () => {
     const { channel, state } = createChannel();
     const token1 = await mintToken(USER_ID, SECRET, { jti: "fanout-tab-1" });
     const token2 = await mintToken(USER_ID, SECRET, { jti: "fanout-tab-2" });
@@ -331,6 +345,58 @@ describe("OPT-352 UserChannel notify", () => {
     for (const ws of sockets) {
       expect(ws.sent).toEqual([payload]);
     }
+  });
+
+  it("preserves a non-UTF-8 binary notify body as a binary frame", async () => {
+    const { channel, state } = createChannel();
+    const token = await mintToken(USER_ID, SECRET, { jti: "fanout-binary-tab" });
+    await channel.fetch(buildWsRequest(USER_ID, token));
+
+    // Bytes that are NOT valid UTF-8 — would mojibake under TextDecoder.
+    const bytes = new Uint8Array([0xff, 0xfe, 0xfd, 0x00, 0x01, 0x02]);
+    const res = await channel.fetch(buildNotifyRequest(USER_ID, bytes, {
+      auth: `Bearer ${SECRET}`,
+      contentType: "application/octet-stream",
+    }));
+
+    expect(res.status).toBe(202);
+    const ws = (state.getWebSockets() as unknown as MockWebSocket[])[0]!;
+    expect(ws.sent).toHaveLength(1);
+    const sent = ws.sent[0];
+    expect(sent).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(sent as ArrayBuffer)).toEqual(bytes);
+  });
+});
+
+describe("OPT-352 UserChannel health", () => {
+  it("rejects health with no Authorization header", async () => {
+    const { channel } = createChannel();
+
+    const res = await channel.fetch(buildHealthRequest(USER_ID));
+
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects health with the wrong Bearer secret", async () => {
+    const { channel } = createChannel();
+
+    const res = await channel.fetch(buildHealthRequest(USER_ID, { auth: "Bearer nope" }));
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns the connection count when authed", async () => {
+    const { channel } = createChannel();
+    const t1 = await mintToken(USER_ID, SECRET, { jti: "health-tab-1" });
+    const t2 = await mintToken(USER_ID, SECRET, { jti: "health-tab-2" });
+    await channel.fetch(buildWsRequest(USER_ID, t1));
+    await channel.fetch(buildWsRequest(USER_ID, t2));
+
+    const res = await channel.fetch(buildHealthRequest(USER_ID, { auth: `Bearer ${SECRET}` }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { connections: number };
+    expect(body.connections).toBe(2);
   });
 });
 

@@ -69,7 +69,7 @@ export class UserChannel implements DurableObject {
 
     if (route === "health") {
       if (request.method !== "GET") return new Response("Method not allowed", { status: 405 });
-      return this.handleHealth();
+      return this.handleHealth(request, userId);
     }
 
     return new Response("Not found", { status: 404 });
@@ -124,16 +124,29 @@ export class UserChannel implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    // Pass the body through opaquely. T3 defines the event vocabulary;
-    // this DO is just a fanout primitive.
-    const body = await request.text();
-    this.broadcast(body);
+    // Pass the body through opaquely. T3 defines the event vocabulary; this DO
+    // is just a fanout primitive. Preserve the wire frame type by content-type:
+    // text frames for JSON / text/*, binary frames for anything else, so a
+    // non-UTF-8 binary payload is not silently mojibake'd through TextDecoder.
+    const contentType = request.headers.get("Content-Type") ?? "";
+    const payload: string | ArrayBuffer
+      = contentType.startsWith("application/json") || contentType.startsWith("text/")
+        ? await request.text()
+        : await request.arrayBuffer();
+    this.broadcast(payload);
     return new Response(null, { status: 202 });
   }
 
   // ─── Health / introspection ────────────────────────────────────────────────
 
-  private handleHealth(): Response {
+  private handleHealth(request: Request, userId: string): Response {
+    // The worker entrypoint already gates this route, but the DO checks too —
+    // defense-in-depth, matches GameSession.handleNotifyEnd's pattern.
+    const auth = request.headers.get("Authorization");
+    if (auth !== `Bearer ${this.env.GAME_WORKER_SECRET}`) {
+      log("auth.failure", { reason: "user_health_bad_secret", userId });
+      return new Response("Unauthorized", { status: 401 });
+    }
     return new Response(JSON.stringify({ connections: this.getConnectionCount() }), {
       headers: { "Content-Type": "application/json" },
     });
@@ -180,7 +193,7 @@ export class UserChannel implements DurableObject {
     await this.state.storage.setAlarm(Date.now() + IDLE_REAP_AFTER_MS);
   }
 
-  private broadcast(payload: string): void {
+  private broadcast(payload: string | ArrayBuffer): void {
     for (const ws of this.state.getWebSockets()) {
       if (!isUserSocketAttachment(ws.deserializeAttachment())) continue;
       try { ws.send(payload); } catch { /* closed */ }
