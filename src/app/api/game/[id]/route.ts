@@ -3,11 +3,12 @@
  * POST /api/game/[id] — Resolve a stuck game when websocket recovery fails
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { finalizeGameResult } from "@/lib/game/finalize";
 import { buildNotifyEndPayload } from "@/lib/game/notify-end";
+import { notifyGame } from "@/lib/realtime/fanout-game";
 import { GameActionSchema } from "@/lib/validators/game";
 import type { GameEndReasonCode } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -157,6 +158,14 @@ async function handleFinalize(
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
 
+  after(() =>
+    notifyGame(game.id, {
+      status: "FINISHED",
+      winnerId: updated!.winnerId,
+      winReason: updated!.winReason,
+    }),
+  );
+
   return apiSuccess({
     id: updated!.id,
     status: updated!.status,
@@ -213,6 +222,14 @@ async function handleConcede(gameId: string, userId: string) {
     where: { id: game.id },
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
+
+  after(() =>
+    notifyGame(game.id, {
+      status: "FINISHED",
+      winnerId: updated.winnerId,
+      winReason: updated.winReason,
+    }),
+  );
 
   const winnerIndex = winnerId === game.player1Id ? 0 : 1;
   if (GAME_WORKER_URL && GAME_WORKER_SECRET) {
