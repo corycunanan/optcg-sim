@@ -1,5 +1,5 @@
 /**
- * GET /api/game/active — Returns the current user's active game session, if any.
+ * GET /api/game/active — Returns the current user's active PVP game session, if any.
  * Used to show a "Rejoin" button when a player navigates away from an ongoing game.
  */
 
@@ -19,6 +19,7 @@ export async function GET() {
 
   const game = await prisma.gameSession.findFirst({
     where: {
+      mode: "PVP",
       status: "IN_PROGRESS",
       OR: [{ player1Id: userId }, { player2Id: userId }],
     },

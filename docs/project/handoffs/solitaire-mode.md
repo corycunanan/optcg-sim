@@ -20,12 +20,12 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 | 2 | OPT-299 | Solitaire entry page: /solitaire route + dual deck picker | 2 | OPT-298 | Done | - | Historical entry-page scope; Lobby Room UX is now the creation surface. |
 | 3 | OPT-300 | Refactor use-game-session to support multiple instances per tab | 2 | OPT-298, OPT-299 | Done | [#199](https://github.com/corycunanan/optcg-sim/pull/199) | Gates finalization to one owner while preserving the hook surface. |
 | 4 | OPT-301 | useSolitaireSession composite hook + perspective state machine | 3 | OPT-300 | Done | [#200](https://github.com/corycunanan/optcg-sim/pull/200) | Composite hook owns both live side sessions and perspective behavior. |
-| 5 | OPT-302 | Wire game board to perspective + Flip button + fade-to-black transition | 3 | OPT-301 | In Review | [#201](https://github.com/corycunanan/optcg-sim/pull/201) | 2026-05-01: Board chooses Solitaire mode and exposes perspective chrome. |
-| 6 | OPT-303 | Solitaire polish: history filter, lobby/feed exclusion, refresh QA | 2 | OPT-302 | Backlog | - | Final product cleanup and QA pass. |
+| 5 | OPT-302 | Wire game board to perspective + Flip button + fade-to-black transition | 3 | OPT-301 | Done | [#201](https://github.com/corycunanan/optcg-sim/pull/201) | 2026-05-01: Board chooses Solitaire mode and exposes perspective chrome. |
+| 6 | OPT-303 | Solitaire polish: history filter, lobby/feed exclusion, refresh QA | 2 | OPT-302 | In Review | [#202](https://github.com/corycunanan/optcg-sim/pull/202) | 2026-05-01: Active-game surface is PVP-only; refresh prompt regression covered. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-303.
+**Next up:** Project closeout after OPT-303 merges.
 
 ---
 
@@ -57,3 +57,12 @@ Tickets in execution order. Ordering criteria: dependencies -> estimate -> prior
 - **Gotchas / do NOT touch:** The Solitaire badge/Flip control is shell chrome outside `<ScaledBoard>`; keep board internals and worker socket semantics unchanged unless OPT-303 explicitly needs them.
 - **Unresolved:** Manual browser QA against a real lobby-created Solitaire game is still the main remaining polish check; no separate tracking ticket beyond OPT-303.
 - **Why this matters for OPT-303:** Polish can assume Solitaire board entry works, PVP stays on the old hook path, and the remaining work is history/feed exclusion plus refresh and UX QA.
+
+### OPT-303 -> Project closeout
+**From:** session on 2026-05-01 - **Commit:** `53dcdca` - **PR:** #202
+
+- **Primer:** The global active-game query now filters to PVP so Solitaire sessions do not surface as competitive lobby blockers; code audit found no separate history/feed/stats/ranking queries yet.
+- **Read first:** `src/app/api/game/active/route.ts`, `src/app/api/game/active/route.test.ts`, `src/hooks/use-solitaire-session.test.ts`.
+- **Gotchas / do NOT touch:** Keep Solitaire re-entry owned by direct `/game/[id]` board routing and the lobby room flow; do not reintroduce Solitaire into `/api/game/active` unless a dedicated solo rejoin surface is designed.
+- **Unresolved:** Local browser QA used seed account `Luffy_D` to create a Solitaire lobby, select decks, ready, start a game, and verify `/lobbies` still excludes the active Solitaire game from the PVP rejoin blocker; board-level refresh/concede dogfood is still blocked by the in-app browser being below the 1280x640 desktop gate.
+- **Pointer:** Run `git show 53dcdca` for the implementation diff.
