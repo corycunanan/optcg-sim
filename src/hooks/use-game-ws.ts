@@ -1,37 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   GameState,
   GameAction,
   PromptOptions,
   ServerMessage,
 } from "@shared/game-types";
+import {
+  useAuthedWebSocket,
+  type ConnectionStatus,
+} from "@/hooks/use-authed-websocket";
 
-export type ConnectionStatus =
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "error"
-  | "failed";
-
-// After MAX_RECONNECT_ATTEMPTS consecutive failed connection attempts we stop
-// retrying and surface a "failed" status so the UI can show an actionable
-// error instead of spinning forever. Total elapsed time at the last attempt is
-// roughly sum(1,2,4,8,16,30) = 61s, which is long enough to distinguish a
-// transient dropout from a persistent failure (bad network, TLS block, token
-// endpoint down).
-const MAX_RECONNECT_ATTEMPTS = 6;
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 30_000;
+export type { ConnectionStatus };
 
 /**
  * useGameWs — manages the WebSocket connection to the Cloudflare game DO.
  *
- * Accepts a `getToken` async function instead of a static token string.
- * This is critical: the HS256 token expires after 5 minutes, and every
- * reconnect attempt fetches a fresh one, preventing the stale-token
- * reconnect loop that caused "cannot rejoin" failures.
+ * Transport (token refetch, reconnect, supersede-safe close) is delegated to
+ * `useAuthedWebSocket`. This hook owns the game-specific message vocabulary
+ * and the `sendAction` / `leaveGame` semantics.
  */
 export function useGameWs(
   gameId: string,
@@ -39,208 +27,106 @@ export function useGameWs(
   getToken: () => Promise<string>,
 ) {
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
-  const [lastError, setLastError] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<PromptOptions | null>(null);
-  const [gameOver, setGameOver] = useState<{ winner: 0 | 1 | null; reason: string } | null>(null);
+  const [gameOver, setGameOver] = useState<{
+    winner: 0 | 1 | null;
+    reason: string;
+  } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
+  const [gameError, setGameError] = useState<string | null>(null);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const unmountedRef = useRef(false);
-  const manualCloseRef = useRef(false);
+  const url = useMemo(
+    () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
+    [gameId, workerUrl],
+  );
 
-  const connect = useCallback(async function connectImpl() {
-    if (!gameId || !workerUrl) return;
-    if (unmountedRef.current) return;
-    manualCloseRef.current = false;
-
-    // Always fetch a fresh token on every connect attempt.
-    // The token expires in 5 min; reusing a stale token on reconnect causes 401 loops.
-    let token: string;
-    try {
-      token = await getToken();
-    } catch {
-      if (unmountedRef.current) return;
-      setLastError("Failed to get auth token");
-      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-        setConnectionStatus("failed");
-        return;
-      }
-      setConnectionStatus("error");
-      const delay = Math.min(
-        RECONNECT_BASE_MS * Math.pow(2, reconnectAttemptsRef.current),
-        RECONNECT_MAX_MS,
-      );
-      reconnectAttemptsRef.current += 1;
-      reconnectTimerRef.current = setTimeout(() => { void connectImpl(); }, delay);
-      return;
+  const onMessage = useCallback((msg: ServerMessage) => {
+    switch (msg.type) {
+      case "game:state":
+        setGameState(msg.state);
+        setCanUndo(msg.canUndo ?? false);
+        if (msg.state.pendingPrompt) {
+          setActivePrompt(msg.state.pendingPrompt.options);
+        }
+        if (msg.state.status !== "IN_PROGRESS") {
+          setGameOver({
+            winner: msg.state.winner,
+            reason: msg.state.winReason ?? "Game over",
+          });
+        }
+        break;
+      case "game:update":
+        setGameState(msg.state);
+        setCanUndo(msg.canUndo ?? false);
+        if (msg.state.pendingPrompt) {
+          setActivePrompt(msg.state.pendingPrompt.options);
+        } else {
+          setActivePrompt(null);
+        }
+        if (msg.state.status !== "IN_PROGRESS") {
+          setGameOver({
+            winner: msg.state.winner,
+            reason: msg.state.winReason ?? "Game over",
+          });
+        }
+        break;
+      case "game:undo":
+        setCanUndo(msg.canUndo);
+        break;
+      case "game:prompt":
+        setActivePrompt(msg.options);
+        break;
+      case "game:error":
+        setGameError(msg.message);
+        break;
+      case "game:over":
+        setGameOver({ winner: msg.winner, reason: msg.reason });
+        break;
+      case "game:player_disconnected":
+      case "game:player_reconnected":
+        // Game state update (connected flag) will arrive via next broadcast
+        break;
     }
-
-    if (unmountedRef.current) return;
-
-    const url = `${workerUrl}/game/${gameId}/ws?token=${encodeURIComponent(token)}`;
-    const wsUrl = url.replace(/^http/, "ws");
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-    setConnectionStatus("connecting");
-
-    ws.onopen = () => {
-      if (unmountedRef.current) { ws.close(); return; }
-      setConnectionStatus("connected");
-      reconnectAttemptsRef.current = 0;
-    };
-
-    ws.onmessage = (event) => {
-      let msg: ServerMessage;
-      try {
-        msg = JSON.parse(event.data);
-      } catch (err) {
-        console.warn("[useGameWs] failed to parse server message", err, event.data);
-        return;
-      }
-
-      switch (msg.type) {
-        case "game:state":
-          setGameState(msg.state);
-          setCanUndo(msg.canUndo ?? false);
-          if (msg.state.pendingPrompt) {
-            setActivePrompt(msg.state.pendingPrompt.options);
-          }
-          if (msg.state.status !== "IN_PROGRESS") {
-            setGameOver({
-              winner: msg.state.winner,
-              reason: msg.state.winReason ?? "Game over",
-            });
-          }
-          break;
-        case "game:update":
-          setGameState(msg.state);
-          setCanUndo(msg.canUndo ?? false);
-          if (msg.state.pendingPrompt) {
-            setActivePrompt(msg.state.pendingPrompt.options);
-          } else {
-            setActivePrompt(null);
-          }
-          if (msg.state.status !== "IN_PROGRESS") {
-            setGameOver({
-              winner: msg.state.winner,
-              reason: msg.state.winReason ?? "Game over",
-            });
-          }
-          break;
-        case "game:undo":
-          setCanUndo(msg.canUndo);
-          break;
-        case "game:prompt":
-          setActivePrompt(msg.options);
-          break;
-        case "game:error":
-          setLastError(msg.message);
-          break;
-        case "game:over":
-          setGameOver({ winner: msg.winner, reason: msg.reason });
-          break;
-        case "game:player_disconnected":
-        case "game:player_reconnected":
-          // Game state update (connected flag) will arrive via next broadcast
-          break;
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.warn("[useGameWs] websocket error", err);
-      if (!unmountedRef.current) setConnectionStatus("error");
-    };
-
-    ws.onclose = () => {
-      // Server-initiated supersedes (Strict Mode double-mount, mid-handshake
-      // duplicates) close the orphan ws after a newer one has already become
-      // authoritative. The orphan's onclose must not null `wsRef.current` —
-      // it points at the live socket — and must not schedule a reconnect, or
-      // we kick off a runaway loop.
-      if (wsRef.current !== ws) return;
-      if (unmountedRef.current || manualCloseRef.current) return;
-      wsRef.current = null;
-
-      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-        setConnectionStatus("failed");
-        return;
-      }
-
-      setConnectionStatus("disconnected");
-      // Exponential backoff; fresh token fetched on each attempt via connect()
-      const delay = Math.min(
-        RECONNECT_BASE_MS * Math.pow(2, reconnectAttemptsRef.current),
-        RECONNECT_MAX_MS,
-      );
-      reconnectAttemptsRef.current += 1;
-      reconnectTimerRef.current = setTimeout(() => { void connectImpl(); }, delay);
-    };
-  }, [gameId, workerUrl, getToken]);
-
-  // Manual retry from the UI after we've given up. Clears the attempt counter
-  // and any pending timers, drops any stale socket, and kicks off a fresh
-  // connection cycle.
-  const retryConnection = useCallback(() => {
-    reconnectAttemptsRef.current = 0;
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-    if (wsRef.current) {
-      wsRef.current.onclose = null;
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setLastError(null);
-    setConnectionStatus("connecting");
-    void connect();
-  }, [connect]);
-
-  useEffect(() => {
-    unmountedRef.current = false;
-    connect();
-    return () => {
-      unmountedRef.current = true;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      if (wsRef.current) {
-        wsRef.current.onclose = null; // suppress reconnect on intentional unmount
-        wsRef.current.close();
-      }
-    };
-  }, [connect]);
-
-  const sendAction = useCallback((action: GameAction) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setLastError("Not connected");
-      return;
-    }
-    ws.send(JSON.stringify({ type: "game:action", action }));
-    setLastError(null);
   }, []);
+
+  const {
+    connectionStatus,
+    lastError: transportError,
+    send,
+    retry,
+    close,
+  } = useAuthedWebSocket<ServerMessage>({
+    url,
+    getToken,
+    onMessage,
+  });
+
+  const sendAction = useCallback(
+    (action: GameAction) => {
+      send({ type: "game:action", action });
+      // Mirror the original setLastError(null) on send: clear any stale game
+      // error so the user sees the freshest state. Transport errors are
+      // managed by useAuthedWebSocket and will repopulate if send failed.
+      setGameError(null);
+    },
+    [send],
+  );
 
   const leaveGame = useCallback(async () => {
-    manualCloseRef.current = true;
-    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.onclose = null;
-      ws.send(JSON.stringify({ type: "game:leave" }));
+    if (connectionStatus === "connected") {
+      send({ type: "game:leave" });
+      // Give the worker a moment to receive game:leave before tearing down.
       await new Promise((resolve) => setTimeout(resolve, 100));
-      ws.close();
-    } else if (ws) {
-      ws.onclose = null;
-      ws.close();
     }
+    await close();
+  }, [connectionStatus, send, close]);
 
-    wsRef.current = null;
-    setConnectionStatus("disconnected");
-  }, []);
+  const retryConnection = useCallback(() => {
+    setGameError(null);
+    retry();
+  }, [retry]);
+
+  const lastError = gameError ?? transportError;
 
   return {
     gameState,
