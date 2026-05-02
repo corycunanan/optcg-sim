@@ -7,6 +7,19 @@ const userFindUniqueMock = vi.fn();
 const messageCreateMock = vi.fn();
 const notifyUserMock = vi.fn();
 
+// Run `after()` callbacks synchronously so the route's fanout is observable
+// in unit tests; the production behavior (post-response scheduling) is owned
+// by Next.js itself.
+vi.mock("next/server", async (importActual) => {
+  const actual = await importActual<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      void cb();
+    },
+  };
+});
+
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {

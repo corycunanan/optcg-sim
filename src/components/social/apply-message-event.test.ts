@@ -53,15 +53,29 @@ describe("applyMessageEvent", () => {
     expect(result).toHaveLength(1);
   });
 
-  it("does not append messages whose fromUserId doesn't match the open conversation", () => {
+  it("does not append messages whose endpoints don't include the conversation partner", () => {
     const incoming = makeIncoming({
       id: "msg-from-stranger",
       fromUserId: "user-stranger",
+      toUserId: "user-also-stranger",
     });
 
     const result = applyMessageEvent([existing], incoming, "user-other");
 
     expect(result).toEqual([existing]);
+  });
+
+  it("appends outbound messages where the conversation partner is the recipient", () => {
+    const incoming = makeIncoming({
+      id: "msg-outbound",
+      fromUserId: "user-me",
+      toUserId: "user-other",
+    });
+
+    const result = applyMessageEvent([existing], incoming, "user-other");
+
+    expect(result).toHaveLength(2);
+    expect(result[1].id).toBe("msg-outbound");
   });
 
   it("appends to an empty list when ids and partner match", () => {

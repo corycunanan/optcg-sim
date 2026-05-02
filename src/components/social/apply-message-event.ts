@@ -9,16 +9,23 @@ export interface ChatMessage {
 
 /**
  * Reducer for `message:new` events on a single chat-widget conversation.
- * Returns `current` unchanged when the event isn't for this conversation
- * partner or when the id is already rendered — the sender's own optimistic
- * append after POST wins the race against the server push.
+ * Accepts a message iff `conversationUserId` is on either end of it — that
+ * way the gate is robust to fanout policy changes (e.g. notifying the
+ * sender's own tabs as well as the recipient). Already-rendered ids are
+ * dropped so the sender's optimistic append after POST wins the race
+ * against the server push.
  */
 export function applyMessageEvent(
   current: ChatMessage[],
   message: SerializedMessage,
   conversationUserId: string,
 ): ChatMessage[] {
-  if (message.fromUserId !== conversationUserId) return current;
+  if (
+    message.fromUserId !== conversationUserId &&
+    message.toUserId !== conversationUserId
+  ) {
+    return current;
+  }
   if (current.some((m) => m.id === message.id)) return current;
   return [
     ...current,
