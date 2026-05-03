@@ -17,9 +17,13 @@ export async function GET() {
   const { userId } = authResult;
 
   try {
+    // OPT-199 — cap defensive read size. A user has no UI path to >200 decks
+    // today; if that ever changes, switch to cursor pagination rather than
+    // raise this number.
     const decks = await prisma.deck.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
+      take: 200,
       include: {
         cards: {
           include: { card: { select: { id: true, name: true, color: true, type: true, imageUrl: true } } },
@@ -27,12 +31,16 @@ export async function GET() {
       },
     });
 
-    // Fetch leader card images in bulk
+    // Fetch leader card images in bulk. Skip the roundtrip when the user has
+    // no decks; Prisma issues `IN ()` for an empty array which the planner
+    // handles fine but the query is pure overhead.
     const leaderIds = [...new Set(decks.map((d) => d.leaderId))];
-    const leaderCards = await prisma.card.findMany({
-      where: { id: { in: leaderIds } },
-      select: { id: true, name: true, imageUrl: true },
-    });
+    const leaderCards = leaderIds.length
+      ? await prisma.card.findMany({
+          where: { id: { in: leaderIds } },
+          select: { id: true, name: true, imageUrl: true },
+        })
+      : [];
     const leaderMap = new Map(leaderCards.map((c) => [c.id, c]));
 
     // Transform to include computed fields

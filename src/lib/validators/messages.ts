@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+// OPT-197 — `messageId` query param for `PUT /api/messages/read`. Prisma
+// generates Message ids via `@default(uuid())`, so anything else is a bad
+// request and should fail before we hit the DB.
+export const MessageIdSchema = z.object({
+  messageId: z.string().uuid(),
+});
+
 export const SendMessageSchema = z.object({
   body: z
     .string()

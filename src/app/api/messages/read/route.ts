@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 import { requireAuth, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { socialLimiter } from "@/lib/rate-limit";
+import { MessageIdSchema } from "@/lib/validators/messages";
 
 export async function PUT(request: NextRequest) {
   const authResult = await requireAuth();
@@ -17,11 +18,13 @@ export async function PUT(request: NextRequest) {
     return apiError("Too many requests. Try again later.", 429);
   }
 
-  const messageId = request.nextUrl.searchParams.get("messageId");
-
-  if (!messageId) {
-    return apiError("messageId required", 400);
+  const parsed = MessageIdSchema.safeParse({
+    messageId: request.nextUrl.searchParams.get("messageId"),
+  });
+  if (!parsed.success) {
+    return apiError("Invalid messageId", 400);
   }
+  const { messageId } = parsed.data;
 
   try {
     const msg = await prisma.message.findFirst({

@@ -145,6 +145,8 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 7. **`cn()` for all conditional classes** — use clsx + tailwind-merge, never string concatenation
 8. **Inside-board floor (scaled game board)** — anything rendered inside `<ScaledBoard>` / `BoardLayout`'s transformed subtree (zones, on-board cards, in-board CTAs, on-board overlays) lifts the floor: **`text-base` (16px)** for labels/counters/badges, **`text-lg` (18px)** for body text, **`ring-4`** for focus indicators. Chrome (navbar, modals, tooltips, popovers, side panels — anything portaled or outside the scaled wrapper) keeps `text-xs`/`ring-2`. Background: at the 1280×640 floor viewport the board scales to ~0.59, which collapses chrome's defaults below the legibility floor. Full table in `docs/design/BRANDING-GUIDELINES.md` §13.
 
+**Exceptions to rule 1:** `src/components/ui/sidebar.tsx` sets inline `style={{ "--sidebar-width": ... }}` (and similar `--sidebar-width-icon` / `--skeleton-width`) to feed responsive width values into CSS custom properties. These are dynamic per-render values, not design-token colors/borders, and Tailwind has no utility for arbitrary `--var` assignment. The exception sites carry an inline comment referencing this rule.
+
 ### Design Principles
 
 1. **Card art is the hero** — Clean, bright surfaces amplify artwork. UI chrome minimizes and recedes.

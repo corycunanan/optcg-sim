@@ -610,6 +610,53 @@ export type ActionType =
   // Self-play
   | "PLAY_SELF";
 
+// Runtime-iterable mirror of the `ActionType` union — needed because TS types
+// vanish at runtime and `schema-registry.ts` / `resolver.ts` both want to
+// loop over every member. The two `_AllActionTypes*` checks below force the
+// array and the union to stay in lockstep at compile time, so adding to
+// either without the other breaks the build.
+export const ALL_ACTION_TYPES = [
+  // Card Movement
+  "DRAW", "SEARCH_DECK", "TRASH_CARD", "KO", "RETURN_TO_HAND", "RETURN_TO_DECK",
+  "PLAY_CARD", "ADD_TO_LIFE", "MILL", "REVEAL", "FULL_DECK_SEARCH", "DECK_SCRY",
+  "SEARCH_TRASH_THE_REST", "SEARCH_AND_PLAY", "PLACE_HAND_TO_DECK", "HAND_WHEEL",
+  "REVEAL_HAND", "SHUFFLE_DECK",
+  // Power & Stats
+  "MODIFY_POWER", "SET_BASE_POWER", "MODIFY_COST", "SET_POWER_TO_ZERO",
+  "SWAP_BASE_POWER", "COPY_POWER", "SET_COST",
+  // Keywords
+  "GRANT_KEYWORD", "NEGATE_EFFECTS",
+  // DON
+  "GIVE_DON", "RETURN_DON_TO_DECK", "ADD_DON_FROM_DECK", "SET_DON_ACTIVE",
+  "REST_DON", "REDISTRIBUTE_DON", "FORCE_OPPONENT_DON_RETURN", "REST_OPPONENT_DON",
+  "GIVE_OPPONENT_DON_TO_OPPONENT", "DISTRIBUTE_DON", "RETURN_ATTACHED_DON_TO_COST",
+  // State Change
+  "SET_ACTIVE", "SET_REST", "APPLY_PROHIBITION", "REMOVE_PROHIBITION",
+  // Meta / Flow
+  "PLAYER_CHOICE", "OPPONENT_CHOICE", "CHOOSE_VALUE", "WIN_GAME",
+  "OPPONENT_ACTION", "EXTRA_TURN", "SCHEDULE_ACTION",
+  // Life Card
+  "TURN_LIFE_FACE_UP", "TURN_LIFE_FACE_DOWN", "TURN_ALL_LIFE_FACE_DOWN",
+  "LIFE_SCRY", "REORDER_ALL_LIFE", "ADD_TO_LIFE_FROM_DECK",
+  "ADD_TO_LIFE_FROM_HAND", "ADD_TO_LIFE_FROM_FIELD", "PLAY_FROM_LIFE",
+  "LIFE_TO_HAND", "TRASH_FROM_LIFE", "DRAIN_LIFE_TO_THRESHOLD",
+  "LIFE_CARD_TO_DECK", "TRASH_FACE_UP_LIFE",
+  // Battle
+  "REDIRECT_ATTACK", "DEAL_DAMAGE", "SELF_TAKE_DAMAGE",
+  // Effect / Meta
+  "ACTIVATE_EVENT_FROM_HAND", "ACTIVATE_EVENT_FROM_TRASH", "REUSE_EFFECT",
+  "NEGATE_TRIGGER_TYPE", "GRANT_ATTRIBUTE", "TRASH_FROM_HAND",
+  "RETURN_HAND_TO_DECK", "GRANT_COUNTER",
+  // One-time modifier
+  "APPLY_ONE_TIME_MODIFIER",
+  // Self-play
+  "PLAY_SELF",
+] as const satisfies readonly ActionType[];
+
+type _AllActionTypesCovers = Exclude<ActionType, typeof ALL_ACTION_TYPES[number]> extends never ? true : never;
+const _allActionTypesCovers: _AllActionTypesCovers = true;
+void _allActionTypesCovers;
+
 // ─── Action Params Map ──────────────────────────────────────────────────────
 // Maps each ActionType to its typed params shape. Used by getActionParams()
 // to provide type-safe access in action handlers without per-site `as any` casts.
