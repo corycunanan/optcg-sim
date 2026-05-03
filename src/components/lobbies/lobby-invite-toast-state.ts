@@ -55,6 +55,9 @@ export function seedInvites(
   const fresh: InviteToastEntry[] = [];
   for (const invite of fromServer) {
     if (known.has(invite.id)) continue;
+    // Track id in `known` so two copies of the same invite inside
+    // `fromServer` are deduped within a single reconciliation batch.
+    known.add(invite.id);
     const expiresAtMs = Date.parse(invite.expiresAt);
     fresh.push({
       ...invite,

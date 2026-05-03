@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindUniqueMock = vi.fn();
 const friendshipFindFirstMock = vi.fn();
-const inviteFindFirstMock = vi.fn();
 const inviteCreateMock = vi.fn();
+const inviteUpdateManyMock = vi.fn();
+const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
 
 vi.mock("next/server", async (importActual) => {
@@ -27,9 +29,10 @@ vi.mock("@/lib/db", () => ({
       findFirst: (...args: unknown[]) => friendshipFindFirstMock(...args),
     },
     lobbyInvite: {
-      findFirst: (...args: unknown[]) => inviteFindFirstMock(...args),
       create: (...args: unknown[]) => inviteCreateMock(...args),
+      updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
     },
+    $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -97,17 +100,31 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   lobbyFindUniqueMock.mockReset();
   friendshipFindFirstMock.mockReset();
-  inviteFindFirstMock.mockReset();
   inviteCreateMock.mockReset();
+  inviteUpdateManyMock.mockReset();
+  transactionMock.mockReset();
   notifyUserMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: HOST_ID } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   lobbyFindUniqueMock.mockResolvedValue(lobbyOpen);
   friendshipFindFirstMock.mockResolvedValue({ id: "friendship-1" });
-  inviteFindFirstMock.mockResolvedValue(null);
   inviteCreateMock.mockResolvedValue(inviteRow);
+  inviteUpdateManyMock.mockResolvedValue({ count: 0 });
   notifyUserMock.mockResolvedValue(undefined);
+
+  // Default tx implementation: invoke the callback with a tx-shaped object
+  // backed by the same mocks. Tests that need a P2002 throw replace this
+  // mock to throw directly.
+  transactionMock.mockImplementation(async (fn: unknown) => {
+    if (typeof fn !== "function") return fn;
+    return (fn as (tx: unknown) => Promise<unknown>)({
+      lobbyInvite: {
+        updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
+        create: (...args: unknown[]) => inviteCreateMock(...args),
+      },
+    });
+  });
 });
 
 describe("POST /api/lobbies/[id]/invite", () => {
@@ -124,16 +141,9 @@ describe("POST /api/lobbies/[id]/invite", () => {
       fromUserId: HOST_ID,
       toUserId: FRIEND_ID,
     });
-    // 5 minute TTL
     const expiresAt = createCall?.data?.expiresAt as Date;
-    const createdAt = createCall?.data?.createdAt as Date | undefined;
-    if (createdAt) {
-      expect(expiresAt.getTime() - createdAt.getTime()).toBe(5 * 60 * 1000);
-    } else {
-      // Created relative to "now" — just assert ~5min in the future.
-      expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(4 * 60 * 1000);
-      expect(expiresAt.getTime() - Date.now()).toBeLessThan(6 * 60 * 1000);
-    }
+    expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(4 * 60 * 1000);
+    expect(expiresAt.getTime() - Date.now()).toBeLessThan(6 * 60 * 1000);
 
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     const [target, event] = notifyUserMock.mock.calls[0] ?? [];
@@ -144,13 +154,48 @@ describe("POST /api/lobbies/[id]/invite", () => {
     });
   });
 
+  it("sweeps stale PENDING rows past expiresAt before creating the new one", async () => {
+    // Codex P2 — without the sweep the partial unique index would block
+    // re-invites after a previous invite naturally TTL'd without anyone
+    // clicking accept/decline. The sweep transitions stale rows to EXPIRED.
+    const { request, params } = buildRequest();
+
+    await POST(request, { params });
+
+    expect(inviteUpdateManyMock).toHaveBeenCalledTimes(1);
+    const where = inviteUpdateManyMock.mock.calls[0]?.[0]?.where;
+    expect(where).toMatchObject({
+      lobbyId: LOBBY_ID,
+      toUserId: FRIEND_ID,
+      status: "PENDING",
+    });
+    expect(where?.expiresAt).toMatchObject({ lte: expect.any(Date) });
+  });
+
+  it("translates a P2002 unique-violation into 409 (live PENDING dedup)", async () => {
+    // CodeRabbit critical — partial unique index on
+    // (lobby_id, to_user_id) WHERE status='PENDING' rejects the duplicate
+    // atomically. Two concurrent requests race; one wins, the other 409s
+    // instead of persisting a duplicate row.
+    transactionMock.mockImplementationOnce(async () => {
+      throw new Prisma.PrismaClientKnownRequestError(
+        "Unique constraint failed",
+        { code: "P2002", clientVersion: "test" },
+      );
+    });
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+    expect(res.status).toBe(409);
+  });
+
   it("rejects non-host callers (403)", async () => {
     authMock.mockResolvedValue({ user: { id: "user-someone-else" } });
     const { request, params } = buildRequest();
 
     const res = await POST(request, { params });
     expect(res.status).toBe(403);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(notifyUserMock).not.toHaveBeenCalled();
   });
 
@@ -160,7 +205,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(400);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(notifyUserMock).not.toHaveBeenCalled();
   });
 
@@ -170,7 +215,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(400);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("rejects non-PVP lobbies (400)", async () => {
@@ -179,7 +224,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(400);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("rejects when a real guest is already seated (409)", async () => {
@@ -191,29 +236,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(409);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects a duplicate PENDING invite (409)", async () => {
-    inviteFindFirstMock.mockResolvedValue({ id: "invite-existing" });
-    const { request, params } = buildRequest();
-
-    const res = await POST(request, { params });
-    expect(res.status).toBe(409);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
-  });
-
-  it("scopes the duplicate check to live (non-expired) PENDING rows", async () => {
-    // Codex P2 — without the `expiresAt > now` gate, a naturally expired
-    // PENDING row would block future invites forever. The route must
-    // include that filter so a stale row is invisible to the dedup.
-    const { request, params } = buildRequest();
-
-    await POST(request, { params });
-
-    const where = inviteFindFirstMock.mock.calls[0]?.[0]?.where;
-    expect(where?.status).toBe("PENDING");
-    expect(where?.expiresAt).toMatchObject({ gt: expect.any(Date) });
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("rejects inviting yourself (400)", async () => {
@@ -221,7 +244,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(400);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 429 when rate limited", async () => {
@@ -230,7 +253,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(429);
-    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 401 when unauthenticated", async () => {

@@ -105,4 +105,16 @@ describe("seedInvites", () => {
     const result = seedInvites(seeded, [makeInvite({ id: "invite-A" })]);
     expect(result).toBe(seeded);
   });
+
+  it("dedupes within a single server batch (CodeRabbit P2)", () => {
+    // The reconciliation endpoint should never return two rows with the
+    // same id, but `known` must track ids accepted *during* this batch
+    // so a degenerate response can't double-render the same toast.
+    const result = seedInvites(
+      [],
+      [makeInvite({ id: "invite-A" }), makeInvite({ id: "invite-A" })],
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe("invite-A");
+  });
 });

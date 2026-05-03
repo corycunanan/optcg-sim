@@ -5,12 +5,18 @@
  * row, flips the lobby `WAITING → READY`, fans out `lobby:state_changed` to
  * the host) — by id rather than by code, with the recipient gate.
  *
- * Idempotent on the invite row: a second call after ACCEPTED returns 410.
+ * State validation runs **inside** the interactive `$transaction` to prevent
+ * TOCTOU: a concurrent start, cancel, or second accept that lands between
+ * the initial guards and the writes would otherwise let us create a guest
+ * for an already-started lobby or stomp `WAITING → READY` over a fresher
+ * status. Conditional `updateMany`s and `create` failures all surface as
+ * 409/410 instead of mutating wrong state.
  *
  * Returns `{ lobbyId }` so the caller can `router.push("/lobbies/<id>")`.
  */
 
 import { after, NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -19,6 +25,16 @@ import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+type AcceptOutcome =
+  | { kind: "ok"; lobbyId: string }
+  | { kind: "not_found" }
+  | { kind: "forbidden" }
+  | { kind: "gone" }
+  | { kind: "self" }
+  | { kind: "mode" }
+  | { kind: "started" }
+  | { kind: "occupied" };
 
 export async function POST(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
@@ -31,79 +47,118 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id: inviteId } = await params;
+  const now = Date.now();
 
-  const invite = await prisma.lobbyInvite.findUnique({
-    where: { id: inviteId },
-    include: {
-      lobby: { include: { guest: true } },
-    },
-  });
-
-  if (!invite) {
-    return apiError("Invite not found", 404);
-  }
-
-  if (invite.toUserId !== userId) {
-    return apiError("Forbidden", 403);
-  }
-
-  if (invite.status !== "PENDING") {
-    return apiError("Invite is no longer active", 410);
-  }
-
-  if (invite.expiresAt.getTime() <= Date.now()) {
-    // Best-effort: roll the row to EXPIRED so the next reconciliation sweep
-    // doesn't keep handing it to the recipient. Failures here are silent.
-    void prisma.lobbyInvite
-      .update({ where: { id: inviteId }, data: { status: "EXPIRED" } })
-      .catch(() => undefined);
-    return apiError("Invite has expired", 410);
-  }
-
-  const lobby = invite.lobby;
-  if (lobby.status !== "WAITING") {
-    return apiError("Lobby is no longer accepting guests", 409);
-  }
-
-  if (lobby.mode !== "PVP") {
-    return apiError("Lobby is not in PVP mode", 409);
-  }
-
-  if (lobby.guest && lobby.guest.userId !== lobby.hostUserId) {
-    return apiError("Lobby already has a guest", 409);
-  }
-
-  if (lobby.hostUserId === userId) {
-    return apiError("You cannot accept an invite to your own lobby", 409);
-  }
-
-  await prisma.$transaction([
-    prisma.lobbyGuest.create({
-      data: { lobbyId: lobby.id, userId },
-    }),
-    prisma.lobby.update({
-      where: { id: lobby.id },
-      data: { status: "READY" },
-    }),
-    prisma.lobbyInvite.update({
+  const result = await prisma.$transaction<AcceptOutcome>(async (tx) => {
+    const invite = await tx.lobbyInvite.findUnique({
       where: { id: inviteId },
+      select: {
+        id: true,
+        lobbyId: true,
+        toUserId: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+    if (!invite) return { kind: "not_found" };
+    if (invite.toUserId !== userId) return { kind: "forbidden" };
+    if (invite.status !== "PENDING") return { kind: "gone" };
+    if (invite.expiresAt.getTime() <= now) {
+      // Roll the row to EXPIRED inside the same tx so a follow-up
+      // /pending fetch doesn't keep handing this invite back.
+      await tx.lobbyInvite.updateMany({
+        where: { id: invite.id, status: "PENDING" },
+        data: { status: "EXPIRED" },
+      });
+      return { kind: "gone" };
+    }
+
+    const lobby = await tx.lobby.findUnique({
+      where: { id: invite.lobbyId },
+      select: {
+        id: true,
+        hostUserId: true,
+        mode: true,
+        status: true,
+        guest: { select: { userId: true } },
+      },
+    });
+    if (!lobby) return { kind: "not_found" };
+    if (lobby.hostUserId === userId) return { kind: "self" };
+    if (lobby.mode !== "PVP") return { kind: "mode" };
+    if (lobby.status !== "WAITING") return { kind: "started" };
+    if (lobby.guest && lobby.guest.userId !== lobby.hostUserId) {
+      return { kind: "occupied" };
+    }
+
+    // Conditional flip on the invite. If a concurrent decline / cancel /
+    // sibling-accept-cleanup landed between the read above and this write,
+    // count is 0 and we return 410 without mutating the lobby.
+    const inviteUpdate = await tx.lobbyInvite.updateMany({
+      where: { id: invite.id, status: "PENDING" },
       data: { status: "ACCEPTED" },
-    }),
-  ]);
+    });
+    if (inviteUpdate.count !== 1) return { kind: "gone" };
 
-  after(async () => {
-    // The seat is now taken; any *other* outstanding invites for this lobby
-    // would only fail with 409 if their recipient clicked Join, so cancel
-    // them and dismiss their toasts. The accepted invite is already
-    // ACCEPTED (not PENDING) so this sweep skips it.
-    await cancelPendingLobbyInvites(lobby.id);
+    // Conditional flip on the lobby. If a concurrent start / close moved
+    // the lobby off WAITING, count is 0 and we return 409.
+    const lobbyUpdate = await tx.lobby.updateMany({
+      where: { id: lobby.id, status: "WAITING" },
+      data: { status: "READY" },
+    });
+    if (lobbyUpdate.count !== 1) return { kind: "started" };
 
-    const state = await buildLobbyRoomState(lobby.id);
-    if (!state) return;
-    // Same actor-skip semantics as `POST /api/lobbies/join` — the new guest
-    // navigates from this route's response, the host learns from the push.
-    await notifyLobby(state, { actorUserId: userId });
+    // LobbyGuest.lobbyId is `@unique` — a concurrent join races us here
+    // and one side gets P2002. Translate to 409.
+    try {
+      await tx.lobbyGuest.create({
+        data: { lobbyId: lobby.id, userId },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        return { kind: "occupied" };
+      }
+      throw err;
+    }
+
+    return { kind: "ok", lobbyId: lobby.id };
   });
 
-  return apiSuccess({ lobbyId: lobby.id });
+  switch (result.kind) {
+    case "ok": {
+      const acceptedLobbyId = result.lobbyId;
+      after(async () => {
+        // The seat is now taken; any *other* outstanding invites for this
+        // lobby would only fail with 409 if their recipient clicked Join,
+        // so cancel them and dismiss their toasts. The accepted invite is
+        // already ACCEPTED (not PENDING) so this sweep skips it.
+        await cancelPendingLobbyInvites(acceptedLobbyId);
+
+        const state = await buildLobbyRoomState(acceptedLobbyId);
+        if (!state) return;
+        // Same actor-skip semantics as `POST /api/lobbies/join` — the new
+        // guest navigates from this route's response, the host learns from
+        // the push.
+        await notifyLobby(state, { actorUserId: userId });
+      });
+      return apiSuccess({ lobbyId: acceptedLobbyId });
+    }
+    case "not_found":
+      return apiError("Invite not found", 404);
+    case "forbidden":
+      return apiError("Forbidden", 403);
+    case "gone":
+      return apiError("Invite is no longer active", 410);
+    case "self":
+      return apiError("You cannot accept an invite to your own lobby", 409);
+    case "mode":
+      return apiError("Lobby is not in PVP mode", 409);
+    case "started":
+      return apiError("Lobby is no longer accepting guests", 409);
+    case "occupied":
+      return apiError("Lobby already has a guest", 409);
+  }
 }

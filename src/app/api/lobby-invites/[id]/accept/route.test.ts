@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const inviteFindUniqueMock = vi.fn();
-const inviteUpdateMock = vi.fn();
+const inviteUpdateManyMock = vi.fn();
+const lobbyFindUniqueMock = vi.fn();
+const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
-const lobbyUpdateMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
@@ -27,13 +29,14 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     lobbyInvite: {
       findUnique: (...args: unknown[]) => inviteFindUniqueMock(...args),
-      update: (...args: unknown[]) => inviteUpdateMock(...args),
+      updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
+    },
+    lobby: {
+      findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args),
+      updateMany: (...args: unknown[]) => lobbyUpdateManyMock(...args),
     },
     lobbyGuest: {
       create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
-    },
-    lobby: {
-      update: (...args: unknown[]) => lobbyUpdateMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
@@ -69,19 +72,20 @@ function buildRequest() {
   };
 }
 
-const pendingInvite = {
+const livePendingInvite = {
   id: INVITE_ID,
+  lobbyId: LOBBY_ID,
   toUserId: RECIPIENT_ID,
-  fromUserId: HOST_ID,
   status: "PENDING",
   expiresAt: new Date("2099-01-01T00:00:00.000Z"),
-  lobby: {
-    id: LOBBY_ID,
-    hostUserId: HOST_ID,
-    status: "WAITING",
-    mode: "PVP",
-    guest: null,
-  },
+};
+
+const openLobby = {
+  id: LOBBY_ID,
+  hostUserId: HOST_ID,
+  status: "WAITING",
+  mode: "PVP",
+  guest: null,
 };
 
 beforeEach(() => {
@@ -89,20 +93,24 @@ beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   inviteFindUniqueMock.mockReset();
-  inviteUpdateMock.mockReset();
+  inviteUpdateManyMock.mockReset();
+  lobbyFindUniqueMock.mockReset();
+  lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
-  lobbyUpdateMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
   cancelPendingLobbyInvitesMock.mockReset();
-  cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
 
   authMock.mockResolvedValue({ user: { id: RECIPIENT_ID } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
-  inviteFindUniqueMock.mockResolvedValue(pendingInvite);
-  inviteUpdateMock.mockResolvedValue(undefined);
-  transactionMock.mockResolvedValue([]);
+  inviteFindUniqueMock.mockResolvedValue(livePendingInvite);
+  inviteUpdateManyMock.mockResolvedValue({ count: 1 });
+  lobbyFindUniqueMock.mockResolvedValue(openLobby);
+  lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
+  lobbyGuestCreateMock.mockResolvedValue(undefined);
+  cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
+  notifyLobbyMock.mockResolvedValue(undefined);
   buildLobbyRoomStateMock.mockResolvedValue({
     id: LOBBY_ID,
     hostUserId: HOST_ID,
@@ -120,7 +128,26 @@ beforeEach(() => {
     },
     gameId: null,
   });
-  notifyLobbyMock.mockResolvedValue(undefined);
+
+  // Default tx implementation: invoke the callback with a tx-shaped object
+  // backed by the same mocks. Tests can override per-mock call results to
+  // exercise different paths inside the tx.
+  transactionMock.mockImplementation(async (fn: unknown) => {
+    if (typeof fn !== "function") return fn;
+    return (fn as (tx: unknown) => Promise<unknown>)({
+      lobbyInvite: {
+        findUnique: (...args: unknown[]) => inviteFindUniqueMock(...args),
+        updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
+      },
+      lobby: {
+        findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args),
+        updateMany: (...args: unknown[]) => lobbyUpdateManyMock(...args),
+      },
+      lobbyGuest: {
+        create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
+      },
+    });
+  });
 });
 
 describe("POST /api/lobby-invites/[id]/accept", () => {
@@ -132,26 +159,20 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     const json = (await res.json()) as { data: { lobbyId: string } };
     expect(json.data.lobbyId).toBe(LOBBY_ID);
 
-    // Single $transaction with three ops: LobbyGuest create, Lobby status
-    // → READY, LobbyInvite status → ACCEPTED.
-    expect(transactionMock).toHaveBeenCalledTimes(1);
-    const ops = transactionMock.mock.calls[0]?.[0];
-    expect(Array.isArray(ops)).toBe(true);
-    expect(ops).toHaveLength(3);
+    // Conditional invite flip + conditional lobby flip + guest create.
+    expect(inviteUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: INVITE_ID, status: "PENDING" },
+      data: { status: "ACCEPTED" },
+    });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: LOBBY_ID, status: "WAITING" },
+      data: { status: "READY" },
+    });
+    expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
+      data: { lobbyId: LOBBY_ID, userId: RECIPIENT_ID },
+    });
 
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
-    const [, options] = notifyLobbyMock.mock.calls[0] ?? [];
-    expect(options).toEqual({ actorUserId: RECIPIENT_ID });
-  });
-
-  it("cancels other PENDING invites for the lobby on accept (Codex P2)", async () => {
-    // The accepted row is already ACCEPTED (not PENDING) by the time the
-    // sweep runs, so it skips it; any other PENDING rows for the same lobby
-    // are canceled and their recipients see lobby:invite_canceled.
-    const { request, params } = buildRequest();
-
-    await POST(request, { params });
-
     expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith(LOBBY_ID);
   });
 
@@ -161,58 +182,95 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(403);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
   });
 
-  it("rejects already-accepted invites (410)", async () => {
+  it("returns 410 when the invite is no longer PENDING", async () => {
     inviteFindUniqueMock.mockResolvedValue({
-      ...pendingInvite,
+      ...livePendingInvite,
       status: "ACCEPTED",
     });
     const { request, params } = buildRequest();
 
     const res = await POST(request, { params });
     expect(res.status).toBe(410);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
   });
 
-  it("rejects expired invites (410)", async () => {
+  it("returns 410 when the invite has expired and rolls the row to EXPIRED", async () => {
     inviteFindUniqueMock.mockResolvedValue({
-      ...pendingInvite,
+      ...livePendingInvite,
       expiresAt: new Date("2000-01-01T00:00:00.000Z"),
     });
     const { request, params } = buildRequest();
 
     const res = await POST(request, { params });
     expect(res.status).toBe(410);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(inviteUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: INVITE_ID, status: "PENDING" },
+      data: { status: "EXPIRED" },
+    });
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
   });
 
-  it("rejects when the lobby is no longer WAITING (409)", async () => {
-    inviteFindUniqueMock.mockResolvedValue({
-      ...pendingInvite,
-      lobby: { ...pendingInvite.lobby, status: "IN_GAME" },
+  it("returns 410 when the conditional ACCEPTED flip loses a race (CodeRabbit critical)", async () => {
+    // Concurrent decline / cancel between the read and the conditional
+    // update — the where clause filters on `status: PENDING` so the count
+    // is 0 and we fail closed instead of stomping ACCEPTED over the
+    // newer state.
+    inviteUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+    expect(res.status).toBe(410);
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when the lobby moved off WAITING during the tx", async () => {
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+    expect(res.status).toBe(409);
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when LobbyGuest.create races on the unique constraint", async () => {
+    // Concurrent join wins via the LobbyGuest.lobbyId @unique — Prisma
+    // throws P2002 and we translate to 409 instead of bubbling a 500.
+    lobbyGuestCreateMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      }),
+    );
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 409 when the lobby is no longer WAITING (pre-write read)", async () => {
+    lobbyFindUniqueMock.mockResolvedValue({ ...openLobby, status: "IN_GAME" });
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+    expect(res.status).toBe(409);
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when a different guest already joined (pre-write read)", async () => {
+    lobbyFindUniqueMock.mockResolvedValue({
+      ...openLobby,
+      guest: { userId: "user-other-guest" },
     });
     const { request, params } = buildRequest();
 
     const res = await POST(request, { params });
     expect(res.status).toBe(409);
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects when a different guest already joined (409)", async () => {
-    inviteFindUniqueMock.mockResolvedValue({
-      ...pendingInvite,
-      lobby: {
-        ...pendingInvite.lobby,
-        guest: { userId: "user-other-guest" },
-      },
-    });
-    const { request, params } = buildRequest();
-
-    const res = await POST(request, { params });
-    expect(res.status).toBe(409);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("returns 429 when rate limited", async () => {

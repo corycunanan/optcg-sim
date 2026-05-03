@@ -87,8 +87,10 @@ export function LobbyInviteToasts() {
         router.push(`/lobbies/${invite.lobbyId}`);
       } catch (err) {
         if (err instanceof ApiError && err.status === 410) {
-          // Already canceled / expired — drop it.
+          // Already canceled / expired — drop it silently. No error toast:
+          // the user clicked a stale row, not a broken one.
           setInvites((prev) => removeInvite(prev, invite.id));
+          return;
         }
         toast.error(
           err instanceof ApiError ? err.message : "Could not join lobby",

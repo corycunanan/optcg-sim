@@ -17,13 +17,17 @@
  */
 
 import { after, NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { socialLimiter } from "@/lib/rate-limit";
 import { SendLobbyInviteSchema } from "@/lib/validators/lobby-invites";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { notifyUser } from "@/lib/realtime/fan-out";
-import { serializeLobbyInviteForEvent } from "@/lib/realtime/serialize-lobby-invite";
+import {
+  serializeLobbyInviteForEvent,
+  type LobbyInviteRow,
+} from "@/lib/realtime/serialize-lobby-invite";
 
 const INVITE_TTL_MS = 5 * 60 * 1000;
 
@@ -95,48 +99,57 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const now = new Date();
-
-  // Only block on a *live* PENDING row. Without the `expiresAt > now` gate,
-  // a naturally-expired invite (recipient never clicked anything) is still
-  // PENDING in the DB — the recipient-side EXPIRED flip only fires on accept
-  // — and would permanently block future invites to the same friend for
-  // this lobby until someone accepted the stale row.
-  const existingPending = await prisma.lobbyInvite.findFirst({
-    where: {
-      lobbyId,
-      toUserId,
-      status: "PENDING",
-      expiresAt: { gt: now },
-    },
-    select: { id: true },
-  });
-  if (existingPending) {
-    return apiError("Invite already pending for this user", 409);
-  }
-
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
 
-  const invite = await prisma.lobbyInvite.create({
-    data: {
-      lobbyId,
-      fromUserId: userId,
-      toUserId,
-      expiresAt,
-    },
-    include: {
-      fromUser: {
-        select: { id: true, username: true, name: true, image: true },
-      },
-      lobby: {
-        select: {
-          joinCode: true,
-          format: true,
-          mode: true,
-          host: { select: { username: true } },
+  // Atomic dedup. The partial unique index on (lobby_id, to_user_id) WHERE
+  // status='PENDING' is the source of truth; the sweep below frees the slot
+  // for naturally-expired rows so the recipient-side EXPIRED flip (only
+  // fires on accept) doesn't strand future invites. Two concurrent requests
+  // for the same (lobby, recipient) race into the create; the loser sees
+  // P2002 and returns 409 instead of persisting a duplicate PENDING row.
+  let invite: LobbyInviteRow;
+  try {
+    invite = await prisma.$transaction(async (tx) => {
+      await tx.lobbyInvite.updateMany({
+        where: {
+          lobbyId,
+          toUserId,
+          status: "PENDING",
+          expiresAt: { lte: now },
         },
-      },
-    },
-  });
+        data: { status: "EXPIRED" },
+      });
+      return tx.lobbyInvite.create({
+        data: {
+          lobbyId,
+          fromUserId: userId,
+          toUserId,
+          expiresAt,
+        },
+        include: {
+          fromUser: {
+            select: { id: true, username: true, name: true, image: true },
+          },
+          lobby: {
+            select: {
+              joinCode: true,
+              format: true,
+              mode: true,
+              host: { select: { username: true } },
+            },
+          },
+        },
+      });
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      return apiError("Invite already pending for this user", 409);
+    }
+    throw err;
+  }
 
   const serialized = serializeLobbyInviteForEvent(invite);
 

@@ -26,13 +26,16 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
 
   const { id: inviteId } = await params;
 
+  // Pre-read so we know the host (`fromUserId`) for the fanout. Don't gate
+  // ownership on this read alone — the conditional `updateMany` below
+  // re-asserts `toUserId` so a TOCTOU between read and write can't seat the
+  // wrong actor.
   const invite = await prisma.lobbyInvite.findUnique({
     where: { id: inviteId },
     select: {
       id: true,
       toUserId: true,
       fromUserId: true,
-      status: true,
     },
   });
 
@@ -44,14 +47,16 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
     return apiError("Forbidden", 403);
   }
 
-  if (invite.status !== "PENDING") {
-    return apiError("Invite is no longer active", 410);
-  }
-
-  await prisma.lobbyInvite.update({
-    where: { id: inviteId },
+  // Atomic transition: only flip from PENDING, only by the recipient. A
+  // concurrent ACCEPTED/DECLINED/CANCELED/EXPIRED write loses this race
+  // and we return 410 instead of overwriting the newer status.
+  const updated = await prisma.lobbyInvite.updateMany({
+    where: { id: inviteId, toUserId: userId, status: "PENDING" },
     data: { status: "DECLINED" },
   });
+  if (updated.count === 0) {
+    return apiError("Invite is no longer active", 410);
+  }
 
   after(async () => {
     await Promise.all([
