@@ -250,6 +250,83 @@ export function executeLifeToHand(
   };
 }
 
+// OPT-363: generic ADD_TO_LIFE dispatcher. Currently the only authored use is
+// OP14-104 Gecko Moria's CHOICE branch ("add a Character from your trash to the
+// top of your Life cards face-up"), targeted by `CARD_IN_TRASH`. The existing
+// `_FROM_DECK` / `_FROM_HAND` / `_FROM_FIELD` variants stay because they're
+// referenced directly by a number of card schemas. If a future schema dispatches
+// ADD_TO_LIFE with a different target, the warning surfaces it instead of a
+// silent no-op.
+export function executeAddToLife(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const targetType = action.target?.type;
+  if (targetType === "CARD_IN_TRASH") {
+    return executeAddToLifeFromTrash(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
+  }
+  console.warn(`[life] ADD_TO_LIFE with unsupported target.type: ${targetType ?? "(missing)"}`);
+  return { state, events: [], succeeded: false };
+}
+
+function executeAddToLifeFromTrash(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const params = action.params ?? {};
+  const face = (params.face as "UP" | "DOWN") ?? "DOWN";
+  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (allValidIds.length === 0) return { state, events, succeeded: false };
+
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  // The trash for `CARD_IN_TRASH` is resolved against `target.controller`
+  // (default SELF), matching `target-resolver.ts:357-365`.
+  const ctrl = action.target?.controller === "OPPONENT" ? (controller === 0 ? 1 : 0) as 0 | 1 : controller;
+  const p = state.players[ctrl];
+
+  const toLife = p.trash.filter((c) => targetIds.includes(c.instanceId));
+  if (toLife.length === 0) return { state, events, succeeded: false };
+
+  const toLifeIds = new Set(toLife.map((c) => c.instanceId));
+  const newTrash = p.trash.filter((c) => !toLifeIds.has(c.instanceId));
+  const lifeCards = toLife.map((c) => ({
+    instanceId: c.instanceId,
+    cardId: c.cardId,
+    face,
+  }));
+  const newLife = position === "TOP"
+    ? [...lifeCards, ...p.life]
+    : [...p.life, ...lifeCards];
+
+  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+  newPlayers[ctrl] = { ...p, trash: newTrash, life: newLife };
+
+  return {
+    state: { ...state, players: newPlayers },
+    events,
+    succeeded: true,
+    result: { targetInstanceIds: lifeCards.map((c) => c.instanceId), count: lifeCards.length },
+  };
+}
+
 export function executeAddToLifeFromHand(
   state: GameState,
   action: Action,

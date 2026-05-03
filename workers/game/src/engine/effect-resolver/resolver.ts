@@ -70,6 +70,7 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   TRASH_FROM_HAND: removal.executeTrashFromHand,
 
   // Life
+  ADD_TO_LIFE: life.executeAddToLife,
   ADD_TO_LIFE_FROM_DECK: life.executeAddToLifeFromDeck,
   TRASH_FROM_LIFE: life.executeTrashFromLife,
   TURN_LIFE_FACE_UP: life.executeTurnLifeFaceUp,
@@ -136,19 +137,12 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
 };
 
 // OPT-200: drift detection between the `ActionType` union and `ACTION_HANDLERS`.
-// Two distinct categories live in `KNOWN_UNHANDLED_ACTION_TYPES`:
-//
-//   1. Resolved through a different path / unused by any schema:
-//      - RETURN_ATTACHED_DON_TO_COST is shared with the Cost union and resolves
-//        through cost-handler.ts.
-//      - CHOOSE_VALUE / GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
-//        union but referenced by zero schemas; harmless until someone authors one.
-//
-//   2. Real authored gap, tracked separately:
-//      - ADD_TO_LIFE is dispatched by op14.ts (OP14-104 Gecko Moria, second
-//        CHOICE branch — "add card from trash to top of Life face-up"). No
-//        handler exists; the branch silently no-ops at runtime today. Tracked
-//        as OPT-363; remove from this list when that ships.
+// Members listed here resolve through a different path or are referenced by
+// zero schemas:
+//   - RETURN_ATTACHED_DON_TO_COST is shared with the Cost union and resolves
+//     through cost-handler.ts.
+//   - CHOOSE_VALUE / GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
+//     union but referenced by zero schemas; harmless until someone authors one.
 //
 // Adding a new ActionType without registering a handler or adding it here trips
 // this assertion at worker boot rather than no-op'ing in production.
@@ -157,8 +151,6 @@ const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set<ActionType
   "CHOOSE_VALUE",
   "GRANT_COUNTER",
   "REMOVE_PROHIBITION",
-  // TODO(OPT-363): implement handler; OP14-104 Gecko Moria silently no-ops.
-  "ADD_TO_LIFE",
 ]);
 
 const _missingActionHandlers = ALL_ACTION_TYPES.filter(
