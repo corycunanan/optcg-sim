@@ -32,6 +32,21 @@ export const PRESENCE_OFFLINE_DEBOUNCE_MS = 5_000;
 export const FRIENDS_CACHE_TTL_MS = 60_000;
 const FANOUT_TIMEOUT_MS = 2_000;
 
+/**
+ * OPT-359 — typing-indicator inbound throttle. The chat-widget client
+ * already throttles emits to 1/sec; the DO clamps to 1 per 1.5s as a
+ * defensive cap so a misbehaving client can't flood the channel. Tracked
+ * per-DO (not per-recipient) — each DO instance handles a single user's
+ * outbound typing.
+ */
+export const TYPING_THROTTLE_MS = 1_500;
+/**
+ * OPT-359 — upper bound on `until` clamps. A client cannot pin a typing
+ * indicator further than `Date.now() + TYPING_MAX_UNTIL_MS` in the future.
+ * Generous enough for the spec's 3s window plus client clock skew.
+ */
+export const TYPING_MAX_UNTIL_MS = 10_000;
+
 interface UserSocketAttachment {
   type: "user-channel-socket";
   userId: string;
@@ -55,12 +70,37 @@ function isUserSocketAttachment(value: unknown): value is UserSocketAttachment {
   );
 }
 
+/**
+ * Mirrors `RealtimeClientEvent` in src/types/realtime.ts. Kept as a
+ * hand-rolled type guard rather than importing the Next.js type so the
+ * worker's tsconfig boundary stays clean — adding a variant requires a
+ * matching update here.
+ */
+type ClientEvent = { type: "chat:typing"; toUserId: string; until: number };
+
+function isClientEvent(value: unknown): value is ClientEvent {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.type === "chat:typing") {
+    return (
+      typeof candidate.toUserId === "string"
+      && candidate.toUserId.length > 0
+      && candidate.toUserId.length < 200
+      && typeof candidate.until === "number"
+      && Number.isFinite(candidate.until)
+    );
+  }
+  return false;
+}
+
 export class UserChannel implements DurableObject {
   state: DurableObjectState;
   env: Env;
   private nextSequence = 0;
   private offlineTimer: ReturnType<typeof setTimeout> | null = null;
   private friendsCache: FriendsCacheEntry | null = null;
+  /** OPT-359 — last accepted `chat:typing` emit timestamp (per-DO). */
+  private lastTypingEmitAt = 0;
   /**
    * Explicit set of attached connection ids. The DO's `getWebSockets()` is
    * not a real-time count during close handshakes — sockets in CLOSING
@@ -219,9 +259,68 @@ export class UserChannel implements DurableObject {
       try { ws.close(1009, "message too big"); } catch { /* ignore */ }
       return;
     }
-    // No client→server vocabulary in OPT-352; drop and log at debug. T9 is
-    // the first ticket to add a typed message handler here.
-    log("user_channel.message_dropped", { reason: "no_vocabulary_yet" });
+
+    if (typeof message !== "string") {
+      // Client→server vocabulary is JSON over text frames. Binary frames
+      // are unexpected and dropped without disconnecting — a misbehaving
+      // client will be reaped by idle/upgrade churn anyway.
+      log("user_channel.message_dropped", { reason: "non_text_frame" });
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(message);
+    } catch {
+      log("user_channel.message_dropped", { reason: "invalid_json" });
+      return;
+    }
+
+    if (!isClientEvent(parsed)) {
+      log("user_channel.message_dropped", { reason: "unknown_shape" });
+      return;
+    }
+
+    const attachment = ws.deserializeAttachment();
+    const senderUserId = isUserSocketAttachment(attachment) ? attachment.userId : null;
+    if (!senderUserId) {
+      log("user_channel.message_dropped", { reason: "no_attachment" });
+      return;
+    }
+
+    if (parsed.type === "chat:typing") {
+      await this.handleTyping(senderUserId, parsed);
+      return;
+    }
+
+    log("user_channel.message_dropped", { reason: "unknown_type" });
+  }
+
+  private async handleTyping(
+    senderUserId: string,
+    event: { toUserId: string; until: number },
+  ): Promise<void> {
+    if (event.toUserId === senderUserId) {
+      log("user_channel.typing_dropped", { reason: "self_target" });
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this.lastTypingEmitAt < TYPING_THROTTLE_MS) {
+      // Defensive cap — the client also throttles to 1/sec.
+      return;
+    }
+    this.lastTypingEmitAt = now;
+
+    // Clamp `until` so the client can't pin an indicator far in the future.
+    const clampedUntil = Math.min(event.until, now + TYPING_MAX_UNTIL_MS);
+
+    const broadcast = JSON.stringify({
+      type: "chat:typing_received",
+      fromUserId: senderUserId,
+      until: clampedUntil,
+    });
+    await this.notifyFriend(event.toUserId, broadcast);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {

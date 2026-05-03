@@ -5,6 +5,11 @@ export interface ChatMessage {
   body: string;
   createdAt: string;
   fromUserId: string;
+  /**
+   * OPT-359 — receipt timestamp. Drives the sender-side ✓ vs ✓✓ render.
+   * Null until the recipient marks the message read.
+   */
+  readAt: string | null;
 }
 
 /**
@@ -34,8 +39,32 @@ export function applyMessageEvent(
       body: message.body,
       createdAt: message.createdAt,
       fromUserId: message.fromUserId,
+      readAt: message.readAt,
     },
   ];
+}
+
+/**
+ * OPT-359 — reducer for `chat:read_to` events. Marks the current user's
+ * own messages (i.e., those they sent in this conversation) created
+ * at-or-before `throughCreatedAt` as read. No-op for messages already
+ * carrying a `readAt` (don't overwrite earlier timestamps with later
+ * ones).
+ */
+export function applyReadToEvent(
+  current: ChatMessage[],
+  myUserId: string,
+  throughCreatedAt: string,
+): ChatMessage[] {
+  let changed = false;
+  const next = current.map((m) => {
+    if (m.fromUserId !== myUserId) return m;
+    if (m.readAt !== null) return m;
+    if (m.createdAt > throughCreatedAt) return m;
+    changed = true;
+    return { ...m, readAt: throughCreatedAt };
+  });
+  return changed ? next : current;
 }
 
 /**

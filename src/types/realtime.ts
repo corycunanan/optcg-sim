@@ -32,7 +32,36 @@ export type RealtimeServerEvent =
       winReason: string | null;
     }
   | { type: "presence:friend_online"; userId: string }
-  | { type: "presence:friend_offline"; userId: string; lastSeen: string };
+  | { type: "presence:friend_offline"; userId: string; lastSeen: string }
+  /**
+   * OPT-359 — typing indicator broadcast. `fromUserId` is the *sender* of
+   * the typing event; recipients filter by matching it against the open
+   * conversation's partner id. `until` is a unix-ms timestamp at which the
+   * indicator should auto-clear.
+   */
+  | { type: "chat:typing_received"; fromUserId: string; until: number }
+  /**
+   * OPT-359 — read receipt. Sent to the original sender after their
+   * messages were marked read by the recipient. `fromUserId` is the
+   * *reader* (counterparty); `throughCreatedAt` is the cutoff timestamp
+   * (ISO) — every message from the original sender to the reader created
+   * at-or-before this is now considered read.
+   */
+  | {
+      type: "chat:read_to";
+      fromUserId: string;
+      throughCreatedAt: string;
+    };
+
+/**
+ * Client → server vocabulary. Routed by `UserChannel.webSocketMessage` on
+ * the worker. Adding a variant is a three-step contract:
+ *   1. Add a new member here.
+ *   2. Validate + handle in `workers/game/src/UserChannel.ts`.
+ *   3. Emit from a hook/component via `useUserChannelEvents().send(event)`.
+ */
+export type RealtimeClientEvent =
+  | { type: "chat:typing"; toUserId: string; until: number };
 
 export interface SerializedMessage {
   id: string;
@@ -40,6 +69,8 @@ export interface SerializedMessage {
   toUserId: string;
   body: string;
   createdAt: string;
+  /** Set when the recipient has marked this message read; null otherwise. */
+  readAt: string | null;
   fromUser: SerializedUser;
 }
 

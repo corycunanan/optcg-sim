@@ -10,6 +10,7 @@ export interface MessageWithSender {
   toUserId: string;
   body: string;
   createdAt: Date;
+  readAt: Date | null;
   fromUser: {
     id: string;
     username: string | null;
@@ -27,6 +28,7 @@ export function serializeMessageForEvent(
     toUserId: message.toUserId,
     body: message.body,
     createdAt: message.createdAt.toISOString(),
+    readAt: message.readAt ? message.readAt.toISOString() : null,
     fromUser: {
       id: message.fromUser.id,
       username: message.fromUser.username,

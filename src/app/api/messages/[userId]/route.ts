@@ -26,7 +26,10 @@ export async function GET(
   const limit = 50;
 
   try {
-    // Polling mode: only fetch messages newer than `after` timestamp
+    // Polling mode: only fetch messages newer than `after` timestamp.
+    // OPT-359: the implicit "GET marks read" side-effect that used to fire
+    // here (and below) was removed; clients now call POST
+    // /api/messages/[userId]/read explicitly.
     if (after) {
       const newMessages = await prisma.message.findMany({
         where: {
@@ -41,13 +44,6 @@ export async function GET(
           fromUser: { select: { id: true, username: true, name: true, image: true } },
         },
       });
-
-      if (newMessages.length > 0) {
-        await prisma.message.updateMany({
-          where: { fromUserId: otherId, toUserId: myId, read: false },
-          data: { read: true },
-        });
-      }
 
       return apiSuccess(newMessages);
     }
@@ -65,12 +61,6 @@ export async function GET(
       include: {
         fromUser: { select: { id: true, username: true, name: true, image: true } },
       },
-    });
-
-    // Mark incoming messages as read
-    await prisma.message.updateMany({
-      where: { fromUserId: otherId, toUserId: myId, read: false },
-      data: { read: true },
     });
 
     const reversed = messages.reverse(); // oldest first
