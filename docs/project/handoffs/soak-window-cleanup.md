@@ -270,8 +270,9 @@ than the existing single-Provider context.
   whitelist is back to its "resolved-elsewhere or unauthored" baseline.
 - **Read first:** `workers/game/src/engine/effect-resolver/actions/life.ts`
   (the new `executeAddToLife` + `executeAddToLifeFromTrash`),
-  `workers/game/src/engine/effect-resolver/resolver.ts:73-76` (registration
-  + updated whitelist comment).
+  `workers/game/src/engine/effect-resolver/resolver.ts:73` (registration),
+  `workers/game/src/engine/effect-resolver/resolver.ts:139-154` (updated
+  `KNOWN_UNHANDLED_ACTION_TYPES` comment block).
 - **Gotchas / do NOT touch:** existing `_FROM_DECK` / `_FROM_HAND` /
   `_FROM_FIELD` handlers stay — they're referenced directly by other schemas.
   The dispatcher only handles `target.type === "CARD_IN_TRASH"` today; other
