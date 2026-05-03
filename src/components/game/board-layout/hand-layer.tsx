@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -31,6 +31,31 @@ export function computeFreshlyAdded(
     if (!seenIds.has(id)) fresh.add(id);
   }
   return fresh;
+}
+
+/**
+ * OPT-364: post-commit reconcile for the seen-ids set. Returns the same `prev`
+ * reference when `currentIds` already matches it (so React's setState bails
+ * out of an extra render), otherwise returns a fresh set containing exactly
+ * the `currentIds`. Drives the convergence: render N marks new ids as
+ * `freshlyAdded`, the post-commit reconcile updates state, render N+1 sees
+ * them as already-seen and reveals them.
+ */
+export function reconcileSeenIds(
+  prev: ReadonlySet<string>,
+  currentIds: readonly string[],
+): Set<string> {
+  if (prev.size === currentIds.length) {
+    let allMatch = true;
+    for (const id of currentIds) {
+      if (!prev.has(id)) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return prev as Set<string>;
+  }
+  return new Set(currentIds);
 }
 
 // Migrated onto `<Card variant="hand">` (OPT-268). The primitive owns the
@@ -168,17 +193,22 @@ export const HandLayer = React.memo(function HandLayer({
 
   // OPT-364: hide cards on their first render in this HandLayer instance so
   // the deck-to-hand flight has a chance to register a transition before the
-  // resting card paints on top of it. The seen set is reconciled after commit
-  // (add new ids, drop departed ids) — once a card is seen, only
-  // `inFlightInstanceIds` controls its visibility.
-  const seenIdsRef = useRef<Set<string>>(new Set());
+  // resting card paints on top of it. `seenIds` is held in state (not a ref)
+  // so the post-commit reconcile schedules a re-render — without that, the
+  // first commit after a perspective flip or a fresh mount would leave every
+  // card stuck hidden because nothing else would re-render the layer. Once a
+  // card is in `seenIds`, only `inFlightInstanceIds` controls its visibility.
+  const cardIds = useMemo(() => cards.map((c) => c.instanceId), [cards]);
+  const [seenIds, setSeenIds] = useState<ReadonlySet<string>>(
+    () => new Set(cardIds),
+  );
   const freshlyAdded = useMemo(
-    () => computeFreshlyAdded(seenIdsRef.current, cards.map((c) => c.instanceId)),
-    [cards],
+    () => computeFreshlyAdded(seenIds, cardIds),
+    [seenIds, cardIds],
   );
   useEffect(() => {
-    seenIdsRef.current = new Set(cards.map((c) => c.instanceId));
-  }, [cards]);
+    setSeenIds((prev) => reconcileSeenIds(prev, cardIds));
+  }, [cardIds]);
 
   const handRef = useCallback(
     (node: HTMLDivElement | null) => {
