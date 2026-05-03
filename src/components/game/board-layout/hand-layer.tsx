@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -9,9 +9,54 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
+
+/**
+ * OPT-364: returns instanceIds present in `currentIds` that were not in
+ * `seenIds`. Pure so the hide-on-first-render behavior in `HandLayer` can be
+ * unit-tested without rendering React.
+ *
+ * The previous helper (`useFieldArrivals`) cached arrivals across renders and
+ * only cleared them when the id list mutated again — leaving the drawn card
+ * hidden indefinitely whenever the hand didn't change between draws (e.g.,
+ * solitaire end-main → next-side draw with an empty hand).
+ */
+export function computeFreshlyAdded(
+  seenIds: ReadonlySet<string>,
+  currentIds: readonly string[],
+): Set<string> {
+  const fresh = new Set<string>();
+  for (const id of currentIds) {
+    if (!seenIds.has(id)) fresh.add(id);
+  }
+  return fresh;
+}
+
+/**
+ * OPT-364: post-commit reconcile for the seen-ids set. Returns the same `prev`
+ * reference when `currentIds` already matches it (so React's setState bails
+ * out of an extra render), otherwise returns a fresh set containing exactly
+ * the `currentIds`. Drives the convergence: render N marks new ids as
+ * `freshlyAdded`, the post-commit reconcile updates state, render N+1 sees
+ * them as already-seen and reveals them.
+ */
+export function reconcileSeenIds(
+  prev: ReadonlySet<string>,
+  currentIds: readonly string[],
+): Set<string> {
+  if (prev.size === currentIds.length) {
+    let allMatch = true;
+    for (const id of currentIds) {
+      if (!prev.has(id)) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return prev as Set<string>;
+  }
+  return new Set(currentIds);
+}
 
 // Migrated onto `<Card variant="hand">` (OPT-268). The primitive owns the
 // hand-card hover lift (handCardHover preset), tooltip, and 3D face stack.
@@ -146,7 +191,24 @@ export const HandLayer = React.memo(function HandLayer({
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
 
-  const newlyArrived = useFieldArrivals(cards.map((c) => c.instanceId));
+  // OPT-364: hide cards on their first render in this HandLayer instance so
+  // the deck-to-hand flight has a chance to register a transition before the
+  // resting card paints on top of it. `seenIds` is held in state (not a ref)
+  // so the post-commit reconcile schedules a re-render — without that, the
+  // first commit after a perspective flip or a fresh mount would leave every
+  // card stuck hidden because nothing else would re-render the layer. Once a
+  // card is in `seenIds`, only `inFlightInstanceIds` controls its visibility.
+  const cardIds = useMemo(() => cards.map((c) => c.instanceId), [cards]);
+  const [seenIds, setSeenIds] = useState<ReadonlySet<string>>(
+    () => new Set(cardIds),
+  );
+  const freshlyAdded = useMemo(
+    () => computeFreshlyAdded(seenIds, cardIds),
+    [seenIds, cardIds],
+  );
+  useEffect(() => {
+    setSeenIds((prev) => reconcileSeenIds(prev, cardIds));
+  }, [cardIds]);
 
   const handRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -167,11 +229,12 @@ export const HandLayer = React.memo(function HandLayer({
 
   const renderCard = (card: CardInstance, i: number) => {
     const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
-    // Hide if the transition system says in-flight, OR if the card just
-    // appeared this render (transition hasn't been created yet).
+    // Hide if the transition system says in-flight, or if the card is
+    // appearing for the first time on this layer instance (the transition
+    // hasn't been registered yet by `useCardTransitions`).
     const isInFlight =
       (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
-      newlyArrived.has(card.instanceId);
+      freshlyAdded.has(card.instanceId);
 
     if (faceDown) {
       return (
