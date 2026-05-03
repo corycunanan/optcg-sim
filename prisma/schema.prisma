@@ -54,6 +54,8 @@ model User {
   receivedMessages  Message[]       @relation("ReceivedMessages")
   hostedLobbies     Lobby[]         @relation("HostedLobbies")
   lobbyGuests       LobbyGuest[]
+  sentLobbyInvites      LobbyInvite[] @relation("SentLobbyInvites")
+  receivedLobbyInvites  LobbyInvite[] @relation("ReceivedLobbyInvites")
 
   // Game
   gamesAsPlayer1    GameSession[]   @relation("GamesAsPlayer1")
@@ -321,6 +323,7 @@ model Lobby {
   hostDeck    Deck?        @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
   guest       LobbyGuest?
   gameSession GameSession?
+  invites     LobbyInvite[]
 
   @@index([status])
   @@map("lobbies")
@@ -338,6 +341,32 @@ model LobbyGuest {
   deck  Deck? @relation(fields: [deckId], references: [id])
 
   @@map("lobby_guests")
+}
+
+enum LobbyInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELED
+}
+
+model LobbyInvite {
+  id         String            @id @default(uuid())
+  lobbyId    String            @map("lobby_id")
+  fromUserId String            @map("from_user_id")
+  toUserId   String            @map("to_user_id")
+  status     LobbyInviteStatus @default(PENDING)
+  createdAt  DateTime          @default(now()) @map("created_at")
+  expiresAt  DateTime          @map("expires_at")
+
+  lobby    Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  fromUser User  @relation("SentLobbyInvites", fields: [fromUserId], references: [id])
+  toUser   User  @relation("ReceivedLobbyInvites", fields: [toUserId], references: [id])
+
+  @@index([toUserId, status])
+  @@index([lobbyId, status])
+  @@map("lobby_invites")
 }
 
 // ─── M3: Game Engine ─────────────────────────────────────────

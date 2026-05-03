@@ -17,6 +17,7 @@ import {
   requirePlayableDeck,
 } from "@/lib/decks/playable";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
@@ -191,6 +192,10 @@ export async function POST(
     }
 
     after(async () => {
+      // Any C-style "third invite" still pending when the host starts: cancel
+      // it and tell the recipient. Per the ticket's E2E spec.
+      await cancelPendingLobbyInvites(lobby.id);
+
       const state = await buildLobbyRoomState(lobby.id);
       if (!state) return;
       // Host (actor) navigates to the game from this route's response;

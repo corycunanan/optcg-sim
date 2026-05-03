@@ -14,6 +14,13 @@ const ChatWidget = dynamic(
   () => import("./chat-widget").then((mod) => mod.ChatWidget),
   { ssr: false }
 );
+const LobbyInviteToasts = dynamic(
+  () =>
+    import("@/components/lobbies/lobby-invite-toast").then(
+      (mod) => mod.LobbyInviteToasts,
+    ),
+  { ssr: false },
+);
 
 export function SocialShell() {
   const { data: session } = useSession();
@@ -22,18 +29,25 @@ export function SocialShell() {
   const [chatUser, setChatUser] = useState<SidebarUser | null>(null);
 
   if (!session?.user) return null;
-  if (isGame) return null;
 
   return (
     <>
-      <SocialSidebar onOpenChat={setChatUser} />
-      {chatUser && (
-        <ChatWidget
-          user={chatUser}
-          currentUserId={session.user.id}
-          sidebarCollapsed={false}
-          onClose={() => setChatUser(null)}
-        />
+      {/* Lobby invite toasts surface even on /game/* — a friend inviting you
+          while you're mid-game is a valid (if rare) flow, and the toast is
+          non-blocking. */}
+      <LobbyInviteToasts />
+      {!isGame && (
+        <>
+          <SocialSidebar onOpenChat={setChatUser} />
+          {chatUser && (
+            <ChatWidget
+              user={chatUser}
+              currentUserId={session.user.id}
+              sidebarCollapsed={false}
+              onClose={() => setChatUser(null)}
+            />
+          )}
+        </>
       )}
     </>
   );
