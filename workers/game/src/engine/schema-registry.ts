@@ -10,7 +10,7 @@
  * from the schemas/ directory.
  */
 
-import type { EffectSchema, EffectBlock, Action, Cost } from "./effect-types.js";
+import { ALL_ACTION_TYPES, type EffectSchema, type EffectBlock, type Action, type Cost } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
@@ -174,39 +174,10 @@ export function getAllAuthoredSchemas(): Record<string, EffectSchema> {
 
 const VALID_CATEGORIES = new Set(["auto", "activate", "permanent", "replacement", "rule_modification"]);
 
-const VALID_ACTION_TYPES = new Set([
-  // Card Movement
-  "DRAW", "SEARCH_DECK", "TRASH_CARD", "KO", "RETURN_TO_HAND", "RETURN_TO_DECK",
-  "PLAY_CARD", "MILL", "REVEAL", "REVEAL_HAND", "FULL_DECK_SEARCH", "DECK_SCRY",
-  "SEARCH_AND_PLAY", "SEARCH_TRASH_THE_REST", "PLACE_HAND_TO_DECK", "HAND_WHEEL",
-  "SHUFFLE_DECK",
-  // Life
-  "ADD_TO_LIFE", "ADD_TO_LIFE_FROM_DECK", "ADD_TO_LIFE_FROM_HAND",
-  "ADD_TO_LIFE_FROM_FIELD", "PLAY_FROM_LIFE", "LIFE_TO_HAND", "TRASH_FROM_LIFE",
-  "DRAIN_LIFE_TO_THRESHOLD", "LIFE_CARD_TO_DECK", "TRASH_FACE_UP_LIFE",
-  "TURN_LIFE_FACE_UP", "TURN_LIFE_FACE_DOWN", "TURN_ALL_LIFE_FACE_DOWN",
-  "LIFE_SCRY", "REORDER_ALL_LIFE",
-  // Power & Stats
-  "MODIFY_POWER", "SET_BASE_POWER", "SET_POWER_TO_ZERO", "MODIFY_COST", "SET_COST",
-  "SWAP_BASE_POWER", "COPY_POWER",
-  // Keywords
-  "GRANT_KEYWORD", "REMOVE_KEYWORD", "NEGATE_EFFECTS", "GRANT_COUNTER", "GRANT_ATTRIBUTE",
-  // DON!!
-  "GIVE_DON", "RETURN_DON_TO_DECK", "ADD_DON_FROM_DECK", "SET_DON_ACTIVE", "REST_DON",
-  "REDISTRIBUTE_DON", "FORCE_OPPONENT_DON_RETURN", "REST_OPPONENT_DON",
-  "GIVE_OPPONENT_DON_TO_OPPONENT", "DISTRIBUTE_DON", "RETURN_ATTACHED_DON_TO_COST",
-  // State Change
-  "SET_ACTIVE", "SET_REST", "APPLY_PROHIBITION", "REMOVE_PROHIBITION",
-  // Meta / Flow
-  "PLAYER_CHOICE", "OPPONENT_CHOICE", "CHOOSE_VALUE", "WIN_GAME",
-  "OPPONENT_ACTION", "EXTRA_TURN", "SCHEDULE_ACTION",
-  // Battle
-  "REDIRECT_ATTACK", "DEAL_DAMAGE", "SELF_TAKE_DAMAGE",
-  // Effect / Meta
-  "ACTIVATE_EVENT_FROM_HAND", "ACTIVATE_EVENT_FROM_TRASH", "REUSE_EFFECT",
-  "NEGATE_TRIGGER_TYPE", "TRASH_FROM_HAND", "RETURN_HAND_TO_DECK",
-  "APPLY_ONE_TIME_MODIFIER", "PLAY_SELF",
-]);
+// OPT-202: derived from `ALL_ACTION_TYPES` so the schema spec can never drift
+// from the `ActionType` union. Engine handler coverage is a separate concern
+// asserted at worker boot in `effect-resolver/resolver.ts` (OPT-200).
+const VALID_ACTION_TYPES: ReadonlySet<string> = new Set(ALL_ACTION_TYPES);
 
 /**
  * Validate an effect schema and return a list of error messages.

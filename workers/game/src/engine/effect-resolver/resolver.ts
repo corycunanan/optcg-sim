@@ -38,7 +38,7 @@ import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
 
-import type { ActionType } from "../effect-types.js";
+import { ALL_ACTION_TYPES, type ActionType } from "../effect-types.js";
 
 // ─── Action dispatcher map ───────────────────────────────────────────────────
 
@@ -134,6 +134,34 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   OPPONENT_ACTION: executeOpponentAction,
   REUSE_EFFECT: executeReuseEffect,
 };
+
+// OPT-200: drift detection between the `ActionType` union and `ACTION_HANDLERS`.
+// Members listed in `KNOWN_UNHANDLED_ACTION_TYPES` are intentionally absent from
+// the dispatcher — RETURN_ATTACHED_DON_TO_COST is shared with the Cost union
+// and resolves through cost-handler.ts; the rest are declared in the union but
+// currently unused by any schema (CHOOSE_VALUE, GRANT_COUNTER, REMOVE_PROHIBITION)
+// or only referenced as a CHOICE branch by op14 (ADD_TO_LIFE — schemas should
+// prefer the ADD_TO_LIFE_FROM_DECK / _FROM_HAND / _FROM_FIELD variants until a
+// standalone handler exists). To clear an entry, register a handler in
+// ACTION_HANDLERS above. Adding a new ActionType without doing either trips
+// this assertion at worker boot rather than no-op'ing in production.
+const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set<ActionType>([
+  "RETURN_ATTACHED_DON_TO_COST",
+  "CHOOSE_VALUE",
+  "GRANT_COUNTER",
+  "REMOVE_PROHIBITION",
+  "ADD_TO_LIFE",
+]);
+
+const _missingActionHandlers = ALL_ACTION_TYPES.filter(
+  (t) => !(t in ACTION_HANDLERS) && !KNOWN_UNHANDLED_ACTION_TYPES.has(t),
+);
+if (_missingActionHandlers.length > 0) {
+  throw new Error(
+    `[resolver] ActionType union has unhandled types: ${_missingActionHandlers.join(", ")}. ` +
+      `Register a handler in ACTION_HANDLERS or add to KNOWN_UNHANDLED_ACTION_TYPES.`,
+  );
+}
 
 // Wire up circular dependencies for choice handlers
 setChoiceDependencies({
