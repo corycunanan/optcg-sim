@@ -5,14 +5,21 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { X, Minus, ChevronUp } from "lucide-react";
+import { X, Minus, ChevronUp, Check, CheckCheck } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import {
   applyMessageEvent,
+  applyReadToEvent,
   mergeInitialHistory,
   type ChatMessage,
 } from "./apply-message-event";
+import {
+  NEVER_EMITTED,
+  TYPING_HOLD_MS,
+  isTypingActive,
+  shouldEmitTyping,
+} from "./chat-typing-state";
 
 type Message = ChatMessage;
 
@@ -33,6 +40,9 @@ interface Props {
 // Reconciliation backstop interval — replaces the 5s poll until OPT-361
 // drops it after a soak window.
 const RECONCILE_INTERVAL_MS = 60_000;
+// 100ms tick that re-evaluates the `typingUntil` window without triggering
+// a re-render every frame.
+const TYPING_TICK_MS = 100;
 
 export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -40,14 +50,23 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [typingUntil, setTypingUntil] = useState<number | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
-  const { subscribe } = useUserChannelEvents();
+  const lastTypingEmitRef = useRef<number>(NEVER_EMITTED);
+  const lastReadCutoffRef = useRef<string>("");
+  const minimizedRef = useRef<boolean>(minimized);
+  const { subscribe, send } = useUserChannelEvents();
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    minimizedRef.current = minimized;
+  }, [minimized]);
 
   useEffect(() => {
     setLoading(true);
@@ -66,10 +85,85 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     });
   }, [subscribe, user.id]);
 
+  // OPT-359 — typing indicator. Filter to the open conversation's partner
+  // so a typing event from a third-party DM doesn't leak into this widget.
+  useEffect(() => {
+    return subscribe("chat:typing_received", (event) => {
+      if (event.fromUserId !== user.id) return;
+      setTypingUntil((prev) =>
+        prev === null || event.until > prev ? event.until : prev,
+      );
+    });
+  }, [subscribe, user.id]);
+
+  // OPT-359 — read receipts. Filter the same way: only events from the
+  // open conversation's partner update *my own* messages' readAt.
+  useEffect(() => {
+    return subscribe("chat:read_to", (event) => {
+      if (event.fromUserId !== user.id) return;
+      setMessages((prev) =>
+        applyReadToEvent(prev, currentUserId, event.throughCreatedAt),
+      );
+    });
+  }, [subscribe, user.id, currentUserId]);
+
+  // 100ms tick — re-evaluates whether `typingUntil` has passed. Only
+  // mounted while a typing window is active so the widget stays idle when
+  // nobody's typing.
+  useEffect(() => {
+    if (typingUntil === null) return;
+    if (typingUntil <= Date.now()) {
+      setTypingUntil(null);
+      return;
+    }
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, TYPING_TICK_MS);
+    return () => clearInterval(timer);
+  }, [typingUntil]);
+
+  useEffect(() => {
+    if (typingUntil !== null && typingUntil <= now) {
+      setTypingUntil(null);
+    }
+  }, [now, typingUntil]);
+
+  const markAsRead = useCallback(() => {
+    const hasUnreadIncoming = messagesRef.current.some(
+      (m) => m.fromUserId === user.id && m.readAt === null,
+    );
+    if (!hasUnreadIncoming) return;
+    const cutoff = new Date().toISOString();
+    if (cutoff <= lastReadCutoffRef.current) return;
+    lastReadCutoffRef.current = cutoff;
+    void apiPost<{ data: { updated: number } }>(
+      `/api/messages/${user.id}/read`,
+      { throughCreatedAt: cutoff },
+    ).catch(() => {
+      // Non-fatal — the next mount/restore call will retry the cutoff.
+      lastReadCutoffRef.current = "";
+    });
+  }, [user.id]);
+
+  // Mark-on-mount: fire after history loads if there are incoming messages.
+  // Must happen post-load so we know whether there's anything to mark.
+  useEffect(() => {
+    if (loading || minimized) return;
+    markAsRead();
+  }, [loading, minimized, markAsRead]);
+
+  // Mark-on-new-message: when a `message:new` lands while expanded, treat
+  // the user's continued attention as a read signal.
+  useEffect(() => {
+    if (loading || minimized) return;
+    if (messages.length === 0) return;
+    markAsRead();
+  }, [messages, loading, minimized, markAsRead]);
+
   useEffect(() => {
     if (loading) return;
     const interval = setInterval(async () => {
-      if (minimized) return;
+      if (minimizedRef.current) return;
       const current = messagesRef.current;
       const lastMsg = current[current.length - 1];
       const after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
@@ -87,7 +181,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       }
     }, RECONCILE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [user.id, loading, minimized]);
+  }, [user.id, loading]);
 
   useEffect(() => {
     if (!minimized) {
@@ -96,7 +190,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     }
   }, [minimized, messages]);
 
-  const send = useCallback(
+  const send_ = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!body.trim() || sending) return;
@@ -112,7 +206,23 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     [body, user.id, sending],
   );
 
+  const handleBodyChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setBody(e.target.value);
+      const nowMs = Date.now();
+      if (!shouldEmitTyping(nowMs, lastTypingEmitRef.current)) return;
+      lastTypingEmitRef.current = nowMs;
+      send({
+        type: "chat:typing",
+        toUserId: user.id,
+        until: nowMs + TYPING_HOLD_MS,
+      });
+    },
+    [send, user.id],
+  );
+
   const displayName = user.username || user.name;
+  const showTyping = isTypingActive(typingUntil, now);
 
   return (
     <div
@@ -181,6 +291,18 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
                     )}
                   >
                     <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                    {isMe && (
+                      <div
+                        className="mt-1 flex justify-end text-content-inverse/60"
+                        aria-label={msg.readAt ? "Read" : "Sent"}
+                      >
+                        {msg.readAt ? (
+                          <CheckCheck className="size-3" />
+                        ) : (
+                          <Check className="size-3" />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -188,16 +310,22 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
             <div ref={bottomRef} />
           </div>
 
+          {showTyping && (
+            <div className="px-3 py-1 text-xs italic text-content-tertiary">
+              {displayName} is typing…
+            </div>
+          )}
+
           {/* Input */}
           <form
-            onSubmit={send}
+            onSubmit={send_}
             className="flex gap-2 border-t border-border bg-surface-1 px-3 py-2"
           >
             <Input
               ref={inputRef}
               type="text"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={handleBodyChange}
               placeholder={`Message ${displayName}...`}
               className="h-8 flex-1 bg-surface-2 text-xs"
             />

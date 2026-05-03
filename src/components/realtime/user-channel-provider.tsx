@@ -14,6 +14,7 @@ import { useUserChannel } from "@/hooks/use-user-channel";
 import type { ConnectionStatus } from "@/hooks/use-authed-websocket";
 import type { EventDispatcher } from "@/lib/realtime/event-dispatcher";
 import { apiGet } from "@/lib/api-client";
+import type { RealtimeClientEvent } from "@/types/realtime";
 import {
   EMPTY_PRESENCE,
   applyOfflineEvent,
@@ -27,6 +28,8 @@ export type { PresenceEntry, PresenceMap } from "./presence-state";
 
 interface UserChannelContextValue {
   subscribe: EventDispatcher["subscribe"];
+  /** Send a typed client→server event. See `RealtimeClientEvent`. */
+  send: (event: RealtimeClientEvent) => void;
   connectionStatus: ConnectionStatus;
   presence: PresenceMap;
   /**
@@ -47,7 +50,7 @@ const UserChannelContext = createContext<UserChannelContextValue | null>(null);
  * would each open a socket, breaking single-socket-per-tab.
  */
 export function UserChannelProvider({ children }: { children: ReactNode }) {
-  const { subscribe, connectionStatus } = useUserChannel();
+  const { subscribe, send, connectionStatus } = useUserChannel();
   const [presence, setPresence] = useState<PresenceMap>(EMPTY_PRESENCE);
   const trackedRef = useRef<Set<string>>(new Set());
 
@@ -80,8 +83,8 @@ export function UserChannelProvider({ children }: { children: ReactNode }) {
   }, [subscribe]);
 
   const value = useMemo<UserChannelContextValue>(
-    () => ({ subscribe, connectionStatus, presence, trackPresence }),
-    [subscribe, connectionStatus, presence, trackPresence],
+    () => ({ subscribe, send, connectionStatus, presence, trackPresence }),
+    [subscribe, send, connectionStatus, presence, trackPresence],
   );
 
   return (

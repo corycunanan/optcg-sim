@@ -10,6 +10,7 @@ import {
   createEventDispatcher,
   type EventDispatcher,
 } from "@/lib/realtime/event-dispatcher";
+import type { RealtimeClientEvent } from "@/types/realtime";
 
 export interface UseUserChannelResult {
   connectionStatus: ConnectionStatus;
@@ -18,6 +19,13 @@ export interface UseUserChannelResult {
    * caller is expected to call on cleanup. Safe to call from `useEffect`.
    */
   subscribe: EventDispatcher["subscribe"];
+  /**
+   * Send a typed client→server event. No-op when the socket is not open
+   * (the underlying controller surfaces "Not connected" via lastError).
+   * OPT-359 introduces the first variant — extend `RealtimeClientEvent` to
+   * add more.
+   */
+  send: (event: RealtimeClientEvent) => void;
 }
 
 const WORKER_URL = process.env.NEXT_PUBLIC_GAME_WORKER_URL ?? "";
@@ -77,7 +85,7 @@ export function useUserChannel(): UseUserChannelResult {
     }
   }, [dispatcher]);
 
-  const { connectionStatus, close } = useAuthedWebSocket<unknown>({
+  const { connectionStatus, close, send: sendRaw } = useAuthedWebSocket<unknown>({
     url,
     getToken,
     onMessage,
@@ -100,10 +108,18 @@ export function useUserChannel(): UseUserChannelResult {
     [dispatcher],
   );
 
+  const send = useCallback(
+    (event: RealtimeClientEvent) => {
+      if (!userId) return;
+      sendRaw(event);
+    },
+    [sendRaw, userId],
+  );
+
   // When signed out we never open the socket; `useAuthedWebSocket` reports
   // `connecting` on first render even with `url=null`, which is misleading.
   // Surface a stable `disconnected` for signed-out callers.
   const reportedStatus: ConnectionStatus = userId ? connectionStatus : "disconnected";
 
-  return { connectionStatus: reportedStatus, subscribe };
+  return { connectionStatus: reportedStatus, subscribe, send };
 }

@@ -67,6 +67,7 @@ beforeEach(() => {
     toUserId: "user-recipient",
     body: "hello",
     read: false,
+    readAt: null,
     createdAt: new Date("2026-05-02T12:00:00.000Z"),
     fromUser: {
       id: "user-sender",
@@ -94,6 +95,7 @@ describe("POST /api/messages/[userId]", () => {
         toUserId: "user-recipient",
         body: "hello",
         createdAt: "2026-05-02T12:00:00.000Z",
+        readAt: null,
         fromUser: {
           id: "user-sender",
           username: "ace",

@@ -9,6 +9,7 @@ describe("serializeMessageForEvent", () => {
       toUserId: "user-b",
       body: "hi",
       createdAt: new Date("2026-05-02T12:00:00.000Z"),
+      readAt: null,
       fromUser: {
         id: "user-a",
         username: "ace",
@@ -23,6 +24,7 @@ describe("serializeMessageForEvent", () => {
       toUserId: "user-b",
       body: "hi",
       createdAt: "2026-05-02T12:00:00.000Z",
+      readAt: null,
       fromUser: {
         id: "user-a",
         username: "ace",
@@ -39,6 +41,7 @@ describe("serializeMessageForEvent", () => {
       toUserId: "user-b",
       body: "hi",
       createdAt: new Date(0),
+      readAt: null,
       fromUser: { id: "user-a", username: null, name: null, image: null },
     });
 
@@ -48,5 +51,19 @@ describe("serializeMessageForEvent", () => {
       name: null,
       image: null,
     });
+  });
+
+  it("converts a Date readAt to an ISO string", () => {
+    const result = serializeMessageForEvent({
+      id: "msg-3",
+      fromUserId: "user-a",
+      toUserId: "user-b",
+      body: "hi",
+      createdAt: new Date("2026-05-02T12:00:00.000Z"),
+      readAt: new Date("2026-05-02T12:01:00.000Z"),
+      fromUser: { id: "user-a", username: "ace", name: "Ace", image: null },
+    });
+
+    expect(result.readAt).toBe("2026-05-02T12:01:00.000Z");
   });
 });

@@ -286,12 +286,16 @@ model Friendship {
 }
 
 model Message {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   fromUserId String
   toUserId   String
   body       String
-  read       Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  // OPT-359: `readAt` is the receipt-timestamp of truth. `read` stays in
+  // sync (`read = readAt != null`) for backward compatibility with the
+  // unread-count subquery in `/api/messages/conversations`.
+  read       Boolean   @default(false)
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
 
   fromUser User @relation("SentMessages", fields: [fromUserId], references: [id])
   toUser   User @relation("ReceivedMessages", fields: [toUserId], references: [id])
