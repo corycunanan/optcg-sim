@@ -11,11 +11,16 @@ pr: https://github.com/corycunanan/optcg-sim/pull/216
 A bundle of six low-risk tech-debt cleanups to run during the OPT-361 soak window
 (2026-05-02 → 2026-05-09). Ship as a single PR.
 
-> **Status (2026-05-03):** In Review — [PR #216](https://github.com/corycunanan/optcg-sim/pull/216) is open and awaiting merge.
+> **Status (2026-05-03):** Bundle in review on [PR #216](https://github.com/corycunanan/optcg-sim/pull/216).
 > OPT-203 / OPT-208 are Done in Linear (no code change needed); the remaining
 > five tickets (OPT-197 / 199 / 200 / 202 / 206) are In Review on the PR and
-> will move to Done on merge. Two follow-up tickets filed: OPT-362 (deferred
-> OPT-199 schema work) and OPT-363 (ADD_TO_LIFE handler gap surfaced by Codex).
+> will move to Done on merge.
+>
+> Follow-ups filed off PR #216:
+> - **OPT-363** — `ADD_TO_LIFE` handler gap (OP14-104 Gecko Moria). In Review on
+>   [PR #217](https://github.com/corycunanan/optcg-sim/pull/217).
+> - **OPT-362** — deferred OPT-199 schema migration (`Deck.leader` Prisma
+>   relation + `include` collapse). Still Backlog; ready when someone wants it.
 
 ---
 
@@ -53,13 +58,12 @@ the close-as-stale work first, the worker change last.
 - [OPT-362](https://linear.app/optcg-sim/issue/OPT-362) — the deferred OPT-199
   schema work (add Prisma `Deck.leader` relation, then collapse to a single
   `include` query). Out of scope for the soak window because it requires a
-  migration.
-- [OPT-363](https://linear.app/optcg-sim/issue/OPT-363) — implement an
-  `ADD_TO_LIFE` handler so OP14-104 Gecko Moria's second CHOICE branch stops
-  silently no-op'ing. Surfaced by Codex review on PR #216 (the OPT-200 boot
-  assertion would have caught this if it weren't on the
-  `KNOWN_UNHANDLED_ACTION_TYPES` whitelist). Whitelist entry now carries an
-  inline `TODO(OPT-363)` so the gap is tracked, not buried.
+  migration. **Status: Backlog — ready to pick up.**
+- [OPT-363](https://linear.app/optcg-sim/issue/OPT-363) — `ADD_TO_LIFE` handler
+  for OP14-104 Gecko Moria's second CHOICE branch. Surfaced by Codex review on
+  PR #216. **Status: In Review on [PR #217](https://github.com/corycunanan/optcg-sim/pull/217).**
+  Whitelist entry removed; the OPT-200 boot assertion now enforces handler
+  coverage for `ADD_TO_LIFE`.
 
 ---
 
@@ -252,3 +256,31 @@ the context. `CardTooltipContent` is rendered through `<CardTooltip>` →
 `player-field`, `opponent-field`, `board-layout`, plus several modals).
 Prop-drilling `activeEffects` through 3+ layers would be strictly worse
 than the existing single-Provider context.
+
+---
+
+## Handoffs
+
+### OPT-363 → OPT-362
+**From:** session on 2026-05-03 · **Commit:** `34154fc` · **PR:** #217
+
+- **Primer:** `ADD_TO_LIFE` is no longer a no-op — there is a real handler
+  (generic dispatcher keyed on `target.type`). The OPT-200 boot assertion now
+  enforces handler coverage for it; the `KNOWN_UNHANDLED_ACTION_TYPES`
+  whitelist is back to its "resolved-elsewhere or unauthored" baseline.
+- **Read first:** `workers/game/src/engine/effect-resolver/actions/life.ts`
+  (the new `executeAddToLife` + `executeAddToLifeFromTrash`),
+  `workers/game/src/engine/effect-resolver/resolver.ts:73` (registration),
+  `workers/game/src/engine/effect-resolver/resolver.ts:139-154` (updated
+  `KNOWN_UNHANDLED_ACTION_TYPES` comment block).
+- **Gotchas / do NOT touch:** existing `_FROM_DECK` / `_FROM_HAND` /
+  `_FROM_FIELD` handlers stay — they're referenced directly by other schemas.
+  The dispatcher only handles `target.type === "CARD_IN_TRASH"` today; other
+  target types `console.warn` + return `succeeded: false`. Don't fold the
+  specialized variants into the dispatcher unless you also rewrite their
+  call sites.
+- **Unresolved:** none. OPT-363 is fully scoped by OP14-104; future
+  `ADD_TO_LIFE` authoring is forward-compatible.
+- **Why this matters for OPT-362:** unrelated surface (Prisma schema +
+  `src/app/api/decks/route.ts`), so nothing in this PR blocks or informs it.
+  The only coupling is that both came out of PR #216's review trail.

@@ -744,8 +744,13 @@ export interface ActionParamsMap {
   APPLY_ONE_TIME_MODIFIER: { modification: Modifier; applies_to: Record<string, unknown> };
   REUSE_EFFECT: { target_effect: string };
 
+  // OPT-363: dispatches by `target.type`; only `CARD_IN_TRASH` is currently
+  // handled (OP14-104 Gecko Moria). Params mirror the other ADD_TO_LIFE_FROM_*
+  // variants for forward compatibility.
+  ADD_TO_LIFE: { face?: "UP" | "DOWN"; position?: "TOP" | "BOTTOM" };
+
   // Unimplemented — forward-compatible
-  ADD_TO_LIFE: Record<string, unknown>;
+
   SEARCH_TRASH_THE_REST: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string };
   SET_BASE_POWER: Record<string, unknown>;
   SET_POWER_TO_ZERO: Record<string, unknown>;
