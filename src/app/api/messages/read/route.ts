@@ -32,9 +32,13 @@ export async function PUT(request: NextRequest) {
       return apiError("Message not found", 404);
     }
 
+    // Keep `readAt` in sync with `read` per the OPT-359 invariant
+    // (see prisma/schema.prisma Message). `read = readAt != null` must
+    // hold for every message-read writer, otherwise the conversations
+    // unread-count subquery and the chat-widget receipt UI diverge.
     await prisma.message.update({
       where: { id: messageId },
-      data: { read: true },
+      data: { read: true, readAt: new Date() },
     });
 
     return apiAction();
