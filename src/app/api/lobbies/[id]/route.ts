@@ -16,6 +16,7 @@ import { PatchLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { viewerIsEvicted } from "@/lib/lobbies/state";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
@@ -297,6 +298,11 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   });
 
   after(async () => {
+    // Pending invites for this lobby become moot the moment it closes; cancel
+    // them and emit `lobby:invite_canceled` so any visible recipient toasts
+    // dismiss without waiting on the 5-minute TTL.
+    await cancelPendingLobbyInvites(id);
+
     const state = await buildLobbyRoomState(id);
     if (!state) return;
 

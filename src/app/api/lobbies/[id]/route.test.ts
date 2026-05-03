@@ -75,6 +75,12 @@ vi.mock("@/lib/realtime/fanout-lobby", () => ({
 vi.mock("@/lib/realtime/fan-out", () => ({
   notifyUser: (...args: unknown[]) => notifyUserMock(...args),
 }));
+// OPT-360 — pending invite cleanup is exercised in cancel-invites.test.ts.
+// Stub it here so the DELETE flow doesn't drag the lobbyInvite Prisma surface
+// into this test.
+vi.mock("@/lib/lobbies/cancel-invites", () => ({
+  cancelPendingLobbyInvites: vi.fn(async () => undefined),
+}));
 
 const { PATCH, DELETE } = await import("./route");
 

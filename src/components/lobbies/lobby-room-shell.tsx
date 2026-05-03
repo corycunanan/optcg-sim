@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { DeckPreviewModal } from "./deck-preview-modal";
+import { InviteFriendPopover } from "./invite-friend-popover";
 
 interface DeckOption extends LobbyRoomDeck {
   format: string;
@@ -291,9 +292,11 @@ export function LobbyRoomShell({
                 />
               ) : (
                 <InvitePanel
+                  lobbyId={lobby.id}
                   joinCode={lobby.joinCode}
                   copied={copied}
                   onCopy={copyInvite}
+                  showInviteFriend={isHost}
                 />
               )
             ) : (
@@ -484,13 +487,17 @@ function SeatPanel({
 }
 
 function InvitePanel({
+  lobbyId,
   joinCode,
   copied,
   onCopy,
+  showInviteFriend,
 }: {
+  lobbyId: string;
   joinCode: string;
   copied: boolean;
   onCopy: () => void;
+  showInviteFriend: boolean;
 }) {
   return (
     <section className="border-border-strong bg-surface-1 flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border border-dashed p-5 text-center">
@@ -508,14 +515,17 @@ function InvitePanel({
       <code className="border-border bg-surface-base text-text-primary rounded-md border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em]">
         {joinCode}
       </code>
-      <Button variant="secondary" onClick={onCopy}>
-        {copied ? (
-          <Check data-icon="inline-start" />
-        ) : (
-          <Copy data-icon="inline-start" />
-        )}
-        {copied ? "Copied" : "Copy Invite"}
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button variant="secondary" onClick={onCopy}>
+          {copied ? (
+            <Check data-icon="inline-start" />
+          ) : (
+            <Copy data-icon="inline-start" />
+          )}
+          {copied ? "Copied" : "Copy Invite"}
+        </Button>
+        {showInviteFriend && <InviteFriendPopover lobbyId={lobbyId} />}
+      </div>
     </section>
   );
 }

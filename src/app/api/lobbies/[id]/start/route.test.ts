@@ -93,6 +93,12 @@ vi.mock("@/lib/lobbies/build-state", () => ({
 vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
+// OPT-360 — pending invite cleanup runs in `after()` after a successful start;
+// covered by cancel-invites.test.ts. Stubbed here so the start flow doesn't
+// drag the lobbyInvite Prisma surface into this test.
+vi.mock("@/lib/lobbies/cancel-invites", () => ({
+  cancelPendingLobbyInvites: vi.fn(async () => undefined),
+}));
 
 const { POST } = await import("./route");
 

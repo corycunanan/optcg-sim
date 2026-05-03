@@ -51,7 +51,26 @@ export type RealtimeServerEvent =
       type: "chat:read_to";
       fromUserId: string;
       throughCreatedAt: string;
-    };
+    }
+  /**
+   * OPT-360 — lobby invite arrived (recipient surface). Carries enough
+   * preview detail (`fromUser`, `lobbyPreview`) for the recipient toast to
+   * render and decide without a follow-up fetch.
+   */
+  | { type: "lobby:invite_received"; invite: SerializedLobbyInvite }
+  /**
+   * OPT-360 — lobby invite was declined. Echoed to the original sender so
+   * any local "Invited X" pending state can clear; recipient also receives
+   * it as the auto-dismiss trigger for their own toast (the in-flight echo
+   * confirms the server saw the decline).
+   */
+  | { type: "lobby:invite_declined"; inviteId: string }
+  /**
+   * OPT-360 — lobby invite was canceled by the host (host closed the lobby
+   * or started the game). Sent to the recipient so a still-visible toast
+   * auto-dismisses.
+   */
+  | { type: "lobby:invite_canceled"; inviteId: string };
 
 /**
  * Client → server vocabulary. Routed by `UserChannel.webSocketMessage` on
@@ -94,6 +113,25 @@ export interface SerializedUser {
   username: string | null;
   name: string | null;
   image: string | null;
+}
+
+export interface SerializedLobbyInvitePreview {
+  format: string;
+  mode: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+  hostUsername: string | null;
+  joinCode: string;
+}
+
+export interface SerializedLobbyInvite {
+  id: string;
+  lobbyId: string;
+  fromUserId: string;
+  toUserId: string;
+  /** ISO timestamp at which the recipient should auto-clear the toast. */
+  expiresAt: string;
+  createdAt: string;
+  fromUser: SerializedUser;
+  lobby: SerializedLobbyInvitePreview;
 }
 
 export { type ConnectionStatus } from "@/hooks/use-authed-websocket";
