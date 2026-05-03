@@ -2,7 +2,7 @@
 linear-project: Tech Debt
 linear-project-url: https://linear.app/optcg-sim/project/tech-debt-7e0a9613928a
 last-updated: 2026-05-03
-status: shipped
+status: in-review
 pr: https://github.com/corycunanan/optcg-sim/pull/216
 ---
 
@@ -11,10 +11,11 @@ pr: https://github.com/corycunanan/optcg-sim/pull/216
 A bundle of six low-risk tech-debt cleanups to run during the OPT-361 soak window
 (2026-05-02 → 2026-05-09). Ship as a single PR.
 
-> **Status (2026-05-03):** Bundle shipped as [PR #216](https://github.com/corycunanan/optcg-sim/pull/216).
-> All 6 tickets either Done in Linear (OPT-203, OPT-208) or commented with
-> implementation notes (status will move on PR merge). One follow-up ticket
-> filed for the deferred OPT-199 schema work.
+> **Status (2026-05-03):** In Review — [PR #216](https://github.com/corycunanan/optcg-sim/pull/216) is open and awaiting merge.
+> OPT-203 / OPT-208 are Done in Linear (no code change needed); the remaining
+> five tickets (OPT-197 / 199 / 200 / 202 / 206) are In Review on the PR and
+> will move to Done on merge. Two follow-up tickets filed: OPT-362 (deferred
+> OPT-199 schema work) and OPT-363 (ADD_TO_LIFE handler gap surfaced by Codex).
 
 ---
 
@@ -88,14 +89,15 @@ the close-as-stale work first, the worker change last.
 - Add to `src/lib/validators/messages.ts`:
   ```ts
   export const MessageIdSchema = z.object({
-    messageId: z.string().cuid(),
+    messageId: z.string().uuid(),
   });
   ```
-  (CUID is Prisma's default ID format for this schema — confirm with
-  `prisma/schema.prisma` for the `Message` model if unsure.)
+  (`Message.id` is `@default(uuid())` per `prisma/schema.prisma:291` — verify
+  there if you ever migrate away from UUIDs. The original handoff said CUID,
+  which is wrong for this model; see the deviation note below.)
 - In the route, replace the manual presence check with
-  `MessageIdSchema.safeParse({ messageId: sp.get("messageId") })`. Return
-  `apiError(400)` on failure.
+  `MessageIdSchema.safeParse({ messageId: request.nextUrl.searchParams.get("messageId") })`.
+  Return `apiError(400)` on failure.
 
 ### OPT-208 — Audit context consumers
 
@@ -185,7 +187,7 @@ the close-as-stale work first, the worker change last.
 
 ## Why a bundle and not six PRs
 
-Each item is mechanical and independently revertable. A single PR is faster to
+Each item is mechanical and independently revertible. A single PR is faster to
 review (one context-switch, not six) and the soak window doesn't reward
 ceremony. If review surfaces an issue with one item, drop just that commit and
 reroll.
@@ -207,7 +209,7 @@ The plan said `z.string().cuid()`. `Message.id` is `@default(uuid())` per
 The plan said "collapse to one query using Prisma `include` on the deck's
 leader relation." There is no `leader` relation on `Deck` — `leaderId` is a
 plain `String` (`prisma/schema.prisma:201`). Adding the relation requires a
-Prisma migration, which is exactly what doesn't belong in a soak window.
+Prisma migration, which doesn't belong in a soak window.
 
 Shipped instead: `take: 200` cap and skip the leader bulk query when there
 are no decks. The full collapse moved to [OPT-362](https://linear.app/optcg-sim/issue/OPT-362).

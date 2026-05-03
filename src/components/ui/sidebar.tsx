@@ -129,6 +129,9 @@ function SidebarProvider({
     <SidebarContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
+        // Inline `style` here assigns CSS custom properties (`--sidebar-*`)
+        // for downstream Tailwind `w-(--sidebar-width)` consumers. Documented
+        // exception to CLAUDE.md Styling Rules #1.
         style={
           {
             "--sidebar-width": SIDEBAR_WIDTH,
@@ -187,6 +190,9 @@ function Sidebar({
           data-slot="sidebar"
           data-mobile="true"
           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          // Inline `style` here assigns the `--sidebar-width` CSS custom
+          // property the className above reads. Documented exception to
+          // CLAUDE.md Styling Rules #1.
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -608,6 +614,9 @@ function SidebarMenuSkeleton({
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
+        // Inline `style` here assigns the per-skeleton `--skeleton-width`
+        // CSS custom property the className above reads. Documented
+        // exception to CLAUDE.md Styling Rules #1.
         style={
           {
             "--skeleton-width": width,
