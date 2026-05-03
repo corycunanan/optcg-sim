@@ -200,6 +200,22 @@ describe("validateClientMessage — ARRANGE_TOP_CARDS", () => {
     ).toBeTruthy();
   });
 
+  // Kujyaku-style search: top 5 reveals no matching cards, player clicks
+  // "Keep None" → "Place at Bottom". The modal sends keptCardInstanceId: ""
+  // as the skip sentinel; the resume handler treats it as "no card kept".
+  it("accepts empty keptCardInstanceId (skip / keep none)", () => {
+    expect(
+      validateClientMessage(
+        wrap({
+          type: "ARRANGE_TOP_CARDS",
+          keptCardInstanceId: "",
+          orderedInstanceIds: ["a", "b", "c", "d", "e"],
+          destination: "bottom",
+        }),
+      ),
+    ).toBeTruthy();
+  });
+
   it("rejects invalid destination", () => {
     expect(() =>
       validateClientMessage(

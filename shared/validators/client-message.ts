@@ -75,7 +75,10 @@ const RevealTrigger = z
 const ArrangeTopCards = z
   .object({
     type: z.literal("ARRANGE_TOP_CARDS"),
-    keptCardInstanceId: id(),
+    // Empty string is the "keep none" sentinel — sent when the prompt has no
+    // valid targets (e.g. Kujyaku reveals top 5 with no Navy cards) or when
+    // the player chooses to skip a SEARCH_DECK pick.
+    keptCardInstanceId: z.string(),
     orderedInstanceIds: z.array(id()),
     destination: z.enum(["top", "bottom"]),
   })
