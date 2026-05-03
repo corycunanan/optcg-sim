@@ -30,7 +30,9 @@ export type RealtimeServerEvent =
       status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
       winnerId: string | null;
       winReason: string | null;
-    };
+    }
+  | { type: "presence:friend_online"; userId: string }
+  | { type: "presence:friend_offline"; userId: string; lastSeen: string };
 
 export interface SerializedMessage {
   id: string;

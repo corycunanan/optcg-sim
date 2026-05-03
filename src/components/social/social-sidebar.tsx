@@ -36,6 +36,7 @@ import {
   type FriendRequestEntry,
   type SidebarUser,
 } from "./apply-friend-event";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Reconciliation backstop interval — replaces the 30s poll until OPT-361
 // drops it after a soak window.
@@ -66,7 +67,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SidebarUser[]>([]);
   const [pendingSent, setPendingSent] = useState<Set<string>>(new Set());
-  const { subscribe } = useUserChannelEvents();
+  const { subscribe, presence, trackPresence } = useUserChannelEvents();
 
   const fetchFriendsData = useCallback(async () => {
     const [friendsJson, requestsJson] = await Promise.all([
@@ -148,7 +149,19 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const user = session?.user;
   const userName = user?.username || user?.name || "User";
 
+  // Seed presence for each newly-added friend. The provider ref-counts so
+  // re-render cycles with the same friends array don't refetch.
+  useEffect(() => {
+    trackPresence(friends.map((f) => f.user.id));
+  }, [friends, trackPresence]);
+
+  const onlineCount = friends.reduce(
+    (acc, f) => acc + (presence[f.user.id]?.online ? 1 : 0),
+    0,
+  );
+
   return (
+    <TooltipProvider>
     <Sidebar side="right" collapsible="none">
       {/* Header — User avatar + account menu */}
       <SidebarHeader>
@@ -246,7 +259,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
         {/* Friends list */}
         <SidebarGroup>
           <SidebarGroupLabel>
-            {friends.length > 0 ? `Online (${friends.length})` : "Friends"}
+            {friends.length > 0 ? `Online (${onlineCount})` : "Friends"}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             {friends.length === 0 ? (
@@ -255,10 +268,18 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
               </p>
             ) : (
               <SidebarMenu className="gap-1">
-                {friends.map(({ friendshipId, user: friendUser }) => (
+                {friends.map(({ friendshipId, user: friendUser }) => {
+                  const friendPresence = presence[friendUser.id];
+                  return (
                   <SidebarMenuItem key={friendshipId}>
                     <SidebarMenuButton size="lg" onClick={() => onOpenChat(friendUser)}>
-                      <UserAvatar user={friendUser} size="sm" variant="dark" showOnline />
+                      <UserAvatar
+                        user={friendUser}
+                        size="sm"
+                        variant="dark"
+                        showOnline={friendPresence?.online ?? false}
+                        lastSeen={friendPresence?.lastSeen ?? null}
+                      />
                       <span className="truncate">
                         {friendUser.username || friendUser.name}
                       </span>
@@ -279,7 +300,8 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
               </SidebarMenu>
             )}
           </SidebarGroupContent>
@@ -356,5 +378,6 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+    </TooltipProvider>
   );
 }
