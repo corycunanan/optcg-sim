@@ -309,14 +309,12 @@ than the existing single-Provider context.
   API route) and `src/app/api/decks/[id]/route.ts:62-67, 149-152` (separate
   `findUnique` for the single-deck GET/PUT responses). File a follow-up
   ticket if these become a hotspot.
-- **Unresolved:** literal "one DB roundtrip" requires the `relationJoins`
-  preview feature (`previewFeatures = ["relationJoins"]` in the Prisma
-  generator) plus `relationLoadStrategy: "join"` on the query. Without it,
-  Prisma still emits ~4 SELECTs internally (decks → deck_cards → cards →
-  leader). Same order of magnitude as the previous 2-await pattern but not
-  literally one SQL statement. Flagged in the PR but not fixed — needs its
-  own ticket if desired since enabling preview features touches the
-  generator config globally.
+- **Unresolved:** none. After Codex review, commit `cab3128` enabled the
+  `relationJoins` preview feature on the generator and opted the GET
+  query into `relationLoadStrategy: "join"`. Verified via Prisma query
+  log: one SELECT (a LATERAL JOIN covering decks + deck_cards + cards +
+  leader) wrapped in BEGIN/COMMIT. Other queries are unchanged — strategy
+  is per-query opt-in.
 - **Why this matters for OPT-205 (next critical-path):** OPT-205 was
   explicitly OOS in PR #216 ("STYLE-1: dynamic color-button styling") and
   ready to pick up. Surface is `src/components/admin/card-edit-form.tsx:204-211`,
