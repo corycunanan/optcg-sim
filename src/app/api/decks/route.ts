@@ -24,6 +24,11 @@ export async function GET() {
       where: { userId },
       orderBy: { updatedAt: "desc" },
       take: 200,
+      // OPT-362 — single DB roundtrip via LATERAL JOIN. Without this,
+      // Prisma defaults to per-relation SELECTs (~4 statements) even with
+      // a nested `include`. Requires `relationJoins` preview feature in
+      // the generator block.
+      relationLoadStrategy: "join",
       include: {
         cards: {
           include: { card: { select: { id: true, name: true, color: true, type: true, imageUrl: true } } },

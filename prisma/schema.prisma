@@ -2,7 +2,8 @@
 // See docs/M0-FOUNDATION.md for design rationale
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
