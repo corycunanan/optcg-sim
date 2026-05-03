@@ -1,10 +1,14 @@
 /**
- * POST /api/realtime/users/[userId]/last-seen — Stamp `User.lastSeen = now()`.
+ * POST /api/realtime/users/[userId]/last-seen — Stamp `User.lastSeen`.
  *
  * Bearer-authed with `GAME_WORKER_SECRET`. Called by the `UserChannel` DO
  * after the 5s offline debounce fires, alongside the `presence:friend_offline`
- * fanout. The DO has no direct DB access; this is the write path it proxies
- * through. Best-effort — the worker fires this without retrying.
+ * fanout. The worker passes its own `lastSeen` ISO timestamp in the body so
+ * the value persisted matches the value in the broadcast payload exactly —
+ * generating a fresh `new Date()` here would drift by network round-trip.
+ *
+ * The DO has no direct DB access; this is the write path it proxies through.
+ * Best-effort — the worker fires this without retrying.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -26,10 +30,16 @@ export async function POST(
 
   const { userId } = await params;
 
+  // Accept an optional `lastSeen` ISO string. If absent or invalid, fall
+  // back to the server clock — older worker callers without the body still
+  // produce a sensible (if slightly drifted) write.
+  const body = await request.json().catch(() => ({})) as { lastSeen?: unknown };
+  const lastSeen = parseLastSeen(body.lastSeen);
+
   try {
     await prisma.user.update({
       where: { id: userId },
-      data: { lastSeen: new Date() },
+      data: { lastSeen },
     });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
@@ -41,4 +51,12 @@ export async function POST(
     console.error("last-seen update error:", error);
     return NextResponse.json({ error: "Failed to update last seen" }, { status: 500 });
   }
+}
+
+function parseLastSeen(raw: unknown): Date {
+  if (typeof raw === "string") {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
 }

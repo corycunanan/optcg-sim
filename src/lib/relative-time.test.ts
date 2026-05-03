@@ -4,9 +4,12 @@ import { formatRelativeTime } from "./relative-time";
 describe("formatRelativeTime", () => {
   const NOW = Date.parse("2026-05-02T18:00:00Z");
 
-  it("returns 'just now' for sub-45s deltas", () => {
+  it("returns 'just now' for sub-60s deltas (covers the 0m ago band)", () => {
     expect(formatRelativeTime(new Date(NOW - 10_000).toISOString(), NOW)).toBe("just now");
     expect(formatRelativeTime(new Date(NOW - 44_000).toISOString(), NOW)).toBe("just now");
+    // Regression: 45–59s used to emit "0m ago".
+    expect(formatRelativeTime(new Date(NOW - 50_000).toISOString(), NOW)).toBe("just now");
+    expect(formatRelativeTime(new Date(NOW - 59_000).toISOString(), NOW)).toBe("just now");
   });
 
   it("formats minutes / hours / days / weeks / months / years", () => {

@@ -167,6 +167,7 @@ interface LastSeenFetchCall {
   url: string;
   method: string;
   auth: string | null;
+  body: string | null;
 }
 
 interface ChannelHarness {
@@ -223,7 +224,8 @@ function createHarness(): ChannelHarness {
     }
 
     if (url.includes("/api/realtime/users/") && url.endsWith("/last-seen")) {
-      lastSeenCalls.push({ url, method: init?.method ?? "GET", auth });
+      const body = typeof init?.body === "string" ? init.body : null;
+      lastSeenCalls.push({ url, method: init?.method ?? "GET", auth, body });
       return new RealResponse(null, { status: 204 });
     }
 
@@ -444,6 +446,63 @@ describe("OPT-358 presence — offline broadcast", () => {
 
     expect(h.userChannelNs.notifies).toHaveLength(0);
     expect(h.lastSeenCalls).toHaveLength(0);
+  });
+});
+
+describe("OPT-358 presence — CLOSING-state safety", () => {
+  it("schedules offline based on the explicit active-id set, not getWebSockets()", async () => {
+    // Cloudflare's getWebSockets() can still report a socket in CLOSING
+    // state when webSocketClose fires. Simulate that: do NOT call
+    // removeSocket() before close — the DO sees the socket in
+    // getWebSockets() but its explicit set is decremented.
+    const h = createHarness();
+    h.setFriends(["friend-1"]);
+
+    await attach(h.channel, USER_ID, "closing-1");
+    await vi.runAllTimersAsync();
+    h.userChannelNs.notifies.length = 0;
+
+    const ws = h.state.getWebSockets()[0]!;
+    // Intentionally NOT calling state.removeSocket(ws) — leave the socket
+    // in CLOSING state per Cloudflare's documented behavior.
+    await h.channel.webSocketClose(ws, 1000, "closed");
+
+    // Despite getWebSockets().length === 1, the active set is empty, so
+    // the offline timer should still fire after the debounce.
+    expect(h.channel.getConnectionCount()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(PRESENCE_OFFLINE_DEBOUNCE_MS + 200);
+    await vi.runAllTimersAsync();
+
+    expect(h.userChannelNs.notifies).toHaveLength(1);
+    const payload = JSON.parse(h.userChannelNs.notifies[0]!.body);
+    expect(payload.type).toBe("presence:friend_offline");
+  });
+
+  it("PATCH /last-seen body matches the broadcast event timestamp exactly", async () => {
+    const h = createHarness();
+    h.setFriends(["friend-1"]);
+
+    await attach(h.channel, USER_ID, "ts-consistency-1");
+    await vi.runAllTimersAsync();
+    h.userChannelNs.notifies.length = 0;
+    h.lastSeenCalls.length = 0;
+
+    const ws = h.state.getWebSockets()[0]!;
+    h.state.removeSocket(ws);
+    await h.channel.webSocketClose(ws, 1000, "closed");
+
+    await vi.advanceTimersByTimeAsync(PRESENCE_OFFLINE_DEBOUNCE_MS + 200);
+    await vi.runAllTimersAsync();
+
+    expect(h.lastSeenCalls).toHaveLength(1);
+    expect(h.userChannelNs.notifies).toHaveLength(1);
+    const eventPayload = JSON.parse(h.userChannelNs.notifies[0]!.body);
+    expect(eventPayload.type).toBe("presence:friend_offline");
+    const rawBody = h.lastSeenCalls[0]!.body;
+    expect(typeof rawBody).toBe("string");
+    const persisted = JSON.parse(rawBody as string) as { lastSeen?: string };
+    expect(persisted.lastSeen).toBe(eventPayload.lastSeen);
   });
 });
 

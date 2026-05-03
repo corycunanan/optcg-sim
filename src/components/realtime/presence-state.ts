@@ -30,7 +30,9 @@ export function applyPresenceSeed(
       && existing.online === entry.online
       && existing.lastSeen === entry.lastSeen
     ) continue;
-    next[id] = entry;
+    // Clone — caller may keep mutating `seed` after the merge; storing the
+    // raw reference would alias reducer state to caller-owned objects.
+    next[id] = { online: entry.online, lastSeen: entry.lastSeen };
     changed = true;
   }
   return changed ? next : current;
