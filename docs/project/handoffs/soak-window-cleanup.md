@@ -17,10 +17,11 @@ A bundle of six low-risk tech-debt cleanups to run during the OPT-361 soak windo
 > will move to Done on merge.
 >
 > Follow-ups filed off PR #216:
-> - **OPT-363** — `ADD_TO_LIFE` handler gap (OP14-104 Gecko Moria). In Review on
->   [PR #217](https://github.com/corycunanan/optcg-sim/pull/217).
+> - **OPT-363** — `ADD_TO_LIFE` handler gap (OP14-104 Gecko Moria). Merged
+>   ([PR #217](https://github.com/corycunanan/optcg-sim/pull/217)).
 > - **OPT-362** — deferred OPT-199 schema migration (`Deck.leader` Prisma
->   relation + `include` collapse). Still Backlog; ready when someone wants it.
+>   relation + `include` collapse). In Review on
+>   [PR #218](https://github.com/corycunanan/optcg-sim/pull/218).
 
 ---
 
@@ -57,11 +58,13 @@ the close-as-stale work first, the worker change last.
 
 - [OPT-362](https://linear.app/optcg-sim/issue/OPT-362) — the deferred OPT-199
   schema work (add Prisma `Deck.leader` relation, then collapse to a single
-  `include` query). Out of scope for the soak window because it requires a
-  migration. **Status: Backlog — ready to pick up.**
+  `include` query). **Status: In Review on
+  [PR #218](https://github.com/corycunanan/optcg-sim/pull/218).** Migration
+  applied cleanly to dev (zero orphans pre-flight); FK enforces non-null
+  leader so the GET response now drops the `?? null` fallbacks.
 - [OPT-363](https://linear.app/optcg-sim/issue/OPT-363) — `ADD_TO_LIFE` handler
   for OP14-104 Gecko Moria's second CHOICE branch. Surfaced by Codex review on
-  PR #216. **Status: In Review on [PR #217](https://github.com/corycunanan/optcg-sim/pull/217).**
+  PR #216. **Status: Merged ([PR #217](https://github.com/corycunanan/optcg-sim/pull/217)).**
   Whitelist entry removed; the OPT-200 boot assertion now enforces handler
   coverage for `ADD_TO_LIFE`.
 
@@ -284,3 +287,35 @@ than the existing single-Provider context.
 - **Why this matters for OPT-362:** unrelated surface (Prisma schema +
   `src/app/api/decks/route.ts`), so nothing in this PR blocks or informs it.
   The only coupling is that both came out of PR #216's review trail.
+
+### OPT-362 → OPT-205
+**From:** session on 2026-05-03 · **Commit:** `9a960f5` · **PR:** #218
+
+- **Primer:** `Deck.leader` is now a real Prisma relation (FK + index added
+  in commit `23564df`); `GET /api/decks` reads leader name/image via
+  `include` instead of a separate bulk `findMany`. The wire shape is
+  unchanged (consumers still type `leaderName` / `leaderImageUrl` as
+  `string | null` in `src/lib/lobbies/state.ts`); the FK simply guarantees
+  those values are never null at runtime now.
+- **Read first:** `prisma/schema.prisma` (Card.ledDecks line ~133, Deck.leader
+  line ~213), `prisma/migrations/20260503060449_add_deck_leader_relation/migration.sql`
+  (CREATE INDEX + ADD CONSTRAINT only — DB column already existed),
+  `src/app/api/decks/route.ts:23-50` (the new include).
+- **Gotchas / do NOT touch:** the POST handler's `prisma.card.findUnique`
+  for leader-type validation stays — different concern from the GET join.
+  Two other call sites still use the legacy two-fetch pattern and could
+  be plumbed to use the new relation but are explicitly out of scope here:
+  `src/app/decks/page.tsx:46-51` (server component; doesn't go through the
+  API route) and `src/app/api/decks/[id]/route.ts:62-67, 149-152` (separate
+  `findUnique` for the single-deck GET/PUT responses). File a follow-up
+  ticket if these become a hotspot.
+- **Unresolved:** none. After Codex review, commit `cab3128` enabled the
+  `relationJoins` preview feature on the generator and opted the GET
+  query into `relationLoadStrategy: "join"`. Verified via Prisma query
+  log: one SELECT (a LATERAL JOIN covering decks + deck_cards + cards +
+  leader) wrapped in BEGIN/COMMIT. Other queries are unchanged — strategy
+  is per-query opt-in.
+- **Why this matters for OPT-205 (next critical-path):** OPT-205 was
+  explicitly OOS in PR #216 ("STYLE-1: dynamic color-button styling") and
+  ready to pick up. Surface is `src/components/admin/card-edit-form.tsx:204-211`,
+  unrelated to anything in this PR. No blockers, no shared files.

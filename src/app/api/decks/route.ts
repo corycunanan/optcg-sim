@@ -24,38 +24,31 @@ export async function GET() {
       where: { userId },
       orderBy: { updatedAt: "desc" },
       take: 200,
+      // OPT-362 — single DB roundtrip via LATERAL JOIN. Without this,
+      // Prisma defaults to per-relation SELECTs (~4 statements) even with
+      // a nested `include`. Requires `relationJoins` preview feature in
+      // the generator block.
+      relationLoadStrategy: "join",
       include: {
         cards: {
           include: { card: { select: { id: true, name: true, color: true, type: true, imageUrl: true } } },
         },
+        leader: { select: { id: true, name: true, imageUrl: true } },
       },
     });
-
-    // Fetch leader card images in bulk. Skip the roundtrip when the user has
-    // no decks; Prisma issues `IN ()` for an empty array which the planner
-    // handles fine but the query is pure overhead.
-    const leaderIds = [...new Set(decks.map((d) => d.leaderId))];
-    const leaderCards = leaderIds.length
-      ? await prisma.card.findMany({
-          where: { id: { in: leaderIds } },
-          select: { id: true, name: true, imageUrl: true },
-        })
-      : [];
-    const leaderMap = new Map(leaderCards.map((c) => [c.id, c]));
 
     // Transform to include computed fields
     const data = decks.map((deck) => {
       const totalCards = deck.cards.reduce((sum, dc) => sum + dc.quantity, 0);
       const colors = new Set<string>();
       deck.cards.forEach((dc) => dc.card.color.forEach((c) => colors.add(c)));
-      const leader = leaderMap.get(deck.leaderId);
 
       return {
         id: deck.id,
         name: deck.name,
         leaderId: deck.leaderId,
-        leaderName: leader?.name ?? null,
-        leaderImageUrl: deck.leaderArtUrl ?? leader?.imageUrl ?? null,
+        leaderName: deck.leader.name,
+        leaderImageUrl: deck.leaderArtUrl ?? deck.leader.imageUrl,
         format: deck.format,
         totalCards,
         colors: Array.from(colors),

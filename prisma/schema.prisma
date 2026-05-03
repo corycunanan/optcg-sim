@@ -2,7 +2,8 @@
 // See docs/M0-FOUNDATION.md for design rationale
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -130,6 +131,7 @@ model Card {
   artVariants ArtVariant[]
   erratas     Errata[]
   deckCards   DeckCard[]
+  ledDecks    Deck[]       @relation("DeckLeader") // Decks where this card is the Leader
   cardSets    CardSet[] // All sets/packs this card appears in
 
   // Performance indexes for deck builder search (M1)
@@ -207,14 +209,16 @@ model Deck {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cards DeckCard[]
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards  DeckCard[]
+  leader Card       @relation("DeckLeader", fields: [leaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   // Social — decks used in lobbies
   hostedLobbies Lobby[]      @relation("LobbyHostDeck")
   lobbyGuests   LobbyGuest[]
 
   @@index([userId])
+  @@index([leaderId])
   @@map("decks")
 }
 
