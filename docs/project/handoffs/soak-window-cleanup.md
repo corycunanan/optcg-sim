@@ -283,5 +283,3 @@ than the existing single-Provider context.
 - **Why this matters for OPT-362:** unrelated surface (Prisma schema +
   `src/app/api/decks/route.ts`), so nothing in this PR blocks or informs it.
   The only coupling is that both came out of PR #216's review trail.
-
--->
