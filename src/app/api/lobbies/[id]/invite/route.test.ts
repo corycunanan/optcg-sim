@@ -131,6 +131,10 @@ describe("POST /api/lobbies/[id]/invite", () => {
   it("creates an invite and fans out lobby:invite_received", async () => {
     const { request, params } = buildRequest();
 
+    // Single baseline timestamp so both bounds use the same reference. The
+    // route reads Date.now() once when computing expiresAt; the assertion
+    // window has to compare against the same anchor or the bounds drift.
+    const baseline = Date.now();
     const res = await POST(request, { params });
     expect(res.status).toBe(201);
 
@@ -142,8 +146,8 @@ describe("POST /api/lobbies/[id]/invite", () => {
       toUserId: FRIEND_ID,
     });
     const expiresAt = createCall?.data?.expiresAt as Date;
-    expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(4 * 60 * 1000);
-    expect(expiresAt.getTime() - Date.now()).toBeLessThan(6 * 60 * 1000);
+    expect(expiresAt.getTime() - baseline).toBeGreaterThan(4 * 60 * 1000);
+    expect(expiresAt.getTime() - baseline).toBeLessThan(6 * 60 * 1000);
 
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     const [target, event] = notifyUserMock.mock.calls[0] ?? [];

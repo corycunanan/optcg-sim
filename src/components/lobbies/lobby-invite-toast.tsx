@@ -104,15 +104,20 @@ export function LobbyInviteToasts() {
 
   const onDecline = useCallback(async (invite: InviteToastEntry) => {
     setBusyId(invite.id);
-    // Optimistic — the server fanout will re-confirm via lobby:invite_declined.
-    setInvites((prev) => removeInvite(prev, invite.id));
     try {
       await apiPost(`/api/lobby-invites/${invite.id}/decline`);
+      // Only remove on success. The server fanout's `lobby:invite_declined`
+      // echo will re-confirm via the subscribe handler; that path is
+      // idempotent (`removeInvite` on a missing id returns the same ref).
+      setInvites((prev) => removeInvite(prev, invite.id));
     } catch (err) {
-      // Already canceled / no longer active is silent — the toast is gone.
+      // 404 / 410 = already canceled / no longer active. Drop the row
+      // silently — the user clicked a stale toast, not a broken one.
       if (err instanceof ApiError && (err.status === 404 || err.status === 410)) {
+        setInvites((prev) => removeInvite(prev, invite.id));
         return;
       }
+      // Transient failure — keep the toast in place so the user can retry.
       toast.error(
         err instanceof ApiError ? err.message : "Could not decline invite",
       );
