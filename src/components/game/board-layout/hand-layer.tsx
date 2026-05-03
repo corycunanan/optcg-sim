@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -9,9 +9,29 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
+
+/**
+ * OPT-364: returns instanceIds present in `currentIds` that were not in
+ * `seenIds`. Pure so the hide-on-first-render behavior in `HandLayer` can be
+ * unit-tested without rendering React.
+ *
+ * The previous helper (`useFieldArrivals`) cached arrivals across renders and
+ * only cleared them when the id list mutated again — leaving the drawn card
+ * hidden indefinitely whenever the hand didn't change between draws (e.g.,
+ * solitaire end-main → next-side draw with an empty hand).
+ */
+export function computeFreshlyAdded(
+  seenIds: ReadonlySet<string>,
+  currentIds: readonly string[],
+): Set<string> {
+  const fresh = new Set<string>();
+  for (const id of currentIds) {
+    if (!seenIds.has(id)) fresh.add(id);
+  }
+  return fresh;
+}
 
 // Migrated onto `<Card variant="hand">` (OPT-268). The primitive owns the
 // hand-card hover lift (handCardHover preset), tooltip, and 3D face stack.
@@ -146,7 +166,19 @@ export const HandLayer = React.memo(function HandLayer({
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
 
-  const newlyArrived = useFieldArrivals(cards.map((c) => c.instanceId));
+  // OPT-364: hide cards on their first render in this HandLayer instance so
+  // the deck-to-hand flight has a chance to register a transition before the
+  // resting card paints on top of it. The seen set is reconciled after commit
+  // (add new ids, drop departed ids) — once a card is seen, only
+  // `inFlightInstanceIds` controls its visibility.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  const freshlyAdded = useMemo(
+    () => computeFreshlyAdded(seenIdsRef.current, cards.map((c) => c.instanceId)),
+    [cards],
+  );
+  useEffect(() => {
+    seenIdsRef.current = new Set(cards.map((c) => c.instanceId));
+  }, [cards]);
 
   const handRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -167,11 +199,12 @@ export const HandLayer = React.memo(function HandLayer({
 
   const renderCard = (card: CardInstance, i: number) => {
     const marginStyle = i > 0 ? { marginLeft: gap } : undefined;
-    // Hide if the transition system says in-flight, OR if the card just
-    // appeared this render (transition hasn't been created yet).
+    // Hide if the transition system says in-flight, or if the card is
+    // appearing for the first time on this layer instance (the transition
+    // hasn't been registered yet by `useCardTransitions`).
     const isInFlight =
       (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
-      newlyArrived.has(card.instanceId);
+      freshlyAdded.has(card.instanceId);
 
     if (faceDown) {
       return (
