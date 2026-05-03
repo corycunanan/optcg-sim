@@ -47,10 +47,18 @@ the close-as-stale work first, the worker change last.
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`,
 `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Follow-up filed:** [OPT-362](https://linear.app/optcg-sim/issue/OPT-362) —
-the deferred OPT-199 schema work (add Prisma `Deck.leader` relation, then
-collapse to a single `include` query). Out of scope for the soak window
-because it requires a migration.
+**Follow-ups filed:**
+
+- [OPT-362](https://linear.app/optcg-sim/issue/OPT-362) — the deferred OPT-199
+  schema work (add Prisma `Deck.leader` relation, then collapse to a single
+  `include` query). Out of scope for the soak window because it requires a
+  migration.
+- [OPT-363](https://linear.app/optcg-sim/issue/OPT-363) — implement an
+  `ADD_TO_LIFE` handler so OP14-104 Gecko Moria's second CHOICE branch stops
+  silently no-op'ing. Surfaced by Codex review on PR #216 (the OPT-200 boot
+  assertion would have caught this if it weren't on the
+  `KNOWN_UNHANDLED_ACTION_TYPES` whitelist). Whitelist entry now carries an
+  inline `TODO(OPT-363)` so the gap is tracked, not buried.
 
 ---
 
@@ -210,17 +218,19 @@ present on `main` — dropped from scope.
 ### OPT-200 / OPT-202 — pre-existing handler gaps
 
 The plan assumed every `ActionType` had a handler and the boot assertion
-"fires only on drift." It does not — six members are missing handlers today:
+"fires only on drift." It does not — five members are missing handlers today
+and live in `KNOWN_UNHANDLED_ACTION_TYPES` so the assertion only trips on
+**new** drift:
 
 - `RETURN_ATTACHED_DON_TO_COST` — resolves through `cost-handler.ts` as a Cost.
 - `CHOOSE_VALUE`, `GRANT_COUNTER`, `REMOVE_PROHIBITION` — declared in the
   union but unused by any current schema.
-- `ADD_TO_LIFE` — referenced once by `op14.ts:3957` as a CHOICE branch;
-  schemas should prefer the `ADD_TO_LIFE_FROM_DECK` / `_FROM_HAND` /
-  `_FROM_FIELD` variants until a standalone handler exists.
-
-These are documented in `KNOWN_UNHANDLED_ACTION_TYPES` so the assertion only
-trips on **new** drift. The compile-time completeness check on
+- `ADD_TO_LIFE` — **real authored gap**: dispatched by `op14.ts:3957`
+  (OP14-104 Gecko Moria, second CHOICE branch) but no handler exists, so
+  that branch silently no-ops at runtime. Tracked as
+  [OPT-363](https://linear.app/optcg-sim/issue/OPT-363); whitelist entry
+  carries an inline `TODO(OPT-363)`. Surfaced by Codex review on PR #216 —
+  the assertion didn't catch it because the whitelist hid it. The compile-time completeness check on
 `ALL_ACTION_TYPES` ensures the runtime mirror can't drift from the type
 union.
 

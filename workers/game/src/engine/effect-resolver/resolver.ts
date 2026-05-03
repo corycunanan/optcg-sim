@@ -136,20 +136,28 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
 };
 
 // OPT-200: drift detection between the `ActionType` union and `ACTION_HANDLERS`.
-// Members listed in `KNOWN_UNHANDLED_ACTION_TYPES` are intentionally absent from
-// the dispatcher — RETURN_ATTACHED_DON_TO_COST is shared with the Cost union
-// and resolves through cost-handler.ts; the rest are declared in the union but
-// currently unused by any schema (CHOOSE_VALUE, GRANT_COUNTER, REMOVE_PROHIBITION)
-// or only referenced as a CHOICE branch by op14 (ADD_TO_LIFE — schemas should
-// prefer the ADD_TO_LIFE_FROM_DECK / _FROM_HAND / _FROM_FIELD variants until a
-// standalone handler exists). To clear an entry, register a handler in
-// ACTION_HANDLERS above. Adding a new ActionType without doing either trips
+// Two distinct categories live in `KNOWN_UNHANDLED_ACTION_TYPES`:
+//
+//   1. Resolved through a different path / unused by any schema:
+//      - RETURN_ATTACHED_DON_TO_COST is shared with the Cost union and resolves
+//        through cost-handler.ts.
+//      - CHOOSE_VALUE / GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
+//        union but referenced by zero schemas; harmless until someone authors one.
+//
+//   2. Real authored gap, tracked separately:
+//      - ADD_TO_LIFE is dispatched by op14.ts (OP14-104 Gecko Moria, second
+//        CHOICE branch — "add card from trash to top of Life face-up"). No
+//        handler exists; the branch silently no-ops at runtime today. Tracked
+//        as OPT-363; remove from this list when that ships.
+//
+// Adding a new ActionType without registering a handler or adding it here trips
 // this assertion at worker boot rather than no-op'ing in production.
 const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set<ActionType>([
   "RETURN_ATTACHED_DON_TO_COST",
   "CHOOSE_VALUE",
   "GRANT_COUNTER",
   "REMOVE_PROHIBITION",
+  // TODO(OPT-363): implement handler; OP14-104 Gecko Moria silently no-ops.
   "ADD_TO_LIFE",
 ]);
 
