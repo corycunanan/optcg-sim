@@ -61,7 +61,12 @@ export async function POST(
     });
 
     if (result.count > 0) {
-      const eventThroughCreatedAt = now.toISOString();
+      // Echo the **client cutoff**, not the server `now`. updateMany's
+      // predicate is `createdAt <= cutoff`, so any message sent by the
+      // original sender after the recipient computed the cutoff was *not*
+      // marked read in the DB — broadcasting `now` would let the sender's
+      // reducer over-ack those rows locally.
+      const eventThroughCreatedAt = cutoff.toISOString();
       after(() =>
         notifyUser(otherUserId, {
           type: "chat:read_to",

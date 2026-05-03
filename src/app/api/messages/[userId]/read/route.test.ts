@@ -87,8 +87,31 @@ describe("POST /api/messages/[userId]/read", () => {
     expect(notifyUserMock).toHaveBeenCalledWith("user-other", {
       type: "chat:read_to",
       fromUserId: "user-me",
-      throughCreatedAt: "2026-05-02T12:00:01.234Z",
+      // Must match the client cutoff (= updateMany's createdAt.lte predicate),
+      // not the server `now`. Broadcasting `now` would let the sender's
+      // reducer over-ack messages they sent after the recipient computed
+      // the cutoff but before this route ran.
+      throughCreatedAt: "2026-05-02T12:00:00.000Z",
     });
+  });
+
+  it("does not over-ack messages sent after the client cutoff (race)", async () => {
+    // Recipient saw last message at T1; sender posts a new one at T2 > T1
+    // before this route runs at T3 > T2. The event must echo T1 so the
+    // sender's reducer never marks the T2 row read locally.
+    const T1 = "2026-05-02T12:00:00.000Z";
+    const T3 = "2026-05-02T12:00:01.234Z";
+    vi.setSystemTime(new Date(T3));
+
+    const { request, params } = buildRequest("user-other", { throughCreatedAt: T1 });
+    const res = await POST(request, { params });
+    expect(res.status).toBe(200);
+
+    const eventArg = notifyUserMock.mock.calls[0]?.[1] as {
+      throughCreatedAt: string;
+    };
+    expect(eventArg.throughCreatedAt).toBe(T1);
+    expect(eventArg.throughCreatedAt).not.toBe(T3);
   });
 
   it("does not fire chat:read_to when no rows were updated", async () => {
