@@ -94,15 +94,26 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     return apiError("You can only invite friends", 400);
   }
 
+  const now = new Date();
+
+  // Only block on a *live* PENDING row. Without the `expiresAt > now` gate,
+  // a naturally-expired invite (recipient never clicked anything) is still
+  // PENDING in the DB — the recipient-side EXPIRED flip only fires on accept
+  // — and would permanently block future invites to the same friend for
+  // this lobby until someone accepted the stale row.
   const existingPending = await prisma.lobbyInvite.findFirst({
-    where: { lobbyId, toUserId, status: "PENDING" },
+    where: {
+      lobbyId,
+      toUserId,
+      status: "PENDING",
+      expiresAt: { gt: now },
+    },
     select: { id: true },
   });
   if (existingPending) {
     return apiError("Invite already pending for this user", 409);
   }
 
-  const now = new Date();
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
 
   const invite = await prisma.lobbyInvite.create({

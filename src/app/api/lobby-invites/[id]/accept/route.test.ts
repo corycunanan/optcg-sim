@@ -10,6 +10,7 @@ const lobbyUpdateMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
+const cancelPendingLobbyInvitesMock = vi.fn();
 
 vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
@@ -45,6 +46,10 @@ vi.mock("@/lib/lobbies/build-state", () => ({
 }));
 vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
+}));
+vi.mock("@/lib/lobbies/cancel-invites", () => ({
+  cancelPendingLobbyInvites: (...args: unknown[]) =>
+    cancelPendingLobbyInvitesMock(...args),
 }));
 
 const { POST } = await import("./route");
@@ -90,6 +95,8 @@ beforeEach(() => {
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
+  cancelPendingLobbyInvitesMock.mockReset();
+  cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
 
   authMock.mockResolvedValue({ user: { id: RECIPIENT_ID } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
@@ -135,6 +142,17 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     const [, options] = notifyLobbyMock.mock.calls[0] ?? [];
     expect(options).toEqual({ actorUserId: RECIPIENT_ID });
+  });
+
+  it("cancels other PENDING invites for the lobby on accept (Codex P2)", async () => {
+    // The accepted row is already ACCEPTED (not PENDING) by the time the
+    // sweep runs, so it skips it; any other PENDING rows for the same lobby
+    // are canceled and their recipients see lobby:invite_canceled.
+    const { request, params } = buildRequest();
+
+    await POST(request, { params });
+
+    expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith(LOBBY_ID);
   });
 
   it("rejects non-recipient callers (403)", async () => {

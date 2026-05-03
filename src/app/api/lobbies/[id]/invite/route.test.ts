@@ -203,6 +203,19 @@ describe("POST /api/lobbies/[id]/invite", () => {
     expect(inviteCreateMock).not.toHaveBeenCalled();
   });
 
+  it("scopes the duplicate check to live (non-expired) PENDING rows", async () => {
+    // Codex P2 — without the `expiresAt > now` gate, a naturally expired
+    // PENDING row would block future invites forever. The route must
+    // include that filter so a stale row is invisible to the dedup.
+    const { request, params } = buildRequest();
+
+    await POST(request, { params });
+
+    const where = inviteFindFirstMock.mock.calls[0]?.[0]?.where;
+    expect(where?.status).toBe("PENDING");
+    expect(where?.expiresAt).toMatchObject({ gt: expect.any(Date) });
+  });
+
   it("rejects inviting yourself (400)", async () => {
     const { request, params } = buildRequest({ toUserId: HOST_ID });
 

@@ -15,6 +15,7 @@ import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -91,6 +92,12 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
   ]);
 
   after(async () => {
+    // The seat is now taken; any *other* outstanding invites for this lobby
+    // would only fail with 409 if their recipient clicked Join, so cancel
+    // them and dismiss their toasts. The accepted invite is already
+    // ACCEPTED (not PENDING) so this sweep skips it.
+    await cancelPendingLobbyInvites(lobby.id);
+
     const state = await buildLobbyRoomState(lobby.id);
     if (!state) return;
     // Same actor-skip semantics as `POST /api/lobbies/join` — the new guest
