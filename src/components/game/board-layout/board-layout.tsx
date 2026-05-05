@@ -427,8 +427,11 @@ function BoardLayoutInner({
           style={{
             width: FIELD_W,
             height: HAND_CARD_H,
-            transform: `scale(${boardScale})`,
-            transformOrigin: "top center",
+            // CSS `zoom` (not `transform: scale`) so descendants lay out at the
+            // final pixel size — `<img>` rasterization samples the full-res
+            // source instead of bitmap-stretching the cached layer texture
+            // when the ancestor scale is >1 on large monitors.
+            zoom: boardScale,
           }}
         >
           <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={opp?.sleeveUrl} />
@@ -445,8 +448,7 @@ function BoardLayoutInner({
           style={{
             width: FIELD_W,
             height: BOARD_CONTENT_H,
-            transform: `scale(${boardScale})`,
-            transformOrigin: "top center",
+            zoom: boardScale,
           }}
         >
           <OpponentField
@@ -521,8 +523,7 @@ function BoardLayoutInner({
           style={{
             width: FIELD_W,
             height: HAND_CARD_H,
-            transform: `scale(${boardScale})`,
-            transformOrigin: "top center",
+            zoom: boardScale,
           }}
         >
           <HandLayer
