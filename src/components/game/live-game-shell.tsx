@@ -35,6 +35,7 @@ import { GameButton } from "./game-button";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
+import { PregameOverlay } from "./pregame/pregame-overlay";
 import type { PromptOptions } from "@shared/game-types";
 import type { SolitairePerspective } from "@/hooks/use-solitaire-session";
 
@@ -432,6 +433,17 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
       <ScaledBoard designWidth={1920} designHeight={1080}>
         <Board state={state} dispatch={dispatch} />
       </ScaledBoard>
+
+      {game.gameState.pregame && (
+        <PregameOverlay
+          pregame={game.gameState.pregame}
+          myIndex={game.myIndex}
+          myHand={game.me?.hand ?? []}
+          cardDb={game.cardDb}
+          activePrompt={activePrompt}
+          onAction={dispatch.onAction}
+        />
+      )}
 
       {process.env.NODE_ENV === "development" && game.me && (
         <div className="fixed right-4 bottom-4 z-[300] flex items-center gap-2">

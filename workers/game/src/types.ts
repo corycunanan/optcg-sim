@@ -188,6 +188,13 @@ export interface GameInitPayload {
   player2: PlayerInitData;
   format: string;
   mode: LobbyMode;
+  /**
+   * OPT-366: deterministic d6 sequence for the pregame priority roll. Each
+   * roll consumes two values (one per player). When the supplied pair is a
+   * tie, the next pair is consumed for the reroll, and so on. Once exhausted
+   * the engine falls back to crypto-backed randomness. Test-only.
+   */
+  testPriorityRolls?: number[] | null;
 }
 
 export interface PlayerInitData {

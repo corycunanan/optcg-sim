@@ -3,6 +3,12 @@
  *
  * Builds the initial GameState from a GameInitPayload:
  * shuffle decks, place leaders, set life, deal opening hands, handle mulligan.
+ *
+ * OPT-366 split this into primitives so the pre-game state machine can drive
+ * each step independently (priority decision → start-of-game effects →
+ * hand deal → mulligan → life placement). `buildInitialState` is preserved as
+ * a one-shot helper that bypasses the pre-game flow — used by tests / non-PVP
+ * code paths that don't need the priority/mulligan UX.
  */
 
 import type {
@@ -21,6 +27,7 @@ import { injectSchemasIntoCardDb } from "./schema-registry.js";
 import { registerTriggersForCard, registerReplacementsForCard, registerPermanentEffectsForCard } from "./triggers.js";
 
 const DEFAULT_DON_DECK_SIZE = 10;
+const OPENING_HAND_SIZE = 5;
 
 /**
  * OPT-228: Leaders may override the starting DON!! deck size via a
@@ -37,13 +44,25 @@ function resolveDonDeckSize(leaderData: CardData | undefined): number {
   return override?.size ?? DEFAULT_DON_DECK_SIZE;
 }
 
-export function buildInitialState(payload: GameInitPayload): {
+/**
+ * OPT-366 §5-2-1-2 / §5-2-1-3: shuffle decks, place leaders, build DON!! decks.
+ *
+ * Returns a state with hand and life empty — the pregame state machine deals
+ * those after the priority decision and any start-of-game leader effects fire.
+ * Test orders, when provided, pre-arrange the top of the deck so a subsequent
+ * `dealOpeningHand` slice and `placeLifeCards` slice yield deterministic
+ * hand and life. The remainder of the deck is shuffled normally.
+ *
+ * Leader trigger/replacement/permanent-effect registration runs here so leader
+ * START_OF_GAME_EFFECT rule_modifications are available the moment the FSM
+ * enters the START_OF_GAME_FX phase (before the hand is dealt).
+ */
+export function prepareDecksAndLeaders(payload: GameInitPayload): {
   state: GameState;
   cardDb: Map<string, CardData>;
 } {
   const cardDb = new Map<string, CardData>();
 
-  // Populate cardDb from both players' deck data
   for (const player of [payload.player1, payload.player2]) {
     cardDb.set(player.leader.cardData.id, player.leader.cardData);
     for (const entry of player.deck) {
@@ -51,45 +70,42 @@ export function buildInitialState(payload: GameInitPayload): {
     }
   }
 
-  // Inject authored effect schemas into cardDb
   injectSchemasIntoCardDb(cardDb);
 
   const [p0State, p0Deck] = buildPlayerDeck(payload.player1, 0 as const, cardDb);
   const [p1State, p1Deck] = buildPlayerDeck(payload.player2, 1 as const, cardDb);
 
-  // Resolve leader life values
   const leader0Data = cardDb.get(payload.player1.leader.cardId);
   const leader1Data = cardDb.get(payload.player2.leader.cardId);
   const leaderLife0 = leader0Data?.life ?? leader0Data?.cost ?? 5;
   const leaderLife1 = leader1Data?.life ?? leader1Data?.cost ?? 5;
 
-  // Deal cards: use test order if configured, otherwise shuffle normally
-  const deal0 = dealCards(p0Deck, leaderLife0, payload.player1.testOrder);
-  const deal1 = dealCards(p1Deck, leaderLife1, payload.player2.testOrder);
+  const arrangedDeck0 = arrangeDeck(p0Deck, leaderLife0, payload.player1.testOrder);
+  const arrangedDeck1 = arrangeDeck(p1Deck, leaderLife1, payload.player2.testOrder);
 
-  // Build DON!! deck per player (default 10, overridable per Leader — OPT-228).
   const donDeck0 = buildDonDeck(0 as const, resolveDonDeckSize(leader0Data));
   const donDeck1 = buildDonDeck(1 as const, resolveDonDeckSize(leader1Data));
 
   const player0 = {
     ...p0State,
-    hand: deal0.hand,
-    deck: deal0.deck,
-    life: deal0.life,
+    hand: [] as CardInstance[],
+    deck: arrangedDeck0,
+    life: [] as LifeCard[],
     donDeck: donDeck0,
   };
 
   const player1 = {
     ...p1State,
-    hand: deal1.hand,
-    deck: deal1.deck,
-    life: deal1.life,
+    hand: [] as CardInstance[],
+    deck: arrangedDeck1,
+    life: [] as LifeCard[],
     donDeck: donDeck1,
   };
 
   const turn: TurnState = {
     number: 1,
     activePlayerIndex: 0,
+    firstPlayerIndex: 0,
     phase: "REFRESH",
     battleSubPhase: null,
     battle: null,
@@ -102,6 +118,7 @@ export function buildInitialState(payload: GameInitPayload): {
     id: payload.gameId,
     players: [player0, player1],
     turn,
+    pregame: null,
     activeEffects: [],
     prohibitions: [],
     scheduledActions: [],
@@ -126,6 +143,60 @@ export function buildInitialState(payload: GameInitPayload): {
     }
   }
 
+  return { state, cardDb };
+}
+
+/**
+ * OPT-366 §5-2-1-6: draw 5 cards from the top of the deck into the hand for
+ * one player. Idempotent only when called once per player per game / per
+ * mulligan cycle — caller is responsible for sequencing.
+ */
+export function dealOpeningHand(state: GameState, playerIndex: 0 | 1): GameState {
+  const player = state.players[playerIndex];
+  const [hand, remaining] = drawN(player.deck, OPENING_HAND_SIZE);
+  const newPlayers = [...state.players] as typeof state.players;
+  newPlayers[playerIndex] = { ...player, hand, deck: remaining };
+  return { ...state, players: newPlayers };
+}
+
+/**
+ * OPT-366 §5-2-1-7: place life cards for both players using each leader's
+ * life value. Mirrors the legacy `normalDeal` semantics — top of life is the
+ * last card consumed (life array is reversed) so damage pops the most-recently
+ * placed card first.
+ */
+export function placeLifeCards(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const newPlayers = [...state.players] as typeof state.players;
+  for (const playerIndex of [0, 1] as const) {
+    const player = newPlayers[playerIndex];
+    const leaderData = cardDb.get(player.leader.cardId);
+    const leaderLife = leaderData?.life ?? leaderData?.cost ?? 5;
+    const [lifeCards, remainingDeck] = drawN(player.deck, leaderLife);
+    const life: LifeCard[] = lifeCards
+      .map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }))
+      .reverse();
+    newPlayers[playerIndex] = { ...player, life, deck: remainingDeck };
+  }
+  return { ...state, players: newPlayers };
+}
+
+/**
+ * Bypass-pregame helper: run shuffle → deal-hand → place-life in one pass and
+ * return a state that is ready for the first turn's REFRESH phase. Used by
+ * tests and non-PVP entry points that don't exercise the priority / mulligan
+ * UX. PVP games drive the FSM in `engine/pregame.ts` instead.
+ */
+export function buildInitialState(payload: GameInitPayload): {
+  state: GameState;
+  cardDb: Map<string, CardData>;
+} {
+  const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
+  let state = dealOpeningHand(prepared, 0);
+  state = dealOpeningHand(state, 1);
+  state = placeLifeCards(state, cardDb);
   return { state, cardDb };
 }
 
@@ -227,49 +298,28 @@ function buildDonDeck(owner: 0 | 1, size: number = DEFAULT_DON_DECK_SIZE): DonIn
 }
 
 /**
- * Deal cards for a player: either apply a test order (fixed life + hand) or shuffle normally.
- * Falls back to normal shuffle if testOrder is invalid.
+ * OPT-366: arrange the top of the deck so subsequent `dealOpeningHand` and
+ * `placeLifeCards` slices yield deterministic hand and life when testOrder is
+ * provided, or a fully shuffled deck otherwise. Top-of-deck layout:
+ *
+ *   [hand[0..4], life[0..N-1], shuffled-rest]
+ *
+ * `placeLifeCards` reverses the sliced life portion (legacy semantics — top of
+ * life is the last consumed). Falls back to a normal shuffle if testOrder is
+ * malformed (e.g. wrong sizes or names not present in the deck).
  */
-function dealCards(
+function arrangeDeck(
   expandedDeck: CardInstance[],
   leaderLife: number,
   testOrder?: { life: string[]; hand: string[] } | null,
-): { hand: CardInstance[]; life: LifeCard[]; deck: CardInstance[] } {
-  if (testOrder) {
-    const result = applyTestOrder(expandedDeck, testOrder, leaderLife);
-    if (result) return result;
-    // Invalid test order — fall back to normal shuffle
-    console.warn("Invalid testOrder, falling back to normal shuffle");
+): CardInstance[] {
+  if (!testOrder) return shuffleDeck(expandedDeck);
+
+  if (testOrder.life.length !== leaderLife || testOrder.hand.length !== OPENING_HAND_SIZE) {
+    console.warn("Invalid testOrder size, falling back to shuffle");
+    return shuffleDeck(expandedDeck);
   }
-  return normalDeal(expandedDeck, leaderLife);
-}
 
-/** Standard shuffle → hand → life pipeline. */
-function normalDeal(
-  expandedDeck: CardInstance[],
-  leaderLife: number,
-): { hand: CardInstance[]; life: LifeCard[]; deck: CardInstance[] } {
-  const shuffled = shuffleDeck(expandedDeck);
-  const [hand, remaining] = drawN(shuffled, 5);
-  const [lifeCards, deck] = drawN(remaining, leaderLife);
-  const life: LifeCard[] = lifeCards
-    .map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }))
-    .reverse();
-  return { hand, life, deck };
-}
-
-/**
- * Apply a fixed test order: consume specified cards for life and hand from the expanded deck.
- * Remaining cards are shuffled. Returns null if the order is invalid.
- */
-function applyTestOrder(
-  expandedDeck: CardInstance[],
-  testOrder: { life: string[]; hand: string[] },
-  leaderLife: number,
-): { hand: CardInstance[]; life: LifeCard[]; deck: CardInstance[] } | null {
-  if (testOrder.life.length !== leaderLife || testOrder.hand.length !== 5) return null;
-
-  // Build consumption pool: Map<cardId, CardInstance[]>
   const pool = new Map<string, CardInstance[]>();
   for (const card of expandedDeck) {
     const arr = pool.get(card.cardId) ?? [];
@@ -283,33 +333,29 @@ function applyTestOrder(
     return arr.pop()!;
   };
 
-  // Consume life cards
-  const lifeInstances: CardInstance[] = [];
-  for (const cardId of testOrder.life) {
-    const instance = consume(cardId);
-    if (!instance) return null;
-    lifeInstances.push(instance);
-  }
-
-  // Consume hand cards
   const handInstances: CardInstance[] = [];
   for (const cardId of testOrder.hand) {
     const instance = consume(cardId);
-    if (!instance) return null;
-    handInstances.push({ ...instance, zone: "HAND" as const });
+    if (!instance) {
+      console.warn("Invalid testOrder.hand card, falling back to shuffle");
+      return shuffleDeck(expandedDeck);
+    }
+    handInstances.push(instance);
   }
 
-  // Remaining cards → shuffle for deck
-  const remaining: CardInstance[] = [];
-  for (const arr of pool.values()) remaining.push(...arr);
-  const deck = shuffleDeck(remaining);
+  const lifeInstances: CardInstance[] = [];
+  for (const cardId of testOrder.life) {
+    const instance = consume(cardId);
+    if (!instance) {
+      console.warn("Invalid testOrder.life card, falling back to shuffle");
+      return shuffleDeck(expandedDeck);
+    }
+    lifeInstances.push(instance);
+  }
 
-  // Life area: reverse per §5-2-1-7 (same as normal deal)
-  const life: LifeCard[] = lifeInstances
-    .map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }))
-    .reverse();
-
-  return { hand: handInstances, life, deck };
+  const rest: CardInstance[] = [];
+  for (const arr of pool.values()) rest.push(...arr);
+  return [...handInstances, ...lifeInstances, ...shuffleDeck(rest)];
 }
 
 function shuffleDeck(cards: CardInstance[]): CardInstance[] {

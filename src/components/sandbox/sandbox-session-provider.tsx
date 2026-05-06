@@ -133,6 +133,7 @@ export function buildSandboxSession(
     id: "sandbox",
     players,
     turn: replayed.turn,
+    pregame: null,
     activeEffects: [],
     prohibitions: [],
     scheduledActions: [],

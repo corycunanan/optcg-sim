@@ -1,0 +1,95 @@
+"use client";
+
+import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
+import { cn } from "@/lib/utils";
+import { GameButton } from "../game-button";
+
+interface MulliganModalProps {
+  /** True when this client owns the active mulligan prompt. False = waiting view. */
+  isResponder: boolean;
+  myHand: CardInstance[];
+  cardDb: CardDb;
+  onAction: (action: GameAction) => void;
+}
+
+/**
+ * OPT-366 §5-2-1-6-1: opening-hand mulligan. Shows the responder's 5-card
+ * opening hand with Keep / Redraw buttons. Non-responders see a waiting state.
+ *
+ * Mulligan rule: redraw returns the entire hand to the deck, reshuffles, and
+ * draws 5 fresh cards. The opponent's mulligan decision is hidden until both
+ * players resolve.
+ */
+export function MulliganModal({
+  isResponder,
+  myHand,
+  cardDb,
+  onAction,
+}: MulliganModalProps) {
+  return (
+    <div className="bg-gb-board/90 fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-2">
+        <h2 className="text-gb-text-bright text-2xl font-bold uppercase tracking-widest">
+          Mulligan
+        </h2>
+        <p className="text-gb-text-dim max-w-md text-center text-sm">
+          {isResponder
+            ? "Keep this opening hand, or shuffle it back into your deck and draw 5 new cards."
+            : "Waiting for the other player to decide on their opening hand…"}
+        </p>
+      </div>
+
+      {isResponder && (
+        <>
+          <div className="flex gap-3">
+            {myHand.map((card) => {
+              const data = cardDb[card.cardId];
+              return (
+                <div
+                  key={card.instanceId}
+                  className={cn(
+                    "border-gb-border-strong w-card-thumb aspect-card overflow-hidden rounded-md border-2 shadow-md",
+                  )}
+                >
+                  {data?.imageUrl ? (
+                    <img
+                      src={data.imageUrl}
+                      alt={data.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="bg-gb-surface-raised flex h-full w-full items-center justify-center p-2">
+                      <span className="text-gb-text-dim text-center text-xs">
+                        {data?.name ?? card.cardId}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-3">
+            <GameButton
+              variant="primary"
+              size="lg"
+              onClick={() => onAction({ type: "PLAYER_CHOICE", choiceId: "KEEP" })}
+              className="min-w-[160px]"
+            >
+              Keep hand
+            </GameButton>
+            <GameButton
+              variant="secondary"
+              size="lg"
+              onClick={() => onAction({ type: "PLAYER_CHOICE", choiceId: "REDRAW" })}
+              className="min-w-[160px]"
+            >
+              Redraw
+            </GameButton>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

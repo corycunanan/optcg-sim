@@ -67,6 +67,7 @@ export function hydrateToGameState(partial: PartialGameState): GameState {
       hydratePlayer(partial.players[1]),
     ],
     turn: partial.turn,
+    pregame: null,
     activeEffects: [],
     prohibitions: [],
     scheduledActions: [],

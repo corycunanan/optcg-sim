@@ -83,8 +83,12 @@ export function BoardModals({
           />
         )}
 
+      {/* OPT-366: pregame PLAYER_CHOICE prompts (priority + mulligan) are owned
+          by <PregameOverlay/> in live-game-shell. Skip the generic modal here
+          to avoid double-rendering. */}
       {activePrompt?.promptType === "PLAYER_CHOICE" &&
-        activePrompt.choices.length > 0 && (
+        activePrompt.choices.length > 0 &&
+        !activePrompt.effectDescription.startsWith("PREGAME_") && (
           <PlayerChoiceModal
             effectDescription={activePrompt.effectDescription}
             choices={activePrompt.choices}

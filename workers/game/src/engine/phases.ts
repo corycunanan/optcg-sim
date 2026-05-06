@@ -55,8 +55,12 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
     }
 
     case "DRAW": {
-      // Draw 1 card (except first player turn 1)
-      const isFirstPlayerTurnOne = turnNumber === 1 && pi === 0;
+      // §6-3-1: first player skips DRAW on turn 1. Anchored to the actual
+      // first player set during the pregame priority decision (OPT-366), not
+      // hardcoded to player 0. Falls back to 0 for legacy paths that bypass
+      // the pregame flow (tests / sandbox scenarios).
+      const firstPlayerIndex = state.turn.firstPlayerIndex ?? 0;
+      const isFirstPlayerTurnOne = turnNumber === 1 && pi === firstPlayerIndex;
       if (!isFirstPlayerTurnOne) {
         const drawn = nextState.players[pi].deck[0];
         if (drawn) {
@@ -73,8 +77,11 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
     }
 
     case "DON": {
-      // Place DON!! cards: 2 normally, 1 on first player's first turn
-      const donCount = (turnNumber === 1 && pi === 0) ? 1 : 2;
+      // §6-4-1: first player places only 1 DON!! on turn 1, otherwise 2.
+      // Anchored to the actual first player set during the pregame priority
+      // decision (OPT-366), not hardcoded to player 0.
+      const firstPlayerIndex = state.turn.firstPlayerIndex ?? 0;
+      const donCount = (turnNumber === 1 && pi === firstPlayerIndex) ? 1 : 2;
       nextState = placeDonFromDeck(nextState, pi, donCount);
       events.push({
         type: "DON_PLACED_ON_FIELD",
@@ -128,9 +135,14 @@ function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>)
     state = result.state;
   }
 
-  // Turn passes to opponent
+  // Turn passes to opponent. Round-counter (state.turn.number) increments only
+  // when control returns to the first player (OPT-366 — previously this was
+  // hardcoded to player 0, which broke when player 1 went first).
   const nextPlayerIndex: 0 | 1 = pi === 0 ? 1 : 0;
-  const nextTurnNumber = nextPlayerIndex === 0 ? state.turn.number + 1 : state.turn.number;
+  const firstPlayerIndex = state.turn.firstPlayerIndex ?? 0;
+  const nextTurnNumber = nextPlayerIndex === firstPlayerIndex
+    ? state.turn.number + 1
+    : state.turn.number;
 
   events.push({ type: "TURN_ENDED", playerIndex: pi });
 
@@ -139,6 +151,7 @@ function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>)
     turn: {
       number: nextTurnNumber,
       activePlayerIndex: nextPlayerIndex,
+      firstPlayerIndex,
       phase: "REFRESH",
       battleSubPhase: null,
       battle: null,

@@ -21,7 +21,13 @@ import type {
   PendingPromptState,
   ResumeContext,
 } from "./types.js";
-import { buildInitialState } from "./engine/setup.js";
+import { prepareDecksAndLeaders } from "./engine/setup.js";
+import {
+  advancePregame,
+  defaultPregameRng,
+  resumePregameFromPrompt,
+  startPregame,
+} from "./engine/pregame.js";
 import { runPipeline } from "./engine/pipeline.js";
 import {
   resumeReplacement,
@@ -127,8 +133,18 @@ function getPlayerSocketAttachment(ws: WebSocket): PlayerSocketAttachment | null
 interface StoredSession {
   state: GameState;
   cardDb: Record<string, CardData>; // serialized as plain object
-  mulliganDone: [boolean, boolean];
+  /**
+   * OPT-366: legacy field — mulligan state now lives on
+   * `state.pregame.mulliganDecisions` and persists with the GameState. Kept
+   * here for backward compatibility on existing in-flight DOs and read with
+   * a `?? [false, false]` default.
+   */
+  mulliganDone?: [boolean, boolean];
   mode?: LobbyMode;
+  /** OPT-366: deterministic priority-roll sequence for tests; persisted so it
+   *  survives DO hibernation between phases (currently consumed in one shot
+   *  by `advancePregame`, but persisted for future per-phase rerolls). */
+  testPriorityRolls?: number[] | null;
   undoHistory?: GameState[]; // snapshot stack for undo (v1: max depth 1)
 }
 
@@ -140,8 +156,9 @@ export class GameSession implements DurableObject {
   private gameState: GameState | null = null;
   private gameMode: LobbyMode = "PVP";
   private cardDb: Map<string, CardData> | null = null;
-  private mulliganDone: [boolean, boolean] = [false, false];
   private undoHistory: GameState[] = [];
+  /** OPT-366: deterministic priority-roll sequence (test-only). */
+  private testPriorityRolls: number[] | null = null;
   private nextWebSocketSequence = 0;
   private readonly actionRateLimitBuckets = new Map<string, TokenBucket>();
   private readonly invalidMessageRateLimitBuckets = new Map<string, TokenBucket>();
@@ -192,23 +209,48 @@ export class GameSession implements DurableObject {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    const { state, cardDb } = buildInitialState(payload);
+    const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
 
     this.cardDb = cardDb;
     this.gameMode = payload.mode;
-    this.mulliganDone = [false, false];
+    this.testPriorityRolls = payload.testPriorityRolls ?? null;
 
-    // Setup returns phase=REFRESH; auto-advance through the start-of-turn phases
-    // (REFRESH → DRAW → DON → MAIN) so the first player is immediately at MAIN.
-    this.gameState = this.runStartOfTurnAutoPhases(state);
+    // OPT-366: enter the pregame state machine — priority decision (2d6),
+    // first-or-second prompt, start-of-game effects (OPT-365), hand deal,
+    // mulligan decisions, life placement — before the first player's REFRESH.
+    const initial = startPregame(prepared);
+    this.gameState = this.drainPregame(initial);
 
     // Persist to DO storage so state survives hibernation
     await this.persist();
     await this.state.storage.put(CONSUMED_TOKEN_JTIS_STORAGE_KEY, {});
 
-    return new Response(JSON.stringify({ ok: true, gameId: state.id }), {
+    return new Response(JSON.stringify({ ok: true, gameId: prepared.id }), {
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  /**
+   * OPT-366: drive `advancePregame` until it pauses for a prompt or finishes.
+   * When the FSM finishes, run the first player's start-of-turn auto-phases
+   * (REFRESH → DRAW → DON → MAIN) so they land at MAIN exactly as before.
+   */
+  private drainPregame(state: GameState): GameState {
+    if (!this.cardDb) return state;
+    let current = state;
+    for (let i = 0; i < 8; i++) {
+      const result = advancePregame(
+        current,
+        this.cardDb,
+        this.testPriorityRolls,
+        defaultPregameRng(),
+      );
+      current = result.state;
+      if (!result.done) return current;
+      // FSM drained — run normal start-of-turn auto-phases for the first player.
+      return this.runStartOfTurnAutoPhases(current);
+    }
+    return current;
   }
 
   /** Called from Next.js after a game is finished in Postgres (e.g. disconnected concede). */
@@ -747,6 +789,27 @@ export class GameSession implements DurableObject {
 
     const prompt = this.gameState.pendingPrompt!;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
+    const respondingPlayer = prompt.respondingPlayer;
+
+    // OPT-366: pregame prompts (priority choice, mulligan) drain through the
+    // pregame FSM rather than the effect resolver / replacement system.
+    if (
+      resumeCtx?.type === "PREGAME_PRIORITY_CHOICE"
+      || resumeCtx?.type === "PREGAME_MULLIGAN"
+    ) {
+      this.gameState = resumePregameFromPrompt(this.gameState, action, respondingPlayer);
+      this.gameState = this.drainPregame(this.gameState);
+
+      this.surfaceRevealTriggerIfNeeded();
+      await this.persist();
+      this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
+      if (this.gameState.pendingPrompt) {
+        this.sendEffectPrompt(this.gameState.pendingPrompt);
+      } else {
+        this.sendPendingPrompts();
+      }
+      return;
+    }
 
     // Clear the pending prompt before resuming
     this.gameState = { ...this.gameState, pendingPrompt: null };
@@ -1018,8 +1081,8 @@ export class GameSession implements DurableObject {
     const stored: StoredSession = {
       state: this.gameState,
       cardDb: Object.fromEntries(this.cardDb),
-      mulliganDone: this.mulliganDone,
       mode: this.gameMode,
+      testPriorityRolls: this.testPriorityRolls,
       undoHistory: this.undoHistory,
     };
     await this.state.storage.put("session", stored);
@@ -1031,8 +1094,8 @@ export class GameSession implements DurableObject {
 
     this.gameState = stored.state;
     this.cardDb = new Map(Object.entries(stored.cardDb));
-    this.mulliganDone = stored.mulliganDone;
     this.gameMode = stored.mode ?? "PVP";
+    this.testPriorityRolls = stored.testPriorityRolls ?? null;
     this.undoHistory = stored.undoHistory ?? [];
     return true;
   }
