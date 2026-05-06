@@ -576,6 +576,7 @@ export interface PlayerChoicePrompt {
   promptType: "PLAYER_CHOICE";
   choices: { id: string; label: string }[];
   effectDescription: string;
+  source?: "PREGAME" | "EFFECT";
 }
 
 export interface OptionalEffectPrompt {

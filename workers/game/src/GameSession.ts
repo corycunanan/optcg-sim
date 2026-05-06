@@ -237,20 +237,15 @@ export class GameSession implements DurableObject {
    */
   private drainPregame(state: GameState): GameState {
     if (!this.cardDb) return state;
-    let current = state;
-    for (let i = 0; i < 8; i++) {
-      const result = advancePregame(
-        current,
-        this.cardDb,
-        this.testPriorityRolls,
-        defaultPregameRng(),
-      );
-      current = result.state;
-      if (!result.done) return current;
-      // FSM drained — run normal start-of-turn auto-phases for the first player.
-      return this.runStartOfTurnAutoPhases(current);
-    }
-    return current;
+    const result = advancePregame(
+      state,
+      this.cardDb,
+      this.testPriorityRolls,
+      defaultPregameRng(),
+    );
+    if (!result.done) return result.state;
+    // FSM drained — run normal start-of-turn auto-phases for the first player.
+    return this.runStartOfTurnAutoPhases(result.state);
   }
 
   /** Called from Next.js after a game is finished in Postgres (e.g. disconnected concede). */
@@ -438,6 +433,11 @@ export class GameSession implements DurableObject {
     }
 
     if (clientMsg.type === "game:leave") {
+      if (this.gameState?.pregame) {
+        await this.handlePregameLeave(playerIndex);
+        try { ws.close(1000, "left"); } catch { /* ignore */ }
+        return;
+      }
       await this.handlePlayerAway(playerIndex, "LEFT", ws);
       try { ws.close(1000, "left"); } catch { /* ignore */ }
       return;
@@ -1285,6 +1285,25 @@ export class GameSession implements DurableObject {
 
     this.broadcastFilteredState((s) => ({ type: "game:state", state: s }));
     this.broadcast({ type: "game:player_disconnected", playerIndex });
+  }
+
+  private async handlePregameLeave(playerIndex: 0 | 1): Promise<void> {
+    if (!this.gameState) return;
+    const winner: 0 | 1 = playerIndex === 0 ? 1 : 0;
+    const reason = `Player ${playerIndex + 1} left during pre-game`;
+    this.gameState = {
+      ...this.gameState,
+      status: "FINISHED",
+      winner,
+      winReason: reason,
+      pendingPrompt: null,
+      pregame: null,
+    };
+    this.undoHistory = [];
+    await this.persist();
+    await this.writeResultToDb();
+    this.broadcastFilteredState((s) => ({ type: "game:state", state: s, canUndo: false }));
+    this.broadcast({ type: "game:over", winner, reason });
   }
 
   private async syncAlarm(): Promise<void> {

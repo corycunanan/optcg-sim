@@ -113,6 +113,7 @@ function emptyState(): GameState {
     scheduledActions: [],
     oneTimeModifiers: [],
     triggerRegistry: [],
+    pregame: null,
     pendingPrompt: null,
     effectStack: [],
     eventLog: [],

@@ -441,6 +441,9 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
           myHand={game.me?.hand ?? []}
           cardDb={game.cardDb}
           activePrompt={activePrompt}
+          promptRespondingPlayer={
+            game.gameState.pendingPrompt?.respondingPlayer ?? (activePrompt ? game.myIndex : null)
+          }
           onAction={dispatch.onAction}
         />
       )}

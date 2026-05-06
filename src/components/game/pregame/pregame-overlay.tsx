@@ -31,6 +31,7 @@ interface PregameOverlayProps {
   myHand: GameState["players"][0]["hand"];
   cardDb: CardDb;
   activePrompt: PromptOptions | null;
+  promptRespondingPlayer: 0 | 1 | null;
   onAction: (action: GameAction) => void;
 }
 
@@ -40,6 +41,7 @@ export function PregameOverlay({
   myHand,
   cardDb,
   activePrompt,
+  promptRespondingPlayer,
   onAction,
 }: PregameOverlayProps) {
   const phase = pregame.phase;
@@ -66,7 +68,8 @@ export function PregameOverlay({
     const isMyTurn =
       activePrompt?.promptType === "PLAYER_CHOICE"
       && activePrompt.effectDescription === "PREGAME_MULLIGAN"
-      && myIndex !== null;
+      && myIndex !== null
+      && promptRespondingPlayer === myIndex;
     return (
       <MulliganModal
         isResponder={isMyTurn}

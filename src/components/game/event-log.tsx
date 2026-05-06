@@ -80,7 +80,12 @@ function formatEvent(
     }
     case "PREGAME_PRIORITY_ROLLED": {
       const [r0, r1] = event.payload.rolls;
-      const winner = event.payload.priorityDeciderIndex === myIndex ? "You" : "Opponent";
+      const winner =
+        myIndex === null
+          ? `Player ${event.payload.priorityDeciderIndex + 1}`
+          : event.payload.priorityDeciderIndex === myIndex
+            ? "You"
+            : "Opponent";
       return {
         icon: "🎲",
         text: `Priority roll: P1 ${r0} vs P2 ${r1} — ${winner} won`,
@@ -88,7 +93,12 @@ function formatEvent(
       };
     }
     case "PREGAME_FIRST_PLAYER_DECIDED": {
-      const firstPlayer = event.payload.firstPlayerIndex === myIndex ? "You" : "Opponent";
+      const firstPlayer =
+        myIndex === null
+          ? `Player ${event.payload.firstPlayerIndex + 1}`
+          : event.payload.firstPlayerIndex === myIndex
+            ? "You"
+            : "Opponent";
       return {
         icon: "▶️",
         text: `${firstPlayer} will go first`,

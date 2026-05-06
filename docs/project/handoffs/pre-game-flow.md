@@ -16,7 +16,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | OPT-366 | Pre-game flow: priority decision (2d6) + hand-redraw mulligan + setup restructure | 5 | — | In Review | — | Foundation — unblocks all the rest |
+| 1 | OPT-366 | Pre-game flow: priority decision (2d6) + hand-redraw mulligan + setup restructure | 5 | — | In Review | [#222](https://github.com/corycunanan/optcg-sim/pull/222) | Foundation — unblocks all the rest |
 | 2 | OPT-365 | Wire START_OF_GAME_EFFECT processing for OP13-079 Imu (Mary Geoise stage play) | 2 | OPT-366 | Backlog | — | Drops into the START_OF_GAME_FX phase the FSM already exposes |
 | 3 | OPT-367 | Lobby settings: host-configurable pre-game flow (turn order + priority roll opt-out) | 3 | OPT-366 | Backlog | — | Adds host overrides; pure surface work above the FSM |
 | 4 | OPT-368 | Solitaire-mode pre-game UX: streamline priority decision when one user controls both sides | 2 | OPT-366 | Backlog | — | Solitaire UX polish; mechanics already work |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 Append new entries at the bottom. Each entry is written *by* the agent who just finished a ticket, *for* the agent who picks up the next ticket.
 
 ### OPT-366 → OPT-365
-**From:** session on 2026-05-06 · **Commit:** _to be filled in commit message_ · **PR:** _to be filled in_
+**From:** session on 2026-05-06 · **Commit:** f5edb65 · **PR:** [#222](https://github.com/corycunanan/optcg-sim/pull/222)
 
 - **Primer:** Added a pre-game finite state machine (`workers/game/src/engine/pregame.ts`) that drives priority roll → first/second prompt → **`START_OF_GAME_FX` (passthrough today)** → hand deal → mulligan → life placement → first turn. `GameSession.handleInit` no longer jumps straight into `runStartOfTurnAutoPhases`; it enters the FSM via `startPregame` + `drainPregame`. New `pregame: PregameState | null` lives on the shared `GameState`; clients render `<PregameOverlay>` when non-null.
 - **Read first:** `workers/game/src/engine/pregame.ts` (the FSM — note `START_OF_GAME_FX` is the seam OPT-365 plugs into), `workers/game/src/engine/setup.ts` (`prepareDecksAndLeaders`/`dealOpeningHand`/`placeLifeCards` — primitives the FSM composes), `shared/game-types.ts` (`PregameState`, `TurnState.firstPlayerIndex`).

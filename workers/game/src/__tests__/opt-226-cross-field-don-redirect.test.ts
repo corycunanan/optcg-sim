@@ -105,6 +105,7 @@ function makeState(p0: PlayerState, p1: PlayerState): GameState {
     scheduledActions: [],
     oneTimeModifiers: [],
     triggerRegistry: [],
+    pregame: null,
     pendingPrompt: null,
     effectStack: [],
     eventLog: [],

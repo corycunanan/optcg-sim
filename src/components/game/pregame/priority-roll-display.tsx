@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { cn } from "@/lib/utils";
 
 interface PriorityRollDisplayProps {
   rolls: [number, number] | null;
@@ -84,11 +85,12 @@ function Die({ value, highlight, reduceMotion, label }: DieProps) {
         initial={value !== null && !reduceMotion ? { rotate: -25, scale: 0.6 } : false}
         animate={{ rotate: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 18 }}
-        className={`flex h-24 w-24 items-center justify-center rounded-lg border-2 text-5xl font-bold ${
+        className={cn(
+          "flex h-24 w-24 items-center justify-center rounded-lg border-2 text-5xl font-bold",
           highlight
             ? "border-gb-accent-amber bg-gb-prompt-bg text-gb-accent-amber shadow-lg"
-            : "border-gb-border-strong bg-gb-surface text-gb-text"
-        }`}
+            : "border-gb-border-strong bg-gb-surface text-gb-text",
+        )}
       >
         {value ?? "—"}
       </motion.div>

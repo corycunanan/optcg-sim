@@ -91,6 +91,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
       },
       activeEffects: [], prohibitions: [], scheduledActions: [],
       oneTimeModifiers: [], triggerRegistry: [], effectStack: [],
+      pregame: null,
       pendingPrompt: null, eventLog: [], winReason: null,
     } as GameState;
 

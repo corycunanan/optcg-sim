@@ -99,10 +99,11 @@ export function advancePregame(
         // Awaiting prompt response (or transitioning out below).
         return { state: current, done: false };
       case "LIFE_PLACEMENT": {
+        const pregame = current.pregame;
         current = placeLifeCards(current, cardDb);
         current = {
           ...current,
-          pregame: { ...current.pregame, phase: "DONE" },
+          pregame: { ...pregame, phase: "DONE" },
         };
         continue;
       }
@@ -270,6 +271,7 @@ function enterPriorityChoice(state: GameState): GameState {
   const decider = state.pregame?.priorityDeciderIndex ?? 0;
   const prompt: PlayerChoicePrompt = {
     promptType: "PLAYER_CHOICE",
+    source: "PREGAME",
     effectDescription: "PREGAME_FIRST_OR_SECOND",
     choices: [
       { id: "FIRST", label: "Go first" },
@@ -305,6 +307,7 @@ function enterMulliganDecisions(state: GameState): GameState {
 
   const prompt: PlayerChoicePrompt = {
     promptType: "PLAYER_CHOICE",
+    source: "PREGAME",
     effectDescription: "PREGAME_MULLIGAN",
     choices: [
       { id: "KEEP", label: "Keep hand" },

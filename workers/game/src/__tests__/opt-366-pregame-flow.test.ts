@@ -33,14 +33,7 @@ function drain(
   cardDb: Map<string, import("../types.js").CardData>,
   testRolls: number[] | null,
 ): { state: GameState; done: boolean } {
-  let current = state;
-  for (let i = 0; i < 8; i++) {
-    const result = advancePregame(current, cardDb, testRolls, FIXED_RNG);
-    current = result.state;
-    if (!result.done) return { state: current, done: false };
-    return { state: current, done: true };
-  }
-  return { state: current, done: false };
+  return advancePregame(state, cardDb, testRolls, FIXED_RNG);
 }
 
 function applyChoice(
