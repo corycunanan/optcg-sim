@@ -4,10 +4,10 @@ description: Audit codebase architecture for modularity, reusability, and scalab
 user-invokable: true
 args:
   - name: scope
-    description: "all" for full codebase, or a specific area (e.g., "api", "components", "engine", "lib", "hooks", "types")
+    description: '"all" for full codebase, or a specific area (e.g., "api", "components", "engine", "lib", "hooks", "types")'
     required: false
   - name: focus
-    description: Narrow to a specific audit dimension (e.g., "modularity", "reusability", "scalability", "types", "dependencies", "dead-code")
+    description: 'Narrow to a specific audit dimension (e.g., "modularity", "reusability", "scalability", "types", "dependencies", "dead-code")'
     required: false
 ---
 

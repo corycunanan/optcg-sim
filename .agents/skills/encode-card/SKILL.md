@@ -4,7 +4,7 @@ description: Encode OPTCG card effect text into machine-readable JSON schemas fo
 user-invokable: true
 args:
   - name: mode
-    description: "single" for one card, "batch" for an entire set file
+    description: '"single" for one card, "batch" for an entire set file'
     required: false
   - name: card_id
     description: Card ID to encode (single mode) or set code (batch mode, e.g. "EB-03")
