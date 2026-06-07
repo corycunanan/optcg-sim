@@ -83,6 +83,14 @@ export interface PerformedAction {
 export interface TurnState {
   number: number;
   activePlayerIndex: 0 | 1;
+  /**
+   * OPT-366: index of the player who took the first turn of the game (set by
+   * the pregame priority decision). Anchors §6-3-1 first-turn skip-draw,
+   * §6-4-1 first-turn 1-DON!!, and the turn-number increment boundary.
+   * Optional — read sites default to 0 so tests / legacy paths that bypass
+   * the pregame flow keep their pre-OPT-366 behavior (player 0 always first).
+   */
+  firstPlayerIndex?: 0 | 1;
   phase: Phase;
   battleSubPhase: BattleSubPhase | null;
   battle: BattleContext | null;
@@ -232,6 +240,10 @@ export interface GameEventPayloadMap {
   BATTLE_ABORTED: { attackerInstanceId: string; targetInstanceId: string; reason: "ATTACKER_LEFT_FIELD" | "TARGET_LEFT_FIELD" };
   LIFE_COUNT_BECOMES_ZERO: Record<string, never>;
   DRAW_OUTSIDE_DRAW_PHASE: { count: number };
+  // OPT-366: pre-game flow events
+  PREGAME_PRIORITY_ROLLED: { rolls: [number, number]; priorityDeciderIndex: 0 | 1 };
+  PREGAME_FIRST_PLAYER_DECIDED: { firstPlayerIndex: 0 | 1 };
+  MULLIGAN_DECISION: { redrew: boolean };
 }
 
 /** Union of all event type strings. */
@@ -331,12 +343,48 @@ export interface PendingPromptState {
   resumeContext: unknown; // cast to ResumeContext in worker
 }
 
+// ─── Pre-game state (OPT-366) ────────────────────────────────────────────────
+
+/**
+ * OPT-366: pre-game state machine state, surfaced on GameState so clients
+ * render the priority-roll / first-or-second / mulligan overlays.
+ *
+ *   PRIORITY_ROLLING → PRIORITY_CHOICE → START_OF_GAME_FX → HAND_DEAL
+ *   → MULLIGAN_DECISIONS → LIFE_PLACEMENT → DONE
+ *
+ * `pregame` is non-null only during the pre-game flow. Once DONE drains into
+ * the first player's REFRESH/DRAW/DON/MAIN auto-phases, it is set to null
+ * and the rest of the game proceeds normally.
+ */
+export type PregamePhase =
+  | "PRIORITY_ROLLING"
+  | "PRIORITY_CHOICE"
+  | "START_OF_GAME_FX"
+  | "HAND_DEAL"
+  | "MULLIGAN_DECISIONS"
+  | "LIFE_PLACEMENT"
+  | "DONE";
+
+export interface PregameState {
+  phase: PregamePhase;
+  /** Final two d6 values from the (last, non-tied) priority roll. */
+  priorityRolls: [number, number] | null;
+  /** Player index that won the priority roll (will choose first/second). */
+  priorityDeciderIndex: 0 | 1 | null;
+  /** Player index who will go first this game (set after PRIORITY_CHOICE). */
+  firstPlayerIndex: 0 | 1 | null;
+  /** Per-player mulligan decision. null = pending, true = redrew, false = kept. */
+  mulliganDecisions: [boolean | null, boolean | null];
+}
+
 // ─── Game State ───────────────────────────────────────────────────────────────
 
 export interface GameState {
   id: string;
   players: [PlayerState, PlayerState];
   turn: TurnState;
+  // OPT-366: pre-game flow state. null once the game is past §5-2-1-8.
+  pregame: PregameState | null;
   // M4 stubs — always empty arrays in M3
   activeEffects: ActiveEffect[];
   prohibitions: ActiveProhibition[];
@@ -528,6 +576,7 @@ export interface PlayerChoicePrompt {
   promptType: "PLAYER_CHOICE";
   choices: { id: string; label: string }[];
   effectDescription: string;
+  source?: "PREGAME" | "EFFECT";
 }
 
 export interface OptionalEffectPrompt {

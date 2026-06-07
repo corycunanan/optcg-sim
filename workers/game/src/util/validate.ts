@@ -78,6 +78,16 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
   if (!isLobbyMode(obj.mode)) {
     throw new Error("GameInitPayload.mode must be a valid lobby mode");
   }
+  if (obj.testPriorityRolls != null) {
+    if (
+      !Array.isArray(obj.testPriorityRolls) ||
+      !obj.testPriorityRolls.every(
+        (n) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 6,
+      )
+    ) {
+      throw new Error("GameInitPayload.testPriorityRolls must be an array of d6 integers (1-6)");
+    }
+  }
 
   return obj as unknown as GameInitPayload;
 }

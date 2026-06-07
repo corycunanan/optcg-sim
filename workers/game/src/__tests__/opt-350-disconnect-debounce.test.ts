@@ -62,6 +62,7 @@ type GameSessionTestAccess = {
   cardDb: Map<string, CardData>;
   acceptAuthoritativePlayerSocket(playerIndex: 0 | 1, ws: WebSocket): void;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
+  webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void>;
 };
 
 function createSession(): {
@@ -100,6 +101,7 @@ describe("OPT-350 DISCONNECTED broadcast debounce", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("does not broadcast game:player_disconnected when a replacement socket arrives within the debounce window", async () => {
@@ -150,5 +152,51 @@ describe("OPT-350 DISCONNECTED broadcast debounce", () => {
     expect(session.gameState.players[0].connected).toBe(false);
     expect(session.gameState.players[0].awayReason).toBe("DISCONNECTED");
     expect(session.gameState.players[0].rejoinDeadlineAt).not.toBeNull();
+  });
+
+  it("finishes immediately when a player leaves during pregame", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { session } = createSession();
+    const player0Ws = new MockWebSocket();
+    const player1Ws = new MockWebSocket();
+    session.acceptAuthoritativePlayerSocket(0, player0Ws as unknown as WebSocket);
+    session.acceptAuthoritativePlayerSocket(1, player1Ws as unknown as WebSocket);
+    player0Ws.sent = [];
+    player1Ws.sent = [];
+    session.gameState = {
+      ...session.gameState,
+      pregame: {
+        phase: "PRIORITY_CHOICE",
+        priorityRolls: [6, 1],
+        priorityDeciderIndex: 0,
+        firstPlayerIndex: null,
+        mulliganDecisions: [null, null],
+      },
+      pendingPrompt: {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          effectDescription: "PREGAME_FIRST_OR_SECOND",
+          choices: [
+            { id: "FIRST", label: "Go first" },
+            { id: "SECOND", label: "Go second" },
+          ],
+        },
+        respondingPlayer: 0,
+        resumeContext: { type: "PREGAME_PRIORITY_CHOICE" },
+      },
+    };
+
+    await session.webSocketMessage(
+      player0Ws as unknown as WebSocket,
+      JSON.stringify({ type: "game:leave" }),
+    );
+
+    expect(session.gameState.status).toBe("FINISHED");
+    expect(session.gameState.winner).toBe(1);
+    expect(session.gameState.pregame).toBeNull();
+    expect(session.gameState.pendingPrompt).toBeNull();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(parseMessages(player1Ws).map((m) => m.type)).toContain("game:over");
   });
 });

@@ -187,11 +187,16 @@ function executeAttachDon(
 
 function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult {
   const winner: 0 | 1 = concedingPlayer === 0 ? 1 : 0;
+  // OPT-366: clear any pendingPrompt — without this the pipeline's
+  // post-execute pendingPrompt early-return (pipeline.ts step-5 boundary)
+  // would skip finishPipeline and never surface `gameOver`. The game is
+  // ending; no UI prompt is meaningful anymore.
   const nextState: GameState = {
     ...state,
     status: "FINISHED",
     winner,
     winReason: `Player ${concedingPlayer + 1} conceded`,
+    pendingPrompt: null,
   };
   return {
     state: nextState,

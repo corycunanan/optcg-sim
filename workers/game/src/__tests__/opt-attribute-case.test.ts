@@ -105,6 +105,7 @@ function buildState(leaderCardId: string, deckCardIds: string[]): GameState {
     oneTimeModifiers: [],
     triggerRegistry: [],
     effectStack: [],
+    pregame: null,
     pendingPrompt: null,
     eventLog: [],
     winReason: null,
