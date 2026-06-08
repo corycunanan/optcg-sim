@@ -1,7 +1,7 @@
 ---
 linear-project: Realtime Social
 linear-project-url: https://linear.app/optcg-sim/project/realtime-social-bf3d7344f863
-last-updated: 2026-05-03 · OPT-360 in review; OPT-359 in review
+last-updated: 2026-06-08 · OPT-361 in review
 ---
 
 # Realtime Social — Handoff Doc
@@ -26,11 +26,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 8 | [OPT-358](https://linear.app/optcg-sim/issue/OPT-358) | Real presence (P4) — `User.lastSeen` + DO bookkeeping + UI | 5 | OPT-353 ✓ | Done | [#213](https://github.com/corycunanan/optcg-sim/pull/213) merged | First schema change. `presence:friend_online` / `presence:friend_offline` events; multi-tab safety via 5s offline-debounce timer cancellation. DO-to-DO fanout via `env.USER_CHANNEL.idFromName(friendId).fetch()` — no Next.js round-trip per recipient. |
 | 9 | [OPT-359](https://linear.app/optcg-sim/issue/OPT-359) | Stretch: typing indicators + read receipts (P5a/b) | 4 | OPT-354 ✓ | In Review | [#214](https://github.com/corycunanan/optcg-sim/pull/214) | First client→server event vocabulary. `RealtimeClientEvent` discriminated union; DO inbound validation + 1.5s throttle; `Message.readAt` schema change; `POST /api/messages/[userId]/read` replaces implicit GET-marks-read. |
 | 10 | [OPT-360](https://linear.app/optcg-sim/issue/OPT-360) | Stretch: lobby invite notifications (P5c) | 3 | OPT-356 ✓ | In Review | [#215](https://github.com/corycunanan/optcg-sim/pull/215) | First non-poll-replacement feature. New `LobbyInvite` schema + 4 routes + sender popover + recipient toast. |
-| 11 | [OPT-361](https://linear.app/optcg-sim/issue/OPT-361) | Cleanup: drop the 60s backstop polls | 1 | OPT-354–358 | Backlog | — | Soak gate: 7 days, <1% fanout failure rate |
+| 11 | [OPT-361](https://linear.app/optcg-sim/issue/OPT-361) | Cleanup: drop the 60s backstop polls | 1 | OPT-354–358 | In Review | [#224](https://github.com/corycunanan/optcg-sim/pull/224) | Recurring backstop polls deleted; visibility-resume one-shots retained. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-361 (cleanup of 60s backstop polls). Gated on a 7-day soak window after OPT-358 merge (2026-05-02) — earliest unblock is 2026-05-09. OPT-359 + OPT-360 PRs need to merge first to clear the in-review queue, but neither blocks OPT-361 directly.
+**Next up:** Project complete after OPT-361 merges — no follow-up tickets in this Action Plan.
 
 **Total:** ~35 points.
 
@@ -152,3 +152,12 @@ Copy this block when writing a new handoff:
 - **Gotchas / do NOT touch:** `Lobby.invites` cascades on hard-delete, but **the app soft-deletes** lobbies (status → CLOSED) — `cancelPendingLobbyInvites()` is the explicit fanout site, don't rely on cascade. Decline fans to **both** the host (clear "Invited X" state) **and** the recipient (multi-tab echo) — keep the dual fanout. The partial unique index on `lobby_invites` (migration `20260503020000_lobby_invite_pending_unique`) enforces "at most one live PENDING per (lobby, recipient)" — drop the sweep-then-create pattern only if you also drop the index. The `LobbyInviteToasts` shell now renders even on `/game/*` (the `isGame` gate was lifted *only* for the toast subtree); don't reintroduce the gate around it. The `InvitePanel` shows the popover only when `showInviteFriend={isHost}` — the guest doesn't get an invite button (would create cross-talk on who's authoritative). The 5-min TTL is a constant (`INVITE_TTL_MS`) in the invite POST route. The `apiPost`/`apiGet` callsites use `type` aliases (not `interface`) for response shapes because TypeScript's `Record<string, unknown>` constraint on the helper rejects interface types without an index signature — keep that pattern.
 - **Unresolved:** Two-browser manual E2E (A invites B → toast within 1s → Join → in lobby in <2s; cancel-on-start dismisses C's toast) **not run** in this session. Verified via unit + route tests + type-check + lint. Worth a single 5-minute pass before merging this PR alongside OPT-359's two-browser pass. `db:check-migration-drift` skipped locally (no `SHADOW_DATABASE_URL`); CI catches it. The `lobby:invite_canceled` recipient echo is best-effort — if a recipient tab never receives the push, the toast self-clears at TTL anyway. Decline uses `apiLimiter` (not `socialLimiter`) — consider tightening if abuse is observed.
 - **Why this matters for OPT-361:** OPT-361 deletes the 60s backstop polls in chat-widget, social-sidebar, and `useLobbyRoom`. The OPT-360 path doesn't add a backstop — invites are entirely event-driven plus the on-mount `GET /pending` reconciliation, which is fundamentally different from the periodic polls and **does not need to be removed by OPT-361**. The cleanup ticket is gated on a 7-day soak window after OPT-358 merge (2026-05-02) — earliest unblock is 2026-05-09. Coordinate the merge order: OPT-359 + OPT-360 PRs land first, then a soak observation window, then OPT-361 lands as a one-shot mechanical removal of three `setInterval(60_000)` calls.
+
+### OPT-361 → Project closeout
+**From:** session on 2026-06-08 · **Commit:** `06e2024` · **PR:** [#224](https://github.com/corycunanan/optcg-sim/pull/224)
+
+- **Primer:** The recurring chat, friends, and lobby reconciliation backstop polls are removed; push is now the steady-state update path for these social surfaces.
+- **Read first:** `src/components/social/chat-widget.tsx`, `src/components/social/social-sidebar.tsx`, `src/hooks/use-lobby-room.ts`, `src/components/realtime/user-channel-connection-status.tsx`.
+- **Gotchas / do NOT touch:** Visibility-resume one-shot refreshes intentionally stay; they are not background polls and cover missed pushes after a tab resumes.
+- **Unresolved:** Manual DevTools zero-recurring-fetch checks and induced-disconnect banner smoke are still PR test-plan items; no follow-up Linear tickets remain in this project.
+- **Why this matters for closeout:** Once #224 merges, the Realtime Social Action Plan is complete and Linear can move OPT-361 to Done.
