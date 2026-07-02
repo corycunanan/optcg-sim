@@ -23,13 +23,13 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuAction,
-  SidebarMenuBadge,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { UserPlus, Check, X, MoreHorizontal, ChevronsUpDown, LogOut, Search } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
+import { UserChannelConnectionStatus } from "@/components/realtime/user-channel-connection-status";
 import {
   applyFriendEvent,
   type FriendEntry,
@@ -37,10 +37,6 @@ import {
   type SidebarUser,
 } from "./apply-friend-event";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-// Reconciliation backstop interval — replaces the 30s poll until OPT-361
-// drops it after a soak window.
-const RECONCILE_INTERVAL_MS = 60_000;
 
 function removeFromSet<T>(set: Set<T>, value: T): Set<T> {
   if (!set.has(value)) return set;
@@ -67,7 +63,8 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SidebarUser[]>([]);
   const [pendingSent, setPendingSent] = useState<Set<string>>(new Set());
-  const { subscribe, presence, trackPresence } = useUserChannelEvents();
+  const { subscribe, connectionStatus, presence, trackPresence } =
+    useUserChannelEvents();
 
   const fetchFriendsData = useCallback(async () => {
     const [friendsJson, requestsJson] = await Promise.all([
@@ -82,8 +79,16 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
     queueMicrotask(() => {
       void fetchFriendsData();
     });
-    const t = setInterval(fetchFriendsData, RECONCILE_INTERVAL_MS);
-    return () => clearInterval(t);
+  }, [fetchFriendsData]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void fetchFriendsData();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [fetchFriendsData]);
 
   useEffect(() => {
@@ -310,6 +315,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
 
       {/* Footer — Add Friend */}
       <SidebarFooter>
+        <UserChannelConnectionStatus connectionStatus={connectionStatus} />
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu open={addOpen} onOpenChange={(open) => {

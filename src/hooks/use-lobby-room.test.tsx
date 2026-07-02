@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
   apiPost: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
   setterCalls: [] as unknown[][],
   setterIndex: 0,
   subscribeHandler: null as ((event: LobbyEvent) => void) | null,
@@ -87,11 +89,18 @@ beforeEach(() => {
   mocks.apiGet.mockReset();
   mocks.apiPatch.mockReset();
   mocks.apiPost.mockReset();
+  mocks.addEventListener.mockReset();
+  mocks.removeEventListener.mockReset();
   mocks.subscribeUnsub.mockReset();
   mocks.subscribeHandler = null;
   mocks.setterCalls = [];
   mocks.setterIndex = 0;
   mocks.effectCleanups = [];
+  vi.stubGlobal("document", {
+    visibilityState: "visible",
+    addEventListener: mocks.addEventListener,
+    removeEventListener: mocks.removeEventListener,
+  });
 
   // Default API responses so the initial refresh doesn't blow up the tests
   // that exercise subscribe behavior.
@@ -153,5 +162,30 @@ describe("useLobbyRoom subscribe behavior", () => {
     // error, mutating, starting). The push handler must reset it to null so
     // a stale "Lobby unavailable" doesn't linger after the room recovers.
     expect(mocks.setterCalls[2]).toContain(null);
+  });
+
+  it("does not install a recurring reconciliation interval", () => {
+    const setIntervalSpy = vi.spyOn(global, "setInterval");
+
+    useLobbyRoom("lobby-1", lobbyState());
+
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    setIntervalSpy.mockRestore();
+  });
+
+  it("refreshes once when the tab becomes visible", async () => {
+    useLobbyRoom("lobby-1", lobbyState());
+    await Promise.resolve();
+    const initialFetchCount = mocks.apiGet.mock.calls.length;
+
+    const visibilityHandler = mocks.addEventListener.mock.calls.find(
+      ([eventName]) => eventName === "visibilitychange",
+    )?.[1] as (() => void) | undefined;
+    expect(visibilityHandler).toBeTypeOf("function");
+
+    visibilityHandler?.();
+    await Promise.resolve();
+
+    expect(mocks.apiGet).toHaveBeenCalledTimes(initialFetchCount + 1);
   });
 });

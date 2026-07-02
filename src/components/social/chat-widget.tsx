@@ -37,9 +37,6 @@ interface Props {
   onClose: () => void;
 }
 
-// Reconciliation backstop interval — replaces the 5s poll until OPT-361
-// drops it after a soak window.
-const RECONCILE_INTERVAL_MS = 60_000;
 // 100ms tick that re-evaluates the `typingUntil` window without triggering
 // a re-render every frame.
 const TYPING_TICK_MS = 100;
@@ -145,6 +142,27 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     });
   }, [user.id]);
 
+  const refreshMessages = useCallback(async () => {
+    if (minimizedRef.current) return;
+    const current = messagesRef.current;
+    const lastMsg = current[current.length - 1];
+    const after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
+    try {
+      const json = await apiGet<{ data: Message[] }>(
+        `/api/messages/${user.id}?after=${encodeURIComponent(after)}`,
+      );
+      if (json.data?.length > 0) {
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const fresh = json.data.filter((m) => !seen.has(m.id));
+          return fresh.length > 0 ? [...prev, ...fresh] : prev;
+        });
+      }
+    } catch {
+      // Non-fatal — push remains authoritative; the next restore can retry.
+    }
+  }, [user.id]);
+
   // Mark-on-mount: fire after history loads if there are incoming messages.
   // Must happen post-load so we know whether there's anything to mark.
   useEffect(() => {
@@ -162,26 +180,14 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
 
   useEffect(() => {
     if (loading) return;
-    const interval = setInterval(async () => {
-      if (minimizedRef.current) return;
-      const current = messagesRef.current;
-      const lastMsg = current[current.length - 1];
-      const after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
-      try {
-        const json = await apiGet<{ data: Message[] }>(`/api/messages/${user.id}?after=${encodeURIComponent(after)}`);
-        if (json.data?.length > 0) {
-          setMessages((prev) => {
-            const seen = new Set(prev.map((m) => m.id));
-            const fresh = json.data.filter((m) => !seen.has(m.id));
-            return fresh.length > 0 ? [...prev, ...fresh] : prev;
-          });
-        }
-      } catch {
-        // ignore poll errors silently
-      }
-    }, RECONCILE_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [user.id, loading]);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshMessages();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [loading, refreshMessages]);
 
   useEffect(() => {
     if (!minimized) {

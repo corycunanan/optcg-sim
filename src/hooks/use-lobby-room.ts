@@ -12,12 +12,6 @@ import type {
 
 export type { LobbyRoomDeck, LobbyRoomMode, LobbyRoomState, LobbyRoomStatus };
 
-// Reconciliation backstop interval — replaces the 1.5s poll until OPT-361
-// drops it after a soak window. Cadence is much lower than P1/P2 because the
-// room flow has explicit terminal states (Start → game route, Close → home)
-// and lobby drift between events is rare.
-const RECONCILE_INTERVAL_MS = 30_000;
-
 type LobbyRoomResponse = {
   data: LobbyRoomState;
 };
@@ -79,10 +73,13 @@ export function useLobbyRoom(
   }, [subscribe, lobbyId]);
 
   useEffect(() => {
-    const t = setInterval(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
       void refresh();
-    }, RECONCILE_INTERVAL_MS);
-    return () => clearInterval(t);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [refresh]);
 
   const patchLobby = useCallback(
