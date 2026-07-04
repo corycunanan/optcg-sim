@@ -74,11 +74,24 @@ function decodeHtmlEntities(text: string): string {
 // name is silently deleted (e.g. "has the <Slash> attribute" → "has the  attribute").
 const ATTRIBUTE_TOKEN = /[<＜](Slash|Strike|Ranged|Special|Wisdom)[>＞]/g;
 
-function sanitizeEffectText(text: string): string {
+// Real HTML tags in vegapull text are lowercase (<br>, <i>, <span>); a leftover
+// capitalized bracket token after ATTRIBUTE_TOKEN unwrapping means content the
+// generic tag-strip below would silently delete (a new/variant attribute token).
+// Warn loudly instead of letting the whitespace collapse erase the evidence.
+const SUSPICIOUS_TOKEN = /<[A-Z][^>]*>/g;
+
+export function sanitizeEffectText(text: string, warnContext?: string): string {
   if (!text || text === "-") return "";
-  return decodeHtmlEntities(text)
+  const unwrapped = decodeHtmlEntities(text)
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(ATTRIBUTE_TOKEN, "$1")
+    .replace(ATTRIBUTE_TOKEN, "$1");
+  const suspicious = unwrapped.match(SUSPICIOUS_TOKEN);
+  if (suspicious) {
+    console.warn(
+      `  ⚠ sanitizeEffectText${warnContext ? ` [${warnContext}]` : ""}: stripping unrecognized token(s) ${suspicious.join(" ")} — if this is a new attribute token, add it to ATTRIBUTE_TOKEN`
+    );
+  }
+  return unwrapped
     .replace(/<[^>]+>/g, "")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
@@ -169,8 +182,8 @@ export function transformCards(
       attribute: raw.attributes,
       traits: raw.types,
       rarity: raw.rarity,
-      effectText: sanitizeEffectText(raw.effect),
-      triggerText: raw.trigger && raw.trigger !== "-" ? raw.trigger : null,
+      effectText: sanitizeEffectText(raw.effect, raw.id),
+      triggerText: sanitizeEffectText(raw.trigger ?? "", raw.id) || null,
       imageUrl: raw.img_full_url,
       blockNumber: raw.block_number ?? 0,
     });

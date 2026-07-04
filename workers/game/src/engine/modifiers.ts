@@ -549,6 +549,31 @@ export function hasGrantedKeyword(
 }
 
 /**
+ * Check if a card has a specific granted attribute from active effects
+ * (GRANT_ATTRIBUTE modifiers, e.g. OP15-093 "gains the Slash attribute").
+ * Attribute values are compared case-insensitively — schemas use uppercase
+ * ("SLASH") while card data stores title-case (["Slash"]).
+ */
+export function hasGrantedAttribute(
+  card: CardInstance,
+  attribute: string,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>,
+): boolean {
+  const want = attribute.toUpperCase();
+  const effects = state.activeEffects as RuntimeActiveEffect[];
+  return effects.some((e) =>
+    effectAppliesToCard(e, card, state, cardDb) &&
+    e.modifiers?.some((m) =>
+      m.type === "GRANT_ATTRIBUTE" &&
+      typeof m.params?.attribute === "string" &&
+      m.params.attribute.toUpperCase() === want,
+    ) &&
+    isEffectConditionMet(e, state, cardDb),
+  );
+}
+
+/**
  * Check if a card has a specific removed keyword from active effects.
  */
 export function hasRemovedKeyword(

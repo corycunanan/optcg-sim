@@ -9,8 +9,6 @@
  * Yellow: P-034 to P-115 (8 cards)
  *
  * Deferred: P-106 End of Turn effect (LIFE_FACE_COST)
- * Historical sanitizer fixes: P-025, P-052, and P-054 attribute names are now
- * restored in docs/cards/UNKNOWN.md and encoded below.
  */
 
 import type { EffectSchema } from "../effect-types.js";

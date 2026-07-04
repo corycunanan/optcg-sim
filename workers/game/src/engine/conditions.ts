@@ -22,7 +22,7 @@ import type {
   EffectResult,
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
-import { getEffectivePower, getEffectiveCost } from "./modifiers.js";
+import { getEffectivePower, getEffectiveCost, hasGrantedAttribute } from "./modifiers.js";
 import { hasEffectiveKeyword } from "./keywords.js";
 import { findCardInstance } from "./state.js";
 
@@ -199,7 +199,8 @@ function evaluateSimple(
       if ("attribute" in prop) {
         if (cardTreatsAsAll(data, "attributes")) return true;
         const want = prop.attribute.toUpperCase();
-        return data.attribute?.some((a) => a.toUpperCase() === want) ?? false;
+        return (data.attribute?.some((a) => a.toUpperCase() === want) ?? false)
+          || hasGrantedAttribute(p.leader, want, state, ctx.cardDb);
       }
       if ("name" in prop) {
         if (cardTreatsAsAll(data, "names")) return true;
@@ -701,14 +702,19 @@ export function matchesFilter(
   // Attribute filters — OPT-227: "treated as all attributes" is omnidirectional.
   // Positive checks pass; attribute_not excludes (e.g. defender's "cannot be
   // K.O.'d by Slash" correctly fires vs. the blanket Leader).
+  // Attributes granted at runtime (GRANT_ATTRIBUTE, e.g. OP15-093) count for
+  // both directions, same as granted keywords.
   const treatsAsAllAttrs = cardTreatsAsAll(data, "attributes");
   if (filter.attribute && !treatsAsAllAttrs) {
     const want = filter.attribute.toUpperCase();
-    if (!(data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
+    if (!(data.attribute ?? []).some((a) => a.toUpperCase() === want)
+      && !hasGrantedAttribute(card, want, state, cardDb)) return false;
   }
   if (filter.attribute_not) {
     const want = filter.attribute_not.toUpperCase();
-    if (treatsAsAllAttrs || (data.attribute ?? []).some((a) => a.toUpperCase() === want)) return false;
+    if (treatsAsAllAttrs
+      || (data.attribute ?? []).some((a) => a.toUpperCase() === want)
+      || hasGrantedAttribute(card, want, state, cardDb)) return false;
   }
 
   if (filter.has_effect === true) {
