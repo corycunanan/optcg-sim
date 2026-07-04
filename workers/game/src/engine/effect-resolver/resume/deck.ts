@@ -89,17 +89,26 @@ export function handleArrangeSearchDeck(
 
   const { restOfDeck, arrangedCards, kept } = computeArrangeContext(p.deck, validatedKeptId, ordered);
 
+  const pickDest = (sp.pick_destination ?? "HAND").toUpperCase();
   let newHand = [...p.hand];
+  let newLife = p.life;
   if (validatedKeptId && kept) {
-    newHand = [...newHand, { ...kept, zone: "HAND" as const }];
-    events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
+    if (pickDest === "LIFE" || pickDest === "LIFE_TOP") {
+      // OP16-119: picked card goes to the top of Life (face-down unless the
+      // schema says otherwise).
+      const face = (sp.face as "UP" | "DOWN") ?? "DOWN";
+      newLife = [{ instanceId: kept.instanceId, cardId: kept.cardId, face }, ...p.life];
+    } else {
+      newHand = [...newHand, { ...kept, zone: "HAND" as const }];
+      events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
+    }
   }
 
   const destination = action.destination ?? restDest.toLowerCase();
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
 
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, deck: newDeck, hand: newHand };
+  newPlayers[controller] = { ...p, deck: newDeck, hand: newHand, life: newLife };
   return { ...state, players: newPlayers };
 }
 

@@ -701,7 +701,7 @@ export interface ActionParamsMap {
   GRANT_ATTRIBUTE: { attribute: string };
 
   // Search
-  SEARCH_DECK: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string };
+  SEARCH_DECK: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string; face?: "UP" | "DOWN" };
   FULL_DECK_SEARCH: { filter?: TargetFilter; shuffle_after?: boolean };
   DECK_SCRY: { look_at?: number };
   SEARCH_AND_PLAY: { look_at?: number; filter?: TargetFilter; rest_destination?: string; search_full_deck?: boolean; shuffle_after?: boolean; entry_state?: "ACTIVE" | "RESTED" };
