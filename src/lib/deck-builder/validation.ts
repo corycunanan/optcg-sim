@@ -10,6 +10,8 @@
  * - Block rotation: if format is block-specific, all cards must be legal
  */
 
+import { stripVariantSuffix } from "@/lib/utils";
+
 export interface DeckCard {
   cardId: string;
   quantity: number;
@@ -42,6 +44,17 @@ export interface DeckLeader {
 }
 
 export type ValidationSeverity = "error" | "warning";
+
+/**
+ * Cards whose effect text overrides the 4-copy rule ("you may have any number
+ * of this card in your deck"). Source of truth: COPY_LIMIT_OVERRIDE rule
+ * modifications in workers/game/src/engine/schemas/ — keep in sync.
+ */
+export const UNLIMITED_COPY_CARD_IDS = new Set([
+  "OP01-075", // Pacifista
+  "OP08-072", // Biscuit Warrior
+  "OP16-042", // Prisoner of Impel Down
+]);
 
 export interface ValidationResult {
   id: string;
@@ -126,8 +139,11 @@ export function validateDeck(
     passed: stats.totalCards === 50,
   });
 
-  // Rule 3: Max 4 copies per card
-  const overLimitCards = cards.filter((dc) => dc.quantity > 4);
+  // Rule 3: Max 4 copies per card (unless the card's effect lifts the limit)
+  const overLimitCards = cards.filter(
+    (dc) =>
+      dc.quantity > 4 && !UNLIMITED_COPY_CARD_IDS.has(stripVariantSuffix(dc.cardId)),
+  );
   results.push({
     id: "copy-limit",
     rule: "Copy Limit",
