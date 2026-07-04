@@ -67,11 +67,20 @@ function decodeHtmlEntities(text: string): string {
 
 // ─── Effect text sanitization ───────────────────────────────
 
+// The five card attributes are rendered as bracketed tokens in effect text,
+// either HTML-encoded (`&lt;Slash&gt;`) or with fullwidth brackets (`＜Slash＞`).
+// Once entities are decoded, `<Slash>` looks like an HTML tag, so it must be
+// unwrapped to the bare name BEFORE tag stripping — otherwise the attribute
+// name is silently deleted (e.g. "has the <Slash> attribute" → "has the  attribute").
+const ATTRIBUTE_TOKEN = /[<＜](Slash|Strike|Ranged|Special|Wisdom)[>＞]/g;
+
 function sanitizeEffectText(text: string): string {
   if (!text || text === "-") return "";
   return decodeHtmlEntities(text)
     .replace(/<br\s*\/?>/gi, "\n")
+    .replace(ATTRIBUTE_TOKEN, "$1")
     .replace(/<[^>]+>/g, "")
+    .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

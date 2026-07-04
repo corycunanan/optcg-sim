@@ -36,7 +36,7 @@
 ## Kaido
 **P-005** · Character · Purple
 
-[Activate: Main]  DON!! −2 (You may return the specified number of DON!! cards from your field to your DON!! deck.): This Character gains [Banish] during this turn.
+[Activate: Main] DON!! −2 (You may return the specified number of DON!! cards from your field to your DON!! deck.): This Character gains [Banish] during this turn.
 (When this card deals damage, the target card is trashed without activating its Trigger.)
 
 ---
@@ -51,7 +51,7 @@
 ## Monkey.D.Luffy
 **P-007** · Character · Red
 
-[DON!! x1] This Character cannot be K.O.'d in battle by ＜Strike＞ attribute Leaders or Characters.
+[DON!! x1] This Character cannot be K.O.'d in battle by Strike attribute Leaders or Characters.
 
 ---
 
@@ -139,7 +139,7 @@
 ## Smoker
 **P-025** · Character · Black
 
-[DON!! x1] This Character cannot be K.O.'d in battle by Characters without the  attribute.
+[DON!! x1] This Character cannot be K.O.'d in battle by Characters without the Special attribute.
 
 ---
 
@@ -303,7 +303,7 @@ Also treat this card's name as [Franky] according to the rules.
 ## Dracule Mihawk
 **P-052** · Character · Blue
 
-[DON!! x1] This Character cannot be K.O.'d in battle by  attribute cards.
+[DON!! x1] This Character cannot be K.O.'d in battle by Slash attribute cards.
 
 ---
 
@@ -317,7 +317,7 @@ Also treat this card's name as [Franky] according to the rules.
 ## Monkey.D.Garp
 **P-054** · Character · Blue
 
-[DON!! x1] This Character cannot be K.O.'d in battle by  attribute cards.
+[DON!! x1] This Character cannot be K.O.'d in battle by Strike attribute cards.
 
 ---
 
@@ -669,5 +669,13 @@ If your Leader has the {Revolutionary Army} type, this Character gains [Blocker]
 
 Under the rules of this game, you can only include {East Blue} type cards in your deck and when your deck is reduced to 0, you win the game instead of losing.
 [DON!! x1] When this Leader's attack deals damage to your opponent's Life, you may trash 1 card from the top of your deck.
+
+---
+
+## Monkey.D.Luffy
+**P-135** · Character · Green
+
+[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)
+[On Play] Rest up to 1 of your opponent's Characters with a cost of 5 or less.
 
 ---
