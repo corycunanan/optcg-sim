@@ -116,7 +116,7 @@ const grantRushBlock: EffectBlock = {
   id: "OP16-079_grant_rush_on_trash_play",
   category: "auto",
   trigger: {
-    custom_event: "CHARACTER_PLAYED",
+    event: "CHARACTER_PLAYED",
     filter: { controller: "SELF", source_zone: "TRASH", target_filter: { traits: ["Land of Wano"] } },
   },
   actions: [
