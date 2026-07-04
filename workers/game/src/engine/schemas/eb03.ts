@@ -531,7 +531,7 @@ export const EB03_013_CARROT: EffectSchema = {
 };
 
 // ─── EB03-014 Kuina (Character) — ACTIVATE_MAIN rest self + give DON to leader
-// [Activate: Main] You may rest this Character: Give up to 2 rested DON!! cards to your Leader.
+// [Activate: Main] You may rest this Character: Give up to 2 rested DON!! cards to your Slash attribute Leader.
 
 export const EB03_014_KUINA: EffectSchema = {
   card_id: "EB03-014",
@@ -546,7 +546,11 @@ export const EB03_014_KUINA: EffectSchema = {
       actions: [
         {
           type: "GIVE_DON",
-          target: { type: "YOUR_LEADER" },
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            filter: { card_type: "LEADER", attribute: "SLASH" },
+          },
           params: { amount: 2, don_state: "RESTED" },
         },
       ],

@@ -841,8 +841,8 @@ export const OP13_024_GORDON: EffectSchema = {
 
 // ─── OP13-025 Koby ─────────────────────────────────────────────────────────
 // [Blocker]
-// [On Play] If your Leader has the {FILM} type or the  attribute, set up to
-// 1 of your DON!! cards as active.
+// [On Play] If your Leader has the {FILM} type or the Strike attribute, set
+// up to 1 of your DON!! cards as active.
 
 export const OP13_025_KOBY: EffectSchema = {
   card_id: "OP13-025",
