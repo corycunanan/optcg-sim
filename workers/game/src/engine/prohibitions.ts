@@ -267,10 +267,12 @@ export interface RemovalContext {
   /** The player whose action/effect caused the removal. */
   causingController: 0 | 1;
   /**
-   * The card instance whose effect is causing the removal, if any. Used to
-   * evaluate `scope.source_filter` (e.g., Luffy's "by Strike attribute"
-   * protection). Omit for battle-K.O. — battle uses the attacker filter
-   * pathway instead, which is not yet wired in.
+   * The card instance causing the removal: the effect's source card for
+   * effect removals, or the attacker for battle K.O.s (battle.ts passes it).
+   * Required to evaluate `scope.source_filter` (e.g., "cannot be K.O.'d in
+   * battle by Slash attribute cards") — when omitted, source-filtered
+   * prohibitions are skipped (fail-open) and the protection will NOT apply,
+   * so always pass it when a causing card exists.
    */
   sourceCardInstanceId?: string | null;
 }

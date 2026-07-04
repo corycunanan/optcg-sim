@@ -9,7 +9,6 @@
  * Yellow: P-034 to P-115 (8 cards)
  *
  * Deferred: P-106 End of Turn effect (LIFE_FACE_COST)
- * Truncated text: P-025, P-052, P-054 (attribute name missing)
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -545,9 +544,8 @@ export const P_024_IM_GONNA_BE_KING_OF_THE_PIRATES: EffectSchema = {
   ],
 };
 
-// ─── P-025 Smoker (Character) — DON!!x1 cannot be KO'd in battle (truncated attribute)
-// [DON!! x1] This Character cannot be K.O.'d in battle by Characters without the  attribute.
-// Truncated: attribute name missing from source text
+// ─── P-025 Smoker (Character) — DON!!x1 cannot be KO'd in battle by non-Special Characters
+// [DON!! x1] This Character cannot be K.O.'d in battle by Characters without the Special attribute.
 
 export const P_025_SMOKER: EffectSchema = {
   card_id: "P-025",
@@ -566,9 +564,11 @@ export const P_025_SMOKER: EffectSchema = {
       },
       prohibitions: [
         {
-          // Truncated: attribute name missing — source_filter for attribute cannot be encoded
           type: "CANNOT_BE_KO",
-          scope: { cause: "BATTLE" },
+          scope: {
+            cause: "BATTLE",
+            source_filter: { card_type: "CHARACTER", attribute_not: "SPECIAL" },
+          },
         },
       ],
     },
@@ -1236,9 +1236,8 @@ export const P_051_SHANKS: EffectSchema = {
   ],
 };
 
-// ─── P-052 Dracule Mihawk (Character) — DON!!x1 cannot be KO'd by attribute (truncated)
-// [DON!! x1] This Character cannot be K.O.'d in battle by  attribute cards.
-// Truncated: attribute name missing from source text
+// ─── P-052 Dracule Mihawk (Character) — DON!!x1 cannot be KO'd by Slash attribute
+// [DON!! x1] This Character cannot be K.O.'d in battle by Slash attribute cards.
 
 export const P_052_DRACULE_MIHAWK: EffectSchema = {
   card_id: "P-052",
@@ -1257,9 +1256,8 @@ export const P_052_DRACULE_MIHAWK: EffectSchema = {
       },
       prohibitions: [
         {
-          // Truncated: attribute name missing — source_filter cannot be encoded
           type: "CANNOT_BE_KO",
-          scope: { cause: "BATTLE" },
+          scope: { cause: "BATTLE", source_filter: { attribute: "SLASH" } },
         },
       ],
     },
@@ -1299,9 +1297,8 @@ export const P_053_NAMI: EffectSchema = {
   ],
 };
 
-// ─── P-054 Monkey.D.Garp (Character) — DON!!x1 cannot be KO'd by attribute (truncated)
-// [DON!! x1] This Character cannot be K.O.'d in battle by  attribute cards.
-// Truncated: attribute name missing from source text
+// ─── P-054 Monkey.D.Garp (Character) — DON!!x1 cannot be KO'd by Strike attribute
+// [DON!! x1] This Character cannot be K.O.'d in battle by Strike attribute cards.
 
 export const P_054_MONKEY_D_GARP: EffectSchema = {
   card_id: "P-054",
@@ -1320,9 +1317,8 @@ export const P_054_MONKEY_D_GARP: EffectSchema = {
       },
       prohibitions: [
         {
-          // Truncated: attribute name missing — source_filter cannot be encoded
           type: "CANNOT_BE_KO",
-          scope: { cause: "BATTLE" },
+          scope: { cause: "BATTLE", source_filter: { attribute: "STRIKE" } },
         },
       ],
     },

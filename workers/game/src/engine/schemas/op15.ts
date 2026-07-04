@@ -3748,7 +3748,7 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
 // ─── OP15-093 The Risky Brothers ─────────────────────────────────────────────
 // [Activate: Main] You may trash this Character: If you have 15 or more cards
 // in your trash, up to 1 of your [Monkey.D.Luffy] Characters gains
-// [Rush: Character] and the  attribute during this turn.
+// [Rush: Character] and the Slash attribute during this turn.
 
 export const OP15_093_THE_RISKY_BROTHERS: EffectSchema = {
   card_id: "OP15-093",
@@ -3787,7 +3787,7 @@ export const OP15_093_THE_RISKY_BROTHERS: EffectSchema = {
             count: { up_to: 1 },
             filter: { name: "Monkey.D.Luffy" },
           },
-          params: { attribute: "STRIKE" },
+          params: { attribute: "SLASH" },
           duration: { type: "THIS_TURN" },
           chain: "AND",
         },

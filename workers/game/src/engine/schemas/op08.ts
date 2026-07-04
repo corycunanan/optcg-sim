@@ -3949,7 +3949,7 @@ export const OP08_112_S_SNAKE: EffectSchema = {
 
 // ─── OP08-114 S-Hawk ────────────────────────────────────────────────────────
 // [DON!! x1] If you have less Life cards than your opponent, this Character
-// cannot be K.O.'d in battle by <attribute> cards and gains +2000 power.
+// cannot be K.O.'d in battle by Slash attribute cards and gains +2000 power.
 // [Trigger] You may trash 1 card from your hand: If you have 2 or less Life
 // cards, play this card.
 
@@ -3980,7 +3980,7 @@ export const OP08_114_S_HAWK: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
-          scope: { cause: "BATTLE" },
+          scope: { cause: "BATTLE", source_filter: { attribute: "SLASH" } },
         },
       ],
       modifiers: [
