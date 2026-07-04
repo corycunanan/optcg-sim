@@ -17,6 +17,7 @@ import {
   popTriggerStaging,
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
+import { getEffectiveCounterValue } from "./counter-value.js";
 import { expireBattleEffects } from "./duration-tracker.js";
 import { hasTrigger, hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
@@ -195,7 +196,8 @@ export function executeUseCounter(
 
   const found = findCardInState(state, cardInstanceId)!;
   const cardData = cardDb.get(found.card.cardId)!;
-  const counterValue = cardData.counter!;
+  // OPT-400: honor COUNTER_GRANT rule mods, not just the printed counter.
+  const counterValue = getEffectiveCounterValue(found.card, cardData, state, cardDb);
 
   // Trash the counter card from hand
   let nextState = moveCard(state, cardInstanceId, "TRASH");

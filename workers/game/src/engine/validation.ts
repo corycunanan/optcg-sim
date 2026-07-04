@@ -9,6 +9,7 @@ import type { CardData, GameAction, GameState } from "../types.js";
 import type { EffectSchema } from "./effect-types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
 import { getEffectiveCost, hasGrantedKeyword, hasRemovedKeyword, isCardNegated } from "./modifiers.js";
+import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
 
@@ -249,7 +250,10 @@ function validateUseCounter(
   const cardData = cardDb.get(found.card.cardId);
   if (!cardData) return "Card data not found";
   if (cardData.type !== "Character") return "Symbol counters are on Character cards";
-  if (!cardData.counter || cardData.counter <= 0) return "This card has no counter value";
+  // OPT-400: COUNTER_GRANT rule mods can give counterless cards a value.
+  if (getEffectiveCounterValue(found.card, cardData, state, cardDb) <= 0) {
+    return "This card has no counter value";
+  }
 
   // Validate counter target (must be one of the inactive player's Leader or Characters)
   const targetFound = findCardInState(state, counterTargetInstanceId);
