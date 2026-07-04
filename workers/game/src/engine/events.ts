@@ -20,8 +20,22 @@ export function emitEvent<T extends GameEventType>(
     payload,
     timestamp: Date.now(),
   } as GameEvent;
+  let turn = state.turn;
+  // Record K.O.s for ACTION_PERFORMED_THIS_TURN conditions (OP16-100
+  // "if your opponent's Character has been K.O.'d during this turn").
+  // playerIndex on CARD_KO is the K.O.'d character's owner.
+  if (type === "CARD_KO") {
+    turn = {
+      ...turn,
+      actionsPerformedThisTurn: [
+        ...turn.actionsPerformedThisTurn,
+        { actionType: "CHARACTER_KO", timestamp: event.timestamp, controller: playerIndex },
+      ],
+    };
+  }
   return {
     ...state,
+    turn,
     eventLog: [...state.eventLog, event],
   };
 }

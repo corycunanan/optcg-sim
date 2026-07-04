@@ -280,6 +280,16 @@ function evaluateSimple(
         if (_actionType === "PLAYED_CHARACTER") return a.actionType === "PLAY_CARD";
         if (_actionType === "USED_BLOCKER") return a.actionType === "DECLARE_BLOCKER";
         if (_actionType === "ATTACKED") return a.actionType === "DECLARE_ATTACK";
+        if (_actionType === "CHARACTER_KO") {
+          if (a.actionType !== "CHARACTER_KO") return false;
+          // cond.controller scopes whose character was K.O.'d (OP16-100:
+          // OPPONENT = an opponent character). Unscoped/EITHER matches any.
+          if (!cond.controller || cond.controller === "EITHER" || cond.controller === "ANY") return true;
+          const ownerPi = cond.controller === "OPPONENT"
+            ? (ctx.controller === 0 ? 1 : 0)
+            : ctx.controller;
+          return a.controller === ownerPi;
+        }
         return false;
       });
     }

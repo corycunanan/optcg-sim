@@ -388,7 +388,7 @@ export interface ActionPerformedThisTurnCondition {
   filter?: TargetFilter;
 }
 
-export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED";
+export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO";
 
 export interface PlayMethodCondition {
   type: "PLAY_METHOD";

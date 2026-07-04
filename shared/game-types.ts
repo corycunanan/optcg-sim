@@ -78,6 +78,8 @@ export type Phase = "REFRESH" | "DRAW" | "DON" | "MAIN" | "END";
 export interface PerformedAction {
   actionType: string;
   timestamp: number;
+  /** For CHARACTER_KO records: owner of the K.O.'d character. */
+  controller?: 0 | 1;
 }
 
 export interface TurnState {
