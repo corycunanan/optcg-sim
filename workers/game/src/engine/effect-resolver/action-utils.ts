@@ -2,8 +2,9 @@
  * Pure utility functions for action handlers.
  */
 
-import type { Action, Duration, DynamicValue, EffectResult, EffectBlock } from "../effect-types.js";
+import type { Action, Duration, DynamicValue, EffectResult, EffectBlock, TargetFilter } from "../effect-types.js";
 import type { CardData, CardInstance, GameState } from "../../types.js";
+import { matchesFilter } from "../conditions.js";
 import { findCardInstance } from "../state.js";
 import type { ExpiryTiming } from "../effect-types.js";
 
@@ -122,7 +123,7 @@ export function resolveAmount(
         return Math.floor(refResult.count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
       }
     }
-    const count = resolvePerCountSource(state, controller, source, cardDb);
+    const count = resolvePerCountSource(state, controller, source, cardDb, dv.filter);
     return Math.floor(count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
   }
 
@@ -150,6 +151,7 @@ function resolvePerCountSource(
   controller: 0 | 1,
   source: string,
   cardDb?: Map<string, CardData>,
+  filter?: TargetFilter,
 ): number {
   const p = state.players[controller];
   const opp = state.players[controller === 0 ? 1 : 0];
@@ -167,8 +169,18 @@ function resolvePerCountSource(
       }).length;
     }
     case "CHARACTERS_ON_FIELD":
-    case "MATCHING_CHARACTERS_ON_FIELD":
-      return p.characters.filter(Boolean).length;
+    case "MATCHING_CHARACTERS_ON_FIELD": {
+      let chars = p.characters.filter(Boolean) as CardInstance[];
+      if (filter && cardDb) {
+        chars = chars.filter((c) => matchesFilter(c, filter, cardDb, state));
+      }
+      // filter.unique_names: count distinct card names (OP16-034 "for each of
+      // your Characters with a different card name").
+      if (filter?.unique_names) {
+        return new Set(chars.map((c) => cardDb?.get(c.cardId)?.name ?? c.cardId)).size;
+      }
+      return chars.length;
+    }
     case "DON_FIELD_COUNT":
       return p.donCostArea.length + p.leader.attachedDon.length +
         p.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);

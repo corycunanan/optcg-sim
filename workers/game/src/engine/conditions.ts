@@ -126,10 +126,15 @@ function evaluateSimple(
         if (cond.exclude_self && c.instanceId === ctx.sourceCardInstanceId) return false;
         return matchesFilter(c, cond.filter, ctx.cardDb, state);
       });
+      // unique_names: count distinct card names (OP16-038 "5 Characters with
+      // different card names"), not card instances.
+      const matchCount = cond.filter?.unique_names
+        ? new Set(matching.map((c) => ctx.cardDb.get(c.cardId)?.name ?? c.cardId)).size
+        : matching.length;
       if (cond.count) {
-        return compareNum(matching.length, cond.count.operator, cond.count.value);
+        return compareNum(matchCount, cond.count.operator, cond.count.value);
       }
-      return matching.length > 0;
+      return matchCount > 0;
     }
 
     case "MULTIPLE_NAMED_CARDS": {

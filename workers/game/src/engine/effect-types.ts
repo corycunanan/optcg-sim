@@ -479,7 +479,7 @@ export type NumericRange =
 
 export type DynamicValue =
   | { type: "FIXED"; value: number }
-  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number }
+  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number; filter?: TargetFilter }
   | { type: "GAME_STATE"; source: GameStateSource; controller?: Controller }
   | { type: "ACTION_RESULT"; ref: string }
   | { type: "CHOSEN_VALUE" };
