@@ -831,7 +831,15 @@ export type TargetType =
   | "DON_IN_DON_DECK"
   | "PLAYER"
   | "SELECTED_CARDS"
-  | "OPPONENT_LIFE";
+  | "OPPONENT_LIFE"
+  | "TRIGGERING_CARD";
+
+/**
+ * Well-known result_ref key holding the card that triggered the currently
+ * resolving auto effect (e.g. the character played from trash for OP16-079).
+ * Seeded by resolveEffect; consumed by the TRIGGERING_CARD target type.
+ */
+export const TRIGGERING_CARD_REF = "__triggering_card";
 
 export type CountMode =
   | { exact: number }

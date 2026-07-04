@@ -319,6 +319,7 @@ export function handleAwaitingTriggerOrderSelection(
     chosenTrigger.sourceCardInstanceId,
     chosenTrigger.controller,
     cardDb,
+    (chosenTrigger.triggeringEvent?.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId ?? null,
   );
   nextState = result.state;
   events.push(...result.events);

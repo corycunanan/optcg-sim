@@ -14,6 +14,7 @@ import type {
   TargetFilter,
   UniquenessConstraint,
 } from "../effect-types.js";
+import { TRIGGERING_CARD_REF } from "../effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -419,6 +420,15 @@ export function computeAllValidTargets(
       }
       return [];
     }
+    case "TRIGGERING_CARD": {
+      // The card that triggered this auto effect (seeded by resolveEffect).
+      // Fizzles (empty) if the card left the field before resolution.
+      const ids = _resultRefs.get(TRIGGERING_CARD_REF)?.targetInstanceIds ?? [];
+      return ids.filter((id) => {
+        const card = findCardInstance(state, id);
+        return card && (card.zone === "CHARACTER" || card.zone === "LEADER" || card.zone === "STAGE");
+      });
+    }
     default: return [];
   }
 }
@@ -452,7 +462,7 @@ export function needsPlayerTargetSelection(
   if (!target) return false;
   if (!target.type) return false;
   // Deterministic targets — never prompt
-  const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS"];
+  const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS", "TRIGGERING_CARD"];
   if (auto.includes(target.type)) return false;
   if (target.self_ref) return false;
   // Dual targets always require player selection — assignment is combinatorial

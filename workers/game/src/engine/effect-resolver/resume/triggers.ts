@@ -55,6 +55,7 @@ export function processRemainingTriggers(
       trigger.sourceCardInstanceId,
       trigger.controller,
       cardDb,
+      (trigger.triggeringEvent?.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId ?? null,
     );
     nextState = result.state;
     events.push(...result.events);
@@ -96,6 +97,7 @@ export function processRemainingTriggers(
       trigger.sourceCardInstanceId,
       trigger.controller,
       cardDb,
+      (trigger.triggeringEvent?.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId ?? null,
     );
     nextState = result.state;
     events.push(...result.events);
