@@ -8,6 +8,7 @@
  */
 
 import type { Action, ChoiceCost, Cost, CostResult, EffectBlock, EffectResult } from "../../effect-types.js";
+import { isOncePerTurnBlock } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
@@ -61,7 +62,7 @@ function finishCostsAndRunActions(
   cardDb: Map<string, CardData>,
 ): EffectResolverResult {
   const block = topFrame.effectBlock as EffectBlock;
-  if (block.flags?.once_per_turn && !topFrame.oncePerTurnMarked) {
+  if (isOncePerTurnBlock(block) && !topFrame.oncePerTurnMarked) {
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
   }
 

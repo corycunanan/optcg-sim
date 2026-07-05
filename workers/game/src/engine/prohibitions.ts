@@ -49,6 +49,58 @@ export function checkProhibitions(
   return null;
 }
 
+/**
+ * Refresh Phase step 4 support: collect the refreshing player's cards held
+ * rested by a CANNOT_REFRESH prohibition ("will not become active in your
+ * opponent's next Refresh Phase") and consume those prohibitions — the effect
+ * applies to exactly one Refresh Phase, so the phase that honors (or outlives)
+ * it also spends it.
+ */
+export function applyRefreshProhibitions(
+  state: GameState,
+  playerIndex: 0 | 1,
+  cardDb: Map<string, CardData>,
+): { skipInstanceIds: Set<string>; nextState: GameState } {
+  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const skipInstanceIds = new Set<string>();
+  if (prohibitions.length === 0) return { skipInstanceIds, nextState: state };
+
+  const player = state.players[playerIndex];
+  const ownedIds = new Set<string>([
+    player.leader.instanceId,
+    ...player.characters.filter((c): c is CardInstance => c !== null).map((c) => c.instanceId),
+    ...(player.stage ? [player.stage.instanceId] : []),
+  ]);
+
+  const consumedIds = new Set<string>();
+  for (const p of prohibitions) {
+    if (p.prohibitionType !== "CANNOT_REFRESH") continue;
+    // A target-less CANNOT_REFRESH did nothing (e.g. "up to 1" declined) —
+    // spend it at the first refresh so it can't linger forever.
+    if (p.appliesTo.length === 0) {
+      consumedIds.add(p.id);
+      continue;
+    }
+    const affected = p.appliesTo.filter((id) => ownedIds.has(id));
+    if (affected.length === 0) continue;
+    consumedIds.add(p.id);
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (p.conditionalOverride) {
+      const ctx: ConditionContext = {
+        sourceCardInstanceId: p.sourceCardInstanceId,
+        controller: p.controller,
+        cardDb,
+      };
+      if (evaluateCondition(state, p.conditionalOverride, ctx)) continue;
+    }
+    for (const id of affected) skipInstanceIds.add(id);
+  }
+
+  if (consumedIds.size === 0) return { skipInstanceIds, nextState: state };
+  const remaining = prohibitions.filter((p) => !consumedIds.has(p.id));
+  return { skipInstanceIds, nextState: { ...state, prohibitions: remaining as any } };
+}
+
 function matchesProhibition(
   prohibition: RuntimeProhibition,
   action: GameAction,
@@ -90,7 +142,8 @@ function matchesProhibition(
       return null;
     }
 
-    case "CANNOT_BLOCK": {
+    case "CANNOT_BLOCK":
+    case "CANNOT_ACTIVATE_BLOCKER": {
       if (action.type !== "DECLARE_BLOCKER") return null;
       if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
         if (!prohibition.appliesTo.includes(action.blockerInstanceId)) return null;

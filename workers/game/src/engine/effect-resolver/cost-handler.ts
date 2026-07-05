@@ -8,6 +8,7 @@ import type {
   CostResult,
   EffectBlock,
   SimpleCost,
+  TargetFilter,
 } from "../effect-types.js";
 import type {
   CardData,
@@ -15,6 +16,7 @@ import type {
   GameState,
   PendingEvent,
   PendingPromptState,
+  PlayerState,
   EffectStackFrame,
 } from "../../types.js";
 import { generateFrameId, pushFrame } from "../effect-stack.js";
@@ -28,20 +30,7 @@ import {
 } from "./card-mutations.js";
 import { costResultToEntries } from "./types.js";
 import { isProhibitedForCard } from "../prohibitions.js";
-
-// ─── Filter helpers ──────────────────────────────────────────────────────────
-
-function matchesHandFilter(data: CardData, filter: NonNullable<SimpleCost["filter"]>): boolean {
-  if (filter.traits && !filter.traits.every((t) => (data.types ?? []).includes(t))) return false;
-  if (filter.traits_contains) {
-    const cardTraits = data.types ?? [];
-    if (!filter.traits_contains.every((t) => cardTraits.some((tr) => tr.includes(t)))) return false;
-  }
-  if (filter.color && !(data.color ?? []).some((clr) => filter.color!.includes(clr as never))) return false;
-  if (filter.name && data.name !== filter.name) return false;
-  if (filter.name_any_of && !filter.name_any_of.includes(data.name)) return false;
-  return true;
-}
+import { matchesFilter } from "../conditions.js";
 
 // ─── payCosts (auto-payable) ─────────────────────────────────────────────────
 
@@ -71,12 +60,16 @@ export function payCosts(
       case "DON_MINUS": {
         const amount = typeof cost.amount === "number" ? cost.amount : 0;
         const player = nextState.players[controller];
-        // Collect DON!! from cost area + attached
-        const allFieldDon = [
-          ...player.donCostArea,
-          ...player.leader.attachedDon,
-          ...player.characters.filter(Boolean).flatMap((c) => c!.attachedDon),
-        ];
+        const activeOnly = cost.filter?.is_active === true || cost.filter?.state === "ACTIVE";
+        // Collect DON!! from cost area + attached, unless a card requires active
+        // DON!! specifically. Attached DON!! is not active/rested cost-area DON.
+        const allFieldDon = activeOnly
+          ? player.donCostArea.filter((d) => d.state === "ACTIVE")
+          : [
+              ...player.donCostArea,
+              ...player.leader.attachedDon,
+              ...player.characters.filter(Boolean).flatMap((c) => c!.attachedDon),
+            ];
         if (allFieldDon.length < amount) return null;
 
         // Return DON!! to DON!! deck — prefer cost area DON!! first
@@ -85,12 +78,16 @@ export function payCosts(
         let p = { ...player };
 
         // Take from cost area first
-        const fromCostArea = Math.min(amount, p.donCostArea.length);
+        const costAreaCandidates = activeOnly
+          ? p.donCostArea.filter((d) => d.state === "ACTIVE")
+          : p.donCostArea;
+        const fromCostArea = Math.min(amount, costAreaCandidates.length);
         if (fromCostArea > 0) {
-          const toReturn = p.donCostArea.slice(0, fromCostArea);
+          const toReturn = costAreaCandidates.slice(0, fromCostArea);
+          const toReturnIds = new Set(toReturn.map((d) => d.instanceId));
           p = {
             ...p,
-            donCostArea: p.donCostArea.slice(fromCostArea),
+            donCostArea: p.donCostArea.filter((d) => !toReturnIds.has(d.instanceId)),
             donDeck: [...p.donDeck, ...toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }))],
           };
           returned += fromCostArea;
@@ -169,11 +166,9 @@ export function payCosts(
         // For now, take from the end of hand
         let trashable = p.hand;
         if (cost.filter) {
-          trashable = trashable.filter((c) => {
-            const data = _cardDb.get(c.cardId);
-            if (!data) return false;
-            return matchesHandFilter(data, cost.filter!);
-          });
+          trashable = trashable.filter((c) =>
+            matchesFilter(c, cost.filter!, _cardDb, nextState, undefined, undefined, controller),
+          );
         }
         if (trashable.length < amount) return null;
 
@@ -362,8 +357,7 @@ export function payCosts(
         const p = nextState.players[controller];
         if (!p.stage) return null;
         if (cost.filter) {
-          const data = _cardDb.get(p.stage.cardId);
-          if (!data || !matchesHandFilter(data, cost.filter)) return null;
+          if (!matchesFilter(p.stage, cost.filter, _cardDb, nextState, undefined, undefined, controller)) return null;
         }
         const stageId = p.stage.instanceId;
         const result = trashStage(nextState, stageId, "cost");
@@ -443,6 +437,22 @@ function resolveAmount(cost: SimpleCost, fallback = 1): number {
   return typeof cost.amount === "number" ? cost.amount : fallback;
 }
 
+function getRestCostCandidates(player: PlayerState, filter?: TargetFilter): CardInstance[] {
+  const explicitType = filter?.card_type;
+  const cardTypes = explicitType
+    ? new Set((Array.isArray(explicitType) ? explicitType : [explicitType]).map((t) => t.toUpperCase()))
+    : null;
+  const includeCharacters = !cardTypes || cardTypes.has("CHARACTER");
+  const includeLeader = cardTypes?.has("LEADER") ?? false;
+  const includeStage = cardTypes?.has("STAGE") ?? false;
+
+  return [
+    ...(includeLeader ? [player.leader] : []),
+    ...(includeCharacters ? player.characters.filter((c): c is CardInstance => c !== null) : []),
+    ...(includeStage && player.stage ? [player.stage] : []),
+  ];
+}
+
 /**
  * Determine whether a single cost is payable in the current state.
  * Pure predicate — no state mutation.
@@ -482,6 +492,9 @@ export function isCostPayable(
   switch (cost.type) {
     case "DON_MINUS": {
       const amt = resolveAmount(simple, 0);
+      if (simple.filter?.is_active === true || simple.filter?.state === "ACTIVE") {
+        return player.donCostArea.filter((d) => d.state === "ACTIVE").length >= amt;
+      }
       const allFieldDon = [
         ...player.donCostArea,
         ...player.leader.attachedDon,
@@ -555,9 +568,7 @@ export function isCostPayable(
     case "TRASH_OWN_STAGE": {
       if (!player.stage) return false;
       if (!simple.filter) return true;
-      const data = cardDb.get(player.stage.cardId);
-      if (!data) return false;
-      return matchesHandFilter(data, simple.filter);
+      return matchesFilter(player.stage, simple.filter, cardDb, state, undefined, undefined, controller);
     }
 
     case "RETURN_ATTACHED_DON_TO_COST": {
@@ -864,11 +875,9 @@ export function computeCostTargets(
     case "REVEAL_FROM_HAND": {
       let candidates = player.hand;
       if (cost.filter) {
-        candidates = candidates.filter((c) => {
-          const data = cardDb.get(c.cardId);
-          if (!data) return false;
-          return matchesHandFilter(data, cost.filter!);
-        });
+        candidates = candidates.filter((c) =>
+          matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),
+        );
       }
       return candidates.map((c) => c.instanceId);
     }
@@ -879,21 +888,9 @@ export function computeCostTargets(
     case "PLACE_OWN_CHARACTER_TO_DECK": {
       let candidates = player.characters.filter(Boolean) as CardInstance[];
       if (cost.filter) {
-        candidates = candidates.filter((c) => {
-          const data = cardDb.get(c.cardId);
-          if (!data) return false;
-          if (cost.filter?.traits) {
-            if (!cost.filter.traits.every((t: string) => (data.types ?? []).includes(t))) return false;
-          }
-          if (cost.filter?.traits_contains) {
-            const cardTraits = data.types ?? [];
-            if (!cost.filter.traits_contains.every((t: string) => cardTraits.some((tr: string) => tr.includes(t)))) return false;
-          }
-          if (cost.filter?.cost_max !== undefined) {
-            return (data.cost ?? 0) <= (cost.filter.cost_max as number);
-          }
-          return true;
-        });
+        candidates = candidates.filter((c) =>
+          matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),
+        );
       }
       return candidates.map((c) => c.instanceId);
     }
@@ -905,9 +902,11 @@ export function computeCostTargets(
     case "REST_CARDS": {
       // OPT-250: characters under CANNOT_BE_RESTED cannot satisfy a rest cost
       // (qa_op13.md:85-87 — "cannot become rested by the effects of other cards").
-      return player.characters
-        .filter((c): c is CardInstance => c !== null && c.state === "ACTIVE")
+      const candidates = getRestCostCandidates(player, cost.filter);
+      return candidates
+        .filter((c) => c.state === "ACTIVE")
         .filter((c) => !isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb))
+        .filter((c) => !cost.filter || matchesFilter(c, cost.filter, cardDb, state, undefined, undefined, controller))
         .map((c) => c.instanceId);
     }
 
@@ -1009,6 +1008,9 @@ export function getCostCards(
       const cards = player.characters.filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
       if (targetSet.has(player.leader.instanceId)) {
         cards.push(player.leader);
+      }
+      if (player.stage && targetSet.has(player.stage.instanceId)) {
+        cards.push(player.stage);
       }
       return cards;
     }
@@ -1129,8 +1131,11 @@ export function applyCostSelection(
       const newLeader = selectedSet.has(p.leader.instanceId)
         ? { ...p.leader, state: "RESTED" as const }
         : p.leader;
+      const newStage = p.stage && selectedSet.has(p.stage.instanceId)
+        ? { ...p.stage, state: "RESTED" as const }
+        : p.stage;
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, leader: newLeader, characters: newChars };
+      newPlayers[controller] = { ...p, leader: newLeader, characters: newChars, stage: newStage };
       return { ...state, players: newPlayers };
     }
 

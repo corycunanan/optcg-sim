@@ -69,6 +69,17 @@ export interface EffectBlock {
   zone?: EffectZone;
 }
 
+/**
+ * Block-level [Once Per Turn]. Canonical home is `flags.once_per_turn`, but
+ * many schemas across sets declare it on the trigger object (the trigger
+ * types also allow it) — the engine honors both placements.
+ */
+export function isOncePerTurnBlock(block: EffectBlock): boolean {
+  if (block.flags?.once_per_turn) return true;
+  const trigger = block.trigger as { once_per_turn?: boolean } | undefined;
+  return trigger?.once_per_turn === true;
+}
+
 export interface EffectFlags {
   once_per_turn?: boolean;
   optional?: boolean;
@@ -210,6 +221,7 @@ export type SimpleCondition =
   | FieldPurityCondition
   | LeaderPropertyCondition
   | SelfPowerCondition
+  | SelfCostCondition
   | SelfStateCondition
   | NoBaseEffectCondition
   | HasEffectTypeCondition
@@ -322,10 +334,17 @@ export type LeaderPropertyCheck =
   | { trait_contains: string }
   | { attribute: Attribute }
   | { name: string }
+  | { name_includes: string }
   | { multicolored: boolean };
 
 export interface SelfPowerCondition {
   type: "SELF_POWER";
+  operator: NumericOperator;
+  value: number;
+}
+
+export interface SelfCostCondition {
+  type: "SELF_COST";
   operator: NumericOperator;
   value: number;
 }
@@ -685,7 +704,7 @@ export interface ActionParamsMap {
   SET_DON_ACTIVE: { amount?: number };
   REST_OPPONENT_DON: { amount?: number };
   RETURN_DON_TO_DECK: { amount?: number };
-  TRASH_FROM_HAND: { amount?: number | DynamicValue };
+  TRASH_FROM_HAND: { amount?: number | DynamicValue; optional?: boolean };
   REVEAL: { amount?: number; source?: string };
   REVEAL_HAND: { amount?: number };
 
@@ -705,7 +724,7 @@ export interface ActionParamsMap {
   SEARCH_DECK: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string; face?: "UP" | "DOWN" };
   FULL_DECK_SEARCH: { filter?: TargetFilter; shuffle_after?: boolean };
   DECK_SCRY: { look_at?: number };
-  SEARCH_AND_PLAY: { look_at?: number; filter?: TargetFilter; rest_destination?: string; search_full_deck?: boolean; shuffle_after?: boolean; entry_state?: "ACTIVE" | "RESTED" };
+  SEARCH_AND_PLAY: { look_at?: number; filter?: TargetFilter; rest_destination?: string; search_full_deck?: boolean; shuffle_after?: boolean; entry_state?: "ACTIVE" | "RESTED"; pick?: { up_to?: number } };
 
   // Play/move
   PLAY_CARD: {
@@ -817,6 +836,7 @@ export type TargetType =
   | "CHARACTER"
   | "STAGE"
   | "LEADER_OR_CHARACTER"
+  | "FIELD_CARD"
   | "ALL_YOUR_CHARACTERS"
   | "ALL_OPPONENT_CHARACTERS"
   | "CHARACTER_CARD"
@@ -851,6 +871,10 @@ export type CountMode =
 export type SourceZone = "HAND" | "TRASH" | "DECK" | "DECK_TOP" | "LIFE" | "FIELD" | "DON_DECK";
 
 export interface TargetFilter {
+  // Controller scoping for filters used outside Target.controller, especially
+  // replacement target_filter ("your Character would be...").
+  controller?: Controller;
+
   // Cost filters
   cost_exact?: number | DynamicValue;
   cost_min?: number | DynamicValue;

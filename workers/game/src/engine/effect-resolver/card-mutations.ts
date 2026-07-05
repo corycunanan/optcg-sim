@@ -278,6 +278,11 @@ export function setCardState(state: GameState, instanceId: string, newState: "AC
       newPlayers[pi] = { ...player, characters: newChars };
       return { ...state, players: newPlayers };
     }
+    if (player.stage?.instanceId === instanceId) {
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[pi] = { ...player, stage: { ...player.stage, state: newState } };
+      return { ...state, players: newPlayers };
+    }
   }
   return state;
 }

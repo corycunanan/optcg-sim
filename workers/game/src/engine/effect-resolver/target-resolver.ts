@@ -306,16 +306,25 @@ export function computeAllValidTargets(
       return state.players[opp].characters.filter(Boolean).map((c) => c!.instanceId);
     }
     case "CHARACTER":
-    case "LEADER_OR_CHARACTER": {
+    case "LEADER_OR_CHARACTER":
+    case "FIELD_CARD": {
+      // FIELD_CARD = leader + characters + stage ("your cards" on the field).
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : -1;
+      const includeLeader = targetType === "LEADER_OR_CHARACTER" || targetType === "FIELD_CARD";
       let candidates: CardInstance[] = [];
       if (pi === -1) {
         candidates = [...state.players[0].characters.filter(Boolean) as CardInstance[], ...state.players[1].characters.filter(Boolean) as CardInstance[]];
-        if (targetType === "LEADER_OR_CHARACTER") candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
+        if (includeLeader) candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
+        if (targetType === "FIELD_CARD") {
+          candidates = [...candidates, ...[state.players[0].stage, state.players[1].stage].filter(Boolean) as CardInstance[]];
+        }
       } else {
         candidates = state.players[pi].characters.filter(Boolean) as CardInstance[];
-        if (targetType === "LEADER_OR_CHARACTER") candidates = [state.players[pi].leader, ...candidates];
+        if (includeLeader) candidates = [state.players[pi].leader, ...candidates];
+        if (targetType === "FIELD_CARD" && state.players[pi].stage) {
+          candidates = [...candidates, state.players[pi].stage as CardInstance];
+        }
       }
       if (target.filter) {
         candidates = candidates.filter((c) => {
@@ -603,9 +612,12 @@ export function resolveTargetInstances(
     }
 
     case "CHARACTER":
-    case "LEADER_OR_CHARACTER": {
+    case "LEADER_OR_CHARACTER":
+    case "FIELD_CARD": {
+      // FIELD_CARD = leader + characters + stage ("your cards" on the field).
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : -1;
+      const includeLeader = targetType === "LEADER_OR_CHARACTER" || targetType === "FIELD_CARD";
 
       let candidates: CardInstance[] = [];
       if (pi === -1) {
@@ -614,13 +626,19 @@ export function resolveTargetInstances(
           ...state.players[0].characters.filter(Boolean) as CardInstance[],
           ...state.players[1].characters.filter(Boolean) as CardInstance[],
         ];
-        if (targetType === "LEADER_OR_CHARACTER") {
+        if (includeLeader) {
           candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
+        }
+        if (targetType === "FIELD_CARD") {
+          candidates = [...candidates, ...[state.players[0].stage, state.players[1].stage].filter(Boolean) as CardInstance[]];
         }
       } else {
         candidates = state.players[pi].characters.filter(Boolean) as CardInstance[];
-        if (targetType === "LEADER_OR_CHARACTER") {
+        if (includeLeader) {
           candidates = [state.players[pi].leader, ...candidates];
+        }
+        if (targetType === "FIELD_CARD" && state.players[pi].stage) {
+          candidates = [...candidates, state.players[pi].stage as CardInstance];
         }
       }
 

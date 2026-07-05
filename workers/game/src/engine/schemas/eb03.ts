@@ -2117,7 +2117,7 @@ export const EB03_053_NAMI: EffectSchema = {
         },
         {
           type: "LIFE_TO_HAND",
-          target: { type: "OPPONENT_LIFE" },
+          target: { type: "OPPONENT_LIFE", controller: "OPPONENT" },
           params: { amount: 1, position: "TOP" },
           chain: "THEN",
           conditions: {

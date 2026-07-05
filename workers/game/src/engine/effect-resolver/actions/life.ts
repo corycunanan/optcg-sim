@@ -201,7 +201,9 @@ export function executeLifeToHand(
   const params = action.params ?? {};
   const amount = (params.amount as number) ?? 1;
   const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
-  const targetController = (action.target?.controller === "OPPONENT")
+  // The OPPONENT_LIFE target type implies the opponent even without an
+  // explicit controller (same convention as executeReorderAllLife).
+  const targetController = (action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT")
     ? (controller === 0 ? 1 : 0) as 0 | 1
     : controller;
   const p = state.players[targetController];
@@ -488,6 +490,7 @@ export function executePlayFromLife(
         zone: "CHARACTER",
         source: "LIFE",
         playedRested: entryState === "RESTED",
+        sourceZone: "LIFE",
       },
     });
 

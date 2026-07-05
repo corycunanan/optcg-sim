@@ -197,7 +197,7 @@ export interface GameEventPayloadMap {
   PHASE_CHANGED: { from: string; to: string };
   TURN_STARTED: Record<string, never>;
   TURN_ENDED: Record<string, never>;
-  CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean };
+  CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
   CARD_KO: { cardInstanceId: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
   CARD_TRASHED: { cardId?: string; cardInstanceId?: string; count?: number; reason: string; from?: string };
@@ -448,7 +448,7 @@ export type GameAction =
   | { type: "USE_COUNTER"; cardInstanceId: string; counterTargetInstanceId: string }
   | { type: "USE_COUNTER_EVENT"; cardInstanceId: string; counterTargetInstanceId: string }
   | { type: "REVEAL_TRIGGER"; reveal: boolean }  // true = reveal and activate, false = add to hand
-  | { type: "ARRANGE_TOP_CARDS"; keptCardInstanceId: string; orderedInstanceIds: string[]; destination: "top" | "bottom" }
+  | { type: "ARRANGE_TOP_CARDS"; keptCardInstanceId: string; keptCardInstanceIds?: string[]; orderedInstanceIds: string[]; destination: "top" | "bottom" }
   | { type: "SELECT_TARGET"; selectedInstanceIds: string[] }
   | {
       type: "REDISTRIBUTE_DON";
@@ -543,6 +543,8 @@ export interface ArrangeTopCardsPrompt {
   canSendToBottom: boolean;
   validTargets?: string[];
   restDestination?: string;
+  /** How many cards may be kept/picked ("play up to N"). Defaults to 1. */
+  maxKeep?: number;
 }
 
 export interface SelectTargetPrompt {

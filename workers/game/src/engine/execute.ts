@@ -24,7 +24,7 @@ import {
   executeRevealTrigger,
 } from "./battle.js";
 import { resolveEffect } from "./effect-resolver/index.js";
-import type { EffectSchema } from "./effect-types.js";
+import { isOncePerTurnBlock, type EffectSchema } from "./effect-types.js";
 
 export function execute(
   state: GameState,
@@ -117,13 +117,13 @@ function executePlayCard(
       nextState = { ...nextState, players: newPlayers };
     }
 
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER", source: "FROM_HAND" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER", source: "FROM_HAND", sourceZone: "HAND" } });
 
   } else if (cardData.type === "Event") {
     // Trash the event, then resolve its MAIN_EVENT effect block directly
     nextState = moveCard(nextState, cardInstanceId, "TRASH");
     const newEventInstance = nextState.players[pi].trash[0]; // trash is LIFO, newest at [0]
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH", source: "FROM_HAND" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH", source: "FROM_HAND", sourceZone: "HAND" } });
     // OPT-236 class 1: distinct event for "Event [Main] activated from hand".
     // Watchers subscribing to EVENT_ACTIVATED_FROM_HAND (Usopp-style) fire here
     // and NOT on class 2 (from trash) or class 3 (from life trigger).
@@ -156,7 +156,7 @@ function executePlayCard(
     }
     nextState = moveCard(nextState, cardInstanceId, "STAGE");
     const newStageInstance = nextState.players[pi].stage!;
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newStageInstance.instanceId, zone: "STAGE", source: "FROM_HAND" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newStageInstance.instanceId, zone: "STAGE", source: "FROM_HAND", sourceZone: "HAND" } });
   }
 
   return { state: nextState, events };
@@ -250,7 +250,7 @@ function executeActivateEffect(
   }
 
   // Check once-per-turn restriction
-  if (block.flags?.once_per_turn) {
+  if (isOncePerTurnBlock(block)) {
     const usedSet = state.turn.oncePerTurnUsed[block.id];
     if (usedSet?.includes(cardInstanceId)) {
       return { state, events };

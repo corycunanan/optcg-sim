@@ -102,6 +102,8 @@ interface ArrangeTopCardsModalProps {
   canSendToBottom: boolean;
   /** If provided, only these instanceIds may be selected to add to hand */
   validTargets?: string[];
+  /** How many cards may be kept ("up to N"). Defaults to 1. */
+  maxKeep?: number;
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -113,6 +115,7 @@ export function ArrangeTopCardsModal({
   effectDescription,
   canSendToBottom,
   validTargets,
+  maxKeep = 1,
   cardDb,
   isHidden,
   onHide,
@@ -121,7 +124,7 @@ export function ArrangeTopCardsModal({
   const [step, setStep] = useState<1 | 2>(1);
   const [orderedCards, setOrderedCards] = useState<CardInstance[]>(initialCards);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [keptCardInstanceId, setKeptCardInstanceId] = useState<string | null>(null);
+  const [keptIds, setKeptIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion() ?? false;
@@ -155,21 +158,22 @@ export function ArrangeTopCardsModal({
 
   function handleAddToHand() {
     if (!selectedId) return;
-    setKeptCardInstanceId(selectedId);
+    const next = [...keptIds, selectedId];
+    setKeptIds(next);
     setOrderedCards((prev) => prev.filter((c) => c.instanceId !== selectedId));
     setSelectedId(null);
-    setStep(2);
+    if (next.length >= maxKeep) setStep(2);
   }
 
   function handleSkip() {
-    setKeptCardInstanceId("");
     setStep(2);
   }
 
   function handleSend(destination: "top" | "bottom") {
     onAction({
       type: "ARRANGE_TOP_CARDS",
-      keptCardInstanceId: keptCardInstanceId ?? "",
+      keptCardInstanceId: keptIds[0] ?? "",
+      keptCardInstanceIds: keptIds,
       orderedInstanceIds: orderedCards.map((c) => c.instanceId),
       destination,
     });
@@ -277,9 +281,9 @@ export function ArrangeTopCardsModal({
         <DialogFooter className="flex-row items-center justify-end gap-2 px-4 py-3 border-t border-gb-border pt-3">
           {step === 1 && (
             <>
-              {validTargets !== undefined && (
+              {(validTargets !== undefined || maxKeep > 1) && (
                 <GameButton variant="secondary" size="sm" onClick={handleSkip}>
-                  Keep None
+                  {keptIds.length > 0 ? "Done" : "Keep None"}
                 </GameButton>
               )}
               <GameButton
@@ -288,7 +292,7 @@ export function ArrangeTopCardsModal({
                 disabled={!selectedId}
                 onClick={handleAddToHand}
               >
-                Add to Hand
+                {maxKeep > 1 ? `Take (${keptIds.length}/${maxKeep})` : "Add to Hand"}
               </GameButton>
             </>
           )}

@@ -24,6 +24,7 @@ import type {
   RuntimeRegisteredTrigger,
   RuntimeProhibition,
 } from "./effect-types.js";
+import { isOncePerTurnBlock } from "./effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -364,7 +365,7 @@ export function matchTriggersForEvent(
     // `oncePerTurnUsed` bag. once_per_turn writes on accept; lock_on_decline
     // writes on decline (OPT-244). Either flag's presence means we skip if
     // the source has been recorded used this turn.
-    if (reg.effectBlock.flags?.once_per_turn || reg.effectBlock.flags?.lock_on_decline) {
+    if (isOncePerTurnBlock(reg.effectBlock) || reg.effectBlock.flags?.lock_on_decline) {
       const usedSet = state.turn.oncePerTurnUsed[reg.effectBlockId];
       if (usedSet?.includes(reg.sourceCardInstanceId)) continue;
     }
@@ -710,9 +711,14 @@ function matchesEventFilter(
   }
 
   if (filter.source_zone) {
-    const cardId = "cardInstanceId" in event.payload ? (event.payload as { cardInstanceId?: string }).cardInstanceId : undefined;
-    if (cardId) {
-      const card = findCardInstance(state, cardId);
+    // Play events stamp the origin zone on the payload (the instance's
+    // current zone is the destination by the time triggers match). Fall back
+    // to the current zone for events without an origin stamp.
+    const payload = event.payload as { cardInstanceId?: string; sourceZone?: string };
+    if (payload.sourceZone) {
+      if (payload.sourceZone !== filter.source_zone) return false;
+    } else if (payload.cardInstanceId) {
+      const card = findCardInstance(state, payload.cardInstanceId);
       if (card && card.zone !== filter.source_zone) return false;
     }
   }

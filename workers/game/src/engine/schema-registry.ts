@@ -27,6 +27,7 @@ import { OP12_SCHEMAS } from "./schemas/op12.js";
 import { OP13_SCHEMAS } from "./schemas/op13.js";
 import { OP14_SCHEMAS } from "./schemas/op14.js";
 import { OP15_SCHEMAS } from "./schemas/op15.js";
+import { OP16_SCHEMAS } from "./schemas/op16.js";
 import { EB01_SCHEMAS } from "./schemas/eb01.js";
 import { EB02_SCHEMAS } from "./schemas/eb02.js";
 import { EB03_SCHEMAS } from "./schemas/eb03.js";
@@ -62,6 +63,7 @@ import { ST26_SCHEMAS } from "./schemas/st26.js";
 import { ST27_SCHEMAS } from "./schemas/st27.js";
 import { ST28_SCHEMAS } from "./schemas/st28.js";
 import { ST29_SCHEMAS } from "./schemas/st29.js";
+import { ST30_SCHEMAS } from "./schemas/st30.js";
 import { P_SCHEMAS } from "./schemas/p.js";
 
 /** All pre-authored schemas, keyed by card ID */
@@ -81,6 +83,7 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...OP13_SCHEMAS,
   ...OP14_SCHEMAS,
   ...OP15_SCHEMAS,
+  ...OP16_SCHEMAS,
   ...EB01_SCHEMAS,
   ...EB02_SCHEMAS,
   ...EB03_SCHEMAS,
@@ -116,6 +119,7 @@ const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
   ...ST27_SCHEMAS,
   ...ST28_SCHEMAS,
   ...ST29_SCHEMAS,
+  ...ST30_SCHEMAS,
   ...P_SCHEMAS,
 };
 

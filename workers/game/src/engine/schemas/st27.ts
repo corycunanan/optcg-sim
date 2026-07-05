@@ -24,7 +24,7 @@ export const ST27_001_AVALO_PIZARRO: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [
-        { type: "REST_CARDS", amount: 1, filter: { name: "Fullalead" } },
+        { type: "REST_CARDS", amount: 1, filter: { name: "Fullalead", card_type: "STAGE" } },
       ],
       conditions: {
         type: "LEADER_PROPERTY",

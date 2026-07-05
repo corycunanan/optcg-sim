@@ -28,21 +28,24 @@ import { nanoid } from "../../../util/nanoid.js";
  */
 function computeArrangeContext(
   deck: CardInstance[],
-  keptId: string | undefined,
+  keptIds: string | string[] | undefined,
   ordered: string[],
 ): {
   restOfDeck: CardInstance[];
   arrangedCards: CardInstance[];
   kept: CardInstance | undefined;
+  keptCards: CardInstance[];
 } {
-  const removedIds = new Set<string>(ordered);
-  if (keptId) removedIds.add(keptId);
+  const keptList = (keptIds === undefined ? [] : Array.isArray(keptIds) ? keptIds : [keptIds]).filter(Boolean);
+  const removedIds = new Set<string>([...ordered, ...keptList]);
   const restOfDeck = deck.filter((c) => !removedIds.has(c.instanceId));
   const arrangedCards = ordered
     .map((id) => deck.find((c) => c.instanceId === id))
     .filter(Boolean) as CardInstance[];
-  const kept = keptId ? deck.find((c) => c.instanceId === keptId) : undefined;
-  return { restOfDeck, arrangedCards, kept };
+  const keptCards = keptList
+    .map((id) => deck.find((c) => c.instanceId === id))
+    .filter(Boolean) as CardInstance[];
+  return { restOfDeck, arrangedCards, kept: keptCards[0], keptCards };
 }
 
 /**
@@ -167,6 +170,7 @@ export function handleArrangeSearchAndPlay(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
+  validTargets?: string[],
 ): GameState | null {
   if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "SEARCH_AND_PLAY") {
     return null;
@@ -177,20 +181,37 @@ export function handleArrangeSearchAndPlay(
   const shuffleAfter = sap.shuffle_after ?? false;
   const searchFullDeck = sap.search_full_deck ?? false;
   const entryState = sap.entry_state ?? "ACTIVE";
+  const pickLimit = sap.pick?.up_to ?? 1;
 
   const p = state.players[controller];
-  const keptId = action.keptCardInstanceId;
-  const ordered = action.orderedInstanceIds ?? [];
+  // Multi-pick ("play up to N"): the client sends keptCardInstanceIds; the
+  // legacy single keptCardInstanceId remains the fallback. Enforce the
+  // filter's validTargets and the pick limit server-side.
+  const requestedKept = action.keptCardInstanceIds?.length
+    ? action.keptCardInstanceIds
+    : (action.keptCardInstanceId ? [action.keptCardInstanceId] : []);
+  const searchValid = validTargets ?? [];
+  const keptIds = [...new Set(requestedKept)]
+    .filter((id) => searchValid.length === 0 || searchValid.includes(id))
+    .slice(0, pickLimit);
+  const ordered = (action.orderedInstanceIds ?? []).filter((id) => !keptIds.includes(id));
 
-  const { restOfDeck, arrangedCards, kept } = computeArrangeContext(p.deck, keptId, ordered);
+  const { restOfDeck, arrangedCards, keptCards } = computeArrangeContext(p.deck, keptIds, ordered);
 
-  // Play kept card to field (CHARACTER or STAGE zone)
+  // Play each kept card to the field (CHARACTER or STAGE zone)
   const newCharacters = [...p.characters] as (typeof p.characters);
   let newStage = p.stage;
   let newTrash = [...p.trash];
-  if (keptId && kept) {
+  const unplayable: CardInstance[] = [];
+  for (const kept of keptCards) {
     const data = cardDb.get(kept.cardId);
     if (data && data.type.toUpperCase() === "CHARACTER") {
+      const charSlot = newCharacters.indexOf(null);
+      if (charSlot === -1) {
+        // Character area full — the card joins the rest pile instead of vanishing.
+        unplayable.push(kept);
+        continue;
+      }
       const newChar: CardInstance = {
         ...kept,
         instanceId: nanoid(),
@@ -201,8 +222,7 @@ export function handleArrangeSearchAndPlay(
         controller,
         owner: controller,
       };
-      const charSlot = newCharacters.indexOf(null);
-      if (charSlot !== -1) newCharacters[charSlot] = newChar;
+      newCharacters[charSlot] = newChar;
       events.push({
         type: "CARD_PLAYED",
         playerIndex: controller,
@@ -212,6 +232,7 @@ export function handleArrangeSearchAndPlay(
           zone: "CHARACTER",
           source: "search_and_play",
           playedRested: entryState === "RESTED",
+          sourceZone: "DECK",
         },
       });
     } else if (data && data.type.toUpperCase() === "STAGE") {
@@ -232,17 +253,19 @@ export function handleArrangeSearchAndPlay(
       events.push({
         type: "CARD_PLAYED",
         playerIndex: controller,
-        payload: { cardInstanceId: newStage.instanceId, cardId: kept.cardId, zone: "STAGE", source: "search_and_play" },
+        payload: { cardInstanceId: newStage.instanceId, cardId: kept.cardId, zone: "STAGE", source: "search_and_play", sourceZone: "DECK" },
       });
     }
   }
 
   let newDeck: CardInstance[];
   if (searchFullDeck) {
-    newDeck = restOfDeck;
+    // restOfDeck excludes every orderedInstanceId, so arranged-but-unkept
+    // cards must rejoin the deck here or they vanish from the game.
+    newDeck = [...restOfDeck, ...arrangedCards, ...unplayable];
   } else {
     const destination = action.destination ?? restDest.toLowerCase();
-    newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
+    newDeck = placeArrangedInDeck(restOfDeck, [...arrangedCards, ...unplayable], destination);
   }
 
   if (shuffleAfter) {

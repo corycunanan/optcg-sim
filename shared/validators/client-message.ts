@@ -79,6 +79,9 @@ const ArrangeTopCards = z
     // valid targets (e.g. Kujyaku reveals top 5 with no Navy cards) or when
     // the player chooses to skip a SEARCH_DECK pick.
     keptCardInstanceId: z.string(),
+    // Multi-pick responses ("play up to N" — OP16-059): the picked instance
+    // ids. When present, the server prefers this over keptCardInstanceId.
+    keptCardInstanceIds: z.array(id()).optional(),
     orderedInstanceIds: z.array(id()),
     destination: z.enum(["top", "bottom"]),
   })

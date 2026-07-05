@@ -203,7 +203,7 @@ function replacementMatchesTarget(
     const targetCard = findCardInstance(state, targetInstanceId);
     if (!targetCard) return false;
     if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
-    if (!matchesFilter(targetCard, params.target_filter, cardDb, state)) return false;
+    if (!matchesFilter(targetCard, params.target_filter, cardDb, state, undefined, undefined, effect.controller)) return false;
   }
 
   if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {
@@ -406,11 +406,12 @@ function canPayReplacementCost(
   for (const action of actions) {
     if (action.type === "TRASH_FROM_HAND") {
       const amount = (action.params?.amount as number) ?? 1;
-      const filter = action.params?.filter as Record<string, unknown> | undefined;
+      const filter = (action.target?.filter ?? action.params?.filter) as TargetFilter | undefined;
 
       if (filter) {
-        // Count cards in hand matching the filter
-        const matching = player.hand.filter((c) => matchesCardFilter(c, filter, cardDb));
+        const matching = player.hand.filter((c) =>
+          matchesFilter(c, filter, cardDb, state, undefined, undefined, controller),
+        );
         if (matching.length < amount) return false;
       } else {
         if (player.hand.length < amount) return false;
@@ -447,6 +448,19 @@ function canExecuteReplacementSubstitute(
       // Bandai rulings, if every Life is already face-up (or Life is empty)
       // the replacement is infeasible — the removal proceeds as written.
       if (!canTurnLifeFaceUpSucceed(state, effect)) return false;
+    } else if (action.type === "REST_DON") {
+      const amount = (action.params?.amount as number) ?? 1;
+      const activeDon = state.players[effect.controller].donCostArea.filter((d) => d.state === "ACTIVE").length;
+      if (activeDon < amount) return false;
+    } else if (action.type === "PLAYER_CHOICE") {
+      // Choice-of-payments substitute (e.g. OP16-033 Morley "rest 2 of your
+      // cards" = field cards and/or DON). Feasible if at least one non-empty
+      // branch is fully feasible.
+      const options = (action.params?.options as Action[][]) ?? [];
+      const anyFeasible = options.some(
+        (branch) => branch.length > 0 && canExecuteReplacementSubstitute(state, effect, branch, cardDb),
+      );
+      if (!anyFeasible) return false;
     }
     // Other substitute types (TRASH_CARD, RETURN_TO_HAND, MODIFY_POWER, …):
     // default to feasible. Add explicit checks here as card interactions
@@ -473,13 +487,17 @@ function canSetRestSucceed(
   }
 
   // Filter path (e.g. Pica: rest another cost-3+ character instead).
+  // `exact: N` payments (e.g. Morley's rest-2) need N usable candidates.
+  const needed = target.count && "exact" in target.count ? target.count.exact : 1;
   const candidates = collectSubstituteCandidates(state, target, effect.controller);
+  let usable = 0;
   for (const candidate of candidates) {
     if (candidate.state !== "ACTIVE") continue;
     if (target.filter?.exclude_self && candidate.instanceId === effect.sourceCardInstanceId) continue;
     if (isProhibitedForCard(state, candidate.instanceId, "CANNOT_BE_RESTED", cardDb)) continue;
     if (target.filter && !matchesFilter(candidate, target.filter, cardDb, state)) continue;
-    return true;
+    usable++;
+    if (usable >= needed) return true;
   }
   return false;
 }
@@ -500,11 +518,14 @@ function collectSubstituteCandidates(
   const opp = replacementController === 0 ? 1 : 0;
   const pickChars = (pi: 0 | 1) => state.players[pi].characters.filter(Boolean) as CardInstance[];
   const pickLeader = (pi: 0 | 1) => state.players[pi].leader;
-  const includeLeader = target.type === "LEADER_OR_CHARACTER";
+  const includeLeader = target.type === "LEADER_OR_CHARACTER" || target.type === "FIELD_CARD";
 
   const gather = (pi: 0 | 1): CardInstance[] => {
     const chars = pickChars(pi);
-    return includeLeader ? [pickLeader(pi), ...chars] : chars;
+    const base = includeLeader ? [pickLeader(pi), ...chars] : chars;
+    return target.type === "FIELD_CARD" && state.players[pi].stage
+      ? [...base, state.players[pi].stage as CardInstance]
+      : base;
   };
 
   if (scope === "OPPONENT") return gather(opp);
@@ -857,17 +878,23 @@ export function processBatchReplacements(
   state: GameState,
   targetIds: string[],
   actionKind: BatchActionKind,
-  event: ReplacementEvent,
+  event: ReplacementEvent | ReplacementEvent[],
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
   returnToDeckPosition?: "TOP" | "BOTTOM",
 ): BatchResumeResult {
-  const matches = scanReplacementsForBatch(state, targetIds, event, cause, causingController, cardDb);
+  // Multiple events: scan each in order (specific first, e.g. WOULD_BE_KO
+  // before WOULD_BE_REMOVED_FROM_FIELD / WOULD_LEAVE_FIELD). A replacement
+  // effect registers for exactly one trigger, so no match can duplicate.
+  const eventList = Array.isArray(event) ? event : [event];
+  const matches = eventList.flatMap((e) =>
+    scanReplacementsForBatch(state, targetIds, e, cause, causingController, cardDb),
+  );
   const ctx: ReplacementBatchResumeContext = {
     type: "REPLACEMENT_BATCH",
     actionKind,
-    event,
+    event: eventList[0],
     allTargetIds: targetIds,
     protectedIds: [],
     pendingMatches: matches,
@@ -964,4 +991,3 @@ export function resumeReplacementBatch(
     unprotectedIds: rest.unprotectedIds,
   };
 }
-

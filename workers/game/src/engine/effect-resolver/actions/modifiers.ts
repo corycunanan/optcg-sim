@@ -359,7 +359,11 @@ export function executeCopyPower(
   const sourceCard = findCardInstance(state, sourceIds[0]);
   const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   if (!sourceCard || !sourceData) return { state, events, succeeded: false };
-  const sourcePower = getEffectivePower(sourceCard, sourceData, state, cardDb);
+  // source_power: "BASE" copies the source's printed power, ignoring active
+  // modifiers ("base power becomes the same as…", e.g. OP16-036).
+  const sourcePower = params.source_power === "BASE"
+    ? sourceData.power ?? 0
+    : getEffectivePower(sourceCard, sourceData, state, cardDb);
 
   // Apply copied power to self or action target
   const selfTarget = action.target ?? { type: "SELF" };

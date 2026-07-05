@@ -426,15 +426,19 @@ export function returnAttachedDonToCostArea(
 
 /**
  * During Refresh Phase step 4: set all rested cards and cost area DON!! to active.
+ * Cards in `skipInstanceIds` stay rested (CANNOT_REFRESH prohibitions).
  */
 export function activateAllRested(
   state: GameState,
   playerIndex: 0 | 1,
+  skipInstanceIds?: ReadonlySet<string>,
 ): GameState {
   const player = state.players[playerIndex];
 
   const activate = (card: CardInstance): CardInstance =>
-    card.state === "RESTED" ? { ...card, state: "ACTIVE" } : card;
+    card.state === "RESTED" && !skipInstanceIds?.has(card.instanceId)
+      ? { ...card, state: "ACTIVE" }
+      : card;
 
   const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
   newPlayers[playerIndex] = {

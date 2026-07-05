@@ -38,7 +38,7 @@ import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
 
-import { ALL_ACTION_TYPES, TRIGGERING_CARD_REF, type ActionType } from "../effect-types.js";
+import { ALL_ACTION_TYPES, TRIGGERING_CARD_REF, isOncePerTurnBlock, type ActionType } from "../effect-types.js";
 
 // ─── Action dispatcher map ───────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ export function resolveEffect(
   };
 
   // Guard: reject once-per-turn effects already used this turn
-  if (block.flags?.once_per_turn) {
+  if (isOncePerTurnBlock(block)) {
     const usedSet = state.turn.oncePerTurnUsed[block.id];
     if (usedSet?.includes(sourceCardInstanceId)) {
       log("effect.skipped", { ...logCtx, reason: "once_per_turn_used" });
@@ -287,7 +287,7 @@ export function resolveEffect(
   }
 
   // Mark once-per-turn as used
-  if (block.flags?.once_per_turn) {
+  if (isOncePerTurnBlock(block)) {
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
   }
 
