@@ -216,6 +216,50 @@ describe("validateClientMessage — ARRANGE_TOP_CARDS", () => {
     ).toBeTruthy();
   });
 
+  // OP16-059-style multi-pick ("play up to 2"): the modal sends the picked
+  // ids in keptCardInstanceIds alongside the legacy single-pick field.
+  it("accepts keptCardInstanceIds (multi-pick)", () => {
+    expect(
+      validateClientMessage(
+        wrap({
+          type: "ARRANGE_TOP_CARDS",
+          keptCardInstanceId: "",
+          keptCardInstanceIds: ["k1", "k2"],
+          orderedInstanceIds: ["a", "b", "c"],
+          destination: "bottom",
+        }),
+      ),
+    ).toBeTruthy();
+  });
+
+  it("accepts empty keptCardInstanceIds (multi-pick skip)", () => {
+    expect(
+      validateClientMessage(
+        wrap({
+          type: "ARRANGE_TOP_CARDS",
+          keptCardInstanceId: "",
+          keptCardInstanceIds: [],
+          orderedInstanceIds: ["a", "b", "c"],
+          destination: "bottom",
+        }),
+      ),
+    ).toBeTruthy();
+  });
+
+  it("rejects keptCardInstanceIds of wrong type", () => {
+    expect(() =>
+      validateClientMessage(
+        wrap({
+          type: "ARRANGE_TOP_CARDS",
+          keptCardInstanceId: "",
+          keptCardInstanceIds: [1, 2],
+          orderedInstanceIds: [],
+          destination: "top",
+        }),
+      ),
+    ).toThrow();
+  });
+
   it("rejects invalid destination", () => {
     expect(() =>
       validateClientMessage(
