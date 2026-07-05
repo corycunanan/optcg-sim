@@ -19,6 +19,7 @@ import {
   processScheduledActions,
 } from "./duration-tracker.js";
 import { resolveEffect } from "./effect-resolver/index.js";
+import { applyRefreshProhibitions } from "./prohibitions.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
@@ -46,8 +47,10 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
       // Step 3: Return attached DON!! to cost area (rested)
       nextState = returnAttachedDonToCostArea(nextState, pi);
       events.push({ type: "DON_DETACHED", playerIndex: pi });
-      // Step 4: Activate all rested cards
-      nextState = activateAllRested(nextState, pi);
+      // Step 4: Activate all rested cards — except those held rested by a
+      // CANNOT_REFRESH prohibition, which is consumed by the refresh it skips
+      const refreshProhib = applyRefreshProhibitions(nextState, pi, cardDb);
+      nextState = activateAllRested(refreshProhib.nextState, pi, refreshProhib.skipInstanceIds);
       // Advance to DRAW
       nextState = { ...nextState, turn: { ...nextState.turn, phase: "DRAW" } };
       events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "REFRESH", to: "DRAW" } });

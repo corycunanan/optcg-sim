@@ -917,7 +917,6 @@ export const OP16_041_BUGGY: EffectSchema = {
         event: "CHARACTER_REMOVED_FROM_FIELD",
         filter: { controller: "SELF", target_filter: { card_type: "CHARACTER", traits: ["Impel Down"] } },
         don_requirement: 1,
-        once_per_turn: true,
       },
       actions: [
         {
@@ -926,7 +925,7 @@ export const OP16_041_BUGGY: EffectSchema = {
           params: { source_zone: "HAND", cost_override: "FREE" },
         },
       ],
-      flags: { optional: true },
+      flags: { optional: true, once_per_turn: true },
     },
   ],
 };
@@ -1027,7 +1026,7 @@ export const OP16_048_BUGGY: EffectSchema = {
     {
       id: "opponent_attack_grant_blocker",
       category: "auto",
-      trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
+      trigger: { keyword: "ON_OPPONENT_ATTACK" },
       actions: [
         {
           type: "GRANT_KEYWORD",
@@ -1036,7 +1035,7 @@ export const OP16_048_BUGGY: EffectSchema = {
           duration: { type: "THIS_TURN" },
         },
       ],
-      flags: { optional: true },
+      flags: { optional: true, once_per_turn: true },
     },
   ],
 };
@@ -1658,7 +1657,7 @@ export const OP16_080_MARSHALL_D_TEACH: EffectSchema = {
     {
       id: "opponent_attack_redirect",
       category: "auto",
-      trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
+      trigger: { keyword: "ON_OPPONENT_ATTACK" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1, filter: { has_trigger: true } }],
       actions: [
         {
@@ -1671,7 +1670,7 @@ export const OP16_080_MARSHALL_D_TEACH: EffectSchema = {
           },
         },
       ],
-      flags: { optional: true },
+      flags: { optional: true, once_per_turn: true },
     },
   ],
 };
@@ -2111,7 +2110,7 @@ export const OP16_102_AVALO_PIZARRO: EffectSchema = {
         { type: "DRAW", params: { amount: 1 } },
         {
           type: "PLAY_CARD",
-          target: { type: "CHARACTER_CARD", source_zone: ["HAND", "TRASH"], count: { up_to: 1 }, filter: { name: "Fullalead" } },
+          target: { type: "STAGE_CARD", source_zone: ["HAND", "TRASH"], count: { up_to: 1 }, filter: { name: "Fullalead" } },
           params: { source_zone: "HAND_OR_TRASH", cost_override: "FREE" },
           chain: "THEN",
         },
@@ -2217,7 +2216,7 @@ export const OP16_107_JESUS_BURGESS: EffectSchema = {
       id: "on_ko_opponent_life_to_hand",
       category: "auto",
       trigger: { keyword: "ON_KO" },
-      actions: [{ type: "LIFE_TO_HAND", target: { type: "OPPONENT_LIFE" }, params: { amount: 1, position: "TOP" } }],
+      actions: [{ type: "LIFE_TO_HAND", target: { type: "OPPONENT_LIFE", controller: "OPPONENT" }, params: { amount: 1, position: "TOP" } }],
     },
     {
       id: "trigger_trash_play_self",
@@ -2380,7 +2379,7 @@ export const OP16_116_ZEHAHAHAHAHA: EffectSchema = {
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Marshall.D.Teach" } },
           params: { source_zone: "HAND", cost_override: "FREE" },
         },
-        { type: "LIFE_TO_HAND", target: { type: "OPPONENT_LIFE" }, params: { amount: 1, position: "TOP" }, chain: "THEN" },
+        { type: "LIFE_TO_HAND", target: { type: "OPPONENT_LIFE", controller: "OPPONENT" }, params: { amount: 1, position: "TOP" }, chain: "THEN" },
       ],
     },
     { id: "trigger_draw_trash", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [{ type: "DRAW", params: { amount: 2 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" }] },

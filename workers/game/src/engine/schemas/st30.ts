@@ -368,7 +368,7 @@ export const ST30_015_THE_NAME_OF_THIS_ERA_IS_WHITEBEARD: EffectSchema = {
   effects: [
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "CARD_ON_FIELD",
@@ -415,7 +415,7 @@ export const ST30_016_CAN_YOU_STILL_FIGHT_LUFFY: EffectSchema = {
   effects: [
     {
       id: "counter_power_then_draw",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

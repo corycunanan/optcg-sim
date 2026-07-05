@@ -289,6 +289,11 @@ function computeProhibitionExpiry(
       return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
     case "PERMANENT":
       return { wave: "SOURCE_LEAVES_ZONE" };
+    case "SKIP_NEXT_REFRESH":
+      // Consumed by the Refresh Phase it skips (applyRefreshProhibitions),
+      // not by an expiry wave — END_OF_TURN would cull it before the
+      // opponent's refresh ever happens.
+      return { wave: "NEVER" };
     default:
       return { wave: "END_OF_TURN", turn: state.turn.number };
   }
