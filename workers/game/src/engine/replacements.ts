@@ -203,7 +203,7 @@ function replacementMatchesTarget(
     const targetCard = findCardInstance(state, targetInstanceId);
     if (!targetCard) return false;
     if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
-    if (!matchesFilter(targetCard, params.target_filter, cardDb, state)) return false;
+    if (!matchesFilter(targetCard, params.target_filter, cardDb, state, undefined, undefined, effect.controller)) return false;
   }
 
   if (params.cause_filter && !matchesCauseFilter(params.cause_filter, cause, causingController, effect.controller)) {
@@ -406,11 +406,12 @@ function canPayReplacementCost(
   for (const action of actions) {
     if (action.type === "TRASH_FROM_HAND") {
       const amount = (action.params?.amount as number) ?? 1;
-      const filter = action.params?.filter as Record<string, unknown> | undefined;
+      const filter = (action.target?.filter ?? action.params?.filter) as TargetFilter | undefined;
 
       if (filter) {
-        // Count cards in hand matching the filter
-        const matching = player.hand.filter((c) => matchesCardFilter(c, filter, cardDb));
+        const matching = player.hand.filter((c) =>
+          matchesFilter(c, filter, cardDb, state, undefined, undefined, controller),
+        );
         if (matching.length < amount) return false;
       } else {
         if (player.hand.length < amount) return false;
@@ -964,4 +965,3 @@ export function resumeReplacementBatch(
     unprotectedIds: rest.unprotectedIds,
   };
 }
-

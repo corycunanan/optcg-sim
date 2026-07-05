@@ -2981,6 +2981,39 @@ export const P_117_NAMI: EffectSchema = {
   ],
 };
 
+// ─── P-135 Monkey.D.Luffy (Character) — Blocker + rest opponent cost 5 or less
+// [Blocker]
+// [On Play] Rest up to 1 of your opponent's Characters with a cost of 5 or less.
+
+export const P_135_MONKEY_D_LUFFY: EffectSchema = {
+  card_id: "P-135",
+  card_name: "Monkey.D.Luffy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "blocker",
+      category: "permanent",
+      flags: { keywords: ["BLOCKER"] },
+    },
+    {
+      id: "on_play_rest_cost_5",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "SET_REST",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 5 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3077,4 +3110,5 @@ export const P_SCHEMAS: Record<string, EffectSchema> = {
   "P-113": P_113_JEWELRY_BONNEY,
   "P-115": P_115_BOA_HANCOCK,
   "P-117": P_117_NAMI,
+  "P-135": P_135_MONKEY_D_LUFFY,
 };

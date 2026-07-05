@@ -210,6 +210,7 @@ export type SimpleCondition =
   | FieldPurityCondition
   | LeaderPropertyCondition
   | SelfPowerCondition
+  | SelfCostCondition
   | SelfStateCondition
   | NoBaseEffectCondition
   | HasEffectTypeCondition
@@ -322,10 +323,17 @@ export type LeaderPropertyCheck =
   | { trait_contains: string }
   | { attribute: Attribute }
   | { name: string }
+  | { name_includes: string }
   | { multicolored: boolean };
 
 export interface SelfPowerCondition {
   type: "SELF_POWER";
+  operator: NumericOperator;
+  value: number;
+}
+
+export interface SelfCostCondition {
+  type: "SELF_COST";
   operator: NumericOperator;
   value: number;
 }
@@ -851,6 +859,10 @@ export type CountMode =
 export type SourceZone = "HAND" | "TRASH" | "DECK" | "DECK_TOP" | "LIFE" | "FIELD" | "DON_DECK";
 
 export interface TargetFilter {
+  // Controller scoping for filters used outside Target.controller, especially
+  // replacement target_filter ("your Character would be...").
+  controller?: Controller;
+
   // Cost filters
   cost_exact?: number | DynamicValue;
   cost_min?: number | DynamicValue;

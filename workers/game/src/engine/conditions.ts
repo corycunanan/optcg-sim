@@ -211,6 +211,10 @@ function evaluateSimple(
         if (cardTreatsAsAll(data, "names")) return true;
         return data.name === prop.name;
       }
+      if ("name_includes" in prop) {
+        if (cardTreatsAsAll(data, "names")) return true;
+        return data.name.includes(prop.name_includes as string);
+      }
       if ("multicolored" in prop) {
         const isMulti = data.color.length > 1;
         return prop.multicolored ? isMulti : !isMulti;
@@ -224,6 +228,14 @@ function evaluateSimple(
       const data = ctx.cardDb.get(card.cardId);
       if (!data) return false;
       return compareNum(getEffectivePower(card, data, state, ctx.cardDb), cond.operator, cond.value);
+    }
+
+    case "SELF_COST": {
+      const card = findInstanceById(state, ctx.sourceCardInstanceId);
+      if (!card) return false;
+      const data = ctx.cardDb.get(card.cardId);
+      if (!data) return false;
+      return compareNum(getEffectiveCost(data, state, card.instanceId, ctx.cardDb), cond.operator, cond.value);
     }
 
     case "SELF_STATE": {
@@ -593,17 +605,23 @@ export function matchesFilter(
   state: GameState,
   resultRefs?: Map<string, EffectResult>,
   costOverride?: number,
+  filterController?: 0 | 1,
 ): boolean {
   const data = cardDb.get(card.cardId);
   if (!data) return false;
+
+  if (filter.controller && filter.controller !== "ANY" && filter.controller !== "EITHER" && filterController !== undefined) {
+    const expected = filter.controller === "SELF" ? filterController : (1 - filterController) as 0 | 1;
+    if (card.controller !== expected) return false;
+  }
 
   // Disjunctive filter
   if (filter.any_of) {
     const baseFilter = { ...filter, any_of: undefined };
     const baseOk = Object.keys(baseFilter).filter((k) => baseFilter[k as keyof TargetFilter] !== undefined).length === 0
-      || matchesFilter(card, baseFilter, cardDb, state, resultRefs, costOverride);
+      || matchesFilter(card, baseFilter, cardDb, state, resultRefs, costOverride, filterController);
     if (!baseOk) return false;
-    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state, resultRefs, costOverride));
+    return filter.any_of.some((f) => matchesFilter(card, f, cardDb, state, resultRefs, costOverride, filterController));
   }
 
   // Cost filters — OPT-247: cost_* reads the EFFECTIVE (post-modifier) cost per
