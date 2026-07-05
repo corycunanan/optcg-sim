@@ -260,7 +260,9 @@ export function handleArrangeSearchAndPlay(
 
   let newDeck: CardInstance[];
   if (searchFullDeck) {
-    newDeck = [...restOfDeck, ...unplayable];
+    // restOfDeck excludes every orderedInstanceId, so arranged-but-unkept
+    // cards must rejoin the deck here or they vanish from the game.
+    newDeck = [...restOfDeck, ...arrangedCards, ...unplayable];
   } else {
     const destination = action.destination ?? restDest.toLowerCase();
     newDeck = placeArrangedInDeck(restOfDeck, [...arrangedCards, ...unplayable], destination);

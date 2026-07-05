@@ -100,4 +100,32 @@ describe("SEARCH_AND_PLAY multi-pick", () => {
     const next = handleArrangeSearchAndPlay(state, action, pausedAction, 0, cardDb, events, ["d1", "d2", "d3"]);
     expect(next!.players[0].characters.filter(Boolean).length).toBe(charsBefore + 1);
   });
+
+  // Regression: restOfDeck excludes every orderedInstanceId, so the
+  // full-deck-search branch must add the arranged-but-unkept cards back —
+  // previously they were silently deleted from the game.
+  it("full-deck search keeps arranged-but-unkept cards in the deck", () => {
+    const state = setup();
+    const deckBefore = state.players[0].deck.length;
+    const events: PendingEvent[] = [];
+    const fullDeckAction: Action = {
+      type: "SEARCH_AND_PLAY",
+      params: {
+        pick: { up_to: 1 },
+        filter: { traits: ["Impel Down"] },
+        search_full_deck: true,
+        shuffle_after: true,
+      },
+    };
+    const next = handleArrangeSearchAndPlay(
+      state, arrange(["d1"], ["d2", "d3"]), fullDeckAction, 0, cardDb, events, ["d1", "d2", "d3"],
+    );
+    expect(next).not.toBeNull();
+    // Only the kept card left the deck; the arranged rest stays in it.
+    expect(next!.players[0].deck.length).toBe(deckBefore - 1);
+    const deckIds = new Set(next!.players[0].deck.map((c) => c.instanceId));
+    expect(deckIds.has("d2")).toBe(true);
+    expect(deckIds.has("d3")).toBe(true);
+    expect(deckIds.has("d1")).toBe(false);
+  });
 });
