@@ -126,10 +126,15 @@ function evaluateSimple(
         if (cond.exclude_self && c.instanceId === ctx.sourceCardInstanceId) return false;
         return matchesFilter(c, cond.filter, ctx.cardDb, state);
       });
+      // unique_names: count distinct card names (OP16-038 "5 Characters with
+      // different card names"), not card instances.
+      const matchCount = cond.filter?.unique_names
+        ? new Set(matching.map((c) => ctx.cardDb.get(c.cardId)?.name ?? c.cardId)).size
+        : matching.length;
       if (cond.count) {
-        return compareNum(matching.length, cond.count.operator, cond.count.value);
+        return compareNum(matchCount, cond.count.operator, cond.count.value);
       }
-      return matching.length > 0;
+      return matchCount > 0;
     }
 
     case "MULTIPLE_NAMED_CARDS": {
@@ -275,6 +280,16 @@ function evaluateSimple(
         if (_actionType === "PLAYED_CHARACTER") return a.actionType === "PLAY_CARD";
         if (_actionType === "USED_BLOCKER") return a.actionType === "DECLARE_BLOCKER";
         if (_actionType === "ATTACKED") return a.actionType === "DECLARE_ATTACK";
+        if (_actionType === "CHARACTER_KO") {
+          if (a.actionType !== "CHARACTER_KO") return false;
+          // cond.controller scopes whose character was K.O.'d (OP16-100:
+          // OPPONENT = an opponent character). Unscoped/EITHER matches any.
+          if (!cond.controller || cond.controller === "EITHER" || cond.controller === "ANY") return true;
+          const ownerPi = cond.controller === "OPPONENT"
+            ? (ctx.controller === 0 ? 1 : 0)
+            : ctx.controller;
+          return a.controller === ownerPi;
+        }
         return false;
       });
     }

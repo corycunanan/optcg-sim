@@ -38,7 +38,7 @@ import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
 
-import { ALL_ACTION_TYPES, type ActionType } from "../effect-types.js";
+import { ALL_ACTION_TYPES, TRIGGERING_CARD_REF, type ActionType } from "../effect-types.js";
 
 // ─── Action dispatcher map ───────────────────────────────────────────────────
 
@@ -188,6 +188,7 @@ export function resolveEffect(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
+  triggeringCardInstanceId?: string | null,
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -238,7 +239,9 @@ export function resolveEffect(
       phase: "AWAITING_OPTIONAL_RESPONSE",
       pausedAction: null,
       remainingActions: block.actions ?? [],
-      resultRefs: [],
+      resultRefs: triggeringCardInstanceId
+        ? [[TRIGGERING_CARD_REF, { targetInstanceIds: [triggeringCardInstanceId], count: 1 }]]
+        : [],
       validTargets: [],
       costs: block.costs ?? [],
       currentCostIndex: 0,
@@ -290,13 +293,18 @@ export function resolveEffect(
 
   // Step 4: Execute action chain
   if (block.actions && block.actions.length > 0) {
+    let initialRefs = costResultToRefs(costResult);
+    if (triggeringCardInstanceId) {
+      initialRefs = initialRefs ?? new Map<string, EffectResult>();
+      initialRefs.set(TRIGGERING_CARD_REF, { targetInstanceIds: [triggeringCardInstanceId], count: 1 });
+    }
     const chainResult = executeActionChain(
       state,
       block.actions,
       sourceCardInstanceId,
       controller,
       cardDb,
-      costResultToRefs(costResult),
+      initialRefs,
       blockDescription,
     );
     state = chainResult.state;

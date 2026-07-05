@@ -138,6 +138,7 @@ export type CustomEventType =
   | "ANY_CHARACTER_KO"
   | "ANY_CHARACTER_TRASHED"
   | "OPPONENT_CHARACTER_TRASHED"
+  | "CHARACTER_REMOVED_FROM_FIELD"
   | "DON_RETURNED_TO_DON_DECK"
   | "DON_GIVEN_TO_CARD"
   | "EVENT_ACTIVATED_FROM_HAND"
@@ -388,7 +389,7 @@ export interface ActionPerformedThisTurnCondition {
   filter?: TargetFilter;
 }
 
-export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED";
+export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO";
 
 export interface PlayMethodCondition {
   type: "PLAY_METHOD";
@@ -479,7 +480,7 @@ export type NumericRange =
 
 export type DynamicValue =
   | { type: "FIXED"; value: number }
-  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number }
+  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number; filter?: TargetFilter }
   | { type: "GAME_STATE"; source: GameStateSource; controller?: Controller }
   | { type: "ACTION_RESULT"; ref: string }
   | { type: "CHOSEN_VALUE" };
@@ -701,7 +702,7 @@ export interface ActionParamsMap {
   GRANT_ATTRIBUTE: { attribute: string };
 
   // Search
-  SEARCH_DECK: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string };
+  SEARCH_DECK: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string; face?: "UP" | "DOWN" };
   FULL_DECK_SEARCH: { filter?: TargetFilter; shuffle_after?: boolean };
   DECK_SCRY: { look_at?: number };
   SEARCH_AND_PLAY: { look_at?: number; filter?: TargetFilter; rest_destination?: string; search_full_deck?: boolean; shuffle_after?: boolean; entry_state?: "ACTIVE" | "RESTED" };
@@ -831,7 +832,15 @@ export type TargetType =
   | "DON_IN_DON_DECK"
   | "PLAYER"
   | "SELECTED_CARDS"
-  | "OPPONENT_LIFE";
+  | "OPPONENT_LIFE"
+  | "TRIGGERING_CARD";
+
+/**
+ * Well-known result_ref key holding the card that triggered the currently
+ * resolving auto effect (e.g. the character played from trash for OP16-079).
+ * Seeded by resolveEffect; consumed by the TRIGGERING_CARD target type.
+ */
+export const TRIGGERING_CARD_REF = "__triggering_card";
 
 export type CountMode =
   | { exact: number }

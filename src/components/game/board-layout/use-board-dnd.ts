@@ -99,7 +99,10 @@ export function useBoardDnd(
       battle
     ) {
       const cardData = cardDb[dragData.card.cardId];
-      if (cardData?.type === "Character" && cardData.counter != null && cardData.counter > 0) {
+      // OPT-400: don't gate on printed counter — COUNTER_GRANT rule mods can
+      // give counterless cards a value. The server validates and rejects
+      // cards with no effective counter.
+      if (cardData?.type === "Character") {
         onAction({
           type: "USE_COUNTER",
           cardInstanceId: dragData.card.instanceId,

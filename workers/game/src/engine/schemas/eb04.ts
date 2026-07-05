@@ -466,10 +466,8 @@ export const EB04_011_SCALED_NEPTUNIAN: EffectSchema = {
               type: "PER_COUNT",
               source: "MATCHING_CHARACTERS_ON_FIELD",
               multiplier: 1,
+              filter: { traits: ["Neptunian"] },
             },
-          },
-          target: {
-            filter: { traits: ["Neptunian"] },
           },
         },
         {
@@ -479,6 +477,7 @@ export const EB04_011_SCALED_NEPTUNIAN: EffectSchema = {
               type: "PER_COUNT",
               source: "MATCHING_CHARACTERS_ON_FIELD",
               multiplier: 1,
+              filter: { traits: ["Neptunian"] },
             },
           },
           chain: "THEN",

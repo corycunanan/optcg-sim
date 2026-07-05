@@ -522,10 +522,7 @@ function matchesCustomTrigger(
   sourceCard: CardInstance,
   _cardDb: Map<string, CardData>,
 ): boolean {
-  const eventType = customEventToGameEvent(trigger.event);
-  if (!eventType) return false;
-
-  if (event.type !== eventType) return false;
+  if (!customEventMatchesGameEvent(trigger.event, event)) return false;
 
   // Turn restriction
   if (trigger.turn_restriction) {
@@ -605,6 +602,38 @@ function isOnKOTrigger(trigger: Trigger): boolean {
     );
   }
   return false;
+}
+
+/**
+ * OPT-407: game events that constitute a character being "removed from the
+ * field" (OP16-041 Buggy leader). CARD_KO and CARD_RETURNED_TO_DECK are only
+ * emitted for field exits; CARD_TRASHED and CARD_RETURNED_TO_HAND need
+ * payload guards because hand/deck/trash movements reuse the same event
+ * types. Field exits to Life currently emit no event (known gap).
+ */
+const REMOVED_FROM_FIELD_EVENTS: GameEventType[] = [
+  "CARD_KO",
+  "CARD_TRASHED",
+  "CARD_RETURNED_TO_HAND",
+  "CARD_RETURNED_TO_DECK",
+];
+
+function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent): boolean {
+  if (custom === "CHARACTER_REMOVED_FROM_FIELD") {
+    if (!REMOVED_FROM_FIELD_EVENTS.includes(event.type)) return false;
+    if (event.type === "CARD_TRASHED") {
+      // Field/stage trashes carry the instance id; hand, deck, and search
+      // trashes emit only { count } / { cardId }.
+      return !!(event.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId;
+    }
+    if (event.type === "CARD_RETURNED_TO_HAND") {
+      // Trash→hand recovery sets source: "TRASH"; field bounces don't.
+      return (event.payload as { source?: string } | undefined)?.source !== "TRASH";
+    }
+    return true;
+  }
+  const mapped = customEventToGameEvent(custom);
+  return mapped !== null && event.type === mapped;
 }
 
 function customEventToGameEvent(event: CustomEventType): GameEventType | null {

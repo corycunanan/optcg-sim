@@ -257,6 +257,7 @@ function processTriggerQueuePipeline(
       next.sourceCardInstanceId,
       next.controller,
       cardDb,
+      (next.triggeringEvent?.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId ?? null,
     );
     nextState = result.state;
 
