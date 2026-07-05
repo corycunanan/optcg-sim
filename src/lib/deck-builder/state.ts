@@ -2,6 +2,8 @@
  * Deck Builder State Types
  */
 
+import { getDeckCardCopyLimit } from "@/lib/deck-builder/validation";
+
 export interface TestDeckOrder {
   life: string[]; // cardIds, length = leader's life value
   hand: string[]; // cardIds, length = 5
@@ -29,6 +31,7 @@ export interface DeckCardEntry {
     triggerText: string | null;
     rarity: string;
     originSet: string;
+    effectSchema?: unknown | null;
   };
 }
 
@@ -43,6 +46,7 @@ export interface DeckLeaderEntry {
   traits: string[];
   effectText: string;
   attribute: string[];
+  effectSchema?: unknown | null;
 }
 
 export interface DeckBuilderState {
@@ -72,7 +76,11 @@ export type DeckBuilderAction =
   | { type: "SET_ART_VARIANT"; cardId: string; artUrl: string | null }
   | { type: "CLEAR_DECK" }
   | { type: "LOAD_DECK"; state: Omit<DeckBuilderState, "isDirty" | "isSaving"> }
-  | { type: "IMPORT_CARDS"; leader: DeckLeaderEntry | null; cards: DeckCardEntry[] }
+  | {
+      type: "IMPORT_CARDS";
+      leader: DeckLeaderEntry | null;
+      cards: DeckCardEntry[];
+    }
   | { type: "SAVE_START" }
   | { type: "SAVE_SUCCESS"; id: string }
   | { type: "SAVE_ERROR" }
@@ -98,13 +106,15 @@ export function createInitialState(): DeckBuilderState {
 }
 
 /** Clear testOrder when deck composition changes (returns partial state update or empty object) */
-function clearTestOrder(state: DeckBuilderState): { testOrder: null } | Record<string, never> {
+function clearTestOrder(
+  state: DeckBuilderState
+): { testOrder: null } | Record<string, never> {
   return state.testOrder !== null ? { testOrder: null } : {};
 }
 
 export function deckBuilderReducer(
   state: DeckBuilderState,
-  action: DeckBuilderAction,
+  action: DeckBuilderAction
 ): DeckBuilderState {
   switch (action.type) {
     case "SET_NAME":
@@ -114,17 +124,27 @@ export function deckBuilderReducer(
       return { ...state, format: action.format, isDirty: true };
 
     case "SET_LEADER":
-      return { ...state, leader: action.leader, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        leader: action.leader,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
 
     case "REMOVE_LEADER":
-      return { ...state, leader: null, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        leader: null,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
 
     case "ADD_CARD": {
       const newCards = new Map(state.cards);
       const existing = newCards.get(action.card.id);
       if (existing) {
-        // Increment quantity up to 4
-        if (existing.quantity < 4) {
+        const copyLimit = getDeckCardCopyLimit(existing.card);
+        if (existing.quantity < copyLimit) {
           newCards.set(action.card.id, {
             ...existing,
             quantity: existing.quantity + 1,
@@ -138,13 +158,23 @@ export function deckBuilderReducer(
           card: action.card,
         });
       }
-      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        cards: newCards,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
     }
 
     case "REMOVE_CARD": {
       const newCards = new Map(state.cards);
       newCards.delete(action.cardId);
-      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        cards: newCards,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
     }
 
     case "SET_QUANTITY": {
@@ -154,22 +184,39 @@ export function deckBuilderReducer(
         if (action.quantity <= 0) {
           newCards.delete(action.cardId);
         } else {
+          const copyLimit = getDeckCardCopyLimit(entry.card);
           newCards.set(action.cardId, {
             ...entry,
-            quantity: Math.min(action.quantity, 4),
+            quantity: Math.min(action.quantity, copyLimit),
           });
         }
       }
-      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        cards: newCards,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
     }
 
     case "INCREMENT_CARD": {
       const newCards = new Map(state.cards);
       const entry = newCards.get(action.cardId);
-      if (entry && entry.quantity < 4) {
-        newCards.set(action.cardId, { ...entry, quantity: entry.quantity + 1 });
+      if (entry) {
+        const copyLimit = getDeckCardCopyLimit(entry.card);
+        if (entry.quantity < copyLimit) {
+          newCards.set(action.cardId, {
+            ...entry,
+            quantity: entry.quantity + 1,
+          });
+        }
       }
-      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        cards: newCards,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
     }
 
     case "DECREMENT_CARD": {
@@ -185,7 +232,12 @@ export function deckBuilderReducer(
           });
         }
       }
-      return { ...state, cards: newCards, ...clearTestOrder(state), isDirty: true };
+      return {
+        ...state,
+        cards: newCards,
+        ...clearTestOrder(state),
+        isDirty: true,
+      };
     }
 
     case "SET_ART_VARIANT": {
@@ -214,9 +266,10 @@ export function deckBuilderReducer(
     case "LOAD_DECK": {
       return {
         ...action.state,
-        cards: action.state.cards instanceof Map
-          ? action.state.cards
-          : new Map(Object.entries(action.state.cards)),
+        cards:
+          action.state.cards instanceof Map
+            ? action.state.cards
+            : new Map(Object.entries(action.state.cards)),
         isDirty: false,
         isSaving: false,
       };
@@ -227,13 +280,16 @@ export function deckBuilderReducer(
       for (const entry of action.cards) {
         const existing = newCards.get(entry.cardId);
         if (existing) {
+          const copyLimit = getDeckCardCopyLimit(existing.card);
           newCards.set(entry.cardId, {
             ...existing,
-            quantity: Math.min(existing.quantity + entry.quantity, 4),
+            quantity: Math.min(existing.quantity + entry.quantity, copyLimit),
           });
         } else {
+          const copyLimit = getDeckCardCopyLimit(entry.card);
           newCards.set(entry.cardId, {
             ...entry,
+            quantity: Math.min(entry.quantity, copyLimit),
             selectedArtUrl: entry.selectedArtUrl ?? null,
           });
         }

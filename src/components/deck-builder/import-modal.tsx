@@ -35,6 +35,7 @@ interface ImportCard {
   power: number | null;
   imageUrl: string;
   traits: string[];
+  effectSchema?: unknown | null;
 }
 
 export function ImportModal({ onImport, onClose }: ImportModalProps) {
@@ -54,10 +55,16 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
     setPreview(null);
 
     try {
-      const { data: result } = await apiPost("/api/decks/import", { text }, DeckImportResponseSchema);
+      const { data: result } = await apiPost(
+        "/api/decks/import",
+        { text },
+        DeckImportResponseSchema
+      );
       setErrors(result.errors || []);
       setPreview({
-        leader: result.leader ? { cardId: result.leader.cardId, card: result.leader.card } : null,
+        leader: result.leader
+          ? { cardId: result.leader.cardId, card: result.leader.card }
+          : null,
         cards: result.cards || [],
       });
     } catch {
@@ -113,10 +120,15 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           <DialogTitle>Import Deck</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <p className="text-xs text-content-tertiary">
+          <p className="text-content-tertiary text-xs">
             Paste your deck list below. Supports{" "}
-            <code className="rounded bg-surface-3 px-1 py-0.5">4x OP01-004</code> or{" "}
-            <code className="rounded bg-surface-3 px-1 py-0.5">4 Card Name (OP01-004)</code>{" "}
+            <code className="bg-surface-3 rounded px-1 py-0.5">
+              4x OP01-004
+            </code>{" "}
+            or{" "}
+            <code className="bg-surface-3 rounded px-1 py-0.5">
+              4 Card Name (OP01-004)
+            </code>{" "}
             formats, with optional section headers.
           </p>
 
@@ -125,7 +137,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
             onChange={(e) => setText(e.target.value)}
             placeholder={`Leader\n1 Portgas.D.Ace (OP13-002)\n\nCharacter (40)\n4 Izo (ST22-002)\n4 Monkey.D.Garp (OP13-016)\n\n— or —\n\nLeader: OP01-001\n4x OP01-004\n3x OP01-010`}
             rows={10}
-            className="w-full resize-none rounded border border-border bg-surface-2 p-3 font-mono text-sm text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-navy-900/10"
+            className="border-border bg-surface-2 text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:ring-navy-900/10 w-full resize-none rounded border p-3 font-mono text-sm focus:ring-2 focus:outline-none"
           />
 
           {errors.length > 0 && (
@@ -142,21 +154,28 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           )}
 
           {preview && (
-            <div className="rounded border border-border bg-surface-2 p-3 text-xs text-content-secondary">
+            <div className="border-border bg-surface-2 text-content-secondary rounded border p-3 text-xs">
               {preview.leader && (
                 <span>
                   Leader: <strong>{preview.leader.card.name}</strong> ·{" "}
                 </span>
               )}
-              <strong>{preview.cards.reduce((sum, c) => sum + c.quantity, 0)}</strong> cards from{" "}
-              <strong>{preview.cards.length}</strong> unique
+              <strong>
+                {preview.cards.reduce((sum, c) => sum + c.quantity, 0)}
+              </strong>{" "}
+              cards from <strong>{preview.cards.length}</strong> unique
             </div>
           )}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           {!preview ? (
-            <Button onClick={handleParse} disabled={!text.trim() || isProcessing}>
+            <Button
+              onClick={handleParse}
+              disabled={!text.trim() || isProcessing}
+            >
               {isProcessing ? "Parsing…" : "Parse"}
             </Button>
           ) : (

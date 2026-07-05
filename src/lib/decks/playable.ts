@@ -51,7 +51,7 @@ export class DeckInvalidError extends Error {
     this.name = "DeckInvalidError";
     this.validation = validation;
     this.details = validation.results.filter(
-      (result) => !result.passed && result.severity === "error",
+      (result) => !result.passed && result.severity === "error"
     );
   }
 }
@@ -73,6 +73,7 @@ function toValidationCard(row: DeckCardRow, card: Card): DeckCard {
       blockNumber: card.blockNumber,
       traits: card.traits,
       rarity: card.rarity,
+      effectSchema: card.effectSchema,
     },
   };
 }
@@ -88,6 +89,7 @@ function toValidationLeader(card: Card): DeckLeader {
     imageUrl: card.imageUrl,
     traits: card.traits,
     effectText: card.effectText,
+    effectSchema: card.effectSchema,
   };
 }
 
@@ -95,7 +97,7 @@ function failedResult(
   id: string,
   rule: string,
   message: string,
-  cardIds?: string[],
+  cardIds?: string[]
 ): ValidationResult {
   return {
     id,
@@ -109,7 +111,7 @@ function failedResult(
 
 export async function requirePlayableDeck(
   deckId: string,
-  userId: string,
+  userId: string
 ): Promise<{ deck: PlayableDeck; leader: Card; validation: DeckValidation }> {
   const deck = await prisma.deck.findFirst({
     where: { id: deckId, userId },
@@ -162,8 +164,8 @@ export async function requirePlayableDeck(
         "leader-type",
         "Leader",
         `${leaderCard.name} is not a Leader card`,
-        [leaderCard.id],
-      ),
+        [leaderCard.id]
+      )
     );
   }
 
@@ -176,15 +178,17 @@ export async function requirePlayableDeck(
         "missing-card",
         "Card IDs",
         `${missingCardIds.length} card ID(s) could not be found`,
-        missingCardIds,
-      ),
+        missingCardIds
+      )
     );
   }
 
   const fullValidation: DeckValidation = {
     ...validation,
     results,
-    isValid: results.every((result) => result.passed || result.severity === "warning"),
+    isValid: results.every(
+      (result) => result.passed || result.severity === "warning"
+    ),
   };
 
   if (!fullValidation.isValid || !leaderCard || leaderCard.type !== "Leader") {

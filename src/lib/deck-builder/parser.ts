@@ -33,14 +33,18 @@ export function parseDeckList(text: string): ParsedLine[] {
     if (/^[A-Za-z][A-Za-z\s!!]*(?:\s*\(\d+\))?$/.test(raw)) continue;
 
     // Format: "N Card Name (CARD-ID)" — e.g. "4 Izo (ST22-002)"
-    const namedMatch = raw.match(
-      /^(\d+)\s+.+\(([A-Z]{2,}\d+-\d+)\)\s*$/i,
-    );
+    const namedMatch = raw.match(/^(\d+)\s+.+\(([A-Z]{2,}\d+-\d+)\)\s*$/i);
     if (namedMatch) {
       const quantity = parseInt(namedMatch[1]);
       const cardId = namedMatch[2].toUpperCase();
-      if (quantity < 1 || quantity > 4) {
-        results.push({ line: i + 1, raw, cardId, quantity, error: `Invalid quantity: ${quantity} (must be 1-4)` });
+      if (quantity < 1 || quantity > 50) {
+        results.push({
+          line: i + 1,
+          raw,
+          cardId,
+          quantity,
+          error: `Invalid quantity: ${quantity} (must be 1-50)`,
+        });
       } else {
         results.push({ line: i + 1, raw, cardId, quantity, error: null });
       }
@@ -49,13 +53,13 @@ export function parseDeckList(text: string): ParsedLine[] {
 
     // Try to parse: "Nx CARDID", "NxCARDID", "N CARDID", or just "CARDID"
     const match = raw.match(
-      /^(?:(\d+)\s*[xX×]\s*)?([A-Z]{2,}\d+-\d+)(?:\s.*)?$/i,
+      /^(?:(\d+)\s*[xX×]\s*)?([A-Z]{2,}\d+-\d+)(?:\s.*)?$/i
     );
 
     if (!match) {
       // Try leader line format: "Leader: CARDID"
       const leaderMatch = raw.match(
-        /^(?:leader|ldr)\s*[:=]\s*([A-Z]{2,}\d+-\d+)/i,
+        /^(?:leader|ldr)\s*[:=]\s*([A-Z]{2,}\d+-\d+)/i
       );
       if (leaderMatch) {
         results.push({
@@ -80,13 +84,13 @@ export function parseDeckList(text: string): ParsedLine[] {
     const quantity = match[1] ? parseInt(match[1]) : 1;
     const cardId = match[2].toUpperCase();
 
-    if (quantity < 1 || quantity > 4) {
+    if (quantity < 1 || quantity > 50) {
       results.push({
         line: i + 1,
         raw,
         cardId,
         quantity,
-        error: `Invalid quantity: ${quantity} (must be 1-4)`,
+        error: `Invalid quantity: ${quantity} (must be 1-50)`,
       });
       continue;
     }

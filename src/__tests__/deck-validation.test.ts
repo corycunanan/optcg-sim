@@ -1,8 +1,34 @@
 import { describe, expect, it } from "vitest";
 
-import { validateDeck, type DeckCard, type DeckLeader } from "../lib/deck-builder/validation";
+import {
+  validateDeck,
+  type DeckCard,
+  type DeckLeader,
+} from "../lib/deck-builder/validation";
 
-function makeCard(cardId: string, name: string, quantity: number): DeckCard {
+const topLevelCopyLimitOverride = {
+  rule_modifications: [
+    { rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" },
+  ],
+  effects: [],
+};
+
+const effectBlockCopyLimitOverride = {
+  effects: [
+    {
+      id: "unlimited_copies",
+      category: "rule_modification",
+      rule: { rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" },
+    },
+  ],
+};
+
+function makeCard(
+  cardId: string,
+  name: string,
+  quantity: number,
+  effectSchema: unknown = null
+): DeckCard {
   return {
     cardId,
     quantity,
@@ -19,6 +45,7 @@ function makeCard(cardId: string, name: string, quantity: number): DeckCard {
       blockNumber: 6,
       traits: ["Impel Down"],
       rarity: "C",
+      effectSchema,
     },
   };
 }
@@ -36,7 +63,9 @@ const leader: DeckLeader = {
 };
 
 function copyLimitResult(cards: DeckCard[]) {
-  return validateDeck(leader, cards).results.find((r) => r.id === "copy-limit")!;
+  return validateDeck(leader, cards).results.find(
+    (r) => r.id === "copy-limit"
+  )!;
 }
 
 describe("validateDeck copy limit", () => {
@@ -46,24 +75,34 @@ describe("validateDeck copy limit", () => {
     expect(result.cardIds).toEqual(["OP16-048"]);
   });
 
-  it("allows any number of copies for COPY_LIMIT_OVERRIDE cards", () => {
+  it("does not allow formerly hardcoded IDs without a schema rule", () => {
+    const result = copyLimitResult([makeCard("OP01-075", "Pacifista", 8)]);
+    expect(result.passed).toBe(false);
+    expect(result.cardIds).toEqual(["OP01-075"]);
+  });
+
+  it("allows any number of copies for top-level COPY_LIMIT_OVERRIDE rules", () => {
     const result = copyLimitResult([
-      makeCard("OP16-042", "Prisoner of Impel Down", 20),
-      makeCard("OP01-075", "Pacifista", 8),
+      makeCard("OP01-075", "Pacifista", 20, topLevelCopyLimitOverride),
     ]);
     expect(result.passed).toBe(true);
   });
 
-  it("normalizes variant suffixes before checking the override list", () => {
+  it("allows any number of copies for rule-modification effect blocks", () => {
     const result = copyLimitResult([
-      makeCard("OP16-042_p1", "Prisoner of Impel Down", 12),
+      makeCard("OP08-072", "Biscuit Warrior", 12, effectBlockCopyLimitOverride),
     ]);
     expect(result.passed).toBe(true);
   });
 
   it("still flags normal cards alongside an unlimited card", () => {
     const result = copyLimitResult([
-      makeCard("OP16-042", "Prisoner of Impel Down", 30),
+      makeCard(
+        "OP16-042",
+        "Prisoner of Impel Down",
+        30,
+        effectBlockCopyLimitOverride
+      ),
       makeCard("OP16-050", "Miss Olive", 6),
     ]);
     expect(result.passed).toBe(false);

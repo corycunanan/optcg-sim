@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const DeckCardSchema = z.object({
   cardId: z.string().min(1),
-  quantity: z.number().int().min(1).max(4),
+  quantity: z.number().int().min(1).max(50),
   selectedArtUrl: z.string().nullable().optional(),
 });
 
@@ -39,4 +39,3 @@ export const UpdateDeckSchema = z.object({
 export const ImportDeckSchema = z.object({
   text: z.string().min(1, "Text field is required"),
 });
-

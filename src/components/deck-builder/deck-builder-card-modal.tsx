@@ -8,6 +8,7 @@ interface DeckBuilderCardModalProps {
   onClose: () => void;
   isLeader: boolean;
   quantityInDeck: number;
+  copyLimit: number;
   selectedArtUrl: string | null;
   onAdd: () => void;
   onRemove: () => void;
@@ -19,11 +20,16 @@ export function DeckBuilderCardModal({
   onClose,
   isLeader,
   quantityInDeck,
+  copyLimit,
   selectedArtUrl,
   onAdd,
   onRemove,
   onSetArtVariant,
 }: DeckBuilderCardModalProps) {
+  const copyLabel = isLeader
+    ? "Leader"
+    : `${quantityInDeck}/${copyLimit} in deck`;
+
   return (
     <CardDetailModal
       cardId={cardId}
@@ -43,26 +49,26 @@ export function DeckBuilderCardModal({
                 >
                   −
                 </Button>
-                <span className="w-8 text-center text-lg font-bold tabular-nums text-content-primary">
+                <span className="text-content-primary w-8 text-center text-lg font-bold tabular-nums">
                   {quantityInDeck}
                 </span>
                 <Button
                   variant="secondary"
                   size="icon-sm"
                   onClick={onAdd}
-                  disabled={quantityInDeck >= 4}
+                  disabled={!isLeader && quantityInDeck >= copyLimit}
                   aria-label="Add one"
                 >
                   +
                 </Button>
               </div>
-              <span className="text-xs text-content-tertiary">
-                {isLeader ? "Leader" : `${quantityInDeck}/4 in deck`}
-              </span>
+              <span className="text-content-tertiary text-xs">{copyLabel}</span>
             </>
           ) : (
             <Button onClick={onAdd}>
-              {isLeader || card?.type === "Leader" ? "Set as Leader" : "+ Add to Deck"}
+              {isLeader || card?.type === "Leader"
+                ? "Set as Leader"
+                : "+ Add to Deck"}
             </Button>
           )}
         </div>

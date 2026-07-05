@@ -8,7 +8,11 @@ import {
   type DeckCardEntry,
   type DeckLeaderEntry,
 } from "@/lib/deck-builder/state";
-import { validateDeck, type DeckCard, type DeckLeader } from "@/lib/deck-builder/validation";
+import {
+  validateDeck,
+  type DeckCard,
+  type DeckLeader,
+} from "@/lib/deck-builder/validation";
 import { DeckBuilderSearch } from "./deck-builder-search";
 import { DeckBuilderList } from "./deck-builder-list";
 import { DeckBuilderBacks } from "./deck-builder-backs";
@@ -20,7 +24,12 @@ import { DonPicker } from "./don-picker";
 import { ImportModal } from "./import-modal";
 import { ExportModal } from "./export-modal";
 import { TestOrderEditor } from "./test-order-editor";
-import { TabsRoot, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  TabsRoot,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
 import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { DeckDetailResponseSchema } from "@/lib/validators/cards";
 import type { TestDeckOrder } from "@/lib/deck-builder/state";
@@ -31,12 +40,17 @@ interface DeckBuilderShellProps {
 
 export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   const router = useRouter();
-  const [state, dispatch] = useReducer(deckBuilderReducer, createInitialState());
+  const [state, dispatch] = useReducer(
+    deckBuilderReducer,
+    createInitialState()
+  );
   const [activeTab, setActiveTab] = useState("cards");
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [isLoading, setIsLoading] = useState(!!deckId);
-  const [leaderSelectedArtUrl, setLeaderSelectedArtUrl] = useState<string | null>(null);
+  const [leaderSelectedArtUrl, setLeaderSelectedArtUrl] = useState<
+    string | null
+  >(null);
 
   // Load existing deck
   useEffect(() => {
@@ -44,7 +58,10 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     async function loadDeck() {
       try {
-        const { data } = await apiGet(`/api/decks/${deckId}`, DeckDetailResponseSchema);
+        const { data } = await apiGet(
+          `/api/decks/${deckId}`,
+          DeckDetailResponseSchema
+        );
 
         const cardsMap = new Map<string, DeckCardEntry>();
         for (const dc of data.cards) {
@@ -92,7 +109,11 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
         effectText: state.leader.effectText || "",
       }
     : null;
-  const validation = validateDeck(leaderForValidation, cardsArray, state.format);
+  const validation = validateDeck(
+    leaderForValidation,
+    cardsArray,
+    state.format
+  );
 
   // Save deck
   const saveDeck = useCallback(async () => {
@@ -117,7 +138,10 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     try {
       const { data } = state.id
-        ? await apiPut<{ data: { id: string } }>(`/api/decks/${state.id}`, payload)
+        ? await apiPut<{ data: { id: string } }>(
+            `/api/decks/${state.id}`,
+            payload
+          )
         : await apiPost<{ data: { id: string } }>("/api/decks", payload);
 
       dispatch({ type: "SAVE_SUCCESS", id: data.id });
@@ -131,30 +155,28 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   }, [state, leaderSelectedArtUrl, router]);
 
   // Add card handler
-  const addCard = useCallback(
-    (card: DeckCardEntry["card"]) => {
-      if (card.type === "Leader") {
-        dispatch({
-          type: "SET_LEADER",
-          leader: {
-            id: card.id,
-            name: card.name,
-            color: card.color,
-            type: card.type,
-            life: card.life ?? null,
-            power: card.power,
-            imageUrl: card.imageUrl,
-            traits: card.traits,
-            effectText: card.effectText || "",
-            attribute: card.attribute || [],
-          },
-        });
-      } else {
-        dispatch({ type: "ADD_CARD", card });
-      }
-    },
-    [],
-  );
+  const addCard = useCallback((card: DeckCardEntry["card"]) => {
+    if (card.type === "Leader") {
+      dispatch({
+        type: "SET_LEADER",
+        leader: {
+          id: card.id,
+          name: card.name,
+          color: card.color,
+          type: card.type,
+          life: card.life ?? null,
+          power: card.power,
+          imageUrl: card.imageUrl,
+          traits: card.traits,
+          effectText: card.effectText || "",
+          attribute: card.attribute || [],
+          effectSchema: card.effectSchema ?? null,
+        },
+      });
+    } else {
+      dispatch({ type: "ADD_CARD", card });
+    }
+  }, []);
 
   const removeCard = useCallback((cardId: string) => {
     dispatch({ type: "DECREMENT_CARD", cardId });
@@ -169,7 +191,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       dispatch({ type: "IMPORT_CARDS", leader, cards });
       setShowImport(false);
     },
-    [],
+    []
   );
 
   if (isLoading) {
@@ -181,7 +203,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 bg-background text-content-primary overflow-hidden">
+    <div className="bg-background text-content-primary flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header bar */}
       <DeckBuilderHeader
         name={state.name}
@@ -196,7 +218,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       {/* Main split layout */}
       <div className="flex min-h-0 flex-1">
         {/* Left column: context-dependent */}
-        <div className="flex w-[420px] shrink-0 flex-col overflow-hidden border-r border-border">
+        <div className="border-border flex w-[420px] shrink-0 flex-col overflow-hidden border-r">
           {activeTab === "cards" && (
             <DeckBuilderSearch
               onAddCard={addCard}
@@ -210,7 +232,9 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             <div className="flex-1 overflow-y-auto">
               <SleevePicker
                 selectedUrl={state.sleeveUrl}
-                onSelect={(url) => dispatch({ type: "SET_SLEEVE", sleeveUrl: url })}
+                onSelect={(url) =>
+                  dispatch({ type: "SET_SLEEVE", sleeveUrl: url })
+                }
               />
             </div>
           )}
@@ -218,7 +242,9 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             <div className="flex-1 overflow-y-auto">
               <DonPicker
                 selectedUrl={state.donArtUrl}
-                onSelect={(url) => dispatch({ type: "SET_DON_ART", donArtUrl: url })}
+                onSelect={(url) =>
+                  dispatch({ type: "SET_DON_ART", donArtUrl: url })
+                }
               />
             </div>
           )}
@@ -226,7 +252,11 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
         {/* Right: Deck editor with tabs */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <TabsRoot defaultValue="cards" className="flex min-h-0 flex-1 flex-col" onValueChange={setActiveTab}>
+          <TabsRoot
+            defaultValue="cards"
+            className="flex min-h-0 flex-1 flex-col"
+            onValueChange={setActiveTab}
+          >
             {/* Tab bar */}
             <div className="flex items-center justify-between px-5 pt-4">
               <TabsList>
@@ -238,13 +268,13 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowImport(true)}
-                  className="rounded border border-border px-3 py-1 text-xs font-medium text-content-secondary transition-colors hover:bg-surface-2 hover:text-content-primary"
+                  className="border-border text-content-secondary hover:bg-surface-2 hover:text-content-primary rounded border px-3 py-1 text-xs font-medium transition-colors"
                 >
                   Import
                 </button>
                 <button
                   onClick={() => setShowExport(true)}
-                  className="rounded border border-border px-3 py-1 text-xs font-medium text-content-secondary transition-colors hover:bg-surface-2 hover:text-content-primary"
+                  className="border-border text-content-secondary hover:bg-surface-2 hover:text-content-primary rounded border px-3 py-1 text-xs font-medium transition-colors"
                 >
                   Export
                 </button>
@@ -258,8 +288,12 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
                   cards={Array.from(state.cards.values())}
                   leader={state.leader}
                   leaderArtUrl={leaderSelectedArtUrl}
-                  onIncrement={(id) => dispatch({ type: "INCREMENT_CARD", cardId: id })}
-                  onDecrement={(id) => dispatch({ type: "DECREMENT_CARD", cardId: id })}
+                  onIncrement={(id) =>
+                    dispatch({ type: "INCREMENT_CARD", cardId: id })
+                  }
+                  onDecrement={(id) =>
+                    dispatch({ type: "DECREMENT_CARD", cardId: id })
+                  }
                   onSetArtVariant={setArtVariant}
                   onAddCard={addCard}
                   onRemoveLeader={() => {

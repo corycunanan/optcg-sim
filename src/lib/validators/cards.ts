@@ -46,16 +46,19 @@ export const CardResponseSchema = z.object({
   triggerText: z.string().nullable(),
   rarity: z.string(),
   originSet: z.string(),
+  effectSchema: z.unknown().nullable().optional(),
 });
 
 export type CardResponse = z.infer<typeof CardResponseSchema>;
 
 /** GET /api/cards response envelope. */
 export const CardSearchResponseSchema = z.object({
-  data: z.array(CardResponseSchema.extend({
-    artVariants: z.array(z.unknown()).optional(),
-    cardSets: z.array(z.unknown()).optional(),
-  })),
+  data: z.array(
+    CardResponseSchema.extend({
+      artVariants: z.array(z.unknown()).optional(),
+      cardSets: z.array(z.unknown()).optional(),
+    })
+  ),
   pagination: z.object({
     total: z.number(),
     page: z.number(),
@@ -76,19 +79,21 @@ export const DeckCardResponseSchema = z.object({
 
 /** GET /api/decks/[id] response envelope. */
 export const DeckDetailResponseSchema = z.object({
-  data: z.object({
-    id: z.string(),
-    name: z.string(),
-    format: z.string().nullable(),
-    leaderId: z.string(),
-    leaderArtUrl: z.string().nullable(),
-    sleeveUrl: z.string().nullable(),
-    donArtUrl: z.string().nullable(),
-    testOrder: z.unknown().nullable(),
-    updatedAt: z.string(),
-    cards: z.array(DeckCardResponseSchema),
-    leader: CardResponseSchema.nullable(),
-  }).passthrough(),
+  data: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      format: z.string().nullable(),
+      leaderId: z.string(),
+      leaderArtUrl: z.string().nullable(),
+      sleeveUrl: z.string().nullable(),
+      donArtUrl: z.string().nullable(),
+      testOrder: z.unknown().nullable(),
+      updatedAt: z.string(),
+      cards: z.array(DeckCardResponseSchema),
+      leader: CardResponseSchema.nullable(),
+    })
+    .passthrough(),
 });
 
 export type DeckDetailResponse = z.infer<typeof DeckDetailResponseSchema>;
@@ -103,25 +108,32 @@ const ImportCardSchema = z.object({
   power: z.number().nullable(),
   imageUrl: z.string(),
   traits: z.array(z.string()),
+  effectSchema: z.unknown().nullable().optional(),
 });
 
 /** POST /api/decks/import response envelope. */
 export const DeckImportResponseSchema = z.object({
   data: z.object({
-    leader: z.object({
-      cardId: z.string(),
-      card: ImportCardSchema,
-    }).nullable(),
-    cards: z.array(z.object({
-      cardId: z.string(),
-      quantity: z.number(),
-      card: ImportCardSchema,
-    })),
-    errors: z.array(z.object({
-      line: z.number(),
-      raw: z.string(),
-      error: z.string().nullable(),
-    })),
+    leader: z
+      .object({
+        cardId: z.string(),
+        card: ImportCardSchema,
+      })
+      .nullable(),
+    cards: z.array(
+      z.object({
+        cardId: z.string(),
+        quantity: z.number(),
+        card: ImportCardSchema,
+      })
+    ),
+    errors: z.array(
+      z.object({
+        line: z.number(),
+        raw: z.string(),
+        error: z.string().nullable(),
+      })
+    ),
     totalLines: z.number(),
   }),
 });
@@ -167,4 +179,3 @@ export const UpdateCardSchema = z.object({
   banStatus: BanStatusEnum.optional(),
   isReprint: z.boolean().optional(),
 });
-
