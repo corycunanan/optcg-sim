@@ -722,8 +722,23 @@ export const OP16_033_MORLEY: EffectSchema = {
       id: "ko_replacement_rest_cards",
       category: "replacement",
       replaces: { event: "WOULD_BE_KO" },
+      // "rest 2 of your cards" — any mix of field cards (Leader/Character/
+      // Stage) and DON!!, expressed as a payment choice.
       replacement_actions: [
-        { type: "SET_REST", target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { exact: 2 } } },
+        {
+          type: "PLAYER_CHOICE",
+          params: {
+            labels: ["Rest 2 of your field cards", "Rest 1 field card and 1 DON!!", "Rest 2 DON!! cards"],
+            options: [
+              [{ type: "SET_REST", target: { type: "FIELD_CARD", controller: "SELF", count: { exact: 2 } } }],
+              [
+                { type: "SET_REST", target: { type: "FIELD_CARD", controller: "SELF", count: { exact: 1 } } },
+                { type: "REST_DON", params: { amount: 1 } },
+              ],
+              [{ type: "REST_DON", params: { amount: 2 } }],
+            ],
+          },
+        },
       ],
       flags: { optional: true },
     },
@@ -768,8 +783,19 @@ export const OP16_035_RORONOA_ZORO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "SET_REST", target: { type: "LEADER_OR_CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } },
-        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
+        // "Rest up to 1 of your opponent's cards" — field card or DON!!.
+        {
+          type: "PLAYER_CHOICE",
+          params: {
+            labels: ["Rest an opponent Leader, Character, or Stage", "Rest 1 opponent DON!!", "Rest nothing"],
+            options: [
+              [{ type: "SET_REST", target: { type: "FIELD_CARD", controller: "OPPONENT", count: { exact: 1 } } }],
+              [{ type: "REST_OPPONENT_DON", params: { amount: 1 } }],
+              [],
+            ],
+          },
+        },
+        { type: "TRASH_FROM_HAND", params: { amount: 1, optional: true }, chain: "THEN" },
         {
           type: "GIVE_DON",
           target: { type: "YOUR_LEADER" },
@@ -796,7 +822,9 @@ export const OP16_036_MR_2_BON_KUREI: EffectSchema = {
       id: "when_attacking_copy_leader_power",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
-      actions: [{ type: "COPY_POWER", target: { type: "SELF" }, params: { source: "OPPONENT_LEADER" }, duration: { type: "THIS_TURN" } }],
+      // "becomes the same as your opponent's Leader" — the Leader's printed
+      // power, unlike OP16-055 which copies "your opponent's Leader's power".
+      actions: [{ type: "COPY_POWER", target: { type: "SELF" }, params: { source: "OPPONENT_LEADER", source_power: "BASE" }, duration: { type: "THIS_TURN" } }],
     },
   ],
 };

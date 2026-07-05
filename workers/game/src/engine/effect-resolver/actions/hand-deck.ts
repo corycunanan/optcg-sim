@@ -386,6 +386,7 @@ export function executeSearchAndPlay(
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
       validTargets,
+      maxKeep: sap.pick?.up_to ?? 1,
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,

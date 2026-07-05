@@ -55,7 +55,11 @@ export function executeKO(
   // replacement regardless of how many targets it protects. The batch does
   // NOT finalize; it hands back the subset still eligible for KO so this
   // handler can run its own per-frame loop with rule 6-2 trigger drain.
-  const batch = processBatchReplacements(state, targetIds, "KO", "WOULD_BE_KO", "effect", controller, cardDb);
+  // KO-by-effect is also a removal from field, so the general removal/leave
+  // replacements (e.g. OP16-014 Marco, OP15-090 Perona) intercept it too.
+  const batch = processBatchReplacements(
+    state, targetIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
+  );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
     return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
@@ -129,7 +133,9 @@ export function executeReturnToHand(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  const batch = processBatchReplacements(state, targetIds, "RETURN_TO_HAND", "WOULD_BE_REMOVED_FROM_FIELD", "effect", controller, cardDb);
+  const batch = processBatchReplacements(
+    state, targetIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
+  );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
     return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
@@ -179,7 +185,7 @@ export function executeReturnToDeck(
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   const batch = processBatchReplacements(
-    state, targetIds, "RETURN_TO_DECK", "WOULD_BE_REMOVED_FROM_FIELD", "effect", controller, cardDb, position,
+    state, targetIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, position,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -299,13 +305,18 @@ export function executeTrashFromHand(
 
   if (candidates.length === 0) return { state, events, succeeded: false };
 
+  // "You may trash…" — the player can decline by selecting 0 cards, and an
+  // IF_DO chain after this action only fires when at least 1 was trashed.
+  const optional = params.optional === true;
+
   // Use preselected targets from resume flow (player already chose)
   const selectedIds = preselectedTargets;
 
-  // If no preselection and player needs to choose, prompt
+  // If no preselection and player needs to choose, prompt. Optional trashes
+  // always prompt (even with exactly `amount` candidates, declining is legal).
   if (!selectedIds) {
     const validTargets = candidates.map((c) => c.instanceId);
-    if (validTargets.length > amount) {
+    if (validTargets.length > amount || optional) {
       const resumeCtx: import("../../../types.js").ResumeContext = {
         effectSourceInstanceId: sourceCardInstanceId,
         controller,
@@ -318,9 +329,11 @@ export function executeTrashFromHand(
         options: {
           promptType: "SELECT_TARGET",
           validTargets,
-          countMin: amount,
+          countMin: optional ? 0 : amount,
           countMax: amount,
-          effectDescription: `Choose ${amount} card(s) to trash from hand`,
+          effectDescription: optional
+            ? `You may trash up to ${amount} card(s) from hand`
+            : `Choose ${amount} card(s) to trash from hand`,
           ctaLabel: "Trash",
           cards: candidates.filter((c) => validTargets.includes(c.instanceId)),
         },

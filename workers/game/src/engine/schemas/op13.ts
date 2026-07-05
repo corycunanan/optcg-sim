@@ -3833,7 +3833,7 @@ export const OP13_108_JEWELRY_BONNEY: EffectSchema = {
         },
         {
           type: "LIFE_TO_HAND",
-          target: { type: "OPPONENT_LIFE" },
+          target: { type: "OPPONENT_LIFE", controller: "OPPONENT" },
           params: { amount: 1, position: "TOP" },
           chain: "THEN",
         },

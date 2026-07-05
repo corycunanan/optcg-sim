@@ -142,7 +142,8 @@ function matchesProhibition(
       return null;
     }
 
-    case "CANNOT_BLOCK": {
+    case "CANNOT_BLOCK":
+    case "CANNOT_ACTIVATE_BLOCKER": {
       if (action.type !== "DECLARE_BLOCKER") return null;
       if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
         if (!prohibition.appliesTo.includes(action.blockerInstanceId)) return null;

@@ -14,6 +14,7 @@
  */
 
 import type { Action, Cost, EffectBlock, EffectResult } from "../../effect-types.js";
+import { isOncePerTurnBlock } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
@@ -211,7 +212,7 @@ export function handleAwaitingOptionalResponse(
 
     if (costResult.cannotPay) {
       nextState = popFrame(costResult.state);
-      if (block.flags?.once_per_turn) {
+      if (isOncePerTurnBlock(block)) {
         nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
       }
       return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
@@ -235,7 +236,7 @@ export function handleAwaitingOptionalResponse(
   }
 
   nextState = popFrame(nextState);
-  if (block.flags?.once_per_turn) {
+  if (isOncePerTurnBlock(block)) {
     nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
   }
 

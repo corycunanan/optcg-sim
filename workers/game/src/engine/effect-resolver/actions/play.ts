@@ -148,6 +148,7 @@ function playOneCharacter(
       zone: "CHARACTER",
       source: "BY_EFFECT",
       playedRested: entryState === "RESTED",
+      sourceZone: card.zone,
     },
   });
   return { state: nextState, events, playedId: newChar.instanceId };
@@ -180,7 +181,7 @@ function playOneStage(
   events.push({
     type: "CARD_PLAYED",
     playerIndex: controller,
-    payload: { cardInstanceId: newStage.instanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT" },
+    payload: { cardInstanceId: newStage.instanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT", sourceZone: card.zone },
   });
   return { state: nextState, events, playedId: newStage.instanceId };
 }
@@ -430,7 +431,7 @@ export function executePlaySelf(
     events.push({
       type: "CARD_PLAYED",
       playerIndex: pi as 0 | 1,
-      payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF" },
+      payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF", sourceZone: card.zone },
     });
 
     return {
