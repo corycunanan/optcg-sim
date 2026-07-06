@@ -31,7 +31,17 @@ export async function GET() {
       relationLoadStrategy: "join",
       include: {
         cards: {
-          include: { card: { select: { id: true, name: true, color: true, type: true, imageUrl: true } } },
+          include: {
+            card: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                type: true,
+                imageUrl: true,
+              },
+            },
+          },
         },
         leader: { select: { id: true, name: true, imageUrl: true } },
       },
@@ -78,7 +88,16 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await parseBody(request, CreateDeckSchema);
     if (isErrorResponse(parsed)) return parsed;
-    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, testOrder, format, cards } = parsed;
+    const {
+      name,
+      leaderId,
+      leaderArtUrl,
+      sleeveUrl,
+      donArtUrl,
+      testOrder,
+      format,
+      cards,
+    } = parsed;
 
     // Verify leader exists and is a Leader type
     const leader = await prisma.card.findUnique({ where: { id: leaderId } });
@@ -131,6 +150,8 @@ export async function POST(request: NextRequest) {
                 effectText: true,
                 triggerText: true,
                 rarity: true,
+                originSet: true,
+                effectSchema: true,
               },
             },
           },

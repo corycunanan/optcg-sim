@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { apiGet } from "@/lib/api-client";
-import {
-  Dialog,
-  DialogContent,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_COPY_LIMIT,
+  getDeckCardCopyLimit,
+} from "@/lib/deck-builder/validation";
 
 interface ArtVariant {
   id: string;
@@ -45,6 +45,7 @@ interface CardInspectData {
   triggerText: string | null;
   rarity: string;
   originSet: string;
+  effectSchema?: unknown | null;
   artVariants?: ArtVariant[];
   cardSets?: CardSet[];
 }
@@ -61,7 +62,15 @@ interface CardInspectModalProps {
   onClose: () => void;
 }
 
-const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
+const COLOR_TO_VARIANT: Record<
+  string,
+  | "card-red"
+  | "card-blue"
+  | "card-green"
+  | "card-purple"
+  | "card-black"
+  | "card-yellow"
+> = {
   Red: "card-red",
   Blue: "card-blue",
   Green: "card-green",
@@ -81,11 +90,14 @@ export function CardInspectModal({
   onSetArtVariant,
   onClose,
 }: CardInspectModalProps) {
-  const [card, setCard] = useState<CardInspectData | null>(preloadedCard ?? null);
+  const [card, setCard] = useState<CardInspectData | null>(
+    preloadedCard ?? null
+  );
   const [displayImage, setDisplayImage] = useState(
-    selectedArtUrl || preloadedCard?.imageUrl || "",
+    selectedArtUrl || preloadedCard?.imageUrl || ""
   );
   const [isLoading, setIsLoading] = useState(!preloadedCard?.artVariants);
+  const copyLimit = card ? getDeckCardCopyLimit(card) : DEFAULT_COPY_LIMIT;
 
   useEffect(() => {
     if (preloadedCard?.artVariants) {
@@ -96,7 +108,9 @@ export function CardInspectModal({
 
     async function fetchCard() {
       try {
-        const { data } = await apiGet<{ data: CardInspectData }>(`/api/cards/${cardId}`);
+        const { data } = await apiGet<{ data: CardInspectData }>(
+          `/api/cards/${cardId}`
+        );
         setCard(data);
         if (!displayImage) setDisplayImage(selectedArtUrl || data.imageUrl);
       } catch {
@@ -112,13 +126,6 @@ export function CardInspectModal({
   useEffect(() => {
     if (card && !displayImage) setDisplayImage(selectedArtUrl || card.imageUrl);
   }, [card, selectedArtUrl, displayImage]);
-
-  const primaryColor = card?.color[0] || "Black";
-  const colorCssVars: Record<string, string> = {
-    Red: "var(--card-red)", Blue: "var(--card-blue)", Green: "var(--card-green)",
-    Purple: "var(--card-purple)", Black: "var(--card-black)", Yellow: "var(--card-yellow)",
-  };
-  const accentColor = colorCssVars[primaryColor] || "var(--navy-700)";
 
   const allArtworks = card
     ? [
@@ -138,23 +145,23 @@ export function CardInspectModal({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        size="xl"
-        className="max-h-[90vh] overflow-hidden p-0"
-      >
+      <DialogContent size="xl" className="max-h-[90vh] overflow-hidden p-0">
         {/* Close button */}
-        <DialogClose aria-label="Close" className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary active:scale-95">
+        <DialogClose
+          aria-label="Close"
+          className="text-content-tertiary hover:bg-surface-2 hover:text-content-primary absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded transition-colors active:scale-95"
+        >
           ✕
         </DialogClose>
 
         {isLoading || !card ? (
-          <div className="flex w-full items-center justify-center py-20 text-content-tertiary">
+          <div className="text-content-tertiary flex w-full items-center justify-center py-20">
             Loading…
           </div>
         ) : (
           <div className="flex max-h-[90vh]">
             {/* Left: Card image + art variants */}
-            <div className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-border p-4">
+            <div className="border-border flex w-[280px] shrink-0 flex-col overflow-y-auto border-r p-4">
               {/* Main image */}
               <div className="overflow-hidden rounded">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -169,7 +176,7 @@ export function CardInspectModal({
               {/* Art variant selector */}
               {allArtworks.length > 1 && (
                 <div className="mt-4">
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+                  <h4 className="text-content-tertiary mb-2 text-xs font-semibold tracking-widest uppercase">
                     Artworks ({allArtworks.length})
                   </h4>
                   <div className="grid grid-cols-3 gap-2">
@@ -194,7 +201,9 @@ export function CardInspectModal({
                             alt={art.label}
                             className={cn(
                               "w-full transition-opacity",
-                              isSelected ? "opacity-100" : "opacity-60 group-hover:opacity-100"
+                              isSelected
+                                ? "opacity-100"
+                                : "opacity-60 group-hover:opacity-100"
                             )}
                             loading="lazy"
                           />
@@ -222,10 +231,10 @@ export function CardInspectModal({
               <div className="mb-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-display text-2xl font-bold leading-tight tracking-tight text-content-primary">
+                    <h2 className="font-display text-content-primary text-2xl leading-tight font-bold tracking-tight">
                       {card.name}
                     </h2>
-                    <p className="mt-1 text-sm text-content-tertiary">
+                    <p className="text-content-tertiary mt-1 text-sm">
                       {card.id} · {card.type} · {card.rarity}
                     </p>
                   </div>
@@ -235,7 +244,6 @@ export function CardInspectModal({
                     </Badge>
                   )}
                 </div>
-
               </div>
 
               {/* Color / Attributes / Traits — three columns */}
@@ -258,34 +266,45 @@ export function CardInspectModal({
                   <SectionLabel text="Attributes" />
                   {card.attribute.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
-                      {card.attribute.map((a) => <Tag key={a} text={a} />)}
+                      {card.attribute.map((a) => (
+                        <Tag key={a} text={a} />
+                      ))}
                     </div>
                   ) : (
-                    <span className="text-xs text-content-tertiary">—</span>
+                    <span className="text-content-tertiary text-xs">—</span>
                   )}
                 </div>
                 <div>
                   <SectionLabel text="Traits" />
                   {card.traits.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
-                      {card.traits.map((t) => <Tag key={t} text={t} />)}
+                      {card.traits.map((t) => (
+                        <Tag key={t} text={t} />
+                      ))}
                     </div>
                   ) : (
-                    <span className="text-xs text-content-tertiary">—</span>
+                    <span className="text-content-tertiary text-xs">—</span>
                   )}
                 </div>
               </div>
 
               {/* Stats — six columns */}
               <div className="mb-4 grid grid-cols-6 gap-2">
-                {card.cost !== null && <StatPill label="Cost" value={String(card.cost)} />}
+                {card.cost !== null && (
+                  <StatPill label="Cost" value={String(card.cost)} />
+                )}
                 {card.power !== null && (
                   <StatPill label="Power" value={card.power.toLocaleString()} />
                 )}
                 {card.counter !== null && (
-                  <StatPill label="Counter" value={card.counter.toLocaleString()} />
+                  <StatPill
+                    label="Counter"
+                    value={card.counter.toLocaleString()}
+                  />
                 )}
-                {card.life !== null && <StatPill label="Life" value={String(card.life)} />}
+                {card.life !== null && (
+                  <StatPill label="Life" value={String(card.life)} />
+                )}
                 <StatPill label="Block" value={String(card.blockNumber)} />
                 <StatPill label="Set" value={card.originSet} />
               </div>
@@ -294,7 +313,7 @@ export function CardInspectModal({
               {card.effectText && (
                 <div className="mb-3">
                   <SectionLabel text="Effect" />
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
+                  <p className="text-content-secondary text-sm leading-relaxed whitespace-pre-wrap">
                     {card.effectText}
                   </p>
                 </div>
@@ -304,7 +323,9 @@ export function CardInspectModal({
               {card.triggerText && (
                 <div className="mb-3">
                   <SectionLabel text="Trigger" />
-                  <p className="text-sm text-content-secondary">{card.triggerText}</p>
+                  <p className="text-content-secondary text-sm">
+                    {card.triggerText}
+                  </p>
                 </div>
               )}
 
@@ -314,10 +335,17 @@ export function CardInspectModal({
                   <SectionLabel text="Appears In" />
                   <div className="space-y-1">
                     {card.cardSets.map((cs) => (
-                      <div key={cs.id} className="flex items-center gap-2 text-xs">
-                        <span className="font-mono font-medium text-navy-900">{cs.setLabel}</span>
+                      <div
+                        key={cs.id}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <span className="text-navy-900 font-mono font-medium">
+                          {cs.setLabel}
+                        </span>
                         <span className="text-content-tertiary">—</span>
-                        <span className="text-content-secondary">{cs.setName}</span>
+                        <span className="text-content-secondary">
+                          {cs.setName}
+                        </span>
                         {cs.isOrigin && (
                           <Badge variant="warning" className="rounded-full">
                             Origin
@@ -332,7 +360,7 @@ export function CardInspectModal({
               <div className="flex-1" />
 
               {/* Add/remove actions — pinned to bottom */}
-              <div className="flex items-center gap-3 border-t border-border pt-4">
+              <div className="border-border flex items-center gap-3 border-t pt-4">
                 {quantityInDeck > 0 ? (
                   <>
                     <div className="flex items-center gap-1">
@@ -345,7 +373,7 @@ export function CardInspectModal({
                       >
                         −
                       </Button>
-                      <span className="w-8 text-center text-lg font-bold tabular-nums text-content-primary">
+                      <span className="text-content-primary w-8 text-center text-lg font-bold tabular-nums">
                         {quantityInDeck}
                       </span>
                       <Button
@@ -353,19 +381,23 @@ export function CardInspectModal({
                         size="sm"
                         aria-label="Add one"
                         onClick={onAddCard}
-                        disabled={quantityInDeck >= 4}
+                        disabled={!isLeader && quantityInDeck >= copyLimit}
                         className="h-9 w-9 p-0 active:scale-95"
                       >
                         +
                       </Button>
                     </div>
-                    <span className="text-xs text-content-tertiary">
-                      {isLeader ? "Set as leader" : `${quantityInDeck}/4 in deck`}
+                    <span className="text-content-tertiary text-xs">
+                      {isLeader
+                        ? "Set as leader"
+                        : `${quantityInDeck}/${copyLimit} in deck`}
                     </span>
                   </>
                 ) : (
                   <Button onClick={onAddCard}>
-                    {isLeader || card.type === "Leader" ? "Set as Leader" : "+ Add to Deck"}
+                    {isLeader || card.type === "Leader"
+                      ? "Set as Leader"
+                      : "+ Add to Deck"}
                   </Button>
                 )}
               </div>
@@ -379,18 +411,20 @@ export function CardInspectModal({
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-border bg-surface-2 px-3 py-2 text-center">
-      <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+    <div className="border-border bg-surface-2 rounded border px-3 py-2 text-center">
+      <div className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
         {label}
       </div>
-      <div className="text-sm font-bold tabular-nums text-content-primary">{value}</div>
+      <div className="text-content-primary text-sm font-bold tabular-nums">
+        {value}
+      </div>
     </div>
   );
 }
 
 function SectionLabel({ text }: { text: string }) {
   return (
-    <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+    <h4 className="text-content-tertiary mb-1.5 text-xs font-semibold tracking-widest uppercase">
       {text}
     </h4>
   );

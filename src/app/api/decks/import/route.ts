@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
         power: true,
         imageUrl: true,
         traits: true,
+        effectSchema: true,
       },
     });
 
@@ -67,15 +68,19 @@ export async function POST(request: NextRequest) {
     // Separate leader and main deck cards
     const validCards = results.filter((r) => !r.error && r.cardId);
     const leader = validCards.find(
-      (r) => "card" in r && (r as { card: { type: string } }).card?.type === "Leader",
+      (r) =>
+        "card" in r && (r as { card: { type: string } }).card?.type === "Leader"
     );
     const mainDeck = validCards.filter(
-      (r) => "card" in r && (r as { card: { type: string } }).card?.type !== "Leader",
+      (r) =>
+        "card" in r && (r as { card: { type: string } }).card?.type !== "Leader"
     );
     const errors = results.filter((r) => r.error);
 
     return apiSuccess({
-      leader: leader ? { cardId: leader.cardId, card: (leader as { card: unknown }).card } : null,
+      leader: leader
+        ? { cardId: leader.cardId, card: (leader as { card: unknown }).card }
+        : null,
       cards: mainDeck.map((r) => ({
         cardId: r.cardId,
         quantity: r.quantity,

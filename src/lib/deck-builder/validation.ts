@@ -4,13 +4,16 @@
  * Validates deck construction rules:
  * - Exactly 1 Leader
  * - Exactly 50 cards in main deck
- * - Max 4 copies of any card
+ * - Max 4 copies of any card, unless card effect schema overrides it
  * - Color affinity: all cards share at least one color with the Leader
  * - Format legality: no banned cards (restricted cards within limits)
  * - Block rotation: if format is block-specific, all cards must be legal
  */
 
-import { stripVariantSuffix } from "@/lib/utils";
+export const DEFAULT_COPY_LIMIT = 4;
+export const MAIN_DECK_SIZE = 50;
+
+type RuleModificationJson = Record<string, unknown>;
 
 export interface DeckCard {
   cardId: string;
@@ -28,6 +31,7 @@ export interface DeckCard {
     blockNumber: number;
     traits: string[];
     rarity: string;
+    effectSchema?: unknown | null;
   };
 }
 
@@ -41,20 +45,10 @@ export interface DeckLeader {
   imageUrl: string;
   traits: string[];
   effectText: string;
+  effectSchema?: unknown | null;
 }
 
 export type ValidationSeverity = "error" | "warning";
-
-/**
- * Cards whose effect text overrides the 4-copy rule ("you may have any number
- * of this card in your deck"). Source of truth: COPY_LIMIT_OVERRIDE rule
- * modifications in workers/game/src/engine/schemas/ — keep in sync.
- */
-export const UNLIMITED_COPY_CARD_IDS = new Set([
-  "OP01-075", // Pacifista
-  "OP08-072", // Biscuit Warrior
-  "OP16-042", // Prisoner of Impel Down
-]);
 
 export interface ValidationResult {
   id: string;
@@ -110,14 +104,67 @@ function computeStats(cards: DeckCard[]): DeckStats {
     }
   }
 
-  return { totalCards, colorBreakdown, costCurve, typeBreakdown, traitBreakdown };
+  return {
+    totalCards,
+    colorBreakdown,
+    costCurve,
+    typeBreakdown,
+    traitBreakdown,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Collect rule modifications from both schema encodings used by authored cards. */
+export function collectRuleModifications(
+  effectSchema: unknown
+): RuleModificationJson[] {
+  if (!isRecord(effectSchema)) return [];
+
+  const mods: RuleModificationJson[] = [];
+  const topLevelMods = effectSchema.rule_modifications;
+  if (Array.isArray(topLevelMods)) {
+    for (const mod of topLevelMods) {
+      if (isRecord(mod)) mods.push(mod);
+    }
+  }
+
+  const effects = effectSchema.effects;
+  if (Array.isArray(effects)) {
+    for (const effect of effects) {
+      if (!isRecord(effect)) continue;
+      if (effect.category !== "rule_modification") continue;
+      if (isRecord(effect.rule)) mods.push(effect.rule);
+    }
+  }
+
+  return mods;
+}
+
+export function allowsUnlimitedCopies(card: {
+  effectSchema?: unknown | null;
+}): boolean {
+  return collectRuleModifications(card.effectSchema).some(
+    (mod) =>
+      mod.rule_type === "COPY_LIMIT_OVERRIDE" && mod.limit === "UNLIMITED"
+  );
+}
+
+export function getDeckCardCopyLimit(card: {
+  effectSchema?: unknown | null;
+}): number {
+  return allowsUnlimitedCopies(card) ? MAIN_DECK_SIZE : DEFAULT_COPY_LIMIT;
 }
 
 export function validateDeck(
   leader: DeckLeader | null,
   cards: DeckCard[],
-  _format: string = "Standard",
+  _format: string = "Standard"
 ): DeckValidation {
+  void _format;
+
   const results: ValidationResult[] = [];
   const stats = computeStats(cards);
 
@@ -134,15 +181,14 @@ export function validateDeck(
   results.push({
     id: "deck-size",
     rule: "Deck Size",
-    message: `${stats.totalCards}/50 cards`,
+    message: `${stats.totalCards}/${MAIN_DECK_SIZE} cards`,
     severity: "error",
-    passed: stats.totalCards === 50,
+    passed: stats.totalCards === MAIN_DECK_SIZE,
   });
 
   // Rule 3: Max 4 copies per card (unless the card's effect lifts the limit)
   const overLimitCards = cards.filter(
-    (dc) =>
-      dc.quantity > 4 && !UNLIMITED_COPY_CARD_IDS.has(stripVariantSuffix(dc.cardId)),
+    (dc) => dc.quantity > DEFAULT_COPY_LIMIT && !allowsUnlimitedCopies(dc.card)
   );
   results.push({
     id: "copy-limit",
@@ -160,7 +206,7 @@ export function validateDeck(
   if (leader) {
     const leaderColors = new Set(leader.color);
     const colorViolations = cards.filter(
-      (dc) => !dc.card.color.some((c) => leaderColors.has(c)),
+      (dc) => !dc.card.color.some((c) => leaderColors.has(c))
     );
     results.push({
       id: "color-affinity",
@@ -191,7 +237,7 @@ export function validateDeck(
 
   // Rule 6: Restricted cards (max 1 copy)
   const restrictedOver = cards.filter(
-    (dc) => dc.card.banStatus === "RESTRICTED" && dc.quantity > 1,
+    (dc) => dc.card.banStatus === "RESTRICTED" && dc.quantity > 1
   );
   if (restrictedOver.length > 0) {
     results.push({

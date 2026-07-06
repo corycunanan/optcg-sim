@@ -46,11 +46,13 @@ describe("POST /api/decks", () => {
       quantity: 1,
     }));
 
-    const res = await POST(buildRequest({
-      name: "Draft Deck",
-      leaderId: "LEADER-1",
-      cards,
-    }));
+    const res = await POST(
+      buildRequest({
+        name: "Draft Deck",
+        leaderId: "LEADER-1",
+        cards,
+      })
+    );
 
     expect(res.status).toBe(201);
     expect(deckCreateMock).toHaveBeenCalledWith(
@@ -65,7 +67,32 @@ describe("POST /api/decks", () => {
             }),
           }),
         }),
-      }),
+      })
+    );
+  });
+
+  it("allows draft payloads with over-four card quantities", async () => {
+    const res = await POST(
+      buildRequest({
+        name: "Pacifista Draft",
+        leaderId: "LEADER-1",
+        cards: [{ cardId: "OP01-075", quantity: 8 }],
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(deckCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cards: expect.objectContaining({
+            createMany: expect.objectContaining({
+              data: [
+                expect.objectContaining({ cardId: "OP01-075", quantity: 8 }),
+              ],
+            }),
+          }),
+        }),
+      })
     );
   });
 });

@@ -5,7 +5,12 @@
  */
 
 import { NextRequest } from "next/server";
-import { requireAuth, apiSuccess, apiAction, apiError } from "@/lib/api-response";
+import {
+  requireAuth,
+  apiSuccess,
+  apiAction,
+  apiError,
+} from "@/lib/api-response";
 import { UpdateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { prisma } from "@/lib/db";
@@ -29,6 +34,7 @@ const CARD_SELECT = {
   triggerText: true,
   rarity: true,
   originSet: true,
+  effectSchema: true,
 } as const;
 
 async function getDeckForUser(deckId: string, userId: string) {
@@ -45,7 +51,7 @@ async function getDeckForUser(deckId: string, userId: string) {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
@@ -74,7 +80,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
@@ -98,7 +104,16 @@ export async function PUT(
 
     const parsed = await parseBody(request, UpdateDeckSchema);
     if (isErrorResponse(parsed)) return parsed;
-    const { name, leaderId, leaderArtUrl, sleeveUrl, donArtUrl, testOrder, format, cards } = parsed;
+    const {
+      name,
+      leaderId,
+      leaderArtUrl,
+      sleeveUrl,
+      donArtUrl,
+      testOrder,
+      format,
+      cards,
+    } = parsed;
 
     // If changing leader, validate it
     if (leaderId && leaderId !== existing.leaderId) {
@@ -160,7 +175,7 @@ export async function PUT(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
+import { getDeckCardCopyLimit } from "@/lib/deck-builder/validation";
 
 interface CardSearchResult {
   id: string;
@@ -25,6 +26,7 @@ interface CardSearchResult {
   triggerText: string | null;
   rarity: string;
   originSet: string;
+  effectSchema?: unknown | null;
 }
 
 interface DeckBuilderSearchProps {
@@ -65,7 +67,9 @@ export function DeckBuilderSearch({
   const [costMin, setCostMin] = useState("");
   const [costMax, setCostMax] = useState("");
   const [inspectCard, setInspectCard] = useState<CardSearchResult | null>(null);
-  const [pendingArtVariants, setPendingArtVariants] = useState<Map<string, string | null>>(new Map());
+  const [pendingArtVariants, setPendingArtVariants] = useState<
+    Map<string, string | null>
+  >(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +80,7 @@ export function DeckBuilderSearch({
       colors: string[],
       type: string,
       cMin: string,
-      cMax: string,
+      cMax: string
     ) => {
       setIsLoading(true);
       const params = new URLSearchParams();
@@ -91,7 +95,10 @@ export function DeckBuilderSearch({
       params.set("order", "asc");
 
       try {
-        const json = await apiGet<{ data: CardSearchResult[]; pagination?: { total: number } }>(`/api/cards?${params.toString()}`);
+        const json = await apiGet<{
+          data: CardSearchResult[];
+          pagination?: { total: number };
+        }>(`/api/cards?${params.toString()}`);
         setResults(json.data || []);
         setTotal(json.pagination?.total || 0);
       } catch {
@@ -101,7 +108,7 @@ export function DeckBuilderSearch({
         setIsLoading(false);
       }
     },
-    [],
+    []
   );
 
   useEffect(() => {
@@ -124,7 +131,10 @@ export function DeckBuilderSearch({
   const leaderColorsKey = useMemo(() => leaderColors.join(","), [leaderColors]);
   const prevLeaderColorsKeyRef = useRef("");
   useEffect(() => {
-    if (leaderColorsKey !== "" && leaderColorsKey !== prevLeaderColorsKeyRef.current) {
+    if (
+      leaderColorsKey !== "" &&
+      leaderColorsKey !== prevLeaderColorsKeyRef.current
+    ) {
       prevLeaderColorsKeyRef.current = leaderColorsKey;
       setActiveColors(leaderColors);
       setActiveType(""); // switch from Leader type filter to all types
@@ -133,7 +143,7 @@ export function DeckBuilderSearch({
 
   const toggleColor = (c: string) => {
     setActiveColors((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
     );
   };
 
@@ -165,8 +175,10 @@ export function DeckBuilderSearch({
                   className={cn(
                     "rounded px-2 py-0.5 text-xs font-medium transition-all",
                     active
-                      ? c === "Yellow" ? "text-content-primary" : "text-content-inverse"
-                      : "border border-border bg-surface-2 text-content-tertiary hover:border-border-strong"
+                      ? c === "Yellow"
+                        ? "text-content-primary"
+                        : "text-content-inverse"
+                      : "border-border bg-surface-2 text-content-tertiary hover:border-border-strong border"
                   )}
                   style={active ? { background: COLOR_BG[c] } : undefined}
                 >
@@ -181,11 +193,13 @@ export function DeckBuilderSearch({
             <select
               value={activeType}
               onChange={(e) => setActiveType(e.target.value)}
-              className="rounded border border-border bg-surface-1 px-2 py-1 text-xs text-content-secondary focus:outline-none focus:border-border-focus"
+              className="border-border bg-surface-1 text-content-secondary focus:border-border-focus rounded border px-2 py-1 text-xs focus:outline-none"
             >
               <option value="">All Types</option>
               {TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </select>
 
@@ -199,7 +213,7 @@ export function DeckBuilderSearch({
                 onChange={(e) => setCostMin(e.target.value)}
                 className="h-7 w-14 px-2 text-xs"
               />
-              <span className="text-xs text-content-tertiary">-</span>
+              <span className="text-content-tertiary text-xs">-</span>
               <Input
                 type="number"
                 min={0}
@@ -209,13 +223,13 @@ export function DeckBuilderSearch({
                 onChange={(e) => setCostMax(e.target.value)}
                 className="h-7 w-14 px-2 text-xs"
               />
-              <span className="text-xs text-content-tertiary">Cost</span>
+              <span className="text-content-tertiary text-xs">Cost</span>
             </div>
           </div>
         </div>
 
         {/* Results count */}
-        <div className="px-3 pb-1 text-xs text-content-tertiary">
+        <div className="text-content-tertiary px-3 pb-1 text-xs">
           {isLoading ? "Searching…" : `${total.toLocaleString()} cards`}
         </div>
 
@@ -236,12 +250,12 @@ export function DeckBuilderSearch({
                   aria-label={`Inspect ${card.name}`}
                   onClick={() => setInspectCard(card)}
                   className={cn(
-                    "group relative overflow-hidden rounded border-0 bg-surface-1 text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                    "group bg-surface-1 relative overflow-hidden rounded border-0 text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
                     qtyInDeck > 0 ? "border-navy-900" : "border-border",
                     !isLeaderColor && "opacity-40"
                   )}
                 >
-                  <div className="relative aspect-card w-full overflow-hidden">
+                  <div className="aspect-card relative w-full overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={card.imageUrl}
@@ -250,18 +264,20 @@ export function DeckBuilderSearch({
                       loading="lazy"
                     />
                     {qtyInDeck > 0 && (
-                      <div className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-content-inverse">
+                      <div className="bg-navy-900 text-content-inverse absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold">
                         {qtyInDeck}
                       </div>
                     )}
                   </div>
                   {/* Mini info */}
                   <div className="px-1.5 py-1">
-                    <p className="truncate text-xs font-medium leading-tight text-content-primary">
+                    <p className="text-content-primary truncate text-xs leading-tight font-medium">
                       {card.name}
                     </p>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-content-tertiary">{card.id}</span>
+                      <span className="text-content-tertiary text-xs">
+                        {card.id}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -276,18 +292,18 @@ export function DeckBuilderSearch({
                 aria-label="Previous page"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="flex h-9 w-9 items-center justify-center rounded border border-border text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:opacity-30"
+                className="border-border text-content-secondary hover:bg-surface-2 flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
               >
                 ←
               </button>
-              <span className="px-2 text-xs tabular-nums text-content-tertiary">
+              <span className="text-content-tertiary px-2 text-xs tabular-nums">
                 {page} / {totalPages}
               </span>
               <button
                 aria-label="Next page"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="flex h-9 w-9 items-center justify-center rounded border border-border text-sm text-content-secondary transition-colors hover:bg-surface-2 disabled:opacity-30"
+                className="border-border text-content-secondary hover:bg-surface-2 flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
               >
                 →
               </button>
@@ -300,8 +316,17 @@ export function DeckBuilderSearch({
         <DeckBuilderCardModal
           cardId={inspectCard.id}
           isLeader={inspectCard.type === "Leader"}
-          quantityInDeck={inspectCard.type === "Leader" ? 0 : deckCards.get(inspectCard.id)?.quantity || 0}
-          selectedArtUrl={deckCards.get(inspectCard.id)?.selectedArtUrl ?? pendingArtVariants.get(inspectCard.id) ?? null}
+          quantityInDeck={
+            inspectCard.type === "Leader"
+              ? 0
+              : deckCards.get(inspectCard.id)?.quantity || 0
+          }
+          copyLimit={getDeckCardCopyLimit(inspectCard)}
+          selectedArtUrl={
+            deckCards.get(inspectCard.id)?.selectedArtUrl ??
+            pendingArtVariants.get(inspectCard.id) ??
+            null
+          }
           onAdd={() => {
             onAddCard(inspectCard);
             const pendingArt = pendingArtVariants.get(inspectCard.id);
@@ -309,8 +334,11 @@ export function DeckBuilderSearch({
           }}
           onRemove={() => onRemoveCard(inspectCard.id)}
           onSetArtVariant={(artUrl) => {
-            setPendingArtVariants((prev) => new Map(prev).set(inspectCard.id, artUrl));
-            if (deckCards.has(inspectCard.id)) onSetArtVariant(inspectCard.id, artUrl);
+            setPendingArtVariants((prev) =>
+              new Map(prev).set(inspectCard.id, artUrl)
+            );
+            if (deckCards.has(inspectCard.id))
+              onSetArtVariant(inspectCard.id, artUrl);
           }}
           onClose={() => setInspectCard(null)}
         />

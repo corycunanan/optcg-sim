@@ -11,9 +11,15 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const { DeckInvalidError, DeckNotFoundError, requirePlayableDeck } = await import(
-  "./playable"
-);
+const { DeckInvalidError, DeckNotFoundError, requirePlayableDeck } =
+  await import("./playable");
+
+const copyLimitOverrideSchema = {
+  rule_modifications: [
+    { rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" },
+  ],
+  effects: [],
+};
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
@@ -48,7 +54,11 @@ const leader = makeCard({
 });
 
 function mainDeckRows(total = 50) {
-  const rows: Array<{ cardId: string; quantity: number; selectedArtUrl: null }> = [];
+  const rows: Array<{
+    cardId: string;
+    quantity: number;
+    selectedArtUrl: null;
+  }> = [];
   let remaining = total;
   let index = 1;
   while (remaining > 0) {
@@ -66,7 +76,7 @@ function mainDeckCards(rows = mainDeckRows()) {
       id: row.cardId,
       name: row.cardId,
       color: ["Red"],
-    }),
+    })
   );
 }
 
@@ -112,16 +122,16 @@ describe("requirePlayableDeck", () => {
     expect(result.deck.cards).toHaveLength(rows.length);
     expect(result.leader.id).toBe(leader.id);
     expect(deckFindFirstMock).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "deck-1", userId: "user-1" } }),
+      expect.objectContaining({ where: { id: "deck-1", userId: "user-1" } })
     );
   });
 
   it("throws DeckNotFoundError when the user does not own the deck", async () => {
     deckFindFirstMock.mockResolvedValue(null);
 
-    await expect(requirePlayableDeck("deck-1", "user-1")).rejects.toBeInstanceOf(
-      DeckNotFoundError,
-    );
+    await expect(
+      requirePlayableDeck("deck-1", "user-1")
+    ).rejects.toBeInstanceOf(DeckNotFoundError);
     expect(cardFindManyMock).not.toHaveBeenCalled();
   });
 
@@ -139,6 +149,28 @@ describe("requirePlayableDeck", () => {
     mockCards([leader, ...mainDeckCards(rows)]);
 
     await expectInvalidDetail("deck-size");
+  });
+
+  it("allows game start for over-4 COPY_LIMIT_OVERRIDE cards", async () => {
+    const rows = [
+      { cardId: "OP01-075", quantity: 8, selectedArtUrl: null },
+      ...mainDeckRows(42),
+    ];
+    mockDeck(rows);
+    mockCards([
+      leader,
+      makeCard({
+        id: "OP01-075",
+        name: "Pacifista",
+        color: ["Red"],
+        effectSchema: copyLimitOverrideSchema,
+      }),
+      ...mainDeckCards(rows.slice(1)),
+    ]);
+
+    const result = await requirePlayableDeck("deck-1", "user-1");
+
+    expect(result.validation.isValid).toBe(true);
   });
 
   it("rejects a missing leader card", async () => {
@@ -166,7 +198,11 @@ describe("requirePlayableDeck", () => {
     const rows = mainDeckRows(50);
     mockDeck(rows);
     const cards = mainDeckCards(rows);
-    cards[0] = makeCard({ id: rows[0].cardId, name: "Banned Card", banStatus: "BANNED" });
+    cards[0] = makeCard({
+      id: rows[0].cardId,
+      name: "Banned Card",
+      banStatus: "BANNED",
+    });
     mockCards([leader, ...cards]);
 
     await expectInvalidDetail("ban-status");
@@ -176,7 +212,11 @@ describe("requirePlayableDeck", () => {
     const rows = mainDeckRows(50);
     mockDeck(rows);
     const cards = mainDeckCards(rows);
-    cards[0] = makeCard({ id: rows[0].cardId, name: "Blue Card", color: ["Blue"] });
+    cards[0] = makeCard({
+      id: rows[0].cardId,
+      name: "Blue Card",
+      color: ["Blue"],
+    });
     mockCards([leader, ...cards]);
 
     await expectInvalidDetail("color-affinity");
@@ -196,8 +236,8 @@ describe("requirePlayableDeck", () => {
     mockDeck(rows);
     mockCards([leader, ...mainDeckCards(rows)]);
 
-    await expect(requirePlayableDeck("deck-1", "user-1")).rejects.toBeInstanceOf(
-      DeckInvalidError,
-    );
+    await expect(
+      requirePlayableDeck("deck-1", "user-1")
+    ).rejects.toBeInstanceOf(DeckInvalidError);
   });
 });

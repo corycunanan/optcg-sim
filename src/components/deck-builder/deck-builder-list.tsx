@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import type { DeckLeaderEntry } from "@/lib/deck-builder/state";
+import { getDeckCardCopyLimit } from "@/lib/deck-builder/validation";
 import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import {
   CardFanStack,
@@ -39,13 +40,14 @@ interface CardGroup {
   triggerText: string | null;
   traits: string[];
   count: number;
+  copyLimit: number;
   isLeader: boolean;
 }
 
 function buildGroups(
   leader: DeckLeaderEntry | null,
   leaderArtUrl: string | null,
-  cards: DeckCardEntry[],
+  cards: DeckCardEntry[]
 ): CardGroup[] {
   const groups: CardGroup[] = [];
 
@@ -63,6 +65,7 @@ function buildGroups(
       triggerText: null,
       traits: leader.traits,
       count: 1,
+      copyLimit: 1,
       isLeader: true,
     });
   }
@@ -88,6 +91,7 @@ function buildGroups(
       triggerText: entry.card.triggerText ?? null,
       traits: entry.card.traits,
       count: entry.quantity,
+      copyLimit: getDeckCardCopyLimit(entry.card),
       isLeader: false,
     });
   }
@@ -107,9 +111,9 @@ function StatPill({
   className?: string;
 }) {
   return (
-    <div className="text-center px-2">
-      <div className={cn("font-bold text-sm", className)}>{String(value)}</div>
-      <div className="text-xs text-content-tertiary uppercase tracking-wide">
+    <div className="px-2 text-center">
+      <div className={cn("text-sm font-bold", className)}>{String(value)}</div>
+      <div className="text-content-tertiary text-xs tracking-wide uppercase">
         {label}
       </div>
     </div>
@@ -123,13 +127,13 @@ function CardTooltipBody({ group }: { group: CardGroup }) {
 
   return (
     <>
-      <div className="font-bold text-sm text-content-primary">{group.name}</div>
-      <div className="text-xs text-content-tertiary mb-3">
+      <div className="text-content-primary text-sm font-bold">{group.name}</div>
+      <div className="text-content-tertiary mb-3 text-xs">
         {group.type} &middot; {group.cardId}
       </div>
 
       {isFieldCard ? (
-        <div className="flex gap-5 flex-wrap mb-3 text-xs">
+        <div className="mb-3 flex flex-wrap gap-5 text-xs">
           {group.type === "Leader" ? (
             <StatPill
               label="Life"
@@ -157,7 +161,7 @@ function CardTooltipBody({ group }: { group: CardGroup }) {
           )}
         </div>
       ) : (
-        <div className="flex gap-3 flex-wrap mb-3 text-xs">
+        <div className="mb-3 flex flex-wrap gap-3 text-xs">
           {group.cost != null && (
             <StatPill
               label="Cost"
@@ -166,17 +170,13 @@ function CardTooltipBody({ group }: { group: CardGroup }) {
             />
           )}
           {group.life != null && (
-            <StatPill
-              label="Life"
-              value={group.life}
-              className="text-error"
-            />
+            <StatPill label="Life" value={group.life} className="text-error" />
           )}
         </div>
       )}
 
       {group.effectText && (
-        <div className="text-xs text-content-secondary leading-relaxed border-t border-border pt-3 flex flex-col gap-2">
+        <div className="text-content-secondary border-border flex flex-col gap-2 border-t pt-3 text-xs leading-relaxed">
           {group.effectText.split(/\n{2,}/).map((paragraph, i) => (
             <p key={i} className="whitespace-pre-wrap">
               {paragraph}
@@ -205,17 +205,20 @@ export function DeckBuilderList({
   const [inspectCardId, setInspectCardId] = useState<string | null>(null);
   const [inspectIsLeader, setInspectIsLeader] = useState(false);
 
-  const inspectEntry = inspectCardId && !inspectIsLeader
-    ? cards.find((e) => e.cardId === inspectCardId) ?? null
-    : null;
+  const inspectEntry =
+    inspectCardId && !inspectIsLeader
+      ? (cards.find((e) => e.cardId === inspectCardId) ?? null)
+      : null;
 
   const groups = buildGroups(leader, leaderArtUrl, cards);
 
   if (!leader && cards.length === 0) {
     return (
-      <div className="rounded border border-border bg-surface-1 p-8 text-center">
-        <p className="text-sm font-medium text-content-tertiary">No cards in deck yet</p>
-        <p className="mt-1 text-xs text-content-tertiary">
+      <div className="border-border bg-surface-1 rounded border p-8 text-center">
+        <p className="text-content-tertiary text-sm font-medium">
+          No cards in deck yet
+        </p>
+        <p className="text-content-tertiary mt-1 text-xs">
           Click cards from the search panel to add them
         </p>
       </div>
@@ -225,69 +228,76 @@ export function DeckBuilderList({
   return (
     <>
       <TooltipProvider disableHoverableContent>
-      <div className="flex flex-wrap justify-start gap-4">
-        {groups.map((group) => (
-          <TooltipRoot key={group.cardId} delayDuration={200}>
-            <TooltipTrigger asChild>
-              <div className="group/stack flex w-min flex-col items-center">
-                {/* Card stack */}
-                { }
-                <div onClick={() => {
-                  setInspectCardId(group.cardId);
-                  setInspectIsLeader(group.isLeader);
-                }}>
-                <CardFanStack
-                  cardId={group.cardId}
-                  count={group.count}
-                  className="relative cursor-pointer"
-                  renderCard={(i) => (
-                    <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card group-hover/stack:-translate-y-2 transition-transform duration-150">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={group.imageUrl}
-                        alt={group.name}
-                        className={cn(
-                          "h-full w-full object-cover",
-                          group.count > 1 && i > 0 && "brightness-90",
-                        )}
-                        loading="lazy"
-                      />
+        <div className="flex flex-wrap justify-start gap-4">
+          {groups.map((group) => (
+            <TooltipRoot key={group.cardId} delayDuration={200}>
+              <TooltipTrigger asChild>
+                <div className="group/stack flex w-min flex-col items-center">
+                  {/* Card stack */}
+                  {}
+                  <div
+                    onClick={() => {
+                      setInspectCardId(group.cardId);
+                      setInspectIsLeader(group.isLeader);
+                    }}
+                  >
+                    <CardFanStack
+                      cardId={group.cardId}
+                      count={group.count}
+                      className="relative cursor-pointer"
+                      renderCard={(i) => (
+                        <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-transform duration-150 group-hover/stack:-translate-y-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={group.imageUrl}
+                            alt={group.name}
+                            className={cn(
+                              "h-full w-full object-cover",
+                              group.count > 1 && i > 0 && "brightness-90"
+                            )}
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                    />
+                  </div>
+
+                  {/* Quantity controls — below the stack */}
+                  {!group.isLeader && (
+                    <div className="mt-2 flex items-center gap-1">
+                      <button
+                        aria-label="Remove one"
+                        onClick={() => onDecrement(group.cardId)}
+                        className="text-content-tertiary hover:bg-surface-2 hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="text-content-primary min-w-4 text-center text-xs font-bold tabular-nums">
+                        {group.count}
+                      </span>
+                      <button
+                        aria-label="Add one"
+                        onClick={() => onIncrement(group.cardId)}
+                        disabled={
+                          group.count >= group.copyLimit || totalCards >= 50
+                        }
+                        className="text-content-tertiary hover:bg-surface-2 hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors disabled:opacity-30"
+                      >
+                        +
+                      </button>
                     </div>
                   )}
-                />
                 </div>
-
-                {/* Quantity controls — below the stack */}
-                {!group.isLeader && (
-                  <div className="mt-2 flex items-center gap-1">
-                    <button
-                      aria-label="Remove one"
-                      onClick={() => onDecrement(group.cardId)}
-                      className="flex h-5 w-5 items-center justify-center rounded text-xs font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary"
-                    >
-                      −
-                    </button>
-                    <span className="min-w-4 text-center text-xs font-bold tabular-nums text-content-primary">
-                      {group.count}
-                    </span>
-                    <button
-                      aria-label="Add one"
-                      onClick={() => onIncrement(group.cardId)}
-                      disabled={group.count >= 4 || totalCards >= 50}
-                      className="flex h-5 w-5 items-center justify-center rounded text-xs font-bold text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-primary disabled:opacity-30"
-                    >
-                      +
-                    </button>
-                  </div>
-                )}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="w-72 bg-surface-base border-border text-content-primary p-3">
-              <CardTooltipBody group={group} />
-            </TooltipContent>
-          </TooltipRoot>
-        ))}
-      </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="bg-surface-base border-border text-content-primary w-72 p-3"
+              >
+                <CardTooltipBody group={group} />
+              </TooltipContent>
+            </TooltipRoot>
+          ))}
+        </div>
       </TooltipProvider>
 
       {/* Inspect modal for deck cards */}
@@ -300,10 +310,13 @@ export function DeckBuilderList({
           }}
           isLeader={false}
           quantityInDeck={inspectEntry.quantity}
+          copyLimit={getDeckCardCopyLimit(inspectEntry.card)}
           selectedArtUrl={inspectEntry.selectedArtUrl}
           onAdd={() => onAddCard(inspectEntry.card)}
           onRemove={() => onDecrement(inspectEntry.cardId)}
-          onSetArtVariant={(artUrl) => onSetArtVariant(inspectEntry.cardId, artUrl)}
+          onSetArtVariant={(artUrl) =>
+            onSetArtVariant(inspectEntry.cardId, artUrl)
+          }
         />
       )}
 
@@ -317,9 +330,14 @@ export function DeckBuilderList({
           }}
           isLeader={true}
           quantityInDeck={0}
+          copyLimit={1}
           selectedArtUrl={leaderArtUrl}
           onAdd={() => {}}
-          onRemove={() => {}}
+          onRemove={() => {
+            onRemoveLeader();
+            setInspectCardId(null);
+            setInspectIsLeader(false);
+          }}
           onSetArtVariant={(artUrl) => onSetLeaderArt(artUrl)}
         />
       )}
