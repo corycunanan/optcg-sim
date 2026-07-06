@@ -225,7 +225,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
               onRemoveCard={removeCard}
               onSetArtVariant={setArtVariant}
               deckCards={state.cards}
-              leaderColors={state.leader?.color ?? []}
+              leader={state.leader}
             />
           )}
           {activeTab === "backs" && (
