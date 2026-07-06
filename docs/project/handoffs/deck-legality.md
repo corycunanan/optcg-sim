@@ -1,7 +1,7 @@
 ---
 linear-project: Deck Legality
 linear-project-url: https://linear.app/optcg-sim/project/deck-legality-03c2eba86dfa
-last-updated: 2026-07-05
+last-updated: 2026-07-06
 ---
 
 # Deck Legality — Handoff Doc
@@ -16,12 +16,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket                                                | Title                                                                                                   | Estimate | Depends on | Status      | PR  | Notes                                                                                                 |
 | ----- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------- | ---------- | ----------- | --- | ----------------------------------------------------------------------------------------------------- |
-| 1     | [OPT-373](https://linear.app/optcg-sim/issue/OPT-373) | Enforce COPY_LIMIT_OVERRIDE in deck validation — legal Pacifista/Biscuit Warrior decks falsely rejected | —        | —          | In Progress | —   | Smallest schema-consumer path; proves validator can read rule_modifications from `Card.effectSchema`. |
-| 2     | [OPT-374](https://linear.app/optcg-sim/issue/OPT-374) | Enforce leader DECK_RESTRICTION rules at deck build + game start (Rayleigh, Imu, P-117 Nami)            | —        | OPT-373    | Backlog     | —   | Reuse the same schema-reading pattern, then add filter matching plus deck-builder search affordances. |
+| 1     | [OPT-373](https://linear.app/optcg-sim/issue/OPT-373) | Enforce COPY_LIMIT_OVERRIDE in deck validation — legal Pacifista/Biscuit Warrior decks falsely rejected | —        | —          | Done        | [#228](https://github.com/corycunanan/optcg-sim/pull/228) | Smallest schema-consumer path; proves validator can read rule_modifications from `Card.effectSchema`. |
+| 2     | [OPT-374](https://linear.app/optcg-sim/issue/OPT-374) | Enforce leader DECK_RESTRICTION rules at deck build + game start (Rayleigh, Imu, P-117 Nami)            | —        | OPT-373    | In Review   | [#229](https://github.com/corycunanan/optcg-sim/pull/229) | Reuses schema-rule collection, adds app-side deck-restriction filter matching, and dims illegal cards in search. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-373 is active. OPT-374 follows after OPT-373 lands.
+**Next up:** Project complete after OPT-374 lands.
 
 ---
 
@@ -41,7 +41,7 @@ Append new entries at the bottom. Each entry is written _by_ the agent who just 
 
 ### OPT-373 implementation pass → OPT-374
 
-**From:** session on 2026-07-05 · **Commit:** _(uncommitted)_ · **PR:** —
+**From:** session on 2026-07-05 · **Commit:** `9f2d8f4` · **PR:** [#228](https://github.com/corycunanan/optcg-sim/pull/228)
 
 - **Primer:** `validateDeck` now derives copy limits from `Card.effectSchema` instead of a hardcoded card ID allowlist. It reads both top-level `rule_modifications` and `effects[]` blocks with `category: "rule_modification"`, so OP01 Pacifista-style and OP08/OP16 authored schemas are covered. Deck-builder reducer/import/search/modal paths use `getDeckCardCopyLimit`, and API create/update/import schemas allow quantities up to 50 so over-four unlimited-copy decks can be saved.
 - **Read first:** `src/lib/deck-builder/validation.ts`, `src/lib/deck-builder/state.ts`, `src/lib/decks/playable.ts`, `src/__tests__/deck-validation.test.ts`, `src/__tests__/deck-builder-state.test.ts`, `src/lib/decks/playable.test.ts`.
@@ -49,3 +49,13 @@ Append new entries at the bottom. Each entry is written _by_ the agent who just 
 - **Verification:** `pnpm test` passes 72 files / 523 tests. `pnpm type-check` passes. `pnpm lint` exits 0 with the existing warning baseline only.
 - **Unresolved:** OPT-374 should extend the same rule-modification collection helper for leader `DECK_RESTRICTION` rules and add the matcher for filters like `cost_min`, `card_type`, and `traits`.
 - **Why this matters for OPT-374:** The app now has a shared helper for reading schema rule modifications and proven app/server plumbing from card records into deck validation.
+
+### OPT-374 implementation pass → project complete
+
+**From:** session on 2026-07-06 · **Commit:** `9f8923e` · **PR:** [#229](https://github.com/corycunanan/optcg-sim/pull/229)
+
+- **Primer:** `validateDeck` now consumes leader `DECK_RESTRICTION` rule modifications for the three current authored cases: Rayleigh `CANNOT_INCLUDE { cost_min: 5 }`, Imu `CANNOT_INCLUDE { card_type: "EVENT", cost_min: 2 }`, and P-117 Nami `ONLY_INCLUDE { traits: ["East Blue"] }`. Game-start legality follows automatically through `requirePlayableDeck`.
+- **Read first:** `src/lib/deck-builder/validation.ts`, `src/components/deck-builder/deck-builder-search.tsx`, `src/__tests__/deck-validation.test.ts`, `src/lib/decks/playable.test.ts`.
+- **Gotchas / do NOT touch:** The matcher is intentionally app-side and slim because OPT-101 has not moved worker filter utilities into a shared package. `rg -n "DECK_RESTRICTION" workers/game/src/engine/schemas` still shows only OP12-001, OP13-079, and P-117 plus docs.
+- **Verification:** `pnpm verify` passes with network enabled. The first sandboxed run only failed during `next build` because DNS to `fonts.googleapis.com` was blocked.
+- **Unresolved:** None in this Deck Legality action plan. Future broader sharing of filter semantics belongs with OPT-101.
