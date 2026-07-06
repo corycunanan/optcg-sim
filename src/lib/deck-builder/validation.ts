@@ -8,12 +8,26 @@
  * - Color affinity: all cards share at least one color with the Leader
  * - Format legality: no banned cards (restricted cards within limits)
  * - Block rotation: if format is block-specific, all cards must be legal
+ * - Leader deck restrictions: leader-authored card filters may constrain the main deck
  */
 
 export const DEFAULT_COPY_LIMIT = 4;
 export const MAIN_DECK_SIZE = 50;
 
 type RuleModificationJson = Record<string, unknown>;
+type DeckRestrictionType = "CANNOT_INCLUDE" | "ONLY_INCLUDE";
+
+interface DeckRestrictionRule {
+  restriction: DeckRestrictionType;
+  filter: RuleModificationJson;
+}
+
+interface DeckRestrictionCard {
+  name: string;
+  type: string;
+  cost: number | null;
+  traits: string[];
+}
 
 export interface DeckCard {
   cardId: string;
@@ -158,6 +172,99 @@ export function getDeckCardCopyLimit(card: {
   return allowsUnlimitedCopies(card) ? MAIN_DECK_SIZE : DEFAULT_COPY_LIMIT;
 }
 
+function isDeckRestrictionRule(mod: RuleModificationJson): mod is {
+  rule_type: "DECK_RESTRICTION";
+  restriction: DeckRestrictionType;
+  filter: RuleModificationJson;
+} {
+  return (
+    mod.rule_type === "DECK_RESTRICTION" &&
+    (mod.restriction === "CANNOT_INCLUDE" ||
+      mod.restriction === "ONLY_INCLUDE") &&
+    isRecord(mod.filter)
+  );
+}
+
+export function collectDeckRestrictionRules(leader: {
+  effectSchema?: unknown | null;
+}): DeckRestrictionRule[] {
+  return collectRuleModifications(leader.effectSchema)
+    .filter(isDeckRestrictionRule)
+    .map((mod) => ({
+      restriction: mod.restriction,
+      filter: mod.filter,
+    }));
+}
+
+function matchesCardType(cardType: string, filterType: unknown): boolean {
+  const normalizedCardType = cardType.toUpperCase();
+
+  if (typeof filterType === "string") {
+    return filterType.toUpperCase() === normalizedCardType;
+  }
+
+  if (Array.isArray(filterType)) {
+    return filterType.some(
+      (type) =>
+        typeof type === "string" && type.toUpperCase() === normalizedCardType
+    );
+  }
+
+  return true;
+}
+
+function matchesTraitFilter(
+  cardTraits: string[],
+  filterTraits: unknown
+): boolean {
+  if (!Array.isArray(filterTraits)) return true;
+  return filterTraits.every(
+    (trait) => typeof trait === "string" && cardTraits.includes(trait)
+  );
+}
+
+export function matchesDeckRestrictionFilter(
+  card: DeckRestrictionCard,
+  filter: RuleModificationJson
+): boolean {
+  if (
+    typeof filter.cost_min === "number" &&
+    (card.cost ?? 0) < filter.cost_min
+  ) {
+    return false;
+  }
+
+  if (!matchesCardType(card.type, filter.card_type)) return false;
+  if (!matchesTraitFilter(card.traits ?? [], filter.traits)) return false;
+
+  return true;
+}
+
+export function isCardAllowedByLeaderDeckRestrictions(
+  leader: { effectSchema?: unknown | null } | null,
+  card: DeckRestrictionCard
+): boolean {
+  if (!leader) return true;
+
+  return isCardAllowedByDeckRestrictionRules(
+    collectDeckRestrictionRules(leader),
+    card
+  );
+}
+
+function isCardAllowedByDeckRestrictionRules(
+  rules: DeckRestrictionRule[],
+  card: DeckRestrictionCard
+): boolean {
+  for (const rule of rules) {
+    const matchesFilter = matchesDeckRestrictionFilter(card, rule.filter);
+    if (rule.restriction === "CANNOT_INCLUDE" && matchesFilter) return false;
+    if (rule.restriction === "ONLY_INCLUDE" && !matchesFilter) return false;
+  }
+
+  return true;
+}
+
 export function validateDeck(
   leader: DeckLeader | null,
   cards: DeckCard[],
@@ -219,6 +326,25 @@ export function validateDeck(
       passed: colorViolations.length === 0,
       cardIds: colorViolations.map((dc) => dc.cardId),
     });
+
+    const deckRestrictionRules = collectDeckRestrictionRules(leader);
+    if (deckRestrictionRules.length > 0) {
+      const deckRestrictionViolations = cards.filter(
+        (dc) =>
+          !isCardAllowedByDeckRestrictionRules(deckRestrictionRules, dc.card)
+      );
+      results.push({
+        id: "leader-deck-restriction",
+        rule: "Leader Restriction",
+        message:
+          deckRestrictionViolations.length > 0
+            ? `${deckRestrictionViolations.length} card(s) violate ${leader.name}'s deck restriction: ${deckRestrictionViolations.map((dc) => dc.card.name).join(", ")}`
+            : "All cards satisfy leader deck restrictions",
+        severity: "error",
+        passed: deckRestrictionViolations.length === 0,
+        cardIds: deckRestrictionViolations.map((dc) => dc.cardId),
+      });
+    }
   }
 
   // Rule 5: Ban status

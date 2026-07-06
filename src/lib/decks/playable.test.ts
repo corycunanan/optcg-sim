@@ -21,6 +21,16 @@ const copyLimitOverrideSchema = {
   effects: [],
 };
 
+const rayleighRestrictionSchema = {
+  rule_modifications: [
+    {
+      rule_type: "DECK_RESTRICTION",
+      restriction: "CANNOT_INCLUDE",
+      filter: { cost_min: 5 },
+    },
+  ],
+};
+
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
     id: "OP01-001",
@@ -171,6 +181,31 @@ describe("requirePlayableDeck", () => {
     const result = await requirePlayableDeck("deck-1", "user-1");
 
     expect(result.validation.isValid).toBe(true);
+  });
+
+  it("rejects game start for leader DECK_RESTRICTION violations", async () => {
+    const rows = mainDeckRows(50);
+    mockDeck(rows, { leaderId: "OP12-001" });
+    const cards = mainDeckCards(rows);
+    cards[0] = makeCard({
+      id: rows[0].cardId,
+      name: "Illegal High Cost",
+      color: ["Red"],
+      cost: 5,
+    });
+    mockCards([
+      makeCard({
+        id: "OP12-001",
+        name: "Silvers Rayleigh",
+        type: "Leader",
+        life: 5,
+        color: ["Red"],
+        effectSchema: rayleighRestrictionSchema,
+      }),
+      ...cards,
+    ]);
+
+    await expectInvalidDetail("leader-deck-restriction");
   });
 
   it("rejects a missing leader card", async () => {

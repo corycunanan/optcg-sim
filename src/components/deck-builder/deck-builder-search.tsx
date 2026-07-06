@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import type { DeckCardEntry } from "@/lib/deck-builder/state";
+import type { DeckCardEntry, DeckLeaderEntry } from "@/lib/deck-builder/state";
 import { Input } from "@/components/ui/input";
 import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
-import { getDeckCardCopyLimit } from "@/lib/deck-builder/validation";
+import {
+  getDeckCardCopyLimit,
+  isCardAllowedByLeaderDeckRestrictions,
+} from "@/lib/deck-builder/validation";
 
 interface CardSearchResult {
   id: string;
@@ -34,7 +37,7 @@ interface DeckBuilderSearchProps {
   onRemoveCard: (cardId: string) => void;
   onSetArtVariant: (cardId: string, artUrl: string | null) => void;
   deckCards: Map<string, DeckCardEntry>;
-  leaderColors: string[];
+  leader: DeckLeaderEntry | null;
 }
 
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
@@ -55,7 +58,7 @@ export function DeckBuilderSearch({
   onRemoveCard,
   onSetArtVariant,
   deckCards,
-  leaderColors,
+  leader,
 }: DeckBuilderSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardSearchResult[]>([]);
@@ -128,6 +131,7 @@ export function DeckBuilderSearch({
   }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When a leader is selected/changed, auto-filter to their compatible colors
+  const leaderColors = useMemo(() => leader?.color ?? [], [leader]);
   const leaderColorsKey = useMemo(() => leaderColors.join(","), [leaderColors]);
   const prevLeaderColorsKeyRef = useRef("");
   useEffect(() => {
@@ -243,6 +247,9 @@ export function DeckBuilderSearch({
                 leaderColors.length === 0 ||
                 card.color.some((c) => leaderColors.includes(c)) ||
                 card.type === "Leader";
+              const isLeaderRestrictionAllowed =
+                card.type === "Leader" ||
+                isCardAllowedByLeaderDeckRestrictions(leader, card);
 
               return (
                 <button
@@ -252,7 +259,8 @@ export function DeckBuilderSearch({
                   className={cn(
                     "group bg-surface-1 relative overflow-hidden rounded border-0 text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
                     qtyInDeck > 0 ? "border-navy-900" : "border-border",
-                    !isLeaderColor && "opacity-40"
+                    (!isLeaderColor || !isLeaderRestrictionAllowed) &&
+                      "opacity-40"
                   )}
                 >
                   <div className="aspect-card relative w-full overflow-hidden">
