@@ -38,8 +38,11 @@ jobs:
               - 'pipeline/sync-effect-schemas.ts'
 
   deploy-game:
-    needs: changes
-    if: needs.changes.outputs.game == 'true'
+    needs: [changes, sync-effect-schemas]
+    if: >-
+      always() &&
+      needs.changes.outputs.game == 'true' &&
+      (needs.changes.outputs.schemas != 'true' || needs.sync-effect-schemas.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
