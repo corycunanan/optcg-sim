@@ -7,8 +7,9 @@ import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 import {
+  collectDeckRestrictionRules,
   getDeckCardCopyLimit,
-  isCardAllowedByLeaderDeckRestrictions,
+  isCardAllowedByDeckRestrictionRules,
 } from "@/lib/deck-builder/validation";
 
 interface CardSearchResult {
@@ -132,6 +133,11 @@ export function DeckBuilderSearch({
 
   // When a leader is selected/changed, auto-filter to their compatible colors
   const leaderColors = useMemo(() => leader?.color ?? [], [leader]);
+  // Rules depend only on the leader — don't re-parse its schema per card per render
+  const leaderRestrictionRules = useMemo(
+    () => (leader ? collectDeckRestrictionRules(leader) : []),
+    [leader]
+  );
   const leaderColorsKey = useMemo(() => leaderColors.join(","), [leaderColors]);
   const prevLeaderColorsKeyRef = useRef("");
   useEffect(() => {
@@ -249,7 +255,10 @@ export function DeckBuilderSearch({
                 card.type === "Leader";
               const isLeaderRestrictionAllowed =
                 card.type === "Leader" ||
-                isCardAllowedByLeaderDeckRestrictions(leader, card);
+                isCardAllowedByDeckRestrictionRules(
+                  leaderRestrictionRules,
+                  card
+                );
 
               return (
                 <button

@@ -112,6 +112,18 @@ function clearTestOrder(
   return state.testOrder !== null ? { testOrder: null } : {};
 }
 
+/** Write `entry` with its quantity clamped to the card's copy limit. */
+function setClampedQuantity(
+  cards: Map<string, DeckCardEntry>,
+  entry: DeckCardEntry,
+  quantity: number
+): void {
+  cards.set(entry.cardId, {
+    ...entry,
+    quantity: Math.min(quantity, getDeckCardCopyLimit(entry.card)),
+  });
+}
+
 export function deckBuilderReducer(
   state: DeckBuilderState,
   action: DeckBuilderAction
@@ -143,13 +155,7 @@ export function deckBuilderReducer(
       const newCards = new Map(state.cards);
       const existing = newCards.get(action.card.id);
       if (existing) {
-        const copyLimit = getDeckCardCopyLimit(existing.card);
-        if (existing.quantity < copyLimit) {
-          newCards.set(action.card.id, {
-            ...existing,
-            quantity: existing.quantity + 1,
-          });
-        }
+        setClampedQuantity(newCards, existing, existing.quantity + 1);
       } else {
         newCards.set(action.card.id, {
           cardId: action.card.id,
@@ -184,11 +190,7 @@ export function deckBuilderReducer(
         if (action.quantity <= 0) {
           newCards.delete(action.cardId);
         } else {
-          const copyLimit = getDeckCardCopyLimit(entry.card);
-          newCards.set(action.cardId, {
-            ...entry,
-            quantity: Math.min(action.quantity, copyLimit),
-          });
+          setClampedQuantity(newCards, entry, action.quantity);
         }
       }
       return {
@@ -203,13 +205,7 @@ export function deckBuilderReducer(
       const newCards = new Map(state.cards);
       const entry = newCards.get(action.cardId);
       if (entry) {
-        const copyLimit = getDeckCardCopyLimit(entry.card);
-        if (entry.quantity < copyLimit) {
-          newCards.set(action.cardId, {
-            ...entry,
-            quantity: entry.quantity + 1,
-          });
-        }
+        setClampedQuantity(newCards, entry, entry.quantity + 1);
       }
       return {
         ...state,
@@ -280,18 +276,17 @@ export function deckBuilderReducer(
       for (const entry of action.cards) {
         const existing = newCards.get(entry.cardId);
         if (existing) {
-          const copyLimit = getDeckCardCopyLimit(existing.card);
-          newCards.set(entry.cardId, {
-            ...existing,
-            quantity: Math.min(existing.quantity + entry.quantity, copyLimit),
-          });
+          setClampedQuantity(
+            newCards,
+            existing,
+            existing.quantity + entry.quantity
+          );
         } else {
-          const copyLimit = getDeckCardCopyLimit(entry.card);
-          newCards.set(entry.cardId, {
-            ...entry,
-            quantity: Math.min(entry.quantity, copyLimit),
-            selectedArtUrl: entry.selectedArtUrl ?? null,
-          });
+          setClampedQuantity(
+            newCards,
+            { ...entry, selectedArtUrl: entry.selectedArtUrl ?? null },
+            entry.quantity
+          );
         }
       }
       return {

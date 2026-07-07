@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DeckCardEntry } from "@/lib/deck-builder/state";
 import type { DeckLeaderEntry } from "@/lib/deck-builder/state";
@@ -210,7 +210,12 @@ export function DeckBuilderList({
       ? (cards.find((e) => e.cardId === inspectCardId) ?? null)
       : null;
 
-  const groups = buildGroups(leader, leaderArtUrl, cards);
+  // buildGroups walks every card and parses effect schemas for copy limits —
+  // don't redo it when only unrelated state (e.g. the inspect modal) changes
+  const groups = useMemo(
+    () => buildGroups(leader, leaderArtUrl, cards),
+    [leader, leaderArtUrl, cards]
+  );
 
   if (!leader && cards.length === 0) {
     return (

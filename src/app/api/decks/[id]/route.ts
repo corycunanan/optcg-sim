@@ -16,27 +16,7 @@ import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
 import { findCopyLimitViolations } from "@/lib/decks/copy-limits";
-
-const CARD_SELECT = {
-  id: true,
-  name: true,
-  color: true,
-  type: true,
-  cost: true,
-  power: true,
-  counter: true,
-  life: true,
-  imageUrl: true,
-  banStatus: true,
-  blockNumber: true,
-  traits: true,
-  attribute: true,
-  effectText: true,
-  triggerText: true,
-  rarity: true,
-  originSet: true,
-  effectSchema: true,
-} as const;
+import { CARD_SELECT } from "@/lib/decks/card-select";
 
 async function getDeckForUser(deckId: string, userId: string) {
   return prisma.deck.findFirst({
