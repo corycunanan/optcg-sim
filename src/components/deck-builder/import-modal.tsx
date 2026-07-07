@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getDeckCardCopyLimit } from "@/lib/deck-builder/validation";
 
 interface ImportModalProps {
   onImport: (leader: DeckLeaderEntry | null, cards: DeckCardEntry[]) => void;
@@ -46,6 +47,20 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
     leader: { cardId: string; card: ImportCard } | null;
     cards: { cardId: string; quantity: number; card: ImportCard }[];
   } | null>(null);
+
+  // Quantities above a card's copy limit are clamped on import — surface that
+  // in the preview instead of silently dropping copies.
+  const clampWarnings = (preview?.cards ?? [])
+    .map((c) => ({ ...c, copyLimit: getDeckCardCopyLimit(c.card) }))
+    .filter((c) => c.quantity > c.copyLimit)
+    .map(
+      (c) =>
+        `${c.card.name} (${c.cardId}): importing ${c.copyLimit} of ${c.quantity} copies (copy limit ${c.copyLimit})`
+    );
+  const importedCardCount = (preview?.cards ?? []).reduce(
+    (sum, c) => sum + Math.min(c.quantity, getDeckCardCopyLimit(c.card)),
+    0
+  );
 
   const handleParse = useCallback(async () => {
     if (!text.trim()) return;
@@ -89,6 +104,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           traits: preview.leader.card.traits || [],
           effectText: "",
           attribute: [],
+          effectSchema: preview.leader.card.effectSchema ?? null,
         }
       : null;
 
@@ -153,6 +169,16 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
             </div>
           )}
 
+          {clampWarnings.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {clampWarnings.map((warning, i) => (
+                <Alert key={i} variant="warning">
+                  <AlertDescription>{warning}</AlertDescription>
+                </Alert>
+              ))}
+            </div>
+          )}
+
           {preview && (
             <div className="border-border bg-surface-2 text-content-secondary rounded border p-3 text-xs">
               {preview.leader && (
@@ -160,10 +186,8 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
                   Leader: <strong>{preview.leader.card.name}</strong> ·{" "}
                 </span>
               )}
-              <strong>
-                {preview.cards.reduce((sum, c) => sum + c.quantity, 0)}
-              </strong>{" "}
-              cards from <strong>{preview.cards.length}</strong> unique
+              <strong>{importedCardCount}</strong> cards from{" "}
+              <strong>{preview.cards.length}</strong> unique
             </div>
           )}
         </DialogBody>

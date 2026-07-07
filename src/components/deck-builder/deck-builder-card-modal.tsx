@@ -12,6 +12,8 @@ interface DeckBuilderCardModalProps {
   selectedArtUrl: string | null;
   onAdd: () => void;
   onRemove: () => void;
+  /** When set, the card is the deck's current leader and the footer offers removal instead of "Set as Leader". */
+  onRemoveLeader?: () => void;
   onSetArtVariant: (artUrl: string | null) => void;
 }
 
@@ -24,6 +26,7 @@ export function DeckBuilderCardModal({
   selectedArtUrl,
   onAdd,
   onRemove,
+  onRemoveLeader,
   onSetArtVariant,
 }: DeckBuilderCardModalProps) {
   const copyLabel = isLeader
@@ -38,7 +41,14 @@ export function DeckBuilderCardModal({
       onImageSelect={(url, isBase) => onSetArtVariant(isBase ? null : url)}
       footer={(card) => (
         <div className="flex items-center gap-3">
-          {quantityInDeck > 0 ? (
+          {isLeader && onRemoveLeader ? (
+            <>
+              <Button variant="destructive" onClick={onRemoveLeader}>
+                Remove Leader
+              </Button>
+              <span className="text-content-tertiary text-xs">{copyLabel}</span>
+            </>
+          ) : quantityInDeck > 0 ? (
             <>
               <div className="flex items-center gap-1">
                 <Button

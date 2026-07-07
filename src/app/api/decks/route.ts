@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { CreateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
+import { findCopyLimitViolations } from "@/lib/decks/copy-limits";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -106,6 +107,14 @@ export async function POST(request: NextRequest) {
     }
     if (leader.type !== "Leader") {
       return apiError("Selected card is not a Leader", 400);
+    }
+
+    const copyLimitViolations = await findCopyLimitViolations(cards ?? []);
+    if (copyLimitViolations.length > 0) {
+      return apiError(
+        `Quantity exceeds copy limit for: ${copyLimitViolations.join(", ")}`,
+        400
+      );
     }
 
     const deck = await prisma.deck.create({

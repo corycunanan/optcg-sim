@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const cardFindUniqueMock = vi.fn();
+const cardFindManyMock = vi.fn();
 const deckCreateMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {
-    card: { findUnique: (...args: unknown[]) => cardFindUniqueMock(...args) },
+    card: {
+      findUnique: (...args: unknown[]) => cardFindUniqueMock(...args),
+      findMany: (...args: unknown[]) => cardFindManyMock(...args),
+    },
     deck: { create: (...args: unknown[]) => deckCreateMock(...args) },
   },
 }));
@@ -27,15 +31,23 @@ function buildRequest(body: unknown) {
   });
 }
 
+const copyLimitOverrideSchema = {
+  rule_modifications: [
+    { rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" },
+  ],
+};
+
 beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   cardFindUniqueMock.mockReset();
+  cardFindManyMock.mockReset();
   deckCreateMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-1" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   cardFindUniqueMock.mockResolvedValue({ id: "LEADER-1", type: "Leader" });
+  cardFindManyMock.mockResolvedValue([]);
   deckCreateMock.mockResolvedValue({ id: "deck-1", name: "Draft Deck" });
 });
 
@@ -71,7 +83,11 @@ describe("POST /api/decks", () => {
     );
   });
 
-  it("allows draft payloads with over-four card quantities", async () => {
+  it("allows over-four quantities for COPY_LIMIT_OVERRIDE cards", async () => {
+    cardFindManyMock.mockResolvedValue([
+      { id: "OP01-075", effectSchema: copyLimitOverrideSchema },
+    ]);
+
     const res = await POST(
       buildRequest({
         name: "Pacifista Draft",
@@ -94,5 +110,22 @@ describe("POST /api/decks", () => {
         }),
       })
     );
+  });
+
+  it("rejects over-four quantities for cards without a copy limit override", async () => {
+    cardFindManyMock.mockResolvedValue([
+      { id: "OP01-001", effectSchema: null },
+    ]);
+
+    const res = await POST(
+      buildRequest({
+        name: "Illegal Draft",
+        leaderId: "LEADER-1",
+        cards: [{ cardId: "OP01-001", quantity: 8 }],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(deckCreateMock).not.toHaveBeenCalled();
   });
 });
