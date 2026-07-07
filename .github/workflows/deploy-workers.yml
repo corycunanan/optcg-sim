@@ -6,6 +6,8 @@ on:
     paths:
       - "workers/game/**"
       - "workers/images/**"
+      - "src/lib/deck-builder/validation.ts"
+      - "pipeline/sync-effect-schemas.ts"
       - ".github/workflows/deploy-workers.yml"
 
 concurrency:
@@ -18,6 +20,7 @@ jobs:
     outputs:
       game: ${{ steps.filter.outputs.game }}
       images: ${{ steps.filter.outputs.images }}
+      schemas: ${{ steps.filter.outputs.schemas }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -28,6 +31,11 @@ jobs:
               - 'workers/game/**'
             images:
               - 'workers/images/**'
+            schemas:
+              - 'workers/game/src/engine/schemas/**'
+              - 'workers/game/src/engine/schema-registry.ts'
+              - 'src/lib/deck-builder/validation.ts'
+              - 'pipeline/sync-effect-schemas.ts'
 
   deploy-game:
     needs: changes
@@ -49,6 +57,42 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: workers/game
+
+  # Card.effectSchema is a derived copy of the authored schemas in
+  # workers/game/src/engine/schemas/ (see pipeline/sync-effect-schemas.ts).
+  # Re-sync both Neon branches whenever the authored schemas or the sync
+  # logic change, then verify with --check so drift fails the workflow.
+  sync-effect-schemas:
+    needs: changes
+    if: needs.changes.outputs.schemas == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env-name: dev
+            url-secret: DATABASE_URL_DEV
+          - env-name: prod
+            url-secret: DATABASE_URL_PROD
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+      - name: Sync effect schemas (${{ matrix.env-name }})
+        run: pnpm pipeline:sync-schemas
+        env:
+          DATABASE_URL: ${{ secrets[matrix.url-secret] }}
+      - name: Verify no drift remains (${{ matrix.env-name }})
+        run: pnpm pipeline:sync-schemas --check
+        env:
+          DATABASE_URL: ${{ secrets[matrix.url-secret] }}
 
   deploy-images:
     needs: changes
