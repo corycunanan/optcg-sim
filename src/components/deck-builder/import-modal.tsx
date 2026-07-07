@@ -121,6 +121,8 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
         }
       : null;
 
+    // Quantities are intentionally raw: the IMPORT_CARDS reducer owns
+    // clamping, since only it can merge with copies already in the deck.
     const cards: DeckCardEntry[] = preview.cards.map((c) => ({
       cardId: c.cardId,
       quantity: c.quantity,

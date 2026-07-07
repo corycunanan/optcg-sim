@@ -11,6 +11,7 @@ import { CreateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 import { findCopyLimitViolations } from "@/lib/decks/copy-limits";
+import { CARD_SELECT } from "@/lib/decks/card-select";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -142,27 +143,7 @@ export async function POST(request: NextRequest) {
       include: {
         cards: {
           include: {
-            card: {
-              select: {
-                id: true,
-                name: true,
-                color: true,
-                type: true,
-                cost: true,
-                power: true,
-                counter: true,
-                imageUrl: true,
-                banStatus: true,
-                blockNumber: true,
-                traits: true,
-                attribute: true,
-                effectText: true,
-                triggerText: true,
-                rarity: true,
-                originSet: true,
-                effectSchema: true,
-              },
-            },
+            card: { select: CARD_SELECT },
           },
         },
       },

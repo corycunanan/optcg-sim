@@ -17,7 +17,7 @@ export const MAIN_DECK_SIZE = 50;
 type RuleModificationJson = Record<string, unknown>;
 type DeckRestrictionType = "CANNOT_INCLUDE" | "ONLY_INCLUDE";
 
-interface DeckRestrictionRule {
+export interface DeckRestrictionRule {
   restriction: DeckRestrictionType;
   filter: RuleModificationJson;
 }
@@ -240,19 +240,7 @@ export function matchesDeckRestrictionFilter(
   return true;
 }
 
-export function isCardAllowedByLeaderDeckRestrictions(
-  leader: { effectSchema?: unknown | null } | null,
-  card: DeckRestrictionCard
-): boolean {
-  if (!leader) return true;
-
-  return isCardAllowedByDeckRestrictionRules(
-    collectDeckRestrictionRules(leader),
-    card
-  );
-}
-
-function isCardAllowedByDeckRestrictionRules(
+export function isCardAllowedByDeckRestrictionRules(
   rules: DeckRestrictionRule[],
   card: DeckRestrictionCard
 ): boolean {

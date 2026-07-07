@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useCallback, useEffect, useState } from "react";
+import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   deckBuilderReducer,
@@ -101,19 +101,18 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     loadDeck();
   }, [deckId, router]);
 
-  // Validation
-  const cardsArray: DeckCard[] = Array.from(state.cards.values());
-  const leaderForValidation: DeckLeader | null = state.leader
-    ? {
-        ...state.leader,
-        effectText: state.leader.effectText || "",
-      }
-    : null;
-  const validation = validateDeck(
-    leaderForValidation,
-    cardsArray,
-    state.format
-  );
+  // Validation — walks every card and parses effect schemas, so only rerun
+  // when the deck actually changes
+  const validation = useMemo(() => {
+    const cardsArray: DeckCard[] = Array.from(state.cards.values());
+    const leaderForValidation: DeckLeader | null = state.leader
+      ? {
+          ...state.leader,
+          effectText: state.leader.effectText || "",
+        }
+      : null;
+    return validateDeck(leaderForValidation, cardsArray, state.format);
+  }, [state.leader, state.cards, state.format]);
 
   // Save deck
   const saveDeck = useCallback(async () => {
