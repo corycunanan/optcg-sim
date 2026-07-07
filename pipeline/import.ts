@@ -16,6 +16,7 @@ import { classifyEntries } from "./classify";
 import { buildSetMembership } from "./build-set-membership";
 import { writeToDatabase } from "./write";
 import { verify } from "./verify";
+import { syncEffectSchemas } from "./sync-effect-schemas";
 
 const DEFAULT_DATA_DIR = "data/vegapull-full/json";
 
@@ -87,6 +88,19 @@ async function main() {
     // Step 6: Verify
     console.log("━━━ Step 6: Verifying ━━━");
     await verify(prisma, baseCards, artVariants, cardSets);
+    console.log();
+
+    // Step 7: Sync deck-legality rule modifications from authored schemas
+    console.log("━━━ Step 7: Syncing effect schemas ━━━");
+    const syncResult = await syncEffectSchemas(prisma, { write: true });
+    console.log(
+      `  Schemas synced:       ${syncResult.updated.length + syncResult.cleared.length} (${syncResult.unchanged} unchanged)`
+    );
+    if (syncResult.missingInDb.length > 0) {
+      console.log(
+        `  ⚠ Authored schemas for cards not in DB: ${syncResult.missingInDb.join(", ")}`
+      );
+    }
   } finally {
     await prisma.$disconnect();
   }

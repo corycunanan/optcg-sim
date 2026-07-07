@@ -333,7 +333,8 @@ export function DeckBuilderList({
           copyLimit={1}
           selectedArtUrl={leaderArtUrl}
           onAdd={() => {}}
-          onRemove={() => {
+          onRemove={() => {}}
+          onRemoveLeader={() => {
             onRemoveLeader();
             setInspectCardId(null);
             setInspectIsLeader(false);

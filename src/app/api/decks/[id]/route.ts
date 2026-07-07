@@ -15,6 +15,7 @@ import { UpdateDeckSchema } from "@/lib/validators/decks";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
+import { findCopyLimitViolations } from "@/lib/decks/copy-limits";
 
 const CARD_SELECT = {
   id: true,
@@ -121,6 +122,14 @@ export async function PUT(
       if (!leader || leader.type !== "Leader") {
         return apiError("Invalid leader card", 400);
       }
+    }
+
+    const copyLimitViolations = await findCopyLimitViolations(cards ?? []);
+    if (copyLimitViolations.length > 0) {
+      return apiError(
+        `Quantity exceeds copy limit for: ${copyLimitViolations.join(", ")}`,
+        400
+      );
     }
 
     // Build update data

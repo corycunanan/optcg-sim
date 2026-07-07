@@ -59,3 +59,13 @@ Append new entries at the bottom. Each entry is written _by_ the agent who just 
 - **Gotchas / do NOT touch:** The matcher is intentionally app-side and slim because OPT-101 has not moved worker filter utilities into a shared package. `rg -n "DECK_RESTRICTION" workers/game/src/engine/schemas` still shows only OP12-001, OP13-079, and P-117 plus docs.
 - **Verification:** `pnpm verify` passes with network enabled. The first sandboxed run only failed during `next build` because DNS to `fonts.googleapis.com` was blocked.
 - **Unresolved:** None in this Deck Legality action plan. Future broader sharing of filter semantics belongs with OPT-101.
+
+### Post-merge review fix → effect schema sync
+
+**From:** session on 2026-07-06 · **Commit:** _(uncommitted)_ · **PR:** —
+
+- **Primer:** This doc's premise ("rule modifications already encoded in `Card.effectSchema`") was false: no code path ever wrote that column, and both Neon branches had `effectSchema = NULL` for every card, so OPT-373/374 validation was inert and unlimited-copy decks regressed (the deleted allowlist had no schema replacement). `pipeline/sync-effect-schemas.ts` now materializes the deck-legality subset (`rule_modifications` only) from the authored worker schemas into the DB — as `pnpm pipeline:sync-schemas` (`--check` for drift, `--dry-run`), and as Step 7 of `pipeline/import.ts` so imports can't leave the column empty.
+- **Read first:** `pipeline/sync-effect-schemas.ts`, `src/__tests__/effect-schema-sync.test.ts`, `workers/game/src/engine/schema-registry.ts` (`getAllAuthoredSchemas`).
+- **Gotchas / do NOT touch:** The DB column is a derived copy — authored TS files in `workers/game/src/engine/schemas/` stay the single source of truth; never hand-edit `effectSchema` in the DB. The CI test `effect-schema-sync.test.ts` fails on any authored `DECK_RESTRICTION` filter key outside `{cost_min, card_type, traits}` — extend `matchesDeckRestrictionFilter` in `validation.ts` before authoring new keys (the matcher silently ignores unknown keys otherwise).
+- **Verification:** dev synced (23 cards) and prod synced (21 cards; OP16-042/OP16-118 flagged missing because prod lacks the OP16 set), `--check` clean on both; `pnpm lint` / `type-check` / `test` (74 files, 536 tests) / `build` pass.
+- **Unresolved:** None. The same session also fixed the other post-merge review findings: import modal now carries leader `effectSchema` (restrictions visible for imported decks), import preview warns when quantities will be clamped to a card's copy limit (and counts the clamped total), the leader inspect modal has a working "Remove Leader" button (`onRemoveLeader` prop on `DeckBuilderCardModal`), and deck POST/PUT reject over-limit quantities schema-aware via `src/lib/decks/copy-limits.ts`.
