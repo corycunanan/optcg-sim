@@ -49,15 +49,28 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
   } | null>(null);
 
   // Quantities above a card's copy limit are clamped on import — surface that
-  // in the preview instead of silently dropping copies.
-  const clampWarnings = (preview?.cards ?? [])
+  // in the preview instead of silently dropping copies. The reducer merges
+  // duplicate lines for the same card before clamping, so aggregate by cardId
+  // first or repeated lines each look under-limit.
+  const aggregatedCards = [
+    ...(preview?.cards ?? [])
+      .reduce((byId, c) => {
+        const existing = byId.get(c.cardId);
+        return byId.set(c.cardId, {
+          ...c,
+          quantity: (existing?.quantity ?? 0) + c.quantity,
+        });
+      }, new Map<string, { cardId: string; quantity: number; card: ImportCard }>())
+      .values(),
+  ];
+  const clampWarnings = aggregatedCards
     .map((c) => ({ ...c, copyLimit: getDeckCardCopyLimit(c.card) }))
     .filter((c) => c.quantity > c.copyLimit)
     .map(
       (c) =>
         `${c.card.name} (${c.cardId}): importing ${c.copyLimit} of ${c.quantity} copies (copy limit ${c.copyLimit})`
     );
-  const importedCardCount = (preview?.cards ?? []).reduce(
+  const importedCardCount = aggregatedCards.reduce(
     (sum, c) => sum + Math.min(c.quantity, getDeckCardCopyLimit(c.card)),
     0
   );
@@ -187,7 +200,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
                 </span>
               )}
               <strong>{importedCardCount}</strong> cards from{" "}
-              <strong>{preview.cards.length}</strong> unique
+              <strong>{aggregatedCards.length}</strong> unique
             </div>
           )}
         </DialogBody>
