@@ -1,7 +1,7 @@
 ---
 linear-project: Deck Legality
 linear-project-url: https://linear.app/optcg-sim/project/deck-legality-03c2eba86dfa
-last-updated: 2026-07-06
+last-updated: 2026-07-07
 ---
 
 # Deck Legality — Handoff Doc
@@ -17,11 +17,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket                                                | Title                                                                                                   | Estimate | Depends on | Status      | PR  | Notes                                                                                                 |
 | ----- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------- | ---------- | ----------- | --- | ----------------------------------------------------------------------------------------------------- |
 | 1     | [OPT-373](https://linear.app/optcg-sim/issue/OPT-373) | Enforce COPY_LIMIT_OVERRIDE in deck validation — legal Pacifista/Biscuit Warrior decks falsely rejected | —        | —          | Done        | [#228](https://github.com/corycunanan/optcg-sim/pull/228) | Smallest schema-consumer path; proves validator can read rule_modifications from `Card.effectSchema`. |
-| 2     | [OPT-374](https://linear.app/optcg-sim/issue/OPT-374) | Enforce leader DECK_RESTRICTION rules at deck build + game start (Rayleigh, Imu, P-117 Nami)            | —        | OPT-373    | In Review   | [#229](https://github.com/corycunanan/optcg-sim/pull/229) | Reuses schema-rule collection, adds app-side deck-restriction filter matching, and dims illegal cards in search. |
+| 2     | [OPT-374](https://linear.app/optcg-sim/issue/OPT-374) | Enforce leader DECK_RESTRICTION rules at deck build + game start (Rayleigh, Imu, P-117 Nami)            | —        | OPT-373    | Done        | [#229](https://github.com/corycunanan/optcg-sim/pull/229) | Reuses schema-rule collection, adds app-side deck-restriction filter matching, and dims illegal cards in search. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** Project complete after OPT-374 lands.
+**Next up:** None — project complete (OPT-374 merged in [#229](https://github.com/corycunanan/optcg-sim/pull/229)).
 
 ---
 
@@ -62,7 +62,7 @@ Append new entries at the bottom. Each entry is written _by_ the agent who just 
 
 ### Post-merge review fix → effect schema sync
 
-**From:** session on 2026-07-06 · **Commit:** _(uncommitted)_ · **PR:** —
+**From:** session on 2026-07-06 · **Commit:** `58fd713` · **PR:** [#231](https://github.com/corycunanan/optcg-sim/pull/231) (fixes), [#232](https://github.com/corycunanan/optcg-sim/pull/232) (cleanup), [#233](https://github.com/corycunanan/optcg-sim/pull/233)/[#234](https://github.com/corycunanan/optcg-sim/pull/234) (CI auto-sync)
 
 - **Primer:** This doc's premise ("rule modifications already encoded in `Card.effectSchema`") was false: no code path ever wrote that column, and both Neon branches had `effectSchema = NULL` for every card, so OPT-373/374 validation was inert and unlimited-copy decks regressed (the deleted allowlist had no schema replacement). `pipeline/sync-effect-schemas.ts` now materializes the deck-legality subset (`rule_modifications` only) from the authored worker schemas into the DB — as `pnpm pipeline:sync-schemas` (`--check` for drift, `--dry-run`), and as Step 7 of `pipeline/import.ts` so imports can't leave the column empty.
 - **Read first:** `pipeline/sync-effect-schemas.ts`, `src/__tests__/effect-schema-sync.test.ts`, `workers/game/src/engine/schema-registry.ts` (`getAllAuthoredSchemas`).
