@@ -9,6 +9,9 @@ on:
       - "src/lib/deck-builder/validation.ts"
       - "pipeline/sync-effect-schemas.ts"
       - ".github/workflows/deploy-workers.yml"
+  # Manual runs execute only the schema sync (deploys stay path-gated).
+  # Useful to verify the sync end-to-end or re-sync after a DB import.
+  workflow_dispatch:
 
 concurrency:
   group: deploy-workers-${{ github.ref }}
@@ -26,6 +29,9 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          # Explicit base keeps push behavior unchanged and lets the filter
+          # resolve on workflow_dispatch (empty diff → all outputs false).
+          base: main
           filters: |
             game:
               - 'workers/game/**'
@@ -41,6 +47,7 @@ jobs:
     needs: [changes, sync-effect-schemas]
     if: >-
       always() &&
+      github.event_name == 'push' &&
       needs.changes.outputs.game == 'true' &&
       (needs.changes.outputs.schemas != 'true' || needs.sync-effect-schemas.result == 'success')
     runs-on: ubuntu-latest
@@ -67,7 +74,9 @@ jobs:
   # logic change, then verify with --check so drift fails the workflow.
   sync-effect-schemas:
     needs: changes
-    if: needs.changes.outputs.schemas == 'true'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.schemas == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -99,7 +108,7 @@ jobs:
 
   deploy-images:
     needs: changes
-    if: needs.changes.outputs.images == 'true'
+    if: github.event_name == 'push' && needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
