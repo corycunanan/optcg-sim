@@ -210,9 +210,73 @@ describe("OPT-436: rejected responses restore the pending prompt", () => {
 
     await session.handleAction(ws as unknown as WebSocket, 0, { type: "PASS" } as GameAction);
 
-    // PASS is always allowed through the type gate; the cost handler rejects
-    // it, and the prompt must survive for the player to answer properly.
+    expect(lastError(ws)).toMatch(/SELECT_TARGET/);
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  });
+
+  it("rejects a stale wrong-type response during an optional effect", async () => {
+    const { session, ws } = sessionWithOptionalPrompt();
+    const stackBefore = session.gameState.effectStack;
+
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["stale-target"],
+    } as GameAction);
+
+    expect(lastError(ws)).toMatch(/OPTIONAL_EFFECT/);
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect(session.gameState.effectStack).toEqual(stackBefore);
+  });
+
+  it("rejects an unoffered PLAYER_CHOICE id before it can consume a frame", async () => {
+    const { session, ws } = sessionWithOptionalPrompt();
+    const resumeContext = session.gameState.pendingPrompt!.resumeContext;
+    session.gameState = {
+      ...session.gameState,
+      pendingPrompt: {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          effectDescription: "Choose one",
+          choices: [{ id: "current-choice", label: "Current choice" }],
+        },
+        respondingPlayer: 0,
+        resumeContext,
+      },
+    };
+    const stackBefore = session.gameState.effectStack;
+
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "PLAYER_CHOICE",
+      choiceId: "stale-choice",
+    } as GameAction);
+
+    expect(lastError(ws)).toMatch(/no longer available/);
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(session.gameState.effectStack).toEqual(stackBefore);
+  });
+
+  it("rejects PASS on a durable reveal-trigger prompt", async () => {
+    const { session, ws } = sessionWithOptionalPrompt();
+    session.gameState = {
+      ...session.gameState,
+      effectStack: [],
+      pendingPrompt: {
+        options: {
+          promptType: "REVEAL_TRIGGER",
+          cards: [],
+          effectDescription: "Reveal Trigger?",
+          optional: false,
+          timeoutMs: 30_000,
+        },
+        respondingPlayer: 0,
+        resumeContext: null as never,
+      },
+    };
+
+    await session.handleAction(ws as unknown as WebSocket, 0, { type: "PASS" } as GameAction);
+
+    expect(lastError(ws)).toMatch(/REVEAL_TRIGGER/);
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
   });
 
   it("PASS still declines a legitimate optional-effect prompt", async () => {

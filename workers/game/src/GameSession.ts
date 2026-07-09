@@ -23,14 +23,25 @@ import type {
   ResumeContext,
 } from "./types.js";
 
-// OPT-436: which response action answers each durable prompt type. PASS is
-// always accepted (optional prompts decline with it). Prompt types not listed
-// keep the legacy permissive routing.
-const EXPECTED_RESPONSE_TYPES: Partial<Record<PromptType, ReadonlyArray<GameAction["type"]>>> = {
+type DurablePromptType = Extract<
+  PromptType,
+  | "SELECT_TARGET"
+  | "ARRANGE_TOP_CARDS"
+  | "REDISTRIBUTE_DON"
+  | "PLAYER_CHOICE"
+  | "OPTIONAL_EFFECT"
+  | "REVEAL_TRIGGER"
+>;
+
+// OPT-436: only these action types may answer each durable prompt. Keeping
+// PASS prompt-specific prevents mandatory prompts from being skipped.
+const EXPECTED_RESPONSE_TYPES: Record<DurablePromptType, ReadonlyArray<GameAction["type"]>> = {
   SELECT_TARGET: ["SELECT_TARGET"],
   ARRANGE_TOP_CARDS: ["ARRANGE_TOP_CARDS"],
   REDISTRIBUTE_DON: ["REDISTRIBUTE_DON"],
   PLAYER_CHOICE: ["PLAYER_CHOICE"],
+  OPTIONAL_EFFECT: ["PLAYER_CHOICE", "PASS"],
+  REVEAL_TRIGGER: ["REVEAL_TRIGGER"],
 };
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import {
@@ -643,37 +654,48 @@ export class GameSession implements DurableObject {
 
     // If an effect is awaiting player input, only allow prompt responses
     if (this.gameState.pendingPrompt) {
-      const isPromptResponse =
-        action.type === "SELECT_TARGET" ||
-        action.type === "REDISTRIBUTE_DON" ||
-        action.type === "PLAYER_CHOICE" ||
-        action.type === "ARRANGE_TOP_CARDS" ||
-        action.type === "PASS";
-      if (isPromptResponse) {
+      const prompt = this.gameState.pendingPrompt;
+      const promptType = prompt.options.promptType;
+      const expected = promptType in EXPECTED_RESPONSE_TYPES
+        ? EXPECTED_RESPONSE_TYPES[promptType as DurablePromptType]
+        : null;
+
+      if (expected) {
         if (playerIndex !== this.gameState.pendingPrompt.respondingPlayer) {
           this.send(ws, { type: "game:error", message: "Waiting for opponent to respond to prompt" });
           return;
         }
-        // OPT-436: the response must match the pending prompt's type — a
-        // delayed duplicate of an earlier response (e.g. SELECT_TARGET while
-        // the arrange prompt is current) must not reach the resolver, where
-        // clearing the prompt first can wedge the match.
-        const expected = EXPECTED_RESPONSE_TYPES[this.gameState.pendingPrompt.options.promptType];
-        if (expected && action.type !== "PASS" && !expected.includes(action.type)) {
+        if (!expected.includes(action.type)) {
           this.send(ws, {
             type: "game:error",
-            message: `Expected a ${this.gameState.pendingPrompt.options.promptType} response`,
+            message: `Expected a ${promptType} response`,
           });
           return;
         }
-        await this.resumeFromPrompt(ws, playerIndex, action);
-        return;
-      }
-      // REVEAL_TRIGGER is a "fire-through" prompt — clear it and let the
-      // action proceed through the normal pipeline so executeRevealTrigger runs.
-      if (action.type === "REVEAL_TRIGGER") {
-        this.gameState = { ...this.gameState, pendingPrompt: null };
-        // Fall through to pipeline processing below
+
+        if (promptType === "PLAYER_CHOICE" && action.type === "PLAYER_CHOICE") {
+          const offered = prompt.options.choices.some((choice) => choice.id === action.choiceId);
+          if (!offered) {
+            this.send(ws, { type: "game:error", message: "That choice is no longer available" });
+            return;
+          }
+        }
+        if (promptType === "OPTIONAL_EFFECT" && action.type === "PLAYER_CHOICE") {
+          const validChoice = action.choiceId === "activate" || action.choiceId === "accept" || action.choiceId === "skip";
+          if (!validChoice) {
+            this.send(ws, { type: "game:error", message: "That choice is no longer available" });
+            return;
+          }
+        }
+
+        // REVEAL_TRIGGER is a fire-through prompt: clear it and let the action
+        // proceed through the normal pipeline so executeRevealTrigger runs.
+        if (action.type === "REVEAL_TRIGGER") {
+          this.gameState = { ...this.gameState, pendingPrompt: null };
+        } else {
+          await this.resumeFromPrompt(ws, playerIndex, action);
+          return;
+        }
       } else if (action.type !== "CONCEDE") {
         this.send(ws, { type: "game:error", message: "Waiting for player to respond to prompt" });
         return;
