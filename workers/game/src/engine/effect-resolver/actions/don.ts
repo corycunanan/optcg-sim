@@ -82,32 +82,176 @@ export function executeAddDonFromDeck(
 }
 
 /**
- * Return `count` DON!! from `playerIndex`'s cost area to their DON!! deck,
- * taking `activeCount` from active DON!! and the rest from rested.
+ * A concrete plan for a forced DON!! return: how many active/rested DON!! come
+ * from the cost area, plus how many attached DON!! detach from each named card.
+ * The three sources are the whole field per Comprehensive Rules 3-1-2 / 8-3-1-6.
  */
-export function applyForcedDonReturn(
+export interface FieldDonReturnPlan {
+  costActive: number;
+  costRested: number;
+  attached: { cardInstanceId: string; count: number }[];
+}
+
+/**
+ * Encode a plan as a PLAYER_CHOICE id. Cost-area-only plans keep the historical
+ * three-part `don-return:<costActive>:<count>` shape (nanoid instance ids never
+ * contain `:`, `,` or `=`, so the extra segments below stay unambiguous). Plans
+ * that detach attached DON!! append a fourth `card=n,card=n` segment.
+ */
+export function encodeFieldDonReturnChoice(plan: FieldDonReturnPlan, count: number): string {
+  const attached = plan.attached.filter((a) => a.count > 0);
+  if (attached.length === 0) return `don-return:${plan.costActive}:${count}`;
+  const spec = attached.map((a) => `${a.cardInstanceId}=${a.count}`).join(",");
+  return `don-return:${plan.costActive}:${count}:${spec}`;
+}
+
+/**
+ * Parse a `don-return:` choice id back into a plan + total count. Returns null
+ * for malformed ids (stale-modal / tampering defense). `costRested` is derived:
+ * count − costActive − attachedTotal.
+ */
+export function decodeFieldDonReturnChoice(
+  id: string,
+): { plan: FieldDonReturnPlan; count: number } | null {
+  const parts = id.split(":");
+  if (parts[0] !== "don-return") return null;
+
+  const costActive = parseInt(parts[1], 10);
+  const count = parseInt(parts[2], 10);
+  if (!Number.isFinite(costActive) || !Number.isFinite(count) || costActive < 0 || count < 0) {
+    return null;
+  }
+
+  let attached: { cardInstanceId: string; count: number }[] = [];
+  if (parts.length === 4) {
+    for (const entry of parts[3].split(",")) {
+      const [cardInstanceId, nRaw] = entry.split("=");
+      const n = parseInt(nRaw, 10);
+      if (!cardInstanceId || !Number.isFinite(n) || n <= 0) return null;
+      attached.push({ cardInstanceId, count: n });
+    }
+  } else if (parts.length !== 3) {
+    return null;
+  }
+
+  const attachedTotal = attached.reduce((s, a) => s + a.count, 0);
+  const costRested = count - costActive - attachedTotal;
+  if (costRested < 0) return null;
+
+  return { plan: { costActive, costRested, attached }, count };
+}
+
+/**
+ * Apply a validated forced-DON!! return for `playerIndex`: pull the chosen
+ * active/rested DON!! from the cost area and detach the chosen attached DON!!
+ * from the named Leader/Character. Every returned DON!! goes back to the DON!!
+ * deck ACTIVE and unattached, matching how DON_MINUS returns field DON!!.
+ */
+export function applyFieldDonReturn(
   state: GameState,
   playerIndex: 0 | 1,
-  activeCount: number,
-  count: number,
-): { state: GameState; events: PendingEvent[] } {
+  plan: FieldDonReturnPlan,
+): { state: GameState; events: PendingEvent[]; returned: number } {
   const events: PendingEvent[] = [];
   const p = state.players[playerIndex];
-  const active = p.donCostArea.filter((d) => d.state === "ACTIVE").slice(0, activeCount);
-  const rested = p.donCostArea.filter((d) => d.state === "RESTED").slice(0, count - activeCount);
-  const returnedIds = new Set([...active, ...rested].map((d) => d.instanceId));
 
-  const newDonCostArea = p.donCostArea.filter((d) => !returnedIds.has(d.instanceId));
-  const newDonDeck = [
-    ...p.donDeck,
-    ...[...active, ...rested].map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null })),
-  ];
+  const fromCostActive = p.donCostArea.filter((d) => d.state === "ACTIVE").slice(0, plan.costActive);
+  const fromCostRested = p.donCostArea.filter((d) => d.state === "RESTED").slice(0, plan.costRested);
+  const returnedCostIds = new Set([...fromCostActive, ...fromCostRested].map((d) => d.instanceId));
+  const newDonCostArea = p.donCostArea.filter((d) => !returnedCostIds.has(d.instanceId));
+
+  const returned = [...fromCostActive, ...fromCostRested].map(
+    (d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }),
+  );
+
+  // Detach the chosen attached DON!! from each named card.
+  let newLeader = p.leader;
+  const newCharacters = [...p.characters] as typeof p.characters;
+  for (const { cardInstanceId, count } of plan.attached) {
+    if (count <= 0) continue;
+    if (newLeader.instanceId === cardInstanceId) {
+      const take = newLeader.attachedDon.slice(0, count);
+      returned.push(...take.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null })));
+      newLeader = { ...newLeader, attachedDon: newLeader.attachedDon.slice(take.length) };
+      continue;
+    }
+    const charIdx = newCharacters.findIndex((c) => c?.instanceId === cardInstanceId);
+    if (charIdx !== -1 && newCharacters[charIdx]) {
+      const char = newCharacters[charIdx]!;
+      const take = char.attachedDon.slice(0, count);
+      returned.push(...take.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null })));
+      newCharacters[charIdx] = { ...char, attachedDon: char.attachedDon.slice(take.length) };
+    }
+  }
 
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[playerIndex] = { ...p, donCostArea: newDonCostArea, donDeck: newDonDeck };
+  newPlayers[playerIndex] = {
+    ...p,
+    leader: newLeader,
+    characters: newCharacters,
+    donCostArea: newDonCostArea,
+    donDeck: [...p.donDeck, ...returned],
+  };
 
-  events.push({ type: "DON_DETACHED", playerIndex, payload: { count: returnedIds.size } });
-  return { state: { ...state, players: newPlayers }, events };
+  events.push({ type: "DON_DETACHED", playerIndex, payload: { count: returned.length } });
+  return { state: { ...state, players: newPlayers }, events, returned: returned.length };
+}
+
+/** Cards whose attached DON!! can be returned, in a stable order (Leader first). */
+function attachedDonSources(
+  p: GameState["players"][0],
+): { cardInstanceId: string; cap: number }[] {
+  const sources: { cardInstanceId: string; cap: number }[] = [];
+  if (p.leader.attachedDon.length > 0) {
+    sources.push({ cardInstanceId: p.leader.instanceId, cap: p.leader.attachedDon.length });
+  }
+  for (const c of p.characters) {
+    if (c && c.attachedDon.length > 0) {
+      sources.push({ cardInstanceId: c.instanceId, cap: c.attachedDon.length });
+    }
+  }
+  return sources;
+}
+
+/**
+ * Enumerate every distinct way to draw exactly `count` DON!! across the ordered
+ * buckets (cost-area active, cost-area rested, then one bucket per card with
+ * attached DON!!), respecting each bucket's capacity. Each result is one
+ * genuinely different game outcome and becomes one PLAYER_CHOICE option.
+ */
+function enumerateDonReturnPlans(
+  activeAvail: number,
+  restedAvail: number,
+  attachedSources: { cardInstanceId: string; cap: number }[],
+  count: number,
+): FieldDonReturnPlan[] {
+  const caps = [activeAvail, restedAvail, ...attachedSources.map((s) => s.cap)];
+  const suffixCap: number[] = new Array(caps.length + 1).fill(0);
+  for (let i = caps.length - 1; i >= 0; i--) suffixCap[i] = suffixCap[i + 1] + caps[i];
+
+  const plans: FieldDonReturnPlan[] = [];
+  const picks: number[] = new Array(caps.length).fill(0);
+
+  const recurse = (i: number, remaining: number): void => {
+    if (i === caps.length) {
+      if (remaining === 0) {
+        plans.push({
+          costActive: picks[0],
+          costRested: picks[1],
+          attached: attachedSources.map((s, j) => ({ cardInstanceId: s.cardInstanceId, count: picks[2 + j] })),
+        });
+      }
+      return;
+    }
+    const lo = Math.max(0, remaining - suffixCap[i + 1]);
+    const hi = Math.min(caps[i], remaining);
+    for (let n = lo; n <= hi; n++) {
+      picks[i] = n;
+      recurse(i + 1, remaining - n);
+    }
+  };
+  recurse(0, count);
+  return plans;
 }
 
 export function executeForceOpponentDonReturn(
@@ -115,7 +259,7 @@ export function executeForceOpponentDonReturn(
   action: Action,
   sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
@@ -123,31 +267,46 @@ export function executeForceOpponentDonReturn(
   const amount = (params.amount as number) ?? 1;
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const p = state.players[opp];
-  const count = Math.min(amount, p.donCostArea.length);
-  if (count === 0) return { state, events, succeeded: false };
 
-  // OP16-074 Magellan FAQ: the DON!! owner chooses WHICH DON!! return —
-  // active vs. rested matters. The only meaningful degree of freedom is the
-  // active/rested split, so prompt the owner with the possible splits and
-  // auto-resolve when there is no real choice (all one state, or the whole
-  // cost area returns).
+  // OPT-426: the returnable pool is the whole field — cost area + DON!! attached
+  // to the Leader and Characters (Comprehensive Rules 3-1-2 / 8-3-1-6). Ignoring
+  // attached DON!! made mandatory effects like OP16-074 Magellan silently no-op
+  // when the opponent's cost area was empty.
   const activeAvail = p.donCostArea.filter((d) => d.state === "ACTIVE").length;
   const restedAvail = p.donCostArea.length - activeAvail;
-  const minActive = Math.max(0, count - restedAvail);
-  const maxActive = Math.min(count, activeAvail);
+  const attachedSources = attachedDonSources(p);
+  const attachedTotal = attachedSources.reduce((s, a) => s + a.cap, 0);
+  const fieldTotal = p.donCostArea.length + attachedTotal;
 
-  if (minActive === maxActive) {
-    const applied = applyForcedDonReturn(state, opp, minActive, count);
+  const count = Math.min(amount, fieldTotal);
+  if (count === 0) return { state, events, succeeded: false };
+
+  const plans = enumerateDonReturnPlans(activeAvail, restedAvail, attachedSources, count);
+
+  // No genuine choice (single distribution) — apply directly. OP16-074 Magellan
+  // FAQ: the DON!! owner chooses which DON!! return, so any real choice prompts.
+  if (plans.length <= 1) {
+    const applied = applyFieldDonReturn(state, opp, plans[0]);
     return { state: applied.state, events: [...events, ...applied.events], succeeded: true };
   }
 
-  const choices: { id: string; label: string }[] = [];
-  for (let k = minActive; k <= maxActive; k++) {
+  const cardName = (instanceId: string): string => {
+    const card =
+      p.leader.instanceId === instanceId
+        ? p.leader
+        : p.characters.find((c) => c?.instanceId === instanceId) ?? null;
+    return (card && cardDb.get(card.cardId)?.name) || "a Character";
+  };
+
+  const choices = plans.map((plan) => {
     const parts: string[] = [];
-    if (k > 0) parts.push(`${k} active`);
-    if (count - k > 0) parts.push(`${count - k} rested`);
-    choices.push({ id: `don-return:${k}:${count}`, label: `Return ${parts.join(" + ")} DON!!` });
-  }
+    if (plan.costActive > 0) parts.push(`${plan.costActive} active`);
+    if (plan.costRested > 0) parts.push(`${plan.costRested} rested`);
+    for (const a of plan.attached) {
+      if (a.count > 0) parts.push(`${a.count} from ${cardName(a.cardInstanceId)}`);
+    }
+    return { id: encodeFieldDonReturnChoice(plan, count), label: `Return ${parts.join(" + ")} DON!!` };
+  });
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
