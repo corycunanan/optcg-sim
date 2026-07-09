@@ -19,8 +19,30 @@ import type {
   LifeCard,
   ServerMessage,
   PendingPromptState,
+  PromptType,
   ResumeContext,
 } from "./types.js";
+
+type DurablePromptType = Extract<
+  PromptType,
+  | "SELECT_TARGET"
+  | "ARRANGE_TOP_CARDS"
+  | "REDISTRIBUTE_DON"
+  | "PLAYER_CHOICE"
+  | "OPTIONAL_EFFECT"
+  | "REVEAL_TRIGGER"
+>;
+
+// OPT-436: only these action types may answer each durable prompt. Keeping
+// PASS prompt-specific prevents mandatory prompts from being skipped.
+const EXPECTED_RESPONSE_TYPES: Record<DurablePromptType, ReadonlyArray<GameAction["type"]>> = {
+  SELECT_TARGET: ["SELECT_TARGET"],
+  ARRANGE_TOP_CARDS: ["ARRANGE_TOP_CARDS"],
+  REDISTRIBUTE_DON: ["REDISTRIBUTE_DON"],
+  PLAYER_CHOICE: ["PLAYER_CHOICE"],
+  OPTIONAL_EFFECT: ["PLAYER_CHOICE", "PASS"],
+  REVEAL_TRIGGER: ["REVEAL_TRIGGER"],
+};
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import {
   advancePregame,
@@ -632,26 +654,52 @@ export class GameSession implements DurableObject {
 
     // If an effect is awaiting player input, only allow prompt responses
     if (this.gameState.pendingPrompt) {
-      const isPromptResponse =
-        action.type === "SELECT_TARGET" ||
-        action.type === "REDISTRIBUTE_DON" ||
-        action.type === "PLAYER_CHOICE" ||
-        action.type === "ARRANGE_TOP_CARDS" ||
-        action.type === "PASS";
-      if (isPromptResponse) {
+      const prompt = this.gameState.pendingPrompt;
+      const promptType = prompt.options.promptType;
+      const expected = promptType in EXPECTED_RESPONSE_TYPES
+        ? EXPECTED_RESPONSE_TYPES[promptType as DurablePromptType]
+        : null;
+
+      if (action.type === "CONCEDE") {
+        // A player may always concede, including while either player owns a prompt.
+        // Fall through to the normal pipeline path below.
+      } else if (expected) {
         if (playerIndex !== this.gameState.pendingPrompt.respondingPlayer) {
           this.send(ws, { type: "game:error", message: "Waiting for opponent to respond to prompt" });
           return;
         }
-        await this.resumeFromPrompt(ws, playerIndex, action);
-        return;
-      }
-      // REVEAL_TRIGGER is a "fire-through" prompt — clear it and let the
-      // action proceed through the normal pipeline so executeRevealTrigger runs.
-      if (action.type === "REVEAL_TRIGGER") {
-        this.gameState = { ...this.gameState, pendingPrompt: null };
-        // Fall through to pipeline processing below
-      } else if (action.type !== "CONCEDE") {
+        if (!expected.includes(action.type)) {
+          this.send(ws, {
+            type: "game:error",
+            message: `Expected a ${promptType} response`,
+          });
+          return;
+        }
+
+        if (promptType === "PLAYER_CHOICE" && action.type === "PLAYER_CHOICE") {
+          const offered = prompt.options.choices.some((choice) => choice.id === action.choiceId);
+          if (!offered) {
+            this.send(ws, { type: "game:error", message: "That choice is no longer available" });
+            return;
+          }
+        }
+        if (promptType === "OPTIONAL_EFFECT" && action.type === "PLAYER_CHOICE") {
+          const validChoice = action.choiceId === "activate" || action.choiceId === "accept";
+          if (!validChoice) {
+            this.send(ws, { type: "game:error", message: "That choice is no longer available" });
+            return;
+          }
+        }
+
+        // REVEAL_TRIGGER is a fire-through prompt: clear it and let the action
+        // proceed through the normal pipeline so executeRevealTrigger runs.
+        if (action.type === "REVEAL_TRIGGER") {
+          this.gameState = { ...this.gameState, pendingPrompt: null };
+        } else {
+          await this.resumeFromPrompt(ws, playerIndex, action);
+          return;
+        }
+      } else {
         this.send(ws, { type: "game:error", message: "Waiting for player to respond to prompt" });
         return;
       }
@@ -788,6 +836,7 @@ export class GameSession implements DurableObject {
     this.undoHistory = [];
 
     const prompt = this.gameState.pendingPrompt!;
+    const stateBeforeResume = this.gameState;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
     const respondingPlayer = prompt.respondingPlayer;
 
@@ -848,6 +897,12 @@ export class GameSession implements DurableObject {
 
       if (resumeResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
+        // OPT-436: the handler rejected the response (stale/duplicate/invalid)
+        // without issuing a replacement prompt. Restore the complete state
+        // from before resume, including the prompt and any frame the resume
+        // router may have popped while validating the response.
+        this.gameState = stateBeforeResume;
       }
     } else {
       // Legacy: bare ResumeContext (no stack frame) — fallback for backward compat
@@ -857,6 +912,9 @@ export class GameSession implements DurableObject {
 
       if (resumeResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
+        // OPT-436: same rejection-restore as the stack branch.
+        this.gameState = stateBeforeResume;
       }
     }
 
