@@ -204,6 +204,35 @@ export function handleAwaitingCostSelection(
     );
   }
 
+  // OPT-372: PLACE_FROM_TRASH_TO_DECK with position TOP_OR_BOTTOM — the
+  // player picked a destination. Pin it on the cost and re-enter the payment
+  // flow (mirrors the CHOOSE_ONE_COST slot replacement); the select/arrange
+  // stages then run with a concrete position.
+  if (
+    action.type === "PLAYER_CHOICE" &&
+    cost.type === "PLACE_FROM_TRASH_TO_DECK" &&
+    (cost as SimpleCost).position === "TOP_OR_BOTTOM"
+  ) {
+    // Only the two emitted ids are valid — a stale/malformed choiceId must
+    // leave the prompt unresolved, not default to TOP.
+    if (action.choiceId !== "0" && action.choiceId !== "1") {
+      return { state, events: [], resolved: false };
+    }
+    const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
+    const replacedCosts = [...topFrame.costs] as Cost[];
+    replacedCosts[topFrame.currentCostIndex] = { ...(cost as SimpleCost), position } as Cost;
+
+    return resumeAfterBranchPick(
+      state,
+      topFrame,
+      replacedCosts,
+      controller,
+      sourceCardInstanceId,
+      accumulatedCostRefs,
+      cardDb,
+    );
+  }
+
   // CHOICE — player chose a branch; splice that branch's costs in and re-enter.
   if (action.type === "PLAYER_CHOICE" && cost.type === "CHOICE") {
     const choiceCost = cost as ChoiceCost;
@@ -281,7 +310,10 @@ export function handleAwaitingCostSelection(
         state: nextState,
         events,
         resolved: false,
-        pendingPrompt: buildTrashToDeckArrangePrompt(nextState, selected, controller, topFrame.id),
+        pendingPrompt: buildTrashToDeckArrangePrompt(
+          nextState, selected, controller, topFrame.id,
+          (cost as SimpleCost).position === "TOP" ? "TOP" : "BOTTOM",
+        ),
       };
     }
 
