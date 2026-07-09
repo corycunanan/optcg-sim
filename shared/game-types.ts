@@ -78,8 +78,20 @@ export type Phase = "REFRESH" | "DRAW" | "DON" | "MAIN" | "END";
 export interface PerformedAction {
   actionType: string;
   timestamp: number;
-  /** For CHARACTER_KO records: owner of the K.O.'d character. */
+  /**
+   * For CHARACTER_KO records: owner of the K.O.'d character.
+   * For ATTACKED records: the attacking player (OPT-413).
+   */
   controller?: 0 | 1;
+  /** ATTACKED records: the attacking card. */
+  attackerInstanceId?: string;
+  /**
+   * ATTACKED records: what the attack's FINAL target was (post-redirect) —
+   * OP16-080 FAQ: a redirected attack counts against the card actually
+   * battled, so this is recorded at battle end, not declaration.
+   */
+  targetType?: "LEADER" | "CHARACTER";
+  targetController?: 0 | 1;
 }
 
 export interface TurnState {

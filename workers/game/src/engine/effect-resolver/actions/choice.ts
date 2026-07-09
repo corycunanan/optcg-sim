@@ -161,6 +161,20 @@ export function executeReuseEffect(
 
   if (!targetBlock) return { state, events, succeeded: false };
 
+  // OP16-103 Van Augur FAQ: the reused block's turn_restriction still applies —
+  // reusing an OPPONENT_TURN-only [On K.O.] during your own turn does nothing.
+  // matchTriggersForEvent enforces this for real trigger firings, but reuse
+  // calls resolveEffect directly and bypasses trigger matching.
+  const restriction =
+    targetBlock.trigger && "turn_restriction" in targetBlock.trigger
+      ? targetBlock.trigger.turn_restriction
+      : undefined;
+  if (restriction) {
+    const isOwnersTurn = state.turn.activePlayerIndex === card.controller;
+    if (restriction === "YOUR_TURN" && !isOwnersTurn) return { state, events, succeeded: false };
+    if (restriction === "OPPONENT_TURN" && isOwnersTurn) return { state, events, succeeded: false };
+  }
+
   const resolveResult = _resolveEffect(state, targetBlock, sourceCardInstanceId, controller, cardDb);
   return {
     state: resolveResult.state,

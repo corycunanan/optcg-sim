@@ -120,8 +120,12 @@ function evaluateSimple(
     }
 
     case "CARD_ON_FIELD": {
-      const p = getPlayerByController(state, cond.controller, ctx.controller);
-      const cards = getFieldCards(p);
+      // EITHER/ANY scans both fields (OP16-081 Otama — the JP text's
+      // "cost-8+ Character" is controller-agnostic per the official FAQ).
+      const checkBoth = cond.controller === "EITHER" || cond.controller === "ANY";
+      const cards = checkBoth
+        ? state.players.flatMap((pl) => getFieldCards(pl))
+        : getFieldCards(getPlayerByController(state, cond.controller, ctx.controller));
       const matching = cards.filter((c) => {
         if (cond.exclude_self && c.instanceId === ctx.sourceCardInstanceId) return false;
         return matchesFilter(c, cond.filter, ctx.cardDb, state);
@@ -171,7 +175,9 @@ function evaluateSimple(
     case "FIELD_PURITY": {
       const p = getPlayerByController(state, cond.controller, ctx.controller);
       const chars = p.characters.filter(Boolean) as CardInstance[];
-      if (chars.length === 0) return true; // vacuously true
+      // OP16-022 Leader Luffy FAQ: "all your Characters are X" requires at
+      // least one Character — an empty field does NOT satisfy the condition.
+      if (chars.length === 0) return false;
       return chars.every((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
     }
 
@@ -291,7 +297,26 @@ function evaluateSimple(
         if (_actionType === "ACTIVATED_EVENT") return a.actionType === "USE_COUNTER_EVENT" || a.actionType === "PLAY_CARD";
         if (_actionType === "PLAYED_CHARACTER") return a.actionType === "PLAY_CARD";
         if (_actionType === "USED_BLOCKER") return a.actionType === "DECLARE_BLOCKER";
-        if (_actionType === "ATTACKED") return a.actionType === "DECLARE_ATTACK";
+        if (_actionType === "ATTACKED") {
+          // Resolution-time entries (OPT-413) carry the attacker and the
+          // FINAL battle target, so controller/filter scoping is reliable —
+          // OP12-020 Zoro ("battled a Character") and the OP16-080 redirect
+          // ruling (redirected-to-Leader must NOT count as a Character battle).
+          if (a.actionType === "ATTACKED") {
+            if (cond.controller && cond.controller !== "EITHER" && cond.controller !== "ANY") {
+              const attackerPi = cond.controller === "OPPONENT"
+                ? (ctx.controller === 0 ? 1 : 0)
+                : ctx.controller;
+              if (a.controller !== attackerPi) return false;
+            }
+            const wantType = (cond.filter as { card_type?: string } | undefined)?.card_type;
+            if (wantType && a.targetType !== wantType.toUpperCase()) return false;
+            return true;
+          }
+          // Legacy declaration-time entries (persisted mid-turn states):
+          // only satisfy unscoped conditions.
+          return a.actionType === "DECLARE_ATTACK" && !cond.controller && !cond.filter;
+        }
         if (_actionType === "CHARACTER_KO") {
           if (a.actionType !== "CHARACTER_KO") return false;
           // cond.controller scopes whose character was K.O.'d (OP16-100:

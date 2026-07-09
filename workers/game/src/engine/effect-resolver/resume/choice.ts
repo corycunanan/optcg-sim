@@ -32,6 +32,7 @@ import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { resolveEffect, executeActionChain } from "../resolver.js";
 import { executePlayCard } from "../actions/play.js";
+import { applyForcedDonReturn } from "../actions/don.js";
 import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 
@@ -116,6 +117,44 @@ export function handlePlayerChoiceStateDistribution(
 
   // Fall through to remainingActions processing below.
   return { kind: "fallthrough", state: nextState };
+}
+
+/**
+ * OPT-413: FORCE_OPPONENT_DON_RETURN split choice — the DON!! owner picked
+ * how many active vs. rested DON!! return (OP16-074 Magellan FAQ). Choice id
+ * format: "don-return:<activeCount>:<count>". Rejects choices the prompt did
+ * not offer (stale-modal defense).
+ *
+ * Mutually exclusive with handlePlayerChoiceBranch (different pausedAction
+ * type); the caller should skip the generic branch-picker when this matches.
+ */
+export function handlePlayerChoiceDonReturn(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  events: PendingEvent[],
+): ChoiceBranchResult {
+  const { pausedAction, controller } = resumeCtx;
+  if (action.type !== "PLAYER_CHOICE" || !pausedAction || pausedAction.type !== "FORCE_OPPONENT_DON_RETURN") {
+    return null;
+  }
+  if (resumeCtx.validTargets && !resumeCtx.validTargets.includes(action.choiceId)) {
+    return { kind: "terminal", result: { state, events: [], resolved: false } };
+  }
+  const parts = action.choiceId.split(":");
+  if (parts.length !== 3 || parts[0] !== "don-return") {
+    return { kind: "terminal", result: { state, events: [], resolved: false } };
+  }
+  const activeCount = parseInt(parts[1], 10);
+  const count = parseInt(parts[2], 10);
+  if (!Number.isFinite(activeCount) || !Number.isFinite(count) || activeCount < 0 || count < activeCount) {
+    return { kind: "terminal", result: { state, events: [], resolved: false } };
+  }
+
+  const opp: 0 | 1 = controller === 0 ? 1 : 0;
+  const applied = applyForcedDonReturn(state, opp, activeCount, count);
+  events.push(...applied.events);
+  return { kind: "fallthrough", state: applied.state };
 }
 
 /**

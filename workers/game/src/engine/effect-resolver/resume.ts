@@ -40,6 +40,7 @@ import {
 } from "./resume/target.js";
 import {
   handlePlayerChoiceStateDistribution,
+  handlePlayerChoiceDonReturn,
   handlePlayerChoiceBranch,
   handleAwaitingOptionalResponse,
   handleAwaitingTriggerOrderSelection,
@@ -102,9 +103,15 @@ export function resumeEffectChain(
   if (stateDist?.kind === "fallthrough") {
     nextState = stateDist.state;
   } else {
-    const playerChoice = handlePlayerChoiceBranch(nextState, action, resumeCtx, resultRefs, cardDb, events);
-    if (playerChoice?.kind === "terminal") return playerChoice.result;
-    if (playerChoice?.kind === "fallthrough") nextState = playerChoice.state;
+    const donReturn = handlePlayerChoiceDonReturn(nextState, action, resumeCtx, events);
+    if (donReturn?.kind === "terminal") return donReturn.result;
+    if (donReturn?.kind === "fallthrough") {
+      nextState = donReturn.state;
+    } else {
+      const playerChoice = handlePlayerChoiceBranch(nextState, action, resumeCtx, resultRefs, cardDb, events);
+      if (playerChoice?.kind === "terminal") return playerChoice.result;
+      if (playerChoice?.kind === "fallthrough") nextState = playerChoice.state;
+    }
   }
 
   // ── REDISTRIBUTE_DON branch ───────────────────────────────────────────────
