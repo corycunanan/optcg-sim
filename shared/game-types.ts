@@ -593,6 +593,15 @@ export interface PlayerChoicePrompt {
   choices: { id: string; label: string }[];
   effectDescription: string;
   source?: "PREGAME" | "EFFECT";
+  donReturn?: {
+    count: number;
+    sources: Array<{
+      id: string;
+      label: string;
+      max: number;
+      kind: "COST_ACTIVE" | "COST_RESTED" | "ATTACHED";
+    }>;
+  };
 }
 
 export interface OptionalEffectPrompt {
