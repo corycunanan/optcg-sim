@@ -5,6 +5,7 @@ const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const userFindUniqueMock = vi.fn();
 const messageCreateMock = vi.fn();
+const messageFindManyMock = vi.fn();
 const notifyUserMock = vi.fn();
 
 // Run `after()` callbacks synchronously so the route's fanout is observable
@@ -28,6 +29,7 @@ vi.mock("@/lib/db", () => ({
     },
     message: {
       create: (...args: unknown[]) => messageCreateMock(...args),
+      findMany: (...args: unknown[]) => messageFindManyMock(...args),
     },
   },
 }));
@@ -38,7 +40,28 @@ vi.mock("@/lib/realtime/fan-out", () => ({
   notifyUser: (...args: unknown[]) => notifyUserMock(...args),
 }));
 
-const { POST } = await import("./route");
+const { GET, POST } = await import("./route");
+
+function buildGetRequest(otherId: string, query = "") {
+  return {
+    request: new NextRequest(
+      `http://localhost/api/messages/${otherId}${query}`,
+    ),
+    params: Promise.resolve({ userId: otherId }),
+  };
+}
+
+function fakeMessage(i: number) {
+  return {
+    id: `msg-${i}`,
+    fromUserId: "user-recipient",
+    toUserId: "user-sender",
+    body: `hello ${i}`,
+    readAt: null,
+    createdAt: new Date(2026, 0, 1, 0, 0, i),
+    fromUser: { id: "user-recipient", username: "zoro", name: "Zoro", image: null },
+  };
+}
 
 function buildRequest(toUserId: string, body: unknown = { body: "hello" }) {
   return {
@@ -56,6 +79,7 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   userFindUniqueMock.mockReset();
   messageCreateMock.mockReset();
+  messageFindManyMock.mockReset();
   notifyUserMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-sender" } });
@@ -77,6 +101,74 @@ beforeEach(() => {
     },
   });
   notifyUserMock.mockResolvedValue(undefined);
+});
+
+describe("GET /api/messages/[userId] polling branch (?after)", () => {
+  it("caps the polling query with a take bound", async () => {
+    messageFindManyMock.mockResolvedValue([fakeMessage(1), fakeMessage(2)]);
+    const { request, params } = buildGetRequest(
+      "user-recipient",
+      "?after=1970-01-01T00:00:00.000Z",
+    );
+
+    const res = await GET(request, { params });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(messageFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 201,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      }),
+    );
+    expect(body.data).toHaveLength(2);
+    expect(body.more).toBe(false);
+  });
+
+  it("uses a composite (createdAt, id) cursor when afterId is supplied", async () => {
+    messageFindManyMock.mockResolvedValue([]);
+    const boundary = "2026-01-01T00:00:05.000Z";
+    const { request, params } = buildGetRequest(
+      "user-recipient",
+      `?after=${boundary}&afterId=msg-5`,
+    );
+
+    const res = await GET(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(messageFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            expect.objectContaining({ OR: expect.any(Array) }),
+            {
+              OR: [
+                { createdAt: { gt: new Date(boundary) } },
+                { createdAt: new Date(boundary), id: { gt: "msg-5" } },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("truncates to the cap and sets more:true when the window overflows", async () => {
+    messageFindManyMock.mockResolvedValue(
+      Array.from({ length: 201 }, (_, i) => fakeMessage(i)),
+    );
+    const { request, params } = buildGetRequest(
+      "user-recipient",
+      "?after=1970-01-01T00:00:00.000Z",
+    );
+
+    const res = await GET(request, { params });
+    const body = await res.json();
+
+    expect(body.data).toHaveLength(200);
+    expect(body.data[199].id).toBe("msg-199");
+    expect(body.more).toBe(true);
+  });
 });
 
 describe("POST /api/messages/[userId]", () => {

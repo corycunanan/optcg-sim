@@ -3,7 +3,7 @@
  * POST /api/messages/[userId] — Send a message
  */
 
-import { after, NextRequest } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { SendMessageSchema } from "@/lib/validators/messages";
@@ -31,21 +31,46 @@ export async function GET(
     // here (and below) was removed; clients now call POST
     // /api/messages/[userId]/read explicitly.
     if (after) {
+      // OPT-375: bound the client-supplied `after` window — a stale tab or a
+      // deliberate after=1970 must not pull the whole conversation. Fetch one
+      // extra row to detect overflow; `more: true` tells the client to poll
+      // again from the last returned message. `afterId` makes the cursor a
+      // composite (createdAt, id) so ties in createdAt at the page boundary
+      // are neither skipped nor re-served forever; ordering must match it.
+      const afterId = request.nextUrl.searchParams.get("afterId");
+      const afterDate = new Date(after);
+      const pollLimit = 200;
       const newMessages = await prisma.message.findMany({
         where: {
-          OR: [
-            { fromUserId: myId, toUserId: otherId },
-            { fromUserId: otherId, toUserId: myId },
+          AND: [
+            {
+              OR: [
+                { fromUserId: myId, toUserId: otherId },
+                { fromUserId: otherId, toUserId: myId },
+              ],
+            },
+            afterId
+              ? {
+                  OR: [
+                    { createdAt: { gt: afterDate } },
+                    { createdAt: afterDate, id: { gt: afterId } },
+                  ],
+                }
+              : { createdAt: { gt: afterDate } },
           ],
-          createdAt: { gt: new Date(after) },
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: pollLimit + 1,
         include: {
           fromUser: { select: { id: true, username: true, name: true, image: true } },
         },
       });
 
-      return apiSuccess(newMessages);
+      const more = newMessages.length > pollLimit;
+      return NextResponse.json({
+        data: more ? newMessages.slice(0, pollLimit) : newMessages,
+        more,
+      });
     }
 
     const messages = await prisma.message.findMany({
