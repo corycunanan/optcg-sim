@@ -307,6 +307,98 @@ describe("OPT-371: arrange-skip cases", () => {
   });
 });
 
+describe("OPT-371: malformed / out-of-order responses (Codex review)", () => {
+  it("ignores an ARRANGE packet sent while still on the select stage", () => {
+    const cardDb = createTestCardDb();
+    const state = withTrash(createBattleReadyState(cardDb), [
+      trashCard(CARDS.VANILLA.id, "a"),
+      trashCard(CARDS.RUSH.id, "b"),
+      trashCard(CARDS.BLOCKER.id, "c"),
+      trashCard(CARDS.COUNTER.id, "d"),
+    ]);
+
+    const block = makeBlock([cost(2)]);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    // A premature arrange packet must NOT pay the cost with all 4 candidates.
+    const result = resumeFromStack(
+      first.state,
+      {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: "",
+        orderedInstanceIds: ["trash-a", "trash-b", "trash-c", "trash-d"],
+        destination: "bottom",
+      },
+      cardDb,
+    );
+    expect(result.resolved).toBe(false);
+    expect(result.state.players[0].trash).toHaveLength(4);
+  });
+
+  it("rejects duplicate ids in the selection response", () => {
+    const cardDb = createTestCardDb();
+    const state = withTrash(createBattleReadyState(cardDb), [
+      trashCard(CARDS.VANILLA.id, "a"),
+      trashCard(CARDS.RUSH.id, "b"),
+      trashCard(CARDS.BLOCKER.id, "c"),
+    ]);
+
+    const block = makeBlock([cost(2)]);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const result = resumeFromStack(
+      first.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["trash-a", "trash-a"] },
+      cardDb,
+    );
+    expect(result.resolved).toBe(false);
+    expect(result.state.players[0].trash).toHaveLength(3);
+  });
+
+  it("ignores a SELECT packet sent during the arrange stage (no ordering bypass)", () => {
+    const cardDb = createTestCardDb();
+    const state = withTrash(createBattleReadyState(cardDb), [
+      trashCard(CARDS.VANILLA.id, "a"),
+      trashCard(CARDS.RUSH.id, "b"),
+      trashCard(CARDS.BLOCKER.id, "c"),
+    ]);
+
+    const block = makeBlock([cost(2)]);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const afterSelect = resumeFromStack(
+      first.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["trash-a", "trash-b"] },
+      cardDb,
+    );
+    expect(afterSelect.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+
+    // Re-sending a selection must not skip the ordering step.
+    const result = resumeFromStack(
+      afterSelect.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["trash-a", "trash-b"] },
+      cardDb,
+    );
+    expect(result.resolved).toBe(false);
+    expect(result.state.players[0].trash).toHaveLength(3);
+
+    // The proper arrange response still completes the payment.
+    const done = resumeFromStack(
+      result.state,
+      {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: "",
+        orderedInstanceIds: ["trash-b", "trash-a"],
+        destination: "bottom",
+      },
+      cardDb,
+    );
+    expect(done.pendingPrompt).toBeUndefined();
+    expect(done.state.players[0].trash.map((c) => c.instanceId)).toEqual(["trash-c"]);
+  });
+});
+
 describe("OPT-371: OP05-082 Shirahoshi cost shape (REST_SELF + place 2, integration)", () => {
   it("rests the source, prompts selection then order, and runs the action chain", () => {
     const cardDb = createTestCardDb();

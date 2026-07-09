@@ -169,6 +169,11 @@ export interface EffectStackFrame {
   // OPT-172: mirror of ActionResult.pendingBatchTriggers so the pending
   // batch-resume survives stack persistence through disconnects.
   batchResumeMarker?: BatchResumeMarker;
+  // OPT-371: true while a PLACE_FROM_TRASH_TO_DECK cost frame is awaiting the
+  // ARRANGE_TOP_CARDS ordering response (validTargets = the chosen cards).
+  // Guards against arrange packets arriving during the select stage, where
+  // validTargets still holds every candidate.
+  costArrangeStage?: boolean;
 }
 
 export interface QueuedTrigger {

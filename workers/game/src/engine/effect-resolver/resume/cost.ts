@@ -262,16 +262,21 @@ export function handleAwaitingCostSelection(
     // costs (unless the block shuffles afterward) chain an arrange prompt so
     // the player also sets the ORDER — the frame stays on the stack and the
     // ARRANGE_TOP_CARDS response below finishes the payment.
+    if (topFrame.costArrangeStage) {
+      // Awaiting an arrange response — a select packet here could bypass
+      // the ordering step. Ignore it.
+      return { state, events: [], resolved: false };
+    }
     const valid = new Set(topFrame.validTargets ?? []);
     const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
-    const selected = (action.selectedInstanceIds ?? []).filter((id) => valid.has(id));
+    const selected = [...new Set(action.selectedInstanceIds ?? [])].filter((id) => valid.has(id));
     if (selected.length !== amount) {
       return { state, events: [], resolved: false };
     }
 
     const needsArrange = amount > 1 && !blockShufflesDeck(topFrame.effectBlock as EffectBlock);
     if (needsArrange) {
-      nextState = updateTopFrame(nextState, { validTargets: selected });
+      nextState = updateTopFrame(nextState, { validTargets: selected, costArrangeStage: true });
       return {
         state: nextState,
         events,
@@ -291,6 +296,11 @@ export function handleAwaitingCostSelection(
     // the cards picked in the selection step (frame.validTargets) count; any
     // of them missing from the response are appended so the cost still pays
     // in full.
+    if (!topFrame.costArrangeStage) {
+      // Still on the select stage — validTargets holds every candidate, so
+      // accepting an arrange packet here would move them all. Ignore it.
+      return { state, events: [], resolved: false };
+    }
     const valid = topFrame.validTargets ?? [];
     const validSet = new Set(valid);
     const ordered = [...new Set((action.orderedInstanceIds ?? []).filter((id) => validSet.has(id)))];

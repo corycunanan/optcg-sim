@@ -792,6 +792,7 @@ export function payCostsWithSelection(
           pendingTriggers: [],
           simultaneousTriggers: [],
           accumulatedEvents: events,
+          costArrangeStage: true,
         };
         nextState = pushFrame(nextState, frame);
         return {
