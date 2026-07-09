@@ -153,6 +153,25 @@ describe("OPT-372: position TOP_OR_BOTTOM prompts the player first", () => {
     expect(p.deck[0].instanceId).toBe("trash-a");
   });
 
+  it("rejects malformed choice ids instead of defaulting to TOP (Codex review)", () => {
+    const cardDb = createTestCardDb();
+    const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);
+
+    const block = makeBlock([cost(1, { position: "TOP_OR_BOTTOM" })]);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+
+    for (const bad of ["BOTTOM", "2", "top"]) {
+      const result = resumeFromStack(
+        first.state,
+        { type: "PLAYER_CHOICE", choiceId: bad },
+        cardDb,
+      );
+      expect(result.resolved).toBe(false);
+      expect(result.state.players[0].trash).toHaveLength(1); // nothing paid
+    }
+  });
+
   it("choosing Bottom keeps bottom placement", () => {
     const cardDb = createTestCardDb();
     const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);

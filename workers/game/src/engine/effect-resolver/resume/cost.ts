@@ -213,6 +213,11 @@ export function handleAwaitingCostSelection(
     cost.type === "PLACE_FROM_TRASH_TO_DECK" &&
     (cost as SimpleCost).position === "TOP_OR_BOTTOM"
   ) {
+    // Only the two emitted ids are valid — a stale/malformed choiceId must
+    // leave the prompt unresolved, not default to TOP.
+    if (action.choiceId !== "0" && action.choiceId !== "1") {
+      return { state, events: [], resolved: false };
+    }
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
     const replacedCosts = [...topFrame.costs] as Cost[];
     replacedCosts[topFrame.currentCostIndex] = { ...(cost as SimpleCost), position } as Cost;
