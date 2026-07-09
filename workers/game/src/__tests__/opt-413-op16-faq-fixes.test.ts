@@ -265,6 +265,50 @@ describe("OPT-413: ATTACKED performed-action fidelity (OP12-020 / OP16-080)", ()
     } as never, ctx0(cardDb))).toBe(true);
   });
 
+  it("does not record an ATTACKED entry for an aborted battle (Codex review)", async () => {
+    const cardDb = createTestCardDb();
+    let state = createBattleReadyState(cardDb);
+    // Rest an opponent character so it is attackable.
+    const oppChars = [...state.players[1].characters];
+    oppChars[0] = { ...oppChars[0]!, state: "RESTED" as const };
+    state = withPlayer(state, 1, { characters: oppChars });
+    const attacker = state.players[0].characters[0]!;
+    const target = oppChars[0]!;
+
+    // Declare + pass block → COUNTER_STEP, then remove the target mid-battle.
+    let result = runPipeline(
+      state,
+      { type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId },
+      cardDb,
+      state.turn.activePlayerIndex,
+    );
+    expect(result.valid).toBe(true);
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, result.state.turn.activePlayerIndex);
+    expect(result.valid).toBe(true);
+
+    const { moveCard } = await import("../engine/state.js");
+    let midBattle = moveCard(result.state, target.instanceId, "TRASH");
+    const afterPass = runPipeline(midBattle, { type: "PASS" }, cardDb, midBattle.turn.activePlayerIndex);
+    expect(afterPass.valid).toBe(true);
+    expect(afterPass.state.turn.battle).toBeNull();
+
+    // Same ruling that gates CHARACTER_BATTLES: an aborted battle is not
+    // "battled a Character this turn"...
+    const entry = afterPass.state.turn.actionsPerformedThisTurn.find(
+      (a: PerformedAction) => a.actionType === "ATTACKED",
+    );
+    expect(entry).toBeUndefined();
+    expect(evaluateCondition(afterPass.state, {
+      type: "ACTION_PERFORMED_THIS_TURN", controller: "SELF", action: "ATTACKED",
+      filter: { card_type: "CHARACTER" },
+    } as never, ctx0(cardDb))).toBe(false);
+    // ...but the unscoped "attacked this turn" still holds via the
+    // declaration-time DECLARE_ATTACK entry.
+    expect(evaluateCondition(afterPass.state, {
+      type: "ACTION_PERFORMED_THIS_TURN", action: "ATTACKED",
+    } as never, ctx0(cardDb))).toBe(true);
+  });
+
   it("legacy declaration-time entries only satisfy unscoped conditions", () => {
     const cardDb = createTestCardDb();
     let state = createBattleReadyState(cardDb);

@@ -1105,7 +1105,11 @@ function endBattle(
   // can scope by attacker controller and target card type. The declaration-time
   // DECLARE_ATTACK entry from the pipeline carries neither, and a blocker or
   // redirect can change what actually got battled.
-  if (battle) {
+  // Aborted battles (combatant left before Damage Step) are NOT recorded —
+  // same ruling that gates CHARACTER_BATTLES (OPT-243): the battle didn't
+  // complete, so "battled a Character" must not match. Unscoped "attacked
+  // this turn" conditions still pass via the DECLARE_ATTACK entry.
+  if (battle && options.aborted !== true) {
     const attackerIndex = state.turn.activePlayerIndex;
     const targetIsLeader = state.players.some(
       (pl) => pl.leader.instanceId === battle.targetInstanceId,
