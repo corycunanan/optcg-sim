@@ -296,8 +296,11 @@ export function payCosts(
         const toMove = candidates.slice(0, amount);
         const toMoveIds = new Set(toMove.map((c) => c.instanceId));
         const newTrash = p.trash.filter((c) => !toMoveIds.has(c.instanceId));
-        // Bottom placement — cost.position is tracked as a separate bug.
-        const newDeck = [...p.deck, ...toMove.map((c) => ({ ...c, zone: "DECK" as const }))];
+        // OPT-372: honor cost.position (deck index 0 = top). TOP_OR_BOTTOM is
+        // resolved to a concrete position by payCostsWithSelection before this
+        // fallback runs; a raw payCosts caller defaults to BOTTOM.
+        const deckCards = toMove.map((c) => ({ ...c, zone: "DECK" as const }));
+        const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
 
         const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
         newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
@@ -769,6 +772,50 @@ export function payCostsWithSelection(
       if (validTargets.length < amount) {
         return { state: nextState, events, cannotPay: true };
       }
+
+      // OPT-372: TOP_OR_BOTTOM — the player picks the destination first;
+      // the resume handler pins the choice on the cost and re-enters this
+      // flow with a concrete position (mirrors CHOOSE_ONE_COST slot
+      // replacement, LIFE_TO_HAND-style Top/Bottom choices).
+      if (cost.position === "TOP_OR_BOTTOM") {
+        const frame: EffectStackFrame = {
+          id: generateFrameId(),
+          sourceCardInstanceId,
+          controller,
+          effectBlock,
+          phase: "AWAITING_COST_SELECTION",
+          pausedAction: null,
+          remainingActions: effectBlock.actions ?? [],
+          resultRefs: [],
+          validTargets: ["TOP", "BOTTOM"],
+          costs: workingCosts,
+          currentCostIndex: i,
+          costsPaid: false,
+          oncePerTurnMarked: false,
+          costResultRefs: [...costResultToEntries(costResult)],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        nextState = pushFrame(nextState, frame);
+        return {
+          state: nextState,
+          events,
+          pendingPrompt: {
+            options: {
+              promptType: "PLAYER_CHOICE",
+              effectDescription: "Choose top or bottom of your deck for the placed cards",
+              choices: [
+                { id: "0", label: "Top" },
+                { id: "1", label: "Bottom" },
+              ],
+            },
+            respondingPlayer: controller,
+            resumeContext: frame.id,
+          },
+        };
+      }
+
       const needsSelection = validTargets.length > amount;
       const needsArrange = amount > 1 && !blockShufflesDeck(effectBlock);
 
@@ -798,7 +845,10 @@ export function payCostsWithSelection(
         return {
           state: nextState,
           events,
-          pendingPrompt: buildTrashToDeckArrangePrompt(nextState, validTargets, controller, frame.id),
+          pendingPrompt: buildTrashToDeckArrangePrompt(
+            nextState, validTargets, controller, frame.id,
+            cost.position === "TOP" ? "TOP" : "BOTTOM",
+          ),
         };
       }
       // No choice and order is moot — pay automatically below.
@@ -937,6 +987,7 @@ export function buildTrashToDeckArrangePrompt(
   cardIds: string[],
   controller: 0 | 1,
   frameId: string,
+  position: "TOP" | "BOTTOM" = "BOTTOM",
 ): PendingPromptState {
   const p = state.players[controller];
   const byId = new Map(p.trash.map((c) => [c.instanceId, c]));
@@ -947,8 +998,10 @@ export function buildTrashToDeckArrangePrompt(
     options: {
       promptType: "ARRANGE_TOP_CARDS",
       cards,
-      effectDescription: "Place the cards at the bottom of your deck in any order",
-      canSendToBottom: true,
+      effectDescription: `Place the cards at the ${position === "TOP" ? "top" : "bottom"} of your deck in any order`,
+      // Drives the modal's single destination button: "Place at Bottom" when
+      // true, "Place on Top" when false.
+      canSendToBottom: position !== "TOP",
       validTargets: [],
       maxKeep: 0,
     },
@@ -1242,8 +1295,10 @@ export function applyCostSelection(
         .map((id) => byId.get(id))
         .filter((c): c is CardInstance => c !== undefined);
       const newTrash = p.trash.filter((c) => !selectedSet.has(c.instanceId));
-      // Bottom placement — cost.position is tracked as a separate bug.
-      const newDeck = [...p.deck, ...moved.map((c) => ({ ...c, zone: "DECK" as const }))];
+      // OPT-372: honor cost.position (deck index 0 = top); TOP_OR_BOTTOM is
+      // resolved to a concrete position before payment reaches this point.
+      const deckCards = moved.map((c) => ({ ...c, zone: "DECK" as const }));
+      const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
       return { ...state, players: newPlayers };
