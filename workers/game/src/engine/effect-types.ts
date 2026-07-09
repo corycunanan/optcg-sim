@@ -406,6 +406,13 @@ export interface ActionPerformedThisTurnCondition {
   controller: Controller;
   action: ActionReference;
   filter?: TargetFilter;
+  // Card-scoping (OPT-424): when "SELF_CARD", the recorded action must have
+  // been performed by the effect's own source card, not merely by a card the
+  // `controller` owns. Currently honored for the ATTACKED action — OP12-020
+  // Zoro's "If THIS Leader battles..." must not fire when a friendly Character
+  // did the battling. Omit for player-scoped conditions (e.g. "if YOU
+  // activated an Event this turn").
+  source?: "SELF_CARD";
 }
 
 export type ActionReference = "ACTIVATED_EVENT" | "PLAYED_CHARACTER" | "USED_BLOCKER" | "ATTACKED" | "CHARACTER_KO";

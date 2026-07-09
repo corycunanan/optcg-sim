@@ -303,6 +303,11 @@ function evaluateSimple(
           // OP12-020 Zoro ("battled a Character") and the OP16-080 redirect
           // ruling (redirected-to-Leader must NOT count as a Character battle).
           if (a.actionType === "ATTACKED") {
+            // Card-scoping (OPT-424): "SELF_CARD" requires that THIS source card
+            // performed the attack — OP12-020 Zoro's "If this Leader battles..."
+            // must not fire when a friendly Character did the battling. Follows
+            // the ctx.sourceCardInstanceId self-scoping pattern used elsewhere.
+            if (cond.source === "SELF_CARD" && a.attackerInstanceId !== ctx.sourceCardInstanceId) return false;
             if (cond.controller && cond.controller !== "EITHER" && cond.controller !== "ANY") {
               const attackerPi = cond.controller === "OPPONENT"
                 ? (ctx.controller === 0 ? 1 : 0)
@@ -314,8 +319,9 @@ function evaluateSimple(
             return true;
           }
           // Legacy declaration-time entries (persisted mid-turn states):
-          // only satisfy unscoped conditions.
-          return a.actionType === "DECLARE_ATTACK" && !cond.controller && !cond.filter;
+          // only satisfy unscoped conditions. A SELF_CARD-scoped condition can
+          // never be confirmed from a declaration-time entry (no attacker id).
+          return a.actionType === "DECLARE_ATTACK" && !cond.controller && !cond.filter && !cond.source;
         }
         if (_actionType === "CHARACTER_KO") {
           if (a.actionType !== "CHARACTER_KO") return false;
