@@ -45,7 +45,7 @@ export function executeModifyPower(
       duration,
     }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -100,7 +100,7 @@ export function executeModifyCost(
       duration,
     }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -145,7 +145,7 @@ export function executeGrantKeyword(
       duration,
     }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -187,7 +187,7 @@ export function executeGrantAttribute(
       duration,
     }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -237,7 +237,7 @@ export function executeNegateEffects(
       duration,
     }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -287,7 +287,7 @@ export function executeSetBasePower(
     category: "auto",
     modifiers: [{ type: "SET_POWER" as any, params: { value }, duration }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -378,7 +378,7 @@ export function executeCopyPower(
     category: "auto",
     modifiers: [{ type: "SET_POWER" as any, params: { value: sourcePower }, duration }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),
@@ -467,7 +467,7 @@ export function executeSwapBasePower(
   // Layer-2 MODIFY_POWER buffs layer on top of the swapped Layer-1 value.
   const powerA = dataA.power ?? 0;
   const powerB = dataB.power ?? 0;
-  const expiry = computeExpiry(duration, state);
+  const expiry = computeExpiry(duration, state, controller);
 
   const effectA: RuntimeActiveEffect = {
     id: nanoid(),

@@ -1256,10 +1256,14 @@ export interface RuntimeActiveEffect {
   timestamp: number;
 }
 
+// `player` marks whose turn (or refresh) the expiry is anchored to. With
+// per-round turn numbering (OPT-366) both seats share a turn.number, so a bare
+// turn can't distinguish the two turns of a round — seatless entries (legacy
+// persisted state) fall back to a turn-only comparison in shouldExpire.
 export type ExpiryTiming =
-  | { wave: "END_OF_END_PHASE"; turn: number }
-  | { wave: "END_OF_TURN"; turn: number }
-  | { wave: "REFRESH_PHASE"; turn: number }
+  | { wave: "END_OF_END_PHASE"; turn: number; player?: 0 | 1 }
+  | { wave: "END_OF_TURN"; turn: number; player?: 0 | 1 }
+  | { wave: "REFRESH_PHASE"; turn: number; player?: 0 | 1 }
   | { wave: "END_OF_BATTLE"; battleId: string }
   | { wave: "SOURCE_LEAVES_ZONE" }
   | { wave: "CONDITION_FALSE" }
@@ -1272,6 +1276,12 @@ export interface RuntimeProhibition {
   prohibitionType: ProhibitionType;
   scope: ProhibitionScope;
   duration: Duration;
+  /**
+   * Expiry stamped at creation (OPT-408) — "next turn" anchors can't be
+   * recomputed at check time. Optional: legacy persisted prohibitions fall
+   * back to a check-time computation in expireProhibitions.
+   */
+  expiresAt?: ExpiryTiming;
   controller: 0 | 1;
   appliesTo: string[];  // CardInstance.instanceIds or player indices
   usesRemaining: number | null;
