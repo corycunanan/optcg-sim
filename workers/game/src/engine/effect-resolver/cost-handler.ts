@@ -146,6 +146,12 @@ export function payCosts(
           break;
         }
         if (!sourceCardInstanceId) return null;
+        const player = nextState.players[controller];
+        const source = player.leader.instanceId === sourceCardInstanceId
+          ? player.leader
+          : player.characters.find((card) => card?.instanceId === sourceCardInstanceId)
+            ?? (player.stage?.instanceId === sourceCardInstanceId ? player.stage : null);
+        if (!source || source.state !== "ACTIVE") return null;
         // OPT-250: if the source is under CANNOT_BE_RESTED, the cost cannot
         // be paid — the entire effect fails (qa_op13.md:77-79).
         if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb)) {
@@ -562,6 +568,11 @@ export function isCostPayable(
       // OPT-250: a source under CANNOT_BE_RESTED can't pay this cost
       // (qa_op13.md:77-79 — [Activate: Main] rest-self effects are gated).
       if (!sourceCardInstanceId) return false;
+      const source = player.leader.instanceId === sourceCardInstanceId
+        ? player.leader
+        : player.characters.find((card) => card?.instanceId === sourceCardInstanceId)
+          ?? (player.stage?.instanceId === sourceCardInstanceId ? player.stage : null);
+      if (!source || source.state !== "ACTIVE") return false;
       if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb)) return false;
       return true;
     }

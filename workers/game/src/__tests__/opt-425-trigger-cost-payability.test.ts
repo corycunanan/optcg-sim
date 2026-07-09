@@ -14,8 +14,9 @@ import { describe, it, expect } from "vitest";
 import type { CardData, GameState, PlayerState } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
-import { canOfferTrigger } from "../engine/battle.js";
+import { canOfferTrigger, continueEffectDamageSequence } from "../engine/battle.js";
 import { payCosts, isCostPayable } from "../engine/effect-resolver/cost-handler.js";
+import { OP04_094_TRUENO_BASTARDO } from "../engine/schemas/op04.js";
 
 function withPlayer(state: GameState, idx: 0 | 1, patch: Partial<PlayerState>): GameState {
   const newPlayers = [...state.players] as [PlayerState, PlayerState];
@@ -68,6 +69,36 @@ function truenoLike(cardDb: Map<string, CardData>): CardData {
   return card;
 }
 
+function actualTrueno(cardDb: Map<string, CardData>): CardData {
+  const card: CardData = {
+    ...CARDS.VANILLA,
+    id: "OP04-094",
+    name: "Trueno Bastardo",
+    type: "Event",
+    keywords: { ...CARDS.VANILLA.keywords, trigger: true },
+    effectSchema: OP04_094_TRUENO_BASTARDO as never,
+  };
+  cardDb.set(card.id, card);
+  return card;
+}
+
+function cannotBeRested(targetInstanceId: string): GameState["prohibitions"][number] {
+  return {
+    id: `cannot-rest-${targetInstanceId}`,
+    sourceCardInstanceId: "prohibition-source",
+    sourceEffectBlockId: "cannot-rest-block",
+    prohibitionType: "CANNOT_BE_RESTED",
+    controller: 0,
+    appliesTo: [targetInstanceId],
+    scope: {},
+    duration: { type: "PERMANENT" },
+    expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+    usesRemaining: null,
+    conditionalOverride: null,
+    timestamp: Date.now(),
+  } as GameState["prohibitions"][number];
+}
+
 describe("OPT-425: rest-your-Leader [Trigger] is offered iff the Leader can be rested", () => {
   it("offered while the owner's Leader is active", () => {
     const cardDb = createTestCardDb();
@@ -88,6 +119,32 @@ describe("OPT-425: rest-your-Leader [Trigger] is offered iff the Leader can be r
     const card = truenoLike(cardDb);
     const state = withLeaderState(createBattleReadyState(cardDb), 0, "ACTIVE");
     expect(canOfferTrigger(state, card.id, cardDb, 0)).toBe(true);
+  });
+
+  it("actual OP04-094 opens an effect-damage Trigger window", () => {
+    const cardDb = createTestCardDb();
+    const card = actualTrueno(cardDb);
+    let state = withLeaderState(createBattleReadyState(cardDb), 0, "ACTIVE");
+    state = withPlayer(state, 0, {
+      life: [{ instanceId: "life-op04-094", cardId: card.id, face: "DOWN" }],
+    });
+
+    const result = continueEffectDamageSequence(state, cardDb, 0, 1, "damage-source", 1);
+
+    expect(result.state.turn.pendingTriggerFromEffect?.lifeCard.instanceId).toBe("life-op04-094");
+    expect(result.state.players[0].hand.some((handCard) => handCard.instanceId === "life-op04-094")).toBe(false);
+  });
+
+  it("suppresses OP04-094 when the Leader cannot be rested", () => {
+    const cardDb = createTestCardDb();
+    const card = actualTrueno(cardDb);
+    const base = withLeaderState(createBattleReadyState(cardDb), 0, "ACTIVE");
+    const state = {
+      ...base,
+      prohibitions: [...base.prohibitions, cannotBeRested(base.players[0].leader.instanceId)],
+    };
+
+    expect(canOfferTrigger(state, card.id, cardDb, 0, "life-op04-094")).toBe(false);
   });
 });
 
@@ -144,6 +201,14 @@ describe("OPT-425: REST_SELF with target YOUR_LEADER rests the Leader, not the s
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
     expect(isCostPayable(state, { type: "REST_SELF" }, 0, cardDb)).toBe(false);
+  });
+
+  it("targetless REST_SELF rejects a non-field source instance", () => {
+    const cardDb = createTestCardDb();
+    const state = withPlayer(createBattleReadyState(cardDb), 0, {
+      life: [{ instanceId: "life-source", cardId: CARDS.VANILLA.id, face: "DOWN" }],
+    });
+    expect(isCostPayable(state, { type: "REST_SELF" }, 0, cardDb, "life-source")).toBe(false);
   });
 });
 
