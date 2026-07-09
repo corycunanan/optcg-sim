@@ -19,8 +19,19 @@ import type {
   LifeCard,
   ServerMessage,
   PendingPromptState,
+  PromptType,
   ResumeContext,
 } from "./types.js";
+
+// OPT-436: which response action answers each durable prompt type. PASS is
+// always accepted (optional prompts decline with it). Prompt types not listed
+// keep the legacy permissive routing.
+const EXPECTED_RESPONSE_TYPES: Partial<Record<PromptType, ReadonlyArray<GameAction["type"]>>> = {
+  SELECT_TARGET: ["SELECT_TARGET"],
+  ARRANGE_TOP_CARDS: ["ARRANGE_TOP_CARDS"],
+  REDISTRIBUTE_DON: ["REDISTRIBUTE_DON"],
+  PLAYER_CHOICE: ["PLAYER_CHOICE"],
+};
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import {
   advancePregame,
@@ -643,6 +654,18 @@ export class GameSession implements DurableObject {
           this.send(ws, { type: "game:error", message: "Waiting for opponent to respond to prompt" });
           return;
         }
+        // OPT-436: the response must match the pending prompt's type — a
+        // delayed duplicate of an earlier response (e.g. SELECT_TARGET while
+        // the arrange prompt is current) must not reach the resolver, where
+        // clearing the prompt first can wedge the match.
+        const expected = EXPECTED_RESPONSE_TYPES[this.gameState.pendingPrompt.options.promptType];
+        if (expected && action.type !== "PASS" && !expected.includes(action.type)) {
+          this.send(ws, {
+            type: "game:error",
+            message: `Expected a ${this.gameState.pendingPrompt.options.promptType} response`,
+          });
+          return;
+        }
         await this.resumeFromPrompt(ws, playerIndex, action);
         return;
       }
@@ -788,6 +811,7 @@ export class GameSession implements DurableObject {
     this.undoHistory = [];
 
     const prompt = this.gameState.pendingPrompt!;
+    const stateBeforeResume = this.gameState;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
     const respondingPlayer = prompt.respondingPlayer;
 
@@ -848,6 +872,12 @@ export class GameSession implements DurableObject {
 
       if (resumeResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
+        // OPT-436: the handler rejected the response (stale/duplicate/invalid)
+        // without issuing a replacement prompt. Restore the complete state
+        // from before resume, including the prompt and any frame the resume
+        // router may have popped while validating the response.
+        this.gameState = stateBeforeResume;
       }
     } else {
       // Legacy: bare ResumeContext (no stack frame) — fallback for backward compat
@@ -857,6 +887,9 @@ export class GameSession implements DurableObject {
 
       if (resumeResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+      } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
+        // OPT-436: same rejection-restore as the stack branch.
+        this.gameState = stateBeforeResume;
       }
     }
 
