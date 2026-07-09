@@ -91,8 +91,10 @@ export function BoardModals({
         activePrompt.choices.length > 0 &&
         activePrompt.source !== "PREGAME" && (
           <PlayerChoiceModal
+            key={activePrompt.choices.map((choice) => choice.id).join(",")}
             effectDescription={activePrompt.effectDescription}
             choices={activePrompt.choices}
+            donReturn={activePrompt.donReturn}
             isHidden={isPromptHidden}
             onHide={onHide}
             onAction={onAction}

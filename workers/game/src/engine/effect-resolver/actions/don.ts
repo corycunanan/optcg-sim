@@ -290,12 +290,15 @@ export function executeForceOpponentDonReturn(
     return { state: applied.state, events: [...events, ...applied.events], succeeded: true };
   }
 
-  const cardName = (instanceId: string): string => {
-    const card =
-      p.leader.instanceId === instanceId
-        ? p.leader
-        : p.characters.find((c) => c?.instanceId === instanceId) ?? null;
-    return (card && cardDb.get(card.cardId)?.name) || "a Character";
+  const cardLabel = (instanceId: string): string => {
+    if (p.leader.instanceId === instanceId) {
+      const name = cardDb.get(p.leader.cardId)?.name || "Leader";
+      return `${name} (Leader)`;
+    }
+    const characterIndex = p.characters.findIndex((c) => c?.instanceId === instanceId);
+    const character = characterIndex >= 0 ? p.characters[characterIndex] : null;
+    const name = (character && cardDb.get(character.cardId)?.name) || "Character";
+    return `${name} (Character ${characterIndex + 1})`;
   };
 
   const choices = plans.map((plan) => {
@@ -303,10 +306,25 @@ export function executeForceOpponentDonReturn(
     if (plan.costActive > 0) parts.push(`${plan.costActive} active`);
     if (plan.costRested > 0) parts.push(`${plan.costRested} rested`);
     for (const a of plan.attached) {
-      if (a.count > 0) parts.push(`${a.count} from ${cardName(a.cardInstanceId)}`);
+      if (a.count > 0) parts.push(`${a.count} from ${cardLabel(a.cardInstanceId)}`);
     }
     return { id: encodeFieldDonReturnChoice(plan, count), label: `Return ${parts.join(" + ")} DON!!` };
   });
+
+  const donReturnSources = [
+    ...(activeAvail > 0
+      ? [{ id: "cost-active", label: "Active DON!! in cost area", max: activeAvail, kind: "COST_ACTIVE" as const }]
+      : []),
+    ...(restedAvail > 0
+      ? [{ id: "cost-rested", label: "Rested DON!! in cost area", max: restedAvail, kind: "COST_RESTED" as const }]
+      : []),
+    ...attachedSources.map((source) => ({
+      id: source.cardInstanceId,
+      label: cardLabel(source.cardInstanceId),
+      max: source.cap,
+      kind: "ATTACHED" as const,
+    })),
+  ];
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
@@ -321,6 +339,7 @@ export function executeForceOpponentDonReturn(
       promptType: "PLAYER_CHOICE",
       effectDescription: `Choose which DON!! to return to your DON!! deck (${count})`,
       choices,
+      donReturn: { count, sources: donReturnSources },
     },
     respondingPlayer: opp,
     resumeContext: resumeCtx,

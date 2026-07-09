@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { CardData, GameState, PlayerState, CardInstance, DonInstance } from "../types.js";
+import type { GameState, PlayerState, CardInstance, DonInstance } from "../types.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
 import { resumeEffectChain } from "../engine/effect-resolver/index.js";
 import { executeForceOpponentDonReturn } from "../engine/effect-resolver/actions/don.js";
@@ -137,6 +137,13 @@ describe("OPT-426: FORCE_OPPONENT_DON_RETURN draws from the full field", () => {
     let ids: string[] = [];
     if (prompt.options.promptType === "PLAYER_CHOICE") {
       ids = prompt.options.choices.map((c) => c.id);
+      expect(prompt.options.donReturn).toEqual({
+        count: 2,
+        sources: [
+          { id: "cost-active", label: "Active DON!! in cost area", max: 2, kind: "COST_ACTIVE" },
+          { id: "char-1-c0", label: `${CARDS.VANILLA.name} (Character 1)`, max: 2, kind: "ATTACHED" },
+        ],
+      });
     }
     // Distributions of 2 across {cost-active(2), char(2)}: 2+0, 1+1, 0+2.
     expect(ids).toEqual([
@@ -161,6 +168,41 @@ describe("OPT-426: FORCE_OPPONENT_DON_RETURN draws from the full field", () => {
     expect(opp.characters.find((c) => c?.instanceId === "char-1-c0")!.attachedDon).toHaveLength(1);
     expect(opp.donDeck).toHaveLength(2);
     expect(opp.donDeck.every((d) => d.state === "ACTIVE" && d.attachedTo === null)).toBe(true);
+  });
+
+  it("disambiguates attached DON!! choices on duplicate Character names", () => {
+    const cardDb = createTestCardDb();
+    const state = withOppField(createBattleReadyState(cardDb), { charDon: [1, 1] });
+
+    const result = executeForceOpponentDonReturn(state, donAction(1), "char-0-v1", 0, cardDb, emptyRefs());
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") return;
+
+    expect(result.pendingPrompt.options.choices.map((choice) => choice.label)).toEqual([
+      `Return 1 from ${CARDS.VANILLA.name} (Character 2) DON!!`,
+      `Return 1 from ${CARDS.VANILLA.name} (Character 1) DON!!`,
+    ]);
+    expect(result.pendingPrompt.options.donReturn?.sources).toEqual([
+      { id: "char-1-c0", label: `${CARDS.VANILLA.name} (Character 1)`, max: 1, kind: "ATTACHED" },
+      { id: "char-1-c1", label: `${CARDS.VANILLA.name} (Character 2)`, max: 1, kind: "ATTACHED" },
+    ]);
+  });
+
+  it("represents the worst-case field as 8 structured source rows", () => {
+    const cardDb = createTestCardDb();
+    const state = withOppField(createBattleReadyState(cardDb), {
+      costActive: 1,
+      costRested: 1,
+      leaderDon: 1,
+      charDon: [1, 1, 1, 2, 2],
+    });
+
+    const result = executeForceOpponentDonReturn(state, donAction(4), "char-0-v1", 0, cardDb, emptyRefs());
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") return;
+
+    expect(result.pendingPrompt.options.choices).toHaveLength(113);
+    expect(result.pendingPrompt.options.donReturn?.sources).toHaveLength(8);
   });
 
   it("rejects a choice id the prompt never offered (stale-modal defense)", () => {
