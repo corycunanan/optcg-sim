@@ -3074,15 +3074,16 @@ export const OP05_082_SHIRAHOSHI: EffectSchema = {
         { type: "REST_SELF" },
         { type: "PLACE_FROM_TRASH_TO_DECK", amount: 2, position: "BOTTOM" },
       ],
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 6,
-      },
       actions: [
         {
           type: "OPPONENT_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 6,
+          },
           params: {
             action: {
               type: "TRASH_FROM_HAND",

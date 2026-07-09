@@ -3304,14 +3304,15 @@ export const OP12_094_MONKEY_D_DRAGON: EffectSchema = {
           filter: { traits: ["Revolutionary Army"] },
         },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Revolutionary Army" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Revolutionary Army" },
+          },
           target: {
             type: "CHARACTER_CARD",
             source_zone: "TRASH",
