@@ -58,6 +58,7 @@ type TestAccess = {
   gameState: GameState;
   cardDb: Map<string, CardData>;
   handleAction(ws: WebSocket, playerIndex: 0 | 1, action: GameAction): Promise<void>;
+  writeResultToDb(): Promise<void>;
 };
 
 function trashCard(cardId: string, suffix: string): CardInstance {
@@ -298,5 +299,15 @@ describe("OPT-436: rejected responses restore the pending prompt", () => {
 
     expect(session.gameState.pendingPrompt).toBeNull();
     expect(session.gameState.effectStack).toHaveLength(0);
+  });
+
+  it.each([0, 1] as const)("player %i can concede while an optional prompt is pending", async (playerIndex) => {
+    const { session, ws } = sessionWithOptionalPrompt();
+    session.writeResultToDb = async () => undefined;
+
+    await session.handleAction(ws as unknown as WebSocket, playerIndex, { type: "CONCEDE" } as GameAction);
+
+    expect(session.gameState.status).toBe("FINISHED");
+    expect(session.gameState.winner).toBe(playerIndex === 0 ? 1 : 0);
   });
 });

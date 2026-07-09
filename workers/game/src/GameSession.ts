@@ -660,7 +660,10 @@ export class GameSession implements DurableObject {
         ? EXPECTED_RESPONSE_TYPES[promptType as DurablePromptType]
         : null;
 
-      if (expected) {
+      if (action.type === "CONCEDE") {
+        // A player may always concede, including while either player owns a prompt.
+        // Fall through to the normal pipeline path below.
+      } else if (expected) {
         if (playerIndex !== this.gameState.pendingPrompt.respondingPlayer) {
           this.send(ws, { type: "game:error", message: "Waiting for opponent to respond to prompt" });
           return;
@@ -681,7 +684,7 @@ export class GameSession implements DurableObject {
           }
         }
         if (promptType === "OPTIONAL_EFFECT" && action.type === "PLAYER_CHOICE") {
-          const validChoice = action.choiceId === "activate" || action.choiceId === "accept" || action.choiceId === "skip";
+          const validChoice = action.choiceId === "activate" || action.choiceId === "accept";
           if (!validChoice) {
             this.send(ws, { type: "game:error", message: "That choice is no longer available" });
             return;
@@ -696,7 +699,7 @@ export class GameSession implements DurableObject {
           await this.resumeFromPrompt(ws, playerIndex, action);
           return;
         }
-      } else if (action.type !== "CONCEDE") {
+      } else {
         this.send(ws, { type: "game:error", message: "Waiting for player to respond to prompt" });
         return;
       }
