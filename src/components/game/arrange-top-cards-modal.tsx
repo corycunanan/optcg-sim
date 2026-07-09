@@ -121,7 +121,8 @@ export function ArrangeTopCardsModal({
   onHide,
   onAction,
 }: ArrangeTopCardsModalProps) {
-  const [step, setStep] = useState<1 | 2>(1);
+  // maxKeep 0 = pure reorder (OPT-371 cost arrangement) — no pick step.
+  const [step, setStep] = useState<1 | 2>(maxKeep === 0 ? 2 : 1);
   const [orderedCards, setOrderedCards] = useState<CardInstance[]>(initialCards);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [keptIds, setKeptIds] = useState<string[]>([]);
@@ -180,7 +181,7 @@ export function ArrangeTopCardsModal({
   }
 
   const title =
-    step === 1
+    step === 1 || maxKeep === 0
       ? effectDescription
       : `Put the remaining ${orderedCards.length} card${orderedCards.length !== 1 ? "s" : ""} back`;
 
