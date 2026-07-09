@@ -228,6 +228,18 @@ describe("OPT-436: rejected responses restore the pending prompt", () => {
     expect(session.gameState.effectStack).toEqual(stackBefore);
   });
 
+  it("rejects an invalid optional-effect choice id", async () => {
+    const { session, ws } = sessionWithOptionalPrompt();
+
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "PLAYER_CHOICE",
+      choiceId: "stale-choice",
+    } as GameAction);
+
+    expect(lastError(ws)).toMatch(/no longer available/);
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+  });
+
   it("rejects an unoffered PLAYER_CHOICE id before it can consume a frame", async () => {
     const { session, ws } = sessionWithOptionalPrompt();
     const resumeContext = session.gameState.pendingPrompt!.resumeContext;
