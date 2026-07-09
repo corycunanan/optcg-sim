@@ -147,14 +147,20 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     const current = messagesRef.current;
     const lastMsg = current[current.length - 1];
     let after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
+    let afterId = lastMsg?.id ?? "";
     try {
       // The server caps each ?after page (OPT-375) and sets `more` when the
-      // window overflowed; page forward from the last returned message. The
-      // iteration cap bounds one reconciliation pass — anything beyond it
-      // lands on the next visibility change.
+      // window overflowed; page forward from the last returned message using
+      // the composite (createdAt, id) cursor so createdAt ties at the page
+      // boundary can't be skipped or re-served. The iteration cap bounds one
+      // reconciliation pass — anything beyond it lands on the next
+      // visibility change.
       for (let page = 0; page < 5; page++) {
+        const cursor =
+          `after=${encodeURIComponent(after)}` +
+          (afterId ? `&afterId=${encodeURIComponent(afterId)}` : "");
         const json = await apiGet<{ data: Message[]; more?: boolean }>(
-          `/api/messages/${user.id}?after=${encodeURIComponent(after)}`,
+          `/api/messages/${user.id}?${cursor}`,
         );
         if (json.data?.length > 0) {
           setMessages((prev) => {
@@ -162,7 +168,9 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
             const fresh = json.data.filter((m) => !seen.has(m.id));
             return fresh.length > 0 ? [...prev, ...fresh] : prev;
           });
-          after = json.data[json.data.length - 1].createdAt;
+          const last = json.data[json.data.length - 1];
+          after = last.createdAt;
+          afterId = last.id;
         }
         if (!json.more) break;
       }

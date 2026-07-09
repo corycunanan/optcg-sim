@@ -116,10 +116,41 @@ describe("GET /api/messages/[userId] polling branch (?after)", () => {
 
     expect(res.status).toBe(200);
     expect(messageFindManyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 201, orderBy: { createdAt: "asc" } }),
+      expect.objectContaining({
+        take: 201,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      }),
     );
     expect(body.data).toHaveLength(2);
     expect(body.more).toBe(false);
+  });
+
+  it("uses a composite (createdAt, id) cursor when afterId is supplied", async () => {
+    messageFindManyMock.mockResolvedValue([]);
+    const boundary = "2026-01-01T00:00:05.000Z";
+    const { request, params } = buildGetRequest(
+      "user-recipient",
+      `?after=${boundary}&afterId=msg-5`,
+    );
+
+    const res = await GET(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(messageFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            expect.objectContaining({ OR: expect.any(Array) }),
+            {
+              OR: [
+                { createdAt: { gt: new Date(boundary) } },
+                { createdAt: new Date(boundary), id: { gt: "msg-5" } },
+              ],
+            },
+          ],
+        },
+      }),
+    );
   });
 
   it("truncates to the cap and sets more:true when the window overflows", async () => {
