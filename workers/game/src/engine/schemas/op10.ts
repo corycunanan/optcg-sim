@@ -4210,15 +4210,16 @@ export const OP10_118_MONKEY_D_LUFFY: EffectSchema = {
         },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 5,
-      },
       actions: [
         {
           type: "OPPONENT_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 5,
+          },
           params: {
             mandatory: true,
             action: {
