@@ -3,7 +3,7 @@
  * POST /api/messages/[userId] — Send a message
  */
 
-import { after, NextRequest } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { SendMessageSchema } from "@/lib/validators/messages";
@@ -31,6 +31,11 @@ export async function GET(
     // here (and below) was removed; clients now call POST
     // /api/messages/[userId]/read explicitly.
     if (after) {
+      // OPT-375: bound the client-supplied `after` window — a stale tab or a
+      // deliberate after=1970 must not pull the whole conversation. Fetch one
+      // extra row to detect overflow; `more: true` tells the client to poll
+      // again from the last returned message.
+      const pollLimit = 200;
       const newMessages = await prisma.message.findMany({
         where: {
           OR: [
@@ -40,12 +45,17 @@ export async function GET(
           createdAt: { gt: new Date(after) },
         },
         orderBy: { createdAt: "asc" },
+        take: pollLimit + 1,
         include: {
           fromUser: { select: { id: true, username: true, name: true, image: true } },
         },
       });
 
-      return apiSuccess(newMessages);
+      const more = newMessages.length > pollLimit;
+      return NextResponse.json({
+        data: more ? newMessages.slice(0, pollLimit) : newMessages,
+        more,
+      });
     }
 
     const messages = await prisma.message.findMany({

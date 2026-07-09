@@ -146,17 +146,25 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     if (minimizedRef.current) return;
     const current = messagesRef.current;
     const lastMsg = current[current.length - 1];
-    const after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
+    let after = lastMsg ? lastMsg.createdAt : new Date(0).toISOString();
     try {
-      const json = await apiGet<{ data: Message[] }>(
-        `/api/messages/${user.id}?after=${encodeURIComponent(after)}`,
-      );
-      if (json.data?.length > 0) {
-        setMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          const fresh = json.data.filter((m) => !seen.has(m.id));
-          return fresh.length > 0 ? [...prev, ...fresh] : prev;
-        });
+      // The server caps each ?after page (OPT-375) and sets `more` when the
+      // window overflowed; page forward from the last returned message. The
+      // iteration cap bounds one reconciliation pass — anything beyond it
+      // lands on the next visibility change.
+      for (let page = 0; page < 5; page++) {
+        const json = await apiGet<{ data: Message[]; more?: boolean }>(
+          `/api/messages/${user.id}?after=${encodeURIComponent(after)}`,
+        );
+        if (json.data?.length > 0) {
+          setMessages((prev) => {
+            const seen = new Set(prev.map((m) => m.id));
+            const fresh = json.data.filter((m) => !seen.has(m.id));
+            return fresh.length > 0 ? [...prev, ...fresh] : prev;
+          });
+          after = json.data[json.data.length - 1].createdAt;
+        }
+        if (!json.more) break;
       }
     } catch {
       // Non-fatal — push remains authoritative; the next restore can retry.
