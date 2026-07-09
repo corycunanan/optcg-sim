@@ -51,7 +51,7 @@ export default async function DecksPage() {
   const leaderMap = new Map(leaders.map((l) => [l.id, l]));
 
   return (
-    <>
+    <div className="bg-surface-base flex-1 overflow-y-auto">
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderTitle>My Decks</PageHeaderTitle>
@@ -136,6 +136,6 @@ export default async function DecksPage() {
         </div>
       )}
       </div>
-    </>
+    </div>
   );
 }

@@ -50,7 +50,7 @@ export default function OnboardingPage() {
         throw new Error(data.error || "Failed to set username");
       }
 
-      router.push("/admin");
+      router.push("/decks");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
