@@ -750,8 +750,11 @@ export const OP12_020_RORONOA_ZORO: EffectSchema = {
           type: "SET_ACTIVE",
           target: { type: "SELF" },
           conditions: {
+            // "If THIS Leader battles your opponent's Character" — card-scoped
+            // (OPT-424), not merely "a friendly Character battled a Character".
             type: "ACTION_PERFORMED_THIS_TURN",
             controller: "SELF",
+            source: "SELF_CARD",
             action: "ATTACKED",
             filter: { card_type: "CHARACTER" },
           },
