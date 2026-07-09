@@ -129,7 +129,29 @@ export function payCosts(
       }
 
       case "REST_SELF": {
+        // A target-bearing REST_SELF rests the targeted card, not the source —
+        // the schema convention for "rest your Leader" costs (OP04-081/094 etc.).
+        if (cost.target?.type === "YOUR_LEADER") {
+          const leader = nextState.players[controller].leader;
+          if (leader.state !== "ACTIVE") return null;
+          if (isProhibitedForCard(nextState, leader.instanceId, "CANNOT_BE_RESTED", _cardDb)) {
+            return null;
+          }
+          nextState = setCardState(nextState, leader.instanceId, "RESTED");
+          events.push({
+            type: "CARD_STATE_CHANGED",
+            playerIndex: controller,
+            payload: { targetInstanceId: leader.instanceId, newState: "RESTED" },
+          });
+          break;
+        }
         if (!sourceCardInstanceId) return null;
+        const player = nextState.players[controller];
+        const source = player.leader.instanceId === sourceCardInstanceId
+          ? player.leader
+          : player.characters.find((card) => card?.instanceId === sourceCardInstanceId)
+            ?? (player.stage?.instanceId === sourceCardInstanceId ? player.stage : null);
+        if (!source || source.state !== "ACTIVE") return null;
         // OPT-250: if the source is under CANNOT_BE_RESTED, the cost cannot
         // be paid — the entire effect fails (qa_op13.md:77-79).
         if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb)) {
@@ -534,12 +556,26 @@ export function isCostPayable(
       return player.donCostArea.filter((d) => !d.attachedTo).length >= amt;
     }
 
-    case "REST_SELF":
+    case "REST_SELF": {
+      // A target-bearing REST_SELF rests the targeted card, not the source —
+      // the schema convention for "rest your Leader" costs (OP04-081/094 etc.).
+      // Payable iff that card is active and not prohibited from resting.
+      if (simple.target?.type === "YOUR_LEADER") {
+        const leader = player.leader;
+        if (leader.state !== "ACTIVE") return false;
+        return !isProhibitedForCard(state, leader.instanceId, "CANNOT_BE_RESTED", cardDb);
+      }
       // OPT-250: a source under CANNOT_BE_RESTED can't pay this cost
       // (qa_op13.md:77-79 — [Activate: Main] rest-self effects are gated).
       if (!sourceCardInstanceId) return false;
+      const source = player.leader.instanceId === sourceCardInstanceId
+        ? player.leader
+        : player.characters.find((card) => card?.instanceId === sourceCardInstanceId)
+          ?? (player.stage?.instanceId === sourceCardInstanceId ? player.stage : null);
+      if (!source || source.state !== "ACTIVE") return false;
       if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb)) return false;
       return true;
+    }
 
     case "TRASH_SELF": {
       if (!sourceCardInstanceId) return false;

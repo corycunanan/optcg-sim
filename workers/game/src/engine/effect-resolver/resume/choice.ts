@@ -32,7 +32,7 @@ import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { resolveEffect, executeActionChain } from "../resolver.js";
 import { executePlayCard } from "../actions/play.js";
-import { applyForcedDonReturn } from "../actions/don.js";
+import { applyFieldDonReturn, decodeFieldDonReturnChoice } from "../actions/don.js";
 import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 
@@ -120,10 +120,11 @@ export function handlePlayerChoiceStateDistribution(
 }
 
 /**
- * OPT-413: FORCE_OPPONENT_DON_RETURN split choice — the DON!! owner picked
- * how many active vs. rested DON!! return (OP16-074 Magellan FAQ). Choice id
- * format: "don-return:<activeCount>:<count>". Rejects choices the prompt did
- * not offer (stale-modal defense).
+ * OPT-413 / OPT-426: FORCE_OPPONENT_DON_RETURN choice — the DON!! owner picked
+ * which field DON!! return (OP16-074 Magellan FAQ). The plan covers cost-area
+ * active/rested DON!! plus DON!! detached from named Leader/Characters; see
+ * `decodeFieldDonReturnChoice` for the id grammar. Rejects choices the prompt
+ * did not offer (stale-modal defense).
  *
  * Mutually exclusive with handlePlayerChoiceBranch (different pausedAction
  * type); the caller should skip the generic branch-picker when this matches.
@@ -141,18 +142,13 @@ export function handlePlayerChoiceDonReturn(
   if (resumeCtx.validTargets && !resumeCtx.validTargets.includes(action.choiceId)) {
     return { kind: "terminal", result: { state, events: [], resolved: false } };
   }
-  const parts = action.choiceId.split(":");
-  if (parts.length !== 3 || parts[0] !== "don-return") {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
-  }
-  const activeCount = parseInt(parts[1], 10);
-  const count = parseInt(parts[2], 10);
-  if (!Number.isFinite(activeCount) || !Number.isFinite(count) || activeCount < 0 || count < activeCount) {
+  const decoded = decodeFieldDonReturnChoice(action.choiceId);
+  if (!decoded) {
     return { kind: "terminal", result: { state, events: [], resolved: false } };
   }
 
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
-  const applied = applyForcedDonReturn(state, opp, activeCount, count);
+  const applied = applyFieldDonReturn(state, opp, decoded.plan);
   events.push(...applied.events);
   return { kind: "fallthrough", state: applied.state };
 }

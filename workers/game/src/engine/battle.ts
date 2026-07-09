@@ -558,7 +558,7 @@ export function continueEffectDamageSequence(
     const lifeCard = popResult.lifeCard;
     const cardData = cardDb.get(lifeCard.cardId);
 
-    if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, damagedPlayerIndex)) {
+    if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, damagedPlayerIndex, lifeCard.instanceId)) {
       const damagesAfterThis = remainingDamages - i - 1;
       nextState = {
         ...nextState,
@@ -731,7 +731,7 @@ function dealOneLeaderDamage(
     return { state: nextState, events, paused: false };
   }
 
-  if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, inactiveIdx)) {
+  if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, inactiveIdx, lifeCard.instanceId)) {
     const curBattle = nextState.turn.battle!;
     const updatedBattle = { ...curBattle, pendingTriggerLifeCard: lifeCard };
     nextState = {
@@ -1060,6 +1060,7 @@ export function canOfferTrigger(
   cardId: string,
   cardDb: Map<string, CardData>,
   ownerIndex: 0 | 1,
+  sourceCardInstanceId?: string,
 ): boolean {
   const cardData = cardDb.get(cardId);
   if (!cardData || !hasTrigger(cardData)) return false;
@@ -1069,7 +1070,7 @@ export function canOfferTrigger(
     (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
   );
   if (!block?.costs?.length) return true;
-  return block.costs.every((c) => isCostPayable(state, c, ownerIndex, cardDb));
+  return block.costs.every((c) => isCostPayable(state, c, ownerIndex, cardDb, sourceCardInstanceId));
 }
 
 function endBattle(
