@@ -51,6 +51,7 @@ export function BoardModals({
       {activePrompt?.promptType === "ARRANGE_TOP_CARDS" &&
         activePrompt.cards.length > 0 && (
           <ArrangeTopCardsModal
+            key={activePrompt.cards.map((c) => c.instanceId).join(",")}
             cards={activePrompt.cards}
             effectDescription={activePrompt.effectDescription}
             canSendToBottom={activePrompt.canSendToBottom}

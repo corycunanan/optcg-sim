@@ -7,7 +7,7 @@
  * and finally executes the effect's action chain.
  */
 
-import type { Action, ChoiceCost, Cost, CostResult, EffectBlock, EffectResult } from "../../effect-types.js";
+import type { Action, ChoiceCost, Cost, CostResult, EffectBlock, EffectResult, SimpleCost } from "../../effect-types.js";
 import { isOncePerTurnBlock } from "../../effect-types.js";
 import type {
   CardData,
@@ -20,7 +20,12 @@ import type {
 import { popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { markOncePerTurnUsed } from "../action-utils.js";
-import { payCostsWithSelection, applyCostSelection } from "../cost-handler.js";
+import {
+  payCostsWithSelection,
+  applyCostSelection,
+  blockShufflesDeck,
+  buildTrashToDeckArrangePrompt,
+} from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { executeActionChain } from "../resolver.js";
 import type { EffectResolverResult } from "../types.js";
@@ -252,6 +257,64 @@ export function handleAwaitingCostSelection(
     newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
     nextState = { ...nextState, players: newPlayers };
     events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: 1 } });
+  } else if (action.type === "SELECT_TARGET" && cost.type === "PLACE_FROM_TRASH_TO_DECK") {
+    // OPT-371: the player chose WHICH trash cards to place. For multi-card
+    // costs (unless the block shuffles afterward) chain an arrange prompt so
+    // the player also sets the ORDER — the frame stays on the stack and the
+    // ARRANGE_TOP_CARDS response below finishes the payment.
+    if (topFrame.costArrangeStage) {
+      // Awaiting an arrange response — a select packet here could bypass
+      // the ordering step. Ignore it.
+      return { state, events: [], resolved: false };
+    }
+    const valid = new Set(topFrame.validTargets ?? []);
+    const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
+    const selected = [...new Set(action.selectedInstanceIds ?? [])].filter((id) => valid.has(id));
+    if (selected.length !== amount) {
+      return { state, events: [], resolved: false };
+    }
+
+    const needsArrange = amount > 1 && !blockShufflesDeck(topFrame.effectBlock as EffectBlock);
+    if (needsArrange) {
+      nextState = updateTopFrame(nextState, { validTargets: selected, costArrangeStage: true });
+      return {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: buildTrashToDeckArrangePrompt(nextState, selected, controller, topFrame.id),
+      };
+    }
+
+    nextState = applyCostSelection(nextState, cost, selected, controller);
+    const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
+    accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
+      targetInstanceIds: existing.targetInstanceIds,
+      count: existing.count + selected.length,
+    });
+  } else if (action.type === "ARRANGE_TOP_CARDS" && cost.type === "PLACE_FROM_TRASH_TO_DECK") {
+    // OPT-371: arranged order arrives top→bottom of the placed group. Only
+    // the cards picked in the selection step (frame.validTargets) count; any
+    // of them missing from the response are appended so the cost still pays
+    // in full.
+    if (!topFrame.costArrangeStage) {
+      // Still on the select stage — validTargets holds every candidate, so
+      // accepting an arrange packet here would move them all. Ignore it.
+      return { state, events: [], resolved: false };
+    }
+    const valid = topFrame.validTargets ?? [];
+    const validSet = new Set(valid);
+    const ordered = [...new Set((action.orderedInstanceIds ?? []).filter((id) => validSet.has(id)))];
+    const seen = new Set(ordered);
+    for (const id of valid) {
+      if (!seen.has(id)) ordered.push(id);
+    }
+
+    nextState = applyCostSelection(nextState, cost, ordered, controller);
+    const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
+    accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
+      targetInstanceIds: existing.targetInstanceIds,
+      count: existing.count + ordered.length,
+    });
   } else if (action.type === "SELECT_TARGET") {
     const selected = action.selectedInstanceIds ?? [];
     nextState = applyCostSelection(nextState, cost, selected, controller);
