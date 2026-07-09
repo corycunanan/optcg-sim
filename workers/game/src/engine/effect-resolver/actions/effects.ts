@@ -10,7 +10,7 @@ import type {
 } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { resolveAmount, computeExpiry } from "../action-utils.js";
+import { resolveAmount, computeExpiry, computeProhibitionExpiry } from "../action-utils.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { nanoid } from "../../../util/nanoid.js";
 
@@ -47,6 +47,7 @@ export function executeApplyProhibition(
     prohibitionType: prohibType as any,
     scope: params.scope as any ?? {},
     duration,
+    expiresAt: computeProhibitionExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     usesRemaining: null,
@@ -223,6 +224,9 @@ export function executeNegateTriggerType(
     prohibitionType: prohibType as any,
     scope: { triggerType },
     duration,
+    // Anchor expiry to the caster ("your ... turn" in card text), not the
+    // affected player stored in `controller`.
+    expiresAt: computeProhibitionExpiry(duration, state, controller),
     controller: targetController as 0 | 1,
     appliesTo: [],
     usesRemaining: null,

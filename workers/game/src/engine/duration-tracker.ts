@@ -30,10 +30,11 @@ export function expireEffects(
 }
 
 /**
- * Expire battle-scoped effects at End of Battle.
+ * Expire battle-scoped effects and prohibitions at End of Battle.
  */
 export function expireBattleEffects(state: GameState, battleId: string): GameState {
-  return expireEffects(state, "END_OF_BATTLE", { battleId });
+  const nextState = expireEffects(state, "END_OF_BATTLE", { battleId });
+  return expireProhibitions(nextState, "END_OF_BATTLE", { battleId });
 }
 
 /**
@@ -43,10 +44,12 @@ export function expireBattleEffects(state: GameState, battleId: string): GameSta
 export function expireEndOfTurnEffects(state: GameState): GameState {
   const context = currentTurnContext(state);
   let nextState = expireEffects(state, "END_OF_TURN", context);
+  nextState = expireProhibitions(nextState, "END_OF_TURN", context);
   // END_OF_END_PHASE carries UNTIL_END_OF_OPPONENT_NEXT_TURN /
   // UNTIL_END_OF_OPPONENT_NEXT_END_PHASE — fires in the same End Phase,
   // after the END_OF_TURN wave.
   nextState = expireEffects(nextState, "END_OF_END_PHASE", context);
+  nextState = expireProhibitions(nextState, "END_OF_END_PHASE", context);
   // Clean up consumed and THIS_TURN one-time modifiers
   nextState = cleanupConsumedOneTimeModifiers(nextState);
   nextState = expireOneTimeModifiers(nextState);
@@ -54,10 +57,13 @@ export function expireEndOfTurnEffects(state: GameState): GameState {
 }
 
 /**
- * Expire UNTIL_START_OF_YOUR_NEXT_TURN effects at Refresh Phase (step 1).
+ * Expire UNTIL_START_OF_YOUR_NEXT_TURN effects and prohibitions at
+ * Refresh Phase (step 1).
  */
 export function expireRefreshPhaseEffects(state: GameState): GameState {
-  return expireEffects(state, "REFRESH_PHASE", currentTurnContext(state));
+  const context = currentTurnContext(state);
+  const nextState = expireEffects(state, "REFRESH_PHASE", context);
+  return expireProhibitions(nextState, "REFRESH_PHASE", context);
 }
 
 /**
@@ -206,7 +212,10 @@ export function expireProhibitions(
 ): GameState {
   const prohibitions = state.prohibitions as import("./effect-types.js").RuntimeProhibition[];
   const remaining = prohibitions.filter((p) => {
-    const expiry = computeProhibitionExpiry(p.duration, state);
+    // Prefer the expiry stamped at creation (OPT-408) — "next turn" anchors
+    // can't be recomputed at check time. Legacy persisted prohibitions
+    // (no expiresAt) keep the old check-time computation.
+    const expiry = p.expiresAt ?? legacyProhibitionExpiry(p.duration, state);
     return !shouldExpire(expiry, wave, context);
   });
 
@@ -323,7 +332,7 @@ function shouldExpire(
   }
 }
 
-function computeProhibitionExpiry(
+function legacyProhibitionExpiry(
   duration: import("./effect-types.js").Duration,
   state: GameState,
 ): ExpiryTiming {

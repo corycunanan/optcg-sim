@@ -123,9 +123,9 @@ function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>)
 
   // Steps 1 & 2: [End of Your Turn] / [End of Your Opponent's Turn] effects (M4)
 
-  // Steps 3-6: Expire THIS_TURN effects and prohibitions before turn transition
+  // Steps 3-6: Expire THIS_TURN / UNTIL_END_OF_*_TURN effects and
+  // prohibitions before the turn transition (both end-phase waves).
   state = expireEndOfTurnEffects(state);
-  state = expireProhibitions(state, "END_OF_TURN", { turn: state.turn.number });
 
   // Process end-of-turn scheduled actions
   const scheduled = processScheduledActions(state, "END_OF_THIS_TURN");

@@ -1276,6 +1276,12 @@ export interface RuntimeProhibition {
   prohibitionType: ProhibitionType;
   scope: ProhibitionScope;
   duration: Duration;
+  /**
+   * Expiry stamped at creation (OPT-408) — "next turn" anchors can't be
+   * recomputed at check time. Optional: legacy persisted prohibitions fall
+   * back to a check-time computation in expireProhibitions.
+   */
+  expiresAt?: ExpiryTiming;
   controller: 0 | 1;
   appliesTo: string[];  // CardInstance.instanceIds or player indices
   usesRemaining: number | null;

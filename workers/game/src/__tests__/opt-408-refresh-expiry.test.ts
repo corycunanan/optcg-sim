@@ -11,9 +11,10 @@
 
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState, KeywordSet } from "../types.js";
-import type { Duration, RuntimeActiveEffect } from "../engine/effect-types.js";
+import type { Duration, RuntimeActiveEffect, RuntimeProhibition } from "../engine/effect-types.js";
 import { executeAdvancePhase } from "../engine/phases.js";
-import { computeExpiry } from "../engine/effect-resolver/action-utils.js";
+import { computeExpiry, computeProhibitionExpiry } from "../engine/effect-resolver/action-utils.js";
+import { expireBattleEffects } from "../engine/duration-tracker.js";
 
 function noKeywords(): KeywordSet {
   return { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false };
@@ -284,6 +285,91 @@ describe("OPT-408: UNTIL_END_OF_YOUR_NEXT_TURN expires at end of the caster's ne
     s = startTurn(s, db);
     s = endTurn(s, db); // end of P0 round 2 → expired
     expect(count(s)).toBe(0);
+  });
+});
+
+function addProhibition(state: GameState, duration: Duration, controller: 0 | 1): GameState {
+  const prohibition: RuntimeProhibition = {
+    id: `prohib-${duration.type}-${controller}`,
+    sourceCardInstanceId: controller === 0 ? "L0" : "L1",
+    sourceEffectBlockId: "block-1",
+    prohibitionType: "CANNOT_ATTACK",
+    scope: {},
+    duration,
+    expiresAt: computeProhibitionExpiry(duration, state, controller),
+    controller,
+    appliesTo: [controller === 0 ? "L1" : "L0"],
+    usesRemaining: null,
+  };
+  return { ...state, prohibitions: [...state.prohibitions, prohibition as any] };
+}
+
+const prohibCount = (s: GameState) => s.prohibitions.length;
+
+describe("OPT-408: prohibition expiry uses the creation-stamped anchor (Codex P1)", () => {
+  it("UNTIL_END_OF_OPPONENT_NEXT_TURN prohibition survives the caster's end phase and locks the opponent's turn", () => {
+    const { state, db } = makeState({ activePlayerIndex: 0 });
+    let s = addProhibition(state, { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" }, 0);
+
+    s = endTurn(s, db); // caster's own end phase — must survive
+    expect(prohibCount(s)).toBe(1);
+
+    s = startTurn(s, db); // opponent's turn: prohibition still active in MAIN
+    expect(prohibCount(s)).toBe(1);
+    s = endTurn(s, db); // end of opponent's turn → expired
+    expect(prohibCount(s)).toBe(0);
+  });
+
+  it("UNTIL_START_OF_YOUR_NEXT_TURN prohibition expires at the caster's next refresh", () => {
+    const { state, db } = makeState({ activePlayerIndex: 0 });
+    let s = addProhibition(state, { type: "UNTIL_START_OF_YOUR_NEXT_TURN" }, 0);
+
+    s = endTurn(s, db);
+    s = startTurn(s, db); // opponent's refresh must not expire it
+    expect(prohibCount(s)).toBe(1);
+    s = endTurn(s, db); // → caster's REFRESH (round 2)
+    s = runRefresh(s, db);
+    expect(prohibCount(s)).toBe(0);
+  });
+
+  it("THIS_BATTLE prohibition expires at end of battle", () => {
+    const { state } = makeState({ activePlayerIndex: 0 });
+    let s = {
+      ...state,
+      turn: { ...state.turn, battle: { battleId: "battle-1" } },
+    } as GameState;
+    s = addProhibition(s, { type: "THIS_BATTLE" }, 0);
+    expect(prohibCount(s)).toBe(1);
+
+    s = expireBattleEffects(s, "battle-1");
+    expect(prohibCount(s)).toBe(0);
+  });
+
+  it("SKIP_NEXT_REFRESH prohibition is never wave-expired (consumed by applyRefreshProhibitions)", () => {
+    const { state, db } = makeState({ activePlayerIndex: 0 });
+    let s = addProhibition(state, { type: "SKIP_NEXT_REFRESH" }, 0);
+    expect((s.prohibitions[0] as RuntimeProhibition).expiresAt).toEqual({ wave: "NEVER" });
+
+    s = endTurn(s, db);
+    expect(prohibCount(s)).toBe(1); // survived both end-phase waves
+  });
+
+  it("legacy prohibition without expiresAt still expires via the check-time fallback", () => {
+    const { state, db } = makeState({ activePlayerIndex: 0 });
+    const legacy = {
+      id: "prohib-legacy",
+      sourceCardInstanceId: "L0",
+      sourceEffectBlockId: "block-1",
+      prohibitionType: "CANNOT_ATTACK",
+      scope: {},
+      duration: { type: "THIS_TURN" },
+      controller: 0,
+      appliesTo: ["L1"],
+      usesRemaining: null,
+    };
+    let s = { ...state, prohibitions: [legacy as any] } as GameState;
+    s = endTurn(s, db);
+    expect(prohibCount(s)).toBe(0);
   });
 });
 

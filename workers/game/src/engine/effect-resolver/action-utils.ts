@@ -245,6 +245,20 @@ function nextTurnOf(seat: 0 | 1, state: GameState): number {
   return active !== seat && seat !== first ? state.turn.number : state.turn.number + 1;
 }
 
+/**
+ * Expiry for a RuntimeProhibition, stamped at creation. Same math as active
+ * effects except SKIP_NEXT_REFRESH: those prohibitions are consumed by the
+ * Refresh Phase they skip (applyRefreshProhibitions), never wave-expired.
+ */
+export function computeProhibitionExpiry(
+  duration: Duration,
+  state: GameState,
+  controller: 0 | 1,
+): ExpiryTiming {
+  if (duration.type === "SKIP_NEXT_REFRESH") return { wave: "NEVER" };
+  return computeExpiry(duration, state, controller);
+}
+
 export function computeExpiry(duration: Duration, state: GameState, controller: 0 | 1): ExpiryTiming {
   switch (duration.type) {
     case "THIS_TURN":
