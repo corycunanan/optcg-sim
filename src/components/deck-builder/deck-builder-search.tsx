@@ -65,7 +65,10 @@ export function DeckBuilderSearch({
   const [results, setResults] = useState<CardSearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  // Starts true: the mount-time debounce always fires a fetch, and the empty
+  // state must not flash "No cards match" before that first result lands.
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [activeColors, setActiveColors] = useState<string[]>([]);
   const [activeType, setActiveType] = useState<string>("Leader");
   const [costMin, setCostMin] = useState("");
@@ -105,9 +108,11 @@ export function DeckBuilderSearch({
         }>(`/api/cards?${params.toString()}`);
         setResults(json.data || []);
         setTotal(json.pagination?.total || 0);
+        setLoadFailed(false);
       } catch {
         setResults([]);
         setTotal(0);
+        setLoadFailed(true);
       } finally {
         setIsLoading(false);
       }
@@ -240,11 +245,40 @@ export function DeckBuilderSearch({
 
         {/* Results count */}
         <div className="text-content-tertiary px-3 pb-1 text-xs">
-          {isLoading ? "Searching…" : `${total.toLocaleString()} cards`}
+          {isLoading ? "Searching…" : loadFailed ? "" : `${total.toLocaleString()} cards`}
         </div>
 
         {/* Results grid */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 pb-3">
+          {/* Search failure ≠ zero results — say which one happened */}
+          {loadFailed && !isLoading && (
+            <div className="py-10 text-center">
+              <p className="text-sm font-medium text-error">
+                Couldn&rsquo;t load cards
+              </p>
+              <p className="text-content-tertiary mt-1 text-xs">
+                Check your connection, then retry.
+              </p>
+              <button
+                onClick={() =>
+                  fetchCards(query, page, activeColors, activeType, costMin, costMax)
+                }
+                className="border-border text-content-secondary hover:bg-surface-2 hover:text-content-primary mt-4 rounded border px-3 py-1 text-xs font-medium transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!loadFailed && !isLoading && results.length === 0 && (
+            <div className="py-10 text-center">
+              <p className="text-content-secondary text-sm font-medium">
+                No cards match
+              </p>
+              <p className="text-content-tertiary mt-1 text-xs">
+                Try a different search or clear some filters.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             {results.map((card) => {
               const inDeck = deckCards.get(card.id);
