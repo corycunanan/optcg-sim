@@ -30,7 +30,8 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
-import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { toast } from "sonner";
+import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { DeckDetailResponseSchema } from "@/lib/validators/cards";
 import type { TestDeckOrder } from "@/lib/deck-builder/state";
 
@@ -92,6 +93,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           setLeaderSelectedArtUrl(data.leaderArtUrl);
         }
       } catch {
+        toast.error("Couldn't load that deck. Returning to your deck list.");
         router.push("/decks");
       } finally {
         setIsLoading(false);
@@ -100,6 +102,17 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     loadDeck();
   }, [deckId, router]);
+
+  // Work-loss guard: warn on tab close / refresh / external nav while dirty.
+  // In-app nav through the header's back link is guarded in DeckBuilderHeader.
+  useEffect(() => {
+    if (!state.isDirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [state.isDirty]);
 
   // Validation — walks every card and parses effect schemas, so only rerun
   // when the deck actually changes
@@ -148,8 +161,13 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       if (!state.id) {
         router.replace(`/decks/${data.id}`);
       }
-    } catch {
+    } catch (err) {
       dispatch({ type: "SAVE_ERROR" });
+      toast.error(
+        err instanceof ApiError
+          ? `Save failed: ${err.message}`
+          : "Save failed. Your changes are still here — try again.",
+      );
     }
   }, [state, leaderSelectedArtUrl, router]);
 
@@ -208,6 +226,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
         name={state.name}
         isDirty={state.isDirty}
         isSaving={state.isSaving}
+        hasLeader={!!state.leader}
         lastSavedAt={state.lastSavedAt}
         onNameChange={(name) => dispatch({ type: "SET_NAME", name })}
         onSave={saveDeck}
