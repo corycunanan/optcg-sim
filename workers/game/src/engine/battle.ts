@@ -22,6 +22,7 @@ import { expireBattleEffects } from "./duration-tracker.js";
 import { hasTrigger, hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
 import { resolveEffect } from "./effect-resolver/index.js";
+import { isCostPayable } from "./effect-resolver/cost-handler.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
 import type { EffectSchema } from "./effect-types.js";
@@ -557,7 +558,7 @@ export function continueEffectDamageSequence(
     const lifeCard = popResult.lifeCard;
     const cardData = cardDb.get(lifeCard.cardId);
 
-    if (hasTrigger(cardData ?? ({ keywords: { trigger: false } } as CardData))) {
+    if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, damagedPlayerIndex)) {
       const damagesAfterThis = remainingDamages - i - 1;
       nextState = {
         ...nextState,
@@ -730,7 +731,7 @@ function dealOneLeaderDamage(
     return { state: nextState, events, paused: false };
   }
 
-  if (hasTrigger(cardDb.get(lifeCard.cardId) ?? ({ keywords: { trigger: false } } as CardData))) {
+  if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, inactiveIdx)) {
     const curBattle = nextState.turn.battle!;
     const updatedBattle = { ...curBattle, pendingTriggerLifeCard: lifeCard };
     nextState = {
@@ -1044,6 +1045,33 @@ function setCardState(
   return { ...state, players: newPlayers };
 }
 
+/**
+ * Whether a life card's [Trigger] may be offered to its owner.
+ *
+ * OP16-107 Jesus Burgess FAQ: a [Trigger] whose activation cost cannot be
+ * paid (e.g. "trash 1 from hand" with an empty hand) may not be activated —
+ * the card must go to hand as normal damage. Gating here prevents the old
+ * failure mode where the trigger was offered, the life card trashed, and the
+ * effect then fizzled on the unpayable cost. Applies to every costed
+ * trigger, not just OP16.
+ */
+export function canOfferTrigger(
+  state: GameState,
+  cardId: string,
+  cardDb: Map<string, CardData>,
+  ownerIndex: 0 | 1,
+): boolean {
+  const cardData = cardDb.get(cardId);
+  if (!cardData || !hasTrigger(cardData)) return false;
+
+  const schema = cardData.effectSchema as EffectSchema | null;
+  const block = schema?.effects?.find(
+    (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
+  );
+  if (!block?.costs?.length) return true;
+  return block.costs.every((c) => isCostPayable(state, c, ownerIndex, cardDb));
+}
+
 function endBattle(
   state: GameState,
   events: PendingEvent[],
@@ -1070,6 +1098,35 @@ function endBattle(
         aborted: options.aborted === true,
       },
     });
+  }
+
+  // OPT-413 (OP12-020 / OP16-080): record the completed attack with its FINAL
+  // target (post-redirect) so ACTION_PERFORMED_THIS_TURN "ATTACKED" conditions
+  // can scope by attacker controller and target card type. The declaration-time
+  // DECLARE_ATTACK entry from the pipeline carries neither, and a blocker or
+  // redirect can change what actually got battled.
+  if (battle) {
+    const attackerIndex = state.turn.activePlayerIndex;
+    const targetIsLeader = state.players.some(
+      (pl) => pl.leader.instanceId === battle.targetInstanceId,
+    );
+    state = {
+      ...state,
+      turn: {
+        ...state.turn,
+        actionsPerformedThisTurn: [
+          ...state.turn.actionsPerformedThisTurn,
+          {
+            actionType: "ATTACKED",
+            timestamp: Date.now(),
+            controller: attackerIndex,
+            attackerInstanceId: battle.attackerInstanceId,
+            targetType: targetIsLeader ? "LEADER" : "CHARACTER",
+            targetController: attackerIndex === 0 ? 1 : 0,
+          },
+        ],
+      },
+    };
   }
 
   events.push({ type: "BATTLE_RESOLVED", playerIndex: state.turn.activePlayerIndex });

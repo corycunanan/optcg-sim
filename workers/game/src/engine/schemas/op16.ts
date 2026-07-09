@@ -1713,7 +1713,9 @@ export const OP16_081_OTAMA: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
-      conditions: { type: "CARD_ON_FIELD", controller: "SELF", filter: { card_type: "CHARACTER", cost_min: 8 } },
+      // FAQ: an opponent's cost-8+ Character also satisfies the condition —
+      // the JP text is controller-agnostic (OPT-413).
+      conditions: { type: "CARD_ON_FIELD", controller: "EITHER", filter: { card_type: "CHARACTER", cost_min: 8 } },
       actions: [{ type: "MODIFY_POWER", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } }, params: { amount: -2000 }, duration: { type: "THIS_TURN" } }],
       flags: { optional: true },
     },

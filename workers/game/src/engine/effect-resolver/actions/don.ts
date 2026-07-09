@@ -81,36 +81,92 @@ export function executeAddDonFromDeck(
   };
 }
 
+/**
+ * Return `count` DON!! from `playerIndex`'s cost area to their DON!! deck,
+ * taking `activeCount` from active DON!! and the rest from rested.
+ */
+export function applyForcedDonReturn(
+  state: GameState,
+  playerIndex: 0 | 1,
+  activeCount: number,
+  count: number,
+): { state: GameState; events: PendingEvent[] } {
+  const events: PendingEvent[] = [];
+  const p = state.players[playerIndex];
+  const active = p.donCostArea.filter((d) => d.state === "ACTIVE").slice(0, activeCount);
+  const rested = p.donCostArea.filter((d) => d.state === "RESTED").slice(0, count - activeCount);
+  const returnedIds = new Set([...active, ...rested].map((d) => d.instanceId));
+
+  const newDonCostArea = p.donCostArea.filter((d) => !returnedIds.has(d.instanceId));
+  const newDonDeck = [
+    ...p.donDeck,
+    ...[...active, ...rested].map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null })),
+  ];
+
+  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+  newPlayers[playerIndex] = { ...p, donCostArea: newDonCostArea, donDeck: newDonDeck };
+
+  events.push({ type: "DON_DETACHED", playerIndex, payload: { count: returnedIds.size } });
+  return { state: { ...state, players: newPlayers }, events };
+}
+
 export function executeForceOpponentDonReturn(
   state: GameState,
   action: Action,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
   const amount = (params.amount as number) ?? 1;
-  const opp = controller === 0 ? 1 : 0;
+  const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const p = state.players[opp];
   const count = Math.min(amount, p.donCostArea.length);
   if (count === 0) return { state, events, succeeded: false };
 
-  const toReturn = p.donCostArea.slice(0, count);
-  const newDonCostArea = p.donCostArea.slice(count);
-  const newDonDeck = [...p.donDeck, ...toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }))];
+  // OP16-074 Magellan FAQ: the DON!! owner chooses WHICH DON!! return —
+  // active vs. rested matters. The only meaningful degree of freedom is the
+  // active/rested split, so prompt the owner with the possible splits and
+  // auto-resolve when there is no real choice (all one state, or the whole
+  // cost area returns).
+  const activeAvail = p.donCostArea.filter((d) => d.state === "ACTIVE").length;
+  const restedAvail = p.donCostArea.length - activeAvail;
+  const minActive = Math.max(0, count - restedAvail);
+  const maxActive = Math.min(count, activeAvail);
 
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[opp] = { ...p, donCostArea: newDonCostArea, donDeck: newDonDeck };
+  if (minActive === maxActive) {
+    const applied = applyForcedDonReturn(state, opp, minActive, count);
+    return { state: applied.state, events: [...events, ...applied.events], succeeded: true };
+  }
 
-  events.push({ type: "DON_DETACHED", playerIndex: opp as 0 | 1, payload: { count } });
+  const choices: { id: string; label: string }[] = [];
+  for (let k = minActive; k <= maxActive; k++) {
+    const parts: string[] = [];
+    if (k > 0) parts.push(`${k} active`);
+    if (count - k > 0) parts.push(`${count - k} rested`);
+    choices.push({ id: `don-return:${k}:${count}`, label: `Return ${parts.join(" + ")} DON!!` });
+  }
 
-  return {
-    state: { ...state, players: newPlayers },
-    events,
-    succeeded: true,
+  const resumeCtx: ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [],
+    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    validTargets: choices.map((c) => c.id),
   };
+  const pendingPrompt: PendingPromptState = {
+    options: {
+      promptType: "PLAYER_CHOICE",
+      effectDescription: `Choose which DON!! to return to your DON!! deck (${count})`,
+      choices,
+    },
+    respondingPlayer: opp,
+    resumeContext: resumeCtx,
+  };
+  return { state, events, succeeded: false, pendingPrompt };
 }
 
 export function executeSetDonActive(
