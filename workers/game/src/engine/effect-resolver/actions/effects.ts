@@ -152,7 +152,7 @@ export function executeSetCost(
     category: "auto",
     modifiers: [{ type: "SET_COST" as any, params: { value }, duration }],
     duration,
-    expiresAt: computeExpiry(duration, state),
+    expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     timestamp: Date.now(),

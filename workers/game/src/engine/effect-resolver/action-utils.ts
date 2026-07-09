@@ -231,7 +231,21 @@ function resolveGameStateSource(
 
 // ─── computeExpiry ────────────────────────────────────────────────────────────
 
-export function computeExpiry(duration: Duration, state: GameState): ExpiryTiming {
+/**
+ * Round number of seat `seat`'s next turn strictly after the current one.
+ *
+ * turn.number counts ROUNDS (OPT-366): it increments only when control
+ * returns to the first player, so both seats share a number within a round.
+ * The second player's round-N turn is still ahead while the first player is
+ * active — that is the only case where "next turn" stays in the current round.
+ */
+function nextTurnOf(seat: 0 | 1, state: GameState): number {
+  const active = state.turn.activePlayerIndex;
+  const first = state.turn.firstPlayerIndex ?? 0;
+  return active !== seat && seat !== first ? state.turn.number : state.turn.number + 1;
+}
+
+export function computeExpiry(duration: Duration, state: GameState, controller: 0 | 1): ExpiryTiming {
   switch (duration.type) {
     case "THIS_TURN":
       return { wave: "END_OF_TURN", turn: state.turn.number };
@@ -239,19 +253,20 @@ export function computeExpiry(duration: Duration, state: GameState): ExpiryTimin
       return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
     case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE":
     case "UNTIL_END_OF_OPPONENT_NEXT_TURN": {
-      // Both mean "until the end of opponent's next turn"
-      const oppTurn = state.turn.activePlayerIndex === 0 ? state.turn.number + 1 : state.turn.number + 2;
-      return { wave: "END_OF_END_PHASE", turn: oppTurn };
+      // Both mean "until the end of the controller's opponent's next turn"
+      const opp: 0 | 1 = controller === 0 ? 1 : 0;
+      return { wave: "END_OF_END_PHASE", turn: nextTurnOf(opp, state), player: opp };
     }
     case "UNTIL_START_OF_YOUR_NEXT_TURN":
-      return { wave: "REFRESH_PHASE", turn: state.turn.number + 2 };
-    case "UNTIL_END_OF_YOUR_NEXT_TURN": {
-      // Lasts until the end of your next turn (2 turns from now)
-      return { wave: "END_OF_TURN", turn: state.turn.number + 2 };
-    }
+      return { wave: "REFRESH_PHASE", turn: nextTurnOf(controller, state), player: controller };
+    case "UNTIL_END_OF_YOUR_NEXT_TURN":
+      return { wave: "END_OF_TURN", turn: nextTurnOf(controller, state), player: controller };
     case "SKIP_NEXT_REFRESH": {
-      // Effect lasts until the character's next refresh phase
-      return { wave: "REFRESH_PHASE", turn: state.turn.number + 2 };
+      // As an active-effect duration this expires at the controller's next
+      // refresh — one refresh after the opponent's refresh it modifies, so it
+      // survives through that phase. (All current schema usages route through
+      // APPLY_PROHIBITION and are consumed by applyRefreshProhibitions instead.)
+      return { wave: "REFRESH_PHASE", turn: nextTurnOf(controller, state), player: controller };
     }
     case "PERMANENT":
       return { wave: "SOURCE_LEAVES_ZONE" };

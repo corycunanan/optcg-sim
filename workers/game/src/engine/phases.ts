@@ -16,6 +16,7 @@ import {
 import {
   expireEndOfTurnEffects,
   expireProhibitions,
+  expireRefreshPhaseEffects,
   processScheduledActions,
 } from "./duration-tracker.js";
 import { resolveEffect } from "./effect-resolver/index.js";
@@ -42,7 +43,8 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
 
   switch (phase) {
     case "REFRESH": {
-      // Step 1: "until start of your next turn" effects expire (M4)
+      // Step 1: "until start of your next turn" effects expire (OPT-408)
+      nextState = expireRefreshPhaseEffects(nextState);
       // Step 2: "at start of your/opponent's turn" auto effects (M4)
       // Step 3: Return attached DON!! to cost area (rested)
       nextState = returnAttachedDonToCostArea(nextState, pi);

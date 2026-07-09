@@ -19,7 +19,7 @@ import { evaluateCondition, type ConditionContext } from "./conditions.js";
 export function expireEffects(
   state: GameState,
   wave: ExpiryTiming["wave"],
-  context?: { turn?: number; battleId?: string },
+  context?: ExpiryContext,
 ): GameState {
   const effects = state.activeEffects as RuntimeActiveEffect[];
   const remaining = effects.filter((e) => !shouldExpire(e.expiresAt, wave, context));
@@ -37,11 +37,16 @@ export function expireBattleEffects(state: GameState, battleId: string): GameSta
 }
 
 /**
- * Expire THIS_TURN effects at End Phase.
+ * Expire THIS_TURN / UNTIL_END_OF_*_TURN effects at End Phase.
  * Order: turn player first, then non-turn player (§6-6-1-3).
  */
 export function expireEndOfTurnEffects(state: GameState): GameState {
-  let nextState = expireEffects(state, "END_OF_TURN", { turn: state.turn.number });
+  const context = currentTurnContext(state);
+  let nextState = expireEffects(state, "END_OF_TURN", context);
+  // END_OF_END_PHASE carries UNTIL_END_OF_OPPONENT_NEXT_TURN /
+  // UNTIL_END_OF_OPPONENT_NEXT_END_PHASE — fires in the same End Phase,
+  // after the END_OF_TURN wave.
+  nextState = expireEffects(nextState, "END_OF_END_PHASE", context);
   // Clean up consumed and THIS_TURN one-time modifiers
   nextState = cleanupConsumedOneTimeModifiers(nextState);
   nextState = expireOneTimeModifiers(nextState);
@@ -49,10 +54,10 @@ export function expireEndOfTurnEffects(state: GameState): GameState {
 }
 
 /**
- * Expire UNTIL_START_OF_YOUR_NEXT_TURN effects at Refresh Phase.
+ * Expire UNTIL_START_OF_YOUR_NEXT_TURN effects at Refresh Phase (step 1).
  */
 export function expireRefreshPhaseEffects(state: GameState): GameState {
-  return expireEffects(state, "REFRESH_PHASE", { turn: state.turn.number });
+  return expireEffects(state, "REFRESH_PHASE", currentTurnContext(state));
 }
 
 /**
@@ -197,7 +202,7 @@ export function processScheduledActions(
 export function expireProhibitions(
   state: GameState,
   wave: ExpiryTiming["wave"],
-  context?: { turn?: number; battleId?: string },
+  context?: ExpiryContext,
 ): GameState {
   const prohibitions = state.prohibitions as import("./effect-types.js").RuntimeProhibition[];
   const remaining = prohibitions.filter((p) => {
@@ -253,18 +258,58 @@ export function evaluateWhileConditions(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+interface ExpiryContext {
+  turn?: number;
+  battleId?: string;
+  /** Seat whose turn the wave is firing in. */
+  player?: 0 | 1;
+  firstPlayerIndex?: 0 | 1;
+}
+
+function currentTurnContext(state: GameState): ExpiryContext {
+  return {
+    turn: state.turn.number,
+    player: state.turn.activePlayerIndex,
+    firstPlayerIndex: state.turn.firstPlayerIndex ?? 0,
+  };
+}
+
+/**
+ * Linear position of a (round, seat) turn within the game: the first player's
+ * turn occupies the even slot of each round. Lets shouldExpire order turns
+ * even though both seats share a turn.number (per-round numbering, OPT-366).
+ */
+function turnSlot(turn: number, player: 0 | 1, firstPlayerIndex: 0 | 1): number {
+  return turn * 2 + (player === firstPlayerIndex ? 0 : 1);
+}
+
 function shouldExpire(
   expiry: ExpiryTiming,
   wave: ExpiryTiming["wave"],
-  context?: { turn?: number; battleId?: string },
+  context?: ExpiryContext,
 ): boolean {
   if (expiry.wave !== wave) return false;
 
   switch (wave) {
     case "END_OF_TURN":
     case "END_OF_END_PHASE":
-    case "REFRESH_PHASE":
-      return "turn" in expiry && context?.turn !== undefined && expiry.turn <= context.turn;
+    case "REFRESH_PHASE": {
+      if (!("turn" in expiry) || context?.turn === undefined) return false;
+      // Seat-stamped expiries fire at the first wave at-or-after their
+      // (turn, seat) slot; seatless ones (THIS_TURN, legacy persisted state)
+      // keep the turn-only comparison.
+      if (
+        expiry.player === undefined ||
+        context.player === undefined ||
+        context.firstPlayerIndex === undefined
+      ) {
+        return expiry.turn <= context.turn;
+      }
+      return (
+        turnSlot(context.turn, context.player, context.firstPlayerIndex) >=
+        turnSlot(expiry.turn, expiry.player, context.firstPlayerIndex)
+      );
+    }
     case "END_OF_BATTLE":
       return "battleId" in expiry && context?.battleId !== undefined && expiry.battleId === context.battleId;
     case "SOURCE_LEAVES_ZONE":
