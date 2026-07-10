@@ -294,9 +294,18 @@ function evaluateSimple(
       // Check actionsPerformedThisTurn for matching action references
       const _actionType = cond.action;
       return state.turn.actionsPerformedThisTurn.some((a) => {
-        if (_actionType === "ACTIVATED_EVENT") return a.actionType === "USE_COUNTER_EVENT" || a.actionType === "PLAY_CARD";
-        if (_actionType === "PLAYED_CHARACTER") return a.actionType === "PLAY_CARD";
-        if (_actionType === "USED_BLOCKER") return a.actionType === "DECLARE_BLOCKER";
+        if (_actionType === "ACTIVATED_EVENT") {
+          if (a.actionType !== "USE_COUNTER_EVENT" && a.actionType !== "PLAY_CARD") return false;
+          return matchesPerformedCard(state, a, cond.controller, cond.filter, "EVENT", ctx);
+        }
+        if (_actionType === "PLAYED_CHARACTER") {
+          if (a.actionType !== "PLAY_CARD") return false;
+          return matchesPerformedCard(state, a, cond.controller, cond.filter, "CHARACTER", ctx);
+        }
+        if (_actionType === "USED_BLOCKER") {
+          if (a.actionType !== "DECLARE_BLOCKER") return false;
+          return matchesPerformedCard(state, a, cond.controller, cond.filter, "CHARACTER", ctx);
+        }
         if (_actionType === "ATTACKED") {
           // Resolution-time entries (OPT-413) carry the attacker and the
           // FINAL battle target, so controller/filter scoping is reliable —
@@ -483,6 +492,70 @@ function evaluateSimple(
     default:
       return true;
   }
+}
+
+/**
+ * Match a card-backed performed action against its player scope, semantic card
+ * category, and optional TargetFilter (OPT-443).
+ *
+ * The acted card is reconstructed from the pre-execution snapshot recorded by
+ * the pipeline. This matters for Events, which have already moved to trash
+ * with a new instance id by the time a later condition is evaluated. Legacy
+ * records without a snapshot fail closed: accepting them would reintroduce the
+ * PLAY_CARD-is-every-card-type false positives this helper prevents.
+ */
+function matchesPerformedCard(
+  state: GameState,
+  action: GameState["turn"]["actionsPerformedThisTurn"][number],
+  controller: Controller | undefined,
+  filter: TargetFilter | undefined,
+  requiredCardType: "CHARACTER" | "EVENT",
+  ctx: ConditionContext,
+): boolean {
+  if (action.controller === undefined || !action.cardId || !action.cardType) return false;
+
+  if (controller && controller !== "EITHER" && controller !== "ANY") {
+    const expectedController = controller === "SELF"
+      ? ctx.controller
+      : (ctx.controller === 0 ? 1 : 0);
+    if (action.controller !== expectedController) return false;
+  }
+
+  if (action.cardType.toUpperCase() !== requiredCardType) return false;
+  if (!filter) return true;
+
+  const cardData = ctx.cardDb.get(action.cardId);
+  if (!cardData) return false;
+
+  // Use the recorded printed values, not a post-hoc zone lookup. Card data is
+  // otherwise reused so all printed-property TargetFilter fields (name, type,
+  // traits, attributes, keywords, etc.) share the canonical matcher.
+  const snapshotCardData: CardData = {
+    ...cardData,
+    cost: action.baseCost ?? cardData.cost,
+  };
+  const snapshotCardDb = new Map(ctx.cardDb);
+  snapshotCardDb.set(action.cardId, snapshotCardData);
+  const snapshotCard: CardInstance = {
+    instanceId: `performed-${action.timestamp}-${action.cardId}`,
+    cardId: action.cardId,
+    zone: action.actionType === "DECLARE_BLOCKER" ? "CHARACTER" : "HAND",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: null,
+    controller: action.controller,
+    owner: action.controller,
+  };
+
+  return matchesFilter(
+    snapshotCard,
+    filter,
+    snapshotCardDb,
+    state,
+    ctx.resultRefs,
+    action.baseCost,
+    ctx.controller,
+  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
