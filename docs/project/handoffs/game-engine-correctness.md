@@ -29,7 +29,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | In Review | [#262](https://github.com/corycunanan/optcg-sim/pull/262) | 142 blocks re-encoded onto the new `post_cost_conditions` engine gate (once-after-costs, whole-chain, Rules 8-3-1/4-10-1); lint rule C6; HAND_COUNT ComparativeMetric. Spawned OPT-456/457. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
 | 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Done | [#264](https://github.com/corycunanan/optcg-sim/pull/264) | Merged 2026-07-10 (`65f955e`). Prompt-identified actions are rejected after their prompt clears. |
-| 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
+| 14 | OPT-449 | Terminal games still accept prompt responses | — | — | In Review | [#267](https://github.com/corycunanan/optcg-sim/pull/267) | Terminal transitions clear prompt/stack state; action routing and reconnect resend are terminal-guarded. |
 | 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
 | 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
 | 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | Done | [#265](https://github.com/corycunanan/optcg-sim/pull/265) | Merged 2026-07-10 (`009ada2`). Items 1–3 complete; item 4 remains documented under OPT-451. |
@@ -39,7 +39,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
 | 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
-| 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | In Review | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Trait alternatives and pre/post-cost split corrected; only OP16-084’s legitimate pre-cost C6 exception remains. |
+| 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Done | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Merged 2026-07-10 (`386af05`). Only OP16-084’s legitimate pre-cost C6 exception remains. |
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | Backlog | — | Same latent per-action classes as PR #262's review proved; includes the 09-EXAMPLE-ENCODINGS doc update. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
@@ -167,3 +167,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Guard terminal state before pending-prompt routing, and suppress/clear resumable prompt state on termination. Keep ordinary stale-action handling in merged OPT-448 unchanged.
 - **Unresolved:** None for OPT-456. OP16-084 remains C6-allowlisted only because its remaining block condition is genuinely pre-cost.
 - **Pointer:** PR #266; inspect `a16d863` for the corrected schemas and structural regression tests.
+
+### OPT-449 → OPT-457
+**From:** session on 2026-07-10 · **Commit:** `68a0bdf` · **PR:** [#267](https://github.com/corycunanan/optcg-sim/pull/267)
+
+- **Primer:** Alarm and external terminal transitions now discard durable prompt/stack continuations. Terminal sessions reject actions before undo/prompt routing and never re-send prompts on reconnect.
+- **Read first:** the 21 marker-comment blocks and the two OPT-433/442 regression files named in OPT-457; use `EffectBlock.post_cost_conditions` as the only post-colon gate.
+- **Gotchas / do NOT touch:** Failed post-cost conditions skip the whole action chain after costs remain paid; update tests that currently assert an ungated THEN action. Check predicates that their own chain mutates.
+- **Unresolved:** None for OPT-449. Preserved untracked files remain excluded.
+- **Pointer:** PR #267; inspect `68a0bdf` for terminal cleanup and alarm regression coverage.
