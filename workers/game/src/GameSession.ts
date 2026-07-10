@@ -372,6 +372,8 @@ export class GameSession implements DurableObject {
       status: "FINISHED",
       winner: winnerIndex as 0 | 1,
       winReason: reason,
+      pendingPrompt: null,
+      effectStack: [],
     };
     await this.persist();
 
@@ -460,7 +462,10 @@ export class GameSession implements DurableObject {
     this.broadcast({ type: "game:player_reconnected", playerIndex });
 
     // Re-send pending prompt to the reconnecting player if they need to respond
-    if (this.gameState!.pendingPrompt?.respondingPlayer === playerIndex) {
+    if (
+      this.gameState!.status === "IN_PROGRESS"
+      && this.gameState!.pendingPrompt?.respondingPlayer === playerIndex
+    ) {
       const playerWs = this.getWebSocketForPlayer(playerIndex as 0 | 1);
       if (playerWs) {
         this.send(playerWs, {
@@ -684,6 +689,8 @@ export class GameSession implements DurableObject {
       status,
       winner,
       winReason: reason,
+      pendingPrompt: null,
+      effectStack: [],
     };
 
     await this.persist();
@@ -700,6 +707,11 @@ export class GameSession implements DurableObject {
     action: GameAction,
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
+
+    if (this.gameState.status === "FINISHED" || this.gameState.status === "ABANDONED") {
+      this.send(ws, { type: "game:error", message: "Game is already over" });
+      return;
+    }
 
     // ── Undo: bypass pipeline entirely ──────────────────────────────────────
     if (action.type === "UNDO") {
