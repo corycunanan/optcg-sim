@@ -722,6 +722,15 @@ export class GameSession implements DurableObject {
       return;
     }
 
+    // A prompt-identified action can only answer the prompt that issued that
+    // identity. Once the prompt has cleared, accepting the same payload as a
+    // normal game action would turn network retries into a second mutation
+    // (notably a duplicate PASS advancing BLOCK_STEP).
+    if (!this.gameState.pendingPrompt && promptResponseId(action)) {
+      this.send(ws, { type: "game:error", message: "That prompt response is stale" });
+      return;
+    }
+
     // If an effect is awaiting player input, only allow prompt responses
     if (this.gameState.pendingPrompt) {
       const prompt = this.gameState.pendingPrompt;

@@ -24,11 +24,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Done | [#258](https://github.com/corycunanan/optcg-sim/pull/258) | Merged 2026-07-10 (`d61f5f5`, reviewed head `ac61c71` + docs). Gate accepts `skip`; replacement paths share the decline predicate; game:error on engine rejections. Delta review surfaced pre-existing OPT-448/OPT-449. |
 | 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Done | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Merged 2026-07-10 (`9ef3fb3`). PLACE_SELF_AND_TRASH_TO_DECK compound cost; self half fixed to the source. Review spawned OPT-453/454/455 + OPT-432 scope note. |
 | 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Done | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Merged 2026-07-10 (`9ef3fb3`). One arrange prompt over the self+trash group (Rule 3-1-7). |
-| 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | In Review | [#263](https://github.com/corycunanan/optcg-sim/pull/263) | Exact trigger identity now survives optional cost prompts; source-aware costs enforce `exclude_self`. |
+| 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | Done | [#263](https://github.com/corycunanan/optcg-sim/pull/263) | Merged 2026-07-10 (`9516abb`). Exact trigger identity survives optional cost prompts; source-aware costs enforce `exclude_self`. |
 | 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Done | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | Merged 2026-07-10 (`b7d8ee7`, reviewed heads `46ef531`/`25b8701` + docs). CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450. |
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | In Review | [#262](https://github.com/corycunanan/optcg-sim/pull/262) | 142 blocks re-encoded onto the new `post_cost_conditions` engine gate (once-after-costs, whole-chain, Rules 8-3-1/4-10-1); lint rule C6; HAND_COUNT ComparativeMetric. Spawned OPT-456/457. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
-| 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Reject prompt-identified actions when no prompt is pending. |
+| 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | In Review | [#264](https://github.com/corycunanan/optcg-sim/pull/264) | Prompt-identified actions are rejected after their prompt clears; deliberate identity-free PASS remains valid. |
 | 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
 | 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
 | 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
@@ -140,3 +140,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** A deliberate battle PASS has no `promptId`; OPT-448 should reject only prompt-identified actions after their prompt has cleared. Keep terminal-game cleanup in OPT-449.
 - **Unresolved:** The untracked `.claude/scheduled_tasks.lock` and `package-lock.json` predate this recovery and were intentionally excluded. No unresolved OPT-432 behavior remains.
 - **Pointer:** PR #263; inspect `d687f1d` for the implementation and regression matrix.
+
+### OPT-448 → OPT-452
+**From:** session on 2026-07-10 · **Commit:** `d405235` · **PR:** [#264](https://github.com/corycunanan/optcg-sim/pull/264)
+
+- **Primer:** `GameSession.handleAction` now rejects any prompt-identified payload when no prompt is pending, preventing a duplicated decline PASS from falling through as a normal battle PASS.
+- **Read first:** `workers/game/src/engine/schema-registry.ts` (`validateTargetFilterController`) and `workers/game/src/engine/schemas/lint-schemas.sh` (C5/walkActions), plus OPT-452's four scoped gaps.
+- **Gotchas / do NOT touch:** OPT-452 item 4 depends on OPT-451's permanent-prohibition representation; implement mechanical items 1–3 without inventing that runtime contract.
+- **Unresolved:** OPT-449 owns terminal-game prompt cleanup. The preserved untracked Claude/npm files remain intentionally excluded.
+- **Pointer:** PR #264; inspect `d405235` for the prompt guard and battle-step regression.
