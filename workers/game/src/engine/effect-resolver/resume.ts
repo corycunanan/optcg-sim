@@ -22,7 +22,7 @@ import type {
   ResumeContext,
   EffectStackFrame,
 } from "../../types.js";
-import { popFrame, peekFrame, updateTopFrame } from "../effect-stack.js";
+import { popFrame, peekFrame, pushFrame, updateTopFrame } from "../effect-stack.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
 import { executeActionChain } from "./resolver.js";
 import type { EffectResolverResult } from "./types.js";
@@ -184,6 +184,7 @@ export function resumeFromStack(
     case "AWAITING_PLAYER_CHOICE": {
       const events: PendingEvent[] = [];
       let nextState = popFrame(state);
+      const stackDepthAfterPop = nextState.effectStack.length;
 
       const legacyCtx: ResumeContext = {
         effectSourceInstanceId: sourceCardInstanceId,
@@ -199,6 +200,17 @@ export function resumeFromStack(
       const result = resumeEffectChain(nextState, legacyCtx, action, cardDb);
       nextState = result.state;
       events.push(...result.events);
+
+      const explicitlySkipped = action.type === "PASS" ||
+        (action.type === "PLAYER_CHOICE" && action.choiceId === "skip");
+      const replacementFrameWasPushed = nextState.effectStack.length > stackDepthAfterPop;
+      const rejectedWithoutReplacement = !result.resolved && !explicitlySkipped && !replacementFrameWasPushed;
+      if (rejectedWithoutReplacement) {
+        nextState = pushFrame(nextState, topFrame);
+        if (!result.pendingPrompt) {
+          return { ...result, state: nextState };
+        }
+      }
 
       if (result.pendingPrompt) {
         const newTop = peekFrame(nextState) as EffectStackFrame;
