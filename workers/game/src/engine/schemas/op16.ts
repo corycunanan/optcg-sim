@@ -1799,10 +1799,15 @@ export const OP16_084_KOUZUKI_MOMONOSUKE: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       conditions: {
-        all_of: [
-          { type: "SELF_COST", operator: ">=", value: 20 },
-          { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 9 },
-        ],
+        type: "SELF_COST",
+        operator: ">=",
+        value: 20,
+      },
+      post_cost_conditions: {
+        type: "DON_FIELD_COUNT",
+        controller: "SELF",
+        operator: ">=",
+        value: 9,
       },
       actions: [
         {
