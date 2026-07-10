@@ -1169,10 +1169,19 @@ export const OP11_034_HATCHAN: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [{ type: "REST_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Fish-Man" },
+      post_cost_conditions: {
+        any_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Fish-Man" },
+          },
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Merfolk" },
+          },
+        ],
       },
       actions: [
         {

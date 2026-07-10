@@ -358,11 +358,8 @@ const C6_PRE_COST_ALLOWLIST = new Set([
   "OP11-117:activate_buff",
   "OP13-001:OP13-001_on_opponent_attack",
   "OP13-082:OP13-082_activate_main",
-  // Pending content fixes (partial trait encodings / mixed pre+post
-  // conditions) — tracked by OPT-456; remove entries as that ticket fixes them.
-  "EB04-015:on_ko_play",
-  "OP08-077:main_effect",
-  "OP11-034:activate_prohibition",
+  // OP16-084 deliberately retains its printed pre-cost SELF_COST qualifier;
+  // its post-colon DON predicate lives in post_cost_conditions (OPT-456).
   "OP16-084:activate_trash_self_play_momonosuke",
 ]);
 

@@ -612,10 +612,19 @@ export const EB04_015_JINBE: EffectSchema = {
         },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Fish-Man" },
+      post_cost_conditions: {
+        any_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Fish-Man" },
+          },
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Merfolk" },
+          },
+        ],
       },
       actions: [
         {

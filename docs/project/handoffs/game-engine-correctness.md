@@ -32,14 +32,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
 | 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
 | 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
-| 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | In Review | [#265](https://github.com/corycunanan/optcg-sim/pull/265) | Items 1–3 complete; item 4 remains deferred until OPT-451 establishes the runtime representation. |
+| 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | Done | [#265](https://github.com/corycunanan/optcg-sim/pull/265) | Merged 2026-07-10 (`009ada2`). Items 1–3 complete; item 4 remains documented under OPT-451. |
 | 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
 | 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
 | 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
 | 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
-| 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Backlog | — | EB04-015/OP08-077/OP11-034/OP16-084 — C6-allowlisted pending content fixes. |
+| 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | In Review | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Trait alternatives and pre/post-cost split corrected; only OP16-084’s legitimate pre-cost C6 exception remains. |
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | Backlog | — | Same latent per-action classes as PR #262's review proved; includes the 09-EXAMPLE-ENCODINGS doc update. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
@@ -158,3 +158,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep OP16-084's `SELF_COST >= 20` pre-cost while moving only its DON predicate post-cost. OPT-452 item 4 remains owned by OPT-451's eventual representation.
 - **Unresolved:** OPT-452 item 4 only, documented on Linear; items 1–3 are complete. Preserved untracked files remain excluded.
 - **Pointer:** PR #265; inspect `74e42ab` for traversal and fixture coverage.
+
+### OPT-456 → OPT-449
+**From:** session on 2026-07-10 · **Commit:** `a16d863` · **PR:** [#266](https://github.com/corycunanan/optcg-sim/pull/266)
+
+- **Primer:** EB04-015 and OP11-034 now evaluate complete two-trait predicates after costs; OP16-084 retains only its printed SELF_COST qualifier pre-cost and evaluates DON count post-cost. Stale C6 exceptions were removed.
+- **Read first:** `workers/game/src/GameSession.ts` (`alarm`, `handleAction`, reconnect prompt resend) and OPT-449's terminal-state reproduction.
+- **Gotchas / do NOT touch:** Guard terminal state before pending-prompt routing, and suppress/clear resumable prompt state on termination. Keep ordinary stale-action handling in merged OPT-448 unchanged.
+- **Unresolved:** None for OPT-456. OP16-084 remains C6-allowlisted only because its remaining block condition is genuinely pre-cost.
+- **Pointer:** PR #266; inspect `a16d863` for the corrected schemas and structural regression tests.
