@@ -184,6 +184,48 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     expect(done.state.players[0].hand).toHaveLength(handBefore + 2);
   });
 
+  it("cleans up the stack and still drains queued triggers when a later cost is unpayable", () => {
+    const cardDb = createTestCardDb();
+    // Empty trash: the second cost (PLACE_FROM_TRASH_TO_DECK) becomes
+    // unpayable once the first selection resolves (rule 8-3-1-3-1 territory —
+    // this test pins the OPT-429 invariants only: no orphaned frame, queued
+    // triggers still processed, effect actions skipped).
+    const state = createBattleReadyState(cardDb);
+    const block = chainedCostBlock();
+
+    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const queuedTrigger: QueuedTrigger = {
+      sourceCardInstanceId: pay.state.players[0].leader.instanceId,
+      controller: 0,
+      effectBlock: {
+        id: "opt429-queued-draw-unpayable",
+        category: "auto",
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      } as EffectBlock,
+      triggeringEvent: {
+        type: "CARD_PLAYED",
+        playerIndex: 0,
+        payload: { cardInstanceId: "queued-source" },
+      } as never,
+    };
+    const stacked = updateTopFrame(pay.state, { pendingTriggers: [queuedTrigger] });
+    const handBefore = stacked.players[0].hand.length;
+
+    const done = resumeFromStack(
+      stacked,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-b1"] } as GameAction,
+      cardDb,
+    );
+
+    expect(done.state.effectStack).toHaveLength(0);
+    expect(done.pendingPrompt).toBeUndefined();
+    // The effect's own DRAW is skipped (cost unpaid), but the queued trigger
+    // behind the chain still resolves — exactly one card drawn.
+    expect(done.state.players[0].hand).toHaveLength(handBefore + 1);
+  });
+
   it("completes the two-cost chain through GameSession without wedging prompt flow", async () => {
     const cardDb = createTestCardDb();
     const state = stateWithChoices(cardDb);
