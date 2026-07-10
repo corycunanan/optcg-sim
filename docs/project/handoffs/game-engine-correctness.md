@@ -19,8 +19,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-423 | Schema validator rejects keyword-only permanent blocks | — | — | Done | [#253](https://github.com/corycunanan/optcg-sim/pull/253) | Restores useful schema-validation signal before the bulk audit. |
 | 2 | OPT-447 | Six activate effects omit ACTIVATE_MAIN triggers | — | OPT-423 | Done | [#254](https://github.com/corycunanan/optcg-sim/pull/254) | Newly visible real validation failures; fix while the schema signal context is fresh. |
 | 3 | OPT-439 | Rejected SELECT_TARGET drops remaining actions or resumes the wrong frame | — | — | Done | [#255](https://github.com/corycunanan/optcg-sim/pull/255) | Merged 2026-07-10 (`a981358`, reviewed head `fea1188`). Review-driven fixes extended into nested replacement batching and continuation events — see `docs/project/pr-255-workflow-retro.md`. |
-| 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Backlog | — | Re-verify after OPT-439; close as covered/duplicate if the generalized fix and tests fully satisfy it. |
-| 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | Backlog | — | Establish symmetric stack handling before compound-cost work. |
+| 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Duplicate | — | Verified 2026-07-10: exact scenario re-run through `GameSession.handleAction` passes on main; covered by OPT-438 + OPT-439. Evidence in a Linear comment. |
+| 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | In Review | [#257](https://github.com/corycunanan/optcg-sim/pull/257) | Symmetric frame retirement + pendingTriggers carry-over. Review re-confirmed OPT-431/OPT-430 as the remaining OP10-026/027 gaps. |
 | 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Todo | — | Finish prompt rejection semantics after the frame fix. |
 | 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Backlog | — | Design jointly with OPT-430 around one source-scoped compound-cost primitive. |
 | 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Backlog | — | Keep adjacent to OPT-431; one shared root implementation may close both. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-427 (ready now — PR #255 merged); verification-first, re-verify whether OPT-439 fully covers it.
+**Next up:** OPT-446 (ready now); then OPT-431 + OPT-430 jointly once PR #257 merges.
 
 ---
 
@@ -62,5 +62,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Primer:** Rejected mid-action responses now restore the exact popped frame when no replacement frame was pushed, preserving nested-stack identity, remaining actions, result refs, and queued triggers.
 - **Read first:** `workers/game/src/engine/effect-resolver/resume.ts`, `workers/game/src/__tests__/opt-439-rejected-frame-restoration.test.ts`, and the OPT-427 DON-return reproduction.
 - **Gotchas / do NOT touch:** Explicit PASS/`skip` remains a real decline and must not restore a frame. Successful handlers that push a replacement frame must not retain the old frame underneath it.
-- **Unresolved:** Re-run OPT-427's exact scenario after PR #255 merges; mark it Duplicate only if the generalized no-prompt rejection regression fully satisfies its acceptance criteria.
+- **Unresolved:** Re-run OPT-427's exact scenario after PR #255 merges; mark it Duplicate only if the generalized no-prompt rejection regression fully satisfies its acceptance criteria. *(Resolved 2026-07-10: verified covered; OPT-427 closed as Duplicate of OPT-439 with evidence in a Linear comment.)*
 - **Pointer:** PR #255 is the system-level frame-restoration change; OPT-427 should be verification-first rather than a parallel implementation.
+
+### OPT-429 → OPT-446
+**From:** session on 2026-07-10 · **Commit:** `759569c` (reviewed head) · **PR:** [#257](https://github.com/corycunanan/optcg-sim/pull/257)
+
+- **Primer:** `handleAwaitingCostSelection` now retires the consumed cost frame *before* paying the next cost (symmetric with `resumeAfterBranchPick`) and carries `costResultRefs` + `pendingTriggers` into the successor frame. Chained selectable costs no longer orphan frames or drop queued triggers.
+- **Read first:** `workers/game/src/engine/effect-resolver/resume/cost.ts` (the restructured tail), `workers/game/src/__tests__/opt-429-chained-cost-frames.test.ts`, and for OPT-446 specifically: `GameSession.ts:686-692` (OPTIONAL_EFFECT gate) vs `engine/effect-resolver/resume/choice.ts` (engine accepts `skip`).
+- **Gotchas / do NOT touch:** Scope freeze re-confirmed by PR #257's adversarial review: the OP10-026/027 self-constraint gap is OPT-431 and the "in any order" ordering gap is OPT-430 — do not fold either into prompt-guard work. The review's rules-fidelity lens independently re-derived both.
+- **Unresolved:** Delta review flagged that the unpayable-later-cost test cannot differentiate a revert of the fix — true by construction (that branch's observable behavior didn't change; the test pins invariants). A production-reachable variant (cost 1 consumes cost 2's resource, passing upfront `validateActivateEffect`) should ride along with OPT-431's test work.
+- **Pointer:** PR #257. The review also confirmed the pendingTriggers carry-over closed a real trigger-loss path; see the trigger-preservation regression in the OPT-429 test file.

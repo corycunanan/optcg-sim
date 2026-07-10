@@ -397,6 +397,12 @@ export function handleAwaitingCostSelection(
   const block = topFrame.effectBlock as EffectBlock;
   const nextCostIndex = topFrame.currentCostIndex + 1;
 
+  // OPT-429: this cost is fully paid — retire its frame before paying the
+  // next one. payCostsWithSelection pushes a fresh frame whenever a later
+  // cost prompts, so leaving the consumed frame underneath orphaned it once
+  // the chain resolved (mirrors resumeAfterBranchPick, which pops first).
+  nextState = popFrame(nextState);
+
   if (nextCostIndex < topFrame.costs.length) {
     const remainingCostResult = payCostsWithSelection(
       nextState, topFrame.costs as Cost[], nextCostIndex, controller, cardDb,
@@ -404,19 +410,21 @@ export function handleAwaitingCostSelection(
     );
 
     if (remainingCostResult.cannotPay) {
-      nextState = popFrame(remainingCostResult.state);
-      return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
+      return processRemainingTriggers(remainingCostResult.state, topFrame.pendingTriggers, cardDb);
     }
 
     nextState = remainingCostResult.state;
     events.push(...remainingCostResult.events);
 
     if (remainingCostResult.pendingPrompt) {
-      // Persist accumulated cost refs into the new frame
+      // Persist accumulated cost refs and queued triggers into the new frame
+      // (mirrors resumeAfterBranchPick — dropping pendingTriggers here would
+      // lose triggers queued behind the cost chain).
       const newTop = peekFrame(nextState) as EffectStackFrame;
       if (newTop) {
         nextState = updateTopFrame(nextState, {
           costResultRefs: [...accumulatedCostRefs.entries()].map(([k, v]) => [k, v as any]),
+          pendingTriggers: topFrame.pendingTriggers,
         });
       }
       return { state: nextState, events, resolved: false, pendingPrompt: remainingCostResult.pendingPrompt };
@@ -426,7 +434,6 @@ export function handleAwaitingCostSelection(
     mergeCostRefs(accumulatedCostRefs, remainingCostResult.costResult);
   }
 
-  nextState = popFrame(nextState);
   return finishCostsAndRunActions(
     nextState,
     events,
