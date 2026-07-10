@@ -456,6 +456,26 @@ export function payCosts(
         break;
       }
 
+      case "PLACE_SELF_AND_TRASH_TO_DECK": {
+        // OPT-431: defensive auto-pay fallback — normal flow goes through
+        // payCostsWithSelection (selection + arrange). Move the source card
+        // and the first matching trash cards to the deck in default order.
+        if (!sourceCardInstanceId) return null;
+        const amt = typeof cost.amount === "number" ? cost.amount : 1;
+        const candidates = computeCostTargets(nextState, cost, controller, _cardDb);
+        if (candidates.length < amt) return null;
+        const p = nextState.players[controller];
+        if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
+        nextState = applyCostSelection(
+          nextState,
+          cost,
+          [sourceCardInstanceId, ...candidates.slice(0, amt)],
+          controller,
+        );
+        costResult.cardsPlacedToDeckCount += 1 + amt;
+        break;
+      }
+
       case "PLAY_NAMED_CARD_FROM_HAND": {
         // Play a specific named card from hand as part of the cost
         const p = nextState.players[controller];
@@ -494,6 +514,7 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
   "REVEAL_FROM_HAND",
   "CHOOSE_ONE_COST",
   "PLACE_FROM_TRASH_TO_DECK",
+  "PLACE_SELF_AND_TRASH_TO_DECK",
 ]);
 
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -541,6 +562,18 @@ export function isCostPayable(
   if (cost.type === "CHOOSE_ONE_COST") {
     const opts = (cost as SimpleCost).options ?? [];
     return opts.some((o) => isCostPayable(state, o, controller, cardDb, sourceCardInstanceId));
+  }
+
+  // OPT-431: the self half of the compound cost is fixed to the source card —
+  // payable only when the source is on the field AND enough matching trash
+  // cards exist for the other half.
+  if (cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+    if (!sourceCardInstanceId) return false;
+    const onField = state.players[controller].characters
+      .some((c) => c?.instanceId === sourceCardInstanceId);
+    if (!onField) return false;
+    const targets = computeCostTargets(state, cost, controller, cardDb);
+    return targets.length >= resolveAmount(cost as SimpleCost);
   }
 
   if (costNeedsPlayerSelection(cost)) {
@@ -922,6 +955,107 @@ export function payCostsWithSelection(
       // step (if any) is chained by the resume handler after selection.
     }
 
+    // OPT-431/OPT-430: PLACE_SELF_AND_TRASH_TO_DECK — "place this Character
+    // and N [matching] from your trash at the bottom of your deck in any
+    // order" (OP10-026/027). The self half is fixed to the source card; the
+    // player selects WHICH trash cards, then orders the whole group (self +
+    // trash) in a single arrange prompt per Comprehensive Rule 3-1-7.
+    if (cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+      const amount = resolveAmount(cost as SimpleCost);
+      const player = nextState.players[controller];
+      const sourceOnField = player.characters
+        .some((c) => c?.instanceId === sourceCardInstanceId);
+      if (!sourceOnField) {
+        return { state: nextState, events, cannotPay: true };
+      }
+      const trashCandidates = computeCostTargets(nextState, cost, controller, cardDb);
+      if (trashCandidates.length < amount) {
+        return { state: nextState, events, cannotPay: true };
+      }
+
+      const needsSelection = trashCandidates.length > amount;
+      const needsArrange = !blockShufflesDeck(effectBlock);
+
+      if (needsSelection) {
+        // Stage 1: pick the trash cards. The arrange stage (self + picks)
+        // is chained by the resume handler.
+        const frame: EffectStackFrame = {
+          id: generateFrameId(),
+          sourceCardInstanceId,
+          controller,
+          effectBlock,
+          phase: "AWAITING_COST_SELECTION",
+          pausedAction: null,
+          remainingActions: effectBlock.actions ?? [],
+          resultRefs: [],
+          validTargets: trashCandidates,
+          costs: workingCosts,
+          currentCostIndex: i,
+          costsPaid: false,
+          oncePerTurnMarked: false,
+          costResultRefs: [...costResultToEntries(costResult)],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        nextState = pushFrame(nextState, frame);
+        const pendingPrompt: PendingPromptState = {
+          options: {
+            promptType: "SELECT_TARGET",
+            validTargets: trashCandidates,
+            countMin: amount,
+            countMax: amount,
+            effectDescription: getCostLabel(cost),
+            ctaLabel: getCostCtaLabel(cost),
+            cards: getCostCards(nextState, cost, trashCandidates, controller),
+          },
+          respondingPlayer: controller,
+          resumeContext: frame.id,
+        };
+        return { state: nextState, events, pendingPrompt };
+      }
+
+      const group = [sourceCardInstanceId, ...trashCandidates];
+      if (needsArrange) {
+        // Every trash candidate is forced — go straight to ordering the
+        // full group (always 2+ cards: self + trash).
+        const frame: EffectStackFrame = {
+          id: generateFrameId(),
+          sourceCardInstanceId,
+          controller,
+          effectBlock,
+          phase: "AWAITING_COST_SELECTION",
+          pausedAction: null,
+          remainingActions: effectBlock.actions ?? [],
+          resultRefs: [],
+          validTargets: group,
+          costs: workingCosts,
+          currentCostIndex: i,
+          costsPaid: false,
+          oncePerTurnMarked: false,
+          costResultRefs: [...costResultToEntries(costResult)],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+          costArrangeStage: true,
+        };
+        nextState = pushFrame(nextState, frame);
+        return {
+          state: nextState,
+          events,
+          pendingPrompt: buildTrashToDeckArrangePrompt(
+            nextState, group, controller, frame.id,
+            cost.position === "TOP" ? "TOP" : "BOTTOM",
+          ),
+        };
+      }
+
+      // Block shuffles afterward — order is moot, pay in default order.
+      nextState = applyCostSelection(nextState, cost, group, controller);
+      costResult.cardsPlacedToDeckCount += group.length;
+      continue;
+    }
+
     if (!autoPayTrashToDeck && costNeedsPlayerSelection(cost)) {
       // Special handling for LIFE_TO_HAND with TOP_OR_BOTTOM — use PLAYER_CHOICE
       if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
@@ -1044,8 +1178,10 @@ export function blockShufflesDeck(block: EffectBlock): boolean {
 }
 
 /**
- * ARRANGE_TOP_CARDS prompt over the trash cards being placed by a
- * PLACE_FROM_TRASH_TO_DECK cost. maxKeep 0 = pure reorder (no pick step).
+ * ARRANGE_TOP_CARDS prompt over the cards being placed by a
+ * PLACE_FROM_TRASH_TO_DECK or PLACE_SELF_AND_TRASH_TO_DECK cost.
+ * maxKeep 0 = pure reorder (no pick step). Cards may come from the trash or
+ * the field (the self half of the compound cost, OPT-430).
  */
 export function buildTrashToDeckArrangePrompt(
   state: GameState,
@@ -1055,7 +1191,10 @@ export function buildTrashToDeckArrangePrompt(
   position: "TOP" | "BOTTOM" = "BOTTOM",
 ): PendingPromptState {
   const p = state.players[controller];
-  const byId = new Map(p.trash.map((c) => [c.instanceId, c]));
+  const byId = new Map([
+    ...p.trash.map((c) => [c.instanceId, c] as const),
+    ...(p.characters.filter(Boolean) as CardInstance[]).map((c) => [c.instanceId, c] as const),
+  ]);
   const cards = cardIds
     .map((id) => byId.get(id))
     .filter((c): c is CardInstance => c !== undefined);
@@ -1113,7 +1252,10 @@ export function computeCostTargets(
       return player.life.map((l) => l.instanceId);
     }
 
-    case "PLACE_FROM_TRASH_TO_DECK": {
+    case "PLACE_FROM_TRASH_TO_DECK":
+    // OPT-431: the selectable half of the compound cost is the trash side
+    // only — the self half is fixed to the source card and never offered.
+    case "PLACE_SELF_AND_TRASH_TO_DECK": {
       let candidates = player.trash;
       if (cost.filter) {
         candidates = candidates.filter((c) =>
@@ -1181,6 +1323,7 @@ export function getCostLabel(cost: Cost): string {
     case "TRASH_FROM_LIFE": return `Choose ${amount} life card(s) to trash as cost`;
     case "PLACE_HAND_TO_DECK": return `Choose ${amount} card(s) to place on deck as cost`;
     case "PLACE_FROM_TRASH_TO_DECK": return `Choose ${amount} card(s) from your trash to place in your deck as cost`;
+    case "PLACE_SELF_AND_TRASH_TO_DECK": return `Choose ${amount} card(s) from your trash to place in your deck with this Character as cost`;
     case "REST_CARDS": return `Choose ${amount} card(s) to rest as cost`;
     case "TRASH_OWN_CHARACTER": return `Choose ${amount} character(s) to trash as cost`;
     case "REVEAL_FROM_HAND": return `Choose ${amount} card(s) from hand to reveal as cost`;
@@ -1202,7 +1345,8 @@ export function getCostCtaLabel(cost: Cost): string {
     case "RETURN_OWN_CHARACTER_TO_HAND": return "Return";
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "PLACE_HAND_TO_DECK":
-    case "PLACE_FROM_TRASH_TO_DECK": return "Place on Deck";
+    case "PLACE_FROM_TRASH_TO_DECK":
+    case "PLACE_SELF_AND_TRASH_TO_DECK": return "Place on Deck";
     case "REST_CARDS":
     case "REST_NAMED_CARD": return "Rest";
     case "REVEAL_FROM_HAND": return "Reveal";
@@ -1226,6 +1370,10 @@ export function getCostCards(
       return player.hand.filter((c) => targetSet.has(c.instanceId));
 
     case "PLACE_FROM_TRASH_TO_DECK":
+      return player.trash.filter((c) => targetSet.has(c.instanceId));
+
+    case "PLACE_SELF_AND_TRASH_TO_DECK":
+      // Selection stage offers trash candidates only; the self half is fixed.
       return player.trash.filter((c) => targetSet.has(c.instanceId));
 
     case "KO_OWN_CHARACTER":
@@ -1366,6 +1514,41 @@ export function applyCostSelection(
       const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
+      return { ...state, players: newPlayers };
+    }
+
+    case "PLACE_SELF_AND_TRASH_TO_DECK": {
+      // OPT-430/431: selectedIds arrive in final arranged top→bottom order
+      // and mix zones — the source Character (field) plus trash cards. Move
+      // each from its own zone, preserving the interleaved order.
+      const trashById = new Map(p.trash.map((c) => [c.instanceId, c]));
+      const charById = new Map(
+        (p.characters.filter(Boolean) as CardInstance[]).map((c) => [c.instanceId, c]),
+      );
+      const moved = selectedIds
+        .map((id) => trashById.get(id) ?? charById.get(id))
+        .filter((c): c is CardInstance => c !== undefined);
+      const newTrash = p.trash.filter((c) => !selectedSet.has(c.instanceId));
+      const newChars = p.characters.map((c) =>
+        c !== null && selectedSet.has(c.instanceId) ? null : c,
+      );
+      const returnedDon = moved
+        .filter((c) => charById.has(c.instanceId))
+        .flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
+      const deckCards = moved.map((c) => ({
+        ...c,
+        zone: "DECK" as const,
+        attachedDon: [] as CardInstance["attachedDon"],
+      }));
+      const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = {
+        ...p,
+        trash: newTrash,
+        characters: newChars,
+        deck: newDeck,
+        donCostArea: [...p.donCostArea, ...returnedDon],
+      };
       return { ...state, players: newPlayers };
     }
 

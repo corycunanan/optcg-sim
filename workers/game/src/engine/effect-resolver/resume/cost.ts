@@ -323,6 +323,63 @@ export function handleAwaitingCostSelection(
       targetInstanceIds: existing.targetInstanceIds,
       count: existing.count + selected.length,
     });
+  } else if (action.type === "SELECT_TARGET" && cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+    // OPT-431/OPT-430: the player chose WHICH trash cards join the source
+    // Character. The self half is fixed — selections are validated against
+    // the trash-only validTargets, so the source can never be substituted.
+    // Unless the block shuffles afterward, chain an arrange prompt covering
+    // the WHOLE group (self + trash) per Comprehensive Rule 3-1-7.
+    if (topFrame.costArrangeStage) {
+      return { state, events: [], resolved: false };
+    }
+    const valid = new Set(topFrame.validTargets ?? []);
+    const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
+    const selected = [...new Set(action.selectedInstanceIds ?? [])].filter((id) => valid.has(id));
+    if (selected.length !== amount) {
+      return { state, events: [], resolved: false };
+    }
+
+    const group = [sourceCardInstanceId, ...selected];
+    if (!blockShufflesDeck(topFrame.effectBlock as EffectBlock)) {
+      nextState = updateTopFrame(nextState, { validTargets: group, costArrangeStage: true });
+      return {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: buildTrashToDeckArrangePrompt(
+          nextState, group, controller, topFrame.id,
+          (cost as SimpleCost).position === "TOP" ? "TOP" : "BOTTOM",
+        ),
+      };
+    }
+
+    nextState = applyCostSelection(nextState, cost, group, controller);
+    const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
+    accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
+      targetInstanceIds: existing.targetInstanceIds,
+      count: existing.count + group.length,
+    });
+  } else if (action.type === "ARRANGE_TOP_CARDS" && cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+    // Arranged order arrives top→bottom for the whole self+trash group.
+    // Only cards staged at the select step (frame.validTargets) count; any
+    // missing from the response are appended so the cost still pays in full.
+    if (!topFrame.costArrangeStage) {
+      return { state, events: [], resolved: false };
+    }
+    const valid = topFrame.validTargets ?? [];
+    const validSet = new Set(valid);
+    const ordered = [...new Set((action.orderedInstanceIds ?? []).filter((id) => validSet.has(id)))];
+    const seen = new Set(ordered);
+    for (const id of valid) {
+      if (!seen.has(id)) ordered.push(id);
+    }
+
+    nextState = applyCostSelection(nextState, cost, ordered, controller);
+    const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
+    accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
+      targetInstanceIds: existing.targetInstanceIds,
+      count: existing.count + ordered.length,
+    });
   } else if (action.type === "ARRANGE_TOP_CARDS" && cost.type === "PLACE_FROM_TRASH_TO_DECK") {
     // OPT-371: arranged order arrives top→bottom of the placed group. Only
     // the cards picked in the selection step (frame.validTargets) count; any
