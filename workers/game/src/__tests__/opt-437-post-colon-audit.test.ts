@@ -20,6 +20,7 @@ import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import { EB03_028_YU } from "../engine/schemas/eb03.js";
 import { EB02_010_MONKEY_D_LUFFY } from "../engine/schemas/eb02.js";
 import { OP01_002_TRAFALGAR_LAW } from "../engine/schemas/op01.js";
+import { ST23_003_BENN_BECKMAN } from "../engine/schemas/st23.js";
 import { OP09_092_MARSHALL_D_TEACH } from "../engine/schemas/op09.js";
 import { createBattleReadyState, createTestCardDb, padChars, CARDS } from "./helpers.js";
 
@@ -396,6 +397,54 @@ describe("OPT-437: OP01-002 Law — the gate is evaluated once, not per action",
       afterReturn.pendingPrompt !== undefined ||
       afterReturn.state.players[0].characters.filter(Boolean).length === 5;
     expect(playHalfReached).toBe(true);
+  });
+});
+
+describe("OPT-437: the gate holds on the selectable-cost resume path (ST23-003)", () => {
+  it("false gate after a selected TRASH_FROM_HAND cost: cost stays paid, KO skipped", () => {
+    const cardDb = createTestCardDb();
+    const benn: CardData = {
+      ...cardDb.get("CHAR-VANILLA")!,
+      id: "ST23-003",
+      name: "Benn.Beckman",
+      effectSchema: ST23_003_BENN_BECKMAN,
+    };
+    cardDb.set(benn.id, benn);
+
+    // Default test leader has no {Red-Haired Pirates} trait -> gate false.
+    const state = createBattleReadyState(cardDb);
+    const block = ST23_003_BENN_BECKMAN.effects[0];
+    const handBefore = state.players[0].hand.length;
+    const oppCharsBefore = state.players[1].characters.filter(Boolean).length;
+
+    const offered = resolveEffect(state, block, "char-0-v1", 0, cardDb);
+    expect(offered.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+
+    const accepted = resumeFromStack(
+      offered.state,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      cardDb,
+    );
+    // TRASH_FROM_HAND is a selectable cost: the cost prompt opens even though
+    // the post-colon gate will be false — the cost must be offered and paid
+    // (Rules 8-3-1/8-3-3).
+    expect(accepted.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const trashId = state.players[0].hand[0].instanceId;
+    const done = resumeFromStack(
+      accepted.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [trashId] },
+      cardDb,
+    );
+    expect(done.resolved).toBe(true);
+    // Cost paid through finishCostsAndRunActions...
+    expect(done.state.players[0].hand).toHaveLength(handBefore - 1);
+    expect(done.state.players[0].trash.some((c) => c.instanceId === trashId)).toBe(true);
+    // ...and the gated KO chain skipped: no opponent character left the field
+    // and no KO target prompt opened.
+    expect(done.pendingPrompt).toBeUndefined();
+    expect(done.state.players[1].characters.filter(Boolean)).toHaveLength(oppCharsBefore);
+    expect(done.state.effectStack).toHaveLength(0);
   });
 });
 
