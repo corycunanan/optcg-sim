@@ -824,6 +824,24 @@ function lintFilters(block, ctx, issues) {
       );
     }
 
+    // C5 (OPT-409): `controller` inside a Target.filter is silently ignored
+    // on normal targeting paths — matchesFilter only enforces it when the
+    // caller passes filterController, which the target-resolver never does.
+    // Scope the target with Target.controller instead.
+    const c5Filters = [filter, ...(Array.isArray(filter.any_of) ? filter.any_of : [])];
+    for (const f of c5Filters) {
+      if (f && f.controller !== undefined) {
+        issues.push(
+          err(
+            cardId,
+            blockId,
+            "C5",
+            `Filter has "controller" on ${action.type} — ignored on targeting paths; use Target.controller instead`,
+          ),
+        );
+      }
+    }
+
     // C4: exclude_self on non-SELF/EITHER targets
     if (
       filter.exclude_self &&

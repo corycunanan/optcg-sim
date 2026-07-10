@@ -10,7 +10,7 @@
  * from the schemas/ directory.
  */
 
-import { ALL_ACTION_TYPES, type EffectSchema, type EffectBlock, type Action, type Cost } from "./effect-types.js";
+import { ALL_ACTION_TYPES, type EffectSchema, type EffectBlock, type Action, type Cost, type TargetFilter } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
@@ -332,6 +332,22 @@ function validateAction(action: Action, prefix: string): string[] {
     errors.push(`${prefix}: Missing 'type' field`);
   } else if (!VALID_ACTION_TYPES.has(action.type)) {
     errors.push(`${prefix}: Unknown action type '${action.type}'`);
+  }
+
+  // OPT-409: `controller` inside Target.filter is silently ignored on normal
+  // targeting paths — matchesFilter only enforces it when the caller passes
+  // the optional filterController argument, which the target-resolver never
+  // does. Scope the target with Target.controller instead.
+  const targetFilter = action.target?.filter as TargetFilter | undefined;
+  if (targetFilter) {
+    const subFilters = [targetFilter, ...(targetFilter.any_of ?? [])];
+    for (const f of subFilters) {
+      if (f?.controller !== undefined) {
+        errors.push(
+          `${prefix}: 'controller' inside target.filter is ignored on targeting paths — use target.controller`,
+        );
+      }
+    }
   }
 
   // Validate nested actions in PLAYER_CHOICE/OPPONENT_CHOICE
