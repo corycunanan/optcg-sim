@@ -22,22 +22,25 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Duplicate | — | Verified 2026-07-10: exact scenario re-run through `GameSession.handleAction` passes on main; covered by OPT-438 + OPT-439. Evidence in a Linear comment. |
 | 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | Done | [#257](https://github.com/corycunanan/optcg-sim/pull/257) | Merged 2026-07-10 (`740a8fc`, reviewed head `759569c` + docs-only handoff). Symmetric frame retirement + pendingTriggers carry-over. Review re-confirmed OPT-431/OPT-430 as the remaining OP10-026/027 gaps. |
 | 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Done | [#258](https://github.com/corycunanan/optcg-sim/pull/258) | Merged 2026-07-10 (`d61f5f5`, reviewed head `ac61c71` + docs). Gate accepts `skip`; replacement paths share the decline predicate; game:error on engine rejections. Delta review surfaced pre-existing OPT-448/OPT-449. |
-| 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Backlog | — | Design jointly with OPT-430 around one source-scoped compound-cost primitive. |
-| 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Backlog | — | Keep adjacent to OPT-431; one shared root implementation may close both. |
+| 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | In Review | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | PLACE_SELF_AND_TRASH_TO_DECK compound cost; self half fixed to the source. Review spawned OPT-453/454/455 + OPT-432 scope note. |
+| 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | In Review | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Closed by the same compound cost: one arrange prompt over the self+trash group (Rule 3-1-7). |
 | 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | Backlog | — | Reuse source-instance identity conventions from the compound-cost work. |
 | 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Done | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | Merged 2026-07-10 (`b7d8ee7`, reviewed heads `46ef531`/`25b8701` + docs). CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450. |
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | Backlog | — | Rebaseline after OPT-442, then split into lint/tooling plus set-family batches. |
-| 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | In Review | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | **Review stop condition** 2026-07-10: capped cycles still surfacing majors (residual guard surfaces → OPT-452; live prohibition-registrar bug → OPT-451). PR left open, merge not armed — user decides merge-as-is vs. one more bounded round. |
+| 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
 | 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Reject prompt-identified actions when no prompt is pending. |
 | 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
 | 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
 | 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
 | 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | Backlog | — | Residual guard surfaces scope-frozen out of PR #260 at its review-cycle cap. |
+| 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
+| 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
+| 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-431 + OPT-430 jointly (ready now — PR #257 merged); OPT-437 (ready now — PR #259 merged); OPT-451 (live prohibition bug, high value).
+**Next up:** OPT-437 (ready now); OPT-432 once PR #261 merges (self-exclusion machinery, includes the X.Barrels scope note); OPT-451 (live prohibition bug, high value).
 
 ---
 
@@ -105,3 +108,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Read first:** `workers/game/src/engine/schema-registry.ts` (`validateTargetFilterController`), `workers/game/src/engine/schemas/lint-schemas.sh` (rule C5), `workers/game/src/__tests__/opt-409-filter-controller-validation.test.ts`.
 - **Gotchas / do NOT touch:** Do not fix OPT-451's registrar inside compound-cost work — it needs its own reproduction-first ticket run. The validator's "use target.controller" advice is wrong for permanent prohibitions until OPT-451 lands.
 - **Pointer:** PR #260. For OPT-431/OPT-430: see the OPT-446 → OPT-431 entry above; the compound-cost primitive design starts from `cost-handler.ts` (`computeCostTargets` receives no `sourceCardInstanceId` today) and the OPT-429-restructured `resume/cost.ts`.
+
+### OPT-431/OPT-430 → OPT-437
+**From:** session on 2026-07-10 · **Commit:** `f8c4a2b` (second reviewed head; first `a8b9cd9`) · **PR:** [#261](https://github.com/corycunanan/optcg-sim/pull/261)
+
+- **Primer:** New `PLACE_SELF_AND_TRASH_TO_DECK` compound cost (EB01-030 precedent): the self half is fixed to the source card — selection offers matching trash candidates only — and one arrange prompt orders the whole self+trash group (Rule 3-1-7). OP10-026/027 re-encoded. Deck placements now reset `turnPlayed`/`state`/`attachedDon` per canonical `moveCard` semantics in the compound cost AND the sibling `PLACE_OWN_CHARACTER_TO_DECK` (identical latent crash: stale non-null `turnPlayed` broke the freshly-played-instance lookup after redraw).
+- **Read first:** `cost-handler.ts` (`PLACE_SELF_AND_TRASH_TO_DECK` branches in `payCostsWithSelection`, `applyCostSelection`, `isCostPayable`), `resume/cost.ts` (the two new SELECT/ARRANGE branches), `opt-430-431-self-and-trash-cost.test.ts`.
+- **Gotchas / do NOT touch:** The compound branches still transition manually — no fresh instanceId, no `CARD_RETURNED_TO_DECK` field-exit event — that is OPT-453 (with the direct sibling-reset test + attached-DON coverage folded in); don't half-fix it during audit work. The reviewers' consumer sweep (behaviorNotes) confirmed the canonical reset intentionally changes stored deck-card state for ~10 existing `PLACE_OWN_CHARACTER_TO_DECK` consumers.
+- **Unresolved:** Review cycle cap reached with residual systemic findings — all ticketed: OPT-453 (zone-transition completeness), OPT-454 (four more mis-encoded self-costs), OPT-455 (ST13-001 destination; trash filters read field stats), OPT-432 comment (X.Barrels `exclude_self`, same machinery as Oars). Merged under the user's standing session authorization.
+- **Pointer:** PR #261. For OPT-437: rebaseline the post-colon audit on current main (CHARACTER_TOTAL_COST now exists per the OPT-444 handoff).
