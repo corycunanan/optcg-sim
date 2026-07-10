@@ -81,8 +81,24 @@ export interface PerformedAction {
   /**
    * For CHARACTER_KO records: owner of the K.O.'d character.
    * For ATTACKED records: the attacking player (OPT-413).
+   * For PLAY_CARD / USE_COUNTER_EVENT / DECLARE_BLOCKER records: the player
+   * who performed the action (OPT-443).
    */
   controller?: 0 | 1;
+  /**
+   * PLAY_CARD / USE_COUNTER_EVENT / DECLARE_BLOCKER records (OPT-443):
+   * snapshot of the acted card's PRINTED properties, captured before
+   * execution (zone transitions reassign instanceIds and Events leave the
+   * field immediately, so a post-hoc lookup is unreliable).
+   * ACTION_PERFORMED_THIS_TURN conditions scope on these. Legacy entries
+   * missing the snapshot fail closed because their card category/filter
+   * cannot be verified.
+   */
+  cardId?: string;
+  /** Upper-cased printed category: "CHARACTER" | "EVENT" | "STAGE". */
+  cardType?: string;
+  /** Printed (base) cost — "base cost of N or more" conditions (OP15-002). */
+  baseCost?: number;
   /** ATTACKED records: the attacking card. */
   attackerInstanceId?: string;
   /**
