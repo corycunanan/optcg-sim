@@ -845,16 +845,15 @@ export const OP04_026_SENOR_PINK: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       costs: [{ type: "DON_REST", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Donquixote Pirates" },
+      },
       actions: [
         {
           type: "SET_REST",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          // The "Then, set up to 1 of your DON!! cards as active..." clause below stays unconditional (chain: "THEN").
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Donquixote Pirates" },
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -1350,16 +1349,16 @@ export const OP04_039_REBECCA: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true },
       costs: [{ type: "DON_REST", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "HAND_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 6,
+      },
       actions: [
         {
           type: "SEARCH_TRASH_THE_REST",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "HAND_COUNT",
-            controller: "SELF",
-            operator: "<=",
-            value: 6,
-          },
           params: {
             look_at: 2,
             pick: { up_to: 1 },
@@ -2025,15 +2024,15 @@ export const OP04_059_ICEBURG: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait_contains: "Water Seven" },
+      },
       actions: [
         {
           type: "GRANT_KEYWORD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait_contains: "Water Seven" },
-          },
           target: { type: "SELF" },
           params: { keyword: "BLOCKER" },
           duration: { type: "THIS_TURN" },
@@ -2059,15 +2058,15 @@ export const OP04_060_CROCODILE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait_contains: "Baroque Works" },
+      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait_contains: "Baroque Works" },
-          },
           params: { amount: 1, position: "TOP", face: "DOWN" },
         },
       ],
@@ -2107,15 +2106,15 @@ export const OP04_061_TOM: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait_contains: "Water Seven" },
+      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait_contains: "Water Seven" },
-          },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -2140,15 +2139,15 @@ export const OP04_063_FRANKY: EffectSchema = {
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
       flags: { once_per_turn: true },
       costs: [{ type: "DON_MINUS", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait_contains: "Water Seven" },
+      },
       actions: [
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait_contains: "Water Seven" },
-          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -3162,16 +3161,15 @@ export const OP04_091_LEO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "REST_SELF", target: { type: "YOUR_LEADER" } }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Dressrosa" },
+      },
       actions: [
         {
           type: "KO",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          // The "Then, trash 2 cards..." mill below stays unconditional (chain: "THEN").
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Dressrosa" },
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3492,16 +3490,16 @@ export const OP04_098_TOKO: EffectSchema = {
           filter: { traits: ["Land of Wano"] },
         },
       ],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LIFE_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 1,
+      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LIFE_COUNT",
-            controller: "SELF",
-            operator: "<=",
-            value: 1,
-          },
           params: { amount: 1, position: "TOP", face: "DOWN" },
         },
       ],

@@ -335,17 +335,16 @@ export const EB02_010_MONKEY_D_LUFFY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "FIELD_PURITY",
+        controller: "SELF",
+        filter: { traits: ["Straw Hat Crew"], card_type: "CHARACTER" },
+      },
       flags: { once_per_turn: true },
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          // The "Then, this Leader gains +1000 power" clause below stays unconditional (chain: "THEN").
-          conditions: {
-            type: "FIELD_PURITY",
-            controller: "SELF",
-            filter: { traits: ["Straw Hat Crew"], card_type: "CHARACTER" },
-          },
           params: { amount: 2 },
         },
         {
@@ -944,16 +943,16 @@ export const EB02_025_DONQUIXOTE_ROSINANTE: EffectSchema = {
         { type: "REST_DON", amount: 1 },
         { type: "REST_SELF" },
       ],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Donquixote Rosinante" },
+      },
       flags: { optional: true },
       actions: [
         {
           type: "SEARCH_AND_PLAY",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { name: "Donquixote Rosinante" },
-          },
           params: {
             look_at: 5,
             filter: { card_type: "CHARACTER", cost_max: 2 },
@@ -1431,16 +1430,16 @@ export const EB02_039_GERMA_66: EffectSchema = {
           filter: { traits: ["GERMA 66"], card_type: "CHARACTER", power_max: 4000 },
         },
       ],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "COMPARATIVE",
+        metric: "DON_FIELD_COUNT",
+        operator: "<=",
+      },
       flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "COMPARATIVE",
-            metric: "DON_FIELD_COUNT",
-            operator: "<=",
-          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -1532,16 +1531,16 @@ export const EB02_041_MERRY_GO: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "COMPARATIVE",
+        metric: "DON_FIELD_COUNT",
+        operator: "<=",
+      },
       flags: { optional: true },
       actions: [
         {
           type: "MODIFY_COST",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "COMPARATIVE",
-            metric: "DON_FIELD_COUNT",
-            operator: "<=",
-          },
           target: {
             type: "CHARACTER",
             controller: "SELF",
@@ -1804,16 +1803,16 @@ export const EB02_049_MONKEY_D_GARP: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Monkey.D.Garp" },
+      },
       flags: { optional: true },
       actions: [
         {
           type: "KO",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { name: "Monkey.D.Garp" },
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -1954,18 +1953,17 @@ export const EB02_052_ENEL: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LIFE_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 1,
+      },
       flags: { optional: true },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          // The "Then, this Character gains +1000 power" clause below stays unconditional (chain: "THEN").
-          conditions: {
-            type: "LIFE_COUNT",
-            controller: "SELF",
-            operator: "<=",
-            value: 1,
-          },
           params: { amount: 1, position: "TOP" },
         },
         {

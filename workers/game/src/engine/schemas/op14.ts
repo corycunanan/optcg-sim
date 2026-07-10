@@ -687,14 +687,14 @@ export const OP14_020_DRACULE_MIHAWK: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "REST_CARDS", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "BOARD_WIDE_EXISTENCE",
+        filter: { card_type: "CHARACTER", cost_min: 5 },
+      },
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "BOARD_WIDE_EXISTENCE",
-            filter: { card_type: "CHARACTER", cost_min: 5 },
-          },
           target: {
             type: "DON_IN_COST_AREA",
             controller: "SELF",
@@ -2851,16 +2851,16 @@ export const OP14_076_EVER_WHITE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Donquixote Pirates" },
+      },
       flags: { optional: true },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Donquixote Pirates" },
-          },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -2938,15 +2938,15 @@ export const OP14_078_BULLET_STRING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Donquixote Pirates" },
+      },
       actions: [
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Donquixote Pirates" },
-          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -2957,12 +2957,6 @@ export const OP14_078_BULLET_STRING: EffectSchema = {
         },
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Donquixote Pirates" },
-          },
           target: {
             type: "SELECTED_CARDS",
           },

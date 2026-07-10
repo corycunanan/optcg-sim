@@ -412,45 +412,29 @@ export const PRB02_010_CHARLOTTE_PUDDING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        all_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Big Mom Pirates" },
+          },
+          {
+            type: "DON_FIELD_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 6,
+          },
+        ],
+      },
       actions: [
         {
           type: "DRAW",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            all_of: [
-              {
-                type: "LEADER_PROPERTY",
-                controller: "SELF",
-                property: { trait: "Big Mom Pirates" },
-              },
-              {
-                type: "DON_FIELD_COUNT",
-                controller: "OPPONENT",
-                operator: ">=",
-                value: 6,
-              },
-            ],
-          },
           params: { amount: 2 },
         },
         {
           type: "PLAY_CARD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            all_of: [
-              {
-                type: "LEADER_PROPERTY",
-                controller: "SELF",
-                property: { trait: "Big Mom Pirates" },
-              },
-              {
-                type: "DON_FIELD_COUNT",
-                controller: "OPPONENT",
-                operator: ">=",
-                value: 6,
-              },
-            ],
-          },
           target: {
             type: "CARD_IN_HAND",
             controller: "SELF",

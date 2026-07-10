@@ -636,6 +636,7 @@ function getMetricValue(p: PlayerState, metric: string): number {
     case "LIFE_COUNT": return p.life.length;
     case "DON_FIELD_COUNT": return getDonFieldCount(p);
     case "CHARACTER_COUNT": return p.characters.filter(Boolean).length;
+    case "HAND_COUNT": return p.hand.length;
     default: return 0;
   }
 }

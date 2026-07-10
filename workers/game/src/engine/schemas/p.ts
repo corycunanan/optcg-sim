@@ -2004,16 +2004,16 @@ export const P_081_DRACULE_MIHAWK: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", color: "BLUE", traits: ["Cross Guild"] },
+        count: { operator: ">=", value: 3 },
+      },
       actions: [
         {
           type: "PLAY_CARD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "CARD_ON_FIELD",
-            controller: "SELF",
-            filter: { card_type: "CHARACTER", color: "BLUE", traits: ["Cross Guild"] },
-            count: { operator: ">=", value: 3 },
-          },
           target: {
             type: "CHARACTER_CARD",
             source_zone: "HAND",

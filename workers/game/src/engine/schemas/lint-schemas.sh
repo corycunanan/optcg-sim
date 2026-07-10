@@ -368,7 +368,7 @@ function lintCostConditions(block, ctx, issues) {
       cardId,
       blockId,
       "C6",
-      "Block has costs + block-level conditions — a post-colon \"If\" must gate the action(s), not the cost (Rules 8-3-1/8-3-3). Move it onto the gated action, or add to the C6 allowlist if verified pre-cost.",
+      "Block has costs + block-level conditions — a post-colon \"If\" is evaluated once after costs and gates the whole chain (Rules 8-3-1/4-10-1). Use post_cost_conditions, or add to the C6 allowlist if verified pre-cost.",
     ),
   );
 }
@@ -415,7 +415,7 @@ function lintEnums(block, ctx, issues) {
   }
 
   // F4: Condition type values
-  for (const cond of walkConditions(block.conditions)) {
+  for (const cond of [...walkConditions(block.conditions), ...walkConditions(block.post_cost_conditions)]) {
     if (
       cond.type &&
       typeof cond.type === "string" &&

@@ -244,15 +244,15 @@ export const OP11_007_TASHIGI: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [{ type: "REST_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Navy" },
+      },
       actions: [
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Navy" },
-          },
           target: {
             type: "CHARACTER",
             controller: "SELF",
@@ -288,15 +288,15 @@ export const OP11_008_DOLL: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       flags: { optional: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Navy" },
+      },
       actions: [
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Navy" },
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2220,15 +2220,15 @@ export const OP11_063_LITTLE_SADI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Impel Down" },
+      },
       actions: [
         {
           type: "SET_REST",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Impel Down" },
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2331,15 +2331,15 @@ export const OP11_069_CHARLOTTE_BRULEE: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       flags: { optional: true },
       costs: [{ type: "LIFE_TO_HAND", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Big Mom Pirates" },
+      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Big Mom Pirates" },
-          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],
@@ -2582,15 +2582,15 @@ export const OP11_080_GEAR_TWO: EffectSchema = {
       trigger: { keyword: "MAIN_EVENT" },
       flags: { optional: true },
       costs: [{ type: "REST_DON", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { color_includes: "BLUE" },
+      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { color_includes: "BLUE" },
-          },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -2631,15 +2631,15 @@ export const OP11_082_ARAMAKI: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [{ type: "TRASH_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Navy" },
+      },
       actions: [
         {
           type: "GRANT_KEYWORD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Navy" },
-          },
           target: {
             type: "CHARACTER",
             controller: "SELF",
@@ -3627,16 +3627,16 @@ export const OP11_114_GUM_GUM_FIRE_FIST_PISTOL_RED_HAWK: EffectSchema = {
       trigger: { keyword: "MAIN_EVENT" },
       flags: { optional: true },
       costs: [{ type: "REST_DON", amount: 3 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "COMBINED_TOTAL",
+        metric: "LIFE_COUNT",
+        operator: ">=",
+        value: 5,
+      },
       actions: [
         {
           type: "KO",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "COMBINED_TOTAL",
-            metric: "LIFE_COUNT",
-            operator: ">=",
-            value: 5,
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

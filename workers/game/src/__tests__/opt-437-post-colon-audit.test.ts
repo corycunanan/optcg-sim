@@ -1,22 +1,27 @@
 /**
  * OPT-437 — schema-wide post-colon condition audit.
  *
- * 141 effect blocks encoded post-colon "If ..." clauses as block-level
+ * 142 effect blocks encoded post-colon "If ..." clauses as block-level
  * `conditions`, which resolveEffect evaluates BEFORE optional activation and
  * cost payment — suppressing legal cost payment. Per Rules 8-3-1/8-3-3 the
- * clause gates only the post-colon effect, so each was moved onto the gated
- * action(s). Verified card-by-card against docs/cards printed text by the
- * OPT-437 audit; lint rule C6 now rejects new violations (allowlisted
- * pre-cost conditions excepted).
+ * clause gates only the post-colon effect, and per Rule 4-10-1 it gates the
+ * ENTIRE post-colon remainder, evaluated once. Each block was verified
+ * against docs/cards printed text and re-encoded onto the new
+ * `post_cost_conditions` gate (evaluated exactly once after costs are paid,
+ * skipping the whole action chain when false). Lint rule C6 rejects new
+ * costs + block-level-conditions encodings outside the pre-cost allowlist.
  */
 
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
+import { evaluateCondition } from "../engine/conditions.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import { EB03_028_YU } from "../engine/schemas/eb03.js";
 import { EB02_010_MONKEY_D_LUFFY } from "../engine/schemas/eb02.js";
-import { createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { OP01_002_TRAFALGAR_LAW } from "../engine/schemas/op01.js";
+import { OP09_092_MARSHALL_D_TEACH } from "../engine/schemas/op09.js";
+import { createBattleReadyState, createTestCardDb, padChars, CARDS } from "./helpers.js";
 
 function withPlayer(state: GameState, idx: 0 | 1, patch: Partial<PlayerState>): GameState {
   const players = [...state.players] as [PlayerState, PlayerState];
@@ -169,16 +174,13 @@ const CORRECTED: ReadonlyArray<readonly [string, string]> = [
   ["ST27-002", "activate_cost_reduction"]
 ];
 
-describe("OPT-437: corrected blocks keep conditions on actions, not the block", () => {
+describe("OPT-437: corrected blocks use the post_cost_conditions gate", () => {
   const schemas = getAllAuthoredSchemas();
   it.each(CORRECTED)("%s %s", (cardId, blockId) => {
     const block = schemas[cardId]?.effects.find((b) => b.id === blockId);
     expect(block, `${cardId} ${blockId} missing`).toBeDefined();
     expect(block!.conditions, "block-level conditions must be gone").toBeUndefined();
-    expect(
-      block!.actions?.some((a) => a.conditions !== undefined),
-      "some action must carry the moved condition",
-    ).toBe(true);
+    expect(block!.post_cost_conditions, "post_cost_conditions must be set").toBeDefined();
   });
 });
 
@@ -222,10 +224,8 @@ describe("OPT-437 family: single gated action (EB03-028 Yu)", () => {
       cardDb,
     );
     expect(result.resolved).toBe(true);
-    // Cost paid: Yu left the field into the trash.
     expect(result.state.players[0].characters.some((c) => c?.instanceId === "char-0-yu")).toBe(false);
     expect(result.state.players[0].trash.some((c) => c.cardId === "EB03-028")).toBe(true);
-    // Gated DRAW skipped: hand unchanged.
     expect(result.state.players[0].hand).toHaveLength(5);
   });
 
@@ -244,8 +244,8 @@ describe("OPT-437 family: single gated action (EB03-028 Yu)", () => {
   });
 });
 
-describe("OPT-437 family: gated action with ungated THEN (EB02-010 Luffy)", () => {
-  it("with impure board: DON_MINUS is paid, SET_DON_ACTIVE is skipped, resolution completes", () => {
+describe("OPT-437 family: the gate covers the whole chain incl. THEN (EB02-010 Luffy)", () => {
+  function setup(pureBoard: boolean) {
     const cardDb = createTestCardDb();
     const leader: CardData = {
       ...cardDb.get("LEADER-T")!,
@@ -254,19 +254,42 @@ describe("OPT-437 family: gated action with ungated THEN (EB02-010 Luffy)", () =
       effectSchema: EB02_010_MONKEY_D_LUFFY,
     };
     cardDb.set(leader.id, leader);
+    const shc: CardData = {
+      ...cardDb.get("CHAR-VANILLA")!,
+      id: "SHC-CHAR",
+      name: "Nami",
+      types: ["Straw Hat Crew"],
+    };
+    cardDb.set(shc.id, shc);
 
     let state = createBattleReadyState(cardDb);
-    // Default board characters carry no {Straw Hat Crew} trait → FIELD_PURITY false.
-    // Two rested DON at the tail; DON_MINUS pays from the (active) prefix.
+    const chars: CardInstance[] = pureBoard
+      ? [{
+          instanceId: "char-0-shc",
+          cardId: shc.id,
+          zone: "CHARACTER",
+          state: "ACTIVE",
+          attachedDon: [],
+          turnPlayed: 1,
+          controller: 0,
+          owner: 0,
+        }]
+      : (state.players[0].characters.filter(Boolean) as CardInstance[]);
     const donCostArea = state.players[0].donCostArea.map((d, i, arr) =>
       i >= arr.length - 2 ? { ...d, state: "RESTED" as const } : d,
     );
     state = withPlayer(state, 0, {
       leader: { ...state.players[0].leader, cardId: leader.id },
+      characters: padChars(chars),
       donCostArea,
     });
+    return { state, cardDb };
+  }
 
+  it("impure board: cost paid, SET_DON_ACTIVE and the THEN power boost are BOTH skipped", () => {
+    const { state, cardDb } = setup(false);
     const donDeckBefore = state.players[0].donDeck.length;
+    const activeEffectsBefore = state.activeEffects.length;
     const block = EB02_010_MONKEY_D_LUFFY.effects.find(
       (b) => b.id === "activate_set_don_active_power",
     )!;
@@ -279,5 +302,134 @@ describe("OPT-437 family: gated action with ungated THEN (EB02-010 Luffy)", () =
     expect(
       result.state.players[0].donCostArea.filter((d) => d.state === "RESTED"),
     ).toHaveLength(2);
+    // Rule 4-10-1: the "Then, +1000 power" clause is also skipped — no new
+    // modifier was registered (pre-fix the THEN action ran unconditionally).
+    expect(result.state.activeEffects).toHaveLength(activeEffectsBefore);
+  });
+
+  it("pure Straw Hat Crew board: both the DON activation and the power boost resolve", () => {
+    const { state, cardDb } = setup(true);
+    const activeEffectsBefore = state.activeEffects.length;
+    const block = EB02_010_MONKEY_D_LUFFY.effects.find(
+      (b) => b.id === "activate_set_don_active_power",
+    )!;
+    const result = resolveEffect(state, block, state.players[0].leader.instanceId, 0, cardDb);
+
+    expect(result.resolved).toBe(true);
+    // Rested DON reactivated (2 rested → 0; DON_MINUS took 2 active first).
+    expect(
+      result.state.players[0].donCostArea.filter((d) => d.state === "RESTED"),
+    ).toHaveLength(0);
+    // The THEN power boost registered a modifier.
+    expect(result.state.activeEffects.length).toBeGreaterThan(activeEffectsBefore);
   });
 });
+
+describe("OPT-437: OP01-002 Law — the gate is evaluated once, not per action", () => {
+  it("with exactly 5 characters, the PLAY_CARD half is reachable after the return", () => {
+    const cardDb = createTestCardDb();
+    const leader: CardData = {
+      ...cardDb.get("LEADER-T")!,
+      id: "OP01-002",
+      name: "Trafalgar Law",
+      effectSchema: OP01_002_TRAFALGAR_LAW,
+    };
+    cardDb.set(leader.id, leader);
+
+    let state = createBattleReadyState(cardDb);
+    // Exactly 5 characters — the only satisfiable case (area cap is 5), and
+    // the case that pre-fix ALWAYS dead-ended: the return dropped the count
+    // to 4 and the per-action re-check skipped PLAY_CARD.
+    const fillers: CardInstance[] = Array.from({ length: 5 }, (_, i) => ({
+      instanceId: `law-char-${i}`,
+      cardId: CARDS.VANILLA.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    }));
+    // A playable BLUE hand candidate — the play filter excludes cards
+    // matching the returned character's color (red in the test db).
+    const blueChar: CardData = {
+      ...cardDb.get("CHAR-VANILLA")!,
+      id: "BLUE-CHAR",
+      name: "Blue Candidate",
+      color: ["Blue"],
+    };
+    cardDb.set(blueChar.id, blueChar);
+    state = withPlayer(state, 0, {
+      leader: { ...state.players[0].leader, cardId: leader.id },
+      characters: padChars(fillers),
+      hand: [
+        ...state.players[0].hand,
+        {
+          instanceId: "hand-blue",
+          cardId: blueChar.id,
+          zone: "HAND",
+          state: "ACTIVE",
+          attachedDon: [],
+          turnPlayed: null,
+          controller: 0,
+          owner: 0,
+        },
+      ],
+    });
+
+    const block = OP01_002_TRAFALGAR_LAW.effects[0];
+    const offered = resolveEffect(state, block, state.players[0].leader.instanceId, 0, cardDb);
+    expect(offered.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const afterReturn = resumeFromStack(
+      offered.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["law-char-0"] },
+      cardDb,
+    );
+    // Pre-fix: resolved with no further prompt (PLAY_CARD dead). Post-fix the
+    // chain continues into the play half — either prompting for the hand
+    // candidate or resolving it — with the character returned to hand.
+    expect(
+      afterReturn.state.players[0].characters.some((c) => c?.instanceId === "law-char-0"),
+    ).toBe(false);
+    const playHalfReached =
+      afterReturn.pendingPrompt !== undefined ||
+      afterReturn.state.players[0].characters.filter(Boolean).length === 5;
+    expect(playHalfReached).toBe(true);
+  });
+});
+
+describe("OPT-437: OP09-092 hand-gap comparison uses the real HAND_COUNT metric", () => {
+  it("is true at a 3-card deficit and false at a 2-card deficit", () => {
+    const cardDb = createTestCardDb();
+    let state = createBattleReadyState(cardDb);
+    const cond = OP09_092_MARSHALL_D_TEACH.effects[0].post_cost_conditions!;
+
+    state = withPlayer(state, 0, { hand: state.players[0].hand.slice(0, 5) });
+    state = withPlayer(state, 1, {
+      hand: padHand(state.players[1].hand, 8),
+    });
+    expect(evaluateCondition(state, cond, { sourceCardInstanceId: "x", controller: 0, cardDb })).toBe(true);
+
+    state = withPlayer(state, 1, { hand: state.players[1].hand.slice(0, 7) });
+    expect(evaluateCondition(state, cond, { sourceCardInstanceId: "x", controller: 0, cardDb })).toBe(false);
+  });
+});
+
+function padHand(hand: CardInstance[], size: number): CardInstance[] {
+  const out = [...hand];
+  let i = 0;
+  while (out.length < size) {
+    out.push({
+      instanceId: `pad-hand-${i++}`,
+      cardId: CARDS.VANILLA.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 1,
+      owner: 1,
+    });
+  }
+  return out.slice(0, size);
+}

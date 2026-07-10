@@ -279,16 +279,16 @@ export const OP16_012_BENN_BECKMAN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "REST_DON", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        all_of: [
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Red-Haired Pirates" } },
+          { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 10 },
+        ],
+      },
       actions: [
         {
           type: "PLAY_CARD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            all_of: [
-              { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Red-Haired Pirates" } },
-              { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 10 },
-            ],
-          },
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Shanks" } },
           params: { source_zone: "HAND", cost_override: "FREE" },
         },
@@ -855,16 +855,16 @@ export const OP16_038_LETS_GO_TO_NAVY_HEADQUARTERS: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 6 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", traits: ["Impel Down"], unique_names: true },
+        count: { operator: ">=", value: 5 },
+      },
       actions: [
         {
           type: "SET_ACTIVE",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "CARD_ON_FIELD",
-            controller: "SELF",
-            filter: { card_type: "CHARACTER", traits: ["Impel Down"], unique_names: true },
-            count: { operator: ">=", value: 5 },
-          },
           target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { all: true } },
         },
       ],
@@ -1031,11 +1031,11 @@ export const OP16_047_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: { type: "HAND_COUNT", controller: "OPPONENT", operator: ">=", value: 8 },
       actions: [
         {
           type: "OPPONENT_ACTION",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: { type: "HAND_COUNT", controller: "OPPONENT", operator: ">=", value: 8 },
           params: { mandatory: true, action: { type: "PLACE_HAND_TO_DECK", params: { amount: 2, position: "BOTTOM" } } },
         },
       ],
@@ -1415,11 +1415,11 @@ export const OP16_065_SAKAZUKI: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "REST_DON", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
           params: { amount: 2, target_state: "ACTIVE" },
         },
       ],
@@ -1504,11 +1504,11 @@ export const OP16_070_DONQUIXOTE_ROSINANTE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "REST_DON", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -1738,13 +1738,13 @@ export const OP16_081_OTAMA: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      // FAQ: an opponent's cost-8+ Character also satisfies the condition —
+      // the JP text is controller-agnostic (OPT-413).
+      post_cost_conditions: { type: "CARD_ON_FIELD", controller: "EITHER", filter: { card_type: "CHARACTER", cost_min: 8 } },
       actions: [
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          // FAQ: an opponent's cost-8+ Character also satisfies the condition —
-          // the JP text is controller-agnostic (OPT-413).
-          conditions: { type: "CARD_ON_FIELD", controller: "EITHER", filter: { card_type: "CHARACTER", cost_min: 8 } },
           target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
           params: { amount: -2000 },
           duration: { type: "THIS_TURN" },
@@ -1847,17 +1847,15 @@ export const OP16_087_SHINOBU: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Land of Wano" } },
       actions: [
         {
           type: "DRAW",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Land of Wano" } },
           params: { amount: 1 },
         },
         {
           type: "MODIFY_COST",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Land of Wano" } },
           target: { type: "CHARACTER", controller: "SELF", count: { up_to: 1 }, filter: { name: "Kouzuki Momonosuke" } },
           params: { amount: 20 },
           duration: { type: "THIS_TURN" },
@@ -2120,17 +2118,17 @@ export const OP16_100_HALLOWED_GLACIER_SLASH: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      // (The [Yamato] leader check encodes the post-colon target "your Leader [Yamato]".)
+      post_cost_conditions: {
+        all_of: [
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Yamato" } },
+          { type: "ACTION_PERFORMED_THIS_TURN", controller: "OPPONENT", action: "CHARACTER_KO" },
+        ],
+      },
       actions: [
         {
           type: "SET_ACTIVE",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          // (The [Yamato] leader check encodes the post-colon target "your Leader [Yamato]".)
-          conditions: {
-            all_of: [
-              { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Yamato" } },
-              { type: "ACTION_PERFORMED_THIS_TURN", controller: "OPPONENT", action: "CHARACTER_KO" },
-            ],
-          },
           target: { type: "YOUR_LEADER" },
         },
       ],

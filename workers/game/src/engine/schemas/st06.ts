@@ -460,6 +460,12 @@ export const ST06_017_NAVY_HQ: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Navy" },
+      },
       actions: [
         {
           type: "MODIFY_COST",
@@ -470,12 +476,6 @@ export const ST06_017_NAVY_HQ: EffectSchema = {
           },
           params: { amount: -1 },
           duration: { type: "THIS_TURN" },
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Navy" },
-          },
         },
       ],
       flags: { optional: true },

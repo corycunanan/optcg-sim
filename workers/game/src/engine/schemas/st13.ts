@@ -109,16 +109,16 @@ export const ST13_003_MONKEY_D_LUFFY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN", don_requirement: 2 },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "LIFE_COUNT",
+        controller: "SELF",
+        operator: "==",
+        value: 0,
+      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_HAND",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LIFE_COUNT",
-            controller: "SELF",
-            operator: "==",
-            value: 0,
-          },
           target: {
             type: "CARD_IN_HAND",
             controller: "SELF",
@@ -424,16 +424,16 @@ export const ST13_009_SHANKS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        type: "HAND_COUNT",
+        controller: "OPPONENT",
+        operator: ">=",
+        value: 7,
+      },
       actions: [
         {
           type: "TRASH_FROM_LIFE",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "HAND_COUNT",
-            controller: "OPPONENT",
-            operator: ">=",
-            value: 7,
-          },
           target: { type: "OPPONENT_LIFE", controller: "OPPONENT" },
           params: { amount: 1, position: "TOP" },
         },

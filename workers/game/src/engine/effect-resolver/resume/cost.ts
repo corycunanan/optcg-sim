@@ -27,7 +27,7 @@ import {
   buildTrashToDeckArrangePrompt,
 } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
-import { executeActionChain } from "../resolver.js";
+import { executeActionChain, postCostConditionsMet } from "../resolver.js";
 import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 
@@ -73,6 +73,13 @@ function finishCostsAndRunActions(
 
   const hasRefs = [...costRefs.values()].some((v) => v.count > 0);
   const costRefsForActions = hasRefs ? costRefs : undefined;
+
+  // OPT-437: the post-colon "If" gate — costs are fully paid at this point
+  // and the chain is about to start; when false, skip every action (the paid
+  // cost stands) but still drain queued triggers.
+  if (!postCostConditionsMet(state, block, sourceCardInstanceId, controller, cardDb)) {
+    return processRemainingTriggers(state, topFrame.pendingTriggers, cardDb, events);
+  }
 
   if (topFrame.remainingActions.length > 0) {
     const chainResult = executeActionChain(

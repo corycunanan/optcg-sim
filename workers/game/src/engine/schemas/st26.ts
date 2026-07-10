@@ -177,28 +177,28 @@ export const ST26_005_MONKEY_D_LUFFY: EffectSchema = {
         ],
       },
       costs: [{ type: "DON_MINUS", amount: 2 }],
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        all_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { multicolored: true },
+          },
+          {
+            type: "DON_FIELD_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 5,
+          },
+        ],
+      },
       actions: [
         {
           type: "SET_BASE_POWER",
           target: { type: "YOUR_LEADER" },
           params: { value: 7000 },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            all_of: [
-              {
-                type: "LEADER_PROPERTY",
-                controller: "SELF",
-                property: { multicolored: true },
-              },
-              {
-                type: "DON_FIELD_COUNT",
-                controller: "OPPONENT",
-                operator: ">=",
-                value: 5,
-              },
-            ],
-          },
         },
       ],
     },
