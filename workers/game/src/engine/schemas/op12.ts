@@ -2008,6 +2008,7 @@ export const OP12_058_I_WILL_MAKE_WHITEBEARD_THE_KING: EffectSchema = {
     {
       id: "main_reveal_play",
       category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",

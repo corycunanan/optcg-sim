@@ -221,6 +221,7 @@ export const ST22_007_SQUARD: EffectSchema = {
     {
       id: "activate_reveal_give_don",
       category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true },
       actions: [
         {
