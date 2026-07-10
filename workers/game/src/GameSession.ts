@@ -947,6 +947,12 @@ export class GameSession implements DurableObject {
 
       if (replacementResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
+      } else if (this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS") {
+        const continuation = resumeFromStack(this.gameState, action, this.cardDb);
+        this.gameState = continuation.state;
+        if (continuation.pendingPrompt) {
+          this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
+        }
       }
     } else if (resumeCtx?.type === "REPLACEMENT_BATCH") {
       const accepted = action.type !== "PASS";
@@ -960,6 +966,12 @@ export class GameSession implements DurableObject {
 
       if (batchResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
+      } else if (this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS") {
+        const continuation = resumeFromStack(this.gameState, action, this.cardDb);
+        this.gameState = continuation.state;
+        if (continuation.pendingPrompt) {
+          this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
+        }
       }
     } else if (this.gameState.effectStack.length > 0) {
       // Stack-based resume — use new effect stack system

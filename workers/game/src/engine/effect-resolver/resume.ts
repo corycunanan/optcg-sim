@@ -212,8 +212,21 @@ export function resumeFromStack(
 
       if (result.pendingPrompt) {
         let pendingPrompt = result.pendingPrompt;
+        const pendingResumeContext = pendingPrompt.resumeContext as { type?: unknown } | null;
+        const isReplacementPrompt = pendingResumeContext?.type === "REPLACEMENT" ||
+          pendingResumeContext?.type === "REPLACEMENT_BATCH";
         if (result.rejected) {
           pendingPrompt = { ...pendingPrompt, resumeContext: topFrame.id };
+        } else if (!replacementFrameWasPushed && isReplacementPrompt) {
+          const continuationFrame: EffectStackFrame = {
+            ...topFrame,
+            id: generateFrameId(),
+            phase: "INTERRUPTED_BY_TRIGGERS",
+            pausedAction: null,
+            validTargets: [],
+            accumulatedEvents: [...topFrame.accumulatedEvents, ...result.events],
+          };
+          nextState = pushFrame(nextState, continuationFrame);
         } else if (!replacementFrameWasPushed) {
           const promptCtx = pendingPrompt.resumeContext as ResumeContext;
           const replacementFrame: EffectStackFrame = {
