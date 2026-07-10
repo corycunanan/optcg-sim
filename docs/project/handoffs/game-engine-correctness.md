@@ -24,7 +24,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Done | [#258](https://github.com/corycunanan/optcg-sim/pull/258) | Merged 2026-07-10 (`d61f5f5`, reviewed head `ac61c71` + docs). Gate accepts `skip`; replacement paths share the decline predicate; game:error on engine rejections. Delta review surfaced pre-existing OPT-448/OPT-449. |
 | 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Done | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Merged 2026-07-10 (`9ef3fb3`). PLACE_SELF_AND_TRASH_TO_DECK compound cost; self half fixed to the source. Review spawned OPT-453/454/455 + OPT-432 scope note. |
 | 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Done | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Merged 2026-07-10 (`9ef3fb3`). One arrange prompt over the self+trash group (Rule 3-1-7). |
-| 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | Backlog | — | Reuse source-instance identity conventions from the compound-cost work. |
+| 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | In Review | [#263](https://github.com/corycunanan/optcg-sim/pull/263) | Exact trigger identity now survives optional cost prompts; source-aware costs enforce `exclude_self`. |
 | 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Done | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | Merged 2026-07-10 (`b7d8ee7`, reviewed heads `46ef531`/`25b8701` + docs). CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450. |
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | In Review | [#262](https://github.com/corycunanan/optcg-sim/pull/262) | 142 blocks re-encoded onto the new `post_cost_conditions` engine gate (once-after-costs, whole-chain, Rules 8-3-1/4-10-1); lint rule C6; HAND_COUNT ComparativeMetric. Spawned OPT-456/457. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
@@ -131,3 +131,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** The first pass proved per-action condition placement WRONG (mid-chain re-evaluation; ungated THENs violating 4-10-1) — never encode post-colon Ifs on actions. The OPT-433/442 cohort (21 blocks, marker comment "gates only this action") still uses the wrong pattern — that migration is OPT-457, including fixing tests that assert the old semantics.
 - **Unresolved:** OPT-456 (4 partial encodings, C6-allowlisted), OPT-457 (cohort migration + encoding-guide doc). For OPT-432: plumb `sourceCardInstanceId` into `computeCostTargets` and honor `exclude_self` there — one mechanism closes both the Oars candidate bug and X.Barrels (see the OPT-432 Linear comment).
 - **Pointer:** PR #262. Both fan-out passes' per-card verdicts are in the session workflow journals.
+
+### OPT-432 → OPT-448
+**From:** session on 2026-07-10 · **Commit:** `d687f1d` · **PR:** [#263](https://github.com/corycunanan/optcg-sim/pull/263)
+
+- **Primer:** Trigger identity seeded on an optional-effect frame now survives selectable cost frames and merges with cost-result references before the action chain. OP15-080 targets that exact triggering instance in trash; source-aware cost filters now enforce `exclude_self`.
+- **Read first:** `workers/game/src/GameSession.ts` around pending-prompt routing and PASS validation, plus `workers/game/src/__tests__/opt-446-prompt-guard-polish.test.ts` for the adjacent prompt guard contract.
+- **Gotchas / do NOT touch:** A deliberate battle PASS has no `promptId`; OPT-448 should reject only prompt-identified actions after their prompt has cleared. Keep terminal-game cleanup in OPT-449.
+- **Unresolved:** The untracked `.claude/scheduled_tasks.lock` and `package-lock.json` predate this recovery and were intentionally excluded. No unresolved OPT-432 behavior remains.
+- **Pointer:** PR #263; inspect `d687f1d` for the implementation and regression matrix.
