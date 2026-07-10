@@ -52,6 +52,17 @@ function promptResponseId(action: GameAction): string | undefined {
 }
 
 /**
+ * OPT-446: PASS and PLAYER_CHOICE "skip" are the engine's shared decline
+ * vocabulary (resume/choice.ts). Replacement resume paths must treat them
+ * identically — deriving acceptance from `type !== "PASS"` alone would turn
+ * a "skip" decline into an accept and apply the replacement.
+ */
+function isDeclineResponse(action: GameAction): boolean {
+  return action.type === "PASS"
+    || (action.type === "PLAYER_CHOICE" && action.choiceId === "skip");
+}
+
+/**
  * Treat an ARRANGE response as an exact partition of the cards the server
  * revealed. This prevents clients from omitting, duplicating, or injecting
  * instance IDs and gives [] validTargets its intended meaning: pick nothing.
@@ -759,7 +770,11 @@ export class GameSession implements DurableObject {
           }
         }
         if (promptType === "OPTIONAL_EFFECT" && action.type === "PLAYER_CHOICE") {
-          const validChoice = action.choiceId === "activate" || action.choiceId === "accept";
+          // OPT-446: "skip" is the engine's documented decline vocabulary
+          // (resume/choice.ts) — the gate must not lock out clients that use
+          // it instead of PASS.
+          const validChoice = action.choiceId === "activate" || action.choiceId === "accept"
+            || action.choiceId === "skip";
           if (!validChoice) {
             this.send(ws, { type: "game:error", message: "That choice is no longer available" });
             return;
@@ -901,7 +916,7 @@ export class GameSession implements DurableObject {
   }
 
   private async resumeFromPrompt(
-    _ws: WebSocket,
+    ws: WebSocket,
     _playerIndex: 0 | 1,
     action: GameAction,
   ): Promise<void> {
@@ -912,6 +927,7 @@ export class GameSession implements DurableObject {
 
     const prompt = this.gameState.pendingPrompt!;
     const stateBeforeResume = this.gameState;
+    let responseRejected = false;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
     const respondingPlayer = prompt.respondingPlayer;
     let resumedGameOver: { winner: 0 | 1 | null; reason: string } | undefined;
@@ -941,7 +957,7 @@ export class GameSession implements DurableObject {
 
     // Route to the appropriate resume handler based on context type
     if (resumeCtx?.type === "REPLACEMENT") {
-      const accepted = action.type !== "PASS";
+      const accepted = !isDeclineResponse(action);
       const replacementResult = resumeReplacement(
         this.gameState,
         resumeCtx as unknown as ReplacementResumeContext,
@@ -957,7 +973,7 @@ export class GameSession implements DurableObject {
         resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
       }
     } else if (resumeCtx?.type === "REPLACEMENT_BATCH") {
-      const accepted = action.type !== "PASS";
+      const accepted = !isDeclineResponse(action);
       const batchResult = resumeReplacementBatch(
         this.gameState,
         resumeCtx as unknown as ReplacementBatchResumeContext,
@@ -993,12 +1009,18 @@ export class GameSession implements DurableObject {
           this.attachReplacementBatchContinuation(resumedFrame.replacementBatchContinuation);
         }
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+        // OPT-446: a rejection that re-issues the prompt (OPT-439 restore
+        // path) is still a rejection — surface it to the sender.
+        if (resumeResult.rejected) {
+          responseRejected = true;
+        }
       } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
         // OPT-436: the handler rejected the response (stale/duplicate/invalid)
         // without issuing a replacement prompt. Restore the complete state
         // from before resume, including the prompt and any frame the resume
         // router may have popped while validating the response.
         this.gameState = stateBeforeResume;
+        responseRejected = true;
       } else {
         resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
         if (!this.gameState.pendingPrompt && !resumedGameOver) {
@@ -1016,6 +1038,7 @@ export class GameSession implements DurableObject {
       } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
         // OPT-436: same rejection-restore as the stack branch.
         this.gameState = stateBeforeResume;
+        responseRejected = true;
       }
     }
 
@@ -1064,6 +1087,17 @@ export class GameSession implements DurableObject {
       return;
     }
     this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
+
+    // OPT-446: engine-level rejections previously answered with only a
+    // game:update echoing the rejected action — the sender couldn't tell
+    // rejection from acceptance without diffing state. Surface it explicitly,
+    // matching the gate paths.
+    if (responseRejected) {
+      this.send(ws, {
+        type: "game:error",
+        message: "That prompt response was rejected; the pending prompt is unchanged",
+      });
+    }
 
     if (this.gameState.pendingPrompt) {
       this.sendEffectPrompt(this.gameState.pendingPrompt);
