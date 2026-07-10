@@ -43,6 +43,59 @@ const EXPECTED_RESPONSE_TYPES: Record<DurablePromptType, ReadonlyArray<GameActio
   OPTIONAL_EFFECT: ["PLAYER_CHOICE", "PASS"],
   REVEAL_TRIGGER: ["REVEAL_TRIGGER"],
 };
+
+function promptResponseId(action: GameAction): string | undefined {
+  return "promptId" in action ? action.promptId : undefined;
+}
+
+/**
+ * Treat an ARRANGE response as an exact partition of the cards the server
+ * revealed. This prevents clients from omitting, duplicating, or injecting
+ * instance IDs and gives [] validTargets its intended meaning: pick nothing.
+ */
+function validateArrangeResponse(
+  prompt: Extract<PendingPromptState["options"], { promptType: "ARRANGE_TOP_CARDS" }>,
+  action: Extract<GameAction, { type: "ARRANGE_TOP_CARDS" }>,
+): string | null {
+  const revealedIds = prompt.cards.map((card) => card.instanceId);
+  const revealed = new Set(revealedIds);
+  const requestedKept = action.keptCardInstanceIds?.length
+    ? action.keptCardInstanceIds
+    : action.keptCardInstanceId
+      ? [action.keptCardInstanceId]
+      : [];
+  const kept = new Set(requestedKept);
+  const ordered = new Set(action.orderedInstanceIds);
+
+  if (kept.size !== requestedKept.length || ordered.size !== action.orderedInstanceIds.length) {
+    return "Arrangement contains duplicate cards";
+  }
+  if (
+    requestedKept.some((id) => !revealed.has(id)) ||
+    action.orderedInstanceIds.some((id) => !revealed.has(id))
+  ) {
+    return "Arrangement contains a card that was not revealed";
+  }
+  if (requestedKept.some((id) => ordered.has(id))) {
+    return "A card cannot be both kept and arranged";
+  }
+
+  const validPicks = prompt.validTargets === undefined ? revealed : new Set(prompt.validTargets);
+  if (requestedKept.some((id) => !validPicks.has(id))) {
+    return "That card is not a valid pick";
+  }
+  if (requestedKept.length > (prompt.maxKeep ?? 1)) {
+    return "Too many cards were selected";
+  }
+  if (
+    kept.size + ordered.size !== revealed.size ||
+    revealedIds.some((id) => !kept.has(id) && !ordered.has(id))
+  ) {
+    return "Arrangement must include every revealed card exactly once";
+  }
+
+  return null;
+}
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import {
   advancePregame,
@@ -396,6 +449,7 @@ export class GameSession implements DurableObject {
       if (playerWs) {
         this.send(playerWs, {
           type: "game:prompt",
+          promptId: this.gameState!.pendingPrompt.promptId,
           options: this.gameState!.pendingPrompt.options,
         });
       }
@@ -674,6 +728,22 @@ export class GameSession implements DurableObject {
             message: `Expected a ${promptType} response`,
           });
           return;
+        }
+
+        if (prompt.promptId && promptResponseId(action) !== prompt.promptId) {
+          this.send(ws, {
+            type: "game:error",
+            message: "That prompt response is stale",
+          });
+          return;
+        }
+
+        if (promptType === "ARRANGE_TOP_CARDS" && action.type === "ARRANGE_TOP_CARDS") {
+          const arrangeError = validateArrangeResponse(prompt.options, action);
+          if (arrangeError) {
+            this.send(ws, { type: "game:error", message: arrangeError });
+            return;
+          }
         }
 
         if (promptType === "PLAYER_CHOICE" && action.type === "PLAYER_CHOICE") {
@@ -977,6 +1047,7 @@ export class GameSession implements DurableObject {
     if (playerWs) {
       this.send(playerWs, {
         type: "game:prompt",
+        promptId: prompt.promptId,
         options: prompt.options,
       });
     }
@@ -1166,6 +1237,15 @@ export class GameSession implements DurableObject {
 
   private async persist(): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
+    if (this.gameState.pendingPrompt && !this.gameState.pendingPrompt.promptId) {
+      this.gameState = {
+        ...this.gameState,
+        pendingPrompt: {
+          ...this.gameState.pendingPrompt,
+          promptId: crypto.randomUUID(),
+        },
+      };
+    }
     const stored: StoredSession = {
       state: this.gameState,
       cardDb: Object.fromEntries(this.cardDb),

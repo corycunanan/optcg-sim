@@ -568,14 +568,15 @@ export const OP05_016_MORLEY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { multicolored: true },
-      },
       actions: [
         {
           type: "PLAY_SELF",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { multicolored: true },
+          },
         },
       ],
       flags: { optional: true },
@@ -622,14 +623,15 @@ export const OP05_017_LINDBERGH: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { multicolored: true },
-      },
       actions: [
         {
           type: "PLAY_SELF",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { multicolored: true },
+          },
         },
       ],
       flags: { optional: true },
@@ -2271,15 +2273,16 @@ export const OP05_060_MONKEY_D_LUFFY: EffectSchema = {
       costs: [
         { type: "LIFE_TO_HAND", amount: 1, position: "TOP" },
       ],
-      conditions: {
-        any_of: [
-          { type: "DON_FIELD_COUNT", controller: "SELF", operator: "==", value: 0 },
-          { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 3 },
-        ],
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            any_of: [
+              { type: "DON_FIELD_COUNT", controller: "SELF", operator: "==", value: 0 },
+              { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 3 },
+            ],
+          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],

@@ -29,6 +29,7 @@ import {
   trashStage,
 } from "./card-mutations.js";
 import { costResultToEntries } from "./types.js";
+import { applyFieldDonReturn } from "./actions/don.js";
 import { isProhibitedForCard } from "../prohibitions.js";
 import { matchesFilter } from "../conditions.js";
 
@@ -61,43 +62,71 @@ export function payCosts(
         const amount = typeof cost.amount === "number" ? cost.amount : 0;
         const player = nextState.players[controller];
         const activeOnly = cost.filter?.is_active === true || cost.filter?.state === "ACTIVE";
-        // Collect DON!! from cost area + attached, unless a card requires active
-        // DON!! specifically. Attached DON!! is not active/rested cost-area DON.
-        const allFieldDon = activeOnly
-          ? player.donCostArea.filter((d) => d.state === "ACTIVE")
-          : [
-              ...player.donCostArea,
-              ...player.leader.attachedDon,
-              ...player.characters.filter(Boolean).flatMap((c) => c!.attachedDon),
-            ];
-        if (allFieldDon.length < amount) return null;
 
-        // Return DON!! to DON!! deck — prefer cost area DON!! first
-        let returned = 0;
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        let p = { ...player };
-
-        // Take from cost area first
-        const costAreaCandidates = activeOnly
-          ? p.donCostArea.filter((d) => d.state === "ACTIVE")
-          : p.donCostArea;
-        const fromCostArea = Math.min(amount, costAreaCandidates.length);
-        if (fromCostArea > 0) {
-          const toReturn = costAreaCandidates.slice(0, fromCostArea);
+        if (activeOnly) {
+          // A card requiring active DON!! specifically pays from the cost
+          // area only — attached DON!! is not active/rested cost-area DON.
+          const candidates = player.donCostArea.filter((d) => d.state === "ACTIVE");
+          if (candidates.length < amount) return null;
+          const toReturn = candidates.slice(0, amount);
           const toReturnIds = new Set(toReturn.map((d) => d.instanceId));
-          p = {
-            ...p,
-            donCostArea: p.donCostArea.filter((d) => !toReturnIds.has(d.instanceId)),
-            donDeck: [...p.donDeck, ...toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }))],
+          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+          newPlayers[controller] = {
+            ...player,
+            donCostArea: player.donCostArea.filter((d) => !toReturnIds.has(d.instanceId)),
+            donDeck: [...player.donDeck, ...toReturn.map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: null }))],
           };
-          returned += fromCostArea;
+          nextState = { ...nextState, players: newPlayers };
+          events.push({ type: "DON_DETACHED", playerIndex: controller, payload: { count: amount } });
+          break;
         }
-        // If still need more, take from attached DON!! (not implemented for simplicity)
-        if (returned < amount) return null;
 
-        newPlayers[controller] = p;
-        nextState = { ...nextState, players: newPlayers };
-        events.push({ type: "DON_DETACHED", playerIndex: controller, payload: { count: amount } });
+        // OPT-440: DON!! −X pays from the whole field — cost area + DON!!
+        // attached to the Leader and Characters (Comprehensive Rules 8-3-1-6 /
+        // 10-2-10-1) — matching exactly what isCostPayable predicts. Before
+        // this, payCosts could only take cost-area DON!!, so an offered
+        // DON!!−X [Trigger] trashed the life card and then fizzled on the cost.
+        //
+        // Deterministic auto-pick: cost area first (array order, the
+        // historical preference), then attached DON!! — Leader first, then
+        // Characters in field order. The rules let the player select any
+        // field DON!!, and which card loses its +1000 buff can matter;
+        // prompting through the cost path (as FORCE_OPPONENT_DON_RETURN does
+        // in actions/don.ts) is deferred because the trigger-reveal cost path
+        // resolves synchronously. Documented in the OPT-440 tests.
+        const attachedSources = [
+          ...(player.leader.attachedDon.length > 0
+            ? [{ cardInstanceId: player.leader.instanceId, cap: player.leader.attachedDon.length }]
+            : []),
+          ...player.characters.flatMap((c) =>
+            c && c.attachedDon.length > 0
+              ? [{ cardInstanceId: c.instanceId, cap: c.attachedDon.length }]
+              : [],
+          ),
+        ];
+        const attachedTotal = attachedSources.reduce((s, a) => s + a.cap, 0);
+        if (player.donCostArea.length + attachedTotal < amount) return null;
+
+        const fromCostArea = Math.min(amount, player.donCostArea.length);
+        // applyFieldDonReturn removes actives-first then resteds by count;
+        // deriving the counts from the array-order prefix keeps the removed
+        // set identical to the historical slice(0, fromCostArea) behavior.
+        const prefix = player.donCostArea.slice(0, fromCostArea);
+        const costActive = prefix.filter((d) => d.state === "ACTIVE").length;
+        const costRested = fromCostArea - costActive;
+
+        let shortfall = amount - fromCostArea;
+        const attached: { cardInstanceId: string; count: number }[] = [];
+        for (const source of attachedSources) {
+          if (shortfall <= 0) break;
+          const take = Math.min(source.cap, shortfall);
+          attached.push({ cardInstanceId: source.cardInstanceId, count: take });
+          shortfall -= take;
+        }
+
+        const applied = applyFieldDonReturn(nextState, controller, { costActive, costRested, attached });
+        nextState = applied.state;
+        events.push(...applied.events);
         break;
       }
 

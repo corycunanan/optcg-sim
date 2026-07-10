@@ -97,6 +97,15 @@ export function runPipeline(
     return finishPipeline(nextState, actingPlayerIndex, cardDb);
   }
 
+  // OPT-443: snapshot the acted card's printed properties BEFORE execution —
+  // Events move to trash (with a new instanceId) during execute, so this is
+  // the only reliable point to capture what card the action was about.
+  // recordAction (end of step 5) attaches the snapshot so
+  // ACTION_PERFORMED_THIS_TURN conditions can scope by controller, card
+  // category, and base cost (OP15-002 "activated an Event with a base cost
+  // of 3 or more").
+  const actedCard = snapshotActedCard(nextState, actionToExecute, cardDb, actingPlayerIndex);
+
   // Step 4: Execute — produce new state snapshot
   log("pipeline.step", { ...logCtx, step: "execute" });
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
@@ -115,7 +124,7 @@ export function runPipeline(
 
   // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
   log("pipeline.step", { ...logCtx, step: "triggers" });
-  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb);
+  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard);
 
   // If triggers paused for player input, skip steps 6-7 and surface the prompt
   if (nextState.pendingPrompt) {
@@ -150,6 +159,7 @@ function fireEventsAndTriggers(
   execResult: ExecuteResult,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  actedCard?: ActedCardSnapshot,
   recordPerformedAction = true,
 ): GameState {
   const pi = state.turn.activePlayerIndex;
@@ -224,7 +234,7 @@ function fireEventsAndTriggers(
     if (result.pendingPrompt) {
       state = recalculateBattlePowers(state, cardDb);
       state = { ...state, pendingPrompt: result.pendingPrompt };
-      if (recordPerformedAction) state = recordAction(state, action);
+      if (recordPerformedAction) state = recordAction(state, action, actedCard);
       return state;
     }
 
@@ -232,7 +242,7 @@ function fireEventsAndTriggers(
   }
 
   // Record the action performed
-  if (recordPerformedAction) state = recordAction(state, action);
+  if (recordPerformedAction) state = recordAction(state, action, actedCard);
   return state;
 }
 
@@ -254,6 +264,7 @@ export function continuePipelineFromExecution(
     execResult,
     continuationAction,
     cardDb,
+    undefined,
     false,
   );
 
@@ -320,14 +331,76 @@ function processTriggerQueuePipeline(
   return { state: nextState };
 }
 
-function recordAction(state: GameState, action: GameAction): GameState {
+/**
+ * Printed-property snapshot of the card a PLAY_CARD / USE_COUNTER_EVENT /
+ * DECLARE_BLOCKER action acted on (OPT-443). Captured pre-execute in
+ * runPipeline; attached to the recorded PerformedAction entry so
+ * ACTION_PERFORMED_THIS_TURN conditions can scope by controller, card
+ * category, and base cost.
+ */
+interface ActedCardSnapshot {
+  /**
+   * Who performed the action. GameSession authenticates this actor before
+   * entering the pipeline, so this remains correct for both active-player
+   * actions and defending-player counter/blocker actions.
+   */
+  controller: 0 | 1;
+  cardId: string;
+  cardType: string;
+  baseCost: number;
+}
+
+/**
+ * Resolve the card an action acts on, before execution moves it.
+ * Returns undefined for action types whose performed-action entries
+ * don't need card scoping.
+ */
+function snapshotActedCard(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): ActedCardSnapshot | undefined {
+  let instanceId: string;
+  if (action.type === "PLAY_CARD") {
+    instanceId = action.cardInstanceId;
+  } else if (action.type === "USE_COUNTER_EVENT") {
+    instanceId = action.cardInstanceId;
+  } else if (action.type === "DECLARE_BLOCKER") {
+    instanceId = action.blockerInstanceId;
+  } else {
+    return undefined;
+  }
+  const card = findCardInstance(state, instanceId);
+  const data = card && cardDb.get(card.cardId);
+  if (!data) return undefined;
+  return {
+    controller: actingPlayerIndex,
+    cardId: card.cardId,
+    cardType: (data.type ?? "").toUpperCase(),
+    baseCost: data.cost ?? 0,
+  };
+}
+
+function recordAction(
+  state: GameState,
+  action: GameAction,
+  actedCard?: ActedCardSnapshot,
+): GameState {
   return {
     ...state,
     turn: {
       ...state.turn,
       actionsPerformedThisTurn: [
         ...state.turn.actionsPerformedThisTurn,
-        { actionType: action.type, timestamp: Date.now() },
+        {
+          actionType: action.type,
+          timestamp: Date.now(),
+          // OPT-443: card-acting actions carry who acted and a printed-property
+          // snapshot so ACTIVATED_EVENT / PLAYED_CHARACTER / USED_BLOCKER
+          // conditions can scope by controller, category, and base cost.
+          ...(actedCard ?? {}),
+        },
       ],
     },
   };
