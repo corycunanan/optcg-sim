@@ -80,6 +80,19 @@ function evaluateSimple(
         cond.value,
       );
 
+    case "CHARACTER_TOTAL_COST": {
+      // OPT-444: unqualified "cost" reads the effective (post-modifier) cost,
+      // consistent with cost_* target filters (OPT-247).
+      const p = getPlayerByController(state, cond.controller, ctx.controller);
+      const total = p.characters.reduce((sum, c) => {
+        if (!c) return sum;
+        const data = ctx.cardDb.get(c.cardId);
+        if (!data) return sum;
+        return sum + getEffectiveCost(data, state, c.instanceId, ctx.cardDb);
+      }, 0);
+      return compareNum(total, cond.operator, cond.value);
+    }
+
     case "TRASH_COUNT": {
       // OPT-257 (F4): exclude trigger-staging instances from trash count —
       // a card mid-Trigger-resolution is not yet "in trash" for queries.
