@@ -71,8 +71,15 @@ function finishCostsAndRunActions(
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
   }
 
-  const hasRefs = [...costRefs.values()].some((v) => v.count > 0);
-  const costRefsForActions = hasRefs ? costRefs : undefined;
+  // Cost prompts preserve the frame's seeded references (notably the exact
+  // card that triggered an [On K.O.] effect) separately from cost result
+  // references. Recombine both before starting the action chain so paying a
+  // selectable cost cannot erase trigger identity.
+  const actionRefs = new Map<string, EffectResult>(
+    topFrame.resultRefs.map(([key, value]) => [key, value as EffectResult]),
+  );
+  for (const [key, value] of costRefs) actionRefs.set(key, value);
+  const refsForActions = actionRefs.size > 0 ? actionRefs : undefined;
 
   // OPT-437: the post-colon "If" gate — costs are fully paid at this point
   // and the chain is about to start; when false, skip every action (the paid
@@ -88,7 +95,7 @@ function finishCostsAndRunActions(
       sourceCardInstanceId,
       controller,
       cardDb,
-      costRefsForActions,
+      refsForActions,
     );
     state = chainResult.state;
     events.push(...chainResult.events);

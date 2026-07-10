@@ -881,7 +881,11 @@ export type TargetType =
   | "PLAYER"
   | "SELECTED_CARDS"
   | "OPPONENT_LIFE"
-  | "TRIGGERING_CARD";
+  | "TRIGGERING_CARD"
+  // OPT-432: the triggering card resolved in the TRASH — "play this Character
+  // card from your trash" targets the exact source instance; empty (the play
+  // is skipped, Rule 1-3-2) when that instance is no longer in the trash.
+  | "TRIGGERING_CARD_IN_TRASH";
 
 /**
  * Well-known result_ref key holding the card that triggered the currently

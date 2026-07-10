@@ -273,7 +273,10 @@ export function handleAwaitingOptionalResponse(
       const newTop = peekFrame(nextState) as EffectStackFrame;
       if (newTop && newTop.id !== topFrame.id) {
         nextState = popFrameById(nextState, topFrame.id);
-        nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+        nextState = updateTopFrame(nextState, {
+          pendingTriggers: topFrame.pendingTriggers,
+          resultRefs: topFrame.resultRefs,
+        });
       }
       return { state: nextState, events, resolved: false, pendingPrompt: costResult.pendingPrompt };
     }
@@ -292,13 +295,17 @@ export function handleAwaitingOptionalResponse(
   }
 
   if (topFrame.remainingActions.length > 0) {
+    const actionRefs = new Map<string, EffectResult>(
+      topFrame.resultRefs.map(([key, value]) => [key, value as EffectResult]),
+    );
+    for (const [key, value] of costRefs ?? []) actionRefs.set(key, value);
     const chainResult = executeActionChain(
       nextState,
       topFrame.remainingActions as Action[],
       sourceCardInstanceId,
       controller,
       cardDb,
-      costRefs,
+      actionRefs.size > 0 ? actionRefs : undefined,
     );
     nextState = chainResult.state;
     events.push(...chainResult.events);

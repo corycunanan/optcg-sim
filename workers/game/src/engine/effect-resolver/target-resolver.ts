@@ -438,6 +438,14 @@ export function computeAllValidTargets(
         return card && (card.zone === "CHARACTER" || card.zone === "LEADER" || card.zone === "STAGE");
       });
     }
+    case "TRIGGERING_CARD_IN_TRASH": {
+      // OPT-432: "play this Character card from your trash" — the exact
+      // triggering instance, only while it is still in the trash. If a cost
+      // consumed it (or it moved anywhere else), the play fizzles per Rule
+      // 1-3-2; another copy is never substituted.
+      const ids = _resultRefs.get(TRIGGERING_CARD_REF)?.targetInstanceIds ?? [];
+      return ids.filter((id) => findCardInstance(state, id)?.zone === "TRASH");
+    }
     default: return [];
   }
 }

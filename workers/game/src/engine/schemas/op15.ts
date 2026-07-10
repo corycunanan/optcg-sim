@@ -3293,11 +3293,13 @@ export const OP15_080_OARS: EffectSchema = {
       actions: [
         {
           type: "PLAY_CARD",
+          // OPT-432: "Play this Character card from your trash" — the exact
+          // K.O.'d instance, never another copy by name. Fizzles (Rule 1-3-2)
+          // if the cost consumed the source or it left the trash.
           target: {
-            type: "CARD_IN_TRASH",
+            type: "TRIGGERING_CARD_IN_TRASH",
             controller: "SELF",
             count: { exact: 1 },
-            filter: { name: "Oars" },
           },
           params: { source_zone: "TRASH", cost_override: "FREE" },
         },

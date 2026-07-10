@@ -462,7 +462,7 @@ export function payCosts(
         // and the first matching trash cards to the deck in default order.
         if (!sourceCardInstanceId) return null;
         const amt = typeof cost.amount === "number" ? cost.amount : 1;
-        const candidates = computeCostTargets(nextState, cost, controller, _cardDb);
+        const candidates = computeCostTargets(nextState, cost, controller, _cardDb, sourceCardInstanceId);
         if (candidates.length < amt) return null;
         const p = nextState.players[controller];
         if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
@@ -572,7 +572,7 @@ export function isCostPayable(
     const onField = state.players[controller].characters
       .some((c) => c?.instanceId === sourceCardInstanceId);
     if (!onField) return false;
-    const targets = computeCostTargets(state, cost, controller, cardDb);
+    const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
     return targets.length >= resolveAmount(cost as SimpleCost);
   }
 
@@ -580,7 +580,7 @@ export function isCostPayable(
     if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
       return state.players[controller].life.length > 0;
     }
-    const targets = computeCostTargets(state, cost, controller, cardDb);
+    const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
     const amt = cost.type === "REST_CARDS" && (cost as SimpleCost).amount === "ANY_NUMBER"
       ? 1
       : resolveAmount(cost as SimpleCost);
@@ -866,7 +866,7 @@ export function payCostsWithSelection(
     let autoPayTrashToDeck = false;
     if (cost.type === "PLACE_FROM_TRASH_TO_DECK") {
       const amount = resolveAmount(cost as SimpleCost);
-      const validTargets = computeCostTargets(nextState, cost, controller, cardDb);
+      const validTargets = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
       if (validTargets.length < amount) {
         return { state: nextState, events, cannotPay: true };
       }
@@ -968,7 +968,7 @@ export function payCostsWithSelection(
       if (!sourceOnField) {
         return { state: nextState, events, cannotPay: true };
       }
-      const trashCandidates = computeCostTargets(nextState, cost, controller, cardDb);
+      const trashCandidates = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
       if (trashCandidates.length < amount) {
         return { state: nextState, events, cannotPay: true };
       }
@@ -1101,7 +1101,7 @@ export function payCostsWithSelection(
       }
 
       // Build valid targets for this cost
-      const validTargets = computeCostTargets(nextState, cost, controller, cardDb);
+      const validTargets = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
       const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
 
       if (validTargets.length < amount) {
@@ -1219,8 +1219,18 @@ export function computeCostTargets(
   cost: Cost,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
 ): string[] {
   const player = state.players[controller];
+
+  // OPT-432: honor filter.exclude_self on cost candidates — printed costs
+  // like OP05-056's "1 of your Characters other than this Character" must
+  // never offer the effect's source. matchesFilter cannot enforce this on
+  // the cost path (it never receives the source), so it is applied here.
+  const dropSelf = (ids: string[]): string[] =>
+    (cost as SimpleCost).filter?.exclude_self && sourceCardInstanceId
+      ? ids.filter((id) => id !== sourceCardInstanceId)
+      : ids;
 
   switch (cost.type) {
     case "TRASH_FROM_HAND":
@@ -1232,7 +1242,7 @@ export function computeCostTargets(
           matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),
         );
       }
-      return candidates.map((c) => c.instanceId);
+      return dropSelf(candidates.map((c) => c.instanceId));
     }
 
     case "KO_OWN_CHARACTER":
@@ -1245,7 +1255,7 @@ export function computeCostTargets(
           matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),
         );
       }
-      return candidates.map((c) => c.instanceId);
+      return dropSelf(candidates.map((c) => c.instanceId));
     }
 
     case "TRASH_FROM_LIFE": {
@@ -1262,7 +1272,7 @@ export function computeCostTargets(
           matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),
         );
       }
-      return candidates.map((c) => c.instanceId);
+      return dropSelf(candidates.map((c) => c.instanceId));
     }
 
     case "REST_CARDS": {
