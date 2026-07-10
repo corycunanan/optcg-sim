@@ -63,6 +63,15 @@ function placeArrangedInDeck(
     : [...arrangedCards, ...restOfDeck];
 }
 
+function resolveRestDestination(
+  schemaDestination: string,
+  requestedDestination: "top" | "bottom",
+): "top" | "bottom" {
+  const normalized = schemaDestination.toUpperCase();
+  if (normalized === "TOP_OR_BOTTOM") return requestedDestination;
+  return normalized === "TOP" ? "top" : "bottom";
+}
+
 // ─── Branch handlers ────────────────────────────────────────────────────────
 
 export function handleArrangeSearchDeck(
@@ -84,9 +93,9 @@ export function handleArrangeSearchDeck(
   const keptId = action.keptCardInstanceId;
   const ordered = action.orderedInstanceIds ?? [];
 
-  // Validate kept card is in validTargets (if filter was applied)
+  // An explicit empty validTargets means the search matched nothing.
   const searchValid = validTargets ?? [];
-  const validatedKeptId = keptId && (searchValid.length === 0 || searchValid.includes(keptId))
+  const validatedKeptId = keptId && searchValid.includes(keptId)
     ? keptId
     : undefined;
 
@@ -107,7 +116,7 @@ export function handleArrangeSearchDeck(
     }
   }
 
-  const destination = action.destination ?? restDest.toLowerCase();
+  const destination = resolveRestDestination(restDest, action.destination);
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
 
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
@@ -120,6 +129,7 @@ export function handleArrangeSearchTrashTheRest(
   action: GameAction,
   pausedAction: Action | null,
   controller: 0 | 1,
+  validTargets: string[] | undefined,
   events: PendingEvent[],
 ): GameState | null {
   if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "SEARCH_TRASH_THE_REST") {
@@ -132,11 +142,19 @@ export function handleArrangeSearchTrashTheRest(
   const p = state.players[controller];
   const keptId = action.keptCardInstanceId;
   const ordered = action.orderedInstanceIds ?? [];
+  const searchValid = validTargets ?? [];
+  const validatedKeptId = keptId && searchValid.includes(keptId)
+    ? keptId
+    : undefined;
 
-  const { restOfDeck, arrangedCards: remainingCards, kept } = computeArrangeContext(p.deck, keptId, ordered);
+  const { restOfDeck, arrangedCards: remainingCards, kept } = computeArrangeContext(
+    p.deck,
+    validatedKeptId,
+    ordered,
+  );
 
   let newHand = [...p.hand];
-  if (keptId && kept) {
+  if (validatedKeptId && kept) {
     newHand = [...newHand, { ...kept, zone: "HAND" as const }];
     events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
   }
@@ -153,7 +171,7 @@ export function handleArrangeSearchTrashTheRest(
     }
   } else {
     // Place at bottom (or top) like SEARCH_DECK
-    const destination = action.destination ?? restDest.toLowerCase();
+    const destination = resolveRestDestination(restDest, action.destination);
     newDeck = placeArrangedInDeck(restOfDeck, remainingCards, destination);
     newTrash = p.trash;
   }
@@ -192,7 +210,7 @@ export function handleArrangeSearchAndPlay(
     : (action.keptCardInstanceId ? [action.keptCardInstanceId] : []);
   const searchValid = validTargets ?? [];
   const keptIds = [...new Set(requestedKept)]
-    .filter((id) => searchValid.length === 0 || searchValid.includes(id))
+    .filter((id) => searchValid.includes(id))
     .slice(0, pickLimit);
   const ordered = (action.orderedInstanceIds ?? []).filter((id) => !keptIds.includes(id));
 
@@ -264,7 +282,7 @@ export function handleArrangeSearchAndPlay(
     // cards must rejoin the deck here or they vanish from the game.
     newDeck = [...restOfDeck, ...arrangedCards, ...unplayable];
   } else {
-    const destination = action.destination ?? restDest.toLowerCase();
+    const destination = resolveRestDestination(restDest, action.destination);
     newDeck = placeArrangedInDeck(restOfDeck, [...arrangedCards, ...unplayable], destination);
   }
 

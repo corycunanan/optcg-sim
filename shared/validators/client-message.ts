@@ -7,6 +7,7 @@
 import { z } from "zod";
 
 const id = () => z.string().min(1);
+const promptId = { promptId: id().optional() };
 
 const AdvancePhase = z.object({ type: z.literal("ADVANCE_PHASE") }).strict();
 
@@ -69,6 +70,7 @@ const RevealTrigger = z
   .object({
     type: z.literal("REVEAL_TRIGGER"),
     reveal: z.boolean(),
+    ...promptId,
   })
   .strict();
 
@@ -84,6 +86,7 @@ const ArrangeTopCards = z
     keptCardInstanceIds: z.array(id()).optional(),
     orderedInstanceIds: z.array(id()),
     destination: z.enum(["top", "bottom"]),
+    ...promptId,
   })
   .strict();
 
@@ -91,6 +94,7 @@ const SelectTarget = z
   .object({
     type: z.literal("SELECT_TARGET"),
     selectedInstanceIds: z.array(id()),
+    ...promptId,
   })
   .strict();
 
@@ -105,7 +109,8 @@ const RedistributeDon = z
           toCardInstanceId: id(),
         })
         .strict(),
-    ),
+      ),
+    ...promptId,
   })
   .strict();
 
@@ -113,10 +118,11 @@ const PlayerChoice = z
   .object({
     type: z.literal("PLAYER_CHOICE"),
     choiceId: id(),
+    ...promptId,
   })
   .strict();
 
-const Pass = z.object({ type: z.literal("PASS") }).strict();
+const Pass = z.object({ type: z.literal("PASS"), ...promptId }).strict();
 const Concede = z.object({ type: z.literal("CONCEDE") }).strict();
 
 const ManualEffect = z

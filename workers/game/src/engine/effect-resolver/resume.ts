@@ -87,7 +87,14 @@ export function resumeEffectChain(
   const deckSearch = handleArrangeSearchDeck(nextState, action, pausedAction, controller, validTargets, events);
   if (deckSearch) nextState = deckSearch;
 
-  const deckTrashRest = handleArrangeSearchTrashTheRest(nextState, action, pausedAction, controller, events);
+  const deckTrashRest = handleArrangeSearchTrashTheRest(
+    nextState,
+    action,
+    pausedAction,
+    controller,
+    validTargets,
+    events,
+  );
   if (deckTrashRest) nextState = deckTrashRest;
 
   const deckAndPlay = handleArrangeSearchAndPlay(nextState, action, pausedAction, controller, cardDb, events, validTargets);

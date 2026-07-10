@@ -352,6 +352,8 @@ export interface QueuedTrigger {
 // ─── Pending Prompt State ─────────────────────────────────────────────────────
 
 export interface PendingPromptState {
+  /** Server-generated identity for this exact prompt instance. */
+  promptId?: string;
   options: PromptOptions;
   respondingPlayer: 0 | 1;
   resumeContext: unknown; // cast to ResumeContext in worker
@@ -459,9 +461,9 @@ export type GameAction =
   | { type: "DECLARE_BLOCKER"; blockerInstanceId: string }
   | { type: "USE_COUNTER"; cardInstanceId: string; counterTargetInstanceId: string }
   | { type: "USE_COUNTER_EVENT"; cardInstanceId: string; counterTargetInstanceId: string }
-  | { type: "REVEAL_TRIGGER"; reveal: boolean }  // true = reveal and activate, false = add to hand
-  | { type: "ARRANGE_TOP_CARDS"; keptCardInstanceId: string; keptCardInstanceIds?: string[]; orderedInstanceIds: string[]; destination: "top" | "bottom" }
-  | { type: "SELECT_TARGET"; selectedInstanceIds: string[] }
+  | { type: "REVEAL_TRIGGER"; reveal: boolean; promptId?: string }  // true = reveal and activate, false = add to hand
+  | { type: "ARRANGE_TOP_CARDS"; keptCardInstanceId: string; keptCardInstanceIds?: string[]; orderedInstanceIds: string[]; destination: "top" | "bottom"; promptId?: string }
+  | { type: "SELECT_TARGET"; selectedInstanceIds: string[]; promptId?: string }
   | {
       type: "REDISTRIBUTE_DON";
       transfers: Array<{
@@ -469,9 +471,10 @@ export type GameAction =
         donInstanceId: string;
         toCardInstanceId: string;
       }>;
+      promptId?: string;
     }
-  | { type: "PLAYER_CHOICE"; choiceId: string }
-  | { type: "PASS" }
+  | { type: "PLAYER_CHOICE"; choiceId: string; promptId?: string }
+  | { type: "PASS"; promptId?: string }
   | { type: "CONCEDE" }
   | { type: "MANUAL_EFFECT"; description: string }
   | { type: "UNDO" };
@@ -482,7 +485,7 @@ export type GameAction =
 export type ServerMessage =
   | { type: "game:state"; state: GameState; canUndo?: boolean }
   | { type: "game:update"; action: GameAction; state: GameState; canUndo?: boolean }
-  | { type: "game:prompt"; options: PromptOptions }
+  | { type: "game:prompt"; promptId?: string; options: PromptOptions }
   | { type: "game:error"; message: string }
   | { type: "game:over"; winner: 0 | 1 | null; reason: string }
   | { type: "game:player_disconnected"; playerIndex: 0 | 1 }

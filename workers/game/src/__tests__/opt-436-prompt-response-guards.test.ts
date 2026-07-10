@@ -180,12 +180,104 @@ describe("OPT-436: response type must match the pending prompt", () => {
       keptCardInstanceId: "",
       orderedInstanceIds: ["trash-a", "trash-c"],
       destination: "bottom",
+      promptId: session.gameState.pendingPrompt?.promptId,
     } as GameAction);
     expect(session.gameState.pendingPrompt).toBeFalsy();
     expect(session.gameState.effectStack.length).toBe(0);
     const deck = session.gameState.players[0].deck;
     expect(deck.slice(-2).map((c) => c.instanceId)).toEqual(["trash-a", "trash-c"]);
   });
+});
+
+describe("OPT-438: prompt identity and ARRANGE payload validation", () => {
+  it("rejects a stale same-type response without consuming the current prompt", async () => {
+    const { session, ws } = sessionWithSelectPrompt();
+    session.gameState = {
+      ...session.gameState,
+      pendingPrompt: {
+        ...session.gameState.pendingPrompt!,
+        promptId: "current-prompt",
+      },
+    };
+    const stateBefore = session.gameState;
+
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["trash-c", "trash-a"],
+      promptId: "previous-prompt",
+    });
+
+    expect(lastError(ws)).toMatch(/stale/);
+    expect(session.gameState).toBe(stateBefore);
+    expect(session.gameState.pendingPrompt?.promptId).toBe("current-prompt");
+  });
+
+  it("accepts the matching identity and stamps the next prompt with a new identity", async () => {
+    const { session, ws } = sessionWithSelectPrompt();
+    session.gameState = {
+      ...session.gameState,
+      pendingPrompt: {
+        ...session.gameState.pendingPrompt!,
+        promptId: "select-prompt",
+      },
+    };
+
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["trash-c", "trash-a"],
+      promptId: "select-prompt",
+    });
+
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    expect(session.gameState.pendingPrompt?.promptId).toBeTruthy();
+    expect(session.gameState.pendingPrompt?.promptId).not.toBe("select-prompt");
+  });
+
+  it.each([
+    {
+      name: "an unrevealed card",
+      keptCardInstanceId: "",
+      orderedInstanceIds: ["trash-a", "forged-id"],
+    },
+    {
+      name: "a duplicate card",
+      keptCardInstanceId: "",
+      orderedInstanceIds: ["trash-a", "trash-a"],
+    },
+    {
+      name: "an omitted card",
+      keptCardInstanceId: "",
+      orderedInstanceIds: ["trash-a"],
+    },
+    {
+      name: "a kept card when validTargets is empty",
+      keptCardInstanceId: "trash-a",
+      orderedInstanceIds: ["trash-c"],
+    },
+  ])(
+    "rejects $name and preserves the ARRANGE prompt",
+    async ({ keptCardInstanceId, orderedInstanceIds }) => {
+      const { session, ws } = sessionWithSelectPrompt();
+      await session.handleAction(ws as unknown as WebSocket, 0, {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: ["trash-c", "trash-a"],
+      });
+      const promptBefore = session.gameState.pendingPrompt!;
+      const stackBefore = session.gameState.effectStack;
+
+      await session.handleAction(ws as unknown as WebSocket, 0, {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId,
+        orderedInstanceIds,
+        destination: "top",
+        promptId: promptBefore.promptId,
+      });
+
+      expect(lastError(ws)).toBeTruthy();
+      expect(session.gameState.pendingPrompt).toBe(promptBefore);
+      expect(session.gameState.effectStack).toBe(stackBefore);
+    },
+  );
 });
 
 // ─── Guard 2: restore the prompt on resolver rejection ───────────────────────
