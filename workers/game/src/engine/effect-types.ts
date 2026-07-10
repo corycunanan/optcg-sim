@@ -209,6 +209,7 @@ export type Condition =
 
 export type SimpleCondition =
   | LifeCountCondition
+  | CharacterTotalCostCondition
   | HandCountCondition
   | TrashCountCondition
   | DeckCountCondition
@@ -244,6 +245,18 @@ export type SimpleCondition =
 
 export interface LifeCountCondition {
   type: "LIFE_COUNT";
+  controller: Controller;
+  operator: NumericOperator;
+  value: number;
+}
+
+/**
+ * OPT-444: sum of the controller's on-field Characters' costs (effective,
+ * post-modifier — unqualified "cost" per the OPT-247 convention).
+ * OP10-022 Law: "If the total cost of your Characters is 5 or more".
+ */
+export interface CharacterTotalCostCondition {
+  type: "CHARACTER_TOTAL_COST";
   controller: Controller;
   operator: NumericOperator;
   value: number;
