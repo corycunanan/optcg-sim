@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   GameState,
   GameAction,
@@ -13,6 +13,15 @@ import {
 } from "@/hooks/use-authed-websocket";
 
 export type { ConnectionStatus };
+
+const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
+  "ARRANGE_TOP_CARDS",
+  "PLAYER_CHOICE",
+  "REDISTRIBUTE_DON",
+  "REVEAL_TRIGGER",
+  "SELECT_TARGET",
+  "PASS",
+]);
 
 /**
  * useGameWs — manages the WebSocket connection to the Cloudflare game DO.
@@ -34,6 +43,7 @@ export function useGameWs(
   } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [gameError, setGameError] = useState<string | null>(null);
+  const activePromptIdRef = useRef<string | null>(null);
 
   const url = useMemo(
     () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
@@ -47,6 +57,9 @@ export function useGameWs(
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
+          activePromptIdRef.current = msg.state.pendingPrompt.promptId ?? null;
+        } else {
+          activePromptIdRef.current = null;
         }
         if (msg.state.status !== "IN_PROGRESS") {
           setGameOver({
@@ -60,8 +73,10 @@ export function useGameWs(
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
+          activePromptIdRef.current = msg.state.pendingPrompt.promptId ?? null;
         } else {
           setActivePrompt(null);
+          activePromptIdRef.current = null;
         }
         if (msg.state.status !== "IN_PROGRESS") {
           setGameOver({
@@ -75,6 +90,7 @@ export function useGameWs(
         break;
       case "game:prompt":
         setActivePrompt(msg.options);
+        activePromptIdRef.current = msg.promptId ?? null;
         break;
       case "game:error":
         setGameError(msg.message);
@@ -103,7 +119,12 @@ export function useGameWs(
 
   const sendAction = useCallback(
     (action: GameAction) => {
-      send({ type: "game:action", action });
+      const promptId = activePromptIdRef.current;
+      const identifiedAction =
+        promptId && PROMPT_RESPONSE_TYPES.has(action.type)
+          ? { ...action, promptId }
+          : action;
+      send({ type: "game:action", action: identifiedAction });
       // Mirror the original setLastError(null) on send: clear any stale game
       // error so the user sees the freshest state. Transport errors are
       // managed by useAuthedWebSocket and will repopulate if send failed.
