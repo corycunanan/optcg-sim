@@ -781,11 +781,13 @@ export const OP10_022_TRAFALGAR_LAW: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN", don_requirement: 1 },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
+      // OPT-444: "If the total cost of your Characters is 5 or more" is a
+      // total-cost predicate, not mere character presence.
       conditions: {
-        type: "CARD_ON_FIELD",
+        type: "CHARACTER_TOTAL_COST",
         controller: "SELF",
-        filter: { card_type: "CHARACTER" },
-        count: { operator: ">=", value: 1 },
+        operator: ">=",
+        value: 5,
       },
       actions: [
         {
