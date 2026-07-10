@@ -28,11 +28,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Done | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | Merged 2026-07-10 (`b7d8ee7`, reviewed heads `46ef531`/`25b8701` + docs). CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450. |
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | In Review | [#262](https://github.com/corycunanan/optcg-sim/pull/262) | 142 blocks re-encoded onto the new `post_cost_conditions` engine gate (once-after-costs, whole-chain, Rules 8-3-1/4-10-1); lint rule C6; HAND_COUNT ComparativeMetric. Spawned OPT-456/457. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
-| 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | In Review | [#264](https://github.com/corycunanan/optcg-sim/pull/264) | Prompt-identified actions are rejected after their prompt clears; deliberate identity-free PASS remains valid. |
+| 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Done | [#264](https://github.com/corycunanan/optcg-sim/pull/264) | Merged 2026-07-10 (`65f955e`). Prompt-identified actions are rejected after their prompt clears. |
 | 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
 | 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
 | 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
-| 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | Backlog | — | Residual guard surfaces scope-frozen out of PR #260 at its review-cycle cap. |
+| 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | In Review | [#265](https://github.com/corycunanan/optcg-sim/pull/265) | Items 1–3 complete; item 4 remains deferred until OPT-451 establishes the runtime representation. |
 | 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
 | 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
@@ -149,3 +149,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** OPT-452 item 4 depends on OPT-451's permanent-prohibition representation; implement mechanical items 1–3 without inventing that runtime contract.
 - **Unresolved:** OPT-449 owns terminal-game prompt cleanup. The preserved untracked Claude/npm files remain intentionally excluded.
 - **Pointer:** PR #264; inspect `d405235` for the prompt guard and battle-step regression.
+
+### OPT-452 → OPT-456
+**From:** session on 2026-07-10 · **Commit:** `74e42ab` · **PR:** [#265](https://github.com/corycunanan/optcg-sim/pull/265)
+
+- **Primer:** Registry and linter C5 coverage now includes nested dual-target filters; linter traversal reaches action-array choices, singular nested actions, and replacement actions. Prohibition execution coverage is explicit.
+- **Read first:** the four allowlisted blocks named in OPT-456 and lint rule C6 in `workers/game/src/engine/schemas/lint-schemas.sh`; use `post_cost_conditions` for post-colon predicates.
+- **Gotchas / do NOT touch:** Keep OP16-084's `SELF_COST >= 20` pre-cost while moving only its DON predicate post-cost. OPT-452 item 4 remains owned by OPT-451's eventual representation.
+- **Unresolved:** OPT-452 item 4 only, documented on Linear; items 1–3 are complete. Preserved untracked files remain excluded.
+- **Pointer:** PR #265; inspect `74e42ab` for traversal and fixture coverage.
