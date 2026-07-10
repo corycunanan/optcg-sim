@@ -594,8 +594,27 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
         { type: "DRAW", params: { amount: 1 } },
       ],
     };
+    const promptedOnRest: EffectBlock = {
+      id: "opt439-prompted-on-rest",
+      category: "auto",
+      trigger: { event: "CHARACTER_BECOMES_RESTED" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+      flags: { optional: true },
+    };
     const first = resolveEffect(
-      { ...base, activeEffects: [replacement as never] },
+      {
+        ...base,
+        activeEffects: [replacement as never],
+        triggerRegistry: [{
+          id: "opt439-prompted-on-rest-registration",
+          sourceCardInstanceId: target.instanceId,
+          effectBlockId: promptedOnRest.id,
+          trigger: promptedOnRest.trigger,
+          effectBlock: promptedOnRest,
+          zone: "FIELD",
+          controller: 1,
+        } as never],
+      },
       block,
       base.players[0].leader.instanceId,
       0,
@@ -630,6 +649,17 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
       promptId: session.gameState.pendingPrompt?.promptId,
     });
 
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect((session.gameState.effectStack.at(-1) as unknown as {
+      replacementBatchContinuation?: unknown;
+    }).replacementBatchContinuation).toBeDefined();
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
     const preservedTarget = session.gameState.players[1].characters.find(
       (card) => card?.instanceId === target.instanceId,
     );
@@ -637,6 +667,9 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     expect(session.gameState.players[1].characters.some(
       (card) => card?.instanceId === unmatchedTarget.instanceId,
     )).toBe(false);
+    expect(session.gameState.eventLog.some(
+      (event) => event.type === "CARD_KO" && event.payload.cardInstanceId === unmatchedTarget.instanceId,
+    )).toBe(true);
     expect(session.gameState.effectStack).toHaveLength(0);
     expect(session.gameState.players[0].hand).toHaveLength(handBefore + 1);
   });

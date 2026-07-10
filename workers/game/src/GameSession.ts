@@ -34,6 +34,8 @@ type DurablePromptType = Extract<
   | "REVEAL_TRIGGER"
 >;
 
+type ResumedGameOver = { winner: 0 | 1 | null; reason: string };
+
 // OPT-436: only these action types may answer each durable prompt. Keeping
 // PASS prompt-specific prevents mandatory prompts from being skipped.
 const EXPECTED_RESPONSE_TYPES: Record<DurablePromptType, ReadonlyArray<GameAction["type"]>> = {
@@ -109,6 +111,7 @@ import {
   continueReplacementBatchAfterSubstitute,
   resumeReplacement,
   resumeReplacementBatch,
+  type BatchResumeResult,
   type ReplacementBatchResumeContext,
   type ReplacementResumeContext,
 } from "./engine/replacements.js";
@@ -951,7 +954,7 @@ export class GameSession implements DurableObject {
       if (replacementResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
       } else {
-        this.resumeInterruptedEffectContinuations(action);
+        resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
       }
     } else if (resumeCtx?.type === "REPLACEMENT_BATCH") {
       const accepted = action.type !== "PASS";
@@ -971,11 +974,13 @@ export class GameSession implements DurableObject {
         }
         this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
       } else {
-        this.recordReplacementContinuationResult(
-          batchResult.finalizedIds.length > 0,
-          batchResult.finalizedIds,
-        );
-        this.resumeInterruptedEffectContinuations(action);
+        resumedGameOver = this.finishReplacementBatchResult(
+          batchResult,
+          resumeCtx as unknown as ReplacementBatchResumeContext,
+        ) ?? resumedGameOver;
+        if (!this.gameState.pendingPrompt && !resumedGameOver) {
+          resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
+        }
       }
     } else if (this.gameState.effectStack.length > 0) {
       // Stack-based resume — use new effect stack system
@@ -984,6 +989,9 @@ export class GameSession implements DurableObject {
       this.gameState = resumeResult.state;
 
       if (resumeResult.pendingPrompt) {
+        if (resumedFrame.replacementBatchContinuation) {
+          this.attachReplacementBatchContinuation(resumedFrame.replacementBatchContinuation);
+        }
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
       } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
         // OPT-436: the handler rejected the response (stale/duplicate/invalid)
@@ -992,9 +1000,9 @@ export class GameSession implements DurableObject {
         // router may have popped while validating the response.
         this.gameState = stateBeforeResume;
       } else {
-        this.completeReplacementBatchContinuation(resumedFrame);
-        if (!this.gameState.pendingPrompt) {
-          this.resumeInterruptedEffectContinuations(action);
+        resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
+        if (!this.gameState.pendingPrompt && !resumedGameOver) {
+          resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
         }
       }
     } else {
@@ -1125,8 +1133,10 @@ export class GameSession implements DurableObject {
     };
   }
 
-  private completeReplacementBatchContinuation(frame: EffectStackFrame): void {
-    if (!this.gameState || !this.cardDb || !frame.replacementBatchContinuation) return;
+  private completeReplacementBatchContinuation(
+    frame: EffectStackFrame,
+  ): ResumedGameOver | undefined {
+    if (!this.gameState || !this.cardDb || !frame.replacementBatchContinuation) return undefined;
     const batchResult = continueReplacementBatchAfterSubstitute(
       this.gameState,
       frame.replacementBatchContinuation,
@@ -1135,33 +1145,65 @@ export class GameSession implements DurableObject {
     this.gameState = batchResult.state;
     if (batchResult.pendingPrompt) {
       this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
-      return;
+      return undefined;
     }
+    return this.finishReplacementBatchResult(
+      batchResult,
+      frame.replacementBatchContinuation,
+    );
+  }
+
+  private finishReplacementBatchResult(
+    batchResult: BatchResumeResult,
+    context: ReplacementBatchResumeContext,
+  ): ResumedGameOver | undefined {
+    if (!this.gameState || !this.cardDb) return undefined;
     this.recordReplacementContinuationResult(
       batchResult.finalizedIds.length > 0,
       batchResult.finalizedIds,
     );
+    if (batchResult.events.length === 0) return undefined;
+
+    const outerContinuation = (this.gameState.effectStack.at(-1) as unknown as EffectStackFrame | undefined)
+      ?.replacementBatchContinuation;
+    const pipelineResult = continuePipelineFromExecution(
+      this.gameState,
+      { state: this.gameState, events: batchResult.events },
+      this.cardDb,
+      context.causingController,
+    );
+    this.gameState = pipelineResult.state;
+    if (pipelineResult.pendingPrompt && outerContinuation) {
+      this.attachReplacementBatchContinuation(outerContinuation);
+    }
+    return pipelineResult.gameOver;
   }
 
   /** Drain a parked outer effect after any nested replacement prompt resolves. */
-  private resumeInterruptedEffectContinuations(action: GameAction): void {
-    if (!this.gameState || !this.cardDb) return;
+  private resumeInterruptedEffectContinuations(action: GameAction): ResumedGameOver | undefined {
+    if (!this.gameState || !this.cardDb) return undefined;
+    let gameOver: ResumedGameOver | undefined;
     while (
       !this.gameState.pendingPrompt
+      && !gameOver
       && this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS"
     ) {
       const resumedFrame = this.gameState.effectStack.at(-1) as unknown as EffectStackFrame;
       const continuation = resumeFromStack(this.gameState, action, this.cardDb);
       this.gameState = continuation.state;
       if (continuation.pendingPrompt) {
+        if (resumedFrame.replacementBatchContinuation) {
+          this.attachReplacementBatchContinuation(resumedFrame.replacementBatchContinuation);
+        }
         this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
         break;
       }
-      this.completeReplacementBatchContinuation(resumedFrame);
+      gameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? gameOver;
       if (this.gameState.pendingPrompt) {
         break;
       }
     }
+    return gameOver;
   }
 
   private sendEffectPrompt(prompt: PendingPromptState): void {
