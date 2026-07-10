@@ -547,32 +547,6 @@ function collectSubstituteCandidates(
   return gather(replacementController);
 }
 
-function matchesCardFilter(
-  card: CardInstance,
-  filter: Record<string, unknown>,
-  cardDb: Map<string, CardData>,
-): boolean {
-  const data = cardDb.get(card.cardId);
-  if (!data) return false;
-
-  if (filter.traits) {
-    const requiredTraits = filter.traits as string[];
-    const cardTraits = data.types ?? [];
-    if (!requiredTraits.every((t) => cardTraits.includes(t))) return false;
-  }
-
-  if (filter.color) {
-    const colors = Array.isArray(filter.color) ? filter.color : [filter.color];
-    if (!colors.includes(data.color)) return false;
-  }
-
-  if (filter.costMax !== undefined) {
-    if ((data.cost ?? 0) > (filter.costMax as number)) return false;
-  }
-
-  return true;
-}
-
 // ─── Apply Replacement ───────────────────────────────────────────────────────
 
 function applyReplacement(
