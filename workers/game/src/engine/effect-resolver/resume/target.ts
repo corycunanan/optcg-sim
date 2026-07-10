@@ -78,7 +78,7 @@ export function handleRedistributeDon(
   );
 
   if (!allValid) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
 
   let nextState = state;
@@ -121,12 +121,12 @@ export function handleSelectTargetRuleTrashForPlay(
 
   const selected = action.selectedInstanceIds ?? [];
   if (selected.length !== 1 || !validTargets.includes(selected[0])) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
   const victimId = selected[0];
   const trashResult = trashCharacter(nextState, victimId, controller);
   if (!trashResult) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
   nextState = trashResult.state;
   events.push(...trashResult.events);
@@ -222,12 +222,12 @@ export function handleSelectTarget(
   // Validate — all selected ids must be in validTargets
   if (selected.some((id) => !validTargets.includes(id))) {
     const reprompt = buildSelectTargetPrompt(nextState, pausedAction, validTargets, effectSourceInstanceId, controller, cardDb, resultRefs);
-    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt } };
+    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt, rejected: true } };
   }
   // Validate target constraints (aggregate sum, uniqueness, named distribution, dual_targets)
   if (pausedAction.target && !validateTargetConstraints(selected, pausedAction.target, nextState, cardDb, resultRefs)) {
     const reprompt = buildSelectTargetPrompt(nextState, pausedAction, validTargets, effectSourceInstanceId, controller, cardDb, resultRefs);
-    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt } };
+    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt, rejected: true } };
   }
 
   const actionResult = executeEffectAction(

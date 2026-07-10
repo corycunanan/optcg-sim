@@ -22,7 +22,7 @@ import type {
   ResumeContext,
   EffectStackFrame,
 } from "../../types.js";
-import { popFrame, peekFrame, pushFrame, updateTopFrame } from "../effect-stack.js";
+import { generateFrameId, popFrame, peekFrame, pushFrame, updateTopFrame } from "../effect-stack.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
 import { executeActionChain } from "./resolver.js";
 import type { EffectResolverResult } from "./types.js";
@@ -47,6 +47,7 @@ import {
 } from "./resume/choice.js";
 import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { processRemainingTriggers } from "./resume/triggers.js";
+import { promptTypeToPhase } from "./cost-handler.js";
 
 // Re-export the stable public API so existing imports keep working.
 export { processRemainingTriggers } from "./resume/triggers.js";
@@ -201,11 +202,8 @@ export function resumeFromStack(
       nextState = result.state;
       events.push(...result.events);
 
-      const explicitlySkipped = action.type === "PASS" ||
-        (action.type === "PLAYER_CHOICE" && action.choiceId === "skip");
       const replacementFrameWasPushed = nextState.effectStack.length > stackDepthAfterPop;
-      const rejectedWithoutReplacement = !result.resolved && !explicitlySkipped && !replacementFrameWasPushed;
-      if (rejectedWithoutReplacement) {
+      if (result.rejected) {
         nextState = pushFrame(nextState, topFrame);
         if (!result.pendingPrompt) {
           return { ...result, state: nextState };
@@ -213,11 +211,31 @@ export function resumeFromStack(
       }
 
       if (result.pendingPrompt) {
-        const newTop = peekFrame(nextState) as EffectStackFrame;
-        if (newTop) {
+        let pendingPrompt = result.pendingPrompt;
+        if (result.rejected) {
+          pendingPrompt = { ...pendingPrompt, resumeContext: topFrame.id };
+        } else if (!replacementFrameWasPushed) {
+          const promptCtx = pendingPrompt.resumeContext as ResumeContext;
+          const replacementFrame: EffectStackFrame = {
+            ...topFrame,
+            id: generateFrameId(),
+            sourceCardInstanceId: promptCtx.effectSourceInstanceId,
+            controller: promptCtx.controller,
+            phase: promptTypeToPhase(pendingPrompt.options.promptType),
+            pausedAction: promptCtx.pausedAction,
+            remainingActions: topFrame.remainingActions,
+            resultRefs: promptCtx.resultRefs,
+            validTargets: promptCtx.validTargets,
+            accumulatedEvents: [...topFrame.accumulatedEvents, ...result.events],
+            ruleTrashForPlay: promptCtx.ruleTrashForPlay,
+            stateDistributionForPlay: promptCtx.stateDistributionForPlay,
+          };
+          nextState = pushFrame(nextState, replacementFrame);
+          pendingPrompt = { ...pendingPrompt, resumeContext: replacementFrame.id };
+        } else {
           nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
         }
-        return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
+        return { state: nextState, events, resolved: false, pendingPrompt };
       }
 
       // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)

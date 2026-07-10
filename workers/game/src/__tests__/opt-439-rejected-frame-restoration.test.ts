@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Action, EffectBlock } from "../engine/effect-types.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
-import type { EffectStackFrame, GameState } from "../types.js";
-import { createBattleReadyState, createTestCardDb } from "./helpers.js";
+import type { CardInstance, EffectStackFrame, GameState } from "../types.js";
+import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const effectBlock: EffectBlock = {
   id: "opt-439-effect",
@@ -121,5 +121,66 @@ describe("OPT-439 rejected response frame restoration", () => {
 
     expect(rejected.resolved).toBe(false);
     expect(rejected.state.effectStack.map((entry) => entry.id)).toEqual(["don-return"]);
+  });
+
+  it("replaces a consumed target frame when an accepted play needs an overflow prompt", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const playTarget = base.players[0].hand[0];
+    const existing = base.players[0].characters.filter((card): card is CardInstance => card !== null);
+    const fillers: CardInstance[] = Array.from({ length: 3 }, (_, index) => ({
+      instanceId: `overflow-filler-${index}`,
+      cardId: CARDS.VANILLA.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    }));
+    const fullBoard: GameState = {
+      ...base,
+      players: [
+        { ...base.players[0], characters: padChars([...existing, ...fillers]) },
+        base.players[1],
+      ],
+    };
+    const pausedAction: Action = {
+      type: "PLAY_CARD",
+      target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { exact: 1 } },
+      params: { source_zone: "HAND", cost_override: "FREE" },
+    };
+    const outer = frame("outer", pausedAction, { phase: "INTERRUPTED_BY_TRIGGERS" });
+    const pending = frame("play-target", pausedAction, {
+      remainingActions: [{ type: "DRAW", params: { amount: 1 } }],
+      validTargets: [playTarget.instanceId],
+    });
+
+    const overflow = resumeFromStack(
+      withStack(fullBoard, [outer, pending]),
+      { type: "SELECT_TARGET", selectedInstanceIds: [playTarget.instanceId] },
+      cardDb,
+    );
+
+    expect(overflow.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(overflow.state.effectStack).toHaveLength(2);
+    expect(overflow.state.effectStack[0].id).toBe("outer");
+    expect(overflow.state.effectStack[1].id).not.toBe("play-target");
+    const replacement = overflow.state.effectStack[1] as unknown as EffectStackFrame;
+    expect(replacement.ruleTrashForPlay?.playTargetId).toBe(playTarget.instanceId);
+    expect(replacement.remainingActions).toEqual(pending.remainingActions);
+
+    const victimId = overflow.state.players[0].characters[0]!.instanceId;
+    const handBefore = overflow.state.players[0].hand.length;
+    const completed = resumeFromStack(
+      overflow.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [victimId] },
+      cardDb,
+    );
+
+    expect(completed.pendingPrompt).toBeUndefined();
+    expect(completed.state.effectStack.map((entry) => entry.id)).toEqual(["outer"]);
+    expect(completed.state.players[0].characters.filter(Boolean)).toHaveLength(5);
+    expect(completed.state.players[0].hand).toHaveLength(handBefore);
   });
 });

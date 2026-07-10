@@ -77,17 +77,17 @@ export function handlePlayerChoiceStateDistribution(
   const sd = stateDistributionForPlay;
   const parts = action.choiceId.split(":");
   if (parts.length !== 3 || parts[0] !== "play-state") {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
   const [, echoedId, chosenState] = parts;
   if (echoedId !== sd.pendingTargetId) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
   if (chosenState !== "ACTIVE" && chosenState !== "RESTED") {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
   if (sd.remaining[chosenState] <= 0) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
 
   const actionResult = executePlayCard(
@@ -140,11 +140,11 @@ export function handlePlayerChoiceDonReturn(
     return null;
   }
   if (resumeCtx.validTargets && !resumeCtx.validTargets.includes(action.choiceId)) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
   const decoded = decodeFieldDonReturnChoice(action.choiceId);
   if (!decoded) {
-    return { kind: "terminal", result: { state, events: [], resolved: false } };
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
   }
 
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
