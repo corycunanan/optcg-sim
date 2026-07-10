@@ -128,6 +128,10 @@ export interface EffectStackFrame {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, unknown][];
   validTargets: string[];
+  /** Result of the action that paused before this continuation. */
+  priorActionSucceeded?: boolean;
+  /** Outer replacement batch to continue after a nested substitute prompt. */
+  replacementBatchContinuation?: import("./engine/replacements.js").ReplacementBatchResumeContext;
 
   // Cost tracking
   costs: import("./engine/effect-types.js").Cost[];

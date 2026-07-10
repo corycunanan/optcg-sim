@@ -22,7 +22,7 @@ import type {
   ResumeContext,
   EffectStackFrame,
 } from "../../types.js";
-import { popFrame, peekFrame, updateTopFrame } from "../effect-stack.js";
+import { generateFrameId, popFrame, peekFrame, pushFrame, updateTopFrame } from "../effect-stack.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
 import { executeActionChain } from "./resolver.js";
 import type { EffectResolverResult } from "./types.js";
@@ -47,6 +47,7 @@ import {
 } from "./resume/choice.js";
 import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { processRemainingTriggers } from "./resume/triggers.js";
+import { promptTypeToPhase } from "./cost-handler.js";
 
 // Re-export the stable public API so existing imports keep working.
 export { processRemainingTriggers } from "./resume/triggers.js";
@@ -184,6 +185,7 @@ export function resumeFromStack(
     case "AWAITING_PLAYER_CHOICE": {
       const events: PendingEvent[] = [];
       let nextState = popFrame(state);
+      const stackDepthAfterPop = nextState.effectStack.length;
 
       const legacyCtx: ResumeContext = {
         effectSourceInstanceId: sourceCardInstanceId,
@@ -200,12 +202,62 @@ export function resumeFromStack(
       nextState = result.state;
       events.push(...result.events);
 
-      if (result.pendingPrompt) {
-        const newTop = peekFrame(nextState) as EffectStackFrame;
-        if (newTop) {
-          nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+      const replacementFrameWasPushed = nextState.effectStack.length > stackDepthAfterPop;
+      if (result.rejected) {
+        nextState = pushFrame(nextState, topFrame);
+        if (!result.pendingPrompt) {
+          return { ...result, state: nextState };
         }
-        return { state: nextState, events, resolved: false, pendingPrompt: result.pendingPrompt };
+      }
+
+      if (result.pendingPrompt) {
+        let pendingPrompt = result.pendingPrompt;
+        const pendingResumeContext = pendingPrompt.resumeContext as { type?: unknown } | null;
+        const isReplacementPrompt = pendingResumeContext?.type === "REPLACEMENT" ||
+          pendingResumeContext?.type === "REPLACEMENT_BATCH";
+        if (result.rejected) {
+          pendingPrompt = { ...pendingPrompt, resumeContext: topFrame.id };
+        } else if (!replacementFrameWasPushed && isReplacementPrompt) {
+          const continuationFrame: EffectStackFrame = {
+            ...topFrame,
+            id: generateFrameId(),
+            phase: "INTERRUPTED_BY_TRIGGERS",
+            validTargets: [],
+            priorActionSucceeded: false,
+            accumulatedEvents: [...topFrame.accumulatedEvents, ...result.events],
+          };
+          nextState = pushFrame(nextState, continuationFrame);
+        } else if (!replacementFrameWasPushed) {
+          const promptCtx = pendingPrompt.resumeContext as ResumeContext;
+          const replacementFrame: EffectStackFrame = {
+            ...topFrame,
+            id: generateFrameId(),
+            sourceCardInstanceId: promptCtx.effectSourceInstanceId,
+            controller: promptCtx.controller,
+            phase: promptTypeToPhase(pendingPrompt.options.promptType),
+            pausedAction: promptCtx.pausedAction,
+            remainingActions: topFrame.remainingActions,
+            resultRefs: promptCtx.resultRefs,
+            validTargets: promptCtx.validTargets,
+            accumulatedEvents: [...topFrame.accumulatedEvents, ...result.events],
+            ruleTrashForPlay: promptCtx.ruleTrashForPlay,
+            stateDistributionForPlay: promptCtx.stateDistributionForPlay,
+          };
+          nextState = pushFrame(nextState, replacementFrame);
+          pendingPrompt = { ...pendingPrompt, resumeContext: replacementFrame.id };
+        } else {
+          const replacementFrame = peekFrame(nextState) as EffectStackFrame | null;
+          if (replacementFrame) {
+            nextState = updateTopFrame(nextState, {
+              pendingTriggers: [
+                ...replacementFrame.pendingTriggers,
+                ...topFrame.pendingTriggers,
+              ],
+              replacementBatchContinuation: topFrame.replacementBatchContinuation,
+            });
+          }
+        }
+        return { state: nextState, events, resolved: false, pendingPrompt, rejected: result.rejected };
       }
 
       // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
@@ -237,11 +289,19 @@ export function resumeFromStack(
           controller,
           cardDb,
           resultRefs,
+          undefined,
+          topFrame.priorActionSucceeded ?? true,
         );
         nextState = chainResult.state;
         events.push(...chainResult.events);
 
         if (chainResult.pendingPrompt) {
+          const nestedFrame = peekFrame(nextState) as EffectStackFrame | null;
+          if (nestedFrame && topFrame.replacementBatchContinuation) {
+            nextState = updateTopFrame(nextState, {
+              replacementBatchContinuation: topFrame.replacementBatchContinuation,
+            });
+          }
           return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
         }
 

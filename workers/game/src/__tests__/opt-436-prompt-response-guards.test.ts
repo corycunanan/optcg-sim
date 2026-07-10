@@ -19,7 +19,7 @@
 import { describe, it, expect } from "vitest";
 import { GameSession } from "../GameSession.js";
 import type { CardData, CardInstance, Env, GameAction, GameState, PlayerState } from "../types.js";
-import type { Cost, EffectBlock } from "../engine/effect-types.js";
+import type { Cost, EffectBlock, RuntimeActiveEffect } from "../engine/effect-types.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
 import { payCostsWithSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
@@ -401,5 +401,372 @@ describe("OPT-436: rejected responses restore the pending prompt", () => {
 
     expect(session.gameState.status).toBe("FINISHED");
     expect(session.gameState.winner).toBe(playerIndex === 0 ? 1 : 0);
+  });
+});
+
+describe("OPT-439: replacement prompts preserve effect continuations", () => {
+  it("routes a selected KO replacement through GameSession and resumes the suffix", async () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = base.players[1].characters.find((card) => card !== null)!;
+    const replacement: RuntimeActiveEffect = {
+      id: "opt439-replacement",
+      sourceCardInstanceId: target.instanceId,
+      sourceEffectBlockId: "opt439-replacement-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+    const state: GameState = { ...base, activeEffects: [replacement as never] };
+    const block: EffectBlock = {
+      id: "opt439-ko-then-draw",
+      category: "auto",
+      actions: [
+        {
+          type: "KO",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+        },
+        { type: "DRAW", params: { amount: 1 } },
+      ],
+    };
+    const first = resolveEffect(state, block, state.players[0].leader.instanceId, 0, cardDb);
+    expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const session = new GameSession(
+      new MockDurableObjectState() as unknown as DurableObjectState,
+      { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env,
+    ) as unknown as TestAccess;
+    session.gameState = { ...first.state, pendingPrompt: first.pendingPrompt! };
+    session.cardDb = cardDb;
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+    const handBefore = session.gameState.players[0].hand.length;
+
+    await session.handleAction(player0 as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId],
+    });
+
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type).toBe("REPLACEMENT_BATCH");
+    expect(session.gameState.effectStack.at(-1)?.phase).toBe("INTERRUPTED_BY_TRIGGERS");
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    expect(session.gameState.pendingPrompt).toBeNull();
+    expect(session.gameState.effectStack).toHaveLength(0);
+    expect(session.gameState.players[1].characters.some((card) => card?.instanceId === target.instanceId)).toBe(true);
+    expect(session.gameState.players[0].hand).toHaveLength(handBefore + 1);
+  });
+
+  it("preserves IF_DO semantics when the selected KO is replaced", async () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = base.players[1].characters.find((card) => card !== null)!;
+    const replacement: RuntimeActiveEffect = {
+      id: "opt439-if-do-replacement",
+      sourceCardInstanceId: target.instanceId,
+      sourceEffectBlockId: "opt439-if-do-replacement-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+    const block: EffectBlock = {
+      id: "opt439-ko-if-do-then",
+      category: "auto",
+      actions: [
+        {
+          type: "KO",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+        },
+        { type: "DRAW", params: { amount: 1 }, chain: "IF_DO" },
+        { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
+      ],
+    };
+    const first = resolveEffect(
+      { ...base, activeEffects: [replacement as never] },
+      block,
+      base.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+    const session = new GameSession(
+      new MockDurableObjectState() as unknown as DurableObjectState,
+      { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env,
+    ) as unknown as TestAccess;
+    session.gameState = { ...first.state, pendingPrompt: first.pendingPrompt! };
+    session.cardDb = cardDb;
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+    const handBefore = session.gameState.players[0].hand.length;
+
+    await session.handleAction(player0 as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId],
+    });
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    expect(session.gameState.effectStack).toHaveLength(0);
+    expect(session.gameState.players[0].hand).toHaveLength(handBefore + 1);
+  });
+
+  it("resumes the outer suffix after a nested replacement choice", async () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const [target, unmatchedTarget] = base.players[1].characters.filter(
+      (card): card is CardInstance => card !== null,
+    );
+    const replacement: RuntimeActiveEffect = {
+      id: "opt439-nested-replacement",
+      sourceCardInstanceId: target.instanceId,
+      sourceEffectBlockId: "opt439-nested-replacement-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: null,
+          replacement_actions: [{
+            type: "PLAYER_CHOICE",
+            params: {
+              labels: ["Rest this card", "Do nothing"],
+              options: [
+                [{ type: "SET_REST", target: { type: "SELF" } }],
+                [],
+              ],
+            },
+          }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [target.instanceId],
+      timestamp: Date.now(),
+    };
+    const block: EffectBlock = {
+      id: "opt439-ko-nested-choice-then-draw",
+      category: "auto",
+      actions: [
+        {
+          type: "KO",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 2 } },
+        },
+        { type: "DRAW", params: { amount: 1 } },
+      ],
+    };
+    const promptedOnRest: EffectBlock = {
+      id: "opt439-prompted-on-rest",
+      category: "auto",
+      trigger: { event: "CHARACTER_BECOMES_RESTED" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+      flags: { optional: true },
+    };
+    const first = resolveEffect(
+      {
+        ...base,
+        activeEffects: [replacement as never],
+        triggerRegistry: [{
+          id: "opt439-prompted-on-rest-registration",
+          sourceCardInstanceId: target.instanceId,
+          effectBlockId: promptedOnRest.id,
+          trigger: promptedOnRest.trigger,
+          effectBlock: promptedOnRest,
+          zone: "FIELD",
+          controller: 1,
+        } as never],
+      },
+      block,
+      base.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+    const session = new GameSession(
+      new MockDurableObjectState() as unknown as DurableObjectState,
+      { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env,
+    ) as unknown as TestAccess;
+    session.gameState = { ...first.state, pendingPrompt: first.pendingPrompt! };
+    session.cardDb = cardDb;
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+    const handBefore = session.gameState.players[0].hand.length;
+
+    await session.handleAction(player0 as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId, unmatchedTarget.instanceId],
+    });
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(session.gameState.effectStack.at(-1)?.phase).toBe("AWAITING_PLAYER_CHOICE");
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "0",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect((session.gameState.effectStack.at(-1) as unknown as {
+      replacementBatchContinuation?: unknown;
+    }).replacementBatchContinuation).toBeDefined();
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    const preservedTarget = session.gameState.players[1].characters.find(
+      (card) => card?.instanceId === target.instanceId,
+    );
+    expect(preservedTarget?.state).toBe("RESTED");
+    expect(session.gameState.players[1].characters.some(
+      (card) => card?.instanceId === unmatchedTarget.instanceId,
+    )).toBe(false);
+    expect(session.gameState.eventLog.some(
+      (event) => event.type === "CARD_KO" && event.payload.cardInstanceId === unmatchedTarget.instanceId,
+    )).toBe(true);
+    expect(session.gameState.effectStack).toHaveLength(0);
+    expect(session.gameState.players[0].hand).toHaveLength(handBefore + 1);
+  });
+
+  it("preserves typed contexts when a substitute action is itself replaced", async () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = base.players[1].characters.find((card) => card !== null)!;
+    const makeReplacement = (
+      id: string,
+      replacementActions: EffectBlock["actions"],
+      causeBy: "OPPONENT_EFFECT" | "ANY" = "OPPONENT_EFFECT",
+    ): RuntimeActiveEffect => ({
+      id,
+      sourceCardInstanceId: target.instanceId,
+      sourceEffectBlockId: `${id}-block`,
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: causeBy },
+          target_filter: null,
+          replacement_actions: replacementActions,
+          optional: true,
+          once_per_turn: true,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [target.instanceId],
+      timestamp: Date.now(),
+    });
+    const outerReplacement = makeReplacement(
+      "opt439-outer-replacement",
+      [{ type: "KO", target: { type: "SELF" } }],
+    );
+    const nestedReplacement = makeReplacement(
+      "opt439-nested-ko-replacement",
+      [{ type: "SET_REST", target: { type: "SELF" } }],
+      "ANY",
+    );
+    const block: EffectBlock = {
+      id: "opt439-nested-replacement-context",
+      category: "auto",
+      actions: [
+        {
+          type: "KO",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+        },
+        { type: "DRAW", params: { amount: 1 } },
+      ],
+    };
+    const first = resolveEffect(
+      { ...base, activeEffects: [outerReplacement as never, nestedReplacement as never] },
+      block,
+      base.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+    const session = new GameSession(
+      new MockDurableObjectState() as unknown as DurableObjectState,
+      { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env,
+    ) as unknown as TestAccess;
+    session.gameState = { ...first.state, pendingPrompt: first.pendingPrompt! };
+    session.cardDb = cardDb;
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+    const handBefore = session.gameState.players[0].hand.length;
+
+    await session.handleAction(player0 as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId],
+    });
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type).toBe(
+      "REPLACEMENT_BATCH",
+    );
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+
+    const preservedTarget = session.gameState.players[1].characters.find(
+      (card) => card?.instanceId === target.instanceId,
+    );
+    expect(preservedTarget?.state).toBe("RESTED");
+    expect(session.gameState.effectStack).toHaveLength(0);
+    expect(session.gameState.players[0].hand).toHaveLength(handBefore + 1);
   });
 });

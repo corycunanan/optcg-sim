@@ -78,6 +78,9 @@ export function processRemainingTriggers(
         event.playerIndex ?? trigger.controller,
         event.payload ?? {},
       );
+      // A later continuation-pipeline pass may still need to match nested
+      // triggers from this event, but it must not duplicate the event log.
+      event.__alreadyEmitted = true;
     }
   }
 
@@ -120,6 +123,7 @@ export function processRemainingTriggers(
         event.playerIndex ?? trigger.controller,
         event.payload ?? {},
       );
+      event.__alreadyEmitted = true;
     }
   }
 

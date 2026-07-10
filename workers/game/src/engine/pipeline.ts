@@ -176,6 +176,11 @@ function fireEventsAndTriggers(
   const triggerQueue: QueuedTrigger[] = [];
 
   for (const pendingEvent of execResult.events) {
+    // Resolver-side per-frame drains mark events after matching them. They
+    // still need event-log publication and zone cleanup above/below, but must
+    // not enqueue the same triggers a second time here.
+    if (pendingEvent.__scannedForTriggers) continue;
+
     const gameEvent = {
       type: pendingEvent.type,
       playerIndex: pendingEvent.playerIndex ?? pi,

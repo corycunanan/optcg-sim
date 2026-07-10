@@ -355,6 +355,10 @@ export interface EffectStackFrame {
   remainingActions: unknown[];
   resultRefs: [string, unknown][];
   validTargets: string[];
+  /** Result of the action that paused before this continuation. */
+  priorActionSucceeded?: boolean;
+  /** Outer replacement batch to continue after a nested substitute prompt. */
+  replacementBatchContinuation?: unknown;
 
   // Cost tracking
   costs: unknown[];
