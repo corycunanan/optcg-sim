@@ -759,7 +759,11 @@ export class GameSession implements DurableObject {
           }
         }
         if (promptType === "OPTIONAL_EFFECT" && action.type === "PLAYER_CHOICE") {
-          const validChoice = action.choiceId === "activate" || action.choiceId === "accept";
+          // OPT-446: "skip" is the engine's documented decline vocabulary
+          // (resume/choice.ts) — the gate must not lock out clients that use
+          // it instead of PASS.
+          const validChoice = action.choiceId === "activate" || action.choiceId === "accept"
+            || action.choiceId === "skip";
           if (!validChoice) {
             this.send(ws, { type: "game:error", message: "That choice is no longer available" });
             return;
@@ -901,7 +905,7 @@ export class GameSession implements DurableObject {
   }
 
   private async resumeFromPrompt(
-    _ws: WebSocket,
+    ws: WebSocket,
     _playerIndex: 0 | 1,
     action: GameAction,
   ): Promise<void> {
@@ -912,6 +916,7 @@ export class GameSession implements DurableObject {
 
     const prompt = this.gameState.pendingPrompt!;
     const stateBeforeResume = this.gameState;
+    let responseRejected = false;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
     const respondingPlayer = prompt.respondingPlayer;
     let resumedGameOver: { winner: 0 | 1 | null; reason: string } | undefined;
@@ -999,6 +1004,7 @@ export class GameSession implements DurableObject {
         // from before resume, including the prompt and any frame the resume
         // router may have popped while validating the response.
         this.gameState = stateBeforeResume;
+        responseRejected = true;
       } else {
         resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
         if (!this.gameState.pendingPrompt && !resumedGameOver) {
@@ -1016,6 +1022,7 @@ export class GameSession implements DurableObject {
       } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
         // OPT-436: same rejection-restore as the stack branch.
         this.gameState = stateBeforeResume;
+        responseRejected = true;
       }
     }
 
@@ -1064,6 +1071,17 @@ export class GameSession implements DurableObject {
       return;
     }
     this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
+
+    // OPT-446: engine-level rejections previously answered with only a
+    // game:update echoing the rejected action — the sender couldn't tell
+    // rejection from acceptance without diffing state. Surface it explicitly,
+    // matching the gate paths.
+    if (responseRejected) {
+      this.send(ws, {
+        type: "game:error",
+        message: "That prompt response was rejected; the pending prompt is unchanged",
+      });
+    }
 
     if (this.gameState.pendingPrompt) {
       this.sendEffectPrompt(this.gameState.pendingPrompt);
