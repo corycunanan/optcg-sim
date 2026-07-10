@@ -17,8 +17,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-423 | Schema validator rejects keyword-only permanent blocks | — | — | Done | [#253](https://github.com/corycunanan/optcg-sim/pull/253) | Restores useful schema-validation signal before the bulk audit. |
-| 2 | OPT-447 | Six activate effects omit ACTIVATE_MAIN triggers | — | OPT-423 | In Review | [#254](https://github.com/corycunanan/optcg-sim/pull/254) | Newly visible real validation failures; fix while the schema signal context is fresh. |
-| 3 | OPT-439 | Rejected SELECT_TARGET drops remaining actions or resumes the wrong frame | — | — | Todo | — | Generalize frame validation/restoration; include the OPT-427 DON-choice path in the regression matrix. |
+| 2 | OPT-447 | Six activate effects omit ACTIVATE_MAIN triggers | — | OPT-423 | Done | [#254](https://github.com/corycunanan/optcg-sim/pull/254) | Newly visible real validation failures; fix while the schema signal context is fresh. |
+| 3 | OPT-439 | Rejected SELECT_TARGET drops remaining actions or resumes the wrong frame | — | — | In Review | [#255](https://github.com/corycunanan/optcg-sim/pull/255) | Generalize frame validation/restoration; include the OPT-427 DON-choice path in the regression matrix. |
 | 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Backlog | — | Re-verify after OPT-439; close as covered/duplicate if the generalized fix and tests fully satisfy it. |
 | 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | Backlog | — | Establish symmetric stack handling before compound-cost work. |
 | 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Todo | — | Finish prompt rejection semantics after the frame fix. |
@@ -32,7 +32,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-439 after PR #254 completes review.
+**Next up:** OPT-427 after PR #255 completes review; re-verify whether OPT-439 fully covers it.
 
 ---
 
@@ -55,3 +55,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep schema cleanup out of the stack-restoration change. Exercise rejection through the production frame path rather than only calling resume handlers with raw contexts.
 - **Unresolved:** OPT-439 must preserve the rejected frame's `remainingActions` and `pendingTriggers` for both empty and nested stack cases; include the related DON-return rejection path in the regression matrix.
 - **Pointer:** Inspect PR #254 for the trigger-contract tests; the stack/resume implementation remains entirely in OPT-439.
+
+### OPT-439 → OPT-427
+**From:** session on 2026-07-09 · **Commit:** `0f35ac7` · **PR:** [#255](https://github.com/corycunanan/optcg-sim/pull/255)
+
+- **Primer:** Rejected mid-action responses now restore the exact popped frame when no replacement frame was pushed, preserving nested-stack identity, remaining actions, result refs, and queued triggers.
+- **Read first:** `workers/game/src/engine/effect-resolver/resume.ts`, `workers/game/src/__tests__/opt-439-rejected-frame-restoration.test.ts`, and the OPT-427 DON-return reproduction.
+- **Gotchas / do NOT touch:** Explicit PASS/`skip` remains a real decline and must not restore a frame. Successful handlers that push a replacement frame must not retain the old frame underneath it.
+- **Unresolved:** Re-run OPT-427's exact scenario after PR #255 merges; mark it Duplicate only if the generalized no-prompt rejection regression fully satisfies its acceptance criteria.
+- **Pointer:** PR #255 is the system-level frame-restoration change; OPT-427 should be verification-first rather than a parallel implementation.
