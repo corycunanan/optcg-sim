@@ -1598,6 +1598,7 @@ export const OP07_048_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
     {
       id: "activate_reveal_play",
       category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_REST", amount: 2 }],
       flags: { once_per_turn: true },
       actions: [

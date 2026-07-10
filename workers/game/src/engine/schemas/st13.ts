@@ -257,6 +257,7 @@ export const ST13_007_SABO_COST2: EffectSchema = {
     {
       id: "activate_reveal_life_play",
       category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },
       actions: [
@@ -301,6 +302,7 @@ export const ST13_010_PORTGAS_D_ACE_COST2: EffectSchema = {
     {
       id: "activate_reveal_life_play",
       category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },
       actions: [
@@ -345,6 +347,7 @@ export const ST13_014_MONKEY_D_LUFFY_COST2: EffectSchema = {
     {
       id: "activate_reveal_life_play",
       category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },
       actions: [
