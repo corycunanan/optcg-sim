@@ -53,10 +53,24 @@ type ActionDispatcher = (
   preselectedTargets?: string[],
 ) => ActionResult;
 
-let executeActionDispatcher: ActionDispatcher | null = null;
+type ActionChainDispatcher = (
+  state: GameState,
+  actions: Action[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  initialResultRefs?: Map<string, EffectResult>,
+) => { state: GameState; events: PendingEvent[]; pendingPrompt?: PendingPromptState };
 
-export function setReplacementDispatcher(dispatcher: ActionDispatcher): void {
+let executeActionDispatcher: ActionDispatcher | null = null;
+let executeActionChainDispatcher: ActionChainDispatcher | null = null;
+
+export function setReplacementDispatcher(
+  dispatcher: ActionDispatcher,
+  chainDispatcher: ActionChainDispatcher,
+): void {
   executeActionDispatcher = dispatcher;
+  executeActionChainDispatcher = chainDispatcher;
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -571,24 +585,37 @@ function applyReplacement(
   const events: PendingEvent[] = [];
   let nextState = state;
 
-  // Execute each substitute action through the real resolver dispatcher.
+  // Execute the complete substitute chain through the real resolver so any
+  // prompt gets its own stack frame and later substitute actions are retained.
   // sourceCardInstanceId = the replacement's source (e.g. Tashigi), so that
   // target: { type: "SELF" } resolves to her, not the event's original target.
-  for (const action of params.replacement_actions) {
-    const result = executeReplacementAction(
+  if (executeActionChainDispatcher) {
+    const result = executeActionChainDispatcher(
       nextState,
-      action,
+      params.replacement_actions,
       effect.sourceCardInstanceId,
       effect.controller,
       cardDb,
     );
     nextState = result.state;
     events.push(...result.events);
-
-    // If a substitute itself raises a prompt (e.g. opponent-targeting SET_REST
-    // with multiple choices, Kujyaku selecting 3 from trash), surface it.
     if (result.pendingPrompt) {
       return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
+    }
+  } else {
+    for (const action of params.replacement_actions) {
+      const result = executeReplacementAction(
+        nextState,
+        action,
+        effect.sourceCardInstanceId,
+        effect.controller,
+        cardDb,
+      );
+      nextState = result.state;
+      events.push(...result.events);
+      if (result.pendingPrompt) {
+        return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
+      }
     }
   }
 

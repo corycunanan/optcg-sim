@@ -21,6 +21,7 @@ import type {
   PendingPromptState,
   PromptType,
   ResumeContext,
+  EffectStackFrame,
 } from "./types.js";
 
 type DurablePromptType = Extract<
@@ -944,15 +945,12 @@ export class GameSession implements DurableObject {
         this.cardDb,
       );
       this.gameState = replacementResult.state;
+      this.recordReplacementContinuationResult(!replacementResult.replaced, []);
 
       if (replacementResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
-      } else if (this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS") {
-        const continuation = resumeFromStack(this.gameState, action, this.cardDb);
-        this.gameState = continuation.state;
-        if (continuation.pendingPrompt) {
-          this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
-        }
+      } else {
+        this.resumeInterruptedEffectContinuations(action);
       }
     } else if (resumeCtx?.type === "REPLACEMENT_BATCH") {
       const accepted = action.type !== "PASS";
@@ -963,15 +961,15 @@ export class GameSession implements DurableObject {
         this.cardDb,
       );
       this.gameState = batchResult.state;
+      this.recordReplacementContinuationResult(
+        batchResult.finalizedIds.length > 0,
+        batchResult.finalizedIds,
+      );
 
       if (batchResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
-      } else if (this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS") {
-        const continuation = resumeFromStack(this.gameState, action, this.cardDb);
-        this.gameState = continuation.state;
-        if (continuation.pendingPrompt) {
-          this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
-        }
+      } else {
+        this.resumeInterruptedEffectContinuations(action);
       }
     } else if (this.gameState.effectStack.length > 0) {
       // Stack-based resume — use new effect stack system
@@ -986,6 +984,8 @@ export class GameSession implements DurableObject {
         // from before resume, including the prompt and any frame the resume
         // router may have popped while validating the response.
         this.gameState = stateBeforeResume;
+      } else {
+        this.resumeInterruptedEffectContinuations(action);
       }
     } else {
       // Legacy: bare ResumeContext (no stack frame) — fallback for backward compat
@@ -1051,6 +1051,67 @@ export class GameSession implements DurableObject {
       this.sendEffectPrompt(this.gameState.pendingPrompt);
     } else {
       this.sendPendingPrompts();
+    }
+  }
+
+  /**
+   * Persist the interrupted action's result across a replacement prompt so
+   * IF_DO and result_ref consumers see the same contract as an inline action.
+   */
+  private recordReplacementContinuationResult(
+    succeeded: boolean,
+    finalizedIds: string[],
+  ): void {
+    if (!this.gameState) return;
+    let index = -1;
+    for (let i = this.gameState.effectStack.length - 1; i >= 0; i--) {
+      if (this.gameState.effectStack[i].phase === "INTERRUPTED_BY_TRIGGERS") {
+        index = i;
+        break;
+      }
+    }
+    if (index < 0) return;
+
+    const frame = this.gameState.effectStack[index] as unknown as EffectStackFrame;
+    const resultRefs = [...frame.resultRefs];
+    const resultRef = frame.pausedAction?.result_ref;
+    if (resultRef) {
+      const nextResult: [string, unknown] = [
+        resultRef,
+        { targetInstanceIds: finalizedIds, count: finalizedIds.length },
+      ];
+      const existing = resultRefs.findIndex(([key]) => key === resultRef);
+      if (existing >= 0) resultRefs[existing] = nextResult;
+      else resultRefs.push(nextResult);
+    }
+
+    const updatedFrame: EffectStackFrame = {
+      ...frame,
+      priorActionSucceeded: succeeded,
+      resultRefs,
+    };
+    this.gameState = {
+      ...this.gameState,
+      effectStack: [
+        ...this.gameState.effectStack.slice(0, index),
+        updatedFrame,
+        ...this.gameState.effectStack.slice(index + 1),
+      ],
+    };
+  }
+
+  /** Drain a parked outer effect after any nested replacement prompt resolves. */
+  private resumeInterruptedEffectContinuations(action: GameAction): void {
+    if (!this.gameState || !this.cardDb) return;
+    while (
+      !this.gameState.pendingPrompt
+      && this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS"
+    ) {
+      const continuation = resumeFromStack(this.gameState, action, this.cardDb);
+      this.gameState = continuation.state;
+      if (continuation.pendingPrompt) {
+        this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
+      }
     }
   }
 

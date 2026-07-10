@@ -222,8 +222,8 @@ export function resumeFromStack(
             ...topFrame,
             id: generateFrameId(),
             phase: "INTERRUPTED_BY_TRIGGERS",
-            pausedAction: null,
             validTargets: [],
+            priorActionSucceeded: false,
             accumulatedEvents: [...topFrame.accumulatedEvents, ...result.events],
           };
           nextState = pushFrame(nextState, continuationFrame);
@@ -288,6 +288,8 @@ export function resumeFromStack(
           controller,
           cardDb,
           resultRefs,
+          undefined,
+          topFrame.priorActionSucceeded ?? true,
         );
         nextState = chainResult.state;
         events.push(...chainResult.events);

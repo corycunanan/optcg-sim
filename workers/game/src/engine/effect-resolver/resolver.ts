@@ -178,7 +178,7 @@ play.setPlayDependencies({ resolveEffect });
 // actions (SET_REST, TRASH_CARD, MODIFY_POWER, …) run through the real
 // handlers. Registered here to avoid a resolver → replacements → resolver
 // import cycle.
-setReplacementDispatcher(executeEffectAction);
+setReplacementDispatcher(executeEffectAction, executeActionChain);
 
 // ─── resolveEffect ───────────────────────────────────────────────────────────
 
@@ -336,16 +336,17 @@ export function executeActionChain(
   cardDb: Map<string, CardData>,
   initialResultRefs?: Map<string, EffectResult>,
   effectDescription?: string,
+  priorActionSucceeded?: boolean,
 ): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
-  let lastActionSucceeded = true;
+  let lastActionSucceeded = priorActionSucceeded ?? true;
 
   for (let i = 0; i < actions.length; i++) {
     const action = actions[i];
 
     // Check chain connector
-    if (action.chain && i > 0) {
+    if (action.chain && (i > 0 || priorActionSucceeded !== undefined)) {
       if (action.chain === "IF_DO" && !lastActionSucceeded) {
         lastActionSucceeded = false;
         continue;
