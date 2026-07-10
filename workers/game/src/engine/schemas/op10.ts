@@ -738,14 +738,15 @@ export const OP10_021_PUNK_HAZARD: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Caesar Clown" },
-      },
       actions: [
         {
           type: "GIVE_DON",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Caesar Clown" },
+          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -1952,14 +1953,16 @@ export const OP10_057_LEO: EffectSchema = {
         },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Usopp" },
-      },
       actions: [
         {
           type: "SEARCH_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          // The "Then, ... trash 1 card" clause below stays unconditional (chain: "THEN").
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Usopp" },
+          },
           params: {
             look_at: 5,
             pick: { up_to: 2 },
@@ -2192,14 +2195,15 @@ export const OP10_062_VIOLET: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_KO" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Donquixote Pirates" },
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Donquixote Pirates" },
+          },
           target: {
             type: "CARD_IN_TRASH",
             controller: "SELF",
@@ -2563,13 +2567,17 @@ export const OP10_075_FOXY: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "DON_FIELD_COUNT",
-        operator: "<=",
-      },
       actions: [
-        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "DON_FIELD_COUNT",
+            operator: "<=",
+          },
+          params: { amount: 1 },
+        },
       ],
     },
   ],
@@ -2591,14 +2599,15 @@ export const OP10_076_BABY_5: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Donquixote Pirates" },
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Donquixote Pirates" },
+          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],
@@ -3021,15 +3030,17 @@ export const OP10_087_TONY_TONY_CHOPPER: EffectSchema = {
         },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 5,
-      },
       actions: [
         {
           type: "OPPONENT_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          // The "Then, trash 2 cards..." mill below stays unconditional (chain: "THEN").
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 5,
+          },
           params: {
             mandatory: true,
             action: {
@@ -3964,12 +3975,17 @@ export const OP10_113_RORONOA_ZORO: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Supernovas" },
-      },
-      actions: [{ type: "PLAY_SELF" }],
+      actions: [
+        {
+          type: "PLAY_SELF",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Supernovas" },
+          },
+        },
+      ],
     },
   ],
 };
@@ -3990,14 +4006,15 @@ export const OP10_114_X_DRAKE: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "LIFE_COUNT",
-        operator: "<=",
-      },
       actions: [
         {
           type: "SET_REST",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "LIFE_COUNT",
+            operator: "<=",
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
