@@ -10,7 +10,7 @@
  * from the schemas/ directory.
  */
 
-import { ALL_ACTION_TYPES, type EffectSchema, type EffectBlock, type Action, type Cost } from "./effect-types.js";
+import { ALL_ACTION_TYPES, type EffectSchema, type EffectBlock, type Action, type Cost, type TargetFilter } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
@@ -277,6 +277,26 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
     }
   }
 
+  // OPT-409: permanent modifiers and prohibitions carry the same Target shape
+  // and their runtime paths (effectAppliesToCard, prohibition matching) also
+  // call matchesFilter without filterController — check their filters too.
+  if (block.modifiers) {
+    for (let i = 0; i < block.modifiers.length; i++) {
+      errors.push(...validateTargetFilterController(
+        block.modifiers[i].target?.filter as TargetFilter | undefined,
+        `${prefix}.modifiers[${i}]`,
+      ));
+    }
+  }
+  if (block.prohibitions) {
+    for (let i = 0; i < block.prohibitions.length; i++) {
+      errors.push(...validateTargetFilterController(
+        block.prohibitions[i].target?.filter as TargetFilter | undefined,
+        `${prefix}.prohibitions[${i}]`,
+      ));
+    }
+  }
+
   return errors;
 }
 
@@ -325,6 +345,31 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
   return errors;
 }
 
+/**
+ * OPT-409: `controller` inside a Target.filter is a silent no-op — runtime
+ * matchesFilter only enforces it when the caller passes the optional
+ * filterController argument, which neither the target-resolver nor
+ * effectAppliesToCard (permanent modifiers) does. Walks nested any_of
+ * branches recursively.
+ */
+function validateTargetFilterController(
+  filter: TargetFilter | undefined,
+  prefix: string,
+): string[] {
+  const errors: string[] = [];
+  const visit = (f: TargetFilter | undefined): void => {
+    if (!f) return;
+    if (f.controller !== undefined) {
+      errors.push(
+        `${prefix}: 'controller' inside target.filter is ignored on targeting paths — use target.controller`,
+      );
+    }
+    for (const sub of f.any_of ?? []) visit(sub);
+  };
+  visit(filter);
+  return errors;
+}
+
 function validateAction(action: Action, prefix: string): string[] {
   const errors: string[] = [];
 
@@ -333,6 +378,12 @@ function validateAction(action: Action, prefix: string): string[] {
   } else if (!VALID_ACTION_TYPES.has(action.type)) {
     errors.push(`${prefix}: Unknown action type '${action.type}'`);
   }
+
+  // OPT-409: `controller` inside Target.filter is silently ignored on normal
+  // targeting paths — matchesFilter only enforces it when the caller passes
+  // the optional filterController argument, which the target-resolver never
+  // does. Scope the target with Target.controller instead.
+  errors.push(...validateTargetFilterController(action.target?.filter as TargetFilter | undefined, prefix));
 
   // Validate nested actions in PLAYER_CHOICE/OPPONENT_CHOICE
   if ((action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") && action.params?.options) {

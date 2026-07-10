@@ -776,8 +776,42 @@ function lintDurations(block, ctx, issues) {
 
 // ─── Category C: Filter Semantics ────────────────────────────────────────────
 
+/**
+ * C5 (OPT-409): flag `controller` anywhere inside a Target.filter, recursing
+ * through nested any_of branches. Runtime matchesFilter only enforces it when
+ * callers pass filterController — targeting, modifier, and prohibition paths
+ * never do, so the key is a silent no-op.
+ */
+function checkFilterController(filter, where, ctx, issues) {
+  if (!filter || typeof filter !== "object") return;
+  if (filter.controller !== undefined) {
+    issues.push(
+      err(
+        ctx.cardId,
+        ctx.blockId,
+        "C5",
+        `Filter has "controller" ${where} — ignored on targeting paths; use Target.controller instead`,
+      ),
+    );
+  }
+  if (Array.isArray(filter.any_of)) {
+    for (const sub of filter.any_of) checkFilterController(sub, where, ctx, issues);
+  }
+}
+
 function lintFilters(block, ctx, issues) {
   const { cardId, blockId } = ctx;
+
+  // C5 also applies to permanent modifier / prohibition targets — their
+  // runtime paths call matchesFilter without filterController too.
+  for (const [key, list] of [["modifiers", block.modifiers], ["prohibitions", block.prohibitions]]) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      if (entry && entry.target && entry.target.filter) {
+        checkFilterController(entry.target.filter, `on ${key} ${entry.type || ""}`.trim(), ctx, issues);
+      }
+    }
+  }
 
   for (const { filter, target, action } of walkFilters(block.actions)) {
     // C1: removed — traits vs traits_contains depends on card text wording
@@ -823,6 +857,12 @@ function lintFilters(block, ctx, issues) {
         ),
       );
     }
+
+    // C5 (OPT-409): `controller` inside a Target.filter is silently ignored
+    // on normal targeting paths — matchesFilter only enforces it when the
+    // caller passes filterController, which the target-resolver never does.
+    // Scope the target with Target.controller instead.
+    checkFilterController(filter, `on ${action.type}`, ctx, issues);
 
     // C4: exclude_self on non-SELF/EITHER targets
     if (
