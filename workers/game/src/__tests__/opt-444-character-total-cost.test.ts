@@ -233,8 +233,11 @@ describe("OPT-444: OP10-022 activation gates on total character cost", () => {
     );
     // The RETURN_OWN_CHARACTER_TO_HAND cost opens its target selection with
     // both characters offered — the activation chain is intact past the gate.
-    expect(accepted.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(accepted.pendingPrompt?.options.validTargets).toEqual(
+    const options = accepted.pendingPrompt?.options;
+    if (options?.promptType !== "SELECT_TARGET") {
+      throw new Error(`expected SELECT_TARGET prompt, got ${options?.promptType}`);
+    }
+    expect(options.validTargets).toEqual(
       expect.arrayContaining(["char-0-a", "char-0-b"]),
     );
   });
