@@ -253,6 +253,7 @@ export function resumeFromStack(
                 ...replacementFrame.pendingTriggers,
                 ...topFrame.pendingTriggers,
               ],
+              replacementBatchContinuation: topFrame.replacementBatchContinuation,
             });
           }
         }
@@ -295,6 +296,12 @@ export function resumeFromStack(
         events.push(...chainResult.events);
 
         if (chainResult.pendingPrompt) {
+          const nestedFrame = peekFrame(nextState) as EffectStackFrame | null;
+          if (nestedFrame && topFrame.replacementBatchContinuation) {
+            nextState = updateTopFrame(nextState, {
+              replacementBatchContinuation: topFrame.replacementBatchContinuation,
+            });
+          }
           return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
         }
 

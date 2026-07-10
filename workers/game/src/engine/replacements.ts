@@ -585,6 +585,12 @@ function applyReplacement(
   const events: PendingEvent[] = [];
   let nextState = state;
 
+  // Accepting the replacement consumes its once-per-turn use before any
+  // substitute action runs; that action can itself raise the same event.
+  if (params.once_per_turn) {
+    nextState = markReplacementUsed(nextState, effect, nextState.turn.number);
+  }
+
   // Execute the complete substitute chain through the real resolver so any
   // prompt gets its own stack frame and later substitute actions are retained.
   // sourceCardInstanceId = the replacement's source (e.g. Tashigi), so that
@@ -617,11 +623,6 @@ function applyReplacement(
         return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
       }
     }
-  }
-
-  // Mark once-per-turn if applicable
-  if (params.once_per_turn) {
-    nextState = markReplacementUsed(nextState, effect, nextState.turn.number);
   }
 
   return { replaced: true, state: nextState, events };
@@ -984,9 +985,49 @@ export function resumeReplacementBatch(
     ...ctx,
     protectedIds: [...protectedIds],
   };
-  const rest = stepBatch(nextState, nextCtx, ctx.currentMatchIndex + 1, cardDb);
+  return finishReplacementBatch(
+    nextState,
+    nextCtx,
+    ctx.currentMatchIndex + 1,
+    events,
+    cardDb,
+  );
+}
+
+/** Continue an accepted replacement after its substitute prompt has resolved. */
+export function continueReplacementBatchAfterSubstitute(
+  state: GameState,
+  ctx: ReplacementBatchResumeContext,
+  cardDb: Map<string, CardData>,
+): BatchResumeResult {
+  const protectedIds = new Set(ctx.protectedIds);
+  const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
+  if (currentMatch) {
+    for (const id of currentMatch.matchedTargetIds) protectedIds.add(id);
+  }
+  const nextCtx: ReplacementBatchResumeContext = {
+    ...ctx,
+    protectedIds: [...protectedIds],
+  };
+  return finishReplacementBatch(
+    state,
+    nextCtx,
+    ctx.currentMatchIndex + 1,
+    [],
+    cardDb,
+  );
+}
+
+function finishReplacementBatch(
+  state: GameState,
+  ctx: ReplacementBatchResumeContext,
+  startMatchIndex: number,
+  priorEvents: PendingEvent[],
+  cardDb: Map<string, CardData>,
+): BatchResumeResult {
+  const rest = stepBatch(state, ctx, startMatchIndex, cardDb);
   let resumeState = rest.state;
-  const resumeEvents = [...events, ...rest.events];
+  const resumeEvents = [...priorEvents, ...rest.events];
 
   if (rest.pendingPrompt) {
     return {

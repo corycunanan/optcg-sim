@@ -395,6 +395,37 @@ export function executeActionChain(
 
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
+      const rawContext = result.pendingPrompt.resumeContext as { type?: unknown } | null;
+      const isReplacementPrompt = rawContext?.type === "REPLACEMENT" ||
+        rawContext?.type === "REPLACEMENT_BATCH";
+      if (isReplacementPrompt) {
+        const continuationFrame: EffectStackFrame = {
+          id: generateFrameId(),
+          sourceCardInstanceId,
+          controller,
+          effectBlock: {} as EffectBlock,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          pausedAction: action,
+          remainingActions: actions.slice(i + 1),
+          resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+          validTargets: [],
+          priorActionSucceeded: false,
+          costs: [],
+          currentCostIndex: 0,
+          costsPaid: true,
+          oncePerTurnMarked: true,
+          costResultRefs: [],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        return {
+          state: pushFrame(result.state, continuationFrame),
+          events,
+          pendingPrompt: result.pendingPrompt,
+        };
+      }
+
       const ctx = result.pendingPrompt.resumeContext as import("../../types.js").ResumeContext;
       const phaseForPrompt = promptTypeToPhase(result.pendingPrompt.options.promptType);
       // Use the resume context's controller — it may differ from the chain's

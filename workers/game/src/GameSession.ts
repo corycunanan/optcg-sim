@@ -106,6 +106,7 @@ import {
 } from "./engine/pregame.js";
 import { continuePipelineFromExecution, runPipeline } from "./engine/pipeline.js";
 import {
+  continueReplacementBatchAfterSubstitute,
   resumeReplacement,
   resumeReplacementBatch,
   type ReplacementBatchResumeContext,
@@ -961,18 +962,24 @@ export class GameSession implements DurableObject {
         this.cardDb,
       );
       this.gameState = batchResult.state;
-      this.recordReplacementContinuationResult(
-        batchResult.finalizedIds.length > 0,
-        batchResult.finalizedIds,
-      );
 
       if (batchResult.pendingPrompt) {
+        if (this.gameState.effectStack.length > stateBeforeResume.effectStack.length) {
+          this.attachReplacementBatchContinuation(
+            resumeCtx as unknown as ReplacementBatchResumeContext,
+          );
+        }
         this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
       } else {
+        this.recordReplacementContinuationResult(
+          batchResult.finalizedIds.length > 0,
+          batchResult.finalizedIds,
+        );
         this.resumeInterruptedEffectContinuations(action);
       }
     } else if (this.gameState.effectStack.length > 0) {
       // Stack-based resume — use new effect stack system
+      const resumedFrame = this.gameState.effectStack.at(-1) as unknown as EffectStackFrame;
       const resumeResult = resumeFromStack(this.gameState, action, this.cardDb);
       this.gameState = resumeResult.state;
 
@@ -985,7 +992,10 @@ export class GameSession implements DurableObject {
         // router may have popped while validating the response.
         this.gameState = stateBeforeResume;
       } else {
-        this.resumeInterruptedEffectContinuations(action);
+        this.completeReplacementBatchContinuation(resumedFrame);
+        if (!this.gameState.pendingPrompt) {
+          this.resumeInterruptedEffectContinuations(action);
+        }
       }
     } else {
       // Legacy: bare ResumeContext (no stack frame) — fallback for backward compat
@@ -1100,6 +1110,39 @@ export class GameSession implements DurableObject {
     };
   }
 
+  private attachReplacementBatchContinuation(
+    context: ReplacementBatchResumeContext,
+  ): void {
+    if (!this.gameState || this.gameState.effectStack.length === 0) return;
+    const index = this.gameState.effectStack.length - 1;
+    const frame = this.gameState.effectStack[index] as unknown as EffectStackFrame;
+    this.gameState = {
+      ...this.gameState,
+      effectStack: [
+        ...this.gameState.effectStack.slice(0, index),
+        { ...frame, replacementBatchContinuation: context },
+      ],
+    };
+  }
+
+  private completeReplacementBatchContinuation(frame: EffectStackFrame): void {
+    if (!this.gameState || !this.cardDb || !frame.replacementBatchContinuation) return;
+    const batchResult = continueReplacementBatchAfterSubstitute(
+      this.gameState,
+      frame.replacementBatchContinuation,
+      this.cardDb,
+    );
+    this.gameState = batchResult.state;
+    if (batchResult.pendingPrompt) {
+      this.gameState = { ...this.gameState, pendingPrompt: batchResult.pendingPrompt };
+      return;
+    }
+    this.recordReplacementContinuationResult(
+      batchResult.finalizedIds.length > 0,
+      batchResult.finalizedIds,
+    );
+  }
+
   /** Drain a parked outer effect after any nested replacement prompt resolves. */
   private resumeInterruptedEffectContinuations(action: GameAction): void {
     if (!this.gameState || !this.cardDb) return;
@@ -1107,10 +1150,16 @@ export class GameSession implements DurableObject {
       !this.gameState.pendingPrompt
       && this.gameState.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS"
     ) {
+      const resumedFrame = this.gameState.effectStack.at(-1) as unknown as EffectStackFrame;
       const continuation = resumeFromStack(this.gameState, action, this.cardDb);
       this.gameState = continuation.state;
       if (continuation.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: continuation.pendingPrompt };
+        break;
+      }
+      this.completeReplacementBatchContinuation(resumedFrame);
+      if (this.gameState.pendingPrompt) {
+        break;
       }
     }
   }
