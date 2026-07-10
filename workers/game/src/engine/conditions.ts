@@ -22,7 +22,7 @@ import type {
   EffectResult,
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
-import { getEffectivePower, getEffectiveCost, hasGrantedAttribute } from "./modifiers.js";
+import { getEffectivePower, getEffectiveCost, getEffectiveFieldCost, hasGrantedAttribute } from "./modifiers.js";
 import { hasEffectiveKeyword } from "./keywords.js";
 import { findCardInstance } from "./state.js";
 
@@ -82,13 +82,14 @@ function evaluateSimple(
 
     case "CHARACTER_TOTAL_COST": {
       // OPT-444: unqualified "cost" reads the effective (post-modifier) cost,
-      // consistent with cost_* target filters (OPT-247).
+      // consistent with cost_* target filters (OPT-247). Field cost only —
+      // pending play-time discounts must not change an on-field total.
       const p = getPlayerByController(state, cond.controller, ctx.controller);
       const total = p.characters.reduce((sum, c) => {
         if (!c) return sum;
         const data = ctx.cardDb.get(c.cardId);
         if (!data) return sum;
-        return sum + getEffectiveCost(data, state, c.instanceId, ctx.cardDb);
+        return sum + getEffectiveFieldCost(data, state, c.instanceId, ctx.cardDb);
       }, 0);
       return compareNum(total, cond.operator, cond.value);
     }

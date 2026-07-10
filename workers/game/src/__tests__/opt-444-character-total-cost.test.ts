@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
-import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import type { RuntimeActiveEffect, RuntimeOneTimeModifier } from "../engine/effect-types.js";
 import { evaluateCondition } from "../engine/conditions.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { OP10_022_TRAFALGAR_LAW } from "../engine/schemas/op10.js";
@@ -116,6 +116,30 @@ describe("OPT-444: CHARACTER_TOTAL_COST condition", () => {
       { ...CTX, cardDb },
     )).toBe(true);
   });
+
+  it("a pending play-time discount does not change the on-field total", () => {
+    const cardDb = createTestCardDb();
+    // 3 + 2 = 5 on the field; a pending "next play −1" one-time modifier
+    // matching every character must not drag the field total to 4.
+    let state = withCharacters(createBattleReadyState(cardDb), 0, [
+      charInstance(CARDS.VANILLA.id, "a"), // cost 3
+      charInstance(CARDS.RUSH.id, "b"), // cost 2
+    ]);
+    const pendingDiscount: RuntimeOneTimeModifier = {
+      id: "opt444-next-play-discount",
+      appliesTo: { action: "MODIFY_COST" as never },
+      modification: { type: "MODIFY_COST", params: { amount: -1 } },
+      expires: { type: "THIS_TURN" } as never,
+      consumed: false,
+      controller: 0,
+    };
+    state = { ...state, oneTimeModifiers: [pendingDiscount as never] };
+    expect(evaluateCondition(
+      state,
+      { type: "CHARACTER_TOTAL_COST", controller: "SELF", operator: ">=", value: 5 },
+      { ...CTX, cardDb },
+    )).toBe(true);
+  });
 });
 
 describe("OPT-444: OP10-022 activation gates on total character cost", () => {
@@ -182,5 +206,36 @@ describe("OPT-444: OP10-022 activation gates on total character cost", () => {
     );
     expect(result.valid).toBe(true);
     expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+  });
+
+  it("accepting the activation chains into the return-to-hand cost selection", async () => {
+    const { state, cardDb } = lawState([
+      charInstance(CARDS.VANILLA.id, "a"), // 3
+      charInstance(CARDS.RUSH.id, "b"), // 2
+    ]);
+    const result = runPipeline(
+      state,
+      {
+        type: "ACTIVATE_EFFECT",
+        cardInstanceId: state.players[0].leader.instanceId,
+        effectId: "activate_reveal_life_play",
+      },
+      cardDb,
+      0,
+    );
+    expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+
+    const { resumeFromStack } = await import("../engine/effect-resolver/index.js");
+    const accepted = resumeFromStack(
+      result.state,
+      { type: "PLAYER_CHOICE", choiceId: "activate" } as never,
+      cardDb,
+    );
+    // The RETURN_OWN_CHARACTER_TO_HAND cost opens its target selection with
+    // both characters offered — the activation chain is intact past the gate.
+    expect(accepted.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(accepted.pendingPrompt?.options.validTargets).toEqual(
+      expect.arrayContaining(["char-0-a", "char-0-b"]),
+    );
   });
 });

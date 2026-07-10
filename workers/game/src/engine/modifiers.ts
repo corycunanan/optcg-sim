@@ -248,6 +248,7 @@ export function getEffectiveCost(
   state?: GameState,
   cardInstanceId?: string,
   cardDb?: Map<string, CardData>,
+  playTimeAdjustments = true,
 ): number {
   // Layer 0
   let cost = cardData.cost ?? 0;
@@ -291,26 +292,45 @@ export function getEffectiveCost(
     // ones — this also guarantees termination (cycle-free).
     cost = applyLayer2CostModifiers(cost, cardInstanceId, card, state, cardDb, effects, turnPlayerIndex);
 
-    // One-time modifiers (unconsumed, matching cost modification for this play action)
-    const oneTimeModifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
-    for (const otm of oneTimeModifiers) {
-      if (otm.consumed) continue;
-      if (otm.modification.type !== "MODIFY_COST") continue;
-      if (!matchesOneTimeFilter(otm, cardData, state)) continue;
+    // Play-time-only adjustments (OPT-444: skipped for on-field cost reads —
+    // a pending "next time you play X" discount or hand-zone self-reduction
+    // must not change the cost of a permanent already in play).
+    if (playTimeAdjustments) {
+      // One-time modifiers (unconsumed, matching cost modification for this play action)
+      const oneTimeModifiers = state.oneTimeModifiers as RuntimeOneTimeModifier[];
+      for (const otm of oneTimeModifiers) {
+        if (otm.consumed) continue;
+        if (otm.modification.type !== "MODIFY_COST") continue;
+        if (!matchesOneTimeFilter(otm, cardData, state)) continue;
 
-      if (otm.modification.params?.amount !== undefined) {
-        cost += otm.modification.params.amount as number;
+        if (otm.modification.params?.amount !== undefined) {
+          cost += otm.modification.params.amount as number;
+        }
       }
-    }
 
-    // Hand-zone permanent modifiers (self-cost-reduction while in hand)
-    if (cardDb) {
-      cost += getHandZoneSelfCostModifier(cardData, state, cardInstanceId, cardDb);
-      cost += getFieldToHandCostModifier(cardData, state, cardInstanceId, cardDb);
+      // Hand-zone permanent modifiers (self-cost-reduction while in hand)
+      if (cardDb) {
+        cost += getHandZoneSelfCostModifier(cardData, state, cardInstanceId, cardDb);
+        cost += getFieldToHandCostModifier(cardData, state, cardInstanceId, cardDb);
+      }
     }
   }
 
   return Math.max(0, cost);
+}
+
+/**
+ * OPT-444: effective cost of a card already on the field — base cost plus
+ * SET_COST / MODIFY_COST active effects only. Play-time adjustments (pending
+ * one-time "next play" discounts, hand-zone self-reductions) are excluded.
+ */
+export function getEffectiveFieldCost(
+  cardData: CardData,
+  state: GameState,
+  cardInstanceId: string,
+  cardDb?: Map<string, CardData>,
+): number {
+  return getEffectiveCost(cardData, state, cardInstanceId, cardDb, false);
 }
 
 /**
