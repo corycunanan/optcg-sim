@@ -19,20 +19,23 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-423 | Schema validator rejects keyword-only permanent blocks | — | — | Done | [#253](https://github.com/corycunanan/optcg-sim/pull/253) | Restores useful schema-validation signal before the bulk audit. |
 | 2 | OPT-447 | Six activate effects omit ACTIVATE_MAIN triggers | — | OPT-423 | Done | [#254](https://github.com/corycunanan/optcg-sim/pull/254) | Newly visible real validation failures; fix while the schema signal context is fresh. |
 | 3 | OPT-439 | Rejected SELECT_TARGET drops remaining actions or resumes the wrong frame | — | — | Done | [#255](https://github.com/corycunanan/optcg-sim/pull/255) | Merged 2026-07-10 (`a981358`, reviewed head `fea1188`). Review-driven fixes extended into nested replacement batching and continuation events — see `docs/project/pr-255-workflow-retro.md`. |
-| 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Backlog | — | Re-verify after OPT-439; close as covered/duplicate if the generalized fix and tests fully satisfy it. |
-| 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | Backlog | — | Establish symmetric stack handling before compound-cost work. |
-| 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Todo | — | Finish prompt rejection semantics after the frame fix. |
+| 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Duplicate | — | Verified 2026-07-10: exact scenario re-run through `GameSession.handleAction` passes on main; covered by OPT-438 + OPT-439. Evidence in a Linear comment. |
+| 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | In Review | [#257](https://github.com/corycunanan/optcg-sim/pull/257) | Symmetric frame retirement + pendingTriggers carry-over. Review re-confirmed OPT-431/OPT-430 as the remaining OP10-026/027 gaps. |
+| 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | In Review | [#258](https://github.com/corycunanan/optcg-sim/pull/258) | Gate accepts `skip`; replacement paths share the decline predicate; game:error on engine rejections. Delta review surfaced pre-existing OPT-448/OPT-449. |
 | 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Backlog | — | Design jointly with OPT-430 around one source-scoped compound-cost primitive. |
 | 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Backlog | — | Keep adjacent to OPT-431; one shared root implementation may close both. |
 | 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | Backlog | — | Reuse source-instance identity conventions from the compound-cost work. |
-| 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Todo | — | Add the missing metric before the schema-wide condition audit. |
+| 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | In Review | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450 (pre-existing on-field cost reads use play cost). |
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | Backlog | — | Rebaseline after OPT-442, then split into lint/tooling plus set-family batches. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Backlog | — | Low-risk cleanup scheduled after shared schema/filter surfaces settle. |
+| 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Reject prompt-identified actions when no prompt is pending. |
+| 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
+| 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-427 (ready now — PR #255 merged); verification-first, re-verify whether OPT-439 fully covers it.
+**Next up:** OPT-409 (ready now, independent); OPT-431 + OPT-430 jointly once PR #257 merges; OPT-437 once PR #259 merges.
 
 ---
 
@@ -62,5 +65,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Primer:** Rejected mid-action responses now restore the exact popped frame when no replacement frame was pushed, preserving nested-stack identity, remaining actions, result refs, and queued triggers.
 - **Read first:** `workers/game/src/engine/effect-resolver/resume.ts`, `workers/game/src/__tests__/opt-439-rejected-frame-restoration.test.ts`, and the OPT-427 DON-return reproduction.
 - **Gotchas / do NOT touch:** Explicit PASS/`skip` remains a real decline and must not restore a frame. Successful handlers that push a replacement frame must not retain the old frame underneath it.
-- **Unresolved:** Re-run OPT-427's exact scenario after PR #255 merges; mark it Duplicate only if the generalized no-prompt rejection regression fully satisfies its acceptance criteria.
+- **Unresolved:** Re-run OPT-427's exact scenario after PR #255 merges; mark it Duplicate only if the generalized no-prompt rejection regression fully satisfies its acceptance criteria. *(Resolved 2026-07-10: verified covered; OPT-427 closed as Duplicate of OPT-439.)*
 - **Pointer:** PR #255 is the system-level frame-restoration change; OPT-427 should be verification-first rather than a parallel implementation.
+
+### OPT-444 → OPT-437
+**From:** session on 2026-07-10 · **Commit:** `25b8701` (reviewed head `46ef531` + type-narrowing fixup) · **PR:** [#259](https://github.com/corycunanan/optcg-sim/pull/259)
+
+- **Primer:** New `CHARACTER_TOTAL_COST` condition (controller/operator/value) sums the controller's characters' **field** cost via the new `getEffectiveFieldCost` — base + SET_COST/MODIFY_COST auras, explicitly excluding play-time adjustments (pending one-time "next play" discounts, hand-zone self-reductions). OP10-022 re-encoded onto it; docs sweep confirms it's the only "total cost" card text in all 51 sets.
+- **Read first:** `workers/game/src/engine/modifiers.ts` (`getEffectiveCost`'s `playTimeAdjustments` split), `workers/game/src/engine/conditions.ts` (`CHARACTER_TOTAL_COST` case), `workers/game/src/__tests__/opt-444-character-total-cost.test.ts`.
+- **Gotchas / do NOT touch:** Pre-existing on-field cost reads (`cost_*` filters at `conditions.ts:~759`, `SELF_COST` at `~257`) still use play cost — that's OPT-450, deliberately out of scope here. Run `pnpm type-check:worker` (or `tsc --noEmit` in `workers/game`) before every PR — root `type-check` does not cover the worker, and a delta review caught a TS2339 the root check missed.
+- **Unresolved:** OPT-437's rebaseline should treat CHARACTER_TOTAL_COST as an available predicate when re-auditing post-colon conditions.
+- **Pointer:** PR #259. Handoff doc note: PRs #257/#258/#259 each carry divergent edits to this file — this branch's version is the superset; prefer it when resolving merge conflicts.
