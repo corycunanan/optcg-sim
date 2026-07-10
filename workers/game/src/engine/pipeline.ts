@@ -150,12 +150,13 @@ function fireEventsAndTriggers(
   execResult: ExecuteResult,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  recordPerformedAction = true,
 ): GameState {
   const pi = state.turn.activePlayerIndex;
 
   // Emit all events from execution
   for (const event of execResult.events) {
-    state = emitPendingEvent(state, event, pi);
+    if (!event.__alreadyEmitted) state = emitPendingEvent(state, event, pi);
   }
 
   // Register triggers for newly played cards BEFORE matching
@@ -223,7 +224,7 @@ function fireEventsAndTriggers(
     if (result.pendingPrompt) {
       state = recalculateBattlePowers(state, cardDb);
       state = { ...state, pendingPrompt: result.pendingPrompt };
-      state = recordAction(state, action);
+      if (recordPerformedAction) state = recordAction(state, action);
       return state;
     }
 
@@ -231,8 +232,37 @@ function fireEventsAndTriggers(
   }
 
   // Record the action performed
-  state = recordAction(state, action);
+  if (recordPerformedAction) state = recordAction(state, action);
   return state;
+}
+
+/**
+ * Finish an execution result produced after an effect prompt resumes. This is
+ * the Step 5-7 half of runPipeline: continuation events still fire auto effects,
+ * recalculate modifiers, and perform lethal rule processing, but the prompt
+ * response is not recorded as a second gameplay action.
+ */
+export function continuePipelineFromExecution(
+  state: GameState,
+  execResult: ExecuteResult,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): PipelineResult {
+  const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
+  let nextState = fireEventsAndTriggers(
+    state,
+    execResult,
+    continuationAction,
+    cardDb,
+    false,
+  );
+
+  if (nextState.pendingPrompt) {
+    return { state: nextState, valid: true, pendingPrompt: nextState.pendingPrompt };
+  }
+
+  nextState = recalculateModifiers(nextState, continuationAction, cardDb);
+  return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
 }
 
 /**

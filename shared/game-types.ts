@@ -123,6 +123,16 @@ export interface TurnState {
     sourceCardInstanceId: string;
     controllerIndex: 0 | 1;    // controller of the effect that dealt the damage
   } | null;
+  // OPT-441: a battle-damage [Trigger] effect may pause on the effect stack.
+  // Keep the completed Life damage's battle identity until that stack (and any
+  // CARD_REMOVED_FROM_LIFE auto effects queued behind it) fully unwinds, then
+  // resume the remaining Double Attack damage through the normal pipeline.
+  pendingBattleDamageContinuation?: {
+    battleId: string;
+    lifeCardInstanceId: string;
+    damagedPlayerIndex: 0 | 1;
+    stage: "LIFE_REMOVAL" | "DAMAGE";
+  } | null;
   // Per-turn sticky flag: set to true the first time a player's deck transitions
   // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
   // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).
@@ -291,6 +301,12 @@ export type PendingGameEvent = {
      * re-scans the same events at the LIFO trigger-queue boundary.
      */
     __scannedForTriggers?: boolean;
+    /**
+     * The event is already present in GameState.eventLog but still needs its
+     * trigger-matching pass. Used when an event must be published before a
+     * prompt while its auto effects wait for the current effect stack.
+     */
+    __alreadyEmitted?: boolean;
   };
 }[GameEventType];
 
