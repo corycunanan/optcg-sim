@@ -934,10 +934,12 @@ export const OP10_026_KINEMON: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
+      // OPT-431/OPT-430: "this Character and 1 [Kin'emon] with 0 power from
+      // your trash ... in any order" — the self half is fixed to the source
+      // and the whole group is ordered in one arrange prompt.
       costs: [
-        { type: "PLACE_OWN_CHARACTER_TO_DECK", position: "BOTTOM" },
         {
-          type: "PLACE_FROM_TRASH_TO_DECK",
+          type: "PLACE_SELF_AND_TRASH_TO_DECK",
           amount: 1,
           filter: { name: "Kin'emon", power_exact: 0 },
           position: "BOTTOM",
@@ -975,10 +977,10 @@ export const OP10_027_KINEMON: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
+      // OPT-431/OPT-430: same compound self+trash cost as OP10-026.
       costs: [
-        { type: "PLACE_OWN_CHARACTER_TO_DECK", position: "BOTTOM" },
         {
-          type: "PLACE_FROM_TRASH_TO_DECK",
+          type: "PLACE_SELF_AND_TRASH_TO_DECK",
           amount: 1,
           filter: { name: "Kin'emon", power_exact: 1000 },
           position: "BOTTOM",
