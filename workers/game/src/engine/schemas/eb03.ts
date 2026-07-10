@@ -1155,15 +1155,16 @@ export const EB03_028_YU: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "SELF",
-        operator: "<=",
-        value: 4,
-      },
       actions: [
         {
           type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 4,
+          },
           params: { amount: 2 },
         },
       ],
@@ -1186,14 +1187,15 @@ export const EB03_029_INSOLENT_FOOL_STAND_DOWN: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 4 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Boa Hancock" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Boa Hancock" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -1244,14 +1246,15 @@ export const EB03_031_VINSMOKE_REIJU: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY", turn_restriction: "YOUR_TURN" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Sanji" },
-      },
       actions: [
         {
           type: "ACTIVATE_EVENT_FROM_TRASH",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Sanji" },
+          },
           target: {
             type: "EVENT_CARD",
             controller: "SELF",
@@ -1481,23 +1484,24 @@ export const EB03_038_THANKS_FOR_THE_TREAT: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
-        all_of: [
-          {
-            type: "COMPARATIVE",
-            metric: "DON_FIELD_COUNT",
-            operator: "<=",
-          },
-          {
-            type: "FIELD_PURITY",
-            controller: "SELF",
-            filter: { card_type: "CHARACTER", traits_contains: ["GERMA"] },
-          },
-        ],
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            all_of: [
+              {
+                type: "COMPARATIVE",
+                metric: "DON_FIELD_COUNT",
+                operator: "<=",
+              },
+              {
+                type: "FIELD_PURITY",
+                controller: "SELF",
+                filter: { card_type: "CHARACTER", traits_contains: ["GERMA"] },
+              },
+            ],
+          },
           params: { amount: 2, target_state: "RESTED" },
         },
       ],
@@ -1947,14 +1951,15 @@ export const EB03_049_I_KNEW_YOU_PEOPLE_WERE_BEHIND_THIS: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 7 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Perona" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Perona" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2068,14 +2073,16 @@ export const EB03_052_SHIRAHOSHI: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Shirahoshi" },
-      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          // The "Then, ... gain +1000 power" clause below stays unconditional (chain: "THEN").
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Shirahoshi" },
+          },
           params: { amount: 1, position: "TOP" },
         },
         {
@@ -2203,14 +2210,15 @@ export const EB03_055_NICO_ROBIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_LIFE", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Straw Hat Crew" },
-      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Straw Hat Crew" },
+          },
           params: { amount: 2, position: "TOP" },
         },
       ],

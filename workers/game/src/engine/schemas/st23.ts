@@ -115,14 +115,15 @@ export const ST23_003_BENN_BECKMAN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Red-Haired Pirates" },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Red-Haired Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

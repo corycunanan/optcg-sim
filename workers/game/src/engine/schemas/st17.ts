@@ -68,14 +68,15 @@ export const ST17_002_TRAFALGAR_LAW: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "The Seven Warlords of the Sea" },
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "The Seven Warlords of the Sea" },
+          },
           target: {
             type: "CHARACTER",
             controller: "EITHER",

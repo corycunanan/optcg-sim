@@ -171,11 +171,6 @@ export const ST25_004_BUGGY: EffectSchema = {
         { type: "TRASH_FROM_HAND", amount: 1 },
         { type: "TRASH_SELF" },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Buggy" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
@@ -186,6 +181,12 @@ export const ST25_004_BUGGY: EffectSchema = {
             filter: { traits: ["Cross Guild"], cost_max: 6 },
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Buggy" },
+          },
         },
       ],
       flags: { optional: true },

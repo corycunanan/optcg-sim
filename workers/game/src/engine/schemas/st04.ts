@@ -361,13 +361,17 @@ export const ST04_017_ONIGASHIMA_ISLAND: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Animal Kingdom Pirates" },
-      },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } },
+        {
+          type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Animal Kingdom Pirates" },
+          },
+          params: { amount: 1, target_state: "RESTED" },
+        },
       ],
       flags: { optional: true },
     },

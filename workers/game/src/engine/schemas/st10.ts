@@ -341,15 +341,16 @@ export const ST10_010_TRAFALGAR_LAW: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 7,
-      },
       actions: [
         {
           type: "OPPONENT_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 7,
+          },
           params: {
             mandatory: true,
             action: {

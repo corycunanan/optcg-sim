@@ -1908,15 +1908,16 @@ export const OP13_057_IF_I_BOWED_DOWN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
-        type: "LIFE_COUNT",
-        controller: "SELF",
-        operator: "<=",
-        value: 1,
-      },
       actions: [
         {
           type: "APPLY_PROHIBITION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 1,
+          },
           params: {
             prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
             scope: { when_attacking: { type: "YOUR_LEADER" } },
@@ -2556,23 +2557,24 @@ export const OP13_075_GUESS_WELL_HAVE_ANOTHER_SCRAP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
-        all_of: [
-          {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { name: "Gol.D.Roger" },
-          },
-          {
-            type: "DON_GIVEN",
-            controller: "SELF",
-            mode: "ANY_CARD_HAS_DON",
-          },
-        ],
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            all_of: [
+              {
+                type: "LEADER_PROPERTY",
+                controller: "SELF",
+                property: { name: "Gol.D.Roger" },
+              },
+              {
+                type: "DON_GIVEN",
+                controller: "SELF",
+                mode: "ANY_CARD_HAS_DON",
+              },
+            ],
+          },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -2611,14 +2613,15 @@ export const OP13_076_DIVINE_DEPARTURE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 5 }],
-      conditions: {
-        type: "DON_GIVEN",
-        controller: "SELF",
-        mode: "ANY_CARD_HAS_DON",
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "ANY_CARD_HAS_DON",
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2668,14 +2671,15 @@ export const OP13_077_GO_ALL_THE_WAY_TO_THE_TOP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 3 }],
-      conditions: {
-        type: "DON_GIVEN",
-        controller: "SELF",
-        mode: "ANY_CARD_HAS_DON",
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "ANY_CARD_HAS_DON",
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3367,14 +3371,15 @@ export const OP13_095_SAINT_ROSWARD: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        type: "FIELD_PURITY",
-        controller: "SELF",
-        filter: { card_type: "CHARACTER", traits: ["Celestial Dragons"] },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "FIELD_PURITY",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER", traits: ["Celestial Dragons"] },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3444,14 +3449,15 @@ export const OP13_097_THE_WORLDS_EQUILIBRIUM: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 5 }],
-      conditions: {
-        type: "FIELD_PURITY",
-        controller: "SELF",
-        filter: { card_type: "CHARACTER", traits: ["Celestial Dragons"] },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "FIELD_PURITY",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER", traits: ["Celestial Dragons"] },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3494,14 +3500,15 @@ export const OP13_098_NEVER_EXISTED: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Imu" },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Imu" },
+          },
           target: {
             type: "STAGE",
             controller: "OPPONENT",
@@ -3659,18 +3666,25 @@ export const OP13_102_EDISON: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "LIFE_COUNT",
-        operator: "<=",
-      },
       actions: [
         {
           type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "LIFE_COUNT",
+            operator: "<=",
+          },
           params: { amount: 1 },
         },
         {
           type: "SET_REST",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "LIFE_COUNT",
+            operator: "<=",
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3726,14 +3740,15 @@ export const OP13_104_KOUZUKI_HIYORI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_KO" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { multicolored: true },
-      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { multicolored: true },
+          },
           params: { amount: 1, position: "TOP" },
         },
       ],

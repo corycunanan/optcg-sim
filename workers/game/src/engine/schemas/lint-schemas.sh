@@ -326,9 +326,51 @@ function lintSchema(schema) {
 
     // Category E: Cost vs Action Confusion
     lintCostAction(block, ctx, issues);
+
+    // C6 (OPT-437): costs + block-level conditions
+    lintCostConditions(block, ctx, issues);
   }
 
   return issues;
+}
+
+// ─── C6 (OPT-437): costs + block-level conditions ────────────────────────────
+// The resolver evaluates block-level `conditions` BEFORE optional activation
+// and cost payment. A post-colon "If" clause only gates the effect after the
+// colon (Rules 8-3-1/8-3-3) and must live on the gated action(s) instead —
+// block-level placement suppresses legal cost payment. Only verified
+// PRE-COST conditions ("If X, you may <cost>: ...") may keep block-level
+// placement; they are allowlisted here by card:block.
+const C6_PRE_COST_ALLOWLIST = new Set([
+  // Verified pre-cost conditions (If precedes the optional cost) — OPT-437.
+  "OP10-022:activate_reveal_life_play",
+  "OP11-100:on_play_draw",
+  "OP11-103:activate_ko",
+  "OP11-107:activate_set_active_at_eot",
+  "OP11-108:on_play_draw_and_trash",
+  "OP11-117:activate_buff",
+  "OP13-001:OP13-001_on_opponent_attack",
+  "OP13-082:OP13-082_activate_main",
+  // Pending content fixes (partial trait encodings / mixed pre+post
+  // conditions) — tracked by OPT-456; remove entries as that ticket fixes them.
+  "EB04-015:on_ko_play",
+  "OP08-077:main_effect",
+  "OP11-034:activate_prohibition",
+  "OP16-084:activate_trash_self_play_momonosuke",
+]);
+
+function lintCostConditions(block, ctx, issues) {
+  const { cardId, blockId } = ctx;
+  if (!block.costs || block.costs.length === 0 || !block.conditions) return;
+  if (C6_PRE_COST_ALLOWLIST.has(`${cardId}:${blockId}`)) return;
+  issues.push(
+    err(
+      cardId,
+      blockId,
+      "C6",
+      "Block has costs + block-level conditions — a post-colon \"If\" must gate the action(s), not the cost (Rules 8-3-1/8-3-3). Move it onto the gated action, or add to the C6 allowlist if verified pre-cost.",
+    ),
+  );
 }
 
 // ─── Category F: Enum Validation ─────────────────────────────────────────────

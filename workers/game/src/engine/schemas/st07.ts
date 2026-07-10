@@ -23,16 +23,17 @@ export const ST07_001_CHARLOTTE_LINLIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING", don_requirement: 2 },
       costs: [{ type: "LIFE_TO_HAND", amount: 1, position: "TOP_OR_BOTTOM" }],
-      conditions: {
-        type: "LIFE_COUNT",
-        controller: "SELF",
-        operator: "<=",
-        value: 2,
-      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_HAND",
           params: { amount: 1, position: "TOP", face: "DOWN" },
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 2,
+          },
         },
       ],
       flags: { optional: true },

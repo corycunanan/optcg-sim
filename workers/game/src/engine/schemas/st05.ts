@@ -124,13 +124,17 @@ export const ST05_005_CARINA: EffectSchema = {
         { type: "REST_SELF" },
         { type: "TRASH_FROM_HAND", amount: 1, filter: { traits: ["FILM"] } },
       ],
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "DON_FIELD_COUNT",
-        operator: "<",
-      },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED" } },
+        {
+          type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "DON_FIELD_COUNT",
+            operator: "<",
+          },
+          params: { amount: 2, target_state: "RESTED" },
+        },
       ],
       flags: { once_per_turn: true, optional: true },
     },

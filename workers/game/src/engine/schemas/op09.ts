@@ -324,14 +324,15 @@ export const OP09_011_HONGO: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [{ type: "REST_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Red-Haired Pirates" },
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Red-Haired Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -674,14 +675,15 @@ export const OP09_021_RED_FORCE: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [{ type: "REST_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Red-Haired Pirates" },
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Red-Haired Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2008,13 +2010,17 @@ export const OP09_060_EMPTEE_BLUFFS_ISLAND: EffectSchema = {
         { type: "REST_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Cross Guild" },
-      },
       actions: [
-        { type: "DRAW", params: { amount: 2 } },
+        {
+          type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Cross Guild" },
+          },
+          params: { amount: 2 },
+        },
       ],
     },
   ],
@@ -2429,14 +2435,15 @@ export const OP09_075_EUSTASS_CAPTAIN_KID: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "LIFE_TO_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Kid Pirates" },
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Kid Pirates" },
+          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],
@@ -2529,14 +2536,15 @@ export const OP09_078_GUM_GUM_GIANT: EffectSchema = {
         { type: "TRASH_FROM_HAND", amount: 1 },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Straw Hat Crew" },
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Straw Hat Crew" },
+          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -2547,6 +2555,12 @@ export const OP09_078_GUM_GUM_GIANT: EffectSchema = {
         },
         {
           type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Straw Hat Crew" },
+          },
           params: { amount: 2 },
           chain: "THEN",
         },
@@ -2694,14 +2708,15 @@ export const OP09_083_VAN_AUGUR: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Blackbeard Pirates" },
-      },
       actions: [
         {
           type: "MODIFY_COST",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Blackbeard Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2910,15 +2925,25 @@ export const OP09_089_STRONGER: EffectSchema = {
         { type: "TRASH_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Blackbeard Pirates" },
-      },
       actions: [
-        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Blackbeard Pirates" },
+          },
+          params: { amount: 1 },
+        },
         {
           type: "MODIFY_COST",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Blackbeard Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2950,14 +2975,15 @@ export const OP09_090_DOC_Q: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Blackbeard Pirates" },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Blackbeard Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3010,15 +3036,30 @@ export const OP09_092_MARSHALL_D_TEACH: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "HAND_COUNT" as never,
-        operator: "<=",
-        margin: -3,
-      },
       actions: [
-        { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" },
+        {
+          type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "HAND_COUNT" as never,
+            operator: "<=",
+            margin: -3,
+          },
+          params: { amount: 2 },
+        },
+        {
+          type: "TRASH_FROM_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "HAND_COUNT" as never,
+            operator: "<=",
+            margin: -3,
+          },
+          params: { amount: 1 },
+          chain: "AND",
+        },
       ],
     },
   ],

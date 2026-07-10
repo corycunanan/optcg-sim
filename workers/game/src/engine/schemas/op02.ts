@@ -1765,13 +1765,17 @@ export const OP02_066_IMPEL_DOWN_ALL_STARS: EffectSchema = {
       costs: [
         { type: "TRASH_FROM_HAND", amount: 2 },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Impel Down" },
-      },
       actions: [
-        { type: "DRAW", params: { amount: 2 } },
+        {
+          type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Impel Down" },
+          },
+          params: { amount: 2 },
+        },
       ],
       flags: { optional: true },
     },
@@ -1950,15 +1954,25 @@ export const OP02_070_NEW_KAMA_LAND: EffectSchema = {
       costs: [
         { type: "REST_SELF" },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Emporio.Ivankov" },
-      },
       actions: [
-        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Emporio.Ivankov" },
+          },
+          params: { amount: 1 },
+        },
         {
           type: "TRASH_FROM_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Emporio.Ivankov" },
+          },
           target: {
             type: "CARD_IN_HAND",
             controller: "SELF",

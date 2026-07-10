@@ -54,20 +54,28 @@ export const OP01_002_TRAFALGAR_LAW: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_REST", amount: 2 }],
-      conditions: {
-        type: "CARD_ON_FIELD",
-        controller: "SELF",
-        filter: { card_type: "CHARACTER" },
-        count: { operator: ">=", value: 5 },
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER" },
+            count: { operator: ">=", value: 5 },
+          },
           target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 } },
           result_ref: "returned_char",
         },
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER" },
+            count: { operator: ">=", value: 5 },
+          },
           target: {
             type: "CARD_IN_HAND",
             controller: "SELF",
@@ -1143,14 +1151,15 @@ export const OP01_042_KOMURASAKI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_REST", amount: 3 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Kouzuki Oden" },
-      },
       actions: [
         {
           type: "SET_ACTIVE",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Kouzuki Oden" },
+          },
           target: {
             type: "CHARACTER",
             controller: "SELF",
@@ -2488,14 +2497,15 @@ export const OP01_094_KAIDO: EffectSchema = {
       costs: [
         { type: "DON_MINUS", amount: 6 },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Animal Kingdom Pirates" },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Animal Kingdom Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "EITHER",

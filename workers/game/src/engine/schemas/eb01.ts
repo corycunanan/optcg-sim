@@ -95,23 +95,24 @@ export const EB01_002_IZO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        any_of: [
-          {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Land of Wano" },
-          },
-          {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Whitebeard Pirates" },
-          },
-        ],
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            any_of: [
+              {
+                type: "LEADER_PROPERTY",
+                controller: "SELF",
+                property: { trait: "Land of Wano" },
+              },
+              {
+                type: "LEADER_PROPERTY",
+                controller: "SELF",
+                property: { trait: "Whitebeard Pirates" },
+              },
+            ],
+          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "OPPONENT",
@@ -1079,14 +1080,15 @@ export const EB01_031_KALIFA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Water Seven" },
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Water Seven" },
+          },
           target: {
             type: "CARD_IN_TRASH",
             controller: "SELF",
@@ -1114,14 +1116,15 @@ export const EB01_033_BLUENO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Water Seven" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Water Seven" },
+          },
           target: {
             type: "CHARACTER_CARD",
             source_zone: ["HAND", "TRASH"],
@@ -1160,14 +1163,15 @@ export const EB01_034_MS_WEDNESDAY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait_contains: "Baroque Works" },
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait_contains: "Baroque Works" },
+          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],
@@ -1302,14 +1306,15 @@ export const EB01_038_OH_COME_MY_WAY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait_contains: "Baroque Works" },
-      },
       actions: [
         {
           type: "REDIRECT_ATTACK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait_contains: "Baroque Works" },
+          },
           target: {
             type: "CHARACTER",
             controller: "SELF",

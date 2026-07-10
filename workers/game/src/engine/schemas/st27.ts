@@ -26,14 +26,15 @@ export const ST27_001_AVALO_PIZARRO: EffectSchema = {
       costs: [
         { type: "REST_CARDS", amount: 1, filter: { name: "Fullalead", card_type: "STAGE" } },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Blackbeard Pirates" },
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Blackbeard Pirates" },
+          },
           target: { type: "SELF" },
           params: { amount: 4000 },
           duration: { type: "THIS_TURN" },
@@ -66,14 +67,15 @@ export const ST27_002_CATARINA_DEVON: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Blackbeard Pirates" },
-      },
       actions: [
         {
           type: "MODIFY_COST",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Blackbeard Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

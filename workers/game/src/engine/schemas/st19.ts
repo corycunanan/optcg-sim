@@ -54,13 +54,17 @@ export const ST19_002_SENGOKU: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 2, filter: { color: "BLACK", traits: ["Navy"] } }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Navy" },
-      },
       actions: [
-        { type: "DRAW", params: { amount: 3 } },
+        {
+          type: "DRAW",
+          params: { amount: 3 },
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Navy" },
+          },
+        },
       ],
       flags: { optional: true },
     },

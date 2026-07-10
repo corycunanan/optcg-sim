@@ -800,14 +800,15 @@ export const EB04_019_ELECLAW: EffectSchema = {
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_CARDS", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Minks" },
-      },
       actions: [
         {
           type: "MODIFY_COST",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Minks" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -969,15 +970,16 @@ export const EB04_022_ISSHO: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 2 }],
       flags: { optional: true },
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 6,
-      },
       actions: [
         {
           type: "OPPONENT_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 6,
+          },
           params: {
             action: {
               type: "PLACE_HAND_TO_DECK",
@@ -1228,14 +1230,15 @@ export const EB04_028_ICE_TIME: EffectSchema = {
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Navy" },
-      },
       actions: [
         {
           type: "APPLY_PROHIBITION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Navy" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -1357,14 +1360,16 @@ export const EB04_030_KAIDO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Animal Kingdom Pirates" },
-      },
       actions: [
         {
           type: "GRANT_KEYWORD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          // The "Then, rest ..." clause below stays unconditional (chain: "THEN").
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Animal Kingdom Pirates" },
+          },
           target: { type: "SELF" },
           params: { keyword: "RUSH" },
           duration: { type: "THIS_TURN" },
@@ -1480,14 +1485,15 @@ export const EB04_032_QUEEN: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "REST_DON", amount: 2 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Animal Kingdom Pirates" },
-      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Animal Kingdom Pirates" },
+          },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -1509,15 +1515,16 @@ export const EB04_033_GROGGY_MONSTERS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "CARD_ON_FIELD",
-        controller: "SELF",
-        filter: { traits: ["Foxy Pirates"] },
-        count: { operator: ">=", value: 3 },
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { traits: ["Foxy Pirates"] },
+            count: { operator: ">=", value: 3 },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -1551,17 +1558,18 @@ export const EB04_034_CHARLOTTE_PUDDING: EffectSchema = {
       trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "CARD_TYPE_IN_ZONE",
-        controller: "SELF",
-        card_type: "EVENT",
-        zone: "TRASH",
-        operator: ">=",
-        value: 4,
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_TYPE_IN_ZONE",
+            controller: "SELF",
+            card_type: "EVENT",
+            zone: "TRASH",
+            operator: ">=",
+            value: 4,
+          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -1628,18 +1636,26 @@ export const EB04_036_FOXY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Foxy Pirates" },
-      },
       actions: [
         {
           type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          // The "Then, rest ..." clause below stays unconditional (chain: "THEN").
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Foxy Pirates" },
+          },
           params: { amount: 2 },
         },
         {
           type: "TRASH_FROM_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Foxy Pirates" },
+          },
           params: { amount: 1 },
           chain: "AND",
         },
@@ -2063,14 +2079,15 @@ export const EB04_045_GINNY: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "BOARD_WIDE_EXISTENCE",
-        filter: { cost_min: 8 },
-        count: { operator: ">=", value: 2 },
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "BOARD_WIDE_EXISTENCE",
+            filter: { cost_min: 8 },
+            count: { operator: ">=", value: 2 },
+          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -2693,14 +2710,15 @@ export const EB04_059_BLACK_ROPE_DRAGON_TWISTER: EffectSchema = {
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "CHARACTER_COUNT",
-        operator: "<",
-      },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "CHARACTER_COUNT",
+            operator: "<",
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

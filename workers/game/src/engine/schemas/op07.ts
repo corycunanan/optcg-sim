@@ -1562,16 +1562,17 @@ export const OP07_047_TRAFALGAR_LAW: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
-      conditions: {
-        type: "HAND_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 6,
-      },
       flags: { optional: true },
       actions: [
         {
           type: "OPPONENT_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 6,
+          },
           params: {
             mandatory: true,
             action: {
@@ -2024,15 +2025,16 @@ export const OP07_058_ISLAND_OF_WOMEN: EffectSchema = {
         { type: "TRASH_FROM_HAND", amount: 1 },
         { type: "REST_SELF" },
       ],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Kuja Pirates" },
-      },
       flags: { optional: true },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Kuja Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "SELF",
@@ -2064,15 +2066,16 @@ export const OP07_059_FOXY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       costs: [{ type: "DON_MINUS", amount: 3 }],
-      conditions: {
-        type: "CARD_ON_FIELD",
-        controller: "SELF",
-        filter: { card_type: "CHARACTER", traits: ["Foxy Pirates"] },
-        count: { operator: ">=", value: 3 },
-      },
       actions: [
         {
           type: "APPLY_PROHIBITION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER", traits: ["Foxy Pirates"] },
+            count: { operator: ">=", value: 3 },
+          },
           target: {
             type: "OPPONENT_LEADER",
           },
@@ -2081,6 +2084,13 @@ export const OP07_059_FOXY: EffectSchema = {
         },
         {
           type: "APPLY_PROHIBITION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER", traits: ["Foxy Pirates"] },
+            count: { operator: ">=", value: 3 },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2150,14 +2160,15 @@ export const OP07_061_VINSMOKE_SANJI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "The Vinsmoke Family" },
-      },
       actions: [
         {
           type: "DRAW",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "The Vinsmoke Family" },
+          },
           params: { amount: 1 },
         },
       ],
@@ -2214,14 +2225,15 @@ export const OP07_063_CAPOTE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Foxy Pirates" },
-      },
       actions: [
         {
           type: "APPLY_PROHIBITION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Foxy Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2548,15 +2560,16 @@ export const OP07_073_MONKEY_D_LUFFY: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_MINUS", amount: 3 }],
       flags: { once_per_turn: true },
-      conditions: {
-        type: "CARD_ON_FIELD",
-        controller: "OPPONENT",
-        filter: { card_type: "CHARACTER" },
-        count: { operator: ">=", value: 3 },
-      },
       actions: [
         {
           type: "SET_ACTIVE",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "CARD_ON_FIELD",
+            controller: "OPPONENT",
+            filter: { card_type: "CHARACTER" },
+            count: { operator: ">=", value: 3 },
+          },
           target: { type: "SELF" },
         },
       ],
@@ -2578,15 +2591,16 @@ export const OP07_074_MONDA: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Foxy Pirates" },
-      },
       flags: { optional: true },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Foxy Pirates" },
+          },
           params: { amount: 1, target_state: "RESTED" },
         },
       ],
@@ -3771,16 +3785,18 @@ export const OP07_109_MONKEY_D_LUFFY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
-        type: "LIFE_COUNT",
-        controller: "SELF",
-        operator: "<=",
-        value: 2,
-      },
       flags: { optional: true },
       actions: [
         {
           type: "KO",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          // The "Then, draw 1 card" clause below stays unconditional (chain: "THEN").
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 2,
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

@@ -2158,14 +2158,15 @@ export const OP06_060_VINSMOKE_ICHIJI_3: EffectSchema = {
         { type: "TRASH_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "GERMA 66" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "GERMA 66" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2299,14 +2300,15 @@ export const OP06_063_VINSMOKE_SORA: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "COMPARATIVE",
-        metric: "DON_FIELD_COUNT",
-        operator: "<=",
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "COMPARATIVE",
+            metric: "DON_FIELD_COUNT",
+            operator: "<=",
+          },
           target: {
             type: "CARD_IN_TRASH",
             controller: "SELF",
@@ -2342,14 +2344,15 @@ export const OP06_064_VINSMOKE_NIJI_3: EffectSchema = {
         { type: "TRASH_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "GERMA 66" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "GERMA 66" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2443,14 +2446,15 @@ export const OP06_066_VINSMOKE_YONJI_2: EffectSchema = {
         { type: "TRASH_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "GERMA 66" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "GERMA 66" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2518,14 +2522,15 @@ export const OP06_068_VINSMOKE_REIJU_2: EffectSchema = {
         { type: "TRASH_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "GERMA 66" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "GERMA 66" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2590,14 +2595,15 @@ export const OP06_071_GILD_TESORO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "FILM" },
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "FILM" },
+          },
           target: {
             type: "CARD_IN_TRASH",
             controller: "SELF",
@@ -3612,14 +3618,15 @@ export const OP06_098_THRILLER_BARK: EffectSchema = {
         { type: "REST_SELF" },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Thriller Bark Pirates" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Thriller Bark Pirates" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",

@@ -500,14 +500,15 @@ export const OP08_016_DR_HIRILUK: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Tony Tony.Chopper" },
-      },
       actions: [
         {
           type: "MODIFY_POWER",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { name: "Tony Tony.Chopper" },
+          },
           target: {
             type: "CHARACTER",
             controller: "SELF",
@@ -1094,14 +1095,15 @@ export const OP08_032_MILKY: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Minks" },
-      },
       actions: [
         {
           type: "SET_DON_ACTIVE",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Minks" },
+          },
           params: { amount: 1 },
         },
       ],
@@ -1341,14 +1343,15 @@ export const OP08_039_ZOU: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Minks" },
-      },
       actions: [
         {
           type: "SET_DON_ACTIVE",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Minks" },
+          },
           params: { amount: 1 },
         },
       ],
@@ -1398,14 +1401,15 @@ export const OP08_040_ATMOS: EffectSchema = {
         },
       ],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait_contains: "Whitebeard Pirates" },
-      },
       actions: [
         {
           type: "RETURN_TO_HAND",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait_contains: "Whitebeard Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -1434,14 +1438,15 @@ export const OP08_041_APHELANDRA: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Kuja Pirates" },
-      },
       actions: [
         {
           type: "RETURN_TO_DECK",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Kuja Pirates" },
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -2097,24 +2102,25 @@ export const OP08_059_ALBER: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },
-      conditions: {
-        all_of: [
-          {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Animal Kingdom Pirates" },
-          },
-          {
-            type: "DON_FIELD_COUNT",
-            controller: "SELF",
-            operator: ">=",
-            value: 10,
-          },
-        ],
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            all_of: [
+              {
+                type: "LEADER_PROPERTY",
+                controller: "SELF",
+                property: { trait: "Animal Kingdom Pirates" },
+              },
+              {
+                type: "DON_FIELD_COUNT",
+                controller: "SELF",
+                operator: ">=",
+                value: 10,
+              },
+            ],
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2143,15 +2149,16 @@ export const OP08_060_KING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
-        type: "DON_FIELD_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 5,
-      },
       actions: [
         {
           type: "GRANT_KEYWORD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "DON_FIELD_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 5,
+          },
           target: { type: "SELF" },
           params: { keyword: "RUSH" },
           duration: { type: "THIS_TURN" },
@@ -2207,14 +2214,15 @@ export const OP08_062_CHARLOTTE_KATAKURI: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Big Mom Pirates" },
-      },
       actions: [
         {
           type: "PLAY_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Big Mom Pirates" },
+          },
           target: {
             type: "CHARACTER_CARD",
             controller: "SELF",
@@ -2749,12 +2757,13 @@ export const OP08_079_KAIDO: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
-        type: "WAS_PLAYED_THIS_TURN",
-      },
       actions: [
         {
           type: "TRASH_CARD",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "WAS_PLAYED_THIS_TURN",
+          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -3550,14 +3559,15 @@ export const OP08_101_CHARLOTTE_ANGEL: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "TRASH_FROM_LIFE", amount: 1, position: "TOP" }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Big Mom Pirates" },
-      },
       actions: [
         {
           type: "SCHEDULE_ACTION",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Big Mom Pirates" },
+          },
           params: {
             timing: "END_OF_THIS_TURN",
             action: {
@@ -3890,15 +3900,16 @@ export const OP08_111_S_SHARK: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LIFE_COUNT",
-        controller: "SELF",
-        operator: "<=",
-        value: 2,
-      },
       actions: [
         {
           type: "PLAY_SELF",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 2,
+          },
         },
       ],
     },
@@ -3997,15 +4008,16 @@ export const OP08_114_S_HAWK: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       flags: { optional: true },
-      conditions: {
-        type: "LIFE_COUNT",
-        controller: "SELF",
-        operator: "<=",
-        value: 2,
-      },
       actions: [
         {
           type: "PLAY_SELF",
+          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 2,
+          },
         },
       ],
     },
