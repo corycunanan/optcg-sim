@@ -1,197 +1,112 @@
-# Workflow & Tooling Guide
+# Workflows — Autonomous Linear Ticket Pipeline
 
-> How to use GSD, Claude Code, Gemini, and multi-agent workflows effectively for this project.
-
----
-
-## GSD Workflow Best Practices
-
-### What GSD Auto-Mode Handles Well (No Human Needed)
-
-Tasks with **clear input → deterministic output → verifiable result**:
-
-- Scaffold a project (Next.js + TypeScript + Prisma + Tailwind)
-- Implement a REST API endpoint with known request/response shapes
-- Build a React component from a clear spec
-- Write and run database migrations from a defined schema
-- Set up CI/CD pipelines
-- Write unit/integration tests for existing code
-- Debug a failing test or build error
-- Refactor code with LSP-assisted precision
-- Data pipeline scripts with clear input/output
-- Reading large documents, cross-referencing, and producing structured output
-
-### Where Human-in-the-Loop is Required
-
-**Irreversible decisions:**
-- Tech stack choices (Supabase vs Firebase, Socket.io vs raw ws)
-- Product direction ("Should we support Block formats at launch?")
-- Architecture pivots discovered mid-implementation
-
-**Taste and UX judgment:**
-- Game board interaction feel (card hover, animation timing, layout balance)
-- Counter window UX clarity
-- Mobile layout compromises
-- The frontend-design skill helps with visual quality, but "does this feel like a good card game UI" needs human eyes
-
-**Rules accuracy validation:**
-- The game engine requirements doc should be reviewed by someone who plays competitively
-- Community rulings and judge calls reveal gaps the comprehensive rules don't cover
-
-**Ambiguous requirements:**
-- When multiple reasonable interpretations exist and the wrong one wastes days
-- GSD defaults to "smallest safe reversible action" but sometimes the right answer is to ask
-
-### GSD Context Transfer Between Sessions
-
-Each session starts with a blank context window. Context persists through artifacts:
-
-**Automatic (committed to repo):**
-- All `docs/**/*.md` files — architecture, milestones, game engine, design, project management
-- `docs/project/LEARNINGS.md` — decisions log
-- `docs/project/PRD.md` — source of truth
-
-**GSD-managed (when using structured `/gsd` workflow):**
-- `STATE.md` — quick-glance status (current milestone, slice, what's done, what's next)
-- Slice summaries (`S01-SUMMARY.md`) — compressed version of everything that happened
-- Task summaries (`T01-SUMMARY.md`) — what was done, decided, and what to watch out for
-- `DECISIONS.md` — append-only architectural choices
-
-**Starting a new session:**
-- Point it at the repo and say "Read the docs/ directory to get up to speed, then [next task]"
-- Or run `/gsd` to enter structured workflow — it reads STATE.md and picks up automatically
-- The docs ARE the context transfer mechanism
-
-**What's lost between sessions:**
-- Conversational nuance and back-and-forth discussion
-- Implicit understanding of preferences not written down
-- Mental model of priorities
-
-If something matters for the next session, write it down in `LEARNINGS.md` or a project context file.
+> The canonical description of how tickets get implemented, reviewed, and merged in this repo.
+> Executable instructions live in the skills; this doc is the map. If a skill and this doc
+> disagree, fix the disagreement — don't fork a third description.
+>
+> Priorities, in order: **correctness > speed > cost.**
 
 ---
 
-## Multi-Agent Usage
+## The pipeline at a glance
 
-### When to Use Parallel Agents
+```
+Pick ticket (Linear Todo, priority order)
+  → Preflight (clean tree, main synced, gh + Linear reachable, gh NETWORK verified)
+  → Branch corymcunanan/opt-###-<slug>  → Linear: In Progress
+  → Load handoff context (docs/project/handoffs/<project-slug>.md)
+  → Implement + tests (engine changes: production-path coverage required)
+  → PR (gh pr create)  → Linear: In Review
+  → Adversarial lens review (pr-review workflow) — max 1 full + 1 delta cycle
+  → Handoff entry committed on the branch
+  → gh pr merge --auto --squash --match-head-commit <final-sha>
+  → Babysit CI (/loop)
+  → Close-out checklist (merge tree verified, Linear Done, handoff refreshed)
+```
 
-Independent tasks with zero shared state:
+**Executable pieces:**
 
-| Parallel Pair | Why It Works |
-|---------------|-------------|
-| M0: Data pipeline (TypeScript) + Frontend scaffold (Next.js) | Completely independent codebases |
-| M1: Card search API + Deck editor UI | API built to spec, UI built against mock data |
-| M2: Friend system API + Messaging API | Independent feature domains |
-
-### When NOT to Parallelize
-
-- Tasks that share files or API shapes — creates merge conflicts
-- M3 and M4 — deeply sequential (effect engine builds on game state machine)
-- Coordination cost can exceed time saved if tasks aren't truly independent
-
-### Scout → Planner → Worker Chains
-
-For unfamiliar territory or large codebases:
-1. **Scout** reads the codebase and gathers context
-2. **Planner** designs the approach given that context
-3. **Worker** implements the plan
-
-Most useful from M3 onward when the codebase is large enough that a single context window can't hold everything.
+| Piece | Location | Role |
+|---|---|---|
+| `ticket` skill | `.claude/skills/ticket/SKILL.md` | The end-to-end driver: preflight → implement → review → merge → close-out |
+| `pr-review` workflow | `.claude/workflows/pr-review.js` | Multi-model lens review; invoke via `scriptPath`, never `name:` (stale cache) |
+| Handoff docs | `docs/project/handoffs/<project-slug>.md` | Cross-session context transfer, Action Plan state |
+| Merge gate | GitHub `main-ci-gate` ruleset | Requires `ci` check; no bypass actors; auto-merge + auto-branch-delete enabled |
 
 ---
 
-## Tool Selection Guide
+## Review: lenses and model routing
 
-### GSD (Primary Tool)
+The `pr-review` workflow selects lenses by diff area and routes each to the cheapest model
+that can do that job. Rationale and tuning history: the lenses come from this repo's actual
+bug classes, not generic review categories.
 
-**Best for:** Structured milestone-by-milestone implementation with verification.
+| Lens | Model | Catches |
+|---|---|---|
+| rules-fidelity | GPT-5.6 Sol | Divergence from official rules/card text (docs/rules/, docs/cards/) — biggest bug class |
+| ordering | GPT-5.6 Sol | Out-of-order/duplicate/stale prompt responses, disconnect mid-prompt — second biggest |
+| adversarial | GPT-5.6 Sol | Decorrelated generalist pass, always runs |
+| test-adequacy | GPT-5.6 Luna | Would tests fail on revert; production-path (GameSession.handleAction) coverage |
+| api-boundary | GPT-5.6 Luna | Zod validation + authz on client-supplied payloads |
+| blast-radius | GPT-5.6 Terra | Other consumers of touched handlers across 51 schema sets (informational, skips verify) |
 
-Strengths:
-- Structured workflow (milestones → slices → tasks) with state tracking
-- Auto-mode for hands-off serial task execution
-- Built-in verification ("work is done when the test passes")
-- Subagent orchestration for parallel/chained work
-- Living artifacts that persist context across sessions
+**Verification is two gates, cheapest first:** (1) Codex cross-model refutation (Sol findings
+refuted by Luna and vice versa, refute-by-default) kills most false positives at ~zero Claude
+cost; (2) Claude Sonnet cross-family gate, majors only, batched one agent per file. Cross-family
+matters because same-family reviewers share blind spots — Codex is the decorrelation play,
+Claude verifies. False positives are the main tax in an unattended loop, hence refute-by-default.
 
-Weaknesses:
-- Overhead for quick one-off tasks
-- Context window limits on very large files/codebases
-- Auto-mode trusts the plan — a wrong plan gets executed efficiently
+Design-system rules are deliberately NOT a lens — mechanically checkable rules belong in
+ESLint/CI, not in model reviews.
 
-### Claude Code (Direct, No GSD Wrapper)
-
-**Best for:** Quick investigations, one-off scripts, prototyping, ad-hoc tasks.
-
-Strengths:
-- Lower overhead — no milestone/slice structure
-- Same underlying model and tools
-- Good for exploration and quick fixes
-
-Weaknesses:
-- No persistent state tracking across sessions
-- No auto-mode
-- No built-in "definition of done" enforcement
-
-### Gemini
-
-**Best for:** Bulk analysis tasks that need massive context windows.
-
-Strengths:
-- 1M+ token context window — can ingest entire codebase, all docs, and all rules simultaneously
-- Good at large-document cross-referencing
-
-Weaknesses:
-- No tool use (can't edit files, run commands, verify against live codebase)
-- Outputs need manual application or piping through another tool
-- Every query is stateless unless you manage context yourself
-
-### Recommended Tool Assignment for This Project
-
-| Activity | Tool | Why |
-|----------|------|-----|
-| Planning, discussion, docs | GSD or Claude Code | Interactive, iterative |
-| M0–M2 implementation | GSD auto-mode | Structured serial tasks with verification |
-| Data pipeline (TypeScript import) | GSD subagent (parallel) | Independent from frontend work |
-| Game engine core (M3) | GSD, single-agent, frequent human review | High-stakes rules accuracy |
-| Effect schema bulk authoring (M4) | Gemini for generation → GSD for integration/testing | Gemini's context window for analyzing 120+ cards at once |
-| Card data source evaluation | Claude Code or GSD | Quick research task |
-| UI polish and feel (M3 board, M5 mobile) | GSD with human in the loop | Taste-dependent work |
-| Quick fixes, debugging, one-offs | Claude Code directly | Less overhead |
+**Tuning:** lens prompts live in `pr-review.js` and are versioned in git. When a lens misses a
+real bug or gets noisy, edit its prompt there and note why in the commit message.
 
 ---
 
-## Documentation Practices
+## Rules that keep the loop safe (learned from PR #255)
 
-### Why Documentation is Front-Loaded
+The full retro: `docs/project/pr-255-workflow-retro.md`.
 
-Documentation serves dual purpose in this project:
-1. **Human reference** — standard docs purpose
-2. **Agent context transfer** — the docs are how future sessions understand the project
-
-Every major decision, architecture choice, and rules interpretation should be written down because the next session has zero memory of this one.
-
-### Document Types and When to Update
-
-| Document | Type | Update Trigger |
-|----------|------|---------------|
-| `docs/project/PRD.md` | Source of truth | When product scope changes |
-| `docs/architecture/ARCHITECTURE.md` | Living | When service boundaries or deployment changes |
-| `docs/architecture/TECH-STACK.md` | Living | When technology choices change |
-| `docs/milestones/M0–M5-*.md` | Living | When phase plans change or more context is added |
-| `docs/game-engine/GAME-ENGINE-REQUIREMENTS.md` | Living | When rules interpretations are corrected or edge cases discovered |
-| `docs/project/PLANNING.md` | Living | When risk assessment or timeline changes |
-| `docs/project/LEARNINGS.md` | Append-only | When a decision is made or a lesson is learned |
-| `DECISIONS.md` (GSD) | Append-only | When an architectural choice is made during implementation |
-| `STATE.md` (GSD) | Current state | After every slice/task completion |
-
-### Writing Good Agent-Readable Docs
-
-- Be specific and concrete — "use Prisma" not "use an ORM"
-- Include the WHY — rationale helps future sessions make consistent follow-on decisions
-- Call out corrections explicitly (like the 13 M3 corrections in GAME-ENGINE-REQUIREMENTS.md)
-- Use machine-parseable formats where possible (tables, code blocks, enums)
-- Keep files focused — one concern per file, not everything in one mega-doc
+1. **Exact-head merges.** Auto-merge is always armed with `--match-head-commit` on the SHA that
+   was reviewed (plus, at most, a docs-only handoff commit). If anything else lands on the
+   branch, GitHub refuses the merge rather than merging unreviewed code. Never `--admin`.
+2. **Review cycles are capped.** One full review + one delta review (`args: {base: <sha>}`) of
+   the fix commits. Findings that survive the cap are a stop condition, not a third loop —
+   repeated full re-reviews were the biggest latency and cost sink in PR #255.
+3. **Scope freeze.** When review findings implicate a new subsystem or behavior family, the PR
+   does not expand. File a follow-up Linear ticket with the finding evidence and keep the PR
+   bounded. This is the autonomous analog of "stop and ask" — PR #255 tripled in scope without
+   a checkpoint.
+4. **Review before broad CI.** Establish a review-clean candidate first; CI/Vercel confirm it.
+   CodeRabbit is advisory only — never a merge gate, never a reason to wait.
+5. **Production-path tests for engine changes.** At least one test through
+   `GameSession.handleAction` / the action pipeline. Helper-only coverage hid real integration
+   bugs in PR #255.
+6. **Close-out is a checklist, not a vibe.** Merge SHA + reviewed tree verified, `main` synced,
+   Linear Done (re-verified at session end — a second linked PR can flip it back), handoff doc
+   refreshed **including rows the merge made stale**, local branch deleted, tree clean.
+7. **Preflight the network.** Run a real `gh` metadata call at preflight with the approved
+   elevated commands; discovering sandbox network limits at merge time slows everything.
+8. **Stop conditions are explicit and recorded in the handoff:** surviving critical/major
+   findings after the capped cycles; unresolvable cross-family reviewer disagreement; a flaky
+   required check (max 2 reruns); any scope decision only the user can make. On stop: disarm
+   auto-merge, leave the PR open, write the handoff, surface.
 
 ---
 
-_Last updated: 2026-03-15_
+## Tooling notes
+
+- **Codex exec is sandboxed without network.** PR-mode diffs are materialized by the
+  unsandboxed scope agent to `/private/tmp/pr-review-<pr>.diff`; branch mode uses local git.
+- **GPT-5.6 model IDs** valid on this account: `gpt-5.6-sol` (frontier), `gpt-5.6-luna` (mid),
+  `gpt-5.6-terra` (fast). Plain `gpt-5.6` is not valid. Reasoning effort: none/low/medium/high/xhigh
+  (`minimal` is rejected).
+- **Lint/typecheck scope:** `.claude/**` is excluded from ESLint and tsconfig — agent worktrees
+  under `.claude/worktrees/` are full repo copies and traversing them is runaway duplicate work.
+- **Empty diffs hard-stop the review.** Without that, lenses improvise ranges or read a
+  reversed diff.
+
+---
+
+_Last updated: 2026-07-10 (PR #255 retro applied; supersedes the GSD-era guide — see git history for the old content)._
