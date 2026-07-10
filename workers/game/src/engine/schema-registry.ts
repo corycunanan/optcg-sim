@@ -282,16 +282,16 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
   // call matchesFilter without filterController — check their filters too.
   if (block.modifiers) {
     for (let i = 0; i < block.modifiers.length; i++) {
-      errors.push(...validateTargetFilterController(
-        block.modifiers[i].target?.filter as TargetFilter | undefined,
+      errors.push(...validateTargetController(
+        block.modifiers[i].target,
         `${prefix}.modifiers[${i}]`,
       ));
     }
   }
   if (block.prohibitions) {
     for (let i = 0; i < block.prohibitions.length; i++) {
-      errors.push(...validateTargetFilterController(
-        block.prohibitions[i].target?.filter as TargetFilter | undefined,
+      errors.push(...validateTargetController(
+        block.prohibitions[i].target,
         `${prefix}.prohibitions[${i}]`,
       ));
     }
@@ -370,6 +370,20 @@ function validateTargetFilterController(
   return errors;
 }
 
+function validateTargetController(target: Action["target"], prefix: string): string[] {
+  const errors = validateTargetFilterController(
+    target?.filter as TargetFilter | undefined,
+    prefix,
+  );
+  for (let i = 0; i < (target?.dual_targets?.length ?? 0); i++) {
+    errors.push(...validateTargetFilterController(
+      target!.dual_targets![i].filter as TargetFilter | undefined,
+      `${prefix}.dual_targets[${i}]`,
+    ));
+  }
+  return errors;
+}
+
 function validateAction(action: Action, prefix: string): string[] {
   const errors: string[] = [];
 
@@ -383,7 +397,7 @@ function validateAction(action: Action, prefix: string): string[] {
   // targeting paths — matchesFilter only enforces it when the caller passes
   // the optional filterController argument, which the target-resolver never
   // does. Scope the target with Target.controller instead.
-  errors.push(...validateTargetFilterController(action.target?.filter as TargetFilter | undefined, prefix));
+  errors.push(...validateTargetController(action.target, prefix));
 
   // Validate nested actions in PLAYER_CHOICE/OPPONENT_CHOICE
   if ((action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") && action.params?.options) {
