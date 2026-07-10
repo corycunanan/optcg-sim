@@ -1487,7 +1487,16 @@ export function applyCostSelection(
         const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
         const returnedDon = toPlace.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
         const position = cost.position ?? "BOTTOM";
-        const deckCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const, attachedDon: [] as typeof c.attachedDon }));
+        // Same zone-transition reset as PLACE_SELF_AND_TRASH_TO_DECK — a
+        // field character keeping its non-null turnPlayed in the deck crashes
+        // the freshly-played-instance lookup after it is redrawn and played.
+        const deckCards = toPlace.map((c) => ({
+          ...c,
+          zone: "DECK" as const,
+          state: "ACTIVE" as const,
+          attachedDon: [] as typeof c.attachedDon,
+          turnPlayed: null,
+        }));
         const newDeck = position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
         const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
         newPlayers[controller] = {
@@ -1535,10 +1544,15 @@ export function applyCostSelection(
       const returnedDon = moved
         .filter((c) => charById.has(c.instanceId))
         .flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
+      // Reset zone-transition fields per the canonical moveCard semantics —
+      // a stale non-null turnPlayed survives draw and later crashes the
+      // freshly-played-instance lookup in execute.ts (review finding).
       const deckCards = moved.map((c) => ({
         ...c,
         zone: "DECK" as const,
+        state: "ACTIVE" as const,
         attachedDon: [] as CardInstance["attachedDon"],
+        turnPlayed: null,
       }));
       const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];

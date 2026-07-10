@@ -28,7 +28,7 @@ import type { Cost, EffectBlock } from "../engine/effect-types.js";
 import { payCostsWithSelection, isCostPayable } from "../engine/effect-resolver/cost-handler.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import { runPipeline } from "../engine/pipeline.js";
-import { OP10_026_KINEMON } from "../engine/schemas/op10.js";
+import { OP10_026_KINEMON, OP10_027_KINEMON } from "../engine/schemas/op10.js";
 import { createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
 
 class MockWebSocket {
@@ -182,6 +182,13 @@ describe("OPT-431: the self half is fixed to the source card", () => {
     expect(p0.characters.some((c) => c?.instanceId === bystanderId)).toBe(true);
     expect(p0.deck.slice(-2).map((c) => c.instanceId)).toEqual([SOURCE_ID, "trash-kin-0"]);
     expect(done.state.effectStack).toHaveLength(0);
+    // Zone-transition reset: a stale non-null turnPlayed in the deck crashes
+    // the freshly-played-instance lookup once the card is redrawn and played.
+    for (const placed of p0.deck.slice(-2)) {
+      expect(placed.turnPlayed).toBeNull();
+      expect(placed.state).toBe("ACTIVE");
+      expect(placed.attachedDon).toHaveLength(0);
+    }
   });
 
   it("a stale selection naming the source or a non-candidate is rejected", () => {
@@ -266,6 +273,123 @@ describe("OPT-430: the self+trash group is ordered in one arrange prompt", () =>
     expect(done.state.players[0].deck.slice(-2).map((c) => c.instanceId))
       .toEqual(["trash-kin-0", SOURCE_ID]);
     expect(done.state.effectStack).toHaveLength(0);
+  });
+});
+
+describe("OPT-430/431: OP10-027 variant (1000-power trash filter)", () => {
+  it("activates with a 1000-power trash Kin'emon and rejects a 0-power one", () => {
+    const cardDb = createTestCardDb();
+    const field: CardData = {
+      ...CARDS.VANILLA,
+      id: "OP10-027",
+      name: "Kin'emon",
+      effectSchema: OP10_027_KINEMON,
+    };
+    const kin1000: CardData = { ...CARDS.VANILLA, id: "TRASH-KIN-1000", name: "Kin'emon", power: 1000 };
+    const kin0: CardData = { ...CARDS.VANILLA, id: "TRASH-KIN-0", name: "Kin'emon", power: 0 };
+    cardDb.set(field.id, field);
+    cardDb.set(kin1000.id, kin1000);
+    cardDb.set(kin0.id, kin0);
+
+    let state = createBattleReadyState(cardDb);
+    const source: CardInstance = {
+      instanceId: SOURCE_ID,
+      cardId: field.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      characters: padChars([source]),
+      trash: [trashInstance(kin1000.id, "k1000"), trashInstance(kin0.id, "k0")],
+    };
+    state = { ...state, players: newPlayers };
+
+    // Only the 1000-power Kin'emon satisfies OP10-027's filter → selection
+    // is skipped (single candidate) and the arrange stage opens over
+    // self + the 1000-power card, never the 0-power one.
+    const activation = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: SOURCE_ID, effectId: "activate_place_and_play" },
+      cardDb,
+      0,
+    );
+    expect(activation.valid).toBe(true);
+    expect(activation.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+
+    const afterAccept = resumeFromStack(
+      activation.state,
+      { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction,
+      cardDb,
+    );
+    expect(afterAccept.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    const options = afterAccept.pendingPrompt!.options;
+    if (options.promptType !== "ARRANGE_TOP_CARDS") throw new Error("narrow");
+    expect(options.cards.map((c) => c.instanceId).sort()).toEqual(
+      [SOURCE_ID, "trash-k1000"].sort(),
+    );
+
+    const done = resumeFromStack(
+      afterAccept.state,
+      {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: "",
+        orderedInstanceIds: ["trash-k1000", SOURCE_ID],
+        destination: "bottom",
+      } as GameAction,
+      cardDb,
+    );
+    const p0 = done.state.players[0];
+    expect(p0.deck.slice(-2).map((c) => c.instanceId)).toEqual(["trash-k1000", SOURCE_ID]);
+    // The 0-power Kin'emon never left the trash.
+    expect(p0.trash.some((c) => c.instanceId === "trash-k0")).toBe(true);
+    expect(done.state.effectStack).toHaveLength(0);
+  });
+
+  it("is unpayable when the trash only holds the wrong-power Kin'emon", () => {
+    const cardDb = createTestCardDb();
+    const field: CardData = {
+      ...CARDS.VANILLA,
+      id: "OP10-027",
+      name: "Kin'emon",
+      effectSchema: OP10_027_KINEMON,
+    };
+    const kin0: CardData = { ...CARDS.VANILLA, id: "TRASH-KIN-0", name: "Kin'emon", power: 0 };
+    cardDb.set(field.id, field);
+    cardDb.set(kin0.id, kin0);
+
+    let state = createBattleReadyState(cardDb);
+    const source: CardInstance = {
+      instanceId: SOURCE_ID,
+      cardId: field.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const newPlayers = [...state.players] as [PlayerState, PlayerState];
+    newPlayers[0] = {
+      ...newPlayers[0],
+      characters: padChars([source]),
+      trash: [trashInstance(kin0.id, "k0")],
+    };
+    state = { ...state, players: newPlayers };
+
+    const result = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: SOURCE_ID, effectId: "activate_place_and_play" },
+      cardDb,
+      0,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Cost cannot be paid");
   });
 });
 
