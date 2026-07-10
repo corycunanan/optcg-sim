@@ -25,17 +25,19 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Backlog | — | Design jointly with OPT-430 around one source-scoped compound-cost primitive. |
 | 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Backlog | — | Keep adjacent to OPT-431; one shared root implementation may close both. |
 | 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | Backlog | — | Reuse source-instance identity conventions from the compound-cost work. |
-| 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | In Review | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450 (pre-existing on-field cost reads use play cost). |
+| 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Done | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | Merged 2026-07-10 (`b7d8ee7`, reviewed heads `46ef531`/`25b8701` + docs). CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450. |
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | Backlog | — | Rebaseline after OPT-442, then split into lint/tooling plus set-family batches. |
-| 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | In Review | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Dead matchesCardFilter deleted; controller-in-target-filter rejected by validateEffectSchema + lint rule C5. |
+| 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | In Review | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | **Review stop condition** 2026-07-10: capped cycles still surfacing majors (residual guard surfaces → OPT-452; live prohibition-registrar bug → OPT-451). PR left open, merge not armed — user decides merge-as-is vs. one more bounded round. |
 | 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Reject prompt-identified actions when no prompt is pending. |
 | 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
 | 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
+| 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
+| 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | Backlog | — | Residual guard surfaces scope-frozen out of PR #260 at its review-cycle cap. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-431 + OPT-430 jointly (ready now — PR #257 merged); OPT-437 once PR #259 merges.
+**Next up:** OPT-431 + OPT-430 jointly (ready now — PR #257 merged); OPT-437 (ready now — PR #259 merged); OPT-451 (live prohibition bug, high value).
 
 ---
 
@@ -94,3 +96,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Pre-existing on-field cost reads (`cost_*` filters, `SELF_COST` in `conditions.ts`) still use play cost — that's OPT-450, deliberately out of scope. Run `pnpm type-check:worker` (or `tsc --noEmit` in `workers/game`) before every PR — root `type-check` does not cover the worker, and a delta review caught a TS2339 the root check missed.
 - **Unresolved:** OPT-437's rebaseline should treat CHARACTER_TOTAL_COST as an available predicate when re-auditing post-colon conditions.
 - **Pointer:** PR #259.
+
+### OPT-409 → OPT-431 (stop condition recorded)
+**From:** session on 2026-07-10 · **Commit:** `cb61e71` (second reviewed head; first was `02ec8a9`) · **PR:** [#260](https://github.com/corycunanan/optcg-sim/pull/260) — open, merge NOT armed
+
+- **Primer:** Dead `matchesCardFilter` deleted; `validateEffectSchema` + lint rule C5 now reject `controller` inside target filters recursively across actions, replacement actions, modifiers, and prohibitions, with a linter-execution regression test.
+- **Stop condition:** capped review cycles (full + delta) kept surfacing confirmed majors — each round found another dead `filter.controller` surface. Residuals are ticketed, not folded in: OPT-452 (dual_targets filters, linter walk gaps, prohibition guidance) and OPT-451 (pre-existing **live** bug: permanent prohibition targets discarded at registration — P-084's population prohibition never applies). Per the workflow, the merge decision is the user's: the PR's content is net-positive and CI-green, but it did not reach review-clean within the cap.
+- **Read first:** `workers/game/src/engine/schema-registry.ts` (`validateTargetFilterController`), `workers/game/src/engine/schemas/lint-schemas.sh` (rule C5), `workers/game/src/__tests__/opt-409-filter-controller-validation.test.ts`.
+- **Gotchas / do NOT touch:** Do not fix OPT-451's registrar inside compound-cost work — it needs its own reproduction-first ticket run. The validator's "use target.controller" advice is wrong for permanent prohibitions until OPT-451 lands.
+- **Pointer:** PR #260. For OPT-431/OPT-430: see the OPT-446 → OPT-431 entry above; the compound-cost primitive design starts from `cost-handler.ts` (`computeCostTargets` receives no `sourceCardInstanceId` today) and the OPT-429-restructured `resume/cost.ts`.
