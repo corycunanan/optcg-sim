@@ -67,6 +67,21 @@ describe("OPT-409: controller inside Target.filter is rejected", () => {
     expect(errors.some((e) => e.includes("'controller' inside target.filter"))).toBe(true);
   });
 
+  it("flags controller inside a dual-target slot filter", () => {
+    const errors = validateEffectSchema(
+      schemaWithTarget({
+        type: "CHARACTER",
+        count: { exact: 2 },
+        dual_targets: [
+          { count: 1, filter: { any_of: [{ controller: "SELF" }] } },
+          { count: 1, filter: { cost_max: 3 } },
+        ],
+      }),
+      "TEST-409",
+    );
+    expect(errors.some((e) => e.includes("dual_targets[0]"))).toBe(true);
+  });
+
   it("flags controller inside a permanent modifier's target filter", () => {
     const errors = validateEffectSchema(
       {
@@ -177,6 +192,61 @@ export const BAD_MODIFIER_FILTER: EffectSchema = {
     }],
   }],
 };
+export const BAD_NESTED_CONTAINERS: EffectSchema = {
+  card_id: "TEST-C5-C",
+  card_name: "Bad Containers",
+  card_type: "Character",
+  effects: [{
+    id: "bad_containers",
+    category: "auto",
+    trigger: { keyword: "ON_PLAY" },
+    actions: [{
+      type: "PLAYER_CHOICE",
+      params: { options: [[{
+        type: "SCHEDULE_ACTION",
+        params: { action: { type: "KO", target: { type: "CHARACTER", filter: { controller: "OPPONENT" } } } },
+      }]] },
+    }],
+  }],
+};
+export const BAD_REPLACEMENT_ACTION: EffectSchema = {
+  card_id: "TEST-C5-D",
+  card_name: "Bad Replacement",
+  card_type: "Character",
+  effects: [{
+    id: "bad_replacement",
+    category: "replacement",
+    replaces: { event: "WOULD_BE_KO" },
+    replacement_actions: [{ type: "KO", target: { type: "CHARACTER", filter: { controller: "OPPONENT" } } }],
+  }],
+};
+export const BAD_PROHIBITION_FILTER: EffectSchema = {
+  card_id: "TEST-C5-E",
+  card_name: "Bad Prohibition",
+  card_type: "Character",
+  effects: [{
+    id: "bad_prohibition",
+    category: "permanent",
+    prohibitions: [{
+      type: "CANNOT_ATTACK",
+      target: { type: "CHARACTER", filter: { controller: "OPPONENT" } },
+    }],
+  }],
+};
+export const BAD_DUAL_TARGET_FILTER: EffectSchema = {
+  card_id: "TEST-C5-F",
+  card_name: "Bad Dual Target",
+  card_type: "Character",
+  effects: [{
+    id: "bad_dual_target",
+    category: "auto",
+    trigger: { keyword: "ON_PLAY" },
+    actions: [{
+      type: "KO",
+      target: { type: "CHARACTER", dual_targets: [{ count: 1, filter: { any_of: [{ controller: "OPPONENT" }] } }] },
+    }],
+  }],
+};
 `);
       const linter = resolve(__dirname, "../engine/schemas/lint-schemas.sh");
       let output = "";
@@ -191,6 +261,10 @@ export const BAD_MODIFIER_FILTER: EffectSchema = {
       const c5Lines = output.split("\n").filter((line) => line.includes("C5"));
       expect(c5Lines.some((line) => line.includes("TEST-C5-A"))).toBe(true);
       expect(c5Lines.some((line) => line.includes("TEST-C5-B"))).toBe(true);
+      expect(c5Lines.some((line) => line.includes("TEST-C5-C"))).toBe(true);
+      expect(c5Lines.some((line) => line.includes("TEST-C5-D"))).toBe(true);
+      expect(c5Lines.some((line) => line.includes("TEST-C5-E"))).toBe(true);
+      expect(c5Lines.some((line) => line.includes("TEST-C5-F"))).toBe(true);
     } finally {
       rmSync(fixtureDir, { recursive: true, force: true });
     }

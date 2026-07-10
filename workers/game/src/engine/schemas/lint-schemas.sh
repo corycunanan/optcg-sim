@@ -218,13 +218,15 @@ function* walkActions(actions) {
     if (action.params) {
       if (Array.isArray(action.params.options)) {
         for (const branch of action.params.options) {
-          if (Array.isArray(branch.actions)) {
-            yield* walkActions(branch.actions);
-          }
+          if (Array.isArray(branch)) yield* walkActions(branch);
+          else if (Array.isArray(branch.actions)) yield* walkActions(branch.actions);
         }
       }
       if (Array.isArray(action.params.actions)) {
         yield* walkActions(action.params.actions);
+      }
+      if (action.params.action && typeof action.params.action === "object") {
+        yield* walkActions([action.params.action]);
       }
     }
   }
@@ -262,6 +264,11 @@ function* walkTargets(actions) {
 function* walkFilters(actions) {
   for (const { target, action } of walkTargets(actions)) {
     if (target.filter) yield { filter: target.filter, target, action };
+    if (Array.isArray(target.dual_targets)) {
+      for (const dualTarget of target.dual_targets) {
+        if (dualTarget.filter) yield { filter: dualTarget.filter, target, action };
+      }
+    }
   }
 }
 
@@ -849,13 +856,21 @@ function lintFilters(block, ctx, issues) {
   for (const [key, list] of [["modifiers", block.modifiers], ["prohibitions", block.prohibitions]]) {
     if (!Array.isArray(list)) continue;
     for (const entry of list) {
-      if (entry && entry.target && entry.target.filter) {
-        checkFilterController(entry.target.filter, `on ${key} ${entry.type || ""}`.trim(), ctx, issues);
+      if (entry && entry.target) {
+        if (entry.target.filter) {
+          checkFilterController(entry.target.filter, `on ${key} ${entry.type || ""}`.trim(), ctx, issues);
+        }
+        for (const dualTarget of entry.target.dual_targets ?? []) {
+          checkFilterController(dualTarget.filter, `on ${key} ${entry.type || ""} dual target`.trim(), ctx, issues);
+        }
       }
     }
   }
 
-  for (const { filter, target, action } of walkFilters(block.actions)) {
+  for (const { filter, target, action } of walkFilters([
+    ...(block.actions ?? []),
+    ...(block.replacement_actions ?? []),
+  ])) {
     // C1: removed — traits vs traits_contains depends on card text wording
     // ("{X} type" = traits exact match, "type including X" = traits_contains substring match)
     // The linter cannot determine the correct choice without access to card text.
