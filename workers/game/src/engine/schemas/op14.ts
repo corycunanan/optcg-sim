@@ -2990,8 +2990,13 @@ export const OP14_079_CROCODILE: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_REMOVED_FROM_FIELD",
+          // "by your effects": relative to the protected opponent Characters,
+          // the remover is their opponent — causeMatches expresses that as
+          // BY_OPPONENT_EFFECT (causing controller !== target controller).
+          // The old `scope.controller: "SELF"` contradicted the target and
+          // made the prohibition unsatisfiable once targets resolved (OPT-451).
           target: { type: "ALL_OPPONENT_CHARACTERS" },
-          scope: { cause: "EFFECT", controller: "SELF" },
+          scope: { cause: "BY_OPPONENT_EFFECT" },
         },
       ],
     },

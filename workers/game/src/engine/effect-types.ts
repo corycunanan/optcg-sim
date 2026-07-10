@@ -1317,6 +1317,19 @@ export interface RuntimeProhibition {
   expiresAt?: ExpiryTiming;
   controller: 0 | 1;
   appliesTo: string[];  // CardInstance.instanceIds or player indices
+  /**
+   * OPT-451: Population target carried from the authored prohibition (e.g.
+   * P-084's "all Characters with a cost of 3 or 4"). When `appliesTo` is
+   * empty and this is set, coverage re-resolves against the live board at
+   * match time — like modifier auras — so cards entering play later are
+   * still covered.
+   */
+  target?: Target;
+  /**
+   * OPT-451: Block-level (and prohibition-level) conditions, re-evaluated at
+   * match time — mirrors RuntimeActiveEffect.conditions.
+   */
+  conditions?: Condition;
   usesRemaining: number | null;
   conditionalOverride?: ConditionalOverride;
 }
