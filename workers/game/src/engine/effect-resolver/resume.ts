@@ -233,9 +233,17 @@ export function resumeFromStack(
           nextState = pushFrame(nextState, replacementFrame);
           pendingPrompt = { ...pendingPrompt, resumeContext: replacementFrame.id };
         } else {
-          nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+          const replacementFrame = peekFrame(nextState) as EffectStackFrame | null;
+          if (replacementFrame) {
+            nextState = updateTopFrame(nextState, {
+              pendingTriggers: [
+                ...replacementFrame.pendingTriggers,
+                ...topFrame.pendingTriggers,
+              ],
+            });
+          }
         }
-        return { state: nextState, events, resolved: false, pendingPrompt };
+        return { state: nextState, events, resolved: false, pendingPrompt, rejected: result.rejected };
       }
 
       // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)

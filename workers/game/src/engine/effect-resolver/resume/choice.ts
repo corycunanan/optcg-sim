@@ -166,7 +166,7 @@ export function handlePlayerChoiceBranch(
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
 ): ChoiceBranchResult {
-  const { pausedAction, controller, effectSourceInstanceId } = resumeCtx;
+  const { pausedAction, controller, effectSourceInstanceId, remainingActions } = resumeCtx;
   if (action.type !== "PLAYER_CHOICE" || !pausedAction) {
     return null;
   }
@@ -191,6 +191,15 @@ export function handlePlayerChoiceBranch(
     events.push(...branchResult.events);
 
     if (branchResult.pendingPrompt) {
+      const replacementFrame = peekFrame(nextState) as EffectStackFrame | null;
+      if (replacementFrame && remainingActions.length > 0) {
+        nextState = updateTopFrame(nextState, {
+          remainingActions: [
+            ...(replacementFrame.remainingActions as Action[]),
+            ...remainingActions,
+          ],
+        });
+      }
       return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: branchResult.pendingPrompt } };
     }
   }

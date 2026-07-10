@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Action, EffectBlock } from "../engine/effect-types.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
-import type { CardInstance, EffectStackFrame, GameState } from "../types.js";
+import type { CardInstance, EffectStackFrame, GameState, QueuedTrigger } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const effectBlock: EffectBlock = {
@@ -68,6 +68,7 @@ describe("OPT-439 rejected response frame restoration", () => {
     );
 
     expect(rejected.resolved).toBe(false);
+    expect(rejected.rejected).toBe(true);
     expect(rejected.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     expect(rejected.state.effectStack.map((entry) => entry.id)).toEqual(["outer", "inner"]);
     expect(rejected.state.effectStack[1].remainingActions).toEqual(inner.remainingActions);
@@ -182,5 +183,66 @@ describe("OPT-439 rejected response frame restoration", () => {
     expect(completed.state.effectStack.map((entry) => entry.id)).toEqual(["outer"]);
     expect(completed.state.players[0].characters.filter(Boolean)).toHaveLength(5);
     expect(completed.state.players[0].hand).toHaveLength(handBefore);
+  });
+
+  it("preserves suffix actions and trigger queues when a choice branch opens a nested prompt", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = base.players[1].characters.find((card) => card !== null)!;
+    const pausedAction: Action = {
+      type: "PLAYER_CHOICE",
+      params: {
+        labels: ["K.O.", "Draw"],
+        options: [
+          [{
+            type: "KO",
+            target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+          }],
+          [{ type: "DRAW", params: { amount: 1 } }],
+        ],
+      },
+    };
+    const queuedTrigger: QueuedTrigger = {
+      sourceCardInstanceId: base.players[0].leader.instanceId,
+      controller: 0,
+      effectBlock: {
+        id: "queued-draw",
+        category: "auto",
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      },
+      triggeringEvent: {
+        type: "CARD_PLAYED",
+        playerIndex: 0,
+        payload: { cardInstanceId: "queued-source" },
+      } as never,
+    };
+    const pending = frame("choice", pausedAction, {
+      phase: "AWAITING_PLAYER_CHOICE",
+      remainingActions: [{ type: "DRAW", params: { amount: 1 } }],
+      pendingTriggers: [queuedTrigger],
+    });
+
+    const nestedPrompt = resumeFromStack(
+      withStack(base, [pending]),
+      { type: "PLAYER_CHOICE", choiceId: "0" },
+      cardDb,
+    );
+
+    expect(nestedPrompt.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(nestedPrompt.rejected).toBeUndefined();
+    const replacement = nestedPrompt.state.effectStack[0] as unknown as EffectStackFrame;
+    expect(replacement.remainingActions).toEqual(pending.remainingActions);
+    expect(replacement.pendingTriggers).toEqual([queuedTrigger]);
+
+    const handBefore = nestedPrompt.state.players[0].hand.length;
+    const completed = resumeFromStack(
+      nestedPrompt.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] },
+      cardDb,
+    );
+
+    expect(completed.pendingPrompt).toBeUndefined();
+    expect(completed.state.effectStack).toHaveLength(0);
+    expect(completed.state.players[0].hand).toHaveLength(handBefore + 2);
   });
 });
