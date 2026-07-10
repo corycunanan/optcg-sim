@@ -13,8 +13,16 @@
 
 import { describe, it, expect } from "vitest";
 import { GameSession } from "../GameSession.js";
-import type { CardData, CardInstance, Env, GameAction, GameState, PlayerState } from "../types.js";
-import type { Cost, EffectBlock } from "../engine/effect-types.js";
+import type {
+  CardData,
+  CardInstance,
+  Env,
+  GameAction,
+  GameState,
+  PlayerState,
+  ResumeContext,
+} from "../types.js";
+import type { Cost, EffectBlock, RuntimeActiveEffect } from "../engine/effect-types.js";
 import { payCostsWithSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
@@ -222,5 +230,190 @@ describe("OPT-446: engine-level rejections surface a game:error", () => {
 
     expect(errors(ws)).toHaveLength(0);
     expect(session.gameState.pendingPrompt).toBeFalsy();
+  });
+
+  it("emits game:error when a rejected selection is re-prompted (OPT-439 restore path)", async () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = base.players[1].characters.find((card) => card !== null)!;
+    const block: EffectBlock = {
+      id: "opt446-ko-block",
+      category: "auto",
+      actions: [{
+        type: "KO",
+        target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+      }],
+    } as EffectBlock;
+    const first = resolveEffect(base, block, base.players[0].leader.instanceId, 0, cardDb);
+    expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const session = makeSession(
+      { ...first.state, pendingPrompt: first.pendingPrompt! },
+      cardDb,
+    );
+    const ws = new MockWebSocket();
+
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["stale-target"],
+    } as GameAction);
+
+    expect(errors(ws)).toContain(
+      "That prompt response was rejected; the pending prompt is unchanged",
+    );
+    // The prompt was re-issued and the frame restored — the match continues.
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    const followUp = new MockWebSocket();
+    await session.handleAction(followUp as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId],
+      promptId: session.gameState.pendingPrompt?.promptId,
+    } as GameAction);
+    expect(errors(followUp)).toHaveLength(0);
+    expect(session.gameState.players[1].characters.some((c) => c?.instanceId === target.instanceId)).toBe(false);
+  });
+
+  it("emits game:error on a rejected legacy (frame-less) DON-return choice", async () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const resumeCtx: ResumeContext = {
+      effectSourceInstanceId: base.players[1].leader.instanceId,
+      controller: 1,
+      pausedAction: { type: "FORCE_OPPONENT_DON_RETURN", params: { amount: 2 } },
+      remainingActions: [],
+      resultRefs: [],
+      validTargets: ["don-return:1:2"],
+    };
+    const session = makeSession(
+      {
+        ...base,
+        effectStack: [],
+        pendingPrompt: {
+          options: {
+            promptType: "PLAYER_CHOICE",
+            effectDescription: "Choose which DON!! to return",
+            choices: [
+              { id: "don-return:1:2", label: "Return 1 active + 1 rested" },
+              { id: "don-return:0:2", label: "Return 2 rested" },
+            ],
+          },
+          respondingPlayer: 0,
+          resumeContext: resumeCtx as never,
+        },
+      },
+      cardDb,
+    );
+    const ws = new MockWebSocket();
+
+    // Offered by the (stale) prompt options, but not in the authoritative
+    // validTargets — the legacy resume handler rejects it.
+    await session.handleAction(ws as unknown as WebSocket, 0, {
+      type: "PLAYER_CHOICE",
+      choiceId: "don-return:0:2",
+    } as GameAction);
+
+    expect(errors(ws)).toContain(
+      "That prompt response was rejected; the pending prompt is unchanged",
+    );
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  });
+});
+
+describe("OPT-446: skip declines replacement prompts instead of accepting them", () => {
+  function koWithOptionalReplacement(): {
+    session: TestAccess;
+    target: CardInstance;
+  } {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = base.players[1].characters.find((card) => card !== null)!;
+    const replacement: RuntimeActiveEffect = {
+      id: "opt446-replacement",
+      sourceCardInstanceId: target.instanceId,
+      sourceEffectBlockId: "opt446-replacement-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: { card_type: "CHARACTER" },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          optional: true,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [],
+      timestamp: Date.now(),
+    };
+    const state: GameState = { ...base, activeEffects: [replacement as never] };
+    const block: EffectBlock = {
+      id: "opt446-ko-vs-replacement",
+      category: "auto",
+      actions: [{
+        type: "KO",
+        target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+      }],
+    } as EffectBlock;
+    const first = resolveEffect(state, block, state.players[0].leader.instanceId, 0, cardDb);
+    expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const session = makeSession(
+      { ...first.state, pendingPrompt: first.pendingPrompt! },
+      cardDb,
+    );
+    return { session, target };
+  }
+
+  it("skip declines the replacement — the K.O. proceeds", async () => {
+    const { session, target } = koWithOptionalReplacement();
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+
+    await session.handleAction(player0 as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId],
+    } as GameAction);
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type)
+      .toBe("REPLACEMENT_BATCH");
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "skip",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    } as GameAction);
+
+    expect(errors(player1)).toHaveLength(0);
+    // Declined: the character is K.O.'d, not rested-and-saved.
+    expect(session.gameState.players[1].characters.some((c) => c?.instanceId === target.instanceId)).toBe(false);
+    expect(session.gameState.effectStack).toHaveLength(0);
+    expect(session.gameState.pendingPrompt).toBeFalsy();
+  });
+
+  it("accept still applies the replacement — the character survives rested", async () => {
+    const { session, target } = koWithOptionalReplacement();
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+
+    await session.handleAction(player0 as unknown as WebSocket, 0, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [target.instanceId],
+    } as GameAction);
+
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: "accept",
+      promptId: session.gameState.pendingPrompt?.promptId,
+    } as GameAction);
+
+    const saved = session.gameState.players[1].characters.find(
+      (c) => c?.instanceId === target.instanceId,
+    );
+    expect(saved).toBeTruthy();
+    expect(saved?.state).toBe("RESTED");
   });
 });

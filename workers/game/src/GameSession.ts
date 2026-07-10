@@ -52,6 +52,17 @@ function promptResponseId(action: GameAction): string | undefined {
 }
 
 /**
+ * OPT-446: PASS and PLAYER_CHOICE "skip" are the engine's shared decline
+ * vocabulary (resume/choice.ts). Replacement resume paths must treat them
+ * identically — deriving acceptance from `type !== "PASS"` alone would turn
+ * a "skip" decline into an accept and apply the replacement.
+ */
+function isDeclineResponse(action: GameAction): boolean {
+  return action.type === "PASS"
+    || (action.type === "PLAYER_CHOICE" && action.choiceId === "skip");
+}
+
+/**
  * Treat an ARRANGE response as an exact partition of the cards the server
  * revealed. This prevents clients from omitting, duplicating, or injecting
  * instance IDs and gives [] validTargets its intended meaning: pick nothing.
@@ -946,7 +957,7 @@ export class GameSession implements DurableObject {
 
     // Route to the appropriate resume handler based on context type
     if (resumeCtx?.type === "REPLACEMENT") {
-      const accepted = action.type !== "PASS";
+      const accepted = !isDeclineResponse(action);
       const replacementResult = resumeReplacement(
         this.gameState,
         resumeCtx as unknown as ReplacementResumeContext,
@@ -962,7 +973,7 @@ export class GameSession implements DurableObject {
         resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
       }
     } else if (resumeCtx?.type === "REPLACEMENT_BATCH") {
-      const accepted = action.type !== "PASS";
+      const accepted = !isDeclineResponse(action);
       const batchResult = resumeReplacementBatch(
         this.gameState,
         resumeCtx as unknown as ReplacementBatchResumeContext,
@@ -998,6 +1009,11 @@ export class GameSession implements DurableObject {
           this.attachReplacementBatchContinuation(resumedFrame.replacementBatchContinuation);
         }
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
+        // OPT-446: a rejection that re-issues the prompt (OPT-439 restore
+        // path) is still a rejection — surface it to the sender.
+        if (resumeResult.rejected) {
+          responseRejected = true;
+        }
       } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
         // OPT-436: the handler rejected the response (stale/duplicate/invalid)
         // without issuing a replacement prompt. Restore the complete state
