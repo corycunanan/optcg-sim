@@ -845,7 +845,8 @@ export const OP04_026_SENOR_PINK: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       costs: [{ type: "DON_REST", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Donquixote Pirates" },
@@ -1348,7 +1349,8 @@ export const OP04_039_REBECCA: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true },
       costs: [{ type: "DON_REST", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "HAND_COUNT",
         controller: "SELF",
         operator: "<=",
@@ -2022,7 +2024,8 @@ export const OP04_059_ICEBURG: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Water Seven" },
@@ -2055,7 +2058,8 @@ export const OP04_060_CROCODILE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Baroque Works" },
@@ -2102,7 +2106,8 @@ export const OP04_061_TOM: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Water Seven" },
@@ -2134,7 +2139,8 @@ export const OP04_063_FRANKY: EffectSchema = {
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
       flags: { once_per_turn: true },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Water Seven" },
@@ -3155,7 +3161,8 @@ export const OP04_091_LEO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "REST_SELF", target: { type: "YOUR_LEADER" } }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Dressrosa" },
@@ -3483,7 +3490,8 @@ export const OP04_098_TOKO: EffectSchema = {
           filter: { traits: ["Land of Wano"] },
         },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
         operator: "<=",

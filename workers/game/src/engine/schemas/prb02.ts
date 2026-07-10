@@ -412,7 +412,8 @@ export const PRB02_010_CHARLOTTE_PUDDING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         all_of: [
           {
             type: "LEADER_PROPERTY",

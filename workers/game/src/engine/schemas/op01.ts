@@ -54,7 +54,8 @@ export const OP01_002_TRAFALGAR_LAW: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_REST", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
         filter: { card_type: "CHARACTER" },
@@ -1143,7 +1144,8 @@ export const OP01_042_KOMURASAKI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_REST", amount: 3 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Kouzuki Oden" },
@@ -2488,7 +2490,8 @@ export const OP01_094_KAIDO: EffectSchema = {
       costs: [
         { type: "DON_MINUS", amount: 6 },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Animal Kingdom Pirates" },

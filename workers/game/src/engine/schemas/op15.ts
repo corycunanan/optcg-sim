@@ -1313,12 +1313,13 @@ export const OP15_032_BROOK: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Straw Hat Crew" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "SET_ACTIVE",
@@ -1683,7 +1684,8 @@ export const OP15_042_KYROS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Rebecca" },
@@ -2533,12 +2535,13 @@ export const OP15_064_KOTORI: EffectSchema = {
         { type: "DON_MINUS", amount: 2 },
         { type: "REST_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "MULTIPLE_NAMED_CARDS",
         controller: "SELF",
         names: ["Satori", "Hotori"],
       },
+      flags: { optional: true },
       actions: [
         {
           type: "SET_REST",
@@ -2854,12 +2857,13 @@ export const OP15_072_HOTORI: EffectSchema = {
         { type: "DON_MINUS", amount: 2 },
         { type: "REST_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "MULTIPLE_NAMED_CARDS",
         controller: "SELF",
         names: ["Kotori", "Satori"],
       },
+      flags: { optional: true },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -2931,13 +2935,17 @@ export const OP15_074_VARIE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Enel" },
       },
       actions: [
-        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          params: { amount: 1 },
+        },
         {
           type: "MODIFY_COST",
           target: {
@@ -2988,7 +2996,8 @@ export const OP15_075_EL_THOR: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Enel" },
@@ -3052,13 +3061,17 @@ export const OP15_076_LIGHTNING_BEAST_KITEN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Enel" },
       },
       actions: [
-        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          params: { amount: 1 },
+        },
         {
           type: "MODIFY_POWER",
           target: {
@@ -3374,13 +3387,14 @@ export const OP15_083_SPOIL: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
         operator: ">=",
         value: 15,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "GIVE_DON",
@@ -3454,12 +3468,13 @@ export const OP15_085_TONY_TONY_CHOPPER: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Straw Hat Crew" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "RETURN_TO_HAND",
@@ -3760,13 +3775,14 @@ export const OP15_093_THE_RISKY_BROTHERS: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
         operator: ">=",
         value: 15,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "GRANT_KEYWORD",
@@ -3852,13 +3868,14 @@ export const OP15_095_GUM_GUM_STORM: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
         operator: ">=",
         value: 15,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -3915,13 +3932,19 @@ export const OP15_096_SWALLOW_BOND_EN_AVANT: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Straw Hat Crew" },
       },
-      actions: [{ type: "MILL", params: { amount: 5 } }],
+      flags: { optional: true },
+      actions: [
+        {
+          type: "MILL",
+          params: { amount: 5 },
+        },
+      ],
     },
     {
       id: "OP15-096_counter",
@@ -4330,12 +4353,13 @@ export const OP15_109_NICO_ROBIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "LIFE_TO_HAND", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Straw Hat Crew" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",

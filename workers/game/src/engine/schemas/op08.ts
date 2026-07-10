@@ -499,12 +499,13 @@ export const OP08_016_DR_HIRILUK: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Tony Tony.Chopper" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1093,12 +1094,13 @@ export const OP08_032_MILKY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Minks" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "SET_DON_ACTIVE",
@@ -1340,12 +1342,13 @@ export const OP08_039_ZOU: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Minks" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "SET_DON_ACTIVE",
@@ -1397,12 +1400,13 @@ export const OP08_040_ATMOS: EffectSchema = {
           filter: { traits_contains: ["Whitebeard Pirates"] },
         },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Whitebeard Pirates" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "RETURN_TO_HAND",
@@ -1433,12 +1437,13 @@ export const OP08_041_APHELANDRA: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Kuja Pirates" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "RETURN_TO_DECK",
@@ -2096,8 +2101,8 @@ export const OP08_059_ALBER: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         all_of: [
           {
             type: "LEADER_PROPERTY",
@@ -2112,6 +2117,7 @@ export const OP08_059_ALBER: EffectSchema = {
           },
         ],
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2143,7 +2149,8 @@ export const OP08_060_KING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "DON_FIELD_COUNT",
         controller: "OPPONENT",
         operator: ">=",
@@ -2206,12 +2213,13 @@ export const OP08_062_CHARLOTTE_KATAKURI: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Big Mom Pirates" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2709,10 +2717,20 @@ export const OP08_077_CONQUEST_OF_THE_SEA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
-      conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Animal Kingdom Pirates" },
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
+        any_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Animal Kingdom Pirates" },
+          },
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Big Mom Pirates" },
+          },
+        ],
       },
       actions: [
         {
@@ -2749,7 +2767,8 @@ export const OP08_079_KAIDO: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "WAS_PLAYED_THIS_TURN",
       },
       actions: [
@@ -3550,7 +3569,8 @@ export const OP08_101_CHARLOTTE_ANGEL: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "TRASH_FROM_LIFE", amount: 1, position: "TOP" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Big Mom Pirates" },
@@ -3889,13 +3909,14 @@ export const OP08_111_S_SHARK: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
         operator: "<=",
         value: 2,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_SELF",
@@ -3996,13 +4017,14 @@ export const OP08_114_S_HAWK: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
         operator: "<=",
         value: 2,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_SELF",

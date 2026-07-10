@@ -30,7 +30,7 @@ import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../../trigge
 import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
-import { resolveEffect, executeActionChain } from "../resolver.js";
+import { resolveEffect, executeActionChain, postCostConditionsMet } from "../resolver.js";
 import { executePlayCard } from "../actions/play.js";
 import { applyFieldDonReturn, decodeFieldDonReturnChoice } from "../actions/don.js";
 import type { EffectResolverResult } from "../types.js";
@@ -282,6 +282,13 @@ export function handleAwaitingOptionalResponse(
   nextState = popFrame(nextState);
   if (isOncePerTurnBlock(block)) {
     nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
+  }
+
+  // OPT-437: the post-colon "If" gate — costs were paid inline above and the
+  // chain is about to start; when false, skip every action (the paid cost
+  // stands) but still drain queued triggers.
+  if (!postCostConditionsMet(nextState, block, sourceCardInstanceId, controller, cardDb)) {
+    return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
   }
 
   if (topFrame.remainingActions.length > 0) {

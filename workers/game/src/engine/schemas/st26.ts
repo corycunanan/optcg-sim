@@ -177,7 +177,8 @@ export const ST26_005_MONKEY_D_LUFFY: EffectSchema = {
         ],
       },
       costs: [{ type: "DON_MINUS", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         all_of: [
           {
             type: "LEADER_PROPERTY",

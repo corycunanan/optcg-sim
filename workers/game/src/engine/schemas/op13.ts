@@ -1908,7 +1908,8 @@ export const OP13_057_IF_I_BOWED_DOWN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
         operator: "<=",
@@ -2556,7 +2557,8 @@ export const OP13_075_GUESS_WELL_HAVE_ANOTHER_SCRAP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         all_of: [
           {
             type: "LEADER_PROPERTY",
@@ -2611,7 +2613,8 @@ export const OP13_076_DIVINE_DEPARTURE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 5 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "DON_GIVEN",
         controller: "SELF",
         mode: "ANY_CARD_HAS_DON",
@@ -2668,7 +2671,8 @@ export const OP13_077_GO_ALL_THE_WAY_TO_THE_TOP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 3 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "DON_GIVEN",
         controller: "SELF",
         mode: "ANY_CARD_HAS_DON",
@@ -3367,7 +3371,8 @@ export const OP13_095_SAINT_ROSWARD: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "FIELD_PURITY",
         controller: "SELF",
         filter: { card_type: "CHARACTER", traits: ["Celestial Dragons"] },
@@ -3444,7 +3449,8 @@ export const OP13_097_THE_WORLDS_EQUILIBRIUM: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 5 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "FIELD_PURITY",
         controller: "SELF",
         filter: { card_type: "CHARACTER", traits: ["Celestial Dragons"] },
@@ -3494,7 +3500,8 @@ export const OP13_098_NEVER_EXISTED: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Imu" },
@@ -3659,7 +3666,8 @@ export const OP13_102_EDISON: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "COMPARATIVE",
         metric: "LIFE_COUNT",
         operator: "<=",
@@ -3726,7 +3734,8 @@ export const OP13_104_KOUZUKI_HIYORI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_KO" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { multicolored: true },

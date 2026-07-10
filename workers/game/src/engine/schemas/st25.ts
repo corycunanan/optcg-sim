@@ -171,7 +171,8 @@ export const ST25_004_BUGGY: EffectSchema = {
         { type: "TRASH_FROM_HAND", amount: 1 },
         { type: "TRASH_SELF" },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Buggy" },

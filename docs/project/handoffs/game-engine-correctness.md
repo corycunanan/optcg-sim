@@ -22,11 +22,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4 | OPT-427 | Rejected stale choice silently skips the pending effect | — | OPT-439 | Duplicate | — | Verified 2026-07-10: exact scenario re-run through `GameSession.handleAction` passes on main; covered by OPT-438 + OPT-439. Evidence in a Linear comment. |
 | 5 | OPT-429 | Chaining selectable costs leaves an orphaned effect-stack frame | — | OPT-439 | Done | [#257](https://github.com/corycunanan/optcg-sim/pull/257) | Merged 2026-07-10 (`740a8fc`, reviewed head `759569c` + docs-only handoff). Symmetric frame retirement + pendingTriggers carry-over. Review re-confirmed OPT-431/OPT-430 as the remaining OP10-026/027 gaps. |
 | 6 | OPT-446 | Prompt-guard decline vocabulary and rejected-response error polish | — | OPT-439 | Done | [#258](https://github.com/corycunanan/optcg-sim/pull/258) | Merged 2026-07-10 (`d61f5f5`, reviewed head `ac61c71` + docs). Gate accepts `skip`; replacement paths share the decline predicate; game:error on engine rejections. Delta review surfaced pre-existing OPT-448/OPT-449. |
-| 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | In Review | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | PLACE_SELF_AND_TRASH_TO_DECK compound cost; self half fixed to the source. Review spawned OPT-453/454/455 + OPT-432 scope note. |
-| 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | In Review | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Closed by the same compound cost: one arrange prompt over the self+trash group (Rule 3-1-7). |
+| 7 | OPT-431 | “This Character” cost can use a different Character | — | OPT-429 | Done | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Merged 2026-07-10 (`9ef3fb3`). PLACE_SELF_AND_TRASH_TO_DECK compound cost; self half fixed to the source. Review spawned OPT-453/454/455 + OPT-432 scope note. |
+| 8 | OPT-430 | Compound cost cannot be reordered | — | OPT-429 | Done | [#261](https://github.com/corycunanan/optcg-sim/pull/261) | Merged 2026-07-10 (`9ef3fb3`). One arrange prompt over the self+trash group (Rule 3-1-7). |
 | 9 | OPT-432 | Oars cost can consume its source and play a different copy | — | OPT-431 | Backlog | — | Reuse source-instance identity conventions from the compound-cost work. |
 | 10 | OPT-444 | OP10-022 total-character-cost activation predicate | — | — | Done | [#259](https://github.com/corycunanan/optcg-sim/pull/259) | Merged 2026-07-10 (`b7d8ee7`, reviewed heads `46ef531`/`25b8701` + docs). CHARACTER_TOTAL_COST condition on effective *field* cost (getEffectiveFieldCost). Review spawned OPT-450. |
-| 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | Backlog | — | Rebaseline after OPT-442, then split into lint/tooling plus set-family batches. |
+| 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | In Review | [#262](https://github.com/corycunanan/optcg-sim/pull/262) | 142 blocks re-encoded onto the new `post_cost_conditions` engine gate (once-after-costs, whole-chain, Rules 8-3-1/4-10-1); lint rule C6; HAND_COUNT ComparativeMetric. Spawned OPT-456/457. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
 | 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Reject prompt-identified actions when no prompt is pending. |
 | 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Backlog | — | Pre-existing; surfaced by PR #258's delta review. Clear prompt/stack on terminal transition; status-guard the prompt route. |
@@ -36,11 +36,16 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
 | 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
+| 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
+| 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
+| 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
+| 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Backlog | — | EB04-015/OP08-077/OP11-034/OP16-084 — C6-allowlisted pending content fixes. |
+| 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | Backlog | — | Same latent per-action classes as PR #262's review proved; includes the 09-EXAMPLE-ENCODINGS doc update. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-437 (ready now); OPT-432 once PR #261 merges (self-exclusion machinery, includes the X.Barrels scope note); OPT-451 (live prohibition bug, high value).
+**Next up:** OPT-432 (ready now — PR #261 merged; includes the X.Barrels scope note); then the review-spawned backlog by value: OPT-451 (live prohibition bug), OPT-453, OPT-457.
 
 ---
 
@@ -117,3 +122,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** The compound branches still transition manually — no fresh instanceId, no `CARD_RETURNED_TO_DECK` field-exit event — that is OPT-453 (with the direct sibling-reset test + attached-DON coverage folded in); don't half-fix it during audit work. The reviewers' consumer sweep (behaviorNotes) confirmed the canonical reset intentionally changes stored deck-card state for ~10 existing `PLACE_OWN_CHARACTER_TO_DECK` consumers.
 - **Unresolved:** Review cycle cap reached with residual systemic findings — all ticketed: OPT-453 (zone-transition completeness), OPT-454 (four more mis-encoded self-costs), OPT-455 (ST13-001 destination; trash filters read field stats), OPT-432 comment (X.Barrels `exclude_self`, same machinery as Oars). Merged under the user's standing session authorization.
 - **Pointer:** PR #261. For OPT-437: rebaseline the post-colon audit on current main (CHARACTER_TOTAL_COST now exists per the OPT-444 handoff).
+
+### OPT-437 → OPT-432
+**From:** session on 2026-07-10 · **Commits:** `f5985e2` (first pass), `ed0814b` (post_cost_conditions re-encode), `97559fe` (coverage) · **PR:** [#262](https://github.com/corycunanan/optcg-sim/pull/262)
+
+- **Primer:** New engine primitive `EffectBlock.post_cost_conditions` — the post-colon "If" evaluated exactly ONCE after costs are fully paid, at every chain-start site (resolveEffect Step 4, `finishCostsAndRunActions`, the optional-accept path), never on mid-chain resumes; when false, the paid cost stands and the whole chain is skipped (Rules 8-3-1/8-3-3/4-10-1). All 142 audited blocks re-encoded onto it. `HAND_COUNT` added to `ComparativeMetric`. Lint rule C6 rejects new costs+block-conditions encodings (allowlist: 8 verified pre-cost + 4 OPT-456 deferrals).
+- **Read first:** `effect-types.ts` (EffectBlock doc comment), `resolver.ts` (`postCostConditionsMet` + Step 4 gate), the two resume gates, `opt-437-post-colon-audit.test.ts`.
+- **Gotchas / do NOT touch:** The first pass proved per-action condition placement WRONG (mid-chain re-evaluation; ungated THENs violating 4-10-1) — never encode post-colon Ifs on actions. The OPT-433/442 cohort (21 blocks, marker comment "gates only this action") still uses the wrong pattern — that migration is OPT-457, including fixing tests that assert the old semantics.
+- **Unresolved:** OPT-456 (4 partial encodings, C6-allowlisted), OPT-457 (cohort migration + encoding-guide doc). For OPT-432: plumb `sourceCardInstanceId` into `computeCostTargets` and honor `exclude_self` there — one mechanism closes both the Oars candidate bug and X.Barrels (see the OPT-432 Linear comment).
+- **Pointer:** PR #262. Both fan-out passes' per-card verdicts are in the session workflow journals.

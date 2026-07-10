@@ -124,13 +124,17 @@ export const ST05_005_CARINA: EffectSchema = {
         { type: "REST_SELF" },
         { type: "TRASH_FROM_HAND", amount: 1, filter: { traits: ["FILM"] } },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "COMPARATIVE",
         metric: "DON_FIELD_COUNT",
         operator: "<",
       },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED" } },
+        {
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 2, target_state: "RESTED" },
+        },
       ],
       flags: { once_per_turn: true, optional: true },
     },

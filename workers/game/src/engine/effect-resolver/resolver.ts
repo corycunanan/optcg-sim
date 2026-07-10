@@ -180,6 +180,31 @@ play.setPlayDependencies({ resolveEffect });
 // import cycle.
 setReplacementDispatcher(executeEffectAction, executeActionChain);
 
+// ─── Post-cost condition gate (OPT-437) ──────────────────────────────────────
+
+/**
+ * Evaluate a block's post-colon "If" gate (`post_cost_conditions`). Called
+ * exactly once per resolution, at the point the action chain STARTS — after
+ * costs are fully paid (resolveEffect Step 4, finishCostsAndRunActions, and
+ * the optional-response accept path). Mid-chain resumes must NOT re-check:
+ * per Rules 8-3-1/4-10-1 the clause is evaluated once and, when false, the
+ * entire post-colon remainder is skipped while the paid cost stands.
+ */
+export function postCostConditionsMet(
+  state: GameState,
+  block: EffectBlock,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (!block.post_cost_conditions) return true;
+  return evaluateCondition(state, block.post_cost_conditions, {
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+  });
+}
+
 // ─── resolveEffect ───────────────────────────────────────────────────────────
 
 export function resolveEffect(
@@ -291,7 +316,12 @@ export function resolveEffect(
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
   }
 
-  // Step 4: Execute action chain
+  // Step 4: Execute action chain — gated by the post-colon "If" (OPT-437),
+  // evaluated exactly once now that costs are fully paid.
+  if (!postCostConditionsMet(state, block, sourceCardInstanceId, controller, cardDb)) {
+    log("effect.skipped", { ...logCtx, reason: "post_cost_conditions_not_met" });
+    return { state, events, resolved: true };
+  }
   if (block.actions && block.actions.length > 0) {
     let initialRefs = costResultToRefs(costResult);
     if (triggeringCardInstanceId) {

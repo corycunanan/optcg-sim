@@ -23,7 +23,8 @@ export const ST07_001_CHARLOTTE_LINLIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING", don_requirement: 2 },
       costs: [{ type: "LIFE_TO_HAND", amount: 1, position: "TOP_OR_BOTTOM" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
         operator: "<=",

@@ -687,7 +687,8 @@ export const OP14_020_DRACULE_MIHAWK: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "REST_CARDS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "BOARD_WIDE_EXISTENCE",
         filter: { card_type: "CHARACTER", cost_min: 5 },
       },
@@ -2850,12 +2851,13 @@ export const OP14_076_EVER_WHITE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 2 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Donquixote Pirates" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
@@ -2936,7 +2938,8 @@ export const OP14_078_BULLET_STRING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Donquixote Pirates" },

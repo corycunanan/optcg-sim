@@ -799,12 +799,13 @@ export const EB04_019_ELECLAW: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_CARDS", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Minks" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "MODIFY_COST",
@@ -968,13 +969,14 @@ export const EB04_022_ISSHO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 2 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "HAND_COUNT",
         controller: "OPPONENT",
         operator: ">=",
         value: 6,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "OPPONENT_ACTION",
@@ -1227,12 +1229,13 @@ export const EB04_028_ICE_TIME: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Navy" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "APPLY_PROHIBITION",
@@ -1357,7 +1360,8 @@ export const EB04_030_KAIDO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Animal Kingdom Pirates" },
@@ -1480,7 +1484,8 @@ export const EB04_032_QUEEN: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [{ type: "REST_DON", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Animal Kingdom Pirates" },
@@ -1509,7 +1514,8 @@ export const EB04_033_GROGGY_MONSTERS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
         filter: { traits: ["Foxy Pirates"] },
@@ -1550,8 +1556,8 @@ export const EB04_034_CHARLOTTE_PUDDING: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "CARD_TYPE_IN_ZONE",
         controller: "SELF",
         card_type: "EVENT",
@@ -1559,6 +1565,7 @@ export const EB04_034_CHARLOTTE_PUDDING: EffectSchema = {
         operator: ">=",
         value: 4,
       },
+      flags: { optional: true },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -1628,7 +1635,8 @@ export const EB04_036_FOXY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Foxy Pirates" },
@@ -2062,12 +2070,13 @@ export const EB04_045_GINNY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "REST_SELF" }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "BOARD_WIDE_EXISTENCE",
         filter: { cost_min: 8 },
         count: { operator: ">=", value: 2 },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "MODIFY_POWER",
@@ -2692,12 +2701,13 @@ export const EB04_059_BLACK_ROPE_DRAGON_TWISTER: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "COMPARATIVE",
         metric: "CHARACTER_COUNT",
         operator: "<",
       },
+      flags: { optional: true },
       actions: [
         {
           type: "KO",

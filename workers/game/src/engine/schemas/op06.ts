@@ -2157,12 +2157,13 @@ export const OP06_060_VINSMOKE_ICHIJI_3: EffectSchema = {
         { type: "DON_MINUS", amount: 1 },
         { type: "TRASH_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "GERMA 66" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2298,12 +2299,13 @@ export const OP06_063_VINSMOKE_SORA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "COMPARATIVE",
         metric: "DON_FIELD_COUNT",
         operator: "<=",
       },
+      flags: { optional: true },
       actions: [
         {
           type: "RETURN_TO_HAND",
@@ -2341,12 +2343,13 @@ export const OP06_064_VINSMOKE_NIJI_3: EffectSchema = {
         { type: "DON_MINUS", amount: 1 },
         { type: "TRASH_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "GERMA 66" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2442,12 +2445,13 @@ export const OP06_066_VINSMOKE_YONJI_2: EffectSchema = {
         { type: "DON_MINUS", amount: 1 },
         { type: "TRASH_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "GERMA 66" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2517,12 +2521,13 @@ export const OP06_068_VINSMOKE_REIJU_2: EffectSchema = {
         { type: "DON_MINUS", amount: 1 },
         { type: "TRASH_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "GERMA 66" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",
@@ -2590,7 +2595,8 @@ export const OP06_071_GILD_TESORO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "FILM" },
@@ -3611,12 +3617,13 @@ export const OP06_098_THRILLER_BARK: EffectSchema = {
         { type: "DON_REST", amount: 1 },
         { type: "REST_SELF" },
       ],
-      flags: { optional: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Thriller Bark Pirates" },
       },
+      flags: { optional: true },
       actions: [
         {
           type: "PLAY_CARD",

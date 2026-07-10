@@ -46,8 +46,16 @@ export interface EffectBlock {
   trigger?: Trigger;
   costs?: Cost[];
 
-  // Conditions (all categories)
+  // Conditions (all categories) — evaluated BEFORE optional activation and
+  // cost payment. Use only for pre-colon/pre-cost predicates.
   conditions?: Condition;
+
+  // OPT-437: post-colon "If ..." gate — evaluated exactly ONCE after costs
+  // are fully paid, immediately before the action chain starts. When false,
+  // every action in the block is skipped (Rules 8-3-1/8-3-3/4-10-1: the cost
+  // is still paid; the entire post-colon remainder cannot resolve). Never
+  // re-evaluated on mid-chain resumes.
+  post_cost_conditions?: Condition;
 
   // Resolution (auto / activate)
   actions?: Action[];
@@ -401,7 +409,7 @@ export interface ComparativeCondition {
   margin?: number;
 }
 
-export type ComparativeMetric = "LIFE_COUNT" | "DON_FIELD_COUNT" | "CHARACTER_COUNT";
+export type ComparativeMetric = "LIFE_COUNT" | "DON_FIELD_COUNT" | "CHARACTER_COUNT" | "HAND_COUNT";
 
 export interface CombinedTotalCondition {
   type: "COMBINED_TOTAL";

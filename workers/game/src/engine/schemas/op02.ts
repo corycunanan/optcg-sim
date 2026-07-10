@@ -1765,13 +1765,17 @@ export const OP02_066_IMPEL_DOWN_ALL_STARS: EffectSchema = {
       costs: [
         { type: "TRASH_FROM_HAND", amount: 2 },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Impel Down" },
       },
       actions: [
-        { type: "DRAW", params: { amount: 2 } },
+        {
+          type: "DRAW",
+          params: { amount: 2 },
+        },
       ],
       flags: { optional: true },
     },
@@ -1950,13 +1954,17 @@ export const OP02_070_NEW_KAMA_LAND: EffectSchema = {
       costs: [
         { type: "REST_SELF" },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Emporio.Ivankov" },
       },
       actions: [
-        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          params: { amount: 1 },
+        },
         {
           type: "TRASH_FROM_HAND",
           target: {

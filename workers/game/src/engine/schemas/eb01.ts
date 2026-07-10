@@ -95,7 +95,8 @@ export const EB01_002_IZO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         any_of: [
           {
             type: "LEADER_PROPERTY",
@@ -1079,7 +1080,8 @@ export const EB01_031_KALIFA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Water Seven" },
@@ -1114,7 +1116,8 @@ export const EB01_033_BLUENO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Water Seven" },
@@ -1160,7 +1163,8 @@ export const EB01_034_MS_WEDNESDAY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK", once_per_turn: true },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Baroque Works" },
@@ -1302,7 +1306,8 @@ export const EB01_038_OH_COME_MY_WAY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait_contains: "Baroque Works" },

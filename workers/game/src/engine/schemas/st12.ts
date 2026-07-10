@@ -180,7 +180,8 @@ export const ST12_007_RIKA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_REST", amount: 2 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "OPPONENT",
         operator: ">=",

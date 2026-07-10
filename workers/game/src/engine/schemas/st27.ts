@@ -26,7 +26,8 @@ export const ST27_001_AVALO_PIZARRO: EffectSchema = {
       costs: [
         { type: "REST_CARDS", amount: 1, filter: { name: "Fullalead", card_type: "STAGE" } },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Blackbeard Pirates" },
@@ -66,7 +67,8 @@ export const ST27_002_CATARINA_DEVON: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Blackbeard Pirates" },

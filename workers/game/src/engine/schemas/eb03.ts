@@ -1155,7 +1155,8 @@ export const EB03_028_YU: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "HAND_COUNT",
         controller: "SELF",
         operator: "<=",
@@ -1186,7 +1187,8 @@ export const EB03_029_INSOLENT_FOOL_STAND_DOWN: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 4 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Boa Hancock" },
@@ -1244,7 +1246,8 @@ export const EB03_031_VINSMOKE_REIJU: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY", turn_restriction: "YOUR_TURN" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Sanji" },
@@ -1481,7 +1484,8 @@ export const EB03_038_THANKS_FOR_THE_TREAT: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         all_of: [
           {
             type: "COMPARATIVE",
@@ -1947,7 +1951,8 @@ export const EB03_049_I_KNEW_YOU_PEOPLE_WERE_BEHIND_THIS: EffectSchema = {
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
       costs: [{ type: "REST_DON", amount: 7 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Perona" },
@@ -2068,7 +2073,8 @@ export const EB03_052_SHIRAHOSHI: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { name: "Shirahoshi" },
@@ -2203,7 +2209,8 @@ export const EB03_055_NICO_ROBIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_LIFE", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Straw Hat Crew" },

@@ -1562,7 +1562,8 @@ export const OP07_047_TRAFALGAR_LAW: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "HAND_COUNT",
         controller: "OPPONENT",
         operator: ">=",
@@ -2024,7 +2025,8 @@ export const OP07_058_ISLAND_OF_WOMEN: EffectSchema = {
         { type: "TRASH_FROM_HAND", amount: 1 },
         { type: "REST_SELF" },
       ],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Kuja Pirates" },
@@ -2064,7 +2066,8 @@ export const OP07_059_FOXY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       costs: [{ type: "DON_MINUS", amount: 3 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
         filter: { card_type: "CHARACTER", traits: ["Foxy Pirates"] },
@@ -2150,7 +2153,8 @@ export const OP07_061_VINSMOKE_SANJI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "The Vinsmoke Family" },
@@ -2214,7 +2218,8 @@ export const OP07_063_CAPOTE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Foxy Pirates" },
@@ -2547,13 +2552,14 @@ export const OP07_073_MONKEY_D_LUFFY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_MINUS", amount: 3 }],
-      flags: { once_per_turn: true },
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "CARD_ON_FIELD",
         controller: "OPPONENT",
         filter: { card_type: "CHARACTER" },
         count: { operator: ">=", value: 3 },
       },
+      flags: { once_per_turn: true },
       actions: [
         {
           type: "SET_ACTIVE",
@@ -2578,7 +2584,8 @@ export const OP07_074_MONDA: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",
         property: { trait: "Foxy Pirates" },
@@ -3771,7 +3778,8 @@ export const OP07_109_MONKEY_D_LUFFY: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "TRASH_SELF" }],
-      conditions: {
+      // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
+      post_cost_conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
         operator: "<=",
