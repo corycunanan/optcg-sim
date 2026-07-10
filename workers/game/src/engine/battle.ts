@@ -27,6 +27,7 @@ import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
 import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
+import { emitPendingEvent } from "./events.js";
 
 // ─── Declare Attack ───────────────────────────────────────────────────────────
 
@@ -332,10 +333,40 @@ export function executeRevealTrigger(
         nextState = effectResult.state;
         events.push(...effectResult.events);
         nextState = popTriggerStaging(nextState, lifeCard.instanceId);
-        // If the trigger effect needs player input, end the battle first
-        // then surface the prompt — battle is over, we're just resolving the effect
+        // OPT-441: a prompt pauses the Trigger effect, not the damage sequence.
+        // Publish the Life removal now and queue its auto effects behind the
+        // current effect frame. Once that stack fully unwinds, GameSession
+        // resumes any remaining Double Attack damage through the pipeline.
         if (effectResult.pendingPrompt) {
-          nextState = endBattle(nextState, events);
+          const removedEvent: PendingEvent = {
+            type: "CARD_REMOVED_FROM_LIFE",
+            playerIndex: inactiveIdx,
+            payload: { cardInstanceId: lifeCard.instanceId },
+            __alreadyEmitted: true,
+          };
+          nextState = emitPendingEvent(nextState, removedEvent, inactiveIdx);
+
+          const pausedBattle = nextState.turn.battle;
+          if (!pausedBattle) {
+            return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
+          }
+          const cleanedBattle = { ...pausedBattle };
+          delete cleanedBattle.pendingTriggerLifeCard;
+          const remainingBefore = cleanedBattle.damagesRemaining ?? 1;
+          cleanedBattle.damagesRemaining = Math.max(0, remainingBefore - 1);
+          nextState = {
+            ...nextState,
+            turn: {
+              ...nextState.turn,
+              battle: cleanedBattle,
+              pendingBattleDamageContinuation: {
+                battleId: cleanedBattle.battleId,
+                lifeCardInstanceId: lifeCard.instanceId,
+                damagedPlayerIndex: inactiveIdx,
+                stage: "LIFE_REMOVAL",
+              },
+            },
+          };
           return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
         }
       } else {
@@ -827,6 +858,52 @@ function continueLeaderDamageSequence(
 
   nextState = endBattle(nextState, events);
   return { state: nextState, events, damagedPlayerIndex };
+}
+
+/**
+ * Re-enter a battle damage loop that was paused while a Life [Trigger] effect
+ * awaited player input. The caller must feed the returned ExecuteResult back
+ * through the action pipeline so its events, auto effects, and lethal checks
+ * receive the same processing as an ordinary REVEAL_TRIGGER action.
+ */
+export function resumeBattleDamageContinuation(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): ExecuteResult {
+  const pending = state.turn.pendingBattleDamageContinuation;
+  if (!pending || state.pendingPrompt || state.effectStack.length > 0) {
+    return { state, events: [] };
+  }
+
+  const battle = state.turn.battle;
+  const clearedState: GameState = {
+    ...state,
+    turn: { ...state.turn, pendingBattleDamageContinuation: null },
+  };
+  if (!battle || battle.battleId !== pending.battleId) {
+    return { state: clearedState, events: [] };
+  }
+
+  if (pending.stage === "LIFE_REMOVAL") {
+    const removalState: GameState = {
+      ...state,
+      turn: {
+        ...state.turn,
+        pendingBattleDamageContinuation: { ...pending, stage: "DAMAGE" },
+      },
+    };
+    return {
+      state: removalState,
+      events: [{
+        type: "CARD_REMOVED_FROM_LIFE",
+        playerIndex: pending.damagedPlayerIndex,
+        payload: { cardInstanceId: pending.lifeCardInstanceId },
+        __alreadyEmitted: true,
+      }],
+    };
+  }
+
+  return continueLeaderDamageSequence(clearedState, cardDb);
 }
 
 // ─── Recalculate Battle Powers ───────────────────────────────────────────────

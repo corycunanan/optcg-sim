@@ -103,7 +103,7 @@ import {
   resumePregameFromPrompt,
   startPregame,
 } from "./engine/pregame.js";
-import { runPipeline } from "./engine/pipeline.js";
+import { continuePipelineFromExecution, runPipeline } from "./engine/pipeline.js";
 import {
   resumeReplacement,
   resumeReplacementBatch,
@@ -117,7 +117,7 @@ import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayloa
 import { buildGameResultCallbackPayload } from "./util/result.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
-import { recalculateBattlePowers } from "./engine/battle.js";
+import { recalculateBattlePowers, resumeBattleDamageContinuation } from "./engine/battle.js";
 import { isEffectConditionMet } from "./engine/modifiers.js";
 import type { RuntimeActiveEffect } from "./engine/effect-types.js";
 import { configureLogger, log } from "./lib/log.js";
@@ -909,6 +909,7 @@ export class GameSession implements DurableObject {
     const stateBeforeResume = this.gameState;
     const resumeCtx = prompt.resumeContext as unknown as Record<string, unknown>;
     const respondingPlayer = prompt.respondingPlayer;
+    let resumedGameOver: { winner: 0 | 1 | null; reason: string } | undefined;
 
     // OPT-366: pregame prompts (priority choice, mulligan) drain through the
     // pregame FSM rather than the effect resolver / replacement system.
@@ -988,6 +989,23 @@ export class GameSession implements DurableObject {
       }
     }
 
+    while (
+      !this.gameState.pendingPrompt
+      && this.gameState.effectStack.length === 0
+      && this.gameState.turn.pendingBattleDamageContinuation
+    ) {
+      const continuation = resumeBattleDamageContinuation(this.gameState, this.cardDb);
+      const pipelineResult = continuePipelineFromExecution(
+        continuation.state,
+        continuation,
+        this.cardDb,
+        respondingPlayer,
+      );
+      this.gameState = pipelineResult.state;
+      resumedGameOver = pipelineResult.gameOver;
+      if (resumedGameOver) break;
+    }
+
     // Recalculate battle powers after effect resolution — trigger effects
     // (e.g., [On Your Opponent's Attack] → MODIFY_POWER) may have changed them
     if (this.cardDb) {
@@ -1003,6 +1021,18 @@ export class GameSession implements DurableObject {
     this.surfaceRevealTriggerIfNeeded();
 
     await this.persist();
+
+    if (resumedGameOver) {
+      this.undoHistory = [];
+      await this.writeResultToDb();
+      this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s, canUndo: false }));
+      this.broadcast({
+        type: "game:over",
+        winner: resumedGameOver.winner,
+        reason: resumedGameOver.reason,
+      });
+      return;
+    }
     this.broadcastFilteredState((s) => ({ type: "game:update", action, state: s }));
 
     if (this.gameState.pendingPrompt) {
