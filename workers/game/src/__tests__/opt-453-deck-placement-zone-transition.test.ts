@@ -366,10 +366,9 @@ describe("OPT-453 — review fixes: resume trigger scan + unresolvable-target fi
       cardDb,
     );
 
-    // The removed-from-field watcher fires on the resume path: Buggy's
-    // optional once-per-turn effect surfaces as the next prompt instead of
-    // being silently dropped (pre-fix: resume cost events were never scanned).
-    expect(done.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    // Rule 8-4-5: deck is secret, so the moved-card auto effect does not
+    // activate even though resume-path cost events are scanned correctly.
+    expect(done.pendingPrompt).toBeUndefined();
   });
 
   it("a stage payment does not satisfy OP16-041's Character-only target filter", () => {
@@ -396,15 +395,14 @@ describe("OPT-453 — review fixes: resume trigger scan + unresolvable-target fi
     };
     expect(matchTriggersForEvent(state, stageEvent as any, cardDb)).toHaveLength(0);
 
-    // Positive control: an unresolvable CHARACTER with the Impel Down trait
-    // still matches through the same snapshot path.
+    // A Character snapshot still cannot bypass Rule 8-4-5's secret-area gate.
     const charEvent = {
       type: "CARD_RETURNED_TO_DECK" as const,
       playerIndex: 0 as const,
       payload: { cardInstanceId: "gone-char", cardId: IMPEL_CHAR.id },
       timestamp: 0,
     };
-    expect(matchTriggersForEvent(state, charEvent as any, cardDb)).toHaveLength(1);
+    expect(matchTriggersForEvent(state, charEvent as any, cardDb)).toHaveLength(0);
   });
 
   it("target-side cleanup: another card's effect stops listing the departed instance", () => {

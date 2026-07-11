@@ -5,10 +5,9 @@
  * activated when your {Impel Down} type Character card is removed from the
  * field. Play up to 1 [Prisoner of Impel Down] card from your hand."
  *
- * The custom event matches every field-exit game event — CARD_KO,
- * CARD_TRASHED (field only), CARD_RETURNED_TO_HAND (field only, not
- * trash→hand recovery), CARD_RETURNED_TO_DECK — with the usual EventFilter
- * scoping (controller, target_filter).
+ * Rule 8-4-5 limits moved-card auto effects to open destinations, so this
+ * custom event matches field→trash exits only: CARD_KO and field-only
+ * CARD_TRASHED. Hand, deck, and face-down Life destinations are secret.
  */
 
 import { describe, it, expect } from "vitest";
@@ -101,21 +100,21 @@ describe("OPT-407: CHARACTER_REMOVED_FROM_FIELD matching (OP16-041)", () => {
     expect(matchTriggersForEvent(state, event, cardDb).length).toBe(0);
   });
 
-  it("matches a field bounce but NOT trash→hand recovery", () => {
+  it("does NOT match movement to the secret hand area", () => {
     const { state, cardDb } = buildState();
     // Field bounce: card now in hand.
     state.players[0].hand.push({ ...state.players[0].trash[0], zone: "HAND" });
     const bounce = makeEvent("CARD_RETURNED_TO_HAND", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id });
-    expect(matchTriggersForEvent(state, bounce, cardDb).length).toBe(1);
+    expect(matchTriggersForEvent(state, bounce, cardDb).length).toBe(0);
 
     const recovery = makeEvent("CARD_RETURNED_TO_HAND", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id, source: "TRASH" });
     expect(matchTriggersForEvent(state, recovery, cardDb).length).toBe(0);
   });
 
-  it("matches a return to deck", () => {
+  it("does NOT match movement to the secret deck area", () => {
     const { state, cardDb } = buildState();
     const event = makeEvent("CARD_RETURNED_TO_DECK", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id, position: "BOTTOM" });
-    expect(matchTriggersForEvent(state, event, cardDb).length).toBe(1);
+    expect(matchTriggersForEvent(state, event, cardDb).length).toBe(0);
   });
 
   it("does NOT match the opponent's removals (controller: SELF filter)", () => {

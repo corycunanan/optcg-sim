@@ -622,16 +622,14 @@ function isOnKOTrigger(trigger: Trigger): boolean {
 
 /**
  * OPT-407: game events that constitute a character being "removed from the
- * field" (OP16-041 Buggy leader). CARD_KO and CARD_RETURNED_TO_DECK are only
- * emitted for field exits; CARD_TRASHED and CARD_RETURNED_TO_HAND need
- * payload guards because hand/deck/trash movements reuse the same event
- * types. Field exits to Life currently emit no event (known gap).
+ * field" (OP16-041 Buggy leader). Rule 8-4-5 permits moved-card auto effects
+ * only when the destination is open: trash qualifies; hand, deck, and
+ * face-down Life are secret areas (3-2-2, 3-4-2, 3-10-2). CARD_TRASHED needs
+ * a payload guard because non-field trashes reuse the event type.
  */
 const REMOVED_FROM_FIELD_EVENTS: GameEventType[] = [
   "CARD_KO",
   "CARD_TRASHED",
-  "CARD_RETURNED_TO_HAND",
-  "CARD_RETURNED_TO_DECK",
 ];
 
 function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent): boolean {
@@ -641,10 +639,6 @@ function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent):
       // Field/stage trashes carry the instance id; hand, deck, and search
       // trashes emit only { count } / { cardId }.
       return !!(event.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId;
-    }
-    if (event.type === "CARD_RETURNED_TO_HAND") {
-      // Trash→hand recovery sets source: "TRASH"; field bounces don't.
-      return (event.payload as { source?: string } | undefined)?.source !== "TRASH";
     }
     return true;
   }
@@ -851,4 +845,3 @@ function isCardInValidZone(card: CardInstance, zone: EffectZone): boolean {
   }
   return false;
 }
-
