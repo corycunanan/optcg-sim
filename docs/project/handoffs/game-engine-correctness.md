@@ -41,8 +41,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | Done | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
 | 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Done | [#275](https://github.com/corycunanan/optcg-sim/pull/275) | Prohibited targets are removed before replacement discovery; attemptable targets retain batch semantics. |
 | 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453, OPT-463 | Done | [#277](https://github.com/corycunanan/optcg-sim/pull/277) | Stage + chosen hand card now use a two-step select/arrange payment with canonical Stage exit. |
-| 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | In Review | [#278](https://github.com/corycunanan/optcg-sim/pull/278) | Rule 8-4-5 gates moved-card autos to open destinations: K.O./field-trash yes; hand/deck no. |
-| 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | Backlog | — | Found during OPT-457: OP10-087's THEN mill never runs after the opponent's discard prompt; pre-existing, pinned in the opt-442 test with a marker. |
+| 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Done | [#278](https://github.com/corycunanan/optcg-sim/pull/278) | Rule 8-4-5 gates moved-card autos to open destinations: K.O./field-trash yes; hand/deck no. |
+| 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | In Review | [#279](https://github.com/corycunanan/optcg-sim/pull/279) | Resume frames separate responder control from the original owner's trailing chain. |
 | 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
@@ -233,3 +233,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Preserve the effect owner as controller after an `OPPONENT_ACTION` prompt; only the prompted action executes from the opponent's perspective.
 - **Unresolved:** None for OPT-461; Bandai's published FAQ index contains no OP16-041 override.
 - **Pointer:** PR #278; inspect `9374b49` for the centralized open-area gate.
+
+### OPT-462 → project complete
+**From:** session on 2026-07-11 · **Commit:** `ff1aae9` · **PR:** [#279](https://github.com/corycunanan/optcg-sim/pull/279)
+
+- **Primer:** Prompt resume frames now preserve separate controllers for the responder-owned paused action and the original owner’s remaining chain.
+- **Read first:** `workers/game/src/engine/effect-resolver/resolver.ts`, `resume.ts`, and the OP10-087 regression in `opt-442-post-colon-conditions.test.ts`.
+- **Gotchas / do NOT touch:** Do not collapse the two controller fields; nested `OPPONENT_ACTION` prompts require both roles.
+- **Unresolved:** None. This closes the remaining Game Engine Correctness backlog identified in the Action Plan.
+- **Pointer:** PR #279; inspect `ff1aae9` for the controller-boundary fix.
