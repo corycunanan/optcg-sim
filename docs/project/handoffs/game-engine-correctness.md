@@ -40,8 +40,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | In Review | [#273](https://github.com/corycunanan/optcg-sim/pull/273) | All 21 re-encoded, tests moved to Rule 4-10-1 semantics, encoding guide updated. Found OPT-462 en route. |
 | 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | Done | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
 | 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Done | [#275](https://github.com/corycunanan/optcg-sim/pull/275) | Prohibited targets are removed before replacement discovery; attemptable targets retain batch semantics. |
-| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453, OPT-463 | In Review | [#277](https://github.com/corycunanan/optcg-sim/pull/277) | Stage + chosen hand card now use a two-step select/arrange payment with canonical Stage exit. |
-| 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Backlog | — | From PR #269's review: research whether deck-bound exits should match OP16-041-style watchers; OPT-407 contract may need changing. |
+| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453, OPT-463 | Done | [#277](https://github.com/corycunanan/optcg-sim/pull/277) | Stage + chosen hand card now use a two-step select/arrange payment with canonical Stage exit. |
+| 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | In Review | [#278](https://github.com/corycunanan/optcg-sim/pull/278) | Rule 8-4-5 gates moved-card autos to open destinations: K.O./field-trash yes; hand/deck no. |
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | Backlog | — | Found during OPT-457: OP10-087's THEN mill never runs after the opponent's discard prompt; pre-existing, pinned in the opt-442 test with a marker. |
 | 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
@@ -224,3 +224,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** OPT-461 is a rules-contract audit, not another cost rewrite. Establish the open-area gate from official rules and update the single centralized trigger matcher if required.
 - **Unresolved:** None for OPT-460.
 - **Pointer:** PR #277; inspect `ad5b065` and the full production Loguetown regression.
+
+### OPT-461 → OPT-462
+**From:** session on 2026-07-11 · **Commit:** `9374b49` · **PR:** [#278](https://github.com/corycunanan/optcg-sim/pull/278)
+
+- **Primer:** `CHARACTER_REMOVED_FROM_FIELD` now obeys Rule 8-4-5 and matches only open-area destinations (K.O./field-trash), excluding hand/deck secret-area exits across pipeline and resume paths.
+- **Read first:** `workers/game/src/engine/effect-resolver/resume.ts`, `resume/opponent.ts`, and the OPT-462 marker in the OPT-442 regression.
+- **Gotchas / do NOT touch:** Preserve the effect owner as controller after an `OPPONENT_ACTION` prompt; only the prompted action executes from the opponent's perspective.
+- **Unresolved:** None for OPT-461; Bandai's published FAQ index contains no OP16-041 override.
+- **Pointer:** PR #278; inspect `9374b49` for the centralized open-area gate.
