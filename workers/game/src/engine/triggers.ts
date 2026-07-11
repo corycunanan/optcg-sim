@@ -164,15 +164,28 @@ export function registerPermanentEffectsForCard(
     // Register prohibitions as RuntimeProhibitions
     if (hasProhibitions) {
       for (const prohibition of block.prohibitions!) {
-        // Resolve appliesTo from prohibition target
+        // Resolve appliesTo from the prohibition target. SELF (or no target)
+        // resolves statically to the source card. Population targets (OPT-451,
+        // e.g. P-084's "all Characters with a cost of 3 or 4") are carried on
+        // the runtime prohibition and re-resolved dynamically at match time so
+        // they track the board as it changes.
         const appliesTo: string[] = [];
+        let target: import("./effect-types.js").Target | undefined;
         if (!prohibition.target || prohibition.target.type === "SELF") {
           appliesTo.push(cardInstance.instanceId);
+        } else {
+          target = prohibition.target;
         }
-        // Non-SELF targets: store source card for now
-        if (prohibition.target && prohibition.target.type !== "SELF") {
-          appliesTo.push(cardInstance.instanceId);
-        }
+
+        // Carry block-level + prohibition-level conditions for match-time
+        // re-evaluation (OPT-451) — mirrors RuntimeActiveEffect.conditions.
+        const conditionList = [block.conditions, prohibition.conditions]
+          .filter((c): c is NonNullable<typeof c> => !!c);
+        const conditions = conditionList.length === 0
+          ? undefined
+          : conditionList.length === 1
+            ? conditionList[0]
+            : { all_of: conditionList };
 
         newProhibitions.push({
           id: nanoid(),
@@ -183,6 +196,8 @@ export function registerPermanentEffectsForCard(
           duration,
           controller: cardInstance.controller,
           appliesTo,
+          target,
+          conditions,
           usesRemaining: null,
           conditionalOverride: prohibition.conditional_override,
         });

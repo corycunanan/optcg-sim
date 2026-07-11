@@ -8,10 +8,114 @@
  * Characters with cost 2 or less", "Cannot be K.O.'d by effects"
  */
 
-import type { EffectSchema, RuntimeProhibition, ProhibitionType, TargetFilter } from "./effect-types.js";
+import type { EffectSchema, RuntimeProhibition, ProhibitionType, Target, TargetFilter } from "./effect-types.js";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "./conditions.js";
-import { findCardInState } from "./state.js";
+import { findCardInState, findCardInstance } from "./state.js";
+import { isCardNegated } from "./modifiers.js";
+
+// ─── Match-time resolution (OPT-451) ─────────────────────────────────────────
+//
+// Permanent prohibitions with population targets (e.g. P-084's "all Characters
+// with a cost of 3 or 4 cannot attack") register with an empty appliesTo and
+// carry the authored `target` on the runtime prohibition. Coverage re-resolves
+// against the live board at every check — like modifier auras — so cards that
+// enter play after registration are covered and cards that change properties
+// fall in/out of coverage naturally. Block-level `conditions` (e.g. "If your
+// Leader is [Buggy]") are likewise re-evaluated at match time.
+
+/**
+ * Re-evaluate a prohibition's carried block/prohibition conditions.
+ * Prohibitions without conditions are always active.
+ *
+ * Also honors the OPT-253 negation contract: while the prohibition's source
+ * card is effect-negated on the field, its schema-sourced prohibitions pause —
+ * mirroring isEffectConditionMet's isEffectSourceNegated gate for modifiers.
+ * Sources that already left the field (e.g. a resolved Event in the trash)
+ * are never in a NEGATE_EFFECTS_FLAG's appliesTo, so one-shot prohibitions
+ * written by resolved effects are unaffected.
+ */
+export function isProhibitionConditionMet(
+  prohibition: RuntimeProhibition,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const source = findCardInstance(state, prohibition.sourceCardInstanceId);
+  if (source && isCardNegated(source, state, cardDb)) return false;
+
+  if (!prohibition.conditions) return true;
+  const ctx: ConditionContext = {
+    sourceCardInstanceId: prohibition.sourceCardInstanceId,
+    controller: prohibition.controller,
+    cardDb,
+  };
+  return evaluateCondition(state, prohibition.conditions, ctx);
+}
+
+/**
+ * Does a prohibition's population target match this card? Mirrors the dynamic
+ * half of modifiers.ts effectAppliesToCard: controller gate (relative to the
+ * prohibition's owner), card-type gate, then the target filter.
+ */
+function prohibitionTargetMatchesCard(
+  target: Target,
+  card: CardInstance,
+  ownerController: 0 | 1,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  const targetType = target.type?.toUpperCase();
+
+  const controller = target.controller ??
+    (targetType === "ALL_YOUR_CHARACTERS" ? "SELF"
+      : targetType === "ALL_OPPONENT_CHARACTERS" ? "OPPONENT"
+      : undefined);
+  if (controller === "SELF" && card.controller !== ownerController) return false;
+  if (controller === "OPPONENT" && card.controller === ownerController) return false;
+
+  if (
+    targetType === "CHARACTER" ||
+    targetType === "ALL_YOUR_CHARACTERS" ||
+    targetType === "ALL_OPPONENT_CHARACTERS" ||
+    targetType === "ALL_CHARACTERS"
+  ) {
+    const data = cardDb.get(card.cardId);
+    if (!data || data.type?.toUpperCase() !== "CHARACTER") return false;
+  } else if (targetType === "LEADER") {
+    const data = cardDb.get(card.cardId);
+    if (!data || data.type?.toUpperCase() !== "LEADER") return false;
+  }
+
+  if (target.filter) {
+    return matchesFilter(card, target.filter, cardDb, state);
+  }
+  return true;
+}
+
+/**
+ * Instance-level coverage check used by the appliesTo-gated matchers.
+ * Static list wins when present; otherwise a carried population target
+ * resolves dynamically; otherwise the prohibition is unrestricted (existing
+ * scope-gated behavior).
+ */
+function prohibitionCoversInstance(
+  prohibition: RuntimeProhibition,
+  instanceId: string,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
+    return prohibition.appliesTo.includes(instanceId);
+  }
+  if (prohibition.target) {
+    const found = findCardInState(state, instanceId);
+    if (!found) return false;
+    return prohibitionTargetMatchesCard(
+      prohibition.target, found.card, prohibition.controller, state, cardDb,
+    );
+  }
+  return true;
+}
 
 /**
  * Check if an action is prohibited by any active prohibition.
@@ -29,6 +133,9 @@ export function checkProhibitions(
   for (const prohibition of prohibitions) {
     // Check uses remaining
     if (prohibition.usesRemaining !== null && prohibition.usesRemaining <= 0) continue;
+
+    // Re-evaluate carried block conditions (OPT-451, e.g. "If your Leader is [Buggy]")
+    if (!isProhibitionConditionMet(prohibition, state, cardDb)) continue;
 
     // Check conditional override
     if (prohibition.conditionalOverride) {
@@ -75,16 +182,33 @@ export function applyRefreshProhibitions(
   const consumedIds = new Set<string>();
   for (const p of prohibitions) {
     if (p.prohibitionType !== "CANNOT_REFRESH") continue;
-    // A target-less CANNOT_REFRESH did nothing (e.g. "up to 1" declined) —
-    // spend it at the first refresh so it can't linger forever.
-    if (p.appliesTo.length === 0) {
-      consumedIds.add(p.id);
+    // Permanent auras (OPT-451, e.g. OP05-040 Birdcage) apply to every
+    // Refresh Phase while their source stays on the field — they are matched
+    // but never consumed. Consumption is for one-shot "next Refresh Phase"
+    // prohibitions written by actions.
+    const isPermanentAura = p.duration?.type === "PERMANENT";
+
+    let affected: string[];
+    if (p.appliesTo.length > 0) {
+      affected = p.appliesTo.filter((id) => ownedIds.has(id));
+    } else if (p.target) {
+      // Dynamic population target — resolve against the refreshing player's
+      // live board (OPT-451).
+      affected = [...ownedIds].filter((id) => {
+        const card = findCardOnField(state, id);
+        return !!card && prohibitionTargetMatchesCard(p.target!, card, p.controller, state, cardDb);
+      });
+    } else {
+      // A target-less one-shot CANNOT_REFRESH did nothing (e.g. "up to 1"
+      // declined) — spend it at the first refresh so it can't linger forever.
+      if (!isPermanentAura) consumedIds.add(p.id);
       continue;
     }
-    const affected = p.appliesTo.filter((id) => ownedIds.has(id));
+
     if (affected.length === 0) continue;
-    consumedIds.add(p.id);
+    if (!isPermanentAura) consumedIds.add(p.id);
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
     if (p.conditionalOverride) {
       const ctx: ConditionContext = {
         sourceCardInstanceId: p.sourceCardInstanceId,
@@ -114,10 +238,8 @@ function matchesProhibition(
   switch (type) {
     case "CANNOT_ATTACK": {
       if (action.type !== "DECLARE_ATTACK") return null;
-      // Check if the attacker is in the prohibition's appliesTo list
-      if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
-        if (!prohibition.appliesTo.includes(action.attackerInstanceId)) return null;
-      }
+      // Static appliesTo list or dynamic population target (OPT-451)
+      if (!prohibitionCoversInstance(prohibition, action.attackerInstanceId, state, cardDb)) return null;
       // Check controller
       if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
       return "This card cannot attack (prohibited by an effect)";
@@ -128,15 +250,11 @@ function matchesProhibition(
       // so a "cannot be rested" prohibition transitively blocks both
       // (qa_op13.md:73-87).
       if (action.type === "DECLARE_ATTACK") {
-        if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
-          if (!prohibition.appliesTo.includes(action.attackerInstanceId)) return null;
-        }
+        if (!prohibitionCoversInstance(prohibition, action.attackerInstanceId, state, cardDb)) return null;
         return "This card cannot be rested, so it cannot attack";
       }
       if (action.type === "DECLARE_BLOCKER") {
-        if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
-          if (!prohibition.appliesTo.includes(action.blockerInstanceId)) return null;
-        }
+        if (!prohibitionCoversInstance(prohibition, action.blockerInstanceId, state, cardDb)) return null;
         return "This card cannot be rested, so it cannot activate [Blocker]";
       }
       return null;
@@ -145,9 +263,7 @@ function matchesProhibition(
     case "CANNOT_BLOCK":
     case "CANNOT_ACTIVATE_BLOCKER": {
       if (action.type !== "DECLARE_BLOCKER") return null;
-      if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
-        if (!prohibition.appliesTo.includes(action.blockerInstanceId)) return null;
-      }
+      if (!prohibitionCoversInstance(prohibition, action.blockerInstanceId, state, cardDb)) return null;
       if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
       return "This card cannot block (prohibited by an effect)";
     }
@@ -243,9 +359,7 @@ function matchesProhibition(
 
     case "CANNOT_ATTACH_DON": {
       if (action.type !== "ATTACH_DON") return null;
-      if (prohibition.appliesTo && prohibition.appliesTo.length > 0) {
-        if (!prohibition.appliesTo.includes(action.targetInstanceId)) return null;
-      }
+      if (!prohibitionCoversInstance(prohibition, action.targetInstanceId, state, cardDb)) return null;
       if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
       return "Cannot attach DON!! to this card (prohibited by an effect)";
     }
@@ -276,10 +390,17 @@ export function isProhibitedForCard(
   for (const p of prohibitions) {
     if (p.prohibitionType !== prohibitionType) continue;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
 
     // Check if this prohibition applies to the target
     if (p.appliesTo && p.appliesTo.length > 0) {
       if (p.appliesTo.includes(targetInstanceId)) return true;
+    } else if (p.target) {
+      // Dynamic population target (OPT-451)
+      const card = findCardOnField(state, targetInstanceId);
+      if (card && prohibitionTargetMatchesCard(p.target, card, p.controller, state, cardDb)) {
+        return true;
+      }
     }
 
     // Scope-based matching
@@ -358,6 +479,7 @@ export function isRemovalProhibited(
   for (const p of prohibitions) {
     if (!applicableTypes.includes(p.prohibitionType)) continue;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
 
     // Conditional override — if the override condition is satisfied the
     // prohibition does not apply (e.g., "unless your life has N or less").
@@ -370,13 +492,19 @@ export function isRemovalProhibited(
       if (evaluateCondition(state, p.conditionalOverride, ctx)) continue;
     }
 
-    // Scope: target must be covered by appliesTo or scope.filter.
+    // Scope: target must be covered by appliesTo, a dynamic population
+    // target (OPT-451), or scope.filter.
     const appliesTo = p.appliesTo ?? [];
-    const coversTarget =
-      (appliesTo.length > 0 && appliesTo.includes(targetInstanceId)) ||
-      (appliesTo.length === 0 && p.scope?.filter
-        ? matchesFilter(target, p.scope.filter as TargetFilter, cardDb, state)
-        : false);
+    let coversTarget: boolean;
+    if (appliesTo.length > 0) {
+      coversTarget = appliesTo.includes(targetInstanceId);
+    } else if (p.target) {
+      coversTarget = prohibitionTargetMatchesCard(p.target, target, p.controller, state, cardDb);
+    } else if (p.scope?.filter) {
+      coversTarget = matchesFilter(target, p.scope.filter as TargetFilter, cardDb, state);
+    } else {
+      coversTarget = false;
+    }
     if (!coversTarget) continue;
 
     // Scope: controller gate (SELF/OPPONENT/EITHER) — whose cards this
@@ -451,7 +579,14 @@ export function isCardPlayProhibitedByEffect(
   for (const p of state.prohibitions as RuntimeProhibition[]) {
     if (p.prohibitionType !== "CANNOT_BE_PLAYED_BY_EFFECTS") continue;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
-    if (p.appliesTo && p.appliesTo.length > 0 && !p.appliesTo.includes(cardInstanceId)) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
+    if (p.appliesTo && p.appliesTo.length > 0) {
+      if (!p.appliesTo.includes(cardInstanceId)) continue;
+    } else if (p.target) {
+      // Dynamic population target (OPT-451) — the candidate card is typically
+      // off-field (hand/trash), so match against its zone-independent state.
+      if (!prohibitionTargetMatchesCard(p.target, card, p.controller, state, cardDb)) continue;
+    }
     return true;
   }
 

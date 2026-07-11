@@ -4152,11 +4152,15 @@ export const OP04_119_DONQUIXOTE_ROSINANTE: EffectSchema = {
     {
       id: "opponent_turn_ko_protection",
       category: "permanent",
+      // "[Opponent's Turn] If this Character is rested" — both the turn gate
+      // and the rested gate are match-time conditions (Rules 8-3-2/8-3-2-5).
+      // The turn gate was previously a comment only (OPT-451 review).
       conditions: {
-        type: "SELF_STATE",
-        required_state: "RESTED",
+        all_of: [
+          { type: "IS_MY_TURN", controller: "OPPONENT" },
+          { type: "SELF_STATE", required_state: "RESTED" },
+        ],
       },
-      // OPPONENT_TURN-scoped permanent: only active during opponent's turn
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
