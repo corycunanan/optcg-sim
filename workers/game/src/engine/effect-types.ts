@@ -1020,6 +1020,8 @@ export interface SimpleCost {
   filter?: TargetFilter;
   target?: Target;
   position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+  // OPT-455: face for Life-destination costs (ST13-001 places face-up).
+  face?: "UP" | "DOWN";
   options?: Cost[];
   card_name?: string;
 }
@@ -1051,6 +1053,8 @@ export type CostType =
   // fixed to the source card, auto-pays like TRASH_SELF (no selection).
   | "PLACE_SELF_TO_DECK"
   | "PLACE_STAGE_TO_DECK"
+  // OPT-455: "add 1 of your Characters ... to the top of your Life cards"
+  | "ADD_OWN_CHARACTER_TO_LIFE"
   | "TRASH_OWN_STAGE"
   | "PLACE_FROM_TRASH_TO_DECK"
   | "LEADER_POWER_REDUCTION"

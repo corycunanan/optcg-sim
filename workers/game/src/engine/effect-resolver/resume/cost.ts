@@ -451,7 +451,20 @@ export function handleAwaitingCostSelection(
       count: existing.count + ordered.length,
     });
   } else if (action.type === "SELECT_TARGET") {
-    const selected = action.selectedInstanceIds ?? [];
+    // OPT-455 review: this generic branch used to trust the client's
+    // selection wholesale — an empty or out-of-offer set "paid" the cost
+    // without moving anything (the frame popped and the action chain ran),
+    // and a non-offered card could be substituted as payment. Enforce
+    // exactly what the prompt offered, mirroring the PLACE_FROM_TRASH /
+    // PLACE_SELF_AND_TRASH branches above: membership in the frame's
+    // validTargets, deduped, exact prompt count (countMin === countMax ===
+    // amount in the generic cost prompt).
+    const valid = new Set(topFrame.validTargets ?? []);
+    const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
+    const selected = [...new Set(action.selectedInstanceIds ?? [])].filter((id) => valid.has(id));
+    if (selected.length !== amount) {
+      return { state, events: [], resolved: false };
+    }
     const appliedSelected = applyCostSelection(nextState, cost, selected, controller);
     nextState = appliedSelected.state;
     events.push(...appliedSelected.events);
@@ -490,11 +503,21 @@ export function handleAwaitingCostSelection(
       });
     }
 
-    events.push({
-      type: "CARD_TRASHED",
-      playerIndex: controller,
-      payload: { count: selected.length, reason: "cost" },
-    });
+    // Only trash payments publish CARD_TRASHED. Other selectable costs use
+    // this same resume branch (including ST13-001's Character-to-Life cost),
+    // so emitting it unconditionally fabricated a trash event for unrelated
+    // zone transitions.
+    if (
+      cost.type === "TRASH_FROM_HAND" ||
+      cost.type === "TRASH_FROM_LIFE" ||
+      cost.type === "TRASH_OWN_CHARACTER"
+    ) {
+      events.push({
+        type: "CARD_TRASHED",
+        playerIndex: controller,
+        payload: { count: selected.length, reason: "cost" },
+      });
+    }
   } else {
     return { state, events, resolved: false };
   }
