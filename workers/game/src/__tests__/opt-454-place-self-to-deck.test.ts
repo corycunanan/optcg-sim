@@ -17,7 +17,9 @@ import { runPipeline } from "../engine/pipeline.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import { payCosts, isCostPayable } from "../engine/effect-resolver/cost-handler.js";
 import { OP06_016_RAISE_MAX } from "../engine/schemas/op06.js";
-import { P_033_MONKEY_D_LUFFY } from "../engine/schemas/p.js";
+import { OP09_008_BUILDING_SNAKE } from "../engine/schemas/op09.js";
+import { P_013_GORDON, P_033_MONKEY_D_LUFFY } from "../engine/schemas/p.js";
+import { registerPermanentEffectsForCard, registerTriggersForCard } from "../engine/triggers.js";
 import { createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
 
 function noKeywords() {
@@ -46,12 +48,13 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
 }
 
 const RAISE_MAX = makeCard("OP06-016", { name: "Raise Max", cost: 1, power: 0, effectSchema: OP06_016_RAISE_MAX });
+const BUILDING_SNAKE = makeCard("OP09-008", { name: "Building Snake", cost: 3, power: 4000, effectSchema: OP09_008_BUILDING_SNAKE });
+const GORDON = makeCard("P-013", { name: "Gordon", cost: 3, power: 4000, effectSchema: P_013_GORDON });
 const P033_LUFFY = makeCard("P-033", { name: "Monkey.D.Luffy", cost: 1, power: 2000, effectSchema: P_033_MONKEY_D_LUFFY });
 
 function buildCardDb(): Map<string, CardData> {
   const db = createTestCardDb();
-  db.set(RAISE_MAX.id, RAISE_MAX);
-  db.set(P033_LUFFY.id, P033_LUFFY);
+  for (const c of [RAISE_MAX, BUILDING_SNAKE, GORDON, P033_LUFFY]) db.set(c.id, c);
   return db;
 }
 
@@ -123,6 +126,67 @@ describe("OPT-454 — the self cost is fixed to the source card", () => {
     expect(p0.characters.some((c) => c?.instanceId === bystander.instanceId)).toBe(true);
     expect(p0.hand.length).toBe(handBefore + 1);
     expect(done.state.effectStack).toHaveLength(0);
+  });
+
+  it("OP09-008 with a bystander: the source pays, the bystander stays", () => {
+    const cardDb = buildCardDb();
+    let state = createBattleReadyState(cardDb);
+    const snake = makeChar(BUILDING_SNAKE.id, 0, "snake");
+    const bystander = makeChar(CARDS.VANILLA.id, 0, "bystander");
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = { ...players[0], characters: padChars([snake, bystander]) };
+    players[1] = { ...players[1], characters: padChars([]) };
+    state = { ...state, players };
+
+    const done = activate(state, cardDb, snake.instanceId, "activate_debuff");
+    expect(done.pendingPrompt?.options.promptType).not.toBe("SELECT_TARGET");
+    const p0 = done.state.players[0];
+    expect(p0.characters.some((c) => c?.instanceId === snake.instanceId)).toBe(false);
+    expect(p0.characters.some((c) => c?.instanceId === bystander.instanceId)).toBe(true);
+    expect(p0.deck.at(-1)!.cardId).toBe(BUILDING_SNAKE.id);
+  });
+
+  it("P-013 pays with attached DON and registrations: full canonical cleanup", () => {
+    const cardDb = buildCardDb();
+    let state = createBattleReadyState(cardDb);
+    const gordon: CardInstance = {
+      ...makeChar(GORDON.id, 0, "gordon"),
+      attachedDon: [{ instanceId: "don-gordon", state: "ACTIVE" as const, attachedTo: "char-0-gordon" }],
+    };
+    const bystander = makeChar(CARDS.VANILLA.id, 0, "bystander");
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = { ...players[0], characters: padChars([gordon, bystander]) };
+    players[1] = { ...players[1], characters: padChars([]) };
+    state = { ...state, players };
+    // Field-entry registrations, as the pipeline performs on play.
+    state = registerTriggersForCard(state, gordon, GORDON);
+    state = registerPermanentEffectsForCard(state, gordon, GORDON);
+    const donBefore = state.players[0].donCostArea.length;
+
+    // Drive payCosts directly to observe the emitted events, then assert the
+    // same cleanup contract the OPT-453 canonical branch provides.
+    const cost: Cost = { type: "PLACE_SELF_TO_DECK", position: "BOTTOM" } as Cost;
+    const result = payCosts(state, [cost], 0, cardDb, gordon.instanceId);
+    expect(result).not.toBeNull();
+    const { state: next, events } = result!;
+
+    // Attached DON returned rested + detached; event propagated with old id.
+    const returned = next.players[0].donCostArea.find((d) => d.instanceId === "don-gordon");
+    expect(next.players[0].donCostArea.length).toBe(donBefore + 1);
+    expect(returned?.state).toBe("RESTED");
+    expect(returned?.attachedTo).toBeNull();
+    expect(events.some(
+      (e) => e.type === "CARD_RETURNED_TO_DECK" && e.payload?.cardInstanceId === gordon.instanceId,
+    )).toBe(true);
+
+    // Old field instance fully deregistered; fresh instance in the deck.
+    expect(next.triggerRegistry.some(
+      (t) => (t as { sourceCardInstanceId?: string }).sourceCardInstanceId === gordon.instanceId,
+    )).toBe(false);
+    const bottom = next.players[0].deck.at(-1)!;
+    expect(bottom.cardId).toBe(GORDON.id);
+    expect(bottom.instanceId).not.toBe(gordon.instanceId);
+    expect(bottom.attachedDon).toHaveLength(0);
   });
 
   it("is unpayable when the source is not on the field", () => {
