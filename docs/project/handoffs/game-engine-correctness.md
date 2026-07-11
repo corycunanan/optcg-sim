@@ -40,10 +40,10 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | In Review | [#273](https://github.com/corycunanan/optcg-sim/pull/273) | All 21 re-encoded, tests moved to Rule 4-10-1 semantics, encoding guide updated. Found OPT-462 en route. |
 | 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | Done | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
 | 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Done | [#275](https://github.com/corycunanan/optcg-sim/pull/275) | Prohibited targets are removed before replacement discovery; attemptable targets retain batch semantics. |
-| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453, OPT-463 | Backlog | — | Live Linear dependency requires OPT-463 first; then add Stage-source and hand-half support. |
+| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453, OPT-463 | In Review | [#277](https://github.com/corycunanan/optcg-sim/pull/277) | Stage + chosen hand card now use a two-step select/arrange payment with canonical Stage exit. |
 | 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Backlog | — | From PR #269's review: research whether deck-bound exits should match OP16-041-style watchers; OPT-407 contract may need changing. |
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | Backlog | — | Found during OPT-457: OP10-087's THEN mill never runs after the opponent's discard prompt; pre-existing, pinned in the opt-442 test with a marker. |
-| 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | In Review | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
+| 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
@@ -215,3 +215,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Loguetown's Stage exit must flow through the fixed-source replacement-aware path; preserve canonical fresh identity and cleanup while adding the selected hand half.
 - **Unresolved:** None for OPT-463; the live Linear dependency now unblocks OPT-460 after this PR merges.
 - **Pointer:** PR #276; inspect `e9323b0` and the production Enel/ST13-001 regression.
+
+### OPT-460 → OPT-461
+**From:** session on 2026-07-11 · **Commit:** `ad5b065` · **PR:** [#277](https://github.com/corycunanan/optcg-sim/pull/277)
+
+- **Primer:** Loguetown now pays its printed Stage + chosen hand-card cost through a select-then-arrange flow; both cards reach deck bottom in chosen order and the Stage gets canonical fresh identity/cleanup.
+- **Read first:** `workers/game/src/engine/triggers.ts` removed-from-field event matching, `workers/game/src/engine/effect-resolver/card-mutations.ts`, and the OPT-461 Rule 8-4-5 evidence.
+- **Gotchas / do NOT touch:** OPT-461 is a rules-contract audit, not another cost rewrite. Establish the open-area gate from official rules and update the single centralized trigger matcher if required.
+- **Unresolved:** None for OPT-460.
+- **Pointer:** PR #277; inspect `ad5b065` and the full production Loguetown regression.
