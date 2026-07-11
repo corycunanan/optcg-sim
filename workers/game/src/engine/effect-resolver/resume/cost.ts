@@ -331,7 +331,9 @@ export function handleAwaitingCostSelection(
       };
     }
 
-    nextState = applyCostSelection(nextState, cost, selected, controller);
+    const appliedTrash = applyCostSelection(nextState, cost, selected, controller);
+    nextState = appliedTrash.state;
+    events.push(...appliedTrash.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
     accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
       targetInstanceIds: existing.targetInstanceIds,
@@ -367,7 +369,9 @@ export function handleAwaitingCostSelection(
       };
     }
 
-    nextState = applyCostSelection(nextState, cost, group, controller);
+    const appliedGroup = applyCostSelection(nextState, cost, group, controller);
+    nextState = appliedGroup.state;
+    events.push(...appliedGroup.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
     accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
       targetInstanceIds: existing.targetInstanceIds,
@@ -388,7 +392,9 @@ export function handleAwaitingCostSelection(
       if (!seen.has(id)) ordered.push(id);
     }
 
-    nextState = applyCostSelection(nextState, cost, ordered, controller);
+    const appliedOrdered = applyCostSelection(nextState, cost, ordered, controller);
+    nextState = appliedOrdered.state;
+    events.push(...appliedOrdered.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
     accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
       targetInstanceIds: existing.targetInstanceIds,
@@ -412,7 +418,9 @@ export function handleAwaitingCostSelection(
       if (!seen.has(id)) ordered.push(id);
     }
 
-    nextState = applyCostSelection(nextState, cost, ordered, controller);
+    const appliedOrdered = applyCostSelection(nextState, cost, ordered, controller);
+    nextState = appliedOrdered.state;
+    events.push(...appliedOrdered.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? { targetInstanceIds: [], count: 0 };
     accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
       targetInstanceIds: existing.targetInstanceIds,
@@ -420,7 +428,9 @@ export function handleAwaitingCostSelection(
     });
   } else if (action.type === "SELECT_TARGET") {
     const selected = action.selectedInstanceIds ?? [];
-    nextState = applyCostSelection(nextState, cost, selected, controller);
+    const appliedSelected = applyCostSelection(nextState, cost, selected, controller);
+    nextState = appliedSelected.state;
+    events.push(...appliedSelected.events);
 
     // OPT-224: a REST_CARDS / REST_NAMED_CARD cost publishes CHARACTER_BECOMES_RESTED
     // (via CARD_STATE_CHANGED) for each character transitioned ACTIVE → RESTED. Valid

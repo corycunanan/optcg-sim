@@ -251,7 +251,7 @@ describe("OPT-224: CHARACTER_BECOMES_RESTED event publication audit", () => {
     // the caller detects REST_CARDS and pushes one CARD_STATE_CHANGED per id.
     const cost = { type: "REST_CARDS" as const, amount: 2 };
     const selected = [c1.instanceId, c2.instanceId];
-    const nextState = applyCostSelection(state, cost, selected, 0);
+    const nextState = applyCostSelection(state, cost, selected, 0).state;
 
     // Confirm both characters are now RESTED (the state part of the fix).
     const newChars = nextState.players[0].characters.filter(Boolean) as CardInstance[];

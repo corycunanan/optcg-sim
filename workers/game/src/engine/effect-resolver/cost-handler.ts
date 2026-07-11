@@ -23,7 +23,6 @@ import { generateFrameId, pushFrame } from "../effect-stack.js";
 import type { CostPaymentResult, CostSelectionResult } from "./types.js";
 import {
   detachDonToCostArea,
-  returnToDeck,
   setCardState,
   trashCharacter,
   trashStage,
@@ -32,6 +31,27 @@ import { costResultToEntries } from "./types.js";
 import { applyFieldDonReturn } from "./actions/don.js";
 import { isProhibitedForCard } from "../prohibitions.js";
 import { matchesFilter } from "../conditions.js";
+import { nanoid } from "../../util/nanoid.js";
+import { deregisterTriggersForCard } from "../triggers.js";
+import { expireSourceLeftZone, expireTargetLeftZone } from "../duration-tracker.js";
+
+/**
+ * OPT-453: complete the canonical field-exit lifecycle for a card paid into
+ * the deck. The zone move itself gives the deck card a fresh instanceId
+ * (rules §3-1-6) — this cleans up everything still registered against the
+ * old field instance: its triggers, its permanent/active effects, and its
+ * membership in other effects' target lists.
+ *
+ * Done inline (not via pipeline events) because deck-placement costs also
+ * resolve on prompt-resume paths that never reach the pipeline's
+ * event-driven `deregisterLeftFieldTriggers` step.
+ */
+function completeFieldExitToDeck(state: GameState, oldInstanceId: string): GameState {
+  let s = deregisterTriggersForCard(state, oldInstanceId);
+  s = expireSourceLeftZone(s, oldInstanceId);
+  s = expireTargetLeftZone(s, oldInstanceId);
+  return s;
+}
 
 // ─── payCosts (auto-payable) ─────────────────────────────────────────────────
 
@@ -412,11 +432,20 @@ export function payCosts(
         if (!p.stage) return null;
 
         const stage = p.stage;
-        const newDeck = [...p.deck, { ...stage, zone: "DECK" as const }];
+        // Canonical zone transition (OPT-453, rules §3-1-6): fresh instance
+        // in the deck; clean up the old field instance's registrations.
+        const newDeck = [...p.deck, {
+          ...stage,
+          instanceId: nanoid(),
+          zone: "DECK" as const,
+          state: "ACTIVE" as const,
+          attachedDon: [] as CardInstance["attachedDon"],
+          turnPlayed: null,
+        }];
         const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
         newPlayers[controller] = { ...p, stage: null, deck: newDeck };
-        nextState = { ...nextState, players: newPlayers };
-        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId } });
+        nextState = completeFieldExitToDeck({ ...nextState, players: newPlayers }, stage.instanceId);
+        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, cardId: stage.cardId } });
         break;
       }
 
@@ -448,11 +477,19 @@ export function payCosts(
       case "PLACE_SELF_AND_HAND_TO_DECK": {
         if (!sourceCardInstanceId) return null;
         // Move source card + specified hand cards to deck bottom.
-        // For auto-pay, just move the source card.
-        const result = returnToDeck(nextState, sourceCardInstanceId, "BOTTOM");
-        if (!result) return null;
-        nextState = result.state;
-        events.push(...result.events);
+        // For auto-pay, just move the source card. Uses the canonical
+        // PLACE_OWN_CHARACTER_TO_DECK transition (OPT-453): fresh deck
+        // instance, field-exit cleanup, CARD_RETURNED_TO_DECK event.
+        const p = nextState.players[controller];
+        if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
+        const applied = applyCostSelection(
+          nextState,
+          { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: "BOTTOM" } as Cost,
+          [sourceCardInstanceId],
+          controller,
+        );
+        nextState = applied.state;
+        events.push(...applied.events);
         break;
       }
 
@@ -466,12 +503,14 @@ export function payCosts(
         if (candidates.length < amt) return null;
         const p = nextState.players[controller];
         if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
-        nextState = applyCostSelection(
+        const applied = applyCostSelection(
           nextState,
           cost,
           [sourceCardInstanceId, ...candidates.slice(0, amt)],
           controller,
         );
+        nextState = applied.state;
+        events.push(...applied.events);
         costResult.cardsPlacedToDeckCount += 1 + amt;
         break;
       }
@@ -1051,7 +1090,9 @@ export function payCostsWithSelection(
       }
 
       // Block shuffles afterward — order is moot, pay in default order.
-      nextState = applyCostSelection(nextState, cost, group, controller);
+      const applied = applyCostSelection(nextState, cost, group, controller);
+      nextState = applied.state;
+      events.push(...applied.events);
       costResult.cardsPlacedToDeckCount += group.length;
       continue;
     }
@@ -1424,12 +1465,23 @@ export function promptTypeToPhase(promptType: string): EffectStackFrame["phase"]
 
 // ─── applyCostSelection ──────────────────────────────────────────────────────
 
+/**
+ * Result of applying one cost selection. `events` carries field-exit events
+ * (OPT-453, e.g. CARD_RETURNED_TO_DECK) so pipeline consumers and observers
+ * see them; the corresponding registry cleanup has already been applied to
+ * `state` inline.
+ */
+export interface AppliedCostSelection {
+  state: GameState;
+  events: PendingEvent[];
+}
+
 export function applyCostSelection(
   state: GameState,
   cost: Cost,
   selectedIds: string[],
   controller: 0 | 1,
-): GameState {
+): AppliedCostSelection {
   const p = state.players[controller];
   const selectedSet = new Set(selectedIds);
 
@@ -1440,7 +1492,7 @@ export function applyCostSelection(
       const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
-      return { ...state, players: newPlayers };
+      return { state: { ...state, players: newPlayers }, events: [] };
     }
 
     case "KO_OWN_CHARACTER":
@@ -1460,7 +1512,7 @@ export function applyCostSelection(
         trash: newTrash,
         donCostArea: [...p.donCostArea, ...returnedDon],
       };
-      return { ...state, players: newPlayers };
+      return { state: { ...state, players: newPlayers }, events: [] };
     }
 
     case "RETURN_OWN_CHARACTER_TO_HAND": {
@@ -1478,12 +1530,14 @@ export function applyCostSelection(
         hand: newHand,
         donCostArea: [...p.donCostArea, ...returnedDon],
       };
-      return { ...state, players: newPlayers };
+      return { state: { ...state, players: newPlayers }, events: [] };
     }
 
     case "PLACE_HAND_TO_DECK":
     case "PLACE_OWN_CHARACTER_TO_DECK": {
       if (cost.type === "PLACE_HAND_TO_DECK") {
+        // Hand → deck is not a field exit: no fresh-instance requirement, no
+        // registry cleanup, no CARD_RETURNED_TO_DECK (OPT-453 audit).
         const toPlace = p.hand.filter((c) => selectedSet.has(c.instanceId));
         const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
         const position = cost.position ?? "BOTTOM";
@@ -1491,17 +1545,19 @@ export function applyCostSelection(
         const newDeck = position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
         const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
         newPlayers[controller] = { ...p, hand: newHand, deck: newDeck };
-        return { ...state, players: newPlayers };
+        return { state: { ...state, players: newPlayers }, events: [] };
       } else {
         const toPlace = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
         const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
         const returnedDon = toPlace.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
         const position = cost.position ?? "BOTTOM";
-        // Same zone-transition reset as PLACE_SELF_AND_TRASH_TO_DECK — a
-        // field character keeping its non-null turnPlayed in the deck crashes
-        // the freshly-played-instance lookup after it is redrawn and played.
+        // Canonical zone transition (OPT-453, rules §3-1-6): the deck card is
+        // a NEW instance — fresh instanceId, ACTIVE, no DON, turnPlayed null
+        // (a stale non-null turnPlayed crashes the freshly-played-instance
+        // lookup after the card is redrawn and played).
         const deckCards = toPlace.map((c) => ({
           ...c,
+          instanceId: nanoid(),
           zone: "DECK" as const,
           state: "ACTIVE" as const,
           attachedDon: [] as typeof c.attachedDon,
@@ -1515,7 +1571,19 @@ export function applyCostSelection(
           deck: newDeck,
           donCostArea: [...p.donCostArea, ...returnedDon],
         };
-        return { ...state, players: newPlayers };
+        let nextState: GameState = { ...state, players: newPlayers };
+        // Field exit: deregister the old instance's triggers, expire its
+        // effects, and announce it so pipeline consumers see the exit.
+        const events: PendingEvent[] = [];
+        for (const c of toPlace) {
+          nextState = completeFieldExitToDeck(nextState, c.instanceId);
+          events.push({
+            type: "CARD_RETURNED_TO_DECK",
+            playerIndex: controller,
+            payload: { cardInstanceId: c.instanceId, cardId: c.cardId, position },
+          });
+        }
+        return { state: nextState, events };
       }
     }
 
@@ -1533,7 +1601,7 @@ export function applyCostSelection(
       const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
-      return { ...state, players: newPlayers };
+      return { state: { ...state, players: newPlayers }, events: [] };
     }
 
     case "PLACE_SELF_AND_TRASH_TO_DECK": {
@@ -1551,14 +1619,17 @@ export function applyCostSelection(
       const newChars = p.characters.map((c) =>
         c !== null && selectedSet.has(c.instanceId) ? null : c,
       );
-      const returnedDon = moved
-        .filter((c) => charById.has(c.instanceId))
+      const fieldExits = moved.filter((c) => charById.has(c.instanceId));
+      const returnedDon = fieldExits
         .flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
-      // Reset zone-transition fields per the canonical moveCard semantics —
-      // a stale non-null turnPlayed survives draw and later crashes the
-      // freshly-played-instance lookup in execute.ts (review finding).
+      // Canonical zone transition (OPT-453, rules §3-1-6): the field half
+      // becomes a NEW instance in the deck — fresh instanceId, ACTIVE, no
+      // DON, turnPlayed null (a stale non-null turnPlayed survives draw and
+      // crashes the freshly-played-instance lookup in execute.ts). Trash
+      // cards keep their identity: they left the field long ago.
       const deckCards = moved.map((c) => ({
         ...c,
+        instanceId: charById.has(c.instanceId) ? nanoid() : c.instanceId,
         zone: "DECK" as const,
         state: "ACTIVE" as const,
         attachedDon: [] as CardInstance["attachedDon"],
@@ -1573,7 +1644,21 @@ export function applyCostSelection(
         deck: newDeck,
         donCostArea: [...p.donCostArea, ...returnedDon],
       };
-      return { ...state, players: newPlayers };
+      let nextState: GameState = { ...state, players: newPlayers };
+      const events: PendingEvent[] = [];
+      for (const c of fieldExits) {
+        nextState = completeFieldExitToDeck(nextState, c.instanceId);
+        events.push({
+          type: "CARD_RETURNED_TO_DECK",
+          playerIndex: controller,
+          payload: {
+            cardInstanceId: c.instanceId,
+            cardId: c.cardId,
+            position: cost.position === "TOP" ? "TOP" : "BOTTOM",
+          },
+        });
+      }
+      return { state: nextState, events };
     }
 
     case "REST_CARDS":
@@ -1589,10 +1674,10 @@ export function applyCostSelection(
         : p.stage;
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, leader: newLeader, characters: newChars, stage: newStage };
-      return { ...state, players: newPlayers };
+      return { state: { ...state, players: newPlayers }, events: [] };
     }
 
     default:
-      return state;
+      return { state, events: [] };
   }
 }
