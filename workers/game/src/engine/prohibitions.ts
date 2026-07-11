@@ -11,7 +11,8 @@
 import type { EffectSchema, RuntimeProhibition, ProhibitionType, Target, TargetFilter } from "./effect-types.js";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "./conditions.js";
-import { findCardInState } from "./state.js";
+import { findCardInState, findCardInstance } from "./state.js";
+import { isCardNegated } from "./modifiers.js";
 
 // ─── Match-time resolution (OPT-451) ─────────────────────────────────────────
 //
@@ -26,12 +27,22 @@ import { findCardInState } from "./state.js";
 /**
  * Re-evaluate a prohibition's carried block/prohibition conditions.
  * Prohibitions without conditions are always active.
+ *
+ * Also honors the OPT-253 negation contract: while the prohibition's source
+ * card is effect-negated on the field, its schema-sourced prohibitions pause —
+ * mirroring isEffectConditionMet's isEffectSourceNegated gate for modifiers.
+ * Sources that already left the field (e.g. a resolved Event in the trash)
+ * are never in a NEGATE_EFFECTS_FLAG's appliesTo, so one-shot prohibitions
+ * written by resolved effects are unaffected.
  */
 export function isProhibitionConditionMet(
   prohibition: RuntimeProhibition,
   state: GameState,
   cardDb: Map<string, CardData>,
 ): boolean {
+  const source = findCardInstance(state, prohibition.sourceCardInstanceId);
+  if (source && isCardNegated(source, state, cardDb)) return false;
+
   if (!prohibition.conditions) return true;
   const ctx: ConditionContext = {
     sourceCardInstanceId: prohibition.sourceCardInstanceId,

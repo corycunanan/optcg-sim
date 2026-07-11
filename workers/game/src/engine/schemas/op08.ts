@@ -995,7 +995,9 @@ export const OP08_029_PEKOMS: EffectSchema = {
               exclude_name: "Pekoms",
             },
           },
-          scope: { cause: "BY_OPPONENT_EFFECT" },
+          // Printed text says "cannot be K.O.'d by effects" — ANY effect,
+          // including the controller's own (OPT-451 review, Rule 1-3-3).
+          scope: { cause: "EFFECT" },
         },
       ],
     },
