@@ -534,11 +534,22 @@ describe("OPT-177: isCostPayable", () => {
   // ─── PLACE_SELF_AND_HAND_TO_DECK ────────────────────────────────────────────
 
   describe("PLACE_SELF_AND_HAND_TO_DECK", () => {
-    it("payable when source character is on field", () => {
+    it("payable when the source Stage is on field and a hand card exists", () => {
       const cardDb = createTestCardDb();
-      const state = makeState(cardDb);
+      const base = makeState(cardDb);
+      const stage = { ...base.players[0].characters[0]!, instanceId: "source-stage", zone: "STAGE" as const };
+      const state = withPlayer(base, 0, { stage });
       const cost: Cost = { type: "PLACE_SELF_AND_HAND_TO_DECK" };
-      expect(isCostPayable(state, cost, 0, cardDb, SOURCE_CHAR_ID)).toBe(true);
+      expect(isCostPayable(state, cost, 0, cardDb, stage.instanceId)).toBe(true);
+    });
+
+    it("unpayable when the source Stage has no hand card to accompany it", () => {
+      const cardDb = createTestCardDb();
+      const base = makeState(cardDb);
+      const stage = { ...base.players[0].characters[0]!, instanceId: "source-stage", zone: "STAGE" as const };
+      const state = withPlayer(base, 0, { stage, hand: [] });
+      const cost: Cost = { type: "PLACE_SELF_AND_HAND_TO_DECK" };
+      expect(isCostPayable(state, cost, 0, cardDb, stage.instanceId)).toBe(false);
     });
 
     it("unpayable without sourceCardInstanceId", () => {
