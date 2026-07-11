@@ -57,19 +57,21 @@ export function executeKO(
   // handler can run its own per-frame loop with rule 6-2 trigger drain.
   // KO-by-effect is also a removal from field, so the general removal/leave
   // replacements (e.g. OP16-014 Marco, OP15-090 Perona) intercept it too.
+  // A prohibited removal never becomes a replaceable event. Filter before
+  // replacement discovery so protected targets cannot prompt or pay a
+  // substitute cost for an action that was never attemptable (OPT-459).
+  const attemptableIds = filterProhibitedTargets(
+    state, targetIds, "KO", "EFFECT", controller, sourceCardInstanceId, cardDb,
+  );
   const batch = processBatchReplacements(
-    state, targetIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
+    state, attemptableIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
     return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
   }
   let nextState = batch.state;
-  // OPT-251: drop targets covered by CANNOT_BE_KO / CANNOT_BE_REMOVED_FROM_FIELD
-  // / CANNOT_LEAVE_FIELD before the K.O. frame loop begins.
-  const unprotectedIds = filterProhibitedTargets(
-    nextState, batch.unprotectedIds, "KO", "EFFECT", controller, sourceCardInstanceId, cardDb,
-  );
+  const unprotectedIds = batch.unprotectedIds;
   const koedIds: string[] = [];
 
   // OPT-172: rule 6-2 — drain ON_KO triggers between frames. Each frame KOs
@@ -133,8 +135,11 @@ export function executeReturnToHand(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const attemptableIds = filterProhibitedTargets(
+    state, targetIds, "RETURN_TO_HAND", "EFFECT", controller, sourceCardInstanceId, cardDb,
+  );
   const batch = processBatchReplacements(
-    state, targetIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
+    state, attemptableIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -144,9 +149,7 @@ export function executeReturnToHand(
   // RETURN_TO_HAND emits CARD_RETURNED_TO_HAND, not CARD_KO — no ON_KO drain
   // is required between frames. Finalize the unprotected subset inline.
   let nextState = batch.state;
-  const finalIds = filterProhibitedTargets(
-    nextState, batch.unprotectedIds, "RETURN_TO_HAND", "EFFECT", controller, sourceCardInstanceId, cardDb,
-  );
+  const finalIds = batch.unprotectedIds;
   const finalizedIds: string[] = [];
   for (const id of finalIds) {
     const result = returnToHand(nextState, id);
@@ -184,8 +187,11 @@ export function executeReturnToDeck(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const attemptableIds = filterProhibitedTargets(
+    state, targetIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
+  );
   const batch = processBatchReplacements(
-    state, targetIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, position,
+    state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, position,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -193,9 +199,7 @@ export function executeReturnToDeck(
   }
 
   let nextState = batch.state;
-  const finalIds = filterProhibitedTargets(
-    nextState, batch.unprotectedIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
-  );
+  const finalIds = batch.unprotectedIds;
   const finalizedIds: string[] = [];
   for (const id of finalIds) {
     const result = returnToDeck(nextState, id, position);

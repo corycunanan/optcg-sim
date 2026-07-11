@@ -185,6 +185,40 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
     expect(result.result?.targetInstanceIds).toEqual([ids.red]);
   });
 
+  it("does not offer a replacement for a target whose removal is prohibited", () => {
+    const cardDb = createTestCardDb();
+    const { state, ids } = buildTashigiState(cardDb);
+    const protectedState: GameState = {
+      ...state,
+      prohibitions: [{
+        id: "protect-green",
+        sourceCardInstanceId: "protection-source",
+        sourceEffectBlockId: "protection-block",
+        prohibitionType: "CANNOT_BE_REMOVED_FROM_FIELD",
+        scope: {},
+        duration: { type: "PERMANENT" },
+        controller: 0,
+        appliesTo: [ids.green],
+        usesRemaining: null,
+      } as never],
+    };
+
+    const result = executeReturnToHand(
+      protectedState,
+      { type: "RETURN_TO_HAND", target: { type: "CHARACTER", controller: "OPPONENT" } },
+      "opponent-source",
+      1,
+      cardDb,
+      new Map<string, EffectResult>(),
+      [ids.green],
+    );
+
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.succeeded).toBe(false);
+    expect(result.state.players[0].characters.some((c) => c?.instanceId === ids.green)).toBe(true);
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi)?.state).toBe("ACTIVE");
+  });
+
   it("does not prompt when Tashigi herself is the target (self-excluded)", () => {
     const cardDb = createTestCardDb();
     const { state, ids } = buildTashigiState(cardDb);
