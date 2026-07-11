@@ -121,6 +121,95 @@ describe("OPT-455 — ST13-001 pays its cost into Life, not the deck", () => {
     expect(p0.characters.some((c) => c?.instanceId === big.instanceId)).toBe(false);
   });
 
+  it("the buff action continues after the cost is paid", () => {
+    const { state, cardDb, big } = saboBoard();
+    const activation = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: state.players[0].leader.instanceId, effectId: "activate_add_to_life_buff" },
+      cardDb,
+      0,
+    );
+    let step = activation.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT"
+      ? resumeFromStack(activation.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb)
+      : { state: activation.state, events: [], pendingPrompt: activation.pendingPrompt, resolved: false };
+    if (step.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      step = resumeFromStack(step.state, { type: "SELECT_TARGET", selectedInstanceIds: [big.instanceId] } as GameAction, cardDb);
+    }
+    // The +2000 buff targets the remaining SMALL_CHAR ("up to 1 of your
+    // Characters") — resolve its target prompt if one appears.
+    if (step.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      step = resumeFromStack(step.state, { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-small"] } as GameAction, cardDb);
+    }
+    const small = step.state.players[0].characters.find((c) => c?.instanceId === "char-0-small")!;
+    expect(getEffectivePower(small, SMALL_CHAR, step.state, cardDb)).toBe(7000); // 5000 + 2000
+    expect(step.state.effectStack).toHaveLength(0);
+  });
+
+  it("cost/power boundaries are enforced independently", () => {
+    const cardDb = createTestCardDb();
+    const cheapStrong = makeCard("CHEAP-7K", { cost: 2, power: 7000 });   // fails cost_min only
+    const bigWeak = makeCard("BIG-6K", { cost: 4, power: 6000 });         // fails power_min only
+    for (const c of [SABO_LEADER, cheapStrong, bigWeak]) cardDb.set(c.id, c);
+    let state = createBattleReadyState(cardDb);
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      characters: padChars([makeChar(cheapStrong.id, 0, "cheap"), makeChar(bigWeak.id, 0, "weak")]),
+    };
+    state = { ...state, players };
+    const cost: Cost = {
+      type: "ADD_OWN_CHARACTER_TO_LIFE",
+      filter: { cost_min: 3, power_min: 7000 },
+      position: "TOP",
+      face: "UP",
+    } as Cost;
+    // Either predicate failing alone must disqualify the candidate.
+    expect(isCostPayable(state, cost, 0, cardDb, state.players[0].leader.instanceId)).toBe(false);
+  });
+
+  it("rejects empty or out-of-offer cost selections", () => {
+    const cardDb = createTestCardDb();
+    const big2 = makeCard("BIG-7K-2", { name: "Big Seven Two", cost: 4, power: 7000 });
+    for (const c of [SABO_LEADER, BIG_CHAR, big2, SMALL_CHAR]) cardDb.set(c.id, c);
+    let state = createBattleReadyState(cardDb);
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      leader: {
+        ...players[0].leader,
+        cardId: SABO_LEADER.id,
+        attachedDon: [{ instanceId: "don-sabo", state: "RESTED" as const, attachedTo: players[0].leader.instanceId }],
+      },
+      // Two qualifying candidates → a genuine selection prompt.
+      characters: padChars([
+        makeChar(BIG_CHAR.id, 0, "big"),
+        makeChar(big2.id, 0, "big2"),
+        makeChar(SMALL_CHAR.id, 0, "small"),
+      ]),
+    };
+    state = { ...state, players };
+    const activation = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: state.players[0].leader.instanceId, effectId: "activate_add_to_life_buff" },
+      cardDb,
+      0,
+    );
+    let step = resumeFromStack(activation.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb);
+    expect(step.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    const lifeBefore = step.state.players[0].life.length;
+
+    // Empty selection: rejected — nothing paid, nothing resolved.
+    const empty = resumeFromStack(step.state, { type: "SELECT_TARGET", selectedInstanceIds: [] } as GameAction, cardDb);
+    expect(empty.resolved).toBe(false);
+    expect(empty.events).toHaveLength(0);
+
+    // Non-offered card (fails the printed filter): rejected the same way.
+    const smuggled = resumeFromStack(step.state, { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-small"] } as GameAction, cardDb);
+    expect(smuggled.resolved).toBe(false);
+    expect(smuggled.state.players[0].life).toHaveLength(lifeBefore);
+    expect(smuggled.state.players[0].characters.some((c) => c?.instanceId === "char-0-small")).toBe(true);
+  });
+
   it("unpayable without a qualifying Character", () => {
     const cardDb = createTestCardDb();
     for (const c of [SABO_LEADER, SMALL_CHAR]) cardDb.set(c.id, c);
@@ -268,5 +357,6 @@ describe("OPT-455 — non-field stat reads use printed power", () => {
     };
     expect(getEffectivePower(inHand, KINEMON_TRASH, state, cardDb)).toBe(0);
     expect(getEffectivePower({ ...inHand, instanceId: "deck-kin", zone: "DECK" }, KINEMON_TRASH, state, cardDb)).toBe(0);
+    expect(getEffectivePower({ ...inHand, instanceId: "life-kin", zone: "LIFE" as never }, KINEMON_TRASH, state, cardDb)).toBe(0);
   });
 });
