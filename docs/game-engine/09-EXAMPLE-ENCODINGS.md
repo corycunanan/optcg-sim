@@ -527,7 +527,7 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
 ---
 
 ### 9. Marco (OP02-018)
-**Categories demonstrated:** permanent (intrinsic keyword BLOCKER), auto (ON_KO), filtered cost (TRASH_FROM_HAND with trait filter), action-level condition (post-colon "If" — LIFE_COUNT), PLAY_CARD from TRASH rested, self-targeting from trash
+**Categories demonstrated:** permanent (intrinsic keyword BLOCKER), auto (ON_KO), filtered cost (TRASH_FROM_HAND with trait filter), post-cost condition (post-colon "If" — LIFE_COUNT via `post_cost_conditions`), PLAY_CARD from TRASH rested, self-targeting from trash
 
 #### Raw Effect Text
 [Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)
@@ -557,15 +557,15 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
           "filter": { "traits": ["Whitebeard Pirates"] }
         }
       ],
+      "post_cost_conditions": {
+        "type": "LIFE_COUNT",
+        "controller": "SELF",
+        "operator": "<=",
+        "value": 2
+      },
       "actions": [
         {
           "type": "PLAY_CARD",
-          "conditions": {
-            "type": "LIFE_COUNT",
-            "controller": "SELF",
-            "operator": "<=",
-            "value": 2
-          },
           "target": {
             "type": "SELF"
           },
@@ -585,10 +585,11 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
 #### Annotations
 - **Intrinsic keyword:** `[Blocker]` is a permanent keyword stored in `EffectFlags.keywords`. It does not require a trigger, condition, or action — it is always active while the card is on the field. The reminder text in parentheses is flavor, not a separate effect.
 - **Filtered cost:** "trash 1 card with a type including 'Whitebeard Pirates' from your hand" is a cost, not an action. The colon (`:`) in the card text separates cost from effect. The `filter` on the cost constrains which hand cards can be trashed to pay it.
-- **Action-level condition (post-colon "If"):** "If you have 2 or less Life cards" appears *after* the cost colon, so it gates only the action it precedes — never the cost. The condition lives on the `PLAY_CARD` action, where the engine evaluates it in `executeActionChain` *after* the optional prompt and cost payment (Rules 8-3-1 through 8-3-1-4). The player may still trash a Whitebeard Pirates card even with 3+ Life; the revival is simply skipped if the check fails at resolution.
+- **Post-cost condition (post-colon "If"):** "If you have 2 or less Life cards" appears *after* the cost colon, so it gates the resolution — never the cost. The condition lives on the block's `post_cost_conditions`, which the engine evaluates exactly **once**, after costs are fully paid, immediately before the action chain starts (OPT-437/OPT-457). The player may still trash a Whitebeard Pirates card even with 3+ Life; the entire post-colon remainder is simply skipped if the check fails (Rules 8-3-1/8-3-3/4-10-1 — the paid cost stands).
 - **Rule of thumb — where does a condition go?**
   - **Pre-colon "If"** (before the cost colon, e.g. "If you have 2 or less Life cards, you may trash 1 card: ...") is an *activation requirement* → **block-level `conditions`**. Checked at Step 1 of `resolveEffect`, before the optional prompt and cost. If it fails, the effect cannot be activated at all.
-  - **Post-colon "If"** (after the cost colon, e.g. "[cost]: If you have 2 or less Life cards, ...") is a *resolution check* → **action-level `conditions`** on the specific action(s) it gates. The cost is payable regardless; only the gated action is skipped when the check fails. Sibling actions with `chain: "THEN"` (e.g. "Then, trash 2 cards...") still execute.
+  - **Post-colon "If"** (after the cost colon, e.g. "[cost]: If you have 2 or less Life cards, ...") is a *whole-chain resolution gate* → **block-level `post_cost_conditions`**. The cost is payable regardless; when the check fails, EVERY action in the block is skipped — including "Then, ..." actions with `chain: "THEN"` (Rule 4-10-1: once the condition-gated remainder cannot resolve, nothing after it resolves either). Evaluated exactly once at chain start, never re-evaluated on mid-chain resumes.
+  - **Never** encode a post-colon "If" as action-level `conditions`: per-action placement re-evaluates mid-chain (wrong when the chain mutates its own predicate) and leaves `chain: "THEN"` siblings ungated in violation of Rule 4-10-1. Lint rule C6 rejects the block-level-`conditions`-with-costs form; the OPT-457 migration removed the last per-action encodings.
 - **Self-targeting from trash:** When Marco is K.O.'d, it moves to trash. The ON_KO trigger fires while the card is transitioning zones. The action `PLAY_CARD` with `target: { type: "SELF" }` and `source_zone: "TRASH"` plays Marco back onto the field from the trash.
 - **play_state: RESTED:** "play this Character card from your trash rested" means Marco enters the field in the rested (tapped) state. This prevents immediate Blocker activation on the same turn.
 - **cost_override: FREE:** Playing from trash via effect does not require paying Marco's normal play cost.

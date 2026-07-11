@@ -1,8 +1,13 @@
 /**
- * OPT-442 — post-colon "If ..." clauses gate resolution actions, not costs.
+ * OPT-442 / OPT-457 — post-colon "If ..." clauses gate the whole action
+ * chain, never the cost.
  *
- * These regressions cover the 17 verified OP05/OP10/OP12 encodings plus the
- * OP02-018 guide example that taught the same incorrect block-level pattern.
+ * OPT-442 moved these 18 predicates off block-level `conditions` (which
+ * wrongly suppressed cost payment). OPT-457 completed the migration onto
+ * `post_cost_conditions` — evaluated exactly once after costs are fully
+ * paid, gating the ENTIRE chain including "Then, ..." actions (Rules
+ * 8-3-1/8-3-3/4-10-1) — replacing the interim per-action placement, which
+ * re-evaluated mid-chain and left THEN actions ungated.
  */
 
 import { describe, expect, it } from "vitest";
@@ -11,7 +16,6 @@ import {
   resolveEffect,
   resumeFromStack,
 } from "../engine/effect-resolver/index.js";
-import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { OP02_018_MARCO } from "../engine/schemas/op02.js";
 import {
   OP05_016_MORLEY,
@@ -36,7 +40,7 @@ import {
   OP12_087_NICO_ROBIN,
   OP12_117_SLAM_GIBSON,
 } from "../engine/schemas/op12.js";
-import { createBattleReadyState, createTestCardDb } from "./helpers.js";
+import { createBattleReadyState, createTestCardDb, CARDS } from "./helpers.js";
 
 function withPlayer(
   state: GameState,
@@ -69,21 +73,63 @@ const correctedSchemas = [
   ["OP12-117", OP12_117_SLAM_GIBSON],
 ] as const;
 
-describe("OPT-442: corrected post-colon condition placement", () => {
+describe("OPT-457: corrected post-colon condition placement", () => {
   it.each(correctedSchemas)(
-    "%s keeps its condition on an action instead of the effect block",
+    "%s carries its post-colon If on post_cost_conditions, not on actions or the block",
     (_cardId, schema) => {
-      const correctedBlock = schema.effects.find((block) =>
-        block.actions?.some((action) => action.conditions !== undefined)
+      const correctedBlock = schema.effects.find(
+        (block) => block.post_cost_conditions !== undefined
       );
 
       expect(correctedBlock).toBeDefined();
+      // Pre-cost block conditions would wrongly suppress cost payment...
       expect(correctedBlock?.conditions).toBeUndefined();
+      // ...and per-action conditions re-evaluate mid-chain and leave
+      // "Then, ..." actions ungated (the interim OPT-442 pattern).
+      expect(
+        correctedBlock?.actions?.some((action) => action.conditions !== undefined)
+      ).toBe(false);
     }
   );
 });
 
 describe("OPT-442: OP05-060 Monkey.D.Luffy", () => {
+  function luffyState(donCount: number): { state: GameState; cardDb: Map<string, CardData>; sourceId: string } {
+    const cardDb = createTestCardDb();
+    const leader: CardData = {
+      ...cardDb.get("LEADER-T")!,
+      id: "OP05-060",
+      name: "Monkey.D.Luffy",
+      effectSchema: OP05_060_MONKEY_D_LUFFY,
+    };
+    cardDb.set(leader.id, leader);
+    let state = createBattleReadyState(cardDb);
+    state = withPlayer(state, 0, {
+      leader: { ...state.players[0].leader, cardId: leader.id },
+      donCostArea: state.players[0].donCostArea.slice(0, donCount),
+    });
+    return { state, cardDb, sourceId: state.players[0].leader.instanceId };
+  }
+
+  it.each([
+    [0, true],   // "0 or 3 or more" — zero DON passes
+    [2, false],  // 1-2 DON fails
+    [3, true],   // boundary: exactly 3 passes
+  ])("with %i DON on the field, the ADD_DON gate is %s", (donCount, gatePasses) => {
+    const { state, cardDb, sourceId } = luffyState(donCount as number);
+    const block = OP05_060_MONKEY_D_LUFFY.effects[0];
+    const initialDonDeck = state.players[0].donDeck.length;
+
+    const offered = resolveEffect(state, block, sourceId, 0, cardDb);
+    const result = resumeFromStack(offered.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+
+    expect(result.resolved).toBe(true);
+    // Cost always paid (life → hand); the gate decides only the DON add.
+    expect(result.state.players[0].donDeck).toHaveLength(
+      gatePasses ? initialDonDeck - 1 : initialDonDeck,
+    );
+  });
+
   it("allows the Life cost with 1-2 DON and skips only ADD_DON", () => {
     const cardDb = createTestCardDb();
     const leader: CardData = {
@@ -124,27 +170,96 @@ describe("OPT-442: OP05-060 Monkey.D.Luffy", () => {
   });
 });
 
-describe("OPT-442: OP10-087 Tony Tony.Chopper", () => {
-  it("still mills 2 for THEN when the opponent-hand condition is false", () => {
+describe("OPT-457: OP10-087 Tony Tony.Chopper", () => {
+  function chopperState(opponentHandSize: number): { state: GameState; cardDb: Map<string, CardData> } {
     const cardDb = createTestCardDb();
-    let state = createBattleReadyState(cardDb);
-    state = withPlayer(state, 1, { hand: state.players[1].hand.slice(0, 4) });
+    const source: CardData = {
+      ...cardDb.get(CARDS.VANILLA.id)!,
+      id: "OP10-087",
+      name: "Tony Tony.Chopper",
+      effectSchema: OP10_087_TONY_TONY_CHOPPER,
+    };
+    const dressrosaLeader: CardData = {
+      ...cardDb.get("LEADER-T")!,
+      id: "LEADER-DRESSROSA",
+      types: ["Dressrosa"],
+    };
+    cardDb.set(source.id, source);
+    cardDb.set(dressrosaLeader.id, dressrosaLeader);
 
+    let state = createBattleReadyState(cardDb);
+    const chars = [...state.players[0].characters];
+    const idx = chars.findIndex((c) => c?.instanceId === "char-0-v1");
+    chars[idx] = { ...chars[idx]!, cardId: source.id };
+    state = withPlayer(state, 0, {
+      characters: chars,
+      leader: { ...state.players[0].leader, cardId: dressrosaLeader.id },
+    });
+    state = withPlayer(state, 1, { hand: state.players[1].hand.slice(0, opponentHandSize) });
+    return { state, cardDb };
+  }
+
+  function activateAndAccept(state: GameState, cardDb: Map<string, CardData>) {
+    const block = OP10_087_TONY_TONY_CHOPPER.effects[0];
+    const first = resolveEffect(state, block, "char-0-v1", 0, cardDb);
+    expect(first.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    let step = resumeFromStack(first.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+    // The REST_CARDS half of the cost selects the Dressrosa leader.
+    if (step.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      step = resumeFromStack(
+        step.state,
+        { type: "SELECT_TARGET", selectedInstanceIds: [state.players[0].leader.instanceId] },
+        cardDb,
+      );
+    }
+    return step;
+  }
+
+  it("a failed If skips the WHOLE chain — the THEN mill included (Rule 4-10-1)", () => {
+    const { state, cardDb } = chopperState(4);
     const initialDeck = state.players[0].deck.length;
     const initialTrash = state.players[0].trash.length;
-    const block = OP10_087_TONY_TONY_CHOPPER.effects[0];
 
-    const result = executeActionChain(
-      state,
-      block.actions!,
-      "char-0-v1",
-      0,
-      cardDb
-    );
+    const result = activateAndAccept(state, cardDb);
 
+    expect(result.resolved).toBe(true);
     expect(result.pendingPrompt).toBeUndefined();
+    // Cost stands: source and the Dressrosa leader are rested.
+    const p0 = result.state.players[0];
+    expect(p0.characters.find((c) => c?.instanceId === "char-0-v1")?.state).toBe("RESTED");
+    expect(p0.leader.state).toBe("RESTED");
+    // Whole chain skipped: no discard AND no mill. (The interim per-action
+    // encoding ran the THEN mill here.)
     expect(result.state.players[1].hand).toHaveLength(4);
-    expect(result.state.players[0].deck).toHaveLength(initialDeck - 2);
-    expect(result.state.players[0].trash).toHaveLength(initialTrash + 2);
+    expect(p0.deck).toHaveLength(initialDeck);
+    expect(p0.trash).toHaveLength(initialTrash);
+  });
+
+  it("a passing If runs the discard and then the mill", () => {
+    const { state, cardDb } = chopperState(5);
+    const initialDeck = state.players[0].deck.length;
+    const initialOppDeck = state.players[1].deck.length;
+
+    let result = activateAndAccept(state, cardDb);
+    // Opponent chooses which card to trash (mandatory discard).
+    if (result.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      const oppCard = state.players[1].hand[0].instanceId;
+      result = resumeFromStack(
+        result.state,
+        { type: "SELECT_TARGET", selectedInstanceIds: [oppCard] },
+        cardDb,
+      );
+    }
+    expect(result.resolved).toBe(true);
+    expect(result.state.players[1].hand).toHaveLength(4);
+    // OPT-462 (pre-existing, unrelated to the OPT-457 migration): the resume
+    // frame created for a prompting OPPONENT_ACTION carries the OPPONENT as
+    // controller, so the chained THEN mill runs against the wrong deck —
+    // player 1's deck loses 2 while Chopper's own deck is untouched. These
+    // assertions pin the CURRENT (buggy) behavior deliberately — when
+    // OPT-462 lands, player 0's deck must be `initialDeck - 2` and player
+    // 1's deck unchanged.
+    expect(result.state.players[0].deck).toHaveLength(initialDeck);
+    expect(result.state.players[1].deck).toHaveLength(initialOppDeck - 2);
   });
 });
