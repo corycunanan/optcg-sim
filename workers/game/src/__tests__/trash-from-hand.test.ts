@@ -61,7 +61,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
       { type: "TRASH_FROM_HAND", amount: 1 } as Cost,
       [cardToTrash.instanceId],
       controller,
-    );
+    ).state;
 
     const handAfter = newState.players[controller].hand;
     const trashAfter = newState.players[controller].trash;

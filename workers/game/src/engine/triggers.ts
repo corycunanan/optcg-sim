@@ -721,7 +721,30 @@ function matchesEventFilter(
     );
     if (targetId) {
       const card = findCardInstance(state, targetId);
-      if (card && !matchesFilter(card, filter.target_filter, cardDb, state)) return false;
+      if (card) {
+        if (!matchesFilter(card, filter.target_filter, cardDb, state)) return false;
+      } else {
+        // OPT-453: field exits into the deck re-id the card (rules §3-1-6),
+        // so the event's pre-transition instanceId is unresolvable by design
+        // (findCardInstance never searches the deck). Evaluate the filter
+        // against a payload-cardId snapshot instead of silently passing — a
+        // Stage cost payment must not satisfy a Character-only target filter
+        // (OP16-041 false positive). Events with neither a resolvable
+        // instance nor a cardId fail the filter rather than skipping it.
+        const cardId = (event.payload as { cardId?: string }).cardId;
+        if (!cardId) return false;
+        const snapshot: CardInstance = {
+          instanceId: targetId,
+          cardId,
+          zone: "DECK",
+          state: "ACTIVE",
+          attachedDon: [],
+          turnPlayed: null,
+          controller: event.playerIndex,
+          owner: event.playerIndex,
+        };
+        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state)) return false;
+      }
     }
   }
 
