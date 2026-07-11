@@ -81,11 +81,35 @@ function finishCostsAndRunActions(
   for (const [key, value] of costRefs) actionRefs.set(key, value);
   const refsForActions = actionRefs.size > 0 ? actionRefs : undefined;
 
+  // OPT-453: cost payments on the prompt-resume path never flow back through
+  // the pipeline's event scan (GameSession keeps resumeResult.state and drops
+  // its events) — scan this resume's cost-payment events here so
+  // event-watching auto effects (e.g. OP16-041's removed-from-field watcher,
+  // OPT-224's becomes-rested watchers) queue exactly as they do when the same
+  // cost auto-pays inside a pipeline run. `events` holds only events produced
+  // by this resume invocation, so nothing is scanned twice.
+  // The legacy count-only CARD_TRASHED bookkeeping event (pushed for every
+  // generic SELECT_TARGET cost, including hand trashes) carries no instance
+  // id and must not reach trigger matching — ANY_CHARACTER_TRASHED watchers
+  // would false-fire on hand trashes. Instance-bearing trash events scan.
+  const scannable = events.filter((e) =>
+    e.type !== "CARD_TRASHED" ||
+    !!(e.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId,
+  );
+  let pendingTriggers = topFrame.pendingTriggers as QueuedTrigger[];
+  if (scannable.length > 0) {
+    const costScan = scanEventsForTriggers(state, scannable, controller, cardDb);
+    state = costScan.state;
+    if (costScan.triggers.length > 0) {
+      pendingTriggers = [...pendingTriggers, ...costScan.triggers];
+    }
+  }
+
   // OPT-437: the post-colon "If" gate — costs are fully paid at this point
   // and the chain is about to start; when false, skip every action (the paid
   // cost stands) but still drain queued triggers.
   if (!postCostConditionsMet(state, block, sourceCardInstanceId, controller, cardDb)) {
-    return processRemainingTriggers(state, topFrame.pendingTriggers, cardDb, events);
+    return processRemainingTriggers(state, pendingTriggers, cardDb, events);
   }
 
   if (topFrame.remainingActions.length > 0) {
@@ -103,7 +127,7 @@ function finishCostsAndRunActions(
     if (chainResult.pendingPrompt) {
       const newTop = peekFrame(state) as EffectStackFrame;
       if (newTop) {
-        state = updateTopFrame(state, { pendingTriggers: topFrame.pendingTriggers });
+        state = updateTopFrame(state, { pendingTriggers });
       }
       return { state, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
     }
@@ -113,13 +137,13 @@ function finishCostsAndRunActions(
       const chainScan = scanEventsForTriggers(state, chainResult.events, controller, cardDb);
       state = chainScan.state;
       if (chainScan.triggers.length > 0) {
-        const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+        const allTriggers = [...chainScan.triggers, ...pendingTriggers];
         return processRemainingTriggers(state, allTriggers, cardDb, events);
       }
     }
   }
 
-  return processRemainingTriggers(state, topFrame.pendingTriggers, cardDb, events);
+  return processRemainingTriggers(state, pendingTriggers, cardDb, events);
 }
 
 /**

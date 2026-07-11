@@ -430,6 +430,11 @@ export function payCosts(
       case "PLACE_STAGE_TO_DECK": {
         const p = nextState.players[controller];
         if (!p.stage) return null;
+        // Printed restrictions ("place 1 of your cost-1 Stages...") ride on
+        // cost.filter — a non-matching Stage cannot pay (OPT-453 review).
+        if (cost.filter && !matchesFilter(p.stage, cost.filter, _cardDb, nextState, undefined, undefined, controller)) {
+          return null;
+        }
 
         const stage = p.stage;
         // Canonical zone transition (OPT-453, rules §3-1-6): fresh instance
@@ -711,8 +716,11 @@ export function isCostPayable(
       return player.donCostArea.filter((d) => !d.attachedTo).length >= amt;
     }
 
-    case "PLACE_STAGE_TO_DECK":
-      return !!player.stage;
+    case "PLACE_STAGE_TO_DECK": {
+      if (!player.stage) return false;
+      if (!simple.filter) return true;
+      return matchesFilter(player.stage, simple.filter, cardDb, state, undefined, undefined, controller);
+    }
 
     case "TRASH_OWN_STAGE": {
       if (!player.stage) return false;

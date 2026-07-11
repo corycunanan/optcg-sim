@@ -24,12 +24,13 @@ import { runPipeline } from "../engine/pipeline.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import { payCosts, payCostsWithSelection } from "../engine/effect-resolver/cost-handler.js";
 import {
+  matchTriggersForEvent,
   registerPermanentEffectsForCard,
   registerTriggersForCard,
 } from "../engine/triggers.js";
 import { hasGrantedKeyword } from "../engine/modifiers.js";
 import { OP15_041_ORLUMBUS } from "../engine/schemas/op15.js";
-import { OP16_003_EDWARD_NEWGATE } from "../engine/schemas/op16.js";
+import { OP16_003_EDWARD_NEWGATE, OP16_041_BUGGY } from "../engine/schemas/op16.js";
 import { OP05_040_BIRDCAGE } from "../engine/schemas/op05.js";
 import { OP10_026_KINEMON } from "../engine/schemas/op10.js";
 import { createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
@@ -280,5 +281,174 @@ describe("OPT-453 — PLACE_STAGE_TO_DECK completes the field exit", () => {
     expect(events.some(
       (e) => e.type === "CARD_RETURNED_TO_DECK" && e.payload?.cardInstanceId === "stage-0-birdcage",
     )).toBe(true);
+  });
+
+  it("rejects a stage that does not match the printed cost.filter", () => {
+    const cardDb = buildCardDb();
+    let state = createBattleReadyState(cardDb);
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      stage: {
+        instanceId: "stage-0-birdcage",
+        cardId: BIRDCAGE.id, // cost 2
+        zone: "STAGE",
+        state: "ACTIVE",
+        attachedDon: [],
+        turnPlayed: 1,
+        controller: 0,
+        owner: 0,
+      },
+    };
+    state = { ...state, players };
+
+    // "place 1 of your cost-1 Stages ..." — a cost-2 Birdcage cannot pay.
+    const cost: Cost = { type: "PLACE_STAGE_TO_DECK", filter: { cost_exact: 1 } } as Cost;
+    expect(payCosts(state, [cost], 0, cardDb, "stage-0-birdcage")).toBeNull();
+    expect(state.players[0].stage).not.toBeNull();
+  });
+});
+
+describe("OPT-453 — review fixes: resume trigger scan + unresolvable-target filters", () => {
+  const IMPEL_CHAR = makeCard("IMPEL-1", { name: "Prisoner", cost: 1, power: 1000, types: ["Impel Down"] });
+  const PRISONER = makeCard("OP16-042", { name: "Prisoner of Impel Down", cost: 1, power: 1000 });
+  const BUGGY_LEADER = makeCard("OP16-041", { name: "Buggy", type: "Leader", cost: null, power: 5000, life: 4, effectSchema: OP16_041_BUGGY });
+
+  function buggyDb(): Map<string, CardData> {
+    const db = buildCardDb();
+    for (const c of [IMPEL_CHAR, PRISONER, BUGGY_LEADER]) db.set(c.id, c);
+    return db;
+  }
+
+  it("a prompted deck-placement cost queues OP16-041's removed-from-field watcher", () => {
+    const cardDb = buggyDb();
+    let state = createBattleReadyState(cardDb);
+    const orlumbus = makeChar(ORLUMBUS.id, 0, "orlumbus");
+    const impel = makeChar(IMPEL_CHAR.id, 0, "impel");
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      // Buggy leader with DON!!x1 attached; a Prisoner in hand to play.
+      leader: { ...players[0].leader, cardId: BUGGY_LEADER.id, attachedDon: [
+        { instanceId: "don-leader", state: "RESTED" as const, attachedTo: players[0].leader.instanceId },
+      ] },
+      characters: padChars([orlumbus, impel]),
+      hand: [{
+        instanceId: "hand-prisoner",
+        cardId: PRISONER.id,
+        zone: "HAND",
+        state: "ACTIVE",
+        attachedDon: [],
+        turnPlayed: null,
+        controller: 0,
+        owner: 0,
+      }, ...players[0].hand],
+    };
+    state = { ...state, players };
+    state = registerTriggersForCard(state, state.players[0].leader, BUGGY_LEADER);
+
+    // Activate Orlumbus and pay the prompted cost with the Impel Down char.
+    const activation = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: orlumbus.instanceId, effectId: "OP15-041_activate" },
+      cardDb,
+      0,
+    );
+    expect(activation.valid).toBe(true);
+    const afterAccept = activation.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT"
+      ? resumeFromStack(activation.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb)
+      : { state: activation.state, events: [], pendingPrompt: activation.pendingPrompt, resolved: false };
+    expect(afterAccept.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+
+    const done = resumeFromStack(
+      afterAccept.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [impel.instanceId] } as GameAction,
+      cardDb,
+    );
+
+    // The removed-from-field watcher fires on the resume path: Buggy's
+    // optional once-per-turn effect surfaces as the next prompt instead of
+    // being silently dropped (pre-fix: resume cost events were never scanned).
+    expect(done.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+  });
+
+  it("a stage payment does not satisfy OP16-041's Character-only target filter", () => {
+    const cardDb = buggyDb();
+    let state = createBattleReadyState(cardDb);
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      leader: { ...players[0].leader, cardId: BUGGY_LEADER.id, attachedDon: [
+        { instanceId: "don-leader", state: "RESTED" as const, attachedTo: players[0].leader.instanceId },
+      ] },
+    };
+    state = { ...state, players };
+    state = registerTriggersForCard(state, state.players[0].leader, BUGGY_LEADER);
+
+    // Post-transition event: the paid stage's old instanceId is unresolvable
+    // by design. The filter must evaluate the payload snapshot (a Stage) and
+    // fail — not silently pass (pre-fix false positive).
+    const stageEvent = {
+      type: "CARD_RETURNED_TO_DECK" as const,
+      playerIndex: 0 as const,
+      payload: { cardInstanceId: "gone-stage", cardId: BIRDCAGE.id },
+      timestamp: 0,
+    };
+    expect(matchTriggersForEvent(state, stageEvent as any, cardDb)).toHaveLength(0);
+
+    // Positive control: an unresolvable CHARACTER with the Impel Down trait
+    // still matches through the same snapshot path.
+    const charEvent = {
+      type: "CARD_RETURNED_TO_DECK" as const,
+      playerIndex: 0 as const,
+      payload: { cardInstanceId: "gone-char", cardId: IMPEL_CHAR.id },
+      timestamp: 0,
+    };
+    expect(matchTriggersForEvent(state, charEvent as any, cardDb)).toHaveLength(1);
+  });
+
+  it("target-side cleanup: another card's effect stops listing the departed instance", () => {
+    const cardDb = buildCardDb();
+    let state = createBattleReadyState(cardDb);
+    const orlumbus = makeChar(ORLUMBUS.id, 0, "orlumbus");
+    const newgate = makeChar(NEWGATE.id, 0, "newgate");
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = { ...players[0], characters: padChars([orlumbus, newgate]) };
+    state = { ...state, players };
+
+    // An effect sourced by a DIFFERENT card that targets Newgate and a
+    // surviving bystander — expireTargetLeftZone must strip only Newgate.
+    const buff = {
+      id: "aoe-buff",
+      sourceCardInstanceId: orlumbus.instanceId,
+      sourceEffectBlockId: "",
+      category: "auto",
+      modifiers: [{ type: "MODIFY_POWER", params: { amount: 1000 }, duration: { type: "THIS_TURN" } }],
+      duration: { type: "THIS_TURN" },
+      expiresAt: { wave: "END_OF_TURN", turn: 3 },
+      controller: 0,
+      appliesTo: [newgate.instanceId, orlumbus.instanceId],
+      timestamp: 0,
+    };
+    state = { ...state, activeEffects: [...state.activeEffects, buff as any] };
+
+    const activation = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: orlumbus.instanceId, effectId: "OP15-041_activate" },
+      cardDb,
+      0,
+    );
+    const afterAccept = activation.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT"
+      ? resumeFromStack(activation.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb)
+      : { state: activation.state, events: [], pendingPrompt: activation.pendingPrompt, resolved: false };
+    const done = resumeFromStack(
+      afterAccept.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [newgate.instanceId] } as GameAction,
+      cardDb,
+    );
+
+    const survived = (done.state.activeEffects as RuntimeActiveEffect[]).find((e) => e.id === "aoe-buff");
+    expect(survived).toBeDefined();
+    expect(survived!.appliesTo).toEqual([orlumbus.instanceId]);
   });
 });
