@@ -38,7 +38,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | OPT-454 | In Review | [#272](https://github.com/corycunanan/optcg-sim/pull/272) | ADD_OWN_CHARACTER_TO_LIFE cost; non-field power reads = printed; generic cost-selection validation. **Stacked on #270**. Residual: OPT-463. |
 | 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Done | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Merged 2026-07-10 (`386af05`). Only OP16-084’s legitimate pre-cost C6 exception remains. |
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | In Review | [#273](https://github.com/corycunanan/optcg-sim/pull/273) | All 21 re-encoded, tests moved to Rule 4-10-1 semantics, encoding guide updated. Found OPT-462 en route. |
-| 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | Backlog | — | From PR #268's review: executeAddToLifeFromField never consults isRemovalProhibited; RemovalAction lacks a TO_LIFE variant. |
+| 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | In Review | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
 | 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Backlog | — | From PR #268's review: prohibited targets can still consume WOULD_BE_KO replacements. |
 | 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453 | Backlog | — | From PR #269's review: PLACE_SELF_AND_HAND_TO_DECK only supports Character sources; hand half never implemented. |
 | 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Backlog | — | From PR #269's review: research whether deck-bound exits should match OP16-041-style watchers; OPT-407 contract may need changing. |
@@ -188,3 +188,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Read first:** each PR body lists its review findings and residual tickets. The new engine primitives: dynamic prohibition targets (`RuntimeProhibition.target`/`conditions`), `AppliedCostSelection` events + inline field-exit cleanup (`completeFieldExitToDeck`), `PLACE_SELF_TO_DECK`, `ADD_OWN_CHARACTER_TO_LIFE`, `getEffectiveCostForRead`, non-field printed-power reads.
 - **Gotchas / do NOT touch:** the OP10-087 passing-If test pins OPT-462's buggy behavior with an explicit marker — flip it when OPT-462 lands. OP16-084 remains the only legitimate pre-cost C6 allowlist entry. The Rule 8-4-5 question (OPT-461) decides whether Buggy-style watchers should fire on deck exits at all — both trigger paths now behave identically, so the contract change (if any) lands in one place.
 - **Unresolved:** OPT-458 (Life-removal prohibition gap, High), OPT-459 (replacements before prohibition filtering), OPT-460 (Loguetown), OPT-461 (8-4-5 research), OPT-462 (OPPONENT_ACTION chain drop), OPT-463 (cost-path replacement bypass). Pre-existing schema-linter errors on main (eb02/op11/op15 — EB02-039 A6, OP11-022 A5, OP15-080 F6) predate this session and are untracked.
+
+### OPT-458 → OPT-459
+**From:** session on 2026-07-11 · **Commit:** `60de6b1` · **PR:** [#274](https://github.com/corycunanan/optcg-sim/pull/274)
+
+- **Primer:** Character-to-Life movement is now part of the shared removal taxonomy and checks static or live-population prohibitions per target before mutating the board.
+- **Read first:** `workers/game/src/engine/effect-resolver/actions/removal.ts` (`filterProhibitedTargets` ordering), `workers/game/src/engine/replacements.ts`, and the OPT-459 reproduction.
+- **Gotchas / do NOT touch:** OPT-458 intentionally does not reorder replacement processing; OPT-459 owns filtering prohibited targets before any `WOULD_*` replacement can be offered or consumed.
+- **Unresolved:** Raw cost-driven field exits still bypass replacement interception and remain tracked by OPT-463.
+- **Pointer:** PR #274; inspect `60de6b1` for the taxonomy and executor regressions.
