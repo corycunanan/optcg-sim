@@ -24,7 +24,7 @@ import type {
   ResumeContext,
 } from "../../types.js";
 import { matchesFilter as matchesFilterImpl } from "../conditions.js";
-import { getEffectivePower, getEffectiveCost } from "../modifiers.js";
+import { getEffectivePower, getEffectiveCostForRead } from "../modifiers.js";
 import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
 
@@ -133,7 +133,9 @@ function resolveCardProperty(instanceId: string, property: "power" | "cost", sta
   const data = cardDb.get(card.cardId);
   if (!data) return 0;
   if (property === "power") return getEffectivePower(card, data, state, cardDb);
-  return getEffectiveCost(data, state, instanceId, cardDb);
+  // OPT-450: zone-aware — aggregate constraints over on-field targets must
+  // not see pending play-time discounts.
+  return getEffectiveCostForRead(card, data, state, cardDb);
 }
 
 function validateAggregateConstraint(

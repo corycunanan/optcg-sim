@@ -334,6 +334,38 @@ export function getEffectiveFieldCost(
 }
 
 /**
+ * OPT-450: zone-aware cost read for predicates and filters.
+ *
+ * One-time "next play" discounts modify what you PAY when playing a card —
+ * never the card's cost property (CR 1-3-9-1 defines cost as the printed
+ * value; 2-7-6 lets effects change it, but e.g. OP02-025's discount is
+ * expressly scoped to "play ... from your hand"). matchesOneTimeFilter has
+ * no zone restriction, so without this gate a pending discount shifted cost
+ * predicates in EVERY zone: a cost-5 permanent matched "K.O. cost ≤ 4", and
+ * a printed-cost-4 deck card matched Oden's "play a cost-3 from your deck".
+ *
+ * Reads therefore use layers 0–2 only (base + SET_COST/MODIFY_COST), plus —
+ * for cards actually in hand — the continuous while-in-hand self-reductions,
+ * which genuinely change a hand card's cost while it is there.
+ *
+ * Play/validation/payment paths intentionally do NOT use this — they read
+ * getEffectiveCost directly so play-time discounts apply to what you pay.
+ */
+export function getEffectiveCostForRead(
+  card: CardInstance,
+  cardData: CardData,
+  state: GameState,
+  cardDb?: Map<string, CardData>,
+): number {
+  let cost = getEffectiveCost(cardData, state, card.instanceId, cardDb, false);
+  if (card.zone === "HAND" && cardDb) {
+    cost += getHandZoneSelfCostModifier(cardData, state, card.instanceId, cardDb);
+    cost += getFieldToHandCostModifier(cardData, state, card.instanceId, cardDb);
+  }
+  return Math.max(0, cost);
+}
+
+/**
  * OPT-242: Apply Layer 2 MODIFY_COST modifiers with include-once iteration.
  *
  * Each iteration, any un-included Layer 2 effect whose filter now matches the

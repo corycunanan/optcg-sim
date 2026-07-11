@@ -22,7 +22,7 @@ import type {
   EffectResult,
 } from "./effect-types.js";
 import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
-import { getEffectivePower, getEffectiveCost, getEffectiveFieldCost, hasGrantedAttribute } from "./modifiers.js";
+import { getEffectivePower, getEffectiveCost, getEffectiveCostForRead, getEffectiveFieldCost, hasGrantedAttribute } from "./modifiers.js";
 import { hasEffectiveKeyword } from "./keywords.js";
 import { findCardInstance } from "./state.js";
 
@@ -255,7 +255,9 @@ function evaluateSimple(
       if (!card) return false;
       const data = ctx.cardDb.get(card.cardId);
       if (!data) return false;
-      return compareNum(getEffectiveCost(data, state, card.instanceId, ctx.cardDb), cond.operator, cond.value);
+      // OPT-450: zone-aware — an on-field source must not see pending
+      // play-time discounts; a hand-zone source (Event predicates) keeps them.
+      return compareNum(getEffectiveCostForRead(card, data, state, ctx.cardDb), cond.operator, cond.value);
     }
 
     case "SELF_STATE": {
@@ -758,7 +760,11 @@ export function matchesFilter(
     || filter.cost_max !== undefined
     || filter.cost_range !== undefined;
   if (hasCurrentCostFilter) {
-    const cost = costOverride ?? getEffectiveCost(data, state, card.instanceId, cardDb);
+    // OPT-450: zone-aware — on-field candidates must not see pending
+    // play-time discounts (e.g. a −1 "next play" modifier must not make a
+    // cost-5 permanent match "cost 4 or less"). Off-field candidates keep
+    // the play-cost read. costOverride (OPT-242 fixed-point) still wins.
+    const cost = costOverride ?? getEffectiveCostForRead(card, data, state, cardDb);
     if (filter.cost_exact !== undefined && !matchesDynamicNum(cost, "==", filter.cost_exact, state, ctrl)) return false;
     if (filter.cost_min !== undefined && !matchesDynamicNum(cost, ">=", filter.cost_min, state, ctrl)) return false;
     if (filter.cost_max !== undefined && !matchesDynamicNum(cost, "<=", filter.cost_max, state, ctrl)) return false;
