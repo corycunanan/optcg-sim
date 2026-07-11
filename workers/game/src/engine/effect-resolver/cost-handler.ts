@@ -579,6 +579,7 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
   "CHOOSE_ONE_COST",
   "PLACE_FROM_TRASH_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK",
+  "ADD_OWN_CHARACTER_TO_LIFE",
 ]);
 
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -1323,7 +1324,8 @@ export function computeCostTargets(
     case "KO_OWN_CHARACTER":
     case "TRASH_OWN_CHARACTER":
     case "RETURN_OWN_CHARACTER_TO_HAND":
-    case "PLACE_OWN_CHARACTER_TO_DECK": {
+    case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "ADD_OWN_CHARACTER_TO_LIFE": {
       let candidates = player.characters.filter(Boolean) as CardInstance[];
       if (cost.filter) {
         candidates = candidates.filter((c) =>
@@ -1405,6 +1407,7 @@ export function getCostLabel(cost: Cost): string {
     case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;
     case "RETURN_OWN_CHARACTER_TO_HAND": return `Choose ${amount} character(s) to return to hand as cost`;
     case "PLACE_OWN_CHARACTER_TO_DECK": return `Choose ${amount} character(s) to place on deck as cost`;
+    case "ADD_OWN_CHARACTER_TO_LIFE": return `Choose ${amount} character(s) to add to your Life cards as cost`;
     case "TRASH_FROM_LIFE": return `Choose ${amount} life card(s) to trash as cost`;
     case "PLACE_HAND_TO_DECK": return `Choose ${amount} card(s) to place on deck as cost`;
     case "PLACE_FROM_TRASH_TO_DECK": return `Choose ${amount} card(s) from your trash to place in your deck as cost`;
@@ -1432,6 +1435,7 @@ export function getCostCtaLabel(cost: Cost): string {
     case "PLACE_HAND_TO_DECK":
     case "PLACE_FROM_TRASH_TO_DECK":
     case "PLACE_SELF_AND_TRASH_TO_DECK": return "Place on Deck";
+    case "ADD_OWN_CHARACTER_TO_LIFE": return "Add to Life";
     case "REST_CARDS":
     case "REST_NAMED_CARD": return "Rest";
     case "REVEAL_FROM_HAND": return "Reveal";
@@ -1465,6 +1469,7 @@ export function getCostCards(
     case "TRASH_OWN_CHARACTER":
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "ADD_OWN_CHARACTER_TO_LIFE":
     case "REST_CARDS":
     case "REST_NAMED_CARD": {
       const cards = player.characters.filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
@@ -1693,6 +1698,38 @@ export function applyCostSelection(
         });
       }
       return { state: nextState, events };
+    }
+
+    case "ADD_OWN_CHARACTER_TO_LIFE": {
+      // OPT-455: "add 1 of your Characters ... to the top of your Life cards
+      // face-up" (ST13-001). Canonical field exit: the Life card is a NEW
+      // instance (rules 3-1-6, matching executeAddToLifeFromField), attached
+      // DON returns rested, and the old field instance's registrations are
+      // cleaned up inline.
+      const toMove = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
+      const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
+      const returnedDon = toMove.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
+      const face = (cost as SimpleCost).face ?? "UP";
+      const position = (cost as SimpleCost).position ?? "TOP";
+      const lifeCards = toMove.map((c) => ({ instanceId: nanoid(), cardId: c.cardId, face }));
+      const newLife = position === "BOTTOM"
+        ? [...p.life, ...lifeCards]
+        : [...lifeCards, ...p.life];
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = {
+        ...p,
+        characters: newChars,
+        life: newLife,
+        donCostArea: [...p.donCostArea, ...returnedDon],
+      };
+      let nextState: GameState = { ...state, players: newPlayers };
+      // Field-to-Life exits have no game event type yet (known gap — see the
+      // REMOVED_FROM_FIELD_EVENTS comment in triggers.ts and OPT-458); the
+      // registry cleanup happens inline either way.
+      for (const c of toMove) {
+        nextState = completeFieldExitToDeck(nextState, c.instanceId);
+      }
+      return { state: nextState, events: [] };
     }
 
     case "REST_CARDS":

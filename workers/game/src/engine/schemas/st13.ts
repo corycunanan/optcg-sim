@@ -25,8 +25,12 @@ export const ST13_001_SABO: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN", don_requirement: 1 },
       costs: [
         {
-          type: "PLACE_OWN_CHARACTER_TO_DECK",
+          // OPT-455: printed text adds the paid Character to the TOP of Life
+          // face-up — it was mis-encoded as a deck placement.
+          type: "ADD_OWN_CHARACTER_TO_LIFE",
           filter: { cost_min: 3, power_min: 7000 },
+          position: "TOP",
+          face: "UP",
         },
       ],
       actions: [

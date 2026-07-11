@@ -188,6 +188,15 @@ export function getEffectivePower(
   // Layer 0: base printed value
   let power = cardData.power ?? 0;
 
+  // OPT-455: power modifiers are field phenomena. A card in the trash, deck,
+  // hand, or life reads its printed power — a field aura ("all your
+  // Characters gain +1000") must not shift a trash candidate's eligibility
+  // for filters like OP10-026's "[Kin'emon] with 0 power from your trash"
+  // (effectAppliesToCard's dynamic matching has no zone gate, so without
+  // this early return broad auras leak into non-field reads).
+  const onField = card.zone === "CHARACTER" || card.zone === "LEADER" || card.zone === "STAGE";
+  if (!onField) return power;
+
   const turnPlayerIndex = state.turn.activePlayerIndex;
 
   // Layer 1: base-setting effects
