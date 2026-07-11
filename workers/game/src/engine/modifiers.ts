@@ -334,6 +334,32 @@ export function getEffectiveFieldCost(
 }
 
 /**
+ * OPT-450: zone-aware cost read for predicates and filters.
+ *
+ * A card ON THE FIELD must never see play-time adjustments: a pending
+ * one-time "next time you play X" discount (matchesOneTimeFilter has no
+ * zone restriction) or a hand-zone self-reduction would otherwise shift
+ * reads like "K.O. a Character with a cost of 4 or less" onto a cost-5
+ * permanent. Off-field cards keep the full play-cost read — hand-zone
+ * self-reductions are continuous effects that legitimately change a hand
+ * card's cost while it is there.
+ *
+ * Play/validation/payment paths intentionally do NOT use this — they read
+ * getEffectiveCost directly so play-time discounts apply to what you pay.
+ */
+export function getEffectiveCostForRead(
+  card: CardInstance,
+  cardData: CardData,
+  state: GameState,
+  cardDb?: Map<string, CardData>,
+): number {
+  const onField = card.zone === "CHARACTER" || card.zone === "LEADER" || card.zone === "STAGE";
+  return onField
+    ? getEffectiveFieldCost(cardData, state, card.instanceId, cardDb)
+    : getEffectiveCost(cardData, state, card.instanceId, cardDb);
+}
+
+/**
  * OPT-242: Apply Layer 2 MODIFY_COST modifiers with include-once iteration.
  *
  * Each iteration, any un-included Layer 2 effect whose filter now matches the
