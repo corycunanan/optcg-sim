@@ -38,12 +38,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | OPT-454 | In Review | [#272](https://github.com/corycunanan/optcg-sim/pull/272) | ADD_OWN_CHARACTER_TO_LIFE cost; non-field power reads = printed; generic cost-selection validation. **Stacked on #270**. Residual: OPT-463. |
 | 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Done | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Merged 2026-07-10 (`386af05`). Only OP16-084’s legitimate pre-cost C6 exception remains. |
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | In Review | [#273](https://github.com/corycunanan/optcg-sim/pull/273) | All 21 re-encoded, tests moved to Rule 4-10-1 semantics, encoding guide updated. Found OPT-462 en route. |
-| 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | In Review | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
-| 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | In Review | [#275](https://github.com/corycunanan/optcg-sim/pull/275) | Prohibited targets are removed before replacement discovery; attemptable targets retain batch semantics. |
-| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453 | Backlog | — | From PR #269's review: PLACE_SELF_AND_HAND_TO_DECK only supports Character sources; hand half never implemented. |
+| 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | Done | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
+| 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Done | [#275](https://github.com/corycunanan/optcg-sim/pull/275) | Prohibited targets are removed before replacement discovery; attemptable targets retain batch semantics. |
+| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453, OPT-463 | Backlog | — | Live Linear dependency requires OPT-463 first; then add Stage-source and hand-half support. |
 | 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Backlog | — | From PR #269's review: research whether deck-bound exits should match OP16-041-style watchers; OPT-407 contract may need changing. |
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | Backlog | — | Found during OPT-457: OP10-087's THEN mill never runs after the opponent's discard prompt; pre-existing, pinned in the opt-442 test with a marker. |
-| 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | — | Backlog | — | From PR #272's review: all cost payment branches mutate zones without replacement interception (Rule 8-3-1-7). |
+| 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | In Review | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
@@ -206,3 +206,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Preserve the single arrange prompt and canonical deck-transition behavior introduced by OPT-453; OPT-460 must add Stage-source and hand-half support without regressing Character-source compound costs.
 - **Unresolved:** Cost-driven field exits still need replacement interception under OPT-463.
 - **Pointer:** PR #275; inspect `fddb080` for the pre-replacement filter ordering.
+
+### OPT-463 → OPT-460
+**From:** session on 2026-07-11 · **Commit:** `e9323b0` · **PR:** [#276](https://github.com/corycunanan/optcg-sim/pull/276)
+
+- **Primer:** Cost-driven field exits now park their cost frame across optional replacement prompts; substituted payments retain earlier partial costs, consume Once Per Turn, and suppress post-colon actions.
+- **Read first:** `workers/game/src/engine/effect-resolver/cost-handler.ts` (`PLACE_SELF_AND_HAND_TO_DECK`), `resume/cost.ts` (cost replacement continuation), and EB01-030 in `schemas/eb01.ts`.
+- **Gotchas / do NOT touch:** Loguetown's Stage exit must flow through the fixed-source replacement-aware path; preserve canonical fresh identity and cleanup while adding the selected hand half.
+- **Unresolved:** None for OPT-463; the live Linear dependency now unblocks OPT-460 after this PR merges.
+- **Pointer:** PR #276; inspect `e9323b0` and the production Enel/ST13-001 regression.
