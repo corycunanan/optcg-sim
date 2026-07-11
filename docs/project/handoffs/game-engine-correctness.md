@@ -1,7 +1,7 @@
 ---
 linear-project: Game Engine Correctness
 linear-project-url: https://linear.app/optcg-sim/project/game-engine-correctness-c3d337079446
-last-updated: 2026-07-10
+last-updated: 2026-07-11
 ---
 
 # Game Engine Correctness — Handoff Doc
@@ -29,23 +29,26 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 11 | OPT-437 | Schema-wide post-colon condition audit | — | OPT-423, OPT-444 | In Review | [#262](https://github.com/corycunanan/optcg-sim/pull/262) | 142 blocks re-encoded onto the new `post_cost_conditions` engine gate (once-after-costs, whole-chain, Rules 8-3-1/4-10-1); lint rule C6; HAND_COUNT ComparativeMetric. Spawned OPT-456/457. |
 | 12 | OPT-409 | Remove dead filter code and close controller no-op | — | — | Done | [#260](https://github.com/corycunanan/optcg-sim/pull/260) | Merged 2026-07-10 (`447a0de`, user-approved past the stop condition; residuals in OPT-451/OPT-452). |
 | 13 | OPT-448 | Duplicate PASS after prompt resolution advances the battle step | — | — | Done | [#264](https://github.com/corycunanan/optcg-sim/pull/264) | Merged 2026-07-10 (`65f955e`). Prompt-identified actions are rejected after their prompt clears. |
-| 14 | OPT-449 | Terminal games still accept prompt responses | — | — | In Review | [#267](https://github.com/corycunanan/optcg-sim/pull/267) | Terminal transitions clear prompt/stack state; action routing and reconnect resend are terminal-guarded. |
-| 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | Backlog | — | Pre-existing; surfaced by PR #259's review. Route cost_* filters and SELF_COST through getEffectiveFieldCost. |
-| 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | Backlog | — | Pre-existing, **live** (P-084 Buggy's population prohibition never applies); surfaced by PR #260's delta review. High priority. |
+| 14 | OPT-449 | Terminal games still accept prompt responses | — | — | Done | [#267](https://github.com/corycunanan/optcg-sim/pull/267) | Merged 2026-07-10 (`10617c7`). Terminal transitions clear prompt/stack state; action routing and reconnect resend are terminal-guarded. |
+| 15 | OPT-450 | On-field cost reads include pending play-time discounts | — | OPT-444 | In Review | [#271](https://github.com/corycunanan/optcg-sim/pull/271) | getEffectiveCostForRead: layers 0-2 in every zone; hand keeps continuous self-reductions; one-time discounts never shift predicate reads (review-hardened for deck/trash). |
+| 16 | OPT-451 | Permanent prohibition targets discarded at registration | — | — | In Review | [#268](https://github.com/corycunanan/optcg-sim/pull/268) | RuntimeProhibition carries target+conditions, resolved live at match time; negation gate; OP04-119/OP08-029/OP14-079 schema fixes. Residuals: OPT-458, OPT-459. |
 | 17 | OPT-452 | Complete the filter-controller guard (dual_targets, linter walk, prohibition guidance) | — | OPT-451 (item 4 only) | Done | [#265](https://github.com/corycunanan/optcg-sim/pull/265) | Merged 2026-07-10 (`009ada2`). Items 1–3 complete; item 4 remains documented under OPT-451. |
-| 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
-| 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
-| 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
-| 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | Backlog | — | Pre-existing + inherited by the compound cost; stale permanent effects (OP15-041+OP16-003 live), retained instanceId. From PR #261's delta review. |
-| 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | Backlog | — | OP06-016/OP09-008/P-013/P-033 need a self-scoped PLACE_SELF_TO_DECK. From PR #261's delta review. |
-| 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | — | Backlog | — | Batched encoding/read-surface corrections. From PR #261's delta review. |
+| 18 | OPT-453 | Deck-placement costs bypass the canonical zone transition | — | — | In Review | [#269](https://github.com/corycunanan/optcg-sim/pull/269) | applyCostSelection returns events; fresh instanceId + inline field-exit cleanup (works on resume paths); review fixes: resume trigger scan, snapshot target filters, stage cost.filter. Residuals: OPT-460, OPT-461. |
+| 19 | OPT-454 | Four more "this Character" self-costs mis-encoded | — | OPT-453 | In Review | [#270](https://github.com/corycunanan/optcg-sim/pull/270) | PLACE_SELF_TO_DECK auto-pay cost; four cards re-encoded. **Stacked on #269** — merge #269 first. |
+| 20 | OPT-455 | ST13-001 cost destination + trash filters read field stats | — | OPT-454 | In Review | [#272](https://github.com/corycunanan/optcg-sim/pull/272) | ADD_OWN_CHARACTER_TO_LIFE cost; non-field power reads = printed; generic cost-selection validation. **Stacked on #270**. Residual: OPT-463. |
 | 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Done | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Merged 2026-07-10 (`386af05`). Only OP16-084’s legitimate pre-cost C6 exception remains. |
-| 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | Backlog | — | Same latent per-action classes as PR #262's review proved; includes the 09-EXAMPLE-ENCODINGS doc update. |
+| 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | In Review | [#273](https://github.com/corycunanan/optcg-sim/pull/273) | All 21 re-encoded, tests moved to Rule 4-10-1 semantics, encoding guide updated. Found OPT-462 en route. |
+| 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | Backlog | — | From PR #268's review: executeAddToLifeFromField never consults isRemovalProhibited; RemovalAction lacks a TO_LIFE variant. |
+| 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Backlog | — | From PR #268's review: prohibited targets can still consume WOULD_BE_KO replacements. |
+| 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453 | Backlog | — | From PR #269's review: PLACE_SELF_AND_HAND_TO_DECK only supports Character sources; hand half never implemented. |
+| 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Backlog | — | From PR #269's review: research whether deck-bound exits should match OP16-041-style watchers; OPT-407 contract may need changing. |
+| 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | Backlog | — | Found during OPT-457: OP10-087's THEN mill never runs after the opponent's discard prompt; pre-existing, pinned in the opt-442 test with a marker. |
+| 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | — | Backlog | — | From PR #272's review: all cost payment branches mutate zones without replacement interception (Rule 8-3-1-7). |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-432 (ready now — PR #261 merged; includes the X.Barrels scope note); then the review-spawned backlog by value: OPT-451 (live prohibition bug), OPT-453, OPT-457.
+**Next up:** merge the open PR train — #268 (OPT-451) and #271 (OPT-450) are independent; #269 → #270 → #272 must merge in order (stacked); #273 (OPT-457) is independent. All six are review-hardened (multi-lens adversarial review, confirmed findings fixed or ticketed). Then the review-spawned backlog by value: OPT-458 (removal-prohibition gap, High), OPT-459-463.
 
 ---
 
@@ -176,3 +179,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Failed post-cost conditions skip the whole action chain after costs remain paid; update tests that currently assert an ungated THEN action. Check predicates that their own chain mutates.
 - **Unresolved:** None for OPT-449. Preserved untracked files remain excluded.
 - **Pointer:** PR #267; inspect `68a0bdf` for terminal cleanup and alarm regression coverage.
+
+### OPT-457 → backlog sweep (session 2026-07-11)
+**From:** session on 2026-07-10/11 · **PRs:** [#268](https://github.com/corycunanan/optcg-sim/pull/268) (OPT-451), [#269](https://github.com/corycunanan/optcg-sim/pull/269) (OPT-453), [#270](https://github.com/corycunanan/optcg-sim/pull/270) (OPT-454, stacked on #269), [#271](https://github.com/corycunanan/optcg-sim/pull/271) (OPT-450), [#272](https://github.com/corycunanan/optcg-sim/pull/272) (OPT-455, stacked on #270), [#273](https://github.com/corycunanan/optcg-sim/pull/273) (OPT-457)
+
+- **Primer:** The six remaining backlog tickets each got a PR, an adversarial multi-lens review, and review-fix commits. Confirmed findings were fixed in-PR when in scope; systemic pre-existing classes were ticketed (OPT-458 through OPT-463).
+- **Merge order:** #268 and #271 and #273 are independent of everything; #269 → #270 → #272 are a stack (each PR's base is the previous branch — after merging #269, retarget/merge #270, then #272).
+- **Read first:** each PR body lists its review findings and residual tickets. The new engine primitives: dynamic prohibition targets (`RuntimeProhibition.target`/`conditions`), `AppliedCostSelection` events + inline field-exit cleanup (`completeFieldExitToDeck`), `PLACE_SELF_TO_DECK`, `ADD_OWN_CHARACTER_TO_LIFE`, `getEffectiveCostForRead`, non-field printed-power reads.
+- **Gotchas / do NOT touch:** the OP10-087 passing-If test pins OPT-462's buggy behavior with an explicit marker — flip it when OPT-462 lands. OP16-084 remains the only legitimate pre-cost C6 allowlist entry. The Rule 8-4-5 question (OPT-461) decides whether Buggy-style watchers should fire on deck exits at all — both trigger paths now behave identically, so the contract change (if any) lands in one place.
+- **Unresolved:** OPT-458 (Life-removal prohibition gap, High), OPT-459 (replacements before prohibition filtering), OPT-460 (Loguetown), OPT-461 (8-4-5 research), OPT-462 (OPPONENT_ACTION chain drop), OPT-463 (cost-path replacement bypass). Pre-existing schema-linter errors on main (eb02/op11/op15 — EB02-039 A6, OP11-022 A5, OP15-080 F6) predate this session and are untracked.
