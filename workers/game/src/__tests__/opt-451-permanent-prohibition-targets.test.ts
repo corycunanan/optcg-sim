@@ -22,6 +22,7 @@ import type { EffectSchema, RuntimeActiveEffect, RuntimeProhibition } from "../e
 import { runPipeline } from "../engine/pipeline.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import { isRemovalProhibited } from "../engine/prohibitions.js";
+import { executeAddToLifeFromField } from "../engine/effect-resolver/actions/life.js";
 import { expireSourceLeftZone } from "../engine/duration-tracker.js";
 import { P_084_BUGGY } from "../engine/schemas/p.js";
 import { OP05_040_BIRDCAGE } from "../engine/schemas/op05.js";
@@ -299,6 +300,18 @@ describe("OPT-451 — removal-family population prohibitions", () => {
     expect(isRemovalProhibited(state, ownChar.instanceId, {
       action: "KO", cause: "EFFECT", causingController: 1,
     }, cardDb)).toBe(false);
+
+    const result = executeAddToLifeFromField(
+      state,
+      { type: "ADD_TO_LIFE_FROM_FIELD", target: { type: "CHARACTER", controller: "OPPONENT" } } as any,
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+      new Map(),
+      [oppChar.instanceId],
+    );
+    expect(result.state.players[1].characters.find((c) => c?.instanceId === oppChar.instanceId)).toBeTruthy();
+    expect(result.state.players[1].life).toHaveLength(state.players[1].life.length);
   });
 
   it("EB04-057: yellow Scientist characters protected while life ≤ 2", () => {
@@ -328,6 +341,18 @@ describe("OPT-451 — removal-family population prohibitions", () => {
     players3[0] = { ...players3[0], life: [...players3[0].life, ...state.players[0].life.slice(0, 1)] };
     const state3 = { ...state, players: players3 };
     expect(isRemovalProhibited(state3, scientist.instanceId, oppEffect, cardDb)).toBe(false);
+
+    const result = executeAddToLifeFromField(
+      state,
+      { type: "ADD_TO_LIFE_FROM_FIELD", target: { type: "CHARACTER", controller: "OPPONENT" } } as any,
+      state.players[1].leader.instanceId,
+      1,
+      cardDb,
+      new Map(),
+      [scientist.instanceId],
+    );
+    expect(result.state.players[0].characters.find((c) => c?.instanceId === scientist.instanceId)).toBeTruthy();
+    expect(result.state.players[0].life).toHaveLength(state.players[0].life.length);
   });
 
   it("OP04-119: protection gated on the printed [Opponent's Turn] + rested conditions", () => {

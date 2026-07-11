@@ -419,7 +419,8 @@ export function isProhibitedForCard(
 //
 // Separates narrow "cannot be K.O.'d" (OP01-024 Luffy) from broad "cannot be
 // removed from the field by opp's effects" (OP02-027 Inuarashi). Every removal
-// path — effect K.O., battle K.O., return-to-hand, return-to-deck, trash — must
+// path — effect K.O., battle K.O., return-to-hand, return-to-deck, trash, or
+// placement into Life — must
 // consult this helper so the protection classes remain distinct.
 //
 // Mapping per rules §6-6-2 and Bandai FAQ on removal taxonomy:
@@ -427,11 +428,12 @@ export function isProhibitedForCard(
 //   RETURN_TO_HAND → CANNOT_BE_RETURNED_TO_HAND, CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
 //   RETURN_TO_DECK → CANNOT_BE_RETURNED_TO_DECK, CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
 //   TRASH          → CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
+//   TO_LIFE        → CANNOT_BE_REMOVED_FROM_FIELD, CANNOT_LEAVE_FIELD
 //
 // CANNOT_BE_KO alone does NOT block non-K.O. removals (return-to-hand/deck,
 // trash) — that's the Luffy/Inuarashi distinction the taxonomy encodes.
 
-export type RemovalAction = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "TRASH";
+export type RemovalAction = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "TRASH" | "TO_LIFE";
 
 export interface RemovalContext {
   /** Which removal action is being attempted. */
@@ -456,6 +458,7 @@ const PROHIBITION_TYPES_FOR_ACTION: Record<RemovalAction, ProhibitionType[]> = {
   RETURN_TO_HAND: ["CANNOT_BE_RETURNED_TO_HAND", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
   RETURN_TO_DECK: ["CANNOT_BE_RETURNED_TO_DECK", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
   TRASH: ["CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
+  TO_LIFE: ["CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_LEAVE_FIELD"],
 };
 
 /**

@@ -7,6 +7,7 @@ import type { CardData, CardInstance, GameState, PendingEvent } from "../../../t
 import type { ActionResult } from "../types.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
+import { isRemovalProhibited } from "../../prohibitions.js";
 import { nanoid } from "../../../util/nanoid.js";
 
 export function executeAddToLifeFromDeck(
@@ -408,6 +409,12 @@ export function executeAddToLifeFromField(
   for (const id of targetIds) {
     const card = findCardInstance(nextState, id);
     if (!card || card.zone !== "CHARACTER") continue;
+    if (isRemovalProhibited(nextState, id, {
+      action: "TO_LIFE",
+      cause: "EFFECT",
+      causingController: controller,
+      sourceCardInstanceId,
+    }, cardDb)) continue;
 
     for (const [pi, player] of nextState.players.entries()) {
       const charIdx = player.characters.findIndex((c) => c?.instanceId === id);

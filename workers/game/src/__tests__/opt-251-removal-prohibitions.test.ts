@@ -25,6 +25,7 @@ import type {
 } from "../types.js";
 import type { RuntimeProhibition } from "../engine/effect-types.js";
 import { isRemovalProhibited } from "../engine/prohibitions.js";
+import { executeAddToLifeFromField } from "../engine/effect-resolver/actions/life.js";
 
 function noKeywords() {
   return {
@@ -621,6 +622,33 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
 
     const stillThere = result.state.players[1].characters.find((c) => c?.instanceId === targetId);
     expect(stillThere).toBeTruthy();
+  });
+
+  it("executeAddToLifeFromField skips characters with CANNOT_BE_REMOVED_FROM_FIELD", () => {
+    const { state, cardDb, targetId } = buildScene({
+      targetCardId: "INUARASHI-CLONE",
+      targetController: 1,
+      prohibitions: [
+        makeProhibition({
+          prohibitionType: "CANNOT_BE_REMOVED_FROM_FIELD",
+          appliesTo: ["tgt-INUARASHI-CLONE"],
+          controller: 1,
+        }),
+      ],
+    });
+
+    const result = executeAddToLifeFromField(
+      state,
+      { type: "ADD_TO_LIFE_FROM_FIELD", target: { type: "CHARACTER", controller: "OPPONENT" } } as any,
+      "source-card",
+      0,
+      cardDb,
+      new Map(),
+      [targetId],
+    );
+
+    expect(result.state.players[1].characters.find((c) => c?.instanceId === targetId)).toBeTruthy();
+    expect(result.state.players[1].life).toHaveLength(0);
   });
 
   it("executeReturnToHand allows the OWNER's own bounce through CANNOT_BE_REMOVED_FROM_FIELD", () => {
