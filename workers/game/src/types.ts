@@ -19,7 +19,7 @@ export type {
   QueuedTrigger as SharedQueuedTrigger,
 } from "../../../shared/game-types.js";
 
-import type { CardData, GameState, PendingPromptState, PendingGameEvent } from "../../../shared/game-types.js";
+import type { CardData, GameAction, GameState, PendingPromptState, PendingGameEvent } from "../../../shared/game-types.js";
 
 // ─── Engine-internal types ────────────────────────────────────────────────────
 
@@ -139,6 +139,10 @@ export interface EffectStackFrame {
   costsPaid: boolean;
   oncePerTurnMarked: boolean;
   costResultRefs: [string, { targetInstanceIds: string[]; count: number }][];
+  /** Validated response parked while an optional cost-exit replacement prompts. */
+  costReplacementAction?: GameAction;
+  /** Prevents a declined replacement from being offered again on resume. */
+  costReplacementChecked?: boolean;
 
   // Queued triggers waiting to resolve after this frame
   pendingTriggers: QueuedTrigger[];
