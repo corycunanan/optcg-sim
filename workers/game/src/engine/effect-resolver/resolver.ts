@@ -466,6 +466,7 @@ export function executeActionChain(
         id: generateFrameId(),
         sourceCardInstanceId,
         controller: resumeController,
+        remainingActionsController: controller,
         effectBlock: {} as EffectBlock, // not needed for mid-chain resumes
         phase: phaseForPrompt,
         pausedAction: ctx.pausedAction,

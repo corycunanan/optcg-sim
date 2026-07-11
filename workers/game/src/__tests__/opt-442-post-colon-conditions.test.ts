@@ -252,14 +252,9 @@ describe("OPT-457: OP10-087 Tony Tony.Chopper", () => {
     }
     expect(result.resolved).toBe(true);
     expect(result.state.players[1].hand).toHaveLength(4);
-    // OPT-462 (pre-existing, unrelated to the OPT-457 migration): the resume
-    // frame created for a prompting OPPONENT_ACTION carries the OPPONENT as
-    // controller, so the chained THEN mill runs against the wrong deck —
-    // player 1's deck loses 2 while Chopper's own deck is untouched. These
-    // assertions pin the CURRENT (buggy) behavior deliberately — when
-    // OPT-462 lands, player 0's deck must be `initialDeck - 2` and player
-    // 1's deck unchanged.
-    expect(result.state.players[0].deck).toHaveLength(initialDeck);
-    expect(result.state.players[1].deck).toHaveLength(initialOppDeck - 2);
+    // The opponent controls only the prompted discard. The resumed THEN
+    // chain retains Chopper's controller, so "your deck" mills player 0.
+    expect(result.state.players[0].deck).toHaveLength(initialDeck - 2);
+    expect(result.state.players[1].deck).toHaveLength(initialOppDeck);
   });
 });
