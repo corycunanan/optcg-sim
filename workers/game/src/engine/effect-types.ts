@@ -1047,6 +1047,9 @@ export type CostType =
   | "TRASH_OWN_CHARACTER"
   | "RETURN_OWN_CHARACTER_TO_HAND"
   | "PLACE_OWN_CHARACTER_TO_DECK"
+  // OPT-454: "place this Character at the bottom of the owner's deck" —
+  // fixed to the source card, auto-pays like TRASH_SELF (no selection).
+  | "PLACE_SELF_TO_DECK"
   | "PLACE_STAGE_TO_DECK"
   | "TRASH_OWN_STAGE"
   | "PLACE_FROM_TRASH_TO_DECK"

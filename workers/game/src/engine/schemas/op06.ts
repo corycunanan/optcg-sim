@@ -468,7 +468,8 @@ export const OP06_016_RAISE_MAX: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [
-        { type: "PLACE_OWN_CHARACTER_TO_DECK", position: "BOTTOM" },
+        // OPT-454: printed "this Character" — self-scoped, never a bystander.
+        { type: "PLACE_SELF_TO_DECK", position: "BOTTOM" },
       ],
       actions: [
         {

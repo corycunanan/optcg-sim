@@ -479,6 +479,26 @@ export function payCosts(
         break;
       }
 
+      case "PLACE_SELF_TO_DECK": {
+        // OPT-454: "place this Character at the bottom of the owner's deck" —
+        // the cost is fixed to the source card (rules 8-3-1/8-3-1-7: a
+        // bystander can never pay a "this Character" cost). Auto-pays with
+        // no selection prompt, via the canonical field-exit transition.
+        if (!sourceCardInstanceId) return null;
+        const p = nextState.players[controller];
+        if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
+        const applied = applyCostSelection(
+          nextState,
+          { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: cost.position ?? "BOTTOM" } as Cost,
+          [sourceCardInstanceId],
+          controller,
+        );
+        nextState = applied.state;
+        events.push(...applied.events);
+        costResult.cardsPlacedToDeckCount += 1;
+        break;
+      }
+
       case "PLACE_SELF_AND_HAND_TO_DECK": {
         if (!sourceCardInstanceId) return null;
         // Move source card + specified hand cards to deck bottom.
@@ -691,6 +711,12 @@ export function isCostPayable(
         if (p.stage?.instanceId === sourceCardInstanceId) return true;
       }
       return false;
+    }
+
+    case "PLACE_SELF_TO_DECK": {
+      // OPT-454: payable only while the source Character is on the field.
+      if (!sourceCardInstanceId) return false;
+      return player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
     }
 
     case "LIFE_TO_HAND": {
