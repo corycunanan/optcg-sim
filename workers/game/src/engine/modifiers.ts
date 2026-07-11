@@ -336,13 +336,17 @@ export function getEffectiveFieldCost(
 /**
  * OPT-450: zone-aware cost read for predicates and filters.
  *
- * A card ON THE FIELD must never see play-time adjustments: a pending
- * one-time "next time you play X" discount (matchesOneTimeFilter has no
- * zone restriction) or a hand-zone self-reduction would otherwise shift
- * reads like "K.O. a Character with a cost of 4 or less" onto a cost-5
- * permanent. Off-field cards keep the full play-cost read — hand-zone
- * self-reductions are continuous effects that legitimately change a hand
- * card's cost while it is there.
+ * One-time "next play" discounts modify what you PAY when playing a card —
+ * never the card's cost property (CR 1-3-9-1 defines cost as the printed
+ * value; 2-7-6 lets effects change it, but e.g. OP02-025's discount is
+ * expressly scoped to "play ... from your hand"). matchesOneTimeFilter has
+ * no zone restriction, so without this gate a pending discount shifted cost
+ * predicates in EVERY zone: a cost-5 permanent matched "K.O. cost ≤ 4", and
+ * a printed-cost-4 deck card matched Oden's "play a cost-3 from your deck".
+ *
+ * Reads therefore use layers 0–2 only (base + SET_COST/MODIFY_COST), plus —
+ * for cards actually in hand — the continuous while-in-hand self-reductions,
+ * which genuinely change a hand card's cost while it is there.
  *
  * Play/validation/payment paths intentionally do NOT use this — they read
  * getEffectiveCost directly so play-time discounts apply to what you pay.
@@ -353,10 +357,12 @@ export function getEffectiveCostForRead(
   state: GameState,
   cardDb?: Map<string, CardData>,
 ): number {
-  const onField = card.zone === "CHARACTER" || card.zone === "LEADER" || card.zone === "STAGE";
-  return onField
-    ? getEffectiveFieldCost(cardData, state, card.instanceId, cardDb)
-    : getEffectiveCost(cardData, state, card.instanceId, cardDb);
+  let cost = getEffectiveCost(cardData, state, card.instanceId, cardDb, false);
+  if (card.zone === "HAND" && cardDb) {
+    cost += getHandZoneSelfCostModifier(cardData, state, card.instanceId, cardDb);
+    cost += getFieldToHandCostModifier(cardData, state, card.instanceId, cardDb);
+  }
+  return Math.max(0, cost);
 }
 
 /**
