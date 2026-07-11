@@ -221,7 +221,8 @@ export const OP09_008_BUILDING_SNAKE: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
-      costs: [{ type: "PLACE_OWN_CHARACTER_TO_DECK", position: "BOTTOM" }],
+      costs: [// OPT-454: printed "this Character" — self-scoped, never a bystander.
+        { type: "PLACE_SELF_TO_DECK", position: "BOTTOM" }],
       actions: [
         {
           type: "MODIFY_POWER",

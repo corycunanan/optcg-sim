@@ -356,7 +356,10 @@ export const P_013_GORDON: EffectSchema = {
       id: "activate_debuff",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "PLACE_OWN_CHARACTER_TO_DECK", position: "BOTTOM" }],
+      costs: [
+        // OPT-454: printed "this Character" — self-scoped, never a bystander.
+        { type: "PLACE_SELF_TO_DECK", position: "BOTTOM" },
+      ],
       actions: [
         {
           type: "MODIFY_POWER",
@@ -781,7 +784,10 @@ export const P_033_MONKEY_D_LUFFY: EffectSchema = {
       id: "activate_self_to_deck_draw",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "PLACE_OWN_CHARACTER_TO_DECK", position: "BOTTOM" }],
+      costs: [
+        // OPT-454: printed "this Character" — self-scoped, never a bystander.
+        { type: "PLACE_SELF_TO_DECK", position: "BOTTOM" },
+      ],
       actions: [
         { type: "DRAW", params: { amount: 1 } },
       ],
