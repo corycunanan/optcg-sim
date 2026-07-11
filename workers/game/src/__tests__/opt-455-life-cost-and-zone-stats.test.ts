@@ -119,6 +119,7 @@ describe("OPT-455 — ST13-001 pays its cost into Life, not the deck", () => {
     expect((p0.life[0] as { face?: string }).face).toBe("UP");
     expect(p0.life[0].instanceId).not.toBe(big.instanceId);
     expect(p0.characters.some((c) => c?.instanceId === big.instanceId)).toBe(false);
+    expect(step.events.some((event) => event.type === "CARD_TRASHED")).toBe(false);
   });
 
   it("the buff action continues after the cost is paid", () => {

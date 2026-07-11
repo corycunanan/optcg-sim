@@ -503,11 +503,21 @@ export function handleAwaitingCostSelection(
       });
     }
 
-    events.push({
-      type: "CARD_TRASHED",
-      playerIndex: controller,
-      payload: { count: selected.length, reason: "cost" },
-    });
+    // Only trash payments publish CARD_TRASHED. Other selectable costs use
+    // this same resume branch (including ST13-001's Character-to-Life cost),
+    // so emitting it unconditionally fabricated a trash event for unrelated
+    // zone transitions.
+    if (
+      cost.type === "TRASH_FROM_HAND" ||
+      cost.type === "TRASH_FROM_LIFE" ||
+      cost.type === "TRASH_OWN_CHARACTER"
+    ) {
+      events.push({
+        type: "CARD_TRASHED",
+        playerIndex: controller,
+        payload: { count: selected.length, reason: "cost" },
+      });
+    }
   } else {
     return { state, events, resolved: false };
   }
