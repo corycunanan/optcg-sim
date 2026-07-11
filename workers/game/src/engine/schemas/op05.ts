@@ -568,15 +568,16 @@ export const OP05_016_MORLEY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { multicolored: true },
+      },
       actions: [
         {
           type: "PLAY_SELF",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { multicolored: true },
-          },
         },
       ],
       flags: { optional: true },
@@ -623,15 +624,16 @@ export const OP05_017_LINDBERGH: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { multicolored: true },
+      },
       actions: [
         {
           type: "PLAY_SELF",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { multicolored: true },
-          },
         },
       ],
       flags: { optional: true },
@@ -2273,16 +2275,17 @@ export const OP05_060_MONKEY_D_LUFFY: EffectSchema = {
       costs: [
         { type: "LIFE_TO_HAND", amount: 1, position: "TOP" },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        any_of: [
+          { type: "DON_FIELD_COUNT", controller: "SELF", operator: "==", value: 0 },
+          { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 3 },
+        ],
+      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            any_of: [
-              { type: "DON_FIELD_COUNT", controller: "SELF", operator: "==", value: 0 },
-              { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 3 },
-            ],
-          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],
@@ -3077,16 +3080,17 @@ export const OP05_082_SHIRAHOSHI: EffectSchema = {
         { type: "REST_SELF" },
         { type: "PLACE_FROM_TRASH_TO_DECK", amount: 2, position: "BOTTOM" },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "HAND_COUNT",
+        controller: "OPPONENT",
+        operator: ">=",
+        value: 6,
+      },
       actions: [
         {
           type: "OPPONENT_ACTION",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "HAND_COUNT",
-            controller: "OPPONENT",
-            operator: ">=",
-            value: 6,
-          },
           params: {
             action: {
               type: "TRASH_FROM_HAND",

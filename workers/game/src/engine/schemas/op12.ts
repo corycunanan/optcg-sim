@@ -1003,15 +1003,16 @@ export const OP12_028_KOUZUKI_HIYORI: EffectSchema = {
         { type: "REST_DON", amount: 1 },
         { type: "REST_SELF" },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Roronoa Zoro" },
+      },
       actions: [
         {
           type: "SEARCH_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { name: "Roronoa Zoro" },
-          },
           params: {
             look_at: 5,
             pick: { up_to: 1 },
@@ -2397,15 +2398,16 @@ export const OP12_069_CROCODILE: EffectSchema = {
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
       flags: { once_per_turn: true },
       costs: [{ type: "DON_MINUS", amount: 1 }],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait_contains: "Baroque Works" },
+      },
       actions: [
         {
           type: "MODIFY_POWER",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait_contains: "Baroque Works" },
-          },
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
@@ -2606,15 +2608,16 @@ export const OP12_074_PATTY: EffectSchema = {
           filter: { card_type: "EVENT" },
         },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Sanji" },
+      },
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { name: "Sanji" },
-          },
           params: { amount: 1, target_state: "ACTIVE" },
         },
       ],
@@ -2823,15 +2826,16 @@ export const OP12_080_BARATIE: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { optional: true },
       costs: [{ type: "PLACE_STAGE_TO_DECK", position: "BOTTOM" }],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Sanji" },
+      },
       actions: [
         {
           type: "SEARCH_DECK",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { name: "Sanji" },
-          },
           params: {
             look_at: 3,
             pick: { up_to: 1 },
@@ -3108,16 +3112,17 @@ export const OP12_087_NICO_ROBIN: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       flags: { optional: true },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "HAND_COUNT",
+        controller: "OPPONENT",
+        operator: ">=",
+        value: 5,
+      },
       actions: [
         {
           type: "OPPONENT_ACTION",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "HAND_COUNT",
-            controller: "OPPONENT",
-            operator: ">=",
-            value: 5,
-          },
           params: {
             action: {
               type: "TRASH_FROM_HAND",
@@ -3313,15 +3318,16 @@ export const OP12_094_MONKEY_D_DRAGON: EffectSchema = {
           filter: { traits: ["Revolutionary Army"] },
         },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Revolutionary Army" },
+      },
       actions: [
         {
           type: "PLAY_CARD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Revolutionary Army" },
-          },
           target: {
             type: "CHARACTER_CARD",
             source_zone: "TRASH",
@@ -4076,15 +4082,16 @@ export const OP12_117_SLAM_GIBSON: EffectSchema = {
       costs: [
         { type: "REST_DON", amount: 5 },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Supernovas" },
+      },
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_FIELD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LEADER_PROPERTY",
-            controller: "SELF",
-            property: { trait: "Supernovas" },
-          },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",

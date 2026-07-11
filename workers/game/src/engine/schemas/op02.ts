@@ -506,16 +506,17 @@ export const OP02_018_MARCO: EffectSchema = {
           filter: { traits_contains: ["Whitebeard Pirates"] },
         },
       ],
+      // OPT-457: post-colon "If" — evaluated once after costs are fully paid,
+      // gating the entire action chain (Rules 8-3-1/8-3-3/4-10-1).
+      post_cost_conditions: {
+        type: "LIFE_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 2,
+      },
       actions: [
         {
           type: "PLAY_CARD",
-          // Post-colon "If" clause gates only this action, not the cost — see Rules 8-3-1/8-3-3.
-          conditions: {
-            type: "LIFE_COUNT",
-            controller: "SELF",
-            operator: "<=",
-            value: 2,
-          },
           target: { type: "SELF" },
           params: {
             source_zone: "TRASH",
