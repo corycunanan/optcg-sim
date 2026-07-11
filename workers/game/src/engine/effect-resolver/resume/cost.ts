@@ -412,7 +412,9 @@ export function handleAwaitingCostSelection(
       targetInstanceIds: existing.targetInstanceIds,
       count: existing.count + selected.length,
     });
-  } else if (action.type === "SELECT_TARGET" && cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+  } else if (action.type === "SELECT_TARGET" && (
+    cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" || cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
+  )) {
     // OPT-431/OPT-430: the player chose WHICH trash cards join the source
     // Character. The self half is fixed — selections are validated against
     // the trash-only validTargets, so the source can never be substituted.
@@ -464,7 +466,9 @@ export function handleAwaitingCostSelection(
       targetInstanceIds: existing.targetInstanceIds,
       count: existing.count + group.length,
     });
-  } else if (action.type === "ARRANGE_TOP_CARDS" && cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+  } else if (action.type === "ARRANGE_TOP_CARDS" && (
+    cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" || cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
+  )) {
     // Arranged order arrives top→bottom for the whole self+trash group.
     // Only cards staged at the select step (frame.validTargets) count; any
     // missing from the response are appended so the cost still pays in full.

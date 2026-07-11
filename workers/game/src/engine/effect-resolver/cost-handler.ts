@@ -580,6 +580,7 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
   "CHOOSE_ONE_COST",
   "PLACE_FROM_TRASH_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK",
+  "PLACE_SELF_AND_HAND_TO_DECK",
   "ADD_OWN_CHARACTER_TO_LIFE",
 ]);
 
@@ -640,6 +641,11 @@ export function isCostPayable(
     if (!onField) return false;
     const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
     return targets.length >= resolveAmount(cost as SimpleCost);
+  }
+
+  if (cost.type === "PLACE_SELF_AND_HAND_TO_DECK") {
+    if (!sourceCardInstanceId || state.players[controller].stage?.instanceId !== sourceCardInstanceId) return false;
+    return computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).length >= 1;
   }
 
   if (costNeedsPlayerSelection(cost)) {
@@ -766,11 +772,6 @@ export function isCostPayable(
         if (p.leader?.instanceId === sourceCardInstanceId) return p.leader.attachedDon.length >= amt;
       }
       return false;
-    }
-
-    case "PLACE_SELF_AND_HAND_TO_DECK": {
-      if (!sourceCardInstanceId) return false;
-      return player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
     }
 
     case "PLAY_NAMED_CARD_FROM_HAND": {
@@ -1035,11 +1036,12 @@ export function payCostsWithSelection(
     // order" (OP10-026/027). The self half is fixed to the source card; the
     // player selects WHICH trash cards, then orders the whole group (self +
     // trash) in a single arrange prompt per Comprehensive Rule 3-1-7.
-    if (cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+    if (cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" || cost.type === "PLACE_SELF_AND_HAND_TO_DECK") {
       const amount = resolveAmount(cost as SimpleCost);
       const player = nextState.players[controller];
-      const sourceOnField = player.characters
-        .some((c) => c?.instanceId === sourceCardInstanceId);
+      const sourceOnField = cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
+        ? player.stage?.instanceId === sourceCardInstanceId
+        : player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
       if (!sourceOnField) {
         return { state: nextState, events, cannotPay: true };
       }
@@ -1310,7 +1312,9 @@ export function buildTrashToDeckArrangePrompt(
   const p = state.players[controller];
   const byId = new Map([
     ...p.trash.map((c) => [c.instanceId, c] as const),
+    ...p.hand.map((c) => [c.instanceId, c] as const),
     ...(p.characters.filter(Boolean) as CardInstance[]).map((c) => [c.instanceId, c] as const),
+    ...(p.stage ? [[p.stage.instanceId, p.stage] as const] : []),
   ]);
   const cards = cardIds
     .map((id) => byId.get(id))
@@ -1352,6 +1356,7 @@ export function computeCostTargets(
   switch (cost.type) {
     case "TRASH_FROM_HAND":
     case "PLACE_HAND_TO_DECK":
+    case "PLACE_SELF_AND_HAND_TO_DECK":
     case "REVEAL_FROM_HAND": {
       let candidates = player.hand;
       if (cost.filter) {
@@ -1453,6 +1458,7 @@ export function getCostLabel(cost: Cost): string {
     case "PLACE_HAND_TO_DECK": return `Choose ${amount} card(s) to place on deck as cost`;
     case "PLACE_FROM_TRASH_TO_DECK": return `Choose ${amount} card(s) from your trash to place in your deck as cost`;
     case "PLACE_SELF_AND_TRASH_TO_DECK": return `Choose ${amount} card(s) from your trash to place in your deck with this Character as cost`;
+    case "PLACE_SELF_AND_HAND_TO_DECK": return "Choose 1 card from your hand to place in your deck with this Stage as cost";
     case "REST_CARDS": return `Choose ${amount} card(s) to rest as cost`;
     case "TRASH_OWN_CHARACTER": return `Choose ${amount} character(s) to trash as cost`;
     case "REVEAL_FROM_HAND": return `Choose ${amount} card(s) from hand to reveal as cost`;
@@ -1476,6 +1482,7 @@ export function getCostCtaLabel(cost: Cost): string {
     case "PLACE_HAND_TO_DECK":
     case "PLACE_FROM_TRASH_TO_DECK":
     case "PLACE_SELF_AND_TRASH_TO_DECK": return "Place on Deck";
+    case "PLACE_SELF_AND_HAND_TO_DECK": return "Place on Deck";
     case "ADD_OWN_CHARACTER_TO_LIFE": return "Add to Life";
     case "REST_CARDS":
     case "REST_NAMED_CARD": return "Rest";
@@ -1739,6 +1746,35 @@ export function applyCostSelection(
         });
       }
       return { state: nextState, events };
+    }
+
+    case "PLACE_SELF_AND_HAND_TO_DECK": {
+      const stage = p.stage && selectedSet.has(p.stage.instanceId) ? p.stage : null;
+      if (!stage) return { state, events: [] };
+      const handById = new Map(p.hand.map((c) => [c.instanceId, c]));
+      const moved = selectedIds
+        .map((id) => id === stage.instanceId ? stage : handById.get(id))
+        .filter((c): c is CardInstance => c !== undefined);
+      const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
+      const deckCards = moved.map((c) => ({
+        ...c,
+        instanceId: c.instanceId === stage.instanceId ? nanoid() : c.instanceId,
+        zone: "DECK" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [] as CardInstance["attachedDon"],
+        turnPlayed: null,
+      }));
+      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+      newPlayers[controller] = { ...p, stage: null, hand: newHand, deck: [...p.deck, ...deckCards] };
+      const nextState = completeFieldExitToDeck({ ...state, players: newPlayers }, stage.instanceId);
+      return {
+        state: nextState,
+        events: [{
+          type: "CARD_RETURNED_TO_DECK",
+          playerIndex: controller,
+          payload: { cardInstanceId: stage.instanceId, cardId: stage.cardId, position: "BOTTOM" },
+        }],
+      };
     }
 
     case "ADD_OWN_CHARACTER_TO_LIFE": {
