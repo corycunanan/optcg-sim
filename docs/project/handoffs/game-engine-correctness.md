@@ -39,7 +39,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 21 | OPT-456 | Four partial condition encodings deferred from the OPT-437 audit | — | OPT-437 | Done | [#266](https://github.com/corycunanan/optcg-sim/pull/266) | Merged 2026-07-10 (`386af05`). Only OP16-084’s legitimate pre-cost C6 exception remains. |
 | 22 | OPT-457 | Migrate the OPT-433/442 cohort (21 blocks) to post_cost_conditions | — | OPT-437 | In Review | [#273](https://github.com/corycunanan/optcg-sim/pull/273) | All 21 re-encoded, tests moved to Rule 4-10-1 semantics, encoding guide updated. Found OPT-462 en route. |
 | 23 | OPT-458 | Life-placement removals bypass removal prohibitions | — | — | In Review | [#274](https://github.com/corycunanan/optcg-sim/pull/274) | Character-to-Life is now a TO_LIFE removal; static and live-population protections veto it per target. |
-| 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | Backlog | — | From PR #268's review: prohibited targets can still consume WOULD_BE_KO replacements. |
+| 24 | OPT-459 | Removal handlers run replacements before prohibition filtering | — | — | In Review | [#275](https://github.com/corycunanan/optcg-sim/pull/275) | Prohibited targets are removed before replacement discovery; attemptable targets retain batch semantics. |
 | 25 | OPT-460 | EB01-030 Loguetown stage+hand cost unpayable | — | OPT-453 | Backlog | — | From PR #269's review: PLACE_SELF_AND_HAND_TO_DECK only supports Character sources; hand half never implemented. |
 | 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Backlog | — | From PR #269's review: research whether deck-bound exits should match OP16-041-style watchers; OPT-407 contract may need changing. |
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | Backlog | — | Found during OPT-457: OP10-087's THEN mill never runs after the opponent's discard prompt; pre-existing, pinned in the opt-442 test with a marker. |
@@ -197,3 +197,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** OPT-458 intentionally does not reorder replacement processing; OPT-459 owns filtering prohibited targets before any `WOULD_*` replacement can be offered or consumed.
 - **Unresolved:** Raw cost-driven field exits still bypass replacement interception and remain tracked by OPT-463.
 - **Pointer:** PR #274; inspect `60de6b1` for the taxonomy and executor regressions.
+
+### OPT-459 → OPT-460
+**From:** session on 2026-07-11 · **Commit:** `fddb080` · **PR:** [#275](https://github.com/corycunanan/optcg-sim/pull/275)
+
+- **Primer:** K.O., return-to-hand, and return-to-deck now filter prohibited targets before replacement discovery, preventing impossible removals from prompting or spending replacement costs.
+- **Read first:** `workers/game/src/engine/effect-resolver/cost-handler.ts` branches for `PLACE_SELF_AND_HAND_TO_DECK`, `workers/game/src/engine/effect-resolver/resume/cost.ts`, and EB01-030 in `schemas/eb01.ts`.
+- **Gotchas / do NOT touch:** Preserve the single arrange prompt and canonical deck-transition behavior introduced by OPT-453; OPT-460 must add Stage-source and hand-half support without regressing Character-source compound costs.
+- **Unresolved:** Cost-driven field exits still need replacement interception under OPT-463.
+- **Pointer:** PR #275; inspect `fddb080` for the pre-replacement filter ordering.
