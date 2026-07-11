@@ -22,6 +22,7 @@ import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { markOncePerTurnUsed } from "../action-utils.js";
 import {
   payCostsWithSelection,
+  payCosts,
   applyCostSelection,
   blockShufflesDeck,
   buildTrashToDeckArrangePrompt,
@@ -30,6 +31,22 @@ import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { executeActionChain, postCostConditionsMet } from "../resolver.js";
 import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
+import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
+
+export function abortReplacedCost(
+  state: GameState,
+  frame: EffectStackFrame,
+  events: PendingEvent[],
+  cardDb: Map<string, CardData>,
+  frameOnStack = true,
+): EffectResolverResult {
+  let nextState = frameOnStack ? popFrame(state) : state;
+  const block = frame.effectBlock as EffectBlock;
+  if (isOncePerTurnBlock(block) && !frame.oncePerTurnMarked) {
+    nextState = markOncePerTurnUsed(nextState, block.id, frame.sourceCardInstanceId);
+  }
+  return processRemainingTriggers(nextState, frame.pendingTriggers, cardDb, events);
+}
 
 /**
  * Merge a new set of cost result refs (from a payCostsWithSelection call)
@@ -219,6 +236,38 @@ export function handleAwaitingCostSelection(
     (topFrame.costResultRefs ?? []) as [string, EffectResult][],
   );
 
+  if (action.type === "PLAYER_CHOICE" && action.choiceId === "__PAY_FIXED_COST__") {
+    let nextState = popFrame(state);
+    const events: PendingEvent[] = [];
+    const paid = payCosts(nextState, [cost], controller, cardDb, sourceCardInstanceId);
+    if (!paid) {
+      return abortReplacedCost(nextState, topFrame, events, cardDb, false);
+    }
+    nextState = paid.state;
+    events.push(...paid.events);
+    mergeCostRefs(accumulatedCostRefs, paid.costResult);
+    const nextCostIndex = topFrame.currentCostIndex + 1;
+    if (nextCostIndex < topFrame.costs.length) {
+      const remaining = payCostsWithSelection(
+        nextState, topFrame.costs as Cost[], nextCostIndex,
+        controller, cardDb, sourceCardInstanceId, topFrame.effectBlock as EffectBlock,
+      );
+      if (remaining.cannotPay) {
+        return abortReplacedCost(remaining.state, topFrame, [...events, ...remaining.events], cardDb, false);
+      }
+      nextState = remaining.state;
+      events.push(...remaining.events);
+      if (remaining.pendingPrompt) {
+        return { state: nextState, events, resolved: false, pendingPrompt: remaining.pendingPrompt };
+      }
+      mergeCostRefs(accumulatedCostRefs, remaining.costResult);
+    }
+    return finishCostsAndRunActions(
+      nextState, events, topFrame, accumulatedCostRefs,
+      controller, sourceCardInstanceId, cardDb,
+    );
+  }
+
   // CHOOSE_ONE_COST — player chose which option to pay; replace slot and re-enter.
   if (action.type === "PLAYER_CHOICE" && cost.type === "CHOOSE_ONE_COST") {
     const options = cost.options ?? [];
@@ -393,6 +442,20 @@ export function handleAwaitingCostSelection(
       };
     }
 
+    if (!topFrame.costReplacementChecked) {
+      const replacement = checkReplacementForRemoval(nextState, sourceCardInstanceId, controller, cardDb);
+      events.push(...replacement.events);
+      nextState = replacement.state;
+      if (replacement.pendingPrompt) {
+        nextState = updateTopFrame(nextState, {
+          costReplacementAction: { type: "SELECT_TARGET", selectedInstanceIds: selected },
+          costReplacementChecked: true,
+        });
+        return { state: nextState, events, resolved: false, pendingPrompt: replacement.pendingPrompt };
+      }
+      if (replacement.replaced) return abortReplacedCost(nextState, topFrame, events, cardDb);
+    }
+
     const appliedGroup = applyCostSelection(nextState, cost, group, controller);
     nextState = appliedGroup.state;
     events.push(...appliedGroup.events);
@@ -414,6 +477,25 @@ export function handleAwaitingCostSelection(
     const seen = new Set(ordered);
     for (const id of valid) {
       if (!seen.has(id)) ordered.push(id);
+    }
+
+    if (!topFrame.costReplacementChecked) {
+      const replacement = checkReplacementForRemoval(nextState, sourceCardInstanceId, controller, cardDb);
+      events.push(...replacement.events);
+      nextState = replacement.state;
+      if (replacement.pendingPrompt) {
+        nextState = updateTopFrame(nextState, {
+          costReplacementAction: {
+            type: "ARRANGE_TOP_CARDS",
+            keptCardInstanceId: "",
+            orderedInstanceIds: action.orderedInstanceIds,
+            destination: action.destination,
+          },
+          costReplacementChecked: true,
+        });
+        return { state: nextState, events, resolved: false, pendingPrompt: replacement.pendingPrompt };
+      }
+      if (replacement.replaced) return abortReplacedCost(nextState, topFrame, events, cardDb);
     }
 
     const appliedOrdered = applyCostSelection(nextState, cost, ordered, controller);
@@ -464,6 +546,38 @@ export function handleAwaitingCostSelection(
     const selected = [...new Set(action.selectedInstanceIds ?? [])].filter((id) => valid.has(id));
     if (selected.length !== amount) {
       return { state, events: [], resolved: false };
+    }
+    const fieldExitCosts = new Set<Cost["type"]>([
+      "KO_OWN_CHARACTER",
+      "TRASH_OWN_CHARACTER",
+      "RETURN_OWN_CHARACTER_TO_HAND",
+      "PLACE_OWN_CHARACTER_TO_DECK",
+      "ADD_OWN_CHARACTER_TO_LIFE",
+    ]);
+    if (fieldExitCosts.has(cost.type) && !topFrame.costReplacementChecked) {
+      // Cost exits are still effect-caused removal events, but a replacement
+      // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
+      // Park the already-validated selection on the existing cost frame.
+      let replacement = cost.type === "KO_OWN_CHARACTER"
+        ? checkReplacementForKO(nextState, selected[0], "effect", controller, cardDb)
+        : checkReplacementForRemoval(nextState, selected[0], controller, cardDb);
+      // K.O. is also a general removal/leave-field event. Only advance to
+      // that family when a K.O.-specific replacement did not intercept.
+      if (cost.type === "KO_OWN_CHARACTER" && !replacement.replaced && !replacement.pendingPrompt) {
+        replacement = checkReplacementForRemoval(nextState, selected[0], controller, cardDb);
+      }
+      events.push(...replacement.events);
+      nextState = replacement.state;
+      if (replacement.pendingPrompt) {
+        nextState = updateTopFrame(nextState, {
+          costReplacementAction: { type: "SELECT_TARGET", selectedInstanceIds: selected },
+          costReplacementChecked: true,
+        });
+        return { state: nextState, events, resolved: false, pendingPrompt: replacement.pendingPrompt };
+      }
+      if (replacement.replaced) {
+        return abortReplacedCost(nextState, topFrame, events, cardDb);
+      }
     }
     const appliedSelected = applyCostSelection(nextState, cost, selected, controller);
     nextState = appliedSelected.state;

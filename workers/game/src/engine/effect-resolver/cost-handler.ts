@@ -34,6 +34,7 @@ import { matchesFilter } from "../conditions.js";
 import { nanoid } from "../../util/nanoid.js";
 import { deregisterTriggersForCard } from "../triggers.js";
 import { expireSourceLeftZone, expireTargetLeftZone } from "../duration-tracker.js";
+import { checkReplacementForKO, checkReplacementForRemoval } from "../replacements.js";
 
 /**
  * OPT-453: complete the canonical field-exit lifecycle for a card paid into
@@ -1221,6 +1222,46 @@ export function payCostsWithSelection(
         resumeContext: frame.id,
       };
       return { state: nextState, events, pendingPrompt };
+    }
+
+    // Fixed-source field exits have no selection prompt, but replacement
+    // effects may still suspend their payment (Rule 8-3-1-7). Park the same
+    // cost frame used by selectable payments so decline can resume exactly.
+    const fixedExitTarget = (() => {
+      if (["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"].includes(cost.type)) {
+        return sourceCardInstanceId;
+      }
+      if (["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"].includes(cost.type)) {
+        return nextState.players[controller].stage?.instanceId;
+      }
+      return undefined;
+    })();
+    if (fixedExitTarget) {
+      let replacement = cost.type === "KO_OWN_CHARACTER"
+        ? checkReplacementForKO(nextState, fixedExitTarget, "effect", controller, cardDb)
+        : checkReplacementForRemoval(nextState, fixedExitTarget, controller, cardDb);
+      if (cost.type === "KO_OWN_CHARACTER" && !replacement.replaced && !replacement.pendingPrompt) {
+        replacement = checkReplacementForRemoval(nextState, fixedExitTarget, controller, cardDb);
+      }
+      nextState = replacement.state;
+      events.push(...replacement.events);
+      if (replacement.pendingPrompt) {
+        const frame: EffectStackFrame = {
+          id: generateFrameId(), sourceCardInstanceId, controller, effectBlock,
+          phase: "AWAITING_COST_SELECTION", pausedAction: null,
+          remainingActions: effectBlock.actions ?? [], resultRefs: [], validTargets: [],
+          costs: workingCosts, currentCostIndex: i, costsPaid: false,
+          oncePerTurnMarked: false, costResultRefs: [...costResultToEntries(costResult)],
+          pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
+          costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
+          costReplacementChecked: true,
+        };
+        nextState = pushFrame(nextState, frame);
+        return { state: nextState, events, pendingPrompt: replacement.pendingPrompt };
+      }
+      if (replacement.replaced) {
+        return { state: nextState, events, cannotPay: true };
+      }
     }
 
     // Auto-payable cost — use existing payCosts for this single cost

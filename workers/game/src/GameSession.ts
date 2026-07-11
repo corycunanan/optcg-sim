@@ -133,6 +133,7 @@ import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayloa
 import { buildGameResultCallbackPayload } from "./util/result.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
+import { abortReplacedCost } from "./engine/effect-resolver/resume/cost.js";
 import { recalculateBattlePowers, resumeBattleDamageContinuation } from "./engine/battle.js";
 import { isEffectConditionMet } from "./engine/modifiers.js";
 import type { RuntimeActiveEffect } from "./engine/effect-types.js";
@@ -986,7 +987,28 @@ export class GameSession implements DurableObject {
         this.cardDb,
       );
       this.gameState = replacementResult.state;
-      this.recordReplacementContinuationResult(!replacementResult.replaced, []);
+      const costFrame = this.gameState.effectStack.at(-1) as unknown as EffectStackFrame | undefined;
+      if (costFrame?.costReplacementAction) {
+        if (replacementResult.replaced) {
+          const aborted = abortReplacedCost(
+            this.gameState, costFrame, replacementResult.events, this.cardDb,
+          );
+          this.gameState = aborted.state;
+          if (aborted.pendingPrompt) {
+            this.gameState = { ...this.gameState, pendingPrompt: aborted.pendingPrompt };
+          }
+        } else {
+          const resumed = resumeFromStack(this.gameState, {
+            ...costFrame.costReplacementAction,
+          } as GameAction, this.cardDb);
+          this.gameState = resumed.state;
+          if (resumed.pendingPrompt) {
+            this.gameState = { ...this.gameState, pendingPrompt: resumed.pendingPrompt };
+          }
+        }
+      } else {
+        this.recordReplacementContinuationResult(!replacementResult.replaced, []);
+      }
 
       if (replacementResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: replacementResult.pendingPrompt };
