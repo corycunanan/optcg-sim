@@ -69,6 +69,7 @@ export function resumeEffectChain(
     resultRefs: resultRefsEntries,
     validTargets,
   } = resumeCtx;
+  const remainingActionsController = resumeCtx.remainingActionsController ?? controller;
 
   const resultRefs = new Map<string, EffectResult>(
     resultRefsEntries.map(([k, v]) => [k, v as EffectResult]),
@@ -143,7 +144,7 @@ export function resumeEffectChain(
       nextState,
       remainingActions,
       effectSourceInstanceId,
-      controller,
+      remainingActionsController,
       cardDb,
       resultRefs,
     );
@@ -190,6 +191,7 @@ export function resumeFromStack(
       const legacyCtx: ResumeContext = {
         effectSourceInstanceId: sourceCardInstanceId,
         controller,
+        remainingActionsController: topFrame.remainingActionsController,
         pausedAction: topFrame.pausedAction as Action | null,
         remainingActions: topFrame.remainingActions as Action[],
         resultRefs: topFrame.resultRefs,

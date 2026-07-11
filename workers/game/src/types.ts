@@ -36,6 +36,8 @@ export interface ExecuteResult {
 export interface ResumeContext {
   effectSourceInstanceId: string;
   controller: 0 | 1;
+  /** Outer effect owner when the paused action temporarily uses another controller. */
+  remainingActionsController?: 0 | 1;
   pausedAction: import("./engine/effect-types.js").Action | null;
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, unknown][];
@@ -120,6 +122,8 @@ export interface EffectStackFrame {
   id: string;
   sourceCardInstanceId: string;
   controller: 0 | 1;
+  /** Controller for the chain after a responder-controlled paused action. */
+  remainingActionsController?: 0 | 1;
   effectBlock: import("./engine/effect-types.js").EffectBlock;
   phase: import("../../../shared/game-types.js").EffectStackPhase;
 
