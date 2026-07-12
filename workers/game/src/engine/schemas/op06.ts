@@ -907,9 +907,8 @@ export const OP06_025_CAMIE: EffectSchema = {
 };
 
 // ─── OP06-026 Koushirou ─────────────────────────────────────────────────────
-// [On Play] Set up to 1 of your
-// _comment: Text is truncated in source. Best guess: "Set up to 1 of your
-// DON!! cards as active."
+// [On Play] Set up to 1 of your <Slash> attribute Characters with a cost of 4
+// or less as active. Then, you cannot attack a Leader during this turn.
 
 export const OP06_026_KOUSHIROU: EffectSchema = {
   card_id: "OP06-026",
@@ -920,11 +919,27 @@ export const OP06_026_KOUSHIROU: EffectSchema = {
       id: "OP06-026_effect_1",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      // _comment: "Card text truncated. Best guess: Set up to 1 of your DON!! cards as active."
       actions: [
         {
-          type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          type: "SET_ACTIVE",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { attribute: "SLASH", cost_max: 4 },
+          },
+        },
+        {
+          type: "APPLY_PROHIBITION",
+          params: {
+            prohibition_type: "CANNOT_ATTACK",
+            scope: {
+              controller: "SELF",
+              when_attacking: { type: "OPPONENT_LEADER" },
+            },
+          },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
         },
       ],
     },

@@ -1457,8 +1457,40 @@ export const OP04_041_APIS: EffectSchema = {
   ],
 };
 
-// ─── OP04-042 Ipponmatsu — TRUNCATED (incomplete card text) ─────────────────
-// Card text is incomplete/truncated — skipping encoding.
+// ─── OP04-042 Ipponmatsu — ON_PLAY Slash power boost then mill ─────────────
+// [On Play] Up to 1 of your <Slash> attribute Characters gains +3000 power
+// during this turn. Then, trash 1 card from the top of your deck.
+
+export const OP04_042_IPPONMATSU: EffectSchema = {
+  card_id: "OP04-042",
+  card_name: "Ipponmatsu",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_slash_power_then_mill",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { attribute: "SLASH" },
+          },
+          params: { amount: 3000 },
+          duration: { type: "THIS_TURN" },
+        },
+        {
+          type: "MILL",
+          params: { amount: 1 },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
 
 // ─── OP04-043 Ulti — DON!!x1 WHEN_ATTACKING return cost 2 or less ──────────
 // [DON!! x1] [When Attacking] Return up to 1 Character with a cost of 2 or
@@ -4249,6 +4281,7 @@ export const OP04_SCHEMAS: Record<string, EffectSchema> = {
   "OP04-039": OP04_039_REBECCA,
   "OP04-040": OP04_040_QUEEN,
   "OP04-041": OP04_041_APIS,
+  "OP04-042": OP04_042_IPPONMATSU,
   "OP04-043": OP04_043_ULTI,
   "OP04-044": OP04_044_KAIDO,
   "OP04-045": OP04_045_KING,
