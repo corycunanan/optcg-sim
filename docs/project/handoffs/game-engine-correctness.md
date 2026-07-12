@@ -308,10 +308,10 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Pointer:** PR #290; inspect `9134129` for the validator, terminal fault, and gate changes.
 
 ### OPT-472 → OPT-474
-**From:** session on 2026-07-12 · **Commit:** `bbf944c` · **PR:** [#292](https://github.com/corycunanan/optcg-sim/pull/292)
+**From:** session on 2026-07-12 · **Commits:** `bbf944c` (implementation), `b0e0267` (review hardening) · **PR:** [#292](https://github.com/corycunanan/optcg-sim/pull/292)
 
 - **Primer:** All 210 authored connective `AND` uses now resolve in printed order as `THEN`. Explicit future `AND` groups lock conditions, dynamic values, and targets against one snapshot, collect every target choice before mutation, and commit their events only after the complete group resolves.
 - **Read first:** `docs/game-engine/AND-CHAIN-AUDIT.md`, `workers/game/src/engine/effect-resolver/simultaneous.ts`, `resolver.ts`, and `workers/game/src/__tests__/opt-472-simultaneous-and.test.ts`.
-- **Gotchas / do NOT touch:** `AND` is not a spelling-level encoding for the word “and.” The simultaneous allowlist intentionally excludes handlers that can open prohibition/replacement, trigger-drain, arrange, or nested-choice continuations; add a handler only with an atomic preflight regression. Same-group result dependencies remain invalid.
+- **Gotchas / do NOT touch:** `AND` is not a spelling-level encoding for the word “and.” The simultaneous allowlist intentionally excludes handlers that can open prohibition/replacement, trigger-drain, arrange, or nested-choice continuations; add a handler only with an atomic preflight regression. Same-group result dependencies remain invalid at any nesting depth (target, dynamic amount, condition, or filter), and resume packets must satisfy the target count rather than trusting the client prompt.
 - **Unresolved:** The issue estimate said 211 authored connectors; the AST-backed source audit found and migrated 210 across 35 schema files. No unclassified authored `AND` remains. OPT-474 can proceed independently while PR #291/#292 review.
-- **Pointer:** PR #292; inspect `bbf944c` for the transaction planner, continuation integration, validator, migration, and adversarial coverage.
+- **Pointer:** PR #292; inspect `bbf944c` for the transaction planner/migration and `b0e0267` for the review-driven count/ref fail-closed guards.
