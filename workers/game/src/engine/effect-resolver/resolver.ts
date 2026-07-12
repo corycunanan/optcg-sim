@@ -37,9 +37,15 @@ import * as effects from "./actions/effects.js";
 import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
-import { consumeResolutionAction, isEngineTerminated } from "../engine-limits.js";
+import { consumeResolutionAction, isEngineTerminated, terminateForEngineContract } from "../engine-limits.js";
 
-import { ALL_ACTION_TYPES, TRIGGERING_CARD_REF, isOncePerTurnBlock, type ActionType } from "../effect-types.js";
+import {
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
+  ALL_ACTION_TYPES,
+  TRIGGERING_CARD_REF,
+  isOncePerTurnBlock,
+  type ActionType,
+} from "../effect-types.js";
 
 // ─── Action dispatcher map ───────────────────────────────────────────────────
 
@@ -143,16 +149,14 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
 //   - RETURN_ATTACHED_DON_TO_COST is shared with the Cost union and resolves
 //     through cost-handler.ts.
 //   - CHOOSE_VALUE / GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
-//     union but referenced by zero schemas; harmless until someone authors one.
+//     union but referenced by zero schemas. Schema validation rejects authored
+//     uses until a real handler is registered.
 //
 // Adding a new ActionType without registering a handler or adding it here trips
 // this assertion at worker boot rather than no-op'ing in production.
-const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set<ActionType>([
-  "RETURN_ATTACHED_DON_TO_COST",
-  "CHOOSE_VALUE",
-  "GRANT_COUNTER",
-  "REMOVE_PROHIBITION",
-]);
+const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set(
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
+);
 
 const _missingActionHandlers = ALL_ACTION_TYPES.filter(
   (t) => !(t in ACTION_HANDLERS) && !KNOWN_UNHANDLED_ACTION_TYPES.has(t),
@@ -179,7 +183,7 @@ play.setPlayDependencies({ resolveEffect });
 // actions (SET_REST, TRASH_CARD, MODIFY_POWER, …) run through the real
 // handlers. Registered here to avoid a resolver → replacements → resolver
 // import cycle.
-setReplacementDispatcher(executeEffectAction, executeActionChain);
+setReplacementDispatcher(executeActionChain);
 
 // ─── Post-cost condition gate (OPT-437) ──────────────────────────────────────
 
@@ -574,8 +578,15 @@ export function executeEffectAction(
   if (handler) {
     return handler(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
   }
-  // Action type not yet implemented — fail loudly so missing handlers are caught
+  // Boot validation makes this unreachable for authored schemas. Treat any
+  // untrusted/runtime drift as a rules-visible terminal engine contract fault.
   log("action.unhandled", { actionType: action.type, sourceInstanceId: sourceCardInstanceId, controller });
-  console.warn(`[EffectResolver] Unhandled action type: ${action.type}`);
+  state = terminateForEngineContract(state, {
+    kind: "ENGINE_CONTRACT",
+    contract: "ACTION_HANDLER",
+    actionType: action.type,
+    sourceCardInstanceId,
+    message: `No resolver handler is registered for action type '${action.type}'`,
+  });
   return { state, events: [], succeeded: false };
 }

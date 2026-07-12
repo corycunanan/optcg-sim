@@ -238,10 +238,17 @@ export type EngineLimitDiagnostic =
       observed: number;
       actionType: string;
       sourceCardInstanceId: string;
+    }
+  | {
+      kind: "ENGINE_CONTRACT";
+      contract: "ACTION_HANDLER" | "REPLACEMENT_DISPATCH";
+      actionType?: string;
+      sourceCardInstanceId?: string;
+      message: string;
     };
 
 export interface EngineTerminalOutcome {
-  type: "INFINITE_LOOP_DRAW";
+  type: "INFINITE_LOOP_DRAW" | "ENGINE_ERROR_DRAW";
   diagnostic: EngineLimitDiagnostic;
 }
 

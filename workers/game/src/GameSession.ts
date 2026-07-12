@@ -1048,7 +1048,7 @@ export class GameSession implements DurableObject {
       const resumeResult = resumeFromStack(this.gameState, action, this.cardDb);
       this.gameState = resumeResult.state;
 
-      if (this.gameState.engineOutcome?.type === "INFINITE_LOOP_DRAW") {
+      if (this.gameState.engineOutcome) {
         resumedGameOver = {
           winner: null,
           reason: this.gameState.winReason ?? "Unstoppable loop detected — game ends in a draw",
@@ -1082,7 +1082,7 @@ export class GameSession implements DurableObject {
       const resumeResult = resumeEffectChain(this.gameState, effectResumeCtx, action, this.cardDb);
       this.gameState = resumeResult.state;
 
-      if (this.gameState.engineOutcome?.type === "INFINITE_LOOP_DRAW") {
+      if (this.gameState.engineOutcome) {
         resumedGameOver = {
           winner: null,
           reason: this.gameState.winReason ?? "Unstoppable loop detected — game ends in a draw",
@@ -1096,7 +1096,7 @@ export class GameSession implements DurableObject {
       }
     }
 
-    if (this.gameState.engineOutcome?.type === "INFINITE_LOOP_DRAW") {
+    if (this.gameState.engineOutcome) {
       this.gameState = { ...this.gameState, pendingPrompt: null, effectStack: [] };
       resumedGameOver = {
         winner: null,

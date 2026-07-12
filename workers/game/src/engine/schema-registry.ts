@@ -10,7 +10,17 @@
  * from the schemas/ directory.
  */
 
-import { ALL_ACTION_TYPES, type EffectSchema, type EffectBlock, type Action, type Cost, type TargetFilter } from "./effect-types.js";
+import {
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
+  ALL_ACTION_TYPES,
+  ALL_COST_TYPES,
+  ALL_TARGET_TYPES,
+  type EffectSchema,
+  type EffectBlock,
+  type Action,
+  type Cost,
+  type TargetFilter,
+} from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
@@ -139,23 +149,46 @@ export function getEffectSchema(cardId: string): EffectSchema | null {
 /**
  * Merge authored schemas into a CardDb's effectSchema fields.
  * Called at game init to inject schemas into the runtime card database.
- * Validates each schema and logs warnings for malformed entries.
+ * Validates the complete candidate registry before mutating the CardDb. A
+ * malformed authored or DB-only schema is a boot error; partial installation
+ * would leave a match with a nondeterministic mix of old and new contracts.
  */
 export function injectSchemasIntoCardDb(
   cardDb: Map<string, import("../types.js").CardData>,
 ): void {
+  const diagnostics: string[] = [];
+  for (const [cardId, data] of cardDb) {
+    const candidate = AUTHORED_SCHEMAS[cardId] ?? data.effectSchema;
+    if (candidate) diagnostics.push(...validateEffectSchema(candidate, cardId));
+  }
   for (const [cardId, schema] of Object.entries(AUTHORED_SCHEMAS)) {
-    const errors = validateEffectSchema(schema, cardId);
-    if (errors.length > 0) {
-      log("schema.validation_errors", { cardId, errors });
-      console.warn(`[schema] Validation errors for ${cardId}:\n  ${errors.join("\n  ")}`);
+    if (!cardDb.has(cardId)) {
+      diagnostics.push(...validateEffectSchema(schema, cardId));
     }
+  }
+  if (diagnostics.length > 0) {
+    throw new SchemaBootValidationError(diagnostics);
+  }
+
+  for (const [cardId, schema] of Object.entries(AUTHORED_SCHEMAS)) {
     const data = cardDb.get(cardId);
     if (data) {
       // Always prefer authored schemas over DB-stored schemas — they are the
       // most up-to-date and thoroughly tested versions.
       cardDb.set(cardId, { ...data, effectSchema: schema });
     }
+  }
+}
+
+export class SchemaBootValidationError extends Error {
+  readonly diagnostics: readonly string[];
+
+  constructor(diagnostics: readonly string[]) {
+    super(
+      `Authored schema validation failed with ${diagnostics.length} error(s):\n${diagnostics.join("\n")}`,
+    );
+    this.name = "SchemaBootValidationError";
+    this.diagnostics = [...diagnostics];
   }
 }
 
@@ -182,25 +215,47 @@ const VALID_CATEGORIES = new Set(["auto", "activate", "permanent", "replacement"
 // from the `ActionType` union. Engine handler coverage is a separate concern
 // asserted at worker boot in `effect-resolver/resolver.ts` (OPT-200).
 const VALID_ACTION_TYPES: ReadonlySet<string> = new Set(ALL_ACTION_TYPES);
+const UNHANDLED_ACTION_TYPES: ReadonlySet<string> = new Set(
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
+);
+const VALID_TARGET_TYPES: ReadonlySet<string> = new Set(ALL_TARGET_TYPES);
+const VALID_COST_TYPES: ReadonlySet<string> = new Set(ALL_COST_TYPES);
+const IMPLICIT_COST_RESULT_REFS = new Set([
+  "__cost_don_rested",
+  "__cost_cards_trashed",
+  "__cost_cards_returned",
+  "__cost_cards_placed_to_deck",
+  "__cost_characters_ko",
+]);
 
 /**
  * Validate an effect schema and return a list of error messages.
  * Returns an empty array if the schema is valid.
  */
-export function validateEffectSchema(schema: EffectSchema, cardId?: string): string[] {
+export function validateEffectSchema(schema: unknown, cardId?: string): string[] {
   const errors: string[] = [];
   const prefix = cardId ? `[${cardId}]` : "";
 
-  if (!schema.effects || !Array.isArray(schema.effects)) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return [`${prefix} Schema must be an object`];
+  }
+  const candidate = schema as Partial<EffectSchema>;
+
+  if (!candidate.effects || !Array.isArray(candidate.effects)) {
     errors.push(`${prefix} Missing or non-array 'effects' field`);
     return errors;
   }
 
   const blockIds = new Set<string>();
 
-  for (let i = 0; i < schema.effects.length; i++) {
-    const block = schema.effects[i];
+  for (let i = 0; i < candidate.effects.length; i++) {
+    const block = candidate.effects[i] as EffectBlock;
     const blockPrefix = `${prefix} effects[${i}]`;
+
+    if (!block || typeof block !== "object" || Array.isArray(block)) {
+      errors.push(`${blockPrefix}: Effect block must be an object`);
+      continue;
+    }
 
     // Check id uniqueness
     if (!block.id) {
@@ -266,15 +321,32 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
 
   // Validate actions
   if (block.actions) {
-    for (let i = 0; i < block.actions.length; i++) {
-      errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`));
+    if (!Array.isArray(block.actions)) {
+      errors.push(`${prefix}.actions: Must be an array`);
+      return errors;
     }
+    for (let i = 0; i < block.actions.length; i++) {
+      errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`, i === 0));
+    }
+    errors.push(...validateResultReferences(block.actions, `${prefix}.actions`));
   }
 
   if (block.replacement_actions) {
-    for (let i = 0; i < block.replacement_actions.length; i++) {
-      errors.push(...validateAction(block.replacement_actions[i], `${prefix}.replacement_actions[${i}]`));
+    if (!Array.isArray(block.replacement_actions)) {
+      errors.push(`${prefix}.replacement_actions: Must be an array`);
+      return errors;
     }
+    for (let i = 0; i < block.replacement_actions.length; i++) {
+      errors.push(...validateAction(
+        block.replacement_actions[i],
+        `${prefix}.replacement_actions[${i}]`,
+        i === 0,
+      ));
+    }
+    errors.push(...validateResultReferences(
+      block.replacement_actions,
+      `${prefix}.replacement_actions`,
+    ));
   }
 
   // OPT-409: permanent modifiers and prohibitions carry the same Target shape
@@ -310,6 +382,10 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
 
   if (!cost.type) {
     errors.push(`${prefix}: Missing 'type' field`);
+    return errors;
+  }
+  if (!VALID_COST_TYPES.has(cost.type)) {
+    errors.push(`${prefix}: Unknown cost type '${cost.type}'`);
     return errors;
   }
 
@@ -361,7 +437,7 @@ function validateTargetFilterController(
     if (!f) return;
     if (f.controller !== undefined) {
       errors.push(
-        `${prefix}: 'controller' inside target.filter is ignored on targeting paths — use target.controller`,
+        `${prefix}: [C5] 'controller' inside target.filter is ignored on targeting paths — use target.controller`,
       );
     }
     for (const sub of f.any_of ?? []) visit(sub);
@@ -371,10 +447,14 @@ function validateTargetFilterController(
 }
 
 function validateTargetController(target: Action["target"], prefix: string): string[] {
-  const errors = validateTargetFilterController(
+  const errors: string[] = [];
+  if (target?.type && !VALID_TARGET_TYPES.has(target.type)) {
+    errors.push(`${prefix}.target: Unknown target type '${target.type}'`);
+  }
+  errors.push(...validateTargetFilterController(
     target?.filter as TargetFilter | undefined,
-    prefix,
-  );
+    `${prefix}.target`,
+  ));
   for (let i = 0; i < (target?.dual_targets?.length ?? 0); i++) {
     errors.push(...validateTargetFilterController(
       target!.dual_targets![i].filter as TargetFilter | undefined,
@@ -384,13 +464,24 @@ function validateTargetController(target: Action["target"], prefix: string): str
   return errors;
 }
 
-function validateAction(action: Action, prefix: string): string[] {
+function validateAction(action: Action, prefix: string, firstInChain = false): string[] {
   const errors: string[] = [];
+
+  if (!action || typeof action !== "object" || Array.isArray(action)) {
+    return [`${prefix}: Action must be an object`];
+  }
 
   if (!action.type) {
     errors.push(`${prefix}: Missing 'type' field`);
   } else if (!VALID_ACTION_TYPES.has(action.type)) {
     errors.push(`${prefix}: Unknown action type '${action.type}'`);
+  } else if (UNHANDLED_ACTION_TYPES.has(action.type)) {
+    errors.push(`${prefix}: Action type '${action.type}' has no resolver handler`);
+  }
+  if (firstInChain && action.chain) {
+    errors.push(
+      `${prefix}: First action has chain '${action.chain}' (only subsequent actions may declare a connector)`,
+    );
   }
 
   // OPT-409: `controller` inside Target.filter is silently ignored on normal
@@ -410,7 +501,11 @@ function validateAction(action: Action, prefix: string): string[] {
           errors.push(`${prefix}.options[${i}]: Must be an array of actions`);
         } else {
           for (let j = 0; j < options[i].length; j++) {
-            errors.push(...validateAction(options[i][j], `${prefix}.options[${i}][${j}]`));
+            errors.push(...validateAction(
+              options[i][j],
+              `${prefix}.params.options[${i}][${j}]`,
+              j === 0,
+            ));
           }
         }
       }
@@ -419,13 +514,92 @@ function validateAction(action: Action, prefix: string): string[] {
 
   // Validate nested action in OPPONENT_ACTION
   if (action.type === "OPPONENT_ACTION" && action.params?.action) {
-    errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`));
+    errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`, true));
   }
 
   // Validate nested action in SCHEDULE_ACTION
   if (action.type === "SCHEDULE_ACTION" && action.params?.action) {
-    errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`));
+    errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`, true));
   }
 
+  return errors;
+}
+
+function walkActions(actions: Action[]): Action[] {
+  const walked: Action[] = [];
+  const visit = (list: Action[]): void => {
+    for (const action of list) {
+      if (!action || typeof action !== "object") continue;
+      walked.push(action);
+      const params = action.params;
+      if (!params) continue;
+      if (Array.isArray(params.options)) {
+        for (const option of params.options) {
+          if (Array.isArray(option)) visit(option as Action[]);
+          else if (
+            option &&
+            typeof option === "object" &&
+            Array.isArray((option as { actions?: unknown }).actions)
+          ) {
+            visit((option as { actions: Action[] }).actions);
+          }
+        }
+      }
+      if (params.action && typeof params.action === "object") {
+        visit([params.action as Action]);
+      }
+    }
+  };
+  visit(actions);
+  return walked;
+}
+
+function validateResultReferences(actions: Action[], prefix: string): string[] {
+  const produced = new Set<string>();
+  const consumed = new Set<string>();
+
+  const scanConsumed = (value: unknown, depth = 0): void => {
+    if (!value || typeof value !== "object" || depth > 12) return;
+    for (const [key, nested] of Object.entries(value)) {
+      if (key === "result_ref") {
+        if (
+          (value as { type?: unknown }).type === "REVEALED_CARD_PROPERTY" &&
+          typeof nested === "string"
+        ) {
+          consumed.add(nested);
+        }
+        continue;
+      }
+      if ((key === "target_ref" || key.endsWith("_ref")) && typeof nested === "string") {
+        consumed.add(nested);
+      }
+      if (
+        nested &&
+        typeof nested === "object" &&
+        (nested as { type?: unknown }).type === "ACTION_RESULT" &&
+        typeof (nested as { ref?: unknown }).ref === "string"
+      ) {
+        consumed.add((nested as { ref: string }).ref);
+      }
+      scanConsumed(nested, depth + 1);
+    }
+  };
+
+  for (const action of walkActions(actions)) {
+    if (action.result_ref) produced.add(action.result_ref);
+    scanConsumed(action);
+  }
+
+  const errors: string[] = [];
+  for (const ref of produced) {
+    if (!consumed.has(ref)) {
+      errors.push(`${prefix}: result_ref '${ref}' is never consumed`);
+    }
+  }
+  for (const ref of consumed) {
+    if (!produced.has(ref) && !IMPLICIT_COST_RESULT_REFS.has(ref)) {
+      errors.push(`${prefix}: target_ref '${ref}' has no matching result_ref`);
+    }
+  }
   return errors;
 }

@@ -701,6 +701,18 @@ export const ALL_ACTION_TYPES = [
   "PLAY_SELF",
 ] as const satisfies readonly ActionType[];
 
+/**
+ * Action union members that intentionally do not have resolver handlers yet.
+ * Authored schemas must not reference these; keeping the list in the canonical
+ * type module lets boot validation and resolver drift checks share one source.
+ */
+export const ACTION_TYPES_WITHOUT_RESOLVER_HANDLER = [
+  "RETURN_ATTACHED_DON_TO_COST",
+  "CHOOSE_VALUE",
+  "GRANT_COUNTER",
+  "REMOVE_PROHIBITION",
+] as const satisfies readonly ActionType[];
+
 type _AllActionTypesCovers = Exclude<ActionType, typeof ALL_ACTION_TYPES[number]> extends never ? true : never;
 const _allActionTypesCovers: _AllActionTypesCovers = true;
 void _allActionTypesCovers;
@@ -888,6 +900,43 @@ export type TargetType =
   | "TRIGGERING_CARD_IN_TRASH";
 
 /**
+ * Runtime mirror of TargetType. Keep this next to the union so semantic
+ * validation uses the same contract as the resolver instead of scraping the
+ * TypeScript source.
+ */
+export const ALL_TARGET_TYPES = [
+  "SELF",
+  "YOUR_LEADER",
+  "OPPONENT_LEADER",
+  "CHARACTER",
+  "STAGE",
+  "LEADER_OR_CHARACTER",
+  "FIELD_CARD",
+  "ALL_YOUR_CHARACTERS",
+  "ALL_OPPONENT_CHARACTERS",
+  "CHARACTER_CARD",
+  "STAGE_CARD",
+  "EVENT_CARD",
+  "CARD_IN_HAND",
+  "CARD_IN_TRASH",
+  "CARD_ON_TOP_OF_DECK",
+  "CARD_IN_DECK",
+  "LIFE_CARD",
+  "DON_IN_COST_AREA",
+  "DON_ATTACHED",
+  "DON_IN_DON_DECK",
+  "PLAYER",
+  "SELECTED_CARDS",
+  "OPPONENT_LIFE",
+  "TRIGGERING_CARD",
+  "TRIGGERING_CARD_IN_TRASH",
+] as const satisfies readonly TargetType[];
+
+type _AllTargetTypesCoverUnion = Exclude<TargetType, typeof ALL_TARGET_TYPES[number]> extends never ? true : never;
+const _allTargetTypesCoverUnion: _AllTargetTypesCoverUnion = true;
+void _allTargetTypesCoverUnion;
+
+/**
  * Well-known result_ref key holding the card that triggered the currently
  * resolving auto effect (e.g. the character played from trash for OP16-079).
  * Seeded by resolveEffect; consumed by the TRIGGERING_CARD target type.
@@ -1068,6 +1117,23 @@ export type CostType =
   | "TURN_LIFE_FACE_DOWN"
   | "CHOOSE_ONE_COST"
   | "CHOICE";
+
+/** Runtime mirror used by authored-schema validation. */
+export const ALL_COST_TYPES = [
+  "DON_MINUS", "DON_REST", "VARIABLE_DON_RETURN", "REST_SELF", "TRASH_SELF",
+  "TRASH_FROM_HAND", "TRASH_FROM_LIFE", "PLACE_HAND_TO_DECK", "REVEAL_FROM_HAND",
+  "PLAY_NAMED_CARD_FROM_HAND", "REST_CARDS", "REST_NAMED_CARD", "KO_OWN_CHARACTER",
+  "TRASH_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK",
+  "PLACE_SELF_TO_DECK", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
+  "TRASH_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
+  "GIVE_OPPONENT_DON", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
+  "PLACE_SELF_AND_TRASH_TO_DECK", "LIFE_TO_HAND", "REST_DON", "TURN_LIFE_FACE_UP",
+  "TURN_LIFE_FACE_DOWN", "CHOOSE_ONE_COST", "CHOICE",
+] as const satisfies readonly CostType[];
+
+type _AllCostTypesCoverUnion = Exclude<CostType, typeof ALL_COST_TYPES[number]> extends never ? true : never;
+const _allCostTypesCoverUnion: _AllCostTypesCoverUnion = true;
+void _allCostTypesCoverUnion;
 
 // ─── Durations (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────
 

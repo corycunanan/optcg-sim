@@ -30,11 +30,11 @@ import type {
   PendingEvent,
   PendingPromptState,
 } from "../types.js";
-import type { ActionResult } from "./effect-resolver/types.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter } from "./conditions.js";
 import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
+import { terminateForEngineContract } from "./engine-limits.js";
 
 // ─── Dispatcher injection ────────────────────────────────────────────────────
 //
@@ -42,16 +42,6 @@ import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-
 // MODIFY_POWER, etc). Importing resolver directly would create a cycle
 // (resolver → removal → replacements → resolver), so the resolver installs
 // its dispatcher here at module init via setReplacementDispatcher.
-
-type ActionDispatcher = (
-  state: GameState,
-  action: Action,
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
-) => ActionResult;
 
 type ActionChainDispatcher = (
   state: GameState,
@@ -62,14 +52,11 @@ type ActionChainDispatcher = (
   initialResultRefs?: Map<string, EffectResult>,
 ) => { state: GameState; events: PendingEvent[]; pendingPrompt?: PendingPromptState };
 
-let executeActionDispatcher: ActionDispatcher | null = null;
 let executeActionChainDispatcher: ActionChainDispatcher | null = null;
 
 export function setReplacementDispatcher(
-  dispatcher: ActionDispatcher,
   chainDispatcher: ActionChainDispatcher,
 ): void {
-  executeActionDispatcher = dispatcher;
   executeActionChainDispatcher = chainDispatcher;
 }
 
@@ -569,68 +556,30 @@ function applyReplacement(
   // prompt gets its own stack frame and later substitute actions are retained.
   // sourceCardInstanceId = the replacement's source (e.g. Tashigi), so that
   // target: { type: "SELF" } resolves to her, not the event's original target.
-  if (executeActionChainDispatcher) {
-    const result = executeActionChainDispatcher(
-      nextState,
-      params.replacement_actions,
-      effect.sourceCardInstanceId,
-      effect.controller,
-      cardDb,
-    );
-    nextState = result.state;
-    events.push(...result.events);
-    if (result.pendingPrompt) {
-      return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
-    }
-  } else {
-    for (const action of params.replacement_actions) {
-      const result = executeReplacementAction(
-        nextState,
-        action,
-        effect.sourceCardInstanceId,
-        effect.controller,
-        cardDb,
-      );
-      nextState = result.state;
-      events.push(...result.events);
-      if (result.pendingPrompt) {
-        return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
-      }
-    }
+  if (!executeActionChainDispatcher) {
+    nextState = terminateForEngineContract(nextState, {
+      kind: "ENGINE_CONTRACT",
+      contract: "REPLACEMENT_DISPATCH",
+      sourceCardInstanceId: effect.sourceCardInstanceId,
+      message: "Replacement action-chain dispatcher was not initialized",
+    });
+    return { replaced: true, state: nextState, events };
+  }
+
+  const result = executeActionChainDispatcher(
+    nextState,
+    params.replacement_actions,
+    effect.sourceCardInstanceId,
+    effect.controller,
+    cardDb,
+  );
+  nextState = result.state;
+  events.push(...result.events);
+  if (result.pendingPrompt) {
+    return { replaced: true, state: nextState, events, pendingPrompt: result.pendingPrompt };
   }
 
   return { replaced: true, state: nextState, events };
-}
-
-/**
- * Execute a single replacement substitute action by dispatching to the
- * effect-resolver's action handlers. Falls back to a no-op if the resolver
- * hasn't installed its dispatcher yet (unreachable at runtime).
- */
-function executeReplacementAction(
-  state: GameState,
-  action: Action,
-  replacementSourceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-): { state: GameState; events: PendingEvent[]; pendingPrompt?: PendingPromptState } {
-  if (!executeActionDispatcher) {
-    console.warn("[Replacements] No dispatcher installed; skipping action", action.type);
-    return { state, events: [] };
-  }
-  const result = executeActionDispatcher(
-    state,
-    action,
-    replacementSourceId,
-    controller,
-    cardDb,
-    new Map<string, EffectResult>(),
-  );
-  return {
-    state: result.state,
-    events: result.events,
-    pendingPrompt: result.pendingPrompt,
-  };
 }
 
 function markReplacementUsed(state: GameState, effect: RuntimeActiveEffect, turn: number): GameState {
