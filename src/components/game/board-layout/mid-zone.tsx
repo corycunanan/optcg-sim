@@ -216,7 +216,13 @@ export const MidZone = React.memo(function MidZone({
       {blockerMode ? (
         <>
           {blockerMode.selectedBlockerId ? (
-            <GameButton variant="green" size="sm" className={IN_BOARD_BTN} onClick={blockerMode.onBlock}>
+            <GameButton
+              variant="green"
+              size="sm"
+              className={IN_BOARD_BTN}
+              data-blocker-selection-control=""
+              onClick={blockerMode.onBlock}
+            >
               Block
             </GameButton>
           ) : (

@@ -493,7 +493,6 @@ function BoardLayoutInner({
             cardDb={cardDb}
             activeDragType={activeDragType}
             activeDrag={activeDrag}
-            turn={turn}
             refreshWave={refreshWave}
             canInteract={bs.canInteract}
             canDragCounter={bs.canDragCounter}

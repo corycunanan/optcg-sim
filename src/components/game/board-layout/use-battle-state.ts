@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   CardDb,
   CardInstance,
@@ -55,6 +55,29 @@ export function useBattleState(
     (id: string | null) => setSelectedBlocker({ battlePhase, id }),
     [battlePhase],
   );
+
+  useEffect(() => {
+    if (!inBlockStep) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedBlockerId(null);
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-blocker-selection], [data-blocker-selection-control]")) {
+        return;
+      }
+      setSelectedBlockerId(null);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [inBlockStep, setSelectedBlockerId]);
 
   const battleInfo: BattleInfo | null = useMemo(() => {
     if (!battle || !me || !opp) return null;

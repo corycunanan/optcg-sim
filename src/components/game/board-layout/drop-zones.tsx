@@ -48,17 +48,39 @@ export function DropOverlay({
   );
 }
 
+export const DroppableOwnField = React.memo(function DroppableOwnField({
+  active,
+  style,
+}: {
+  active: boolean;
+  style: React.CSSProperties;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: "own-field",
+    data: { type: "own-field" },
+    disabled: !active,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="pointer-events-none absolute z-0 rounded-lg"
+    >
+      <DropOverlay active={active} hovered={isOver} color="blue" />
+    </div>
+  );
+});
+
 export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   slotIndex,
   label,
-  cardDb,
   activeDragType,
   zoneKey,
   style,
 }: {
   slotIndex: number;
   label: string;
-  cardDb: CardDb;
   activeDragType: string | null;
   zoneKey?: string;
   style: React.CSSProperties;
