@@ -127,6 +127,7 @@ import {
   type ReplacementResumeContext,
 } from "./engine/replacements.js";
 import { filterStateForPlayer, setPlayerConnected } from "./engine/state.js";
+import { filterPromptOptionsForPlayer } from "./engine/visibility.js";
 import { verifyGameToken } from "./util/auth.js";
 import { CONSUMED_TOKEN_JTIS_STORAGE_KEY, consumeTokenJti } from "./util/token-replay.js";
 import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayload } from "./util/validate.js";
@@ -472,7 +473,7 @@ export class GameSession implements DurableObject {
         this.send(playerWs, {
           type: "game:prompt",
           promptId: this.gameState!.pendingPrompt.promptId,
-          options: this.gameState!.pendingPrompt.options,
+          options: filterPromptOptionsForPlayer(this.gameState!.pendingPrompt.options),
         });
       }
     }
@@ -1289,7 +1290,7 @@ export class GameSession implements DurableObject {
       this.send(playerWs, {
         type: "game:prompt",
         promptId: prompt.promptId,
-        options: prompt.options,
+        options: filterPromptOptionsForPlayer(prompt.options),
       });
     }
   }

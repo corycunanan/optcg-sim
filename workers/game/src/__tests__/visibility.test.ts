@@ -153,7 +153,8 @@ describe("filterStateForPlayer", () => {
 
     for (const event of opponentDrawEvents) {
       if (event.type === "CARD_DRAWN") {
-        expect(event.payload.cardId).toBeUndefined();
+        expect(event.payload.cardId).toBe("hidden");
+        expect(event.payload.cardInstanceId).toBe("hidden");
       }
     }
   });
