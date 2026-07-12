@@ -13,6 +13,7 @@ import { nanoid } from "../../../util/nanoid.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { processBatchReplacements } from "../../replacements.js";
 import { isProhibitedForCard, isCardPlayProhibitedByEffect } from "../../prohibitions.js";
+import { replacePendingEventReferences } from "../../events.js";
 
 // Injected by the resolver module to break the circular dependency so
 // ACTIVATE_EVENT_FROM_TRASH can resolve the selected Event's [Main] block.
@@ -339,6 +340,7 @@ export function executePlayCard(
     if (frame.playedId && i + 1 < targetIds.length && frame.events.length > 0) {
       const scan = scanEventsForTriggers(nextState, frame.events, controller, cardDb);
       nextState = scan.state;
+      replacePendingEventReferences(events, frame.events, scan.events);
       if (scan.triggers.length > 0) {
         const marker: BatchResumeMarker = {
           kind: "PLAY_CARD",
@@ -526,6 +528,7 @@ export function executeSetRest(
     if (i + 1 < unprotectedIds.length && frameEvents.length > 0) {
       const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
       nextState = scan.state;
+      replacePendingEventReferences(events, frameEvents, scan.events);
       if (scan.triggers.length > 0) {
         const marker: BatchResumeMarker = {
           kind: "SET_REST",

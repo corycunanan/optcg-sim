@@ -8,8 +8,8 @@
  * trigger-queue scan (`scanEventsForTriggers` at the LIFO boundary) re-scans
  * the same CARD_KO events and queues the same ON_KO triggers a second time.
  *
- * The fix marks events as `__scannedForTriggers` after any scan; subsequent
- * scans skip them so each trigger fires exactly once.
+ * The fix carries immutable `propagation.triggerScanned` metadata on copied
+ * events; subsequent scans skip them so each trigger fires exactly once.
  */
 
 import { describe, it, expect } from "vitest";

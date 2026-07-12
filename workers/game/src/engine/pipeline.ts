@@ -178,7 +178,7 @@ function fireEventsAndTriggers(
 
   // Emit all events from execution
   for (const event of execResult.events) {
-    if (!event.__alreadyEmitted) state = emitPendingEvent(state, event, pi);
+    if (!event.propagation?.eventLogEmitted) state = emitPendingEvent(state, event, pi);
   }
 
   // Register triggers for newly played cards BEFORE matching
@@ -191,7 +191,7 @@ function fireEventsAndTriggers(
     // Resolver-side per-frame drains mark events after matching them. They
     // still need event-log publication and zone cleanup above/below, but must
     // not enqueue the same triggers a second time here.
-    if (pendingEvent.__scannedForTriggers) continue;
+    if (pendingEvent.propagation?.triggerScanned) continue;
 
     const gameEvent = {
       type: pendingEvent.type,

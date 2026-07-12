@@ -49,6 +49,7 @@ import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { processRemainingTriggers } from "./resume/triggers.js";
 import { promptTypeToPhase } from "./cost-handler.js";
 import { isEngineTerminated } from "../engine-limits.js";
+import { replacePendingEventReferences } from "../events.js";
 
 // Re-export the stable public API so existing imports keep working.
 export { processRemainingTriggers } from "./resume/triggers.js";
@@ -279,6 +280,7 @@ export function resumeFromStack(
       if (result.events.length > 0) {
         const chainScan = scanEventsForTriggers(nextState, result.events, controller, cardDb);
         nextState = chainScan.state;
+        replacePendingEventReferences(events, result.events, chainScan.events);
         if (chainScan.triggers.length > 0) {
           const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers];
           return processRemainingTriggers(nextState, allTriggers, cardDb, events);
@@ -324,6 +326,7 @@ export function resumeFromStack(
         if (chainResult.events.length > 0) {
           const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
           nextState = chainScan.state;
+          replacePendingEventReferences(events, chainResult.events, chainScan.events);
           if (chainScan.triggers.length > 0) {
             const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers];
             return processRemainingTriggers(nextState, allTriggers, cardDb, events);

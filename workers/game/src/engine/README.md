@@ -76,6 +76,11 @@ Step 7: RULE PROCESS   → Check defeat conditions (defeat.ts)
 
 **Important:** Step 5 uses LIFO trigger resolution — when a resolved effect emits events that match new triggers, those triggers are inserted at the front of the queue and resolved before remaining triggers from the original event. This matches TCG stack semantics where the newest effect resolves first.
 
+Pending events carry immutable `propagation` metadata. Trigger scans and
+event-log publication return copied events with updated facts; they never add
+sentinels to event objects already referenced by a `GameState` snapshot or
+effect-stack frame.
+
 ## Core Data Structures
 
 ### GameState (defined in types.ts, outside engine)

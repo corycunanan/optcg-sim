@@ -342,7 +342,7 @@ export function executeRevealTrigger(
             type: "CARD_REMOVED_FROM_LIFE",
             playerIndex: inactiveIdx,
             payload: { cardInstanceId: lifeCard.instanceId },
-            __alreadyEmitted: true,
+            propagation: { eventLogEmitted: true },
           };
           nextState = emitPendingEvent(nextState, removedEvent, inactiveIdx);
 
@@ -898,7 +898,7 @@ export function resumeBattleDamageContinuation(
         type: "CARD_REMOVED_FROM_LIFE",
         playerIndex: pending.damagedPlayerIndex,
         payload: { cardInstanceId: pending.lifeCardInstanceId },
-        __alreadyEmitted: true,
+        propagation: { eventLogEmitted: true },
       }],
     };
   }

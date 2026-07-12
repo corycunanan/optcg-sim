@@ -14,7 +14,11 @@ import type {
   QueuedTrigger,
 } from "../../../types.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
-import { emitEvent } from "../../events.js";
+import {
+  emitEvent,
+  replacePendingEventReferences,
+  withEventLogEmitted,
+} from "../../events.js";
 import { buildTriggerSelectionPrompt } from "../../trigger-ordering.js";
 import { resolveEffect } from "../resolver.js";
 import type { EffectResolverResult } from "../types.js";
@@ -80,8 +84,12 @@ export function processRemainingTriggers(
       );
       // A later continuation-pipeline pass may still need to match nested
       // triggers from this event, but it must not duplicate the event log.
-      event.__alreadyEmitted = true;
     }
+    replacePendingEventReferences(
+      events,
+      result.events,
+      result.events.map(withEventLogEmitted),
+    );
   }
 
   // Non-turn player has 2+ triggers — prompt for ordering
@@ -123,8 +131,12 @@ export function processRemainingTriggers(
         event.playerIndex ?? trigger.controller,
         event.payload ?? {},
       );
-      event.__alreadyEmitted = true;
     }
+    replacePendingEventReferences(
+      events,
+      result.events,
+      result.events.map(withEventLogEmitted),
+    );
   }
 
   // OPT-172: once all triggers for this batch boundary drain, re-enter any

@@ -8,6 +8,34 @@
 
 import type { GameEvent, GameEventType, GameEventPayloadMap, GameState, PendingEvent } from "../types.js";
 
+export function withTriggerScanned(event: PendingEvent): PendingEvent {
+  if (event.propagation?.triggerScanned) return event;
+  return {
+    ...event,
+    propagation: { ...event.propagation, triggerScanned: true },
+  } as PendingEvent;
+}
+
+export function withEventLogEmitted(event: PendingEvent): PendingEvent {
+  if (event.propagation?.eventLogEmitted) return event;
+  return {
+    ...event,
+    propagation: { ...event.propagation, eventLogEmitted: true },
+  } as PendingEvent;
+}
+
+/** Replace references inside a caller-owned accumulator with immutable copies. */
+export function replacePendingEventReferences(
+  accumulator: PendingEvent[],
+  originals: PendingEvent[],
+  replacements: PendingEvent[],
+): void {
+  for (let index = 0; index < accumulator.length; index++) {
+    const originalIndex = originals.indexOf(accumulator[index]);
+    if (originalIndex >= 0) accumulator[index] = replacements[originalIndex];
+  }
+}
+
 export function emitEvent<T extends GameEventType>(
   state: GameState,
   type: T,

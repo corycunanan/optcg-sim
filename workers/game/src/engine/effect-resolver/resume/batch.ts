@@ -25,6 +25,7 @@ import { executeKO } from "../actions/removal.js";
 import { nanoid } from "../../../util/nanoid.js";
 import type { EffectResolverResult, ActionResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
+import { replacePendingEventReferences } from "../../events.js";
 
 /**
  * Loop in case the re-entered handler completes cleanly (no prompt, no new
@@ -93,6 +94,7 @@ export function reenterBatchResume(
     if (actionResult.events.length > 0) {
       const scan = scanEventsForTriggers(nextState, actionResult.events, top.controller, cardDb);
       nextState = scan.state;
+      replacePendingEventReferences(events, actionResult.events, scan.events);
       if (scan.triggers.length > 0) {
         return processRemainingTriggers(nextState, scan.triggers, cardDb, events);
       }
@@ -117,6 +119,7 @@ export function reenterBatchResume(
       if (chainResult.events.length > 0) {
         const chainScan = scanEventsForTriggers(nextState, chainResult.events, top.controller, cardDb);
         nextState = chainScan.state;
+        replacePendingEventReferences(events, chainResult.events, chainScan.events);
         if (chainScan.triggers.length > 0) {
           return processRemainingTriggers(nextState, chainScan.triggers, cardDb, events);
         }

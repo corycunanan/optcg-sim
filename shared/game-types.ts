@@ -338,20 +338,11 @@ export type PendingGameEvent = {
     type: K;
     playerIndex?: 0 | 1;
     payload?: GameEventPayloadMap[K];
-    /**
-     * OPT-173: set true after `scanEventsForTriggers` has matched this event
-     * against the trigger registry. Subsequent scans skip it so a triggered
-     * effect's inner multi-target drain (which scans its own per-frame events
-     * via `pendingBatchTriggers`) does not double-fire when the outer pipeline
-     * re-scans the same events at the LIFO trigger-queue boundary.
-     */
-    __scannedForTriggers?: boolean;
-    /**
-     * The event is already present in GameState.eventLog but still needs its
-     * trigger-matching pass. Used when an event must be published before a
-     * prompt while its auto effects wait for the current effect stack.
-     */
-    __alreadyEmitted?: boolean;
+    /** Immutable propagation facts copied forward as an event crosses stages. */
+    propagation?: Readonly<{
+      triggerScanned?: true;
+      eventLogEmitted?: true;
+    }>;
   };
 }[GameEventType];
 

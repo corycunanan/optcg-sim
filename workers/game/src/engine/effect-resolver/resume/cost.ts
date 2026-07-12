@@ -32,6 +32,7 @@ import { executeActionChain, postCostConditionsMet } from "../resolver.js";
 import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
+import { replacePendingEventReferences } from "../../events.js";
 
 export function abortReplacedCost(
   state: GameState,
@@ -117,6 +118,7 @@ function finishCostsAndRunActions(
   if (scannable.length > 0) {
     const costScan = scanEventsForTriggers(state, scannable, controller, cardDb);
     state = costScan.state;
+    replacePendingEventReferences(events, scannable, costScan.events);
     if (costScan.triggers.length > 0) {
       pendingTriggers = [...pendingTriggers, ...costScan.triggers];
     }
@@ -153,6 +155,7 @@ function finishCostsAndRunActions(
     if (chainResult.events.length > 0) {
       const chainScan = scanEventsForTriggers(state, chainResult.events, controller, cardDb);
       state = chainScan.state;
+      replacePendingEventReferences(events, chainResult.events, chainScan.events);
       if (chainScan.triggers.length > 0) {
         const allTriggers = [...chainScan.triggers, ...pendingTriggers];
         return processRemainingTriggers(state, allTriggers, cardDb, events);
