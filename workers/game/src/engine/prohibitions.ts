@@ -63,12 +63,17 @@ function prohibitionTargetMatchesCard(
   ownerController: 0 | 1,
   state: GameState,
   cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
 ): boolean {
   const targetType = target.type?.toUpperCase();
+
+  if (targetType === "SELF" && card.instanceId !== sourceCardInstanceId) return false;
 
   const controller = target.controller ??
     (targetType === "ALL_YOUR_CHARACTERS" ? "SELF"
       : targetType === "ALL_OPPONENT_CHARACTERS" ? "OPPONENT"
+      : targetType === "YOUR_LEADER" ? "SELF"
+      : targetType === "OPPONENT_LEADER" ? "OPPONENT"
       : undefined);
   if (controller === "SELF" && card.controller !== ownerController) return false;
   if (controller === "OPPONENT" && card.controller === ownerController) return false;
@@ -81,7 +86,11 @@ function prohibitionTargetMatchesCard(
   ) {
     const data = cardDb.get(card.cardId);
     if (!data || data.type?.toUpperCase() !== "CHARACTER") return false;
-  } else if (targetType === "LEADER") {
+  } else if (
+    targetType === "LEADER" ||
+    targetType === "YOUR_LEADER" ||
+    targetType === "OPPONENT_LEADER"
+  ) {
     const data = cardDb.get(card.cardId);
     if (!data || data.type?.toUpperCase() !== "LEADER") return false;
   }
@@ -111,7 +120,12 @@ function prohibitionCoversInstance(
     const found = findCardInState(state, instanceId);
     if (!found) return false;
     return prohibitionTargetMatchesCard(
-      prohibition.target, found.card, prohibition.controller, state, cardDb,
+      prohibition.target,
+      found.card,
+      prohibition.controller,
+      state,
+      cardDb,
+      prohibition.sourceCardInstanceId,
     );
   }
   return true;
@@ -242,6 +256,17 @@ function matchesProhibition(
       if (!prohibitionCoversInstance(prohibition, action.attackerInstanceId, state, cardDb)) return null;
       // Check controller
       if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
+      if (scope.when_attacking) {
+        const target = findCardInState(state, action.targetInstanceId);
+        if (!target || !prohibitionTargetMatchesCard(
+          scope.when_attacking,
+          target.card,
+          prohibition.controller,
+          state,
+          cardDb,
+          prohibition.sourceCardInstanceId,
+        )) return null;
+      }
       return "This card cannot attack (prohibited by an effect)";
     }
 

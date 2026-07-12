@@ -1135,8 +1135,8 @@ export const OP03_031_PEARL: EffectSchema = {
   ],
 };
 
-// ─── OP03-032 Buggy — CANNOT_BE_KO in battle (incomplete card text) ────────
-// This Character cannot be K.O.'d in battle by (card text is incomplete)
+// ─── OP03-032 Buggy — CANNOT_BE_KO in battle by Slash cards ───────────────
+// This Character cannot be K.O.'d in battle by <Slash> attribute cards.
 
 export const OP03_032_BUGGY: EffectSchema = {
   card_id: "OP03-032",
@@ -1149,7 +1149,10 @@ export const OP03_032_BUGGY: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
-          scope: { cause: "BATTLE" },
+          scope: {
+            cause: "BATTLE",
+            source_filter: { attribute: "SLASH" },
+          },
         },
       ],
     },
