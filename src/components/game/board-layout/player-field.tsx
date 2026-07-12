@@ -1,6 +1,6 @@
 "use client";
 
-import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
+import type { CardDb, GameAction, PlayerState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
@@ -8,6 +8,8 @@ import {
   SQUARE,
   SIDE_ZONE_GAP,
   FIELD_W,
+  FIELD_H,
+  CHAR_ROW_W,
   type DragPayload,
 } from "./constants";
 import {
@@ -23,7 +25,8 @@ import {
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
-import { DroppableCharSlot, DroppableStageZone } from "./drop-zones";
+import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop-zones";
+import { isCounterEvent } from "./use-board-dnd";
 import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
 import { ZoneRef } from "./zone-ref";
@@ -33,7 +36,6 @@ interface PlayerFieldProps {
   cardDb: CardDb;
   activeDragType: string | null;
   activeDrag: DragPayload | null;
-  turn: TurnState | null;
   refreshWave: boolean;
   canInteract: boolean;
   canDragCounter: boolean;
@@ -58,9 +60,9 @@ export function PlayerField({
   cardDb,
   activeDragType,
   activeDrag,
-  turn,
   refreshWave,
   canInteract,
+  canDragCounter,
   inBlockStep,
   selectedBlockerId,
   setSelectedBlockerId,
@@ -83,9 +85,21 @@ export function PlayerField({
     if (c) fieldIds.push(c.instanceId);
   }
   const arrivals = useFieldArrivals(fieldIds);
+  const draggedHandData =
+    activeDrag?.type === "hand-card" ? cardDb[activeDrag.card.cardId] : undefined;
+  const eventFieldDropActive =
+    draggedHandData?.type === "Event" &&
+    (canInteract || (canDragCounter && isCounterEvent(draggedHandData)));
+  const characterCounterDragActive =
+    canDragCounter && draggedHandData?.type === "Character";
 
   return (
     <>
+      <DroppableOwnField
+        active={eventFieldDropActive}
+        style={{ left: zone2Left, top: playerTop, width: CHAR_ROW_W, height: FIELD_H }}
+      />
+
       {/* Zone 1 (left): Life */}
       <LifeZone
         life={me?.life ?? []}
@@ -104,8 +118,8 @@ export function PlayerField({
               key={`plr-c${i}`}
               slotIndex={i}
               label={`C${i + 1}`}
-              cardDb={cardDb}
               activeDragType={activeDragType}
+              eventDropTarget={eventFieldDropActive}
               zoneKey={`p-char-${i}`}
               style={{ position: "absolute", left: pos.left, top: playerCharTop }}
             />
@@ -125,13 +139,25 @@ export function PlayerField({
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
-            onSelect={isBlockerEligible ? () => setSelectedBlockerId(char.instanceId) : undefined}
+            counterTarget={
+              characterCounterDragActive && defenderInstanceId === char.instanceId
+            }
+            counterDragActive={characterCounterDragActive}
+            eventDropTarget={eventFieldDropActive}
+            onSelect={
+              isBlockerEligible
+                ? () => setSelectedBlockerId(
+                    selectedBlockerId === char.instanceId ? null : char.instanceId,
+                  )
+                : undefined
+            }
             onAction={onAction}
             zoneKey={`p-char-${i}`}
             slotIndex={i}
             boardFull={(me?.characters.filter(Boolean).length ?? 0) >= 5}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
             redistributeSource={redistributeSourceIds?.has(char.instanceId)}
+            donArtUrl={me?.donArtUrl}
             pendingTransferDonIds={pendingTransferDonIdsByCard?.get(char.instanceId)}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
             entering={arrivals.has(char.instanceId)}
@@ -158,12 +184,17 @@ export function PlayerField({
           canAttack={canInteract && me.leader.state === "ACTIVE"}
           isAttacker={attackerInstanceId === me.leader.instanceId}
           isDefender={defenderInstanceId === me.leader.instanceId}
+          counterTarget={
+            characterCounterDragActive && defenderInstanceId === me.leader.instanceId
+          }
+          eventDropTarget={eventFieldDropActive}
           counterPulse={counterPulseIds?.has(me.leader.instanceId)}
           onAction={onAction}
           zoneKey="p-leader"
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
           redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
+          donArtUrl={me?.donArtUrl}
           pendingTransferDonIds={pendingTransferDonIdsByCard?.get(me.leader.instanceId)}
           donCountAdjust={donCountAdjustments?.get(me.leader.instanceId)}
           entering={arrivals.has(me.leader.instanceId)}
@@ -179,6 +210,7 @@ export function PlayerField({
         card={me?.stage ?? null}
         cardDb={cardDb}
         activeDragType={activeDragType}
+        eventDropTarget={eventFieldDropActive}
         onAction={onAction}
         zoneKey="p-stage"
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
@@ -200,8 +232,6 @@ export function PlayerField({
       <DroppableTrashZone
         trash={me?.trash ?? []}
         cardDb={cardDb}
-        activeDrag={activeDrag}
-        battleSubPhase={turn?.battleSubPhase ?? null}
         onClickTrash={() => me && me.trash.length > 0 && onPreviewZone({ type: "trash", owner: "me" })}
         zoneKey="p-trash"
         arrivingInstanceIds={trashArrivingIds}

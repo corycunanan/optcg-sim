@@ -48,25 +48,51 @@ export function DropOverlay({
   );
 }
 
+export const DroppableOwnField = React.memo(function DroppableOwnField({
+  active,
+  style,
+}: {
+  active: boolean;
+  style: React.CSSProperties;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: "own-field",
+    data: { type: "own-field" },
+    disabled: !active,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="pointer-events-none absolute z-0 rounded-lg"
+    >
+      <DropOverlay active={active} hovered={isOver} color="blue" />
+    </div>
+  );
+});
+
 export const DroppableCharSlot = React.memo(function DroppableCharSlot({
   slotIndex,
   label,
-  cardDb,
   activeDragType,
+  eventDropTarget,
   zoneKey,
   style,
 }: {
   slotIndex: number;
   label: string;
-  cardDb: CardDb;
   activeDragType: string | null;
+  eventDropTarget?: boolean;
   zoneKey?: string;
   style: React.CSSProperties;
 }) {
   const accepts = activeDragType === "hand-card";
   const { setNodeRef, isOver } = useDroppable({
-    id: `char-slot-${slotIndex}`,
-    data: { type: "character-slot", slotIndex },
+    id: eventDropTarget ? `own-field-char-slot-${slotIndex}` : `char-slot-${slotIndex}`,
+    data: eventDropTarget
+      ? { type: "own-field" }
+      : { type: "character-slot", slotIndex },
   });
 
   const zonePos = useZonePosition();
@@ -99,6 +125,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   card,
   cardDb,
   activeDragType,
+  eventDropTarget,
   onAction,
   zoneKey,
   style,
@@ -107,6 +134,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   card: CardInstance | null;
   cardDb: CardDb;
   activeDragType: string | null;
+  eventDropTarget?: boolean;
   onAction?: (action: GameAction) => void;
   zoneKey: string;
   style: React.CSSProperties;
@@ -118,8 +146,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const inputSuppressed = interactionMode !== "full";
   const accepts = activeDragType === "hand-card";
   const { setNodeRef, isOver } = useDroppable({
-    id: `stage-zone-${zoneKey}`,
-    data: { type: "stage-zone" },
+    id: eventDropTarget ? `own-field-stage-${zoneKey}` : `stage-zone-${zoneKey}`,
+    data: { type: eventDropTarget ? "own-field" : "stage-zone" },
   });
 
   const mergedRef = useCallback(
@@ -147,7 +175,11 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
       style={style}
       className="absolute flex items-center justify-center rounded-md border border-gb-border-strong/30"
     >
-      <DropOverlay active={accepts} hovered={isOver && accepts} color="green" />
+      <DropOverlay
+        active={accepts}
+        hovered={isOver && accepts}
+        color={eventDropTarget ? "blue" : "green"}
+      />
       {card ? (
         <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
           <DropdownMenuTrigger asChild>

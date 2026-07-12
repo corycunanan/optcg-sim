@@ -7,8 +7,90 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import type { CardDb, GameAction, TurnState } from "@shared/game-types";
+import type { CardData, CardDb, GameAction, TurnState } from "@shared/game-types";
 import type { DragPayload } from "./constants";
+
+type BoardDropData = {
+  type?: unknown;
+  slotIndex?: unknown;
+  targetInstanceId?: unknown;
+};
+
+const OWN_FIELD_DROP_TYPES = new Set([
+  "own-field",
+  "character-slot",
+  "stage-zone",
+  "don-target",
+]);
+
+/** Single definition of "this Event can be used as a counter" — shared by the
+ * dispatch contract below, hand-card dimming, and the own-field drop surface
+ * so eligibility, affordance, and dispatch cannot drift apart. */
+export function isCounterEvent(
+  data: Pick<CardData, "type" | "effectText"> | undefined,
+): boolean {
+  return data?.type === "Event" && !!data.effectText?.includes("[Counter]");
+}
+
+/** Resolve hand-card gestures independently from dnd-kit so the interaction
+ * grammar is testable as a dispatch contract. Events use the broad own-field
+ * surface; Character counters affect only the current defender. */
+export function resolveHandCardDropAction(
+  dragData: Extract<DragPayload, { type: "hand-card" }>,
+  dropData: BoardDropData,
+  cardDb: CardDb,
+  battle: TurnState["battle"] | null,
+): GameAction | null {
+  const cardData = cardDb[dragData.card.cardId];
+  if (!cardData || typeof dropData.type !== "string") return null;
+
+  if (cardData.type === "Event" && OWN_FIELD_DROP_TYPES.has(dropData.type)) {
+    if (battle && isCounterEvent(cardData)) {
+      return {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: dragData.card.instanceId,
+        counterTargetInstanceId: battle.targetInstanceId,
+      };
+    }
+    if (!battle) {
+      return {
+        type: "PLAY_CARD",
+        cardInstanceId: dragData.card.instanceId,
+      };
+    }
+    return null;
+  }
+
+  if (
+    cardData.type === "Character" &&
+    dropData.type === "counter-target" &&
+    battle &&
+    dropData.targetInstanceId === battle.targetInstanceId
+  ) {
+    return {
+      type: "USE_COUNTER",
+      cardInstanceId: dragData.card.instanceId,
+      counterTargetInstanceId: battle.targetInstanceId,
+    };
+  }
+
+  if (dropData.type === "character-slot" && typeof dropData.slotIndex === "number") {
+    return {
+      type: "PLAY_CARD",
+      cardInstanceId: dragData.card.instanceId,
+      position: dropData.slotIndex,
+    };
+  }
+
+  if (dropData.type === "stage-zone") {
+    return {
+      type: "PLAY_CARD",
+      cardInstanceId: dragData.card.instanceId,
+    };
+  }
+
+  return null;
+}
 
 export function useBoardDnd(
   cardDb: CardDb,
@@ -39,7 +121,7 @@ export function useBoardDnd(
     if (!over) return;
 
     const dragData = active.data.current as DragPayload;
-    const dropData = over.data.current as Record<string, unknown> | undefined;
+    const dropData = over.data.current as BoardDropData | undefined;
 
     // Hand-card reorder: sortable reports the target hand card via over.data.
     // Only fires when active.id !== over.id (dropping on self is a no-op).
@@ -55,18 +137,13 @@ export function useBoardDnd(
 
     if (!dropData) return;
 
-    if (dragData.type === "hand-card" && dropData.type === "character-slot") {
-      onAction({
-        type: "PLAY_CARD",
-        cardInstanceId: dragData.card.instanceId,
-        position: dropData.slotIndex as number,
-      });
-    } else if (dragData.type === "hand-card" && dropData.type === "stage-zone") {
-      onAction({
-        type: "PLAY_CARD",
-        cardInstanceId: dragData.card.instanceId,
-      });
-    } else if (
+    if (dragData.type === "hand-card") {
+      const action = resolveHandCardDropAction(dragData, dropData, cardDb, battle);
+      if (action) onAction(action);
+      return;
+    }
+
+    if (
       dragData.type === "active-don" &&
       dropData.type === "don-target"
     ) {
@@ -93,28 +170,6 @@ export function useBoardDnd(
         attackerInstanceId: dragData.card.instanceId,
         targetInstanceId: dropData.targetInstanceId as string,
       });
-    } else if (
-      dragData.type === "hand-card" &&
-      dropData.type === "counter-trash" &&
-      battle
-    ) {
-      const cardData = cardDb[dragData.card.cardId];
-      // OPT-400: don't gate on printed counter — COUNTER_GRANT rule mods can
-      // give counterless cards a value. The server validates and rejects
-      // cards with no effective counter.
-      if (cardData?.type === "Character") {
-        onAction({
-          type: "USE_COUNTER",
-          cardInstanceId: dragData.card.instanceId,
-          counterTargetInstanceId: battle.targetInstanceId,
-        });
-      } else if (cardData?.type === "Event" && cardData.effectText?.includes("[Counter]")) {
-        onAction({
-          type: "USE_COUNTER_EVENT",
-          cardInstanceId: dragData.card.instanceId,
-          counterTargetInstanceId: battle.targetInstanceId,
-        });
-      }
     }
   }
 

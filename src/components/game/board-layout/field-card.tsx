@@ -12,6 +12,7 @@ import { Card } from "../card";
 import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
+import { DonCard } from "./don-zone";
 import { useInteractionMode } from "./interaction-mode";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
@@ -36,6 +37,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected,
   isAttacker,
   isDefender,
+  counterTarget,
+  counterDragActive,
+  eventDropTarget,
   counterPulse,
   onSelect,
   onAction,
@@ -45,6 +49,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   style,
   animationDelay,
   redistributeSource,
+  donArtUrl,
   pendingTransferDonIds,
   donCountAdjust,
   entering,
@@ -60,6 +65,14 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
    *  Moves with the battle: leader at declare-attack, then the blocker once
    *  block is declared. Drives the amber pulse ring (OPT-274). */
   isDefender?: boolean;
+  /** Current battle defender while a Character counter is being dragged. */
+  counterTarget?: boolean;
+  /** A Character-counter drag is in progress. Board-full replacement is never
+   *  legal mid-battle, so non-defender cards must not offer the replace drop —
+   *  a missed defender drop would otherwise dispatch PLAY_CARD (SIG-6). */
+  counterDragActive?: boolean;
+  /** Part of the broad own-field play surface while an Event is dragged. */
+  eventDropTarget?: boolean;
   counterPulse?: boolean;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
@@ -69,6 +82,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   style: React.CSSProperties;
   animationDelay?: number;
   redistributeSource?: boolean;
+  donArtUrl?: string | null;
   pendingTransferDonIds?: Set<string>;
   donCountAdjust?: number;
   /** If true, plays a one-shot summon-entry pop on mount (OPT-274). Parent
@@ -115,12 +129,29 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       : undefined,
     disabled: !canRedistribute,
   });
-  const acceptsHandCard = !!boardFull && activeDragType === "hand-card";
+  const acceptsCounter = !!counterTarget && activeDragType === "hand-card";
+  const acceptsEvent = !!eventDropTarget && activeDragType === "hand-card";
+  const acceptsHandCard =
+    !acceptsCounter &&
+    !acceptsEvent &&
+    !counterDragActive &&
+    !!boardFull &&
+    activeDragType === "hand-card";
   const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: acceptsHandCard ? `char-slot-${slotIndex}` : `don-target-${card.instanceId}`,
-    data: acceptsHandCard
-      ? { type: "character-slot", slotIndex }
-      : { type: "don-target", targetInstanceId: card.instanceId },
+    id: acceptsCounter
+      ? `counter-target-${card.instanceId}`
+      : acceptsEvent
+        ? `own-field-card-${card.instanceId}`
+        : acceptsHandCard
+          ? `char-slot-${slotIndex}`
+          : `don-target-${card.instanceId}`,
+    data: acceptsCounter
+      ? { type: "counter-target", targetInstanceId: card.instanceId }
+      : acceptsEvent
+        ? { type: "own-field" }
+        : acceptsHandCard
+          ? { type: "character-slot", slotIndex }
+          : { type: "don-target", targetInstanceId: card.instanceId },
   });
 
   const mergedRef = useCallback(
@@ -210,6 +241,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           {...attributes}
           {...listeners}
           onClick={onSelect}
+          data-blocker-selection={blockerSelectable ? "" : undefined}
           onContextMenu={handleContextMenu}
           initial={initialTarget}
           animate={animateTarget}
@@ -222,7 +254,13 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           }}
           className="relative flex items-center justify-center rounded-md"
         >
-          <DropOverlay active={acceptsDon || acceptsHandCard} hovered={isOver && (acceptsDon || acceptsHandCard)} color={acceptsHandCard ? "red" : "amber"} />
+          <DropOverlay
+            active={acceptsDon || acceptsHandCard || acceptsCounter || acceptsEvent}
+            hovered={
+              isOver && (acceptsDon || acceptsHandCard || acceptsCounter || acceptsEvent)
+            }
+            color={acceptsEvent ? "blue" : acceptsHandCard ? "red" : "amber"}
+          />
           <Card
             data={{ card, cardDb }}
             variant="field"
@@ -241,13 +279,13 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
                 donListeners?.onPointerDown?.(e);
               }}
               className={cn(
-                "absolute z-20 left-0 right-0 bottom-0 h-6 rounded-b-md cursor-grab",
-                "bg-gb-accent-gold/30 ring-1 ring-gb-accent-gold/60",
-                "animate-pulse",
+                "absolute bottom-0 right-0 z-20 origin-bottom-right scale-75 cursor-grab rounded animate-pulse",
                 isDonDragging ? "opacity-30" : "opacity-100",
               )}
               aria-label="Drag attached DON"
-            />
+            >
+              <DonCard donArtUrl={donArtUrl} />
+            </div>
           )}
         </motion.div>
       </DropdownMenuTrigger>

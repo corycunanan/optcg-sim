@@ -11,6 +11,7 @@ import type { CardDb, CardData, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { Card } from "../card";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
+import { isCounterEvent } from "./use-board-dnd";
 
 /**
  * OPT-364: returns instanceIds present in `currentIds` that were not in
@@ -73,7 +74,7 @@ export function reconcileSeenIds(
 function isCounterEligible(data: CardData | undefined): boolean {
   if (!data) return false;
   if (data.type === "Character" && data.counter != null && data.counter > 0) return true;
-  if (data.type === "Event" && data.effectText?.includes("[Counter]")) return true;
+  if (isCounterEvent(data)) return true;
   return false;
 }
 
