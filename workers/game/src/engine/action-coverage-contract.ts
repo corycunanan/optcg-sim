@@ -114,6 +114,11 @@ export function collectAuthoredActionCounts(
       walkActions(block.actions, counts);
       walkActions(block.replacement_actions, counts);
     }
+    for (const ruleModification of schema.rule_modifications ?? []) {
+      if (ruleModification.rule_type === "START_OF_GAME_EFFECT") {
+        walkActions(ruleModification.actions, counts);
+      }
+    }
   }
   return counts;
 }

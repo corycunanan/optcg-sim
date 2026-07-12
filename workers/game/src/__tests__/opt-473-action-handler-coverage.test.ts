@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Action, ActionType } from "../engine/effect-types.js";
 import {
   buildActionCoverageInventory,
+  collectAuthoredActionCounts,
   EXECUTED_ACTION_TYPES,
 } from "../engine/action-coverage-contract.js";
 import {
@@ -51,6 +52,30 @@ describe("OPT-473 authored action inventory", () => {
     expect(new Set<ActionType>(EXECUTED_ACTION_TYPES).size).toBe(
       EXECUTED_ACTION_TYPES.length
     );
+  });
+
+  it("walks action containers on rule modifications", () => {
+    const counts = collectAuthoredActionCounts({
+      "RULE-MOD": {
+        effects: [],
+        rule_modifications: [
+          {
+            rule_type: "START_OF_GAME_EFFECT",
+            actions: [
+              {
+                type: "SCHEDULE_ACTION",
+                params: {
+                  action: { type: "DRAW", params: { amount: 1 } },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(counts.get("SCHEDULE_ACTION")).toBe(1);
+    expect(counts.get("DRAW")).toBe(1);
   });
 });
 
