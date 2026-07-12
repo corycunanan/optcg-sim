@@ -32,28 +32,8 @@ import { costResultToEntries } from "./types.js";
 import { applyFieldDonReturn } from "./actions/don.js";
 import { isProhibitedForCard } from "../prohibitions.js";
 import { matchesFilter } from "../conditions.js";
-import { nanoid } from "../../util/nanoid.js";
-import { deregisterTriggersForCard } from "../triggers.js";
-import { expireSourceLeftZone, expireTargetLeftZone } from "../duration-tracker.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "../replacements.js";
-
-/**
- * OPT-453: complete the canonical field-exit lifecycle for a card paid into
- * the deck. The zone move itself gives the deck card a fresh instanceId
- * (rules §3-1-6) — this cleans up everything still registered against the
- * old field instance: its triggers, its permanent/active effects, and its
- * membership in other effects' target lists.
- *
- * Done inline (not via pipeline events) because deck-placement costs also
- * resolve on prompt-resume paths that never reach the pipeline's
- * event-driven `deregisterLeftFieldTriggers` step.
- */
-function completeFieldExitToDeck(state: GameState, oldInstanceId: string): GameState {
-  let s = deregisterTriggersForCard(state, oldInstanceId);
-  s = expireSourceLeftZone(s, oldInstanceId);
-  s = expireTargetLeftZone(s, oldInstanceId);
-  return s;
-}
+import { transitionCard, transitionCards } from "../zone-transition.js";
 
 // ─── payCosts (auto-payable) ─────────────────────────────────────────────────
 
@@ -246,16 +226,11 @@ export function payCosts(
         if (trashable.length < amount) return null;
 
         const toTrash = trashable.slice(0, amount);
-        const toTrashIds = new Set(toTrash.map((c) => c.instanceId));
-        const newHand = p.hand.filter((c) => !toTrashIds.has(c.instanceId));
-        const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
-
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
-        nextState = { ...nextState, players: newPlayers };
-        costResult.cardsTrashedCount = amount;
-        costResult.cardsTrashedInstanceIds.push(...toTrash.map((c) => c.instanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: amount, reason: "cost" } });
+        const moved = transitionCards(nextState, toTrash.map((c) => c.instanceId), "TRASH", { position: "TOP" });
+        nextState = moved.state;
+        costResult.cardsTrashedCount = moved.transitions.length;
+        costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost" } });
         break;
       }
 
@@ -267,27 +242,13 @@ export function payCosts(
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
-        const newLife = position === "TOP" ? p.life.slice(amount) : p.life.slice(0, -amount);
-
-        const handCards = removed.map((l) => ({
-          instanceId: l.instanceId,
-          cardId: l.cardId,
-          zone: "HAND" as const,
-          state: "ACTIVE" as const,
-          attachedDon: [] as any[],
-          turnPlayed: null,
-          controller,
-          owner: controller,
-        }));
-
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
-        nextState = { ...nextState, players: newPlayers };
+        const moved = transitionCards(nextState, removed.map((card) => card.instanceId), "HAND");
+        nextState = moved.state;
         events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: amount } });
         // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
         // already does; the cost path was missing it).
-        for (const l of removed) {
-          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+        for (const transition of moved.transitions) {
+          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId } });
         }
         break;
       }
@@ -304,28 +265,15 @@ export function payCosts(
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
-        const newLife = position === "TOP" ? p.life.slice(amount) : p.life.slice(0, -amount);
-        const trashedCards = removed.map((l) => ({
-          instanceId: l.instanceId,
-          cardId: l.cardId,
-          zone: "TRASH" as const,
-          state: "ACTIVE" as const,
-          attachedDon: [] as any[],
-          turnPlayed: null,
-          controller,
-          owner: controller,
-        }));
-
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        newPlayers[controller] = { ...p, life: newLife, trash: [...trashedCards, ...p.trash] };
-        nextState = { ...nextState, players: newPlayers };
-        costResult.cardsTrashedCount += amount;
-        costResult.cardsTrashedInstanceIds.push(...removed.map((l) => l.instanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: amount, reason: "cost" } });
+        const moved = transitionCards(nextState, removed.map((card) => card.instanceId), "TRASH", { position: "TOP" });
+        nextState = moved.state;
+        costResult.cardsTrashedCount += moved.transitions.length;
+        costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost" } });
         // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
         // Kalgara/Bonney-style watchers fire on cost payments too.
-        for (const l of removed) {
-          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+        for (const transition of moved.transitions) {
+          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId } });
         }
         break;
       }
@@ -410,18 +358,14 @@ export function payCosts(
         if (candidates.length < amount) return null;
 
         const toMove = candidates.slice(0, amount);
-        const toMoveIds = new Set(toMove.map((c) => c.instanceId));
-        const newTrash = p.trash.filter((c) => !toMoveIds.has(c.instanceId));
         // OPT-372: honor cost.position (deck index 0 = top). TOP_OR_BOTTOM is
         // resolved to a concrete position by payCostsWithSelection before this
         // fallback runs; a raw payCosts caller defaults to BOTTOM.
-        const deckCards = toMove.map((c) => ({ ...c, zone: "DECK" as const }));
-        const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
-
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
-        nextState = { ...nextState, players: newPlayers };
-        costResult.cardsPlacedToDeckCount += amount;
+        const moved = transitionCards(nextState, toMove.map((c) => c.instanceId), "DECK", {
+          position: cost.position === "TOP" ? "TOP" : "BOTTOM",
+        });
+        nextState = moved.state;
+        costResult.cardsPlacedToDeckCount += moved.transitions.length;
         break;
       }
 
@@ -482,20 +426,10 @@ export function payCosts(
         }
 
         const stage = p.stage;
-        // Canonical zone transition (OPT-453, rules §3-1-6): fresh instance
-        // in the deck; clean up the old field instance's registrations.
-        const newDeck = [...p.deck, {
-          ...stage,
-          instanceId: nanoid(),
-          zone: "DECK" as const,
-          state: "ACTIVE" as const,
-          attachedDon: [] as CardInstance["attachedDon"],
-          turnPlayed: null,
-        }];
-        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-        newPlayers[controller] = { ...p, stage: null, deck: newDeck };
-        nextState = completeFieldExitToDeck({ ...nextState, players: newPlayers }, stage.instanceId);
-        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, cardId: stage.cardId } });
+        const moved = transitionCard(nextState, stage.instanceId, "DECK", { position: "BOTTOM" });
+        if (!moved) return null;
+        nextState = moved.state;
+        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: stage.cardId } });
         break;
       }
 
@@ -1627,205 +1561,91 @@ export function applyCostSelection(
   switch (cost.type) {
     case "TRASH_FROM_HAND": {
       const toTrash = p.hand.filter((c) => selectedSet.has(c.instanceId));
-      const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
-      const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
-      return { state: { ...state, players: newPlayers }, events: [] };
+      const moved = transitionCards(state, toTrash.map((c) => c.instanceId), "TRASH", { position: "TOP" });
+      return { state: moved.state, events: [] };
     }
 
     case "KO_OWN_CHARACTER":
     case "TRASH_OWN_CHARACTER": {
       const toRemove = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-      const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
-      const newTrash = [
-        ...toRemove.map((c) => ({ ...c, zone: "TRASH" as const, attachedDon: [] as typeof c.attachedDon })),
-        ...p.trash,
-      ];
-      // Return attached DON to cost area (rested)
-      const returnedDon = toRemove.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = {
-        ...p,
-        characters: newChars,
-        trash: newTrash,
-        donCostArea: [...p.donCostArea, ...returnedDon],
-      };
-      return { state: { ...state, players: newPlayers }, events: [] };
+      const moved = transitionCards(state, toRemove.map((c) => c.instanceId), "TRASH", { position: "TOP" });
+      return { state: moved.state, events: [] };
     }
 
     case "RETURN_OWN_CHARACTER_TO_HAND": {
       const toReturn = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-      const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
-      const newHand = [
-        ...p.hand,
-        ...toReturn.map((c) => ({ ...c, zone: "HAND" as const, attachedDon: [] as typeof c.attachedDon })),
-      ];
-      const returnedDon = toReturn.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = {
-        ...p,
-        characters: newChars,
-        hand: newHand,
-        donCostArea: [...p.donCostArea, ...returnedDon],
-      };
-      return { state: { ...state, players: newPlayers }, events: [] };
+      const moved = transitionCards(state, toReturn.map((c) => c.instanceId), "HAND");
+      return { state: moved.state, events: [] };
     }
 
     case "PLACE_HAND_TO_DECK":
     case "PLACE_OWN_CHARACTER_TO_DECK": {
       if (cost.type === "PLACE_HAND_TO_DECK") {
-        // Hand → deck is not a field exit: no fresh-instance requirement, no
-        // registry cleanup, no CARD_RETURNED_TO_DECK (OPT-453 audit).
         const toPlace = p.hand.filter((c) => selectedSet.has(c.instanceId));
-        const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
-        const position = cost.position ?? "BOTTOM";
-        const deckCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const }));
-        const newDeck = position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
-        const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-        newPlayers[controller] = { ...p, hand: newHand, deck: newDeck };
-        return { state: { ...state, players: newPlayers }, events: [] };
+        const position = cost.position === "TOP" ? "TOP" : "BOTTOM";
+        const moved = transitionCards(state, toPlace.map((c) => c.instanceId), "DECK", { position });
+        return { state: moved.state, events: [] };
       } else {
         const toPlace = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-        const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
-        const returnedDon = toPlace.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
-        const position = cost.position ?? "BOTTOM";
-        // Canonical zone transition (OPT-453, rules §3-1-6): the deck card is
-        // a NEW instance — fresh instanceId, ACTIVE, no DON, turnPlayed null
-        // (a stale non-null turnPlayed crashes the freshly-played-instance
-        // lookup after the card is redrawn and played).
-        const deckCards = toPlace.map((c) => ({
-          ...c,
-          instanceId: nanoid(),
-          zone: "DECK" as const,
-          state: "ACTIVE" as const,
-          attachedDon: [] as typeof c.attachedDon,
-          turnPlayed: null,
-        }));
-        const newDeck = position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
-        const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-        newPlayers[controller] = {
-          ...p,
-          characters: newChars,
-          deck: newDeck,
-          donCostArea: [...p.donCostArea, ...returnedDon],
-        };
-        let nextState: GameState = { ...state, players: newPlayers };
-        // Field exit: deregister the old instance's triggers, expire its
-        // effects, and announce it so pipeline consumers see the exit.
-        const events: PendingEvent[] = [];
-        for (const c of toPlace) {
-          nextState = completeFieldExitToDeck(nextState, c.instanceId);
-          events.push({
+        const position = cost.position === "TOP" ? "TOP" : "BOTTOM";
+        const moved = transitionCards(state, toPlace.map((c) => c.instanceId), "DECK", { position });
+        const events: PendingEvent[] = moved.transitions.map((transition) => ({
             type: "CARD_RETURNED_TO_DECK",
             playerIndex: controller,
-            payload: { cardInstanceId: c.instanceId, cardId: c.cardId, position },
-          });
-        }
-        return { state: nextState, events };
+            payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId, cardId: transition.fact.cardId, position },
+          }));
+        return { state: moved.state, events };
       }
     }
 
     case "PLACE_FROM_TRASH_TO_DECK": {
       // selectedIds arrive in final order (arranged top→bottom of the placed
       // group when the arrange step ran; selection order otherwise).
-      const byId = new Map(p.trash.map((c) => [c.instanceId, c]));
-      const moved = selectedIds
-        .map((id) => byId.get(id))
-        .filter((c): c is CardInstance => c !== undefined);
-      const newTrash = p.trash.filter((c) => !selectedSet.has(c.instanceId));
       // OPT-372: honor cost.position (deck index 0 = top); TOP_OR_BOTTOM is
       // resolved to a concrete position before payment reaches this point.
-      const deckCards = moved.map((c) => ({ ...c, zone: "DECK" as const }));
-      const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, trash: newTrash, deck: newDeck };
-      return { state: { ...state, players: newPlayers }, events: [] };
+      const moved = transitionCards(state, selectedIds, "DECK", {
+        position: cost.position === "TOP" ? "TOP" : "BOTTOM",
+      });
+      return { state: moved.state, events: [] };
     }
 
     case "PLACE_SELF_AND_TRASH_TO_DECK": {
       // OPT-430/431: selectedIds arrive in final arranged top→bottom order
       // and mix zones — the source Character (field) plus trash cards. Move
       // each from its own zone, preserving the interleaved order.
-      const trashById = new Map(p.trash.map((c) => [c.instanceId, c]));
-      const charById = new Map(
-        (p.characters.filter(Boolean) as CardInstance[]).map((c) => [c.instanceId, c]),
+      const fieldIds = new Set(
+        p.characters.flatMap((c) => c && selectedSet.has(c.instanceId) ? [c.instanceId] : []),
       );
-      const moved = selectedIds
-        .map((id) => trashById.get(id) ?? charById.get(id))
-        .filter((c): c is CardInstance => c !== undefined);
-      const newTrash = p.trash.filter((c) => !selectedSet.has(c.instanceId));
-      const newChars = p.characters.map((c) =>
-        c !== null && selectedSet.has(c.instanceId) ? null : c,
-      );
-      const fieldExits = moved.filter((c) => charById.has(c.instanceId));
-      const returnedDon = fieldExits
-        .flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
-      // Canonical zone transition (OPT-453, rules §3-1-6): the field half
-      // becomes a NEW instance in the deck — fresh instanceId, ACTIVE, no
-      // DON, turnPlayed null (a stale non-null turnPlayed survives draw and
-      // crashes the freshly-played-instance lookup in execute.ts). Trash
-      // cards keep their identity: they left the field long ago.
-      const deckCards = moved.map((c) => ({
-        ...c,
-        instanceId: charById.has(c.instanceId) ? nanoid() : c.instanceId,
-        zone: "DECK" as const,
-        state: "ACTIVE" as const,
-        attachedDon: [] as CardInstance["attachedDon"],
-        turnPlayed: null,
-      }));
-      const newDeck = cost.position === "TOP" ? [...deckCards, ...p.deck] : [...p.deck, ...deckCards];
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = {
-        ...p,
-        trash: newTrash,
-        characters: newChars,
-        deck: newDeck,
-        donCostArea: [...p.donCostArea, ...returnedDon],
-      };
-      let nextState: GameState = { ...state, players: newPlayers };
-      const events: PendingEvent[] = [];
-      for (const c of fieldExits) {
-        nextState = completeFieldExitToDeck(nextState, c.instanceId);
-        events.push({
+      const moved = transitionCards(state, selectedIds, "DECK", {
+        position: cost.position === "TOP" ? "TOP" : "BOTTOM",
+      });
+      const events: PendingEvent[] = moved.transitions
+        .filter((transition) => fieldIds.has(transition.fact.oldInstanceId))
+        .map((transition) => ({
           type: "CARD_RETURNED_TO_DECK",
           playerIndex: controller,
           payload: {
-            cardInstanceId: c.instanceId,
-            cardId: c.cardId,
+            cardInstanceId: transition.fact.oldInstanceId,
+            newCardInstanceId: transition.fact.newInstanceId,
+            cardId: transition.fact.cardId,
             position: cost.position === "TOP" ? "TOP" : "BOTTOM",
           },
-        });
-      }
-      return { state: nextState, events };
+        }));
+      return { state: moved.state, events };
     }
 
     case "PLACE_SELF_AND_HAND_TO_DECK": {
       const stage = p.stage && selectedSet.has(p.stage.instanceId) ? p.stage : null;
       if (!stage) return { state, events: [] };
-      const handById = new Map(p.hand.map((c) => [c.instanceId, c]));
-      const moved = selectedIds
-        .map((id) => id === stage.instanceId ? stage : handById.get(id))
-        .filter((c): c is CardInstance => c !== undefined);
-      const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
-      const deckCards = moved.map((c) => ({
-        ...c,
-        instanceId: c.instanceId === stage.instanceId ? nanoid() : c.instanceId,
-        zone: "DECK" as const,
-        state: "ACTIVE" as const,
-        attachedDon: [] as CardInstance["attachedDon"],
-        turnPlayed: null,
-      }));
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, stage: null, hand: newHand, deck: [...p.deck, ...deckCards] };
-      const nextState = completeFieldExitToDeck({ ...state, players: newPlayers }, stage.instanceId);
+      const moved = transitionCards(state, selectedIds, "DECK", { position: "BOTTOM" });
+      const stageTransition = moved.transitions.find((transition) => transition.fact.oldInstanceId === stage.instanceId);
       return {
-        state: nextState,
-        events: [{
+        state: moved.state,
+        events: stageTransition ? [{
           type: "CARD_RETURNED_TO_DECK",
           playerIndex: controller,
-          payload: { cardInstanceId: stage.instanceId, cardId: stage.cardId, position: "BOTTOM" },
-        }],
+          payload: { cardInstanceId: stage.instanceId, newCardInstanceId: stageTransition.fact.newInstanceId, cardId: stage.cardId, position: "BOTTOM" },
+        }] : [],
       };
     }
 
@@ -1836,29 +1656,13 @@ export function applyCostSelection(
       // DON returns rested, and the old field instance's registrations are
       // cleaned up inline.
       const toMove = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-      const newChars = p.characters.map((c) => c !== null && selectedSet.has(c.instanceId) ? null : c);
-      const returnedDon = toMove.flatMap((c) => c.attachedDon.map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null })));
       const face = (cost as SimpleCost).face ?? "UP";
       const position = (cost as SimpleCost).position ?? "TOP";
-      const lifeCards = toMove.map((c) => ({ instanceId: nanoid(), cardId: c.cardId, face }));
-      const newLife = position === "BOTTOM"
-        ? [...p.life, ...lifeCards]
-        : [...lifeCards, ...p.life];
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = {
-        ...p,
-        characters: newChars,
-        life: newLife,
-        donCostArea: [...p.donCostArea, ...returnedDon],
-      };
-      let nextState: GameState = { ...state, players: newPlayers };
-      // Field-to-Life exits have no game event type yet (known gap — see the
-      // REMOVED_FROM_FIELD_EVENTS comment in triggers.ts and OPT-458); the
-      // registry cleanup happens inline either way.
-      for (const c of toMove) {
-        nextState = completeFieldExitToDeck(nextState, c.instanceId);
-      }
-      return { state: nextState, events: [] };
+      const moved = transitionCards(state, toMove.map((c) => c.instanceId), "LIFE", {
+        position: position === "BOTTOM" ? "BOTTOM" : "TOP",
+        lifeFace: face,
+      });
+      return { state: moved.state, events: [] };
     }
 
     case "REST_CARDS":

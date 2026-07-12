@@ -10,11 +10,9 @@ import {
   getActivePlayerIndex,
   getInactivePlayerIndex,
   findCardInState,
-  moveCard,
   removeTopLifeCard,
   restDonForCost,
   pushTriggerStaging,
-  popTriggerStaging,
 } from "./state.js";
 import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
@@ -28,6 +26,18 @@ import { isRemovalProhibited } from "./prohibitions.js";
 import type { EffectSchema } from "./effect-types.js";
 import { nanoid } from "../util/nanoid.js";
 import { emitPendingEvent } from "./events.js";
+import { transitionCard, transitionDetachedCard } from "./zone-transition.js";
+
+function restoreTriggerStaging(state: GameState, baseline: readonly string[]): GameState {
+  const keep = new Set(baseline);
+  return {
+    ...state,
+    turn: {
+      ...state.turn,
+      triggerStagingInstanceIds: (state.turn.triggerStagingInstanceIds ?? []).filter((id) => keep.has(id)),
+    },
+  };
+}
 
 // ─── Declare Attack ───────────────────────────────────────────────────────────
 
@@ -202,7 +212,9 @@ export function executeUseCounter(
   const counterValue = getEffectiveCounterValue(found.card, cardData, state, cardDb);
 
   // Trash the counter card from hand
-  let nextState = moveCard(state, cardInstanceId, "TRASH");
+  const moved = transitionCard(state, cardInstanceId, "TRASH", { position: "TOP" });
+  if (!moved) return { state, events };
+  let nextState = moved.state;
 
   // Add counter power to battle context
   const battle = nextState.turn.battle!;
@@ -249,12 +261,14 @@ export function executeUseCounterEvent(
   // Pay cost
   let nextState = restDonForCost(state, inactiveIdx, cost)!;
   // Trash the event
-  nextState = moveCard(nextState, cardInstanceId, "TRASH");
+  const moved = transitionCard(nextState, cardInstanceId, "TRASH", { position: "TOP" });
+  if (!moved) return { state: nextState, events };
+  nextState = moved.state;
 
   events.push({
     type: "COUNTER_USED",
     playerIndex: inactiveIdx,
-    payload: { cardId: cardData.id, cardInstanceId, type: "event" },
+    payload: { cardId: cardData.id, cardInstanceId: moved.fact.newInstanceId, type: "event" },
   });
 
   return { state: nextState, events };
@@ -282,30 +296,27 @@ export function executeRevealTrigger(
   if (!battle?.pendingTriggerLifeCard) return { state, events };
 
   const lifeCard = battle.pendingTriggerLifeCard;
+  let destinationInstanceId: string | undefined;
 
   if (reveal) {
     // Activate trigger — card goes to trash (rules §10-1-5-3)
-    const trashCard = {
+    const moved = transitionDetachedCard(nextState, {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
-      zone: "TRASH" as const,
-      state: "ACTIVE" as const,
-      attachedDon: [],
-      turnPlayed: null,
-      controller: inactiveIdx,
+      source: "LIFE",
       owner: inactiveIdx,
-    };
-    const newPlayers = [...nextState.players] as typeof nextState.players;
-    newPlayers[inactiveIdx] = {
-      ...newPlayers[inactiveIdx],
-      trash: [trashCard, ...newPlayers[inactiveIdx].trash],
-    };
-    nextState = { ...nextState, players: newPlayers };
+      lifeFace: lifeCard.face,
+    }, "TRASH", { position: "TOP" });
+    if (!moved) return { state: nextState, events };
+    nextState = moved.state;
+    const triggerInstanceId = moved.fact.newInstanceId;
+    destinationInstanceId = triggerInstanceId;
     // OPT-257 (F4): mark the just-trashed Life card as staging so trash-targeting
     // effects (PLAY_CARD source_zone TRASH, TRASH_COUNT, etc.) don't see it
     // during this Trigger's resolution. Cleared after resolveEffect returns —
     // any pending prompt's candidate list is already built/locked at that point.
-    nextState = pushTriggerStaging(nextState, lifeCard.instanceId);
+    const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
+    nextState = pushTriggerStaging(nextState, triggerInstanceId);
     events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, activated: true } });
 
     // If the trigger card has an effectSchema with a TRIGGER block, resolve it
@@ -314,7 +325,7 @@ export function executeRevealTrigger(
       events.push({
         type: "EVENT_TRIGGER_RESOLVED",
         playerIndex: inactiveIdx,
-        payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+        payload: { cardId: lifeCard.cardId, cardInstanceId: triggerInstanceId },
       });
     }
     const schema = triggerCardData?.effectSchema as EffectSchema | null;
@@ -326,13 +337,13 @@ export function executeRevealTrigger(
         const effectResult = resolveEffect(
           nextState,
           triggerBlock,
-          lifeCard.instanceId,
+          triggerInstanceId,
           inactiveIdx,
           cardDb,
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
-        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
+        nextState = restoreTriggerStaging(nextState, stagingBaseline);
         // OPT-441: a prompt pauses the Trigger effect, not the damage sequence.
         // Publish the Life removal now and queue its auto effects behind the
         // current effect frame. Once that stack fully unwinds, GameSession
@@ -341,7 +352,10 @@ export function executeRevealTrigger(
           const removedEvent: PendingEvent = {
             type: "CARD_REMOVED_FROM_LIFE",
             playerIndex: inactiveIdx,
-            payload: { cardInstanceId: lifeCard.instanceId },
+            payload: {
+              cardInstanceId: lifeCard.instanceId,
+              newCardInstanceId: triggerInstanceId,
+            },
             propagation: { eventLogEmitted: true },
           };
           nextState = emitPendingEvent(nextState, removedEvent, inactiveIdx);
@@ -370,30 +384,28 @@ export function executeRevealTrigger(
           return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
         }
       } else {
-        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
+        nextState = restoreTriggerStaging(nextState, stagingBaseline);
       }
     } else {
-      nextState = popTriggerStaging(nextState, lifeCard.instanceId);
+      nextState = restoreTriggerStaging(nextState, stagingBaseline);
     }
   } else {
     // Decline trigger — add to hand
-    const handCard = {
+    const moved = transitionDetachedCard(nextState, {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
-      zone: "HAND" as const,
-      state: "ACTIVE" as const,
-      attachedDon: [],
-      turnPlayed: null,
-      controller: inactiveIdx,
+      source: "LIFE",
       owner: inactiveIdx,
-    };
-    const newPlayers = [...nextState.players] as typeof nextState.players;
-    newPlayers[inactiveIdx] = {
-      ...newPlayers[inactiveIdx],
-      hand: [...newPlayers[inactiveIdx].hand, handCard],
-    };
-    nextState = { ...nextState, players: newPlayers };
-    events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId } });
+      lifeFace: lifeCard.face,
+    }, "HAND");
+    if (!moved) return { state: nextState, events };
+    nextState = moved.state;
+    destinationInstanceId = moved.fact.newInstanceId;
+    events.push({
+      type: "CARD_ADDED_TO_HAND_FROM_LIFE",
+      playerIndex: inactiveIdx,
+      payload: { cardId: lifeCard.cardId, cardInstanceId: moved.fact.newInstanceId },
+    });
   }
 
   // OPT-240: emit CARD_REMOVED_FROM_LIFE AFTER the Trigger window fully
@@ -403,7 +415,10 @@ export function executeRevealTrigger(
   events.push({
     type: "CARD_REMOVED_FROM_LIFE",
     playerIndex: inactiveIdx,
-    payload: { cardInstanceId: lifeCard.instanceId },
+    payload: {
+      cardInstanceId: lifeCard.instanceId,
+      ...(destinationInstanceId ? { newCardInstanceId: destinationInstanceId } : {}),
+    },
   });
 
   // Clear the pending trigger marker. The damage that opened this window is
@@ -448,30 +463,27 @@ function executeRevealEffectDamageTrigger(
     ...state,
     turn: { ...state.turn, pendingTriggerFromEffect: null },
   };
+  let destinationInstanceId: string | undefined;
 
   if (reveal) {
     // Trash the revealed Life card (rules §10-1-5-3) before resolving the
     // trigger block. The trigger block runs from the trash.
-    const trashCard = {
+    const moved = transitionDetachedCard(nextState, {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
-      zone: "TRASH" as const,
-      state: "ACTIVE" as const,
-      attachedDon: [],
-      turnPlayed: null,
-      controller: damagedPlayerIndex,
       owner: damagedPlayerIndex,
-    };
-    const newPlayers = [...nextState.players] as typeof nextState.players;
-    newPlayers[damagedPlayerIndex] = {
-      ...newPlayers[damagedPlayerIndex],
-      trash: [trashCard, ...newPlayers[damagedPlayerIndex].trash],
-    };
-    nextState = { ...nextState, players: newPlayers };
+      source: "LIFE",
+      lifeFace: lifeCard.face,
+    }, "TRASH", { position: "TOP" });
+    if (!moved) return { state: nextState, events };
+    nextState = moved.state;
+    const triggerInstanceId = moved.fact.newInstanceId;
+    destinationInstanceId = triggerInstanceId;
     // OPT-257 (F4): see executeRevealTrigger above — staging marker keeps the
     // just-trashed Life card invisible to trash-targeting effects during the
     // Trigger's effect resolution.
-    nextState = pushTriggerStaging(nextState, lifeCard.instanceId);
+    const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
+    nextState = pushTriggerStaging(nextState, triggerInstanceId);
     events.push({ type: "TRIGGER_ACTIVATED", playerIndex: damagedPlayerIndex, payload: { cardId: lifeCard.cardId, activated: true } });
 
     const triggerCardData = cardDb.get(lifeCard.cardId);
@@ -479,7 +491,7 @@ function executeRevealEffectDamageTrigger(
       events.push({
         type: "EVENT_TRIGGER_RESOLVED",
         playerIndex: damagedPlayerIndex,
-        payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+        payload: { cardId: lifeCard.cardId, cardInstanceId: triggerInstanceId },
       });
     }
     const schema = triggerCardData?.effectSchema as EffectSchema | null;
@@ -491,28 +503,31 @@ function executeRevealEffectDamageTrigger(
         const effectResult = resolveEffect(
           nextState,
           triggerBlock,
-          lifeCard.instanceId,
+          triggerInstanceId,
           damagedPlayerIndex,
           cardDb,
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
-        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
+        nextState = restoreTriggerStaging(nextState, stagingBaseline);
         if (effectResult.pendingPrompt) {
           // Trigger effect itself needs input — abandon remaining damages
           // (parity with battle path at executeRevealTrigger's endBattle).
           events.push({
             type: "CARD_REMOVED_FROM_LIFE",
             playerIndex: damagedPlayerIndex,
-            payload: { cardInstanceId: lifeCard.instanceId },
+            payload: {
+              cardInstanceId: lifeCard.instanceId,
+              newCardInstanceId: triggerInstanceId,
+            },
           });
           return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
         }
       } else {
-        nextState = popTriggerStaging(nextState, lifeCard.instanceId);
+        nextState = restoreTriggerStaging(nextState, stagingBaseline);
       }
     } else {
-      nextState = popTriggerStaging(nextState, lifeCard.instanceId);
+      nextState = restoreTriggerStaging(nextState, stagingBaseline);
     }
   } else {
     const handResult = moveLifeCardToHand(nextState, lifeCard, damagedPlayerIndex);
@@ -540,7 +555,10 @@ function executeRevealEffectDamageTrigger(
   events.push({
     type: "CARD_REMOVED_FROM_LIFE",
     playerIndex: damagedPlayerIndex,
-    payload: { cardInstanceId: lifeCard.instanceId },
+    payload: {
+      cardInstanceId: lifeCard.instanceId,
+      ...(destinationInstanceId ? { newCardInstanceId: destinationInstanceId } : {}),
+    },
   });
 
   const cont = continueEffectDamageSequence(
@@ -587,7 +605,6 @@ export function continueEffectDamageSequence(
     events.push(...popResult.events);
 
     const lifeCard = popResult.lifeCard;
-    const cardData = cardDb.get(lifeCard.cardId);
 
     if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, damagedPlayerIndex, lifeCard.instanceId)) {
       const damagesAfterThis = remainingDamages - i - 1;
@@ -670,33 +687,30 @@ export function moveLifeCardToHand(
   damagedPlayerIndex: 0 | 1,
 ): { state: GameState; events: PendingEvent[] } {
   const events: PendingEvent[] = [];
-  const player = state.players[damagedPlayerIndex];
-  const handCard = {
+  const moved = transitionDetachedCard(state, {
     instanceId: lifeCard.instanceId,
     cardId: lifeCard.cardId,
-    zone: "HAND" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: damagedPlayerIndex,
     owner: damagedPlayerIndex,
-  };
-  const newPlayers = [...state.players] as typeof state.players;
-  newPlayers[damagedPlayerIndex] = { ...player, hand: [...player.hand, handCard] };
-  const nextState = { ...state, players: newPlayers };
+    source: "LIFE",
+    lifeFace: lifeCard.face,
+  }, "HAND");
+  if (!moved) return { state, events };
 
   events.push({
     type: "CARD_ADDED_TO_HAND_FROM_LIFE",
     playerIndex: damagedPlayerIndex,
-    payload: { cardId: lifeCard.cardId, cardInstanceId: lifeCard.instanceId },
+    payload: { cardId: lifeCard.cardId, cardInstanceId: moved.fact.newInstanceId },
   });
   events.push({
     type: "CARD_REMOVED_FROM_LIFE",
     playerIndex: damagedPlayerIndex,
-    payload: { cardInstanceId: lifeCard.instanceId },
+    payload: {
+      cardInstanceId: lifeCard.instanceId,
+      newCardInstanceId: moved.fact.newInstanceId,
+    },
   });
 
-  return { state: nextState, events };
+  return { state: moved.state, events };
 }
 
 /**
@@ -738,26 +752,22 @@ function dealOneLeaderDamage(
   events.push(...popResult.events);
 
   if (isBanish) {
-    const trashCard = {
+    const moved = transitionDetachedCard(nextState, {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
-      zone: "TRASH" as const,
-      state: "ACTIVE" as const,
-      attachedDon: [],
-      turnPlayed: null,
-      controller: inactiveIdx,
       owner: inactiveIdx,
-    };
-    const newPlayers = [...nextState.players] as typeof nextState.players;
-    newPlayers[inactiveIdx] = {
-      ...newPlayers[inactiveIdx],
-      trash: [trashCard, ...newPlayers[inactiveIdx].trash],
-    };
-    nextState = { ...nextState, players: newPlayers };
+      source: "LIFE",
+      lifeFace: lifeCard.face,
+    }, "TRASH", { position: "TOP" });
+    if (!moved) return { state: nextState, events, paused: false };
+    nextState = moved.state;
     events.push({
       type: "CARD_REMOVED_FROM_LIFE",
       playerIndex: inactiveIdx,
-      payload: { cardInstanceId: lifeCard.instanceId },
+      payload: {
+        cardInstanceId: lifeCard.instanceId,
+        newCardInstanceId: moved.fact.newInstanceId,
+      },
     });
     return { state: nextState, events, paused: false };
   }

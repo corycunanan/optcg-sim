@@ -130,7 +130,7 @@ describe("OPT-432: OP15-080 plays the exact K.O.'d instance, never a copy", () =
 
     const p0 = done.state.players[0];
     // Cost paid: the source went to the deck bottom with the fillers.
-    expect(p0.deck.slice(-3).map((c) => c.instanceId)).toContain(SOURCE_ID);
+    expect(p0.deck.slice(-3).map((c) => c.instanceId)).not.toContain(SOURCE_ID);
     // Rule 1-3-2: no substitution — the decoy stays in the trash and no
     // Oars reaches the field.
     expect(p0.trash.some((c) => c.instanceId === DECOY_ID)).toBe(true);

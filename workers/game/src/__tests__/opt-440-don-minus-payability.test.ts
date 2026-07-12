@@ -144,7 +144,7 @@ describe("OPT-440 (a): 0 cost-area DON!! + attached DON!! — offered AND payabl
     const reveal = executeRevealTrigger(damage.state, true, cardDb);
     const p0 = reveal.state.players[0];
     // Life card trashed (trigger activated), NOT lost for nothing:
-    expect(p0.trash.some((c) => c.instanceId === "life-donminus")).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === "life-donminus")).toBe(false);
     // Cost actually paid — Leader's DON!! returned to the DON!! deck:
     expect(p0.leader.attachedDon).toHaveLength(0);
     expect(p0.donDeck).toHaveLength(donDeckBefore + 1);

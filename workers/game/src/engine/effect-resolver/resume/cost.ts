@@ -33,6 +33,7 @@ import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
 import { replacePendingEventReferences } from "../../events.js";
+import { transitionCards } from "../../zone-transition.js";
 
 export function abortReplacedCost(
   state: GameState,
@@ -360,52 +361,28 @@ export function handleAwaitingCostSelection(
     }
 
     const removed = position === "TOP" ? p.life.slice(0, 1) : p.life.slice(-1);
-    const newLife = position === "TOP" ? p.life.slice(1) : p.life.slice(0, -1);
-
     if (cost.type === "TRASH_FROM_LIFE") {
-      const trashedCards = removed.map((l) => ({
-        instanceId: l.instanceId,
-        cardId: l.cardId,
-        zone: "TRASH" as const,
-        state: "ACTIVE" as const,
-        attachedDon: [] as any[],
-        turnPlayed: null,
-        controller,
-        owner: controller,
-      }));
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[controller] = { ...p, life: newLife, trash: [...trashedCards, ...p.trash] };
-      nextState = { ...nextState, players: newPlayers };
+      const moved = transitionCards(nextState, removed.map((card) => card.instanceId), "TRASH", { position: "TOP" });
+      nextState = moved.state;
       const existing = accumulatedCostRefs.get("__cost_cards_trashed") ?? { targetInstanceIds: [], count: 0 };
       accumulatedCostRefs.set("__cost_cards_trashed", {
-        targetInstanceIds: [...existing.targetInstanceIds, ...removed.map((l) => l.instanceId)],
-        count: existing.count + removed.length,
+        targetInstanceIds: [...existing.targetInstanceIds, ...moved.transitions.map((transition) => transition.fact.newInstanceId)],
+        count: existing.count + moved.transitions.length,
       });
       events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: 1, reason: "cost" } });
       // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
       // Kalgara/Bonney-style watchers fire on cost payments too.
-      for (const l of removed) {
-        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+      for (const transition of moved.transitions) {
+        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId } });
       }
     } else {
-      const handCards = removed.map((l) => ({
-        instanceId: l.instanceId,
-        cardId: l.cardId,
-        zone: "HAND" as const,
-        state: "ACTIVE" as const,
-        attachedDon: [] as any[],
-        turnPlayed: null,
-        controller,
-        owner: controller,
-      }));
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
-      nextState = { ...nextState, players: newPlayers };
+      const moved = transitionCards(nextState, removed.map((card) => card.instanceId), "HAND");
+      nextState = moved.state;
       events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: 1 } });
       // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
       // already does; the cost path was missing it).
-      for (const l of removed) {
-        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+      for (const transition of moved.transitions) {
+        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId } });
       }
     }
   } else if (action.type === "SELECT_TARGET" && cost.type === "PLACE_FROM_TRASH_TO_DECK") {

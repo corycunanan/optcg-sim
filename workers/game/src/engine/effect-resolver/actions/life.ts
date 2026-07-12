@@ -8,7 +8,7 @@ import type { ActionResult } from "../types.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
-import { nanoid } from "../../../util/nanoid.js";
+import { transitionCard, transitionCards } from "../../zone-transition.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -29,21 +29,13 @@ export function executeAddToLifeFromDeck(
   if (count === 0) return { state, events, succeeded: false };
 
   const cards = p.deck.slice(0, count);
-  const newDeck = p.deck.slice(count);
-  const lifeCards = cards.map((c) => ({
-    instanceId: c.instanceId,
-    cardId: c.cardId,
-    face,
-  }));
-  const newLife = position === "TOP"
-    ? [...lifeCards, ...p.life]
-    : [...p.life, ...lifeCards];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, deck: newDeck, life: newLife };
+  const moved = transitionCards(state, cards.map((card) => card.instanceId), "LIFE", {
+    position,
+    lifeFace: face,
+  });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
   };
@@ -73,37 +65,29 @@ export function executeTrashFromLife(
   const removed = position === "TOP"
     ? p.life.slice(0, count)
     : p.life.slice(-count);
-  const newLife = position === "TOP"
-    ? p.life.slice(count)
-    : p.life.slice(0, -count);
-
-  const trashedCards = removed.map((l) => ({
-    instanceId: l.instanceId,
-    cardId: l.cardId,
-    zone: "TRASH" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: pi as 0 | 1,
-    owner: pi as 0 | 1,
-  }));
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[pi] = {
-    ...p,
-    life: newLife,
-    trash: [...trashedCards, ...p.trash],
-  };
+  const moved = transitionCards(
+    state,
+    removed.map((card) => card.instanceId),
+    "TRASH",
+    { position: "TOP" },
+  );
 
   events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { count, reason: "life_trash" } });
   // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
   // Kalgara/Bonney-style watchers fire on effect-driven life trashes too.
-  for (const l of removed) {
-    events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: pi as 0 | 1, payload: { cardInstanceId: l.instanceId } });
+  for (const transition of moved.transitions) {
+    events.push({
+      type: "CARD_REMOVED_FROM_LIFE",
+      playerIndex: pi as 0 | 1,
+      payload: {
+        cardInstanceId: transition.fact.oldInstanceId,
+        newCardInstanceId: transition.fact.newInstanceId,
+      },
+    });
   }
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
   };
@@ -217,44 +201,39 @@ export function executeLifeToHand(
   if (count === 0) return { state, events, succeeded: false };
 
   const removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
-  const newLife = position === "TOP" ? p.life.slice(count) : p.life.slice(0, -count);
+  const moved = transitionCards(
+    state,
+    removed.map((card) => card.instanceId),
+    "HAND",
+  );
 
-  const handCards: CardInstance[] = removed.map((l) => ({
-    instanceId: l.instanceId,
-    cardId: l.cardId,
-    zone: "HAND" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: targetController,
-    owner: targetController,
-  }));
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[targetController] = {
-    ...p,
-    life: newLife,
-    hand: [...p.hand, ...handCards],
-  };
-
-  for (const lc of removed) {
+  for (const transition of moved.transitions) {
     events.push({
       type: "CARD_ADDED_TO_HAND_FROM_LIFE",
       playerIndex: targetController,
-      payload: { cardId: lc.cardId, cardInstanceId: lc.instanceId },
+      payload: {
+        cardId: transition.fact.cardId,
+        cardInstanceId: transition.fact.newInstanceId,
+      },
     });
     events.push({
       type: "CARD_REMOVED_FROM_LIFE",
       playerIndex: targetController,
-      payload: { cardInstanceId: lc.instanceId },
+      payload: {
+        cardInstanceId: transition.fact.oldInstanceId,
+        newCardInstanceId: transition.fact.newInstanceId,
+      },
     });
   }
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: handCards.map((c) => c.instanceId), count },
+    result: {
+      targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
+      count: moved.transitions.length,
+    },
   };
 }
 
@@ -305,33 +284,20 @@ function executeAddToLifeFromTrash(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  // The trash for `CARD_IN_TRASH` is resolved against `target.controller`
-  // (default SELF), matching `target-resolver.ts:357-365`.
-  const ctrl = action.target?.controller === "OPPONENT" ? (controller === 0 ? 1 : 0) as 0 | 1 : controller;
-  const p = state.players[ctrl];
-
-  const toLife = p.trash.filter((c) => targetIds.includes(c.instanceId));
-  if (toLife.length === 0) return { state, events, succeeded: false };
-
-  const toLifeIds = new Set(toLife.map((c) => c.instanceId));
-  const newTrash = p.trash.filter((c) => !toLifeIds.has(c.instanceId));
-  const lifeCards = toLife.map((c) => ({
-    instanceId: c.instanceId,
-    cardId: c.cardId,
-    face,
-  }));
-  const newLife = position === "TOP"
-    ? [...lifeCards, ...p.life]
-    : [...p.life, ...lifeCards];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[ctrl] = { ...p, trash: newTrash, life: newLife };
+  const moved = transitionCards(state, targetIds, "LIFE", {
+    position,
+    lifeFace: face,
+  });
+  if (moved.transitions.length === 0) return { state, events, succeeded: false };
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: lifeCards.map((c) => c.instanceId), count: lifeCards.length },
+    result: {
+      targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
+      count: moved.transitions.length,
+    },
   };
 }
 
@@ -368,23 +334,13 @@ export function executeAddToLifeFromHand(
   }
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
-  const toLife = p.hand.filter((c) => targetIds.includes(c.instanceId));
-  const toLifeIds = new Set(toLife.map((c) => c.instanceId));
-  const newHand = p.hand.filter((c) => !toLifeIds.has(c.instanceId));
-  const lifeCards = toLife.map((c) => ({
-    instanceId: c.instanceId,
-    cardId: c.cardId,
-    face,
-  }));
-  const newLife = position === "TOP"
-    ? [...lifeCards, ...p.life]
-    : [...p.life, ...lifeCards];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, hand: newHand, life: newLife };
+  const moved = transitionCards(state, targetIds, "LIFE", {
+    position,
+    lifeFace: face,
+  });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
   };
@@ -421,28 +377,12 @@ export function executeAddToLifeFromField(
       sourceCardInstanceId,
     }, cardDb)) continue;
 
-    for (const [pi, player] of nextState.players.entries()) {
-      const charIdx = player.characters.findIndex((c) => c?.instanceId === id);
-      if (charIdx === -1) continue;
-
-      const char = player.characters[charIdx]!;
-      const newChars = [...player.characters] as (typeof player.characters);
-      newChars[charIdx] = null;
-      const returnedDon = char.attachedDon.map((d) => ({
-        ...d, state: "RESTED" as const, attachedTo: null,
-      }));
-      const lifeCard = { instanceId: nanoid(), cardId: char.cardId, face };
-
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[pi] = {
-        ...player,
-        characters: newChars,
-        life: [lifeCard, ...player.life],
-        donCostArea: [...player.donCostArea, ...returnedDon],
-      };
-      nextState = { ...nextState, players: newPlayers };
-      break;
-    }
+    const moved = transitionCard(nextState, id, "LIFE", {
+      position: "TOP",
+      lifeFace: face,
+      preserveSourceTriggers: true,
+    });
+    if (moved) nextState = moved.state;
   }
 
   return { state: nextState, events, succeeded: true };
@@ -463,41 +403,23 @@ export function executePlayFromLife(
   if (p.life.length === 0) return { state, events, succeeded: false };
 
   const lifeCard = position === "TOP" ? p.life[0] : p.life[p.life.length - 1];
-  const newLife = position === "TOP" ? p.life.slice(1) : p.life.slice(0, -1);
   const data = cardDb.get(lifeCard.cardId);
   if (!data) return { state, events, succeeded: false };
 
   const entryState = (params.entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
 
   if (data.type.toUpperCase() === "CHARACTER") {
-    const newChar: CardInstance = {
-      instanceId: nanoid(),
-      cardId: lifeCard.cardId,
-      zone: "CHARACTER",
-      state: entryState,
-      attachedDon: [],
+    const moved = transitionCard(state, lifeCard.instanceId, "CHARACTER", {
+      entryState,
       turnPlayed: state.turn.number,
-      controller,
-      owner: controller,
-    };
-
-    const charSlotIdx = p.characters.indexOf(null);
-    const newChars = charSlotIdx !== -1
-      ? (() => { const nc = [...p.characters] as (typeof p.characters); nc[charSlotIdx] = newChar; return nc; })()
-      : p.characters;
-
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[controller] = {
-      ...p,
-      life: newLife,
-      characters: newChars,
-    };
+    });
+    if (!moved) return { state, events, succeeded: false };
 
     events.push({
       type: "CARD_PLAYED",
       playerIndex: controller,
       payload: {
-        cardInstanceId: newChar.instanceId,
+        cardInstanceId: moved.fact.newInstanceId,
         cardId: lifeCard.cardId,
         zone: "CHARACTER",
         source: "LIFE",
@@ -507,10 +429,10 @@ export function executePlayFromLife(
     });
 
     return {
-      state: { ...state, players: newPlayers },
+      state: moved.state,
       events,
       succeeded: true,
-      result: { targetInstanceIds: [newChar.instanceId], count: 1 },
+      result: { targetInstanceIds: [moved.fact.newInstanceId], count: 1 },
     };
   }
 
@@ -538,30 +460,17 @@ export function executeLifeCardToDeck(
   if (count === 0) return { state, events, succeeded: false };
 
   const removed = p.life.slice(0, count);
-  const newLife = p.life.slice(count);
-
-  const deckCards: CardInstance[] = removed.map((l) => ({
-    instanceId: nanoid(),
-    cardId: l.cardId,
-    zone: "DECK" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: targetController,
-    owner: targetController,
-  }));
-
-  const newDeck = position === "BOTTOM"
-    ? [...p.deck, ...deckCards]
-    : [...deckCards, ...p.deck];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[targetController] = { ...p, life: newLife, deck: newDeck };
+  const moved = transitionCards(
+    state,
+    removed.map((card) => card.instanceId),
+    "DECK",
+    { position },
+  );
 
   events.push({ type: "LIFE_CARD_TO_DECK", playerIndex: targetController, payload: { count } });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
   };
@@ -580,29 +489,17 @@ export function executeTrashFaceUpLife(
   const faceUp = p.life.filter((l) => l.face === "UP");
   if (faceUp.length === 0) return { state, events, succeeded: false };
 
-  const newLife = p.life.filter((l) => l.face !== "UP");
-  const trashedCards: CardInstance[] = faceUp.map((l) => ({
-    instanceId: l.instanceId,
-    cardId: l.cardId,
-    zone: "TRASH" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller,
-    owner: controller,
-  }));
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = {
-    ...p,
-    life: newLife,
-    trash: [...trashedCards, ...p.trash],
-  };
+  const moved = transitionCards(
+    state,
+    faceUp.map((card) => card.instanceId),
+    "TRASH",
+    { position: "TOP" },
+  );
 
   events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: faceUp.length, reason: "face_up_life" } });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
   };
@@ -650,27 +547,15 @@ export function executeDrainLifeToThreshold(
   if (excess <= 0) return { state, events, succeeded: false };
 
   const removed = p.life.slice(0, excess);
-  const newLife = p.life.slice(excess);
-  const trashedCards: CardInstance[] = removed.map((l) => ({
-    instanceId: l.instanceId,
-    cardId: l.cardId,
-    zone: "TRASH" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller,
-    owner: controller,
-  }));
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = {
-    ...p,
-    life: newLife,
-    trash: [...trashedCards, ...p.trash],
-  };
+  const moved = transitionCards(
+    state,
+    removed.map((card) => card.instanceId),
+    "TRASH",
+    { position: "TOP" },
+  );
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
   };

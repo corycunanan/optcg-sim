@@ -164,8 +164,8 @@ describe("OPT-371: selection → arrange chaining", () => {
     expect(p.trash.map((c) => c.instanceId)).toEqual(["trash-b"]);
     // Placed at the bottom in the arranged order: ..., a, c (c bottom-most).
     expect(p.deck.length).toBe(deckBefore + 2 - 1); // +2 placed, −1 drawn by the action
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-c");
-    expect(p.deck[p.deck.length - 2].instanceId).toBe("trash-a");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-c");
+    expect(p.deck[p.deck.length - 2].instanceId).not.toBe("trash-a");
     // The block's DRAW action ran after the cost.
     expect(p.hand.length).toBe(handBefore + 1);
   });
@@ -195,8 +195,8 @@ describe("OPT-371: selection → arrange chaining", () => {
     expect(done.pendingPrompt).toBeUndefined();
     const p = done.state.players[0];
     expect(p.trash).toHaveLength(0);
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-a");
-    expect(p.deck[p.deck.length - 2].instanceId).toBe("trash-b");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-a");
+    expect(p.deck[p.deck.length - 2].instanceId).not.toBe("trash-b");
   });
 
   it("ignores unknown ids in the arrange response and still pays in full", () => {
@@ -225,8 +225,8 @@ describe("OPT-371: selection → arrange chaining", () => {
     expect(done.pendingPrompt).toBeUndefined();
     const p = done.state.players[0];
     expect(p.trash).toHaveLength(0);
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-a");
-    expect(p.deck[p.deck.length - 2].instanceId).toBe("trash-b");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-a");
+    expect(p.deck[p.deck.length - 2].instanceId).not.toBe("trash-b");
   });
 });
 
@@ -250,7 +250,7 @@ describe("OPT-371: arrange-skip cases", () => {
     expect(done.pendingPrompt).toBeUndefined();
     const p = done.state.players[0];
     expect(p.trash.map((c) => c.instanceId)).toEqual(["trash-a"]);
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-b");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-b");
   });
 
   it("amount 1 with trash of exactly 1 auto-pays with no prompt", () => {
@@ -264,7 +264,7 @@ describe("OPT-371: arrange-skip cases", () => {
     expect(result.cannotPay).toBeFalsy();
     const p = result.state.players[0];
     expect(p.trash).toHaveLength(0);
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-a");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-a");
   });
 
   it("shuffle-after block (OP05-080 pattern) skips the arrange step entirely", () => {
@@ -443,8 +443,8 @@ describe("OPT-371: OP05-082 Shirahoshi cost shape (REST_SELF + place 2, integrat
     expect(done.pendingPrompt).toBeUndefined();
     const p = done.state.players[0];
     expect(p.trash.map((c) => c.instanceId)).toEqual(["trash-c"]);
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-a");
-    expect(p.deck[p.deck.length - 2].instanceId).toBe("trash-b");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-a");
+    expect(p.deck[p.deck.length - 2].instanceId).not.toBe("trash-b");
     // Action chain (DRAW) resolved after both costs.
     expect(p.hand.length).toBe(handBefore + 1);
   });

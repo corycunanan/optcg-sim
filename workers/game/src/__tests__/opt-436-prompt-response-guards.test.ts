@@ -185,7 +185,9 @@ describe("OPT-436: response type must match the pending prompt", () => {
     expect(session.gameState.pendingPrompt).toBeFalsy();
     expect(session.gameState.effectStack.length).toBe(0);
     const deck = session.gameState.players[0].deck;
-    expect(deck.slice(-2).map((c) => c.instanceId)).toEqual(["trash-a", "trash-c"]);
+    expect(deck.slice(-2).map((c) => c.cardId)).toEqual([CARDS.VANILLA.id, CARDS.BLOCKER.id]);
+    expect(deck.slice(-2).map((c) => c.instanceId)).not.toContain("trash-a");
+    expect(deck.slice(-2).map((c) => c.instanceId)).not.toContain("trash-c");
   });
 });
 

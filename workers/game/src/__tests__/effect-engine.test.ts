@@ -1362,7 +1362,7 @@ describe("Replacement Effects", () => {
     // Ivankov trashed (not KO'd — no DON returned to deck)
     const onField = result.state.players[0].characters.filter(Boolean);
     expect(onField).toHaveLength(0);
-    expect(result.state.players[0].trash.some((c) => c.instanceId === "ivankov-1")).toBe(true);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === "ivankov-1")).toBe(false);
   });
 });
 

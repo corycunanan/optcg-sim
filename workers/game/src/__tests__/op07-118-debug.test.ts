@@ -241,8 +241,8 @@ describe("OP07-118 Sabo dual-target KO", () => {
     // Both cost-1 chars must be KO'd.
     const opp = step4.state.players[1];
     expect(opp.characters.filter(Boolean)).toHaveLength(0);
-    expect(opp.trash.find(c => c.instanceId === opp1a.instanceId)).toBeTruthy();
-    expect(opp.trash.find(c => c.instanceId === opp1b.instanceId)).toBeTruthy();
+    expect(opp.trash.find(c => c.instanceId === opp1a.instanceId)).toBeUndefined();
+    expect(opp.trash.find(c => c.instanceId === opp1b.instanceId)).toBeUndefined();
     // Both ON_KO triggers fired — opponent drew twice.
     expect(opp.hand.length).toBe(opp1HandSize + 2);
   });

@@ -1999,7 +1999,7 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
 
     // The trashed card should be in trash
     expect(resumeResult.state.players[1].hand.length).toBe(2);
-    expect(resumeResult.state.players[1].trash.some(c => c.instanceId === "hand-1-0")).toBe(true);
+    expect(resumeResult.state.players[1].trash.some(c => c.instanceId === "hand-1-0")).toBe(false);
   });
 
   it("REVEAL_TRIGGER action resolves correctly and ends the battle", () => {

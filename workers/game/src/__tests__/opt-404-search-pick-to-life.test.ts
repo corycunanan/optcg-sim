@@ -104,7 +104,8 @@ describe("OPT-404: SEARCH_DECK pick to top of Life (OP16-119)", () => {
     );
     expect(next).not.toBeNull();
     const p0 = next!.players[0];
-    expect(p0.life.map((l) => l.instanceId)).toEqual(["d2", "lf1"]);
+    expect(p0.life.map((l) => l.cardId)).toEqual(["D2", "LF1"]);
+    expect(p0.life.map((l) => l.instanceId)).not.toContain("d2");
     expect(p0.life[0].face).toBe("DOWN");
     expect(p0.hand).toHaveLength(0);
     // Rest went to the bottom of the deck in the chosen order.
@@ -125,7 +126,8 @@ describe("OPT-404: SEARCH_DECK pick to top of Life (OP16-119)", () => {
       events,
     );
     const p0 = next!.players[0];
-    expect(p0.hand.map((c) => c.instanceId)).toEqual(["d2"]);
+    expect(p0.hand.map((c) => c.cardId)).toEqual(["D2"]);
+    expect(p0.hand.map((c) => c.instanceId)).not.toContain("d2");
     expect(p0.life).toHaveLength(1);
     expect(events).toEqual([
       expect.objectContaining({ type: "CARD_DRAWN" }),

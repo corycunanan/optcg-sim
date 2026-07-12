@@ -104,7 +104,7 @@ describe("OPT-460 — EB01-030 Loguetown compound cost", () => {
     expect(p0.stage).toBeNull();
     expect(p0.hand).toHaveLength(handBefore + 1); // pay 1, then Draw 2
     expect(p0.deck.slice(-2).map((card) => card.cardId)).toEqual([chosen.cardId, stage.cardId]);
-    expect(p0.deck.at(-2)?.instanceId).toBe(chosen.instanceId);
+    expect(p0.deck.at(-2)?.instanceId).not.toBe(chosen.instanceId);
     expect(p0.deck.at(-1)?.instanceId).not.toBe(stage.instanceId);
     expect(session.gameState.effectStack).toHaveLength(0);
     expect(session.gameState.pendingPrompt).toBeFalsy();

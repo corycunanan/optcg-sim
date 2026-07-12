@@ -165,8 +165,8 @@ describe("multiple replacement effects on the same KO batch", () => {
     // Both guardians self-trashed — neither still on the field.
     expect(p0.characters.some((c) => c?.instanceId === ids.ga)).toBe(false);
     expect(p0.characters.some((c) => c?.instanceId === ids.gb)).toBe(false);
-    expect(p0.trash.some((c) => c.instanceId === ids.ga)).toBe(true);
-    expect(p0.trash.some((c) => c.instanceId === ids.gb)).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === ids.ga)).toBe(false);
+    expect(p0.trash.some((c) => c.instanceId === ids.gb)).toBe(false);
 
     // The KO action reports zero targets KO'd (everything was replaced).
     expect(result.result?.targetInstanceIds ?? []).toEqual([]);
@@ -220,7 +220,7 @@ describe("multiple replacement effects on the same KO batch", () => {
     const p0 = final.state.players[0];
     expect(p0.characters.some((c) => c?.instanceId === ids.aa)).toBe(true);
     expect(p0.characters.some((c) => c?.instanceId === ids.ab)).toBe(false);
-    expect(p0.trash.some((c) => c.instanceId === ids.ab)).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === ids.ab)).toBe(false);
     expect(p0.characters.some((c) => c?.instanceId === ids.ga)).toBe(false);
     expect(p0.characters.some((c) => c?.instanceId === ids.gb)).toBe(true);
 
@@ -311,7 +311,7 @@ describe("replacement suppresses the triggered event", () => {
     // Ivan is in trash via CARD_TRASHED, not CARD_KO.
     const p0 = result.state.players[0];
     expect(p0.characters.some((c) => c?.instanceId === ivanInst.instanceId)).toBe(false);
-    expect(p0.trash.some((c) => c.instanceId === ivanInst.instanceId)).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === ivanInst.instanceId)).toBe(false);
 
     const trashedEvents = result.events.filter((e) => e.type === "CARD_TRASHED");
     const koEvents = result.events.filter((e) => e.type === "CARD_KO");

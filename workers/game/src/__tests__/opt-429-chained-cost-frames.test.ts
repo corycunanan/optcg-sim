@@ -138,7 +138,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     const deck = done.state.players[0].deck;
     const bottom = deck.slice(-2);
     const bottomIds = bottom.map((c) => c.instanceId);
-    expect(bottomIds).toContain("trash-a");
+    expect(bottomIds).not.toContain("trash-a");
     // The bottom-decked field character re-enters the deck as a fresh
     // instance (OPT-453, rules §3-1-6) — its old field id is gone.
     expect(bottom.map((c) => c.cardId)).toContain(CARDS.BLOCKER.id);

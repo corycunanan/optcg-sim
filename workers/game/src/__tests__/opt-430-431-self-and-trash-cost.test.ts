@@ -181,10 +181,10 @@ describe("OPT-431: the self half is fixed to the source card", () => {
     expect(p0.characters.some((c) => c?.instanceId === SOURCE_ID)).toBe(false);
     expect(p0.characters.some((c) => c?.instanceId === bystanderId)).toBe(true);
     // OPT-453: the field half re-enters the deck as a NEW instance (§3-1-6);
-    // the trash half keeps its identity. Order pinned by cardId.
+    // the trash half also crosses an identity boundary. Order pinned by cardId.
     expect(p0.deck.slice(-2).map((c) => c.cardId)).toEqual([KINEMON_FIELD, KINEMON_TRASH]);
     expect(p0.deck.at(-2)!.instanceId).not.toBe(SOURCE_ID);
-    expect(p0.deck.at(-1)!.instanceId).toBe("trash-kin-0");
+    expect(p0.deck.at(-1)!.instanceId).not.toBe("trash-kin-0");
     expect(done.state.effectStack).toHaveLength(0);
     // Zone-transition reset: a stale non-null turnPlayed in the deck crashes
     // the freshly-played-instance lookup once the card is redrawn and played.
@@ -278,7 +278,7 @@ describe("OPT-430: the self+trash group is ordered in one arrange prompt", () =>
     // Pre-fix the trash card was hardcoded bottom-most; now the source can be.
     expect(done.state.players[0].deck.slice(-2).map((c) => c.cardId))
       .toEqual([KINEMON_TRASH, KINEMON_FIELD]);
-    expect(done.state.players[0].deck.at(-2)!.instanceId).toBe("trash-kin-0");
+    expect(done.state.players[0].deck.at(-2)!.instanceId).not.toBe("trash-kin-0");
     expect(done.state.players[0].deck.at(-1)!.instanceId).not.toBe(SOURCE_ID);
     expect(done.state.effectStack).toHaveLength(0);
   });
@@ -353,7 +353,7 @@ describe("OPT-430/431: OP10-027 variant (1000-power trash filter)", () => {
       cardDb,
     );
     const p0 = done.state.players[0];
-    expect(p0.deck.at(-2)!.instanceId).toBe("trash-k1000");
+    expect(p0.deck.at(-2)!.instanceId).not.toBe("trash-k1000");
     expect(p0.deck.at(-1)!.cardId).toBe("OP10-027");
     expect(p0.deck.at(-1)!.instanceId).not.toBe(SOURCE_ID); // fresh instance (OPT-453)
     // The 0-power Kin'emon never left the trash.
@@ -453,7 +453,7 @@ describe("OPT-430/431: full OP10-026 activation through the production path", ()
     // Cost fully paid in the chosen order; source left the field and
     // re-entered the deck as a fresh instance (OPT-453, §3-1-6).
     expect(p0.deck.slice(-2).map((c) => c.cardId)).toEqual([KINEMON_TRASH, KINEMON_FIELD]);
-    expect(p0.deck.at(-2)!.instanceId).toBe("trash-kin-1");
+    expect(p0.deck.at(-2)!.instanceId).not.toBe("trash-kin-1");
     expect(p0.deck.at(-1)!.instanceId).not.toBe(SOURCE_ID);
     expect(p0.characters.some((c) => c?.instanceId === SOURCE_ID)).toBe(false);
     // The effect's PLAY_CARD action ran (up to 1 from hand — none match in

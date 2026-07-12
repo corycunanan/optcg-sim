@@ -9,7 +9,6 @@ import type { CardData, GameAction, GameState, PendingEvent, ExecuteResult } fro
 import {
   getActivePlayerIndex,
   findCardInState,
-  moveCard,
   restDonForCost,
   attachDon,
 } from "./state.js";
@@ -25,6 +24,7 @@ import {
 } from "./battle.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { isOncePerTurnBlock, type EffectSchema } from "./effect-types.js";
+import { transitionCard } from "./zone-transition.js";
 
 export function execute(
   state: GameState,
@@ -94,42 +94,40 @@ function executePlayCard(
     if (charCount >= 5 && position != null) {
       const replaced = nextState.players[pi].characters[position];
       if (replaced) {
-        nextState = moveCard(nextState, replaced.instanceId, "TRASH");
-        events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: replaced.cardId, reason: "overflow" } });
+        const moved = transitionCard(nextState, replaced.instanceId, "TRASH", {
+          position: "TOP",
+          preserveSourceTriggers: true,
+        });
+        if (moved) {
+          nextState = moved.state;
+          events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardInstanceId: replaced.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: replaced.cardId, reason: "overflow" } });
+        }
       }
     }
 
-    nextState = moveCard(nextState, cardInstanceId, "CHARACTER", { slotIndex: position });
-    // moveCard assigns a new instanceId — capture it for trigger matching
-    const newCharInstance = nextState.players[pi].characters.find(
-      (c) => c !== null && c.cardId === found.card.cardId && c.turnPlayed === null,
-    );
-    const charNewInstanceId = newCharInstance!.instanceId;
-    // Record turn played for Rush/summoning sickness
-    const charIdx = nextState.players[pi].characters.findIndex(
-      (c) => c?.cardId === found.card.cardId && c?.turnPlayed === null,
-    );
-    if (charIdx !== -1) {
-      const chars = [...nextState.players[pi].characters] as (typeof nextState.players[0]["characters"]);
-      chars[charIdx] = { ...chars[charIdx]!, turnPlayed: nextState.turn.number };
-      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[pi] = { ...newPlayers[pi], characters: chars };
-      nextState = { ...nextState, players: newPlayers };
-    }
+    const moved = transitionCard(nextState, cardInstanceId, "CHARACTER", {
+      slotIndex: position,
+      turnPlayed: nextState.turn.number,
+    });
+    if (!moved) return { state: nextState, events };
+    nextState = moved.state;
+    const charNewInstanceId = moved.fact.newInstanceId;
 
     events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER", source: "FROM_HAND", sourceZone: "HAND" } });
 
   } else if (cardData.type === "Event") {
     // Trash the event, then resolve its MAIN_EVENT effect block directly
-    nextState = moveCard(nextState, cardInstanceId, "TRASH");
-    const newEventInstance = nextState.players[pi].trash[0]; // trash is LIFO, newest at [0]
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, zone: "TRASH", source: "FROM_HAND", sourceZone: "HAND" } });
+    const moved = transitionCard(nextState, cardInstanceId, "TRASH", { position: "TOP" });
+    if (!moved) return { state: nextState, events };
+    nextState = moved.state;
+    const newEventInstanceId = moved.fact.newInstanceId;
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstanceId, zone: "TRASH", source: "FROM_HAND", sourceZone: "HAND" } });
     // OPT-236 class 1: distinct event for "Event [Main] activated from hand".
     // Watchers subscribing to EVENT_ACTIVATED_FROM_HAND (Usopp-style) fire here
     // and NOT on class 2 (from trash) or class 3 (from life trigger).
     const printedCost = cardData.cost ?? 0;
     const costReducedAmount = Math.max(0, printedCost - cost);
-    events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstance.instanceId, costReducedAmount } });
+    events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstanceId, costReducedAmount } });
 
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
     const schema = cardData.effectSchema as EffectSchema | null;
@@ -138,7 +136,7 @@ function executePlayCard(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
       );
       if (mainBlock) {
-        const result = resolveEffect(nextState, mainBlock, newEventInstance.instanceId, pi, cardDb);
+        const result = resolveEffect(nextState, mainBlock, newEventInstanceId, pi, cardDb);
         nextState = result.state;
         events.push(...result.events);
         if (result.pendingPrompt) {
@@ -151,12 +149,19 @@ function executePlayCard(
     // Trash existing stage first
     if (nextState.players[pi].stage) {
       const existingStage = nextState.players[pi].stage!;
-      nextState = moveCard(nextState, existingStage.instanceId, "TRASH");
-      events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardId: existingStage.cardId, reason: "stage_replaced" } });
+      const replaced = transitionCard(nextState, existingStage.instanceId, "TRASH", {
+        position: "TOP",
+        preserveSourceTriggers: true,
+      });
+      if (replaced) {
+        nextState = replaced.state;
+        events.push({ type: "CARD_TRASHED", playerIndex: pi, payload: { cardInstanceId: existingStage.instanceId, newCardInstanceId: replaced.fact.newInstanceId, cardId: existingStage.cardId, reason: "stage_replaced" } });
+      }
     }
-    nextState = moveCard(nextState, cardInstanceId, "STAGE");
-    const newStageInstance = nextState.players[pi].stage!;
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newStageInstance.instanceId, zone: "STAGE", source: "FROM_HAND", sourceZone: "HAND" } });
+    const moved = transitionCard(nextState, cardInstanceId, "STAGE", { turnPlayed: nextState.turn.number });
+    if (!moved) return { state: nextState, events };
+    nextState = moved.state;
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: moved.fact.newInstanceId, zone: "STAGE", source: "FROM_HAND", sourceZone: "HAND" } });
   }
 
   return { state: nextState, events };

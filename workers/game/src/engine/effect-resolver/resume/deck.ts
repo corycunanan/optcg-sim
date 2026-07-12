@@ -17,7 +17,7 @@ import type {
   PendingEvent,
 } from "../../../types.js";
 import { shuffleArray } from "../action-utils.js";
-import { nanoid } from "../../../util/nanoid.js";
+import { transitionCard, transitionCards } from "../../zone-transition.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -102,26 +102,33 @@ export function handleArrangeSearchDeck(
   const { restOfDeck, arrangedCards, kept } = computeArrangeContext(p.deck, validatedKeptId, ordered);
 
   const pickDest = (sp.pick_destination ?? "HAND").toUpperCase();
-  let newHand = [...p.hand];
-  let newLife = p.life;
+  let nextState = state;
   if (validatedKeptId && kept) {
     if (pickDest === "LIFE" || pickDest === "LIFE_TOP") {
       // OP16-119: picked card goes to the top of Life (face-down unless the
       // schema says otherwise).
       const face = (sp.face as "UP" | "DOWN") ?? "DOWN";
-      newLife = [{ instanceId: kept.instanceId, cardId: kept.cardId, face }, ...p.life];
+      const moved = transitionCard(nextState, kept.instanceId, "LIFE", {
+        position: "TOP",
+        lifeFace: face,
+      });
+      if (moved) nextState = moved.state;
     } else {
-      newHand = [...newHand, { ...kept, zone: "HAND" as const }];
-      events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
+      const moved = transitionCard(nextState, kept.instanceId, "HAND");
+      if (moved) {
+        nextState = moved.state;
+        events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
+      }
     }
   }
 
   const destination = resolveRestDestination(restDest, action.destination);
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
 
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, deck: newDeck, hand: newHand, life: newLife };
-  return { ...state, players: newPlayers };
+  const current = nextState.players[controller];
+  const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+  newPlayers[controller] = { ...current, deck: newDeck };
+  return { ...nextState, players: newPlayers };
 }
 
 export function handleArrangeSearchTrashTheRest(
@@ -153,32 +160,43 @@ export function handleArrangeSearchTrashTheRest(
     ordered,
   );
 
-  let newHand = [...p.hand];
+  let nextState = state;
   if (validatedKeptId && kept) {
-    newHand = [...newHand, { ...kept, zone: "HAND" as const }];
-    events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, source: "search" } });
+    const moved = transitionCard(nextState, kept.instanceId, "HAND");
+    if (moved) {
+      nextState = moved.state;
+      events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
+    }
   }
 
   let newDeck: CardInstance[];
-  let newTrash = [...p.trash];
 
   if (restDest.toUpperCase() === "TRASH") {
-    // Trash the remaining cards
     newDeck = restOfDeck;
-    for (const card of remainingCards) {
-      newTrash = [{ ...card, zone: "TRASH" as const } as CardInstance, ...newTrash];
-      events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { cardId: card.cardId, reason: "search_trash" } });
+    const moved = transitionCards(nextState, remainingCards.map((card) => card.instanceId), "TRASH", { position: "TOP" });
+    nextState = moved.state;
+    for (const transition of moved.transitions) {
+      events.push({
+        type: "CARD_TRASHED",
+        playerIndex: controller,
+        payload: {
+          cardInstanceId: transition.fact.oldInstanceId,
+          newCardInstanceId: transition.fact.newInstanceId,
+          cardId: transition.fact.cardId,
+          reason: "search_trash",
+        },
+      });
     }
   } else {
     // Place at bottom (or top) like SEARCH_DECK
     const destination = resolveRestDestination(restDest, action.destination);
     newDeck = placeArrangedInDeck(restOfDeck, remainingCards, destination);
-    newTrash = p.trash;
   }
 
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, deck: newDeck, hand: newHand, trash: newTrash };
-  return { ...state, players: newPlayers };
+  const current = nextState.players[controller];
+  const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+  newPlayers[controller] = { ...current, deck: newDeck };
+  return { ...nextState, players: newPlayers };
 }
 
 export function handleArrangeSearchAndPlay(
@@ -216,36 +234,33 @@ export function handleArrangeSearchAndPlay(
 
   const { restOfDeck, arrangedCards, keptCards } = computeArrangeContext(p.deck, keptIds, ordered);
 
-  // Play each kept card to the field (CHARACTER or STAGE zone)
-  const newCharacters = [...p.characters] as (typeof p.characters);
-  let newStage = p.stage;
-  let newTrash = [...p.trash];
+  // Play each kept card through the authoritative zone-transition contract.
+  let nextState = state;
   const unplayable: CardInstance[] = [];
   for (const kept of keptCards) {
     const data = cardDb.get(kept.cardId);
     if (data && data.type.toUpperCase() === "CHARACTER") {
-      const charSlot = newCharacters.indexOf(null);
+      const charSlot = nextState.players[controller].characters.indexOf(null);
       if (charSlot === -1) {
         // Character area full — the card joins the rest pile instead of vanishing.
         unplayable.push(kept);
         continue;
       }
-      const newChar: CardInstance = {
-        ...kept,
-        instanceId: nanoid(),
-        zone: "CHARACTER",
-        state: entryState,
-        attachedDon: [],
+      const moved = transitionCard(nextState, kept.instanceId, "CHARACTER", {
+        slotIndex: charSlot,
+        entryState,
         turnPlayed: state.turn.number,
-        controller,
-        owner: controller,
-      };
-      newCharacters[charSlot] = newChar;
+      });
+      if (!moved) {
+        unplayable.push(kept);
+        continue;
+      }
+      nextState = moved.state;
       events.push({
         type: "CARD_PLAYED",
         playerIndex: controller,
         payload: {
-          cardInstanceId: newChar.instanceId,
+          cardInstanceId: moved.fact.newInstanceId,
           cardId: kept.cardId,
           zone: "CHARACTER",
           source: "search_and_play",
@@ -255,24 +270,43 @@ export function handleArrangeSearchAndPlay(
       });
     } else if (data && data.type.toUpperCase() === "STAGE") {
       // If a Stage already exists, trash it first
-      if (newStage) {
-        newTrash = [{ ...newStage, zone: "TRASH" as const } as CardInstance, ...newTrash];
+      const existingStage = nextState.players[controller].stage;
+      if (existingStage) {
+        const replaced = transitionCard(nextState, existingStage.instanceId, "TRASH", {
+          position: "TOP",
+          preserveSourceTriggers: true,
+        });
+        if (!replaced) {
+          unplayable.push(kept);
+          continue;
+        }
+        nextState = replaced.state;
+        events.push({
+          type: "CARD_TRASHED",
+          playerIndex: controller,
+          payload: {
+            cardInstanceId: existingStage.instanceId,
+            newCardInstanceId: replaced.fact.newInstanceId,
+            cardId: existingStage.cardId,
+            reason: "stage_replaced",
+          },
+        });
       }
-      newStage = {
-        ...kept,
-        instanceId: nanoid(),
-        zone: "STAGE" as const,
-        state: "ACTIVE" as const,
-        attachedDon: [],
+      const moved = transitionCard(nextState, kept.instanceId, "STAGE", {
         turnPlayed: state.turn.number,
-        controller,
-        owner: controller,
-      } as CardInstance;
+      });
+      if (!moved) {
+        unplayable.push(kept);
+        continue;
+      }
+      nextState = moved.state;
       events.push({
         type: "CARD_PLAYED",
         playerIndex: controller,
-        payload: { cardInstanceId: newStage.instanceId, cardId: kept.cardId, zone: "STAGE", source: "search_and_play", sourceZone: "DECK" },
+        payload: { cardInstanceId: moved.fact.newInstanceId, cardId: kept.cardId, zone: "STAGE", source: "search_and_play", sourceZone: "DECK" },
       });
+    } else {
+      unplayable.push(kept);
     }
   }
 
@@ -290,9 +324,10 @@ export function handleArrangeSearchAndPlay(
     newDeck = shuffleArray(newDeck);
   }
 
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, deck: newDeck, characters: newCharacters, stage: newStage, trash: newTrash };
-  return { ...state, players: newPlayers };
+  const current = nextState.players[controller];
+  const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+  newPlayers[controller] = { ...current, deck: newDeck };
+  return { ...nextState, players: newPlayers };
 }
 
 export function handleArrangeReorderLife(

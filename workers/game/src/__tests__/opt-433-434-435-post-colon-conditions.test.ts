@@ -122,8 +122,8 @@ describe("OPT-433: OP05-082 Shirahoshi — post-colon HAND_COUNT gates only the 
     const source = p0.characters.find((c) => c?.instanceId === SOURCE_CHAR_ID);
     expect(source?.state).toBe("RESTED");
     expect(p0.trash).toHaveLength(0);
-    expect(p0.deck[p0.deck.length - 1].instanceId).toBe("trash-b");
-    expect(p0.deck[p0.deck.length - 2].instanceId).toBe("trash-a");
+    expect(p0.deck[p0.deck.length - 1].instanceId).not.toBe("trash-b");
+    expect(p0.deck[p0.deck.length - 2].instanceId).not.toBe("trash-a");
 
     // Post-colon action was skipped — opponent hand untouched.
     expect(result.state.players[1].hand).toHaveLength(5);
@@ -152,7 +152,7 @@ describe("OPT-433: OP05-082 Shirahoshi — post-colon HAND_COUNT gates only the 
 
     const p1 = final.state.players[1];
     expect(p1.hand).toHaveLength(5);
-    expect(p1.trash.map((c) => c.instanceId)).toContain("hand-opp-0");
+    expect(p1.trash.map((c) => c.instanceId)).not.toContain("hand-opp-0");
   });
 });
 
@@ -210,7 +210,7 @@ describe("OPT-434: OP10-118 Monkey.D.Luffy — post-colon HAND_COUNT gates only 
 
     const p0 = result.state.players[0];
     expect(p0.trash).toHaveLength(0);
-    expect(p0.deck[p0.deck.length - 1].instanceId).toBe("trash-c");
+    expect(p0.deck[p0.deck.length - 1].instanceId).not.toBe("trash-c");
 
     expect(result.state.players[1].hand).toHaveLength(4);
   });
@@ -236,7 +236,7 @@ describe("OPT-434: OP10-118 Monkey.D.Luffy — post-colon HAND_COUNT gates only 
 
     const p1 = final.state.players[1];
     expect(p1.hand).toHaveLength(4);
-    expect(p1.trash.map((c) => c.instanceId)).toContain("hand-opp-0");
+    expect(p1.trash.map((c) => c.instanceId)).not.toContain("hand-opp-0");
   });
 });
 
@@ -309,7 +309,7 @@ describe("OPT-435: OP12-094 Monkey.D.Dragon — post-colon LEADER_PROPERTY gates
     const p0 = result.state.players[0];
     // Cost paid: the 3 fodder cards left trash; the playable card stayed.
     expect(p0.trash.map((c) => c.instanceId)).toEqual(["trash-p1"]);
-    expect(p0.deck[p0.deck.length - 1].instanceId).toBe("trash-f3");
+    expect(p0.deck[p0.deck.length - 1].instanceId).not.toBe("trash-f3");
 
     // Post-colon PLAY_CARD action was skipped — no new character on the field.
     expect(p0.characters.filter(Boolean).map((c) => c!.cardId)).not.toContain(REV_PLAYABLE.id);

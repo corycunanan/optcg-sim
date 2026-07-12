@@ -213,7 +213,16 @@ export function applyMulligan(
   const player = state.players[playerIndex];
 
   // Return hand to deck and reshuffle
-  const combined = [...player.hand, ...player.deck];
+  const returned = player.hand.map((card) => ({
+    ...card,
+    instanceId: nanoid(),
+    zone: "DECK" as const,
+    state: "ACTIVE" as const,
+    attachedDon: [],
+    turnPlayed: null,
+    controller: card.owner,
+  }));
+  const combined = [...returned, ...player.deck];
   const reshuffled = shuffleDeck(combined);
 
   // Draw 5 new cards
@@ -368,7 +377,17 @@ function shuffleDeck(cards: CardInstance[]): CardInstance[] {
 }
 
 function drawN(deck: CardInstance[], n: number): [CardInstance[], CardInstance[]] {
-  const hand = deck.slice(0, n).map((c) => ({ ...c, zone: "HAND" as const }));
+  // Setup precedes a complete GameState, so it cannot call transitionCard;
+  // apply the same identity boundary while dealing the opening hand.
+  const hand = deck.slice(0, n).map((c) => ({
+    ...c,
+    instanceId: nanoid(),
+    zone: "HAND" as const,
+    state: "ACTIVE" as const,
+    attachedDon: [],
+    turnPlayed: null,
+    controller: c.owner,
+  }));
   const remaining = deck.slice(n);
   return [hand, remaining];
 }

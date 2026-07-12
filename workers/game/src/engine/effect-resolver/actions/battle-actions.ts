@@ -3,10 +3,11 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
+import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { continueEffectDamageSequence } from "../../battle.js";
+import { transitionCard } from "../../zone-transition.js";
 
 // ─── REDIRECT_ATTACK ─────────────────────────────────────────────────────────
 
@@ -107,24 +108,19 @@ export function executeSelfTakeDamage(
     if (player.life.length === 0) break;
 
     const lifeCard = player.life[0];
-    const newLife = player.life.slice(1);
-    const handCard: CardInstance = {
-      instanceId: lifeCard.instanceId,
-      cardId: lifeCard.cardId,
-      zone: "HAND" as const,
-      state: "ACTIVE" as const,
-      attachedDon: [],
-      turnPlayed: null,
-      controller: controller,
-      owner: controller,
-    };
-    const newHand = [...player.hand, handCard];
-    const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-    newPlayers[controller] = { ...player, life: newLife, hand: newHand };
-    nextState = { ...nextState, players: newPlayers };
+    const moved = transitionCard(nextState, lifeCard.instanceId, "HAND");
+    if (!moved) break;
+    nextState = moved.state;
     dealt++;
 
-    events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: lifeCard.instanceId } });
+    events.push({
+      type: "CARD_REMOVED_FROM_LIFE",
+      playerIndex: controller,
+      payload: {
+        cardInstanceId: lifeCard.instanceId,
+        newCardInstanceId: moved.fact.newInstanceId,
+      },
+    });
   }
 
   return { state: nextState, events, succeeded: dealt > 0, result: { targetInstanceIds: [], count: dealt } };

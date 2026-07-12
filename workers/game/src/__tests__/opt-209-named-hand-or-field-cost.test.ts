@@ -187,7 +187,7 @@ describe("OPT-209: TRASH_OWN_STAGE", () => {
     expect(result).not.toBeNull();
     const p0 = result!.state.players[0];
     expect(p0.stage).toBeNull();
-    expect(p0.trash[0]?.instanceId).toBe("stage-s1");
+    expect(p0.trash[0]?.instanceId).not.toBe("stage-s1");
     expect(p0.trash[0]?.zone).toBe("TRASH");
     expect(result!.costResult.cardsTrashedCount).toBe(1);
     expect(result!.costResult.cardsTrashedInstanceIds).toContain("stage-s1");

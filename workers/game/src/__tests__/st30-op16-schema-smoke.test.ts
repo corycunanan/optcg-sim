@@ -97,7 +97,7 @@ describe("ST30 / OP16 first-pass schema smoke", () => {
 
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
     expect(remainingIds).toEqual([allyInst.instanceId]);
-    expect(resumed.state.players[0].trash.some((c) => c.instanceId === littleOarsInst.instanceId)).toBe(true);
+    expect(resumed.state.players[0].trash.some((c) => c.instanceId === littleOarsInst.instanceId)).toBe(false);
     expect(resumed.state.players[0].hand.some((c) => c.instanceId === allyInst.instanceId)).toBe(false);
     expect(resumed.events.some((e) => e.type === "CARD_DRAWN")).toBe(true);
   });

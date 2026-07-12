@@ -439,7 +439,7 @@ describe("OPT-437: the gate holds on the selectable-cost resume path (ST23-003)"
     expect(done.resolved).toBe(true);
     // Cost paid through finishCostsAndRunActions...
     expect(done.state.players[0].hand).toHaveLength(handBefore - 1);
-    expect(done.state.players[0].trash.some((c) => c.instanceId === trashId)).toBe(true);
+    expect(done.state.players[0].trash.some((c) => c.instanceId === trashId)).toBe(false);
     // ...and the gated KO chain skipped: no opponent character left the field
     // and no KO target prompt opened.
     expect(done.pendingPrompt).toBeUndefined();

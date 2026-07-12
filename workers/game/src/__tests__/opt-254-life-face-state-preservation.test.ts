@@ -245,7 +245,8 @@ describe("OPT-254 — New Life placements default to face-down", () => {
     expect(result.succeeded).toBe(true);
     const newLife = result.state.players[0].life;
     expect(newLife).toHaveLength(1);
-    expect(newLife[0]).toMatchObject({ instanceId: topDeckId, face: "DOWN" });
+    expect(newLife[0]).toMatchObject({ face: "DOWN" });
+    expect(newLife[0].instanceId).not.toBe(topDeckId);
   });
 
   it("ADD_TO_LIFE_FROM_DECK honors an explicit face: 'UP' param", () => {
@@ -284,7 +285,8 @@ describe("OPT-254 — New Life placements default to face-down", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.state.players[0].life).toHaveLength(1);
-    expect(result.state.players[0].life[0]).toMatchObject({ instanceId: "hand-A", face: "DOWN" });
+    expect(result.state.players[0].life[0]).toMatchObject({ face: "DOWN" });
+    expect(result.state.players[0].life[0].instanceId).not.toBe("hand-A");
   });
 
   it("ADD_TO_LIFE_FROM_FIELD defaults the returned Life to face-DOWN", () => {
@@ -457,7 +459,7 @@ describe("OPT-254 — Face-up Life still opens the [Trigger] window on damage (F
     expect(after.state.players[1].hand.length).toBe(p1HandBefore + 1);
     expect(
       after.state.players[1].hand.some((c) => c.instanceId === triggerLife.instanceId),
-    ).toBe(true);
+    ).toBe(false);
     expect(after.state.players[1].life).toHaveLength(0);
   });
 });

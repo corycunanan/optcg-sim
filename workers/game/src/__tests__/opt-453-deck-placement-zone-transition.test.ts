@@ -165,7 +165,7 @@ describe("OPT-453 — compound self+trash cost: DON return and fresh identity", 
   const KINEMON_FIELD = makeCard("OP10-026", { name: "Kin'emon", cost: 4, power: 5000, effectSchema: OP10_026_KINEMON });
   const KINEMON_TRASH = makeCard("TRASH-KIN", { name: "Kin'emon", cost: 3, power: 0 });
 
-  it("returns attached DON rested and re-ids only the field half", () => {
+  it("returns attached DON rested and re-ids both cross-zone cards", () => {
     const cardDb = buildCardDb();
     cardDb.set(KINEMON_FIELD.id, KINEMON_FIELD);
     cardDb.set(KINEMON_TRASH.id, KINEMON_TRASH);
@@ -233,7 +233,7 @@ describe("OPT-453 — compound self+trash cost: DON return and fresh identity", 
     expect(placed.map((c) => c.cardId)).toEqual([KINEMON_FIELD.id, KINEMON_TRASH.id]);
     expect(placed[0].instanceId).not.toBe(source.instanceId);
     expect(placed[0].attachedDon).toHaveLength(0);
-    expect(placed[1].instanceId).toBe("trash-kin-0");
+    expect(placed[1].instanceId).not.toBe("trash-kin-0");
 
     // Field exit announced for the self half only.
     const returnedEvents = done.events.filter((e) => e.type === "CARD_RETURNED_TO_DECK");

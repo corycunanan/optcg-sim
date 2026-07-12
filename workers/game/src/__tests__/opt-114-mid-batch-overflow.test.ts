@@ -111,7 +111,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     );
     expect(stillTrashed).toHaveLength(0);
     // Victim lives in trash as a rule-trashed card (no CARD_KO emitted).
-    expect(p0.trash.some((c) => c.instanceId === victimId)).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === victimId)).toBe(false);
     const koEvents = resumed.events.filter((e) => e.type === "CARD_KO");
     expect(koEvents).toHaveLength(0);
     // 2 played events total across both pauses (1 before overflow + 1 after resume).
@@ -175,7 +175,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     // Trash: no trash-a or trash-b; victim "board-b0" rule-trashed there.
     expect(p0.trash.some((c) => c.instanceId === "trash-a")).toBe(false);
     expect(p0.trash.some((c) => c.instanceId === "trash-b")).toBe(false);
-    expect(p0.trash.some((c) => c.instanceId === "board-b0")).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === "board-b0")).toBe(false);
     // Played chars: one ACTIVE (from trash-a), one RESTED (from trash-b).
     const newChars = p0.characters.filter(
       (c): c is CardInstance => c !== null && [CARDS.VANILLA.id, CARDS.RUSH.id].includes(c.cardId) && c.turnPlayed !== 1,

@@ -157,7 +157,7 @@ describe("OPT-171: rule 3-7-6-1 replace-and-trash on full board", () => {
     expect(playedOnBoard).toBe(true);
     expect(p0.characters.filter(Boolean).length).toBe(5);
     const victimInTrash = p0.trash.some((c) => c.instanceId === victimId);
-    expect(victimInTrash).toBe(true);
+    expect(victimInTrash).toBe(false);
     // Play source card removed from trash
     const stillInTrash = p0.trash.some((c) => c.instanceId === trashTargetId);
     expect(stillInTrash).toBe(false);

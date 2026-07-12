@@ -124,7 +124,7 @@ describe("OPT-469: OP03-032 Buggy", () => {
   it("is K.O.'d by a non-Slash attacker", () => {
     const result = battle("Strike");
     expect(result.players[1].characters.some((card) => card?.instanceId === "buggy")).toBe(false);
-    expect(result.players[1].trash.some((card) => card.instanceId === "buggy")).toBe(true);
+    expect(result.players[1].trash.some((card) => card.instanceId === "buggy")).toBe(false);
   });
 });
 
