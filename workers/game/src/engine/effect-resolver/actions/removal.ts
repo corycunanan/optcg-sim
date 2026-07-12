@@ -12,6 +12,7 @@ import { processBatchReplacements } from "../../replacements.js";
 import { findCardInstance } from "../../state.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
+import { replacePendingEventReferences } from "../../events.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
 // Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
@@ -92,6 +93,7 @@ export function executeKO(
     if (frameEvents.length > 0 && i + 1 < unprotectedIds.length) {
       const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
       nextState = scan.state;
+      replacePendingEventReferences(events, frameEvents, scan.events);
       if (scan.triggers.length > 0) {
         const marker: BatchResumeMarker = {
           kind: "KO",

@@ -17,6 +17,7 @@ import { pushFrame, generateFrameId } from "./effect-stack.js";
 import { isEngineTerminated } from "./engine-limits.js";
 import { findCardInstance } from "./state.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
+import { withTriggerScanned } from "./events.js";
 
 // ─── scanEventsForTriggers ──────────────────────────────────────────────────
 
@@ -29,12 +30,14 @@ export function scanEventsForTriggers(
   events: PendingEvent[],
   defaultController: 0 | 1,
   cardDb: Map<string, CardData>,
-): { triggers: QueuedTrigger[]; state: GameState } {
+): { triggers: QueuedTrigger[]; state: GameState; events: PendingEvent[] } {
   const triggers: QueuedTrigger[] = [];
   let nextState = state;
+  const scannedEvents = events.map(withTriggerScanned);
 
   // Register triggers for newly played cards before matching
-  for (const event of events) {
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
     if (event.type === "CARD_PLAYED") {
       const { cardId, cardInstanceId } = event.payload ?? {};
       if (!cardId || !cardInstanceId) continue;
@@ -50,12 +53,13 @@ export function scanEventsForTriggers(
     }
   }
 
-  for (const event of events) {
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
     // OPT-173: skip events that an inner multi-target batch handler already
     // scanned via its `pendingBatchTriggers` drain. Without this guard, the
     // pipeline's outer LIFO scan re-matches the same events and queues the
     // same triggers a second time.
-    if (event.__scannedForTriggers) continue;
+    if (event.propagation?.triggerScanned) continue;
 
     const gameEvent = {
       type: event.type,
@@ -73,18 +77,12 @@ export function scanEventsForTriggers(
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
         controller: match.trigger.controller,
         effectBlock: match.effectBlock,
-        triggeringEvent: event,
+        triggeringEvent: scannedEvents[index],
       });
     }
   }
 
-  // OPT-173: mark all scanned events so any future scan along the propagation
-  // path (LIFO pipeline scan, resume scans) treats them as already drained.
-  for (const event of events) {
-    event.__scannedForTriggers = true;
-  }
-
-  return { triggers, state: nextState };
+  return { triggers, state: nextState, events: scannedEvents };
 }
 
 // ─── buildTriggerSelectionPrompt ────────────────────────────────────────────

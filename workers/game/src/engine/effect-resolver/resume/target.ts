@@ -30,6 +30,7 @@ import type { EffectResolverResult } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
 import { processRemainingTriggers } from "./triggers.js";
 import { isEngineTerminated } from "../../engine-limits.js";
+import { replacePendingEventReferences } from "../../events.js";
 
 export interface TargetFallthrough {
   kind: "fallthrough";
@@ -179,6 +180,7 @@ export function handleSelectTargetRuleTrashForPlay(
   if (actionResult.events.length > 0) {
     const scan = scanEventsForTriggers(nextState, actionResult.events, controller, cardDb);
     nextState = scan.state;
+    replacePendingEventReferences(events, actionResult.events, scan.events);
     // triggers drain via the outer pipeline — fall through to remainingActions
   }
 

@@ -25,7 +25,7 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import { popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
-import { emitEvent } from "../../events.js";
+import { emitEvent, replacePendingEventReferences } from "../../events.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../../trigger-ordering.js";
 import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
@@ -322,6 +322,7 @@ export function handleAwaitingOptionalResponse(
     if (chainResult.events.length > 0) {
       const chainScan = scanEventsForTriggers(nextState, chainResult.events, controller, cardDb);
       nextState = chainScan.state;
+      replacePendingEventReferences(events, chainResult.events, chainScan.events);
       if (chainScan.triggers.length > 0) {
         const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
         return processRemainingTriggers(nextState, allTriggers, cardDb, events);
@@ -412,6 +413,7 @@ export function handleAwaitingTriggerOrderSelection(
       nextState, result.events, chosenTrigger.controller, cardDb,
     );
     nextState = scanResult.state;
+    replacePendingEventReferences(events, result.events, scanResult.events);
     if (scanResult.triggers.length > 0) {
       // Process nested triggers first, then come back to remaining simultaneous
       const nestedResult = processRemainingTriggers(nextState, scanResult.triggers, cardDb, events);
@@ -478,6 +480,7 @@ export function handleAwaitingTriggerOrderSelection(
         nextState, lastResult.events, remaining[0].controller, cardDb,
       );
       nextState = scanResult2.state;
+      replacePendingEventReferences(events, lastResult.events, scanResult2.events);
       if (scanResult2.triggers.length > 0) {
         const nestedResult = processRemainingTriggers(nextState, scanResult2.triggers, cardDb, events);
         nextState = nestedResult.state;
