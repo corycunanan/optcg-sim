@@ -96,6 +96,11 @@ export function executeTrashFromLife(
   };
 
   events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { count, reason: "life_trash" } });
+  // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
+  // Kalgara/Bonney-style watchers fire on effect-driven life trashes too.
+  for (const l of removed) {
+    events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: pi as 0 | 1, payload: { cardInstanceId: l.instanceId } });
+  }
 
   return {
     state: { ...state, players: newPlayers },

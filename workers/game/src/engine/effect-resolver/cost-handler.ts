@@ -284,6 +284,49 @@ export function payCosts(
         newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
         nextState = { ...nextState, players: newPlayers };
         events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: amount } });
+        // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
+        // already does; the cost path was missing it).
+        for (const l of removed) {
+          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+        }
+        break;
+      }
+
+      case "TRASH_FROM_LIFE": {
+        // "Trash N from the top of your Life cards" is deterministic — the
+        // player never picks WHICH life card, only whether to pay (the
+        // optional-effect prompt). OPT-259 (F6): not damage, never fires
+        // [Trigger].
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const position = cost.position ?? "TOP";
+        if (position === "TOP_OR_BOTTOM") return null; // Needs player selection
+        const p = nextState.players[controller];
+        if (p.life.length < amount) return null;
+
+        const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
+        const newLife = position === "TOP" ? p.life.slice(amount) : p.life.slice(0, -amount);
+        const trashedCards = removed.map((l) => ({
+          instanceId: l.instanceId,
+          cardId: l.cardId,
+          zone: "TRASH" as const,
+          state: "ACTIVE" as const,
+          attachedDon: [] as any[],
+          turnPlayed: null,
+          controller,
+          owner: controller,
+        }));
+
+        const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+        newPlayers[controller] = { ...p, life: newLife, trash: [...trashedCards, ...p.trash] };
+        nextState = { ...nextState, players: newPlayers };
+        costResult.cardsTrashedCount += amount;
+        costResult.cardsTrashedInstanceIds.push(...removed.map((l) => l.instanceId));
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: amount, reason: "cost" } });
+        // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
+        // Kalgara/Bonney-style watchers fire on cost payments too.
+        for (const l of removed) {
+          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+        }
         break;
       }
 
@@ -572,7 +615,6 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
   "KO_OWN_CHARACTER",
   "RETURN_OWN_CHARACTER_TO_HAND",
   "PLACE_OWN_CHARACTER_TO_DECK",
-  "TRASH_FROM_LIFE",
   "PLACE_HAND_TO_DECK",
   "REST_CARDS",
   "REST_NAMED_CARD",
@@ -587,6 +629,9 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
 
 export function costNeedsPlayerSelection(cost: Cost): boolean {
   if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") return true;
+  // Life is an ordered hidden zone — the only choice a life cost can offer is
+  // top-vs-bottom (OP03-109). Fixed positions auto-pay in payCosts.
+  if (cost.type === "TRASH_FROM_LIFE") return (cost as SimpleCost).position === "TOP_OR_BOTTOM";
   return SELECTION_COST_TYPES.has(cost.type);
 }
 
@@ -650,8 +695,9 @@ export function isCostPayable(
   }
 
   if (costNeedsPlayerSelection(cost)) {
-    if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
-      return state.players[controller].life.length > 0;
+    if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
+        (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
+      return state.players[controller].life.length >= resolveAmount(cost as SimpleCost);
     }
     const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
     const amt = cost.type === "REST_CARDS" && (cost as SimpleCost).amount === "ANY_NUMBER"
@@ -728,7 +774,8 @@ export function isCostPayable(
       return player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
     }
 
-    case "LIFE_TO_HAND": {
+    case "LIFE_TO_HAND":
+    case "TRASH_FROM_LIFE": {
       const amt = resolveAmount(simple);
       return player.life.length >= amt;
     }
@@ -1143,8 +1190,9 @@ export function payCostsWithSelection(
     }
 
     if (!autoPayTrashToDeck && costNeedsPlayerSelection(cost)) {
-      // Special handling for LIFE_TO_HAND with TOP_OR_BOTTOM — use PLAYER_CHOICE
-      if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
+      // Special handling for life costs with TOP_OR_BOTTOM — use PLAYER_CHOICE
+      if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
+          (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
         const p = nextState.players[controller];
         if (p.life.length === 0) {
           return { state: nextState, events, cannotPay: true };
@@ -1175,7 +1223,9 @@ export function payCostsWithSelection(
         const pendingPrompt: PendingPromptState = {
           options: {
             promptType: "PLAYER_CHOICE",
-            effectDescription: "Choose top or bottom of your Life cards to add to your hand",
+            effectDescription: cost.type === "TRASH_FROM_LIFE"
+              ? "Choose top or bottom of your Life cards to trash"
+              : "Choose top or bottom of your Life cards to add to your hand",
             choices: [
               { id: "0", label: "Top" },
               { id: "1", label: "Bottom" },
@@ -1391,10 +1441,6 @@ export function computeCostTargets(
       return dropSelf(candidates.map((c) => c.instanceId));
     }
 
-    case "TRASH_FROM_LIFE": {
-      return player.life.map((l) => l.instanceId);
-    }
-
     case "PLACE_FROM_TRASH_TO_DECK":
     // OPT-431: the selectable half of the compound cost is the trash side
     // only — the self half is fixed to the source card and never offered.
@@ -1539,10 +1585,6 @@ export function getCostCards(
       }
       return cards;
     }
-
-    case "TRASH_FROM_LIFE":
-      // Life cards aren't CardInstance, return empty for now
-      return [];
 
     default:
       return [];
