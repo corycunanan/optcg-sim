@@ -38,6 +38,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isAttacker,
   isDefender,
   counterTarget,
+  eventDropTarget,
   counterPulse,
   onSelect,
   onAction,
@@ -65,6 +66,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isDefender?: boolean;
   /** Current battle defender while a Character counter is being dragged. */
   counterTarget?: boolean;
+  /** Part of the broad own-field play surface while an Event is dragged. */
+  eventDropTarget?: boolean;
   counterPulse?: boolean;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
@@ -122,18 +125,24 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     disabled: !canRedistribute,
   });
   const acceptsCounter = !!counterTarget && activeDragType === "hand-card";
-  const acceptsHandCard = !acceptsCounter && !!boardFull && activeDragType === "hand-card";
+  const acceptsEvent = !!eventDropTarget && activeDragType === "hand-card";
+  const acceptsHandCard =
+    !acceptsCounter && !acceptsEvent && !!boardFull && activeDragType === "hand-card";
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: acceptsCounter
       ? `counter-target-${card.instanceId}`
-      : acceptsHandCard
-        ? `char-slot-${slotIndex}`
-        : `don-target-${card.instanceId}`,
+      : acceptsEvent
+        ? `own-field-card-${card.instanceId}`
+        : acceptsHandCard
+          ? `char-slot-${slotIndex}`
+          : `don-target-${card.instanceId}`,
     data: acceptsCounter
       ? { type: "counter-target", targetInstanceId: card.instanceId }
-      : acceptsHandCard
-        ? { type: "character-slot", slotIndex }
-        : { type: "don-target", targetInstanceId: card.instanceId },
+      : acceptsEvent
+        ? { type: "own-field" }
+        : acceptsHandCard
+          ? { type: "character-slot", slotIndex }
+          : { type: "don-target", targetInstanceId: card.instanceId },
   });
 
   const mergedRef = useCallback(
@@ -237,9 +246,11 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           className="relative flex items-center justify-center rounded-md"
         >
           <DropOverlay
-            active={acceptsDon || acceptsHandCard || acceptsCounter}
-            hovered={isOver && (acceptsDon || acceptsHandCard || acceptsCounter)}
-            color={acceptsHandCard ? "red" : "amber"}
+            active={acceptsDon || acceptsHandCard || acceptsCounter || acceptsEvent}
+            hovered={
+              isOver && (acceptsDon || acceptsHandCard || acceptsCounter || acceptsEvent)
+            }
+            color={acceptsEvent ? "blue" : acceptsHandCard ? "red" : "amber"}
           />
           <Card
             data={{ card, cardDb }}

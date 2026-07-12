@@ -119,6 +119,7 @@ export function PlayerField({
               slotIndex={i}
               label={`C${i + 1}`}
               activeDragType={activeDragType}
+              eventDropTarget={eventFieldDropActive}
               zoneKey={`p-char-${i}`}
               style={{ position: "absolute", left: pos.left, top: playerCharTop }}
             />
@@ -141,6 +142,7 @@ export function PlayerField({
             counterTarget={
               characterCounterDragActive && defenderInstanceId === char.instanceId
             }
+            eventDropTarget={eventFieldDropActive}
             onSelect={
               isBlockerEligible
                 ? () => setSelectedBlockerId(
@@ -184,6 +186,7 @@ export function PlayerField({
           counterTarget={
             characterCounterDragActive && defenderInstanceId === me.leader.instanceId
           }
+          eventDropTarget={eventFieldDropActive}
           counterPulse={counterPulseIds?.has(me.leader.instanceId)}
           onAction={onAction}
           zoneKey="p-leader"
@@ -206,6 +209,7 @@ export function PlayerField({
         card={me?.stage ?? null}
         cardDb={cardDb}
         activeDragType={activeDragType}
+        eventDropTarget={eventFieldDropActive}
         onAction={onAction}
         zoneKey="p-stage"
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
