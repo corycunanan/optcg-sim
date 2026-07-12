@@ -8,7 +8,9 @@ import {
 } from "@dnd-kit/sortable";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance } from "@shared/game-types";
+import { useActiveEffects } from "@/contexts/active-effects-context";
 import { useZonePosition } from "@/contexts/zone-position-context";
+import { getCardAffordability } from "@/lib/game/client-legality";
 import { isCounterEligibleCard } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
@@ -76,6 +78,8 @@ function SortableHandCard({
   cardDb,
   disabled,
   dimmed,
+  affordable,
+  tooltipNotice,
   hidden,
   reducedMotion,
   style,
@@ -86,6 +90,8 @@ function SortableHandCard({
   cardDb: CardDb;
   disabled?: boolean;
   dimmed?: boolean;
+  affordable?: boolean;
+  tooltipNotice?: string;
   /** When true the card reserves layout space but is invisible (in-flight placeholder). */
   hidden?: boolean;
   reducedMotion: boolean;
@@ -109,7 +115,7 @@ function SortableHandCard({
     isDragging,
   } = useSortable({
     id: `hand-${card.instanceId}`,
-    data: { type: "hand-card", card } satisfies HandCardDrag,
+    data: { type: "hand-card", card, affordable } satisfies HandCardDrag,
     disabled: disabled || hidden,
   });
 
@@ -139,7 +145,7 @@ function SortableHandCard({
         style={{
           transform: sortableTransform,
           transition: reducedMotion ? "none" : (transition ?? undefined),
-          cursor: disabled || hidden ? "default" : "grab",
+          cursor: disabled || dimmed || hidden ? "default" : "grab",
           visibility: hidden ? "hidden" : undefined,
           touchAction: "none",
         }}
@@ -153,7 +159,13 @@ function SortableHandCard({
             data={{ card, cardDb }}
             variant="hand"
             state={cardState}
-            interaction={isDragging ? { tooltipDisabled: true } : undefined}
+            interaction={
+              isDragging
+                ? { tooltipDisabled: true }
+                : tooltipNotice
+                  ? { tooltipNotice }
+                  : undefined
+            }
           />
         </motion.div>
       </div>
@@ -167,6 +179,7 @@ export const HandLayer = React.memo(function HandLayer({
   cardDb,
   enableDrag,
   counterMode,
+  availableDon,
   zoneKey,
   inFlightInstanceIds,
   sleeveUrl,
@@ -176,6 +189,8 @@ export const HandLayer = React.memo(function HandLayer({
   cardDb: CardDb;
   enableDrag?: boolean;
   counterMode?: boolean;
+  /** Active DON during Main. Undefined outside affordability-signaling mode. */
+  availableDon?: number;
   zoneKey?: string;
   /** Set of instanceIds currently in-flight (render as invisible placeholders). */
   inFlightInstanceIds?: Set<string>;
@@ -184,6 +199,7 @@ export const HandLayer = React.memo(function HandLayer({
   const count = cards.length;
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
+  const activeEffects = useActiveEffects();
 
   // OPT-364: hide cards on their first render in this HandLayer instance so
   // the deck-to-hand flight has a chance to register a transition before the
@@ -247,6 +263,16 @@ export const HandLayer = React.memo(function HandLayer({
       ? isCounterEligibleCard(cardDb[card.cardId])
       : true;
     const disabled = !enableDrag || (counterMode && !eligible);
+    const affordability =
+      availableDon === undefined
+        ? undefined
+        : getCardAffordability(
+            cardDb[card.cardId],
+            card.instanceId,
+            activeEffects,
+            availableDon,
+          );
+    const unaffordable = affordability?.affordable === false;
 
     return (
       <SortableHandCard
@@ -254,7 +280,9 @@ export const HandLayer = React.memo(function HandLayer({
         card={card}
         cardDb={cardDb}
         disabled={disabled}
-        dimmed={counterMode && !eligible}
+        dimmed={(counterMode && !eligible) || unaffordable}
+        affordable={affordability?.affordable}
+        tooltipNotice={affordability?.reason}
         hidden={isInFlight}
         reducedMotion={reducedMotion}
         style={marginStyle}

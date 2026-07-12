@@ -97,6 +97,11 @@
   --gb-accent-red:      oklch(60%  0.22  25);   /* errors, concede */
   --gb-accent-purple:   oklch(66%  0.14  290);  /* counter, battle phase */
   --gb-accent-rose:     oklch(62%  0.18  15);   /* life stat */
+  --gb-signal-battle:   var(--gb-accent-amber); /* active battle participants */
+  --gb-signal-eligible: var(--gb-accent-blue);  /* legal interaction target */
+  --gb-signal-selected: var(--gb-accent-green); /* confirmed user selection */
+  --gb-signal-hostile:  var(--gb-accent-red);   /* opponent / destructive target */
+  --gb-signal-disabled: var(--gb-text-dim);     /* unavailable interaction */
   --gb-prompt-bg:       oklch(12%  0.01  80);   /* prompt/warning panel bg */
   --gb-board:           oklch(18%  0.005 245);  /* game board felt background */
   --gb-board-dark:      oklch(0%   0     0);    /* banner, mid-zone, hand strips */
@@ -235,6 +240,11 @@
   --color-gb-accent-red:     var(--gb-accent-red);
   --color-gb-accent-purple:  var(--gb-accent-purple);
   --color-gb-accent-rose:    var(--gb-accent-rose);
+  --color-gb-signal-battle:   var(--gb-signal-battle);
+  --color-gb-signal-eligible: var(--gb-signal-eligible);
+  --color-gb-signal-selected: var(--gb-signal-selected);
+  --color-gb-signal-hostile:  var(--gb-signal-hostile);
+  --color-gb-signal-disabled: var(--gb-signal-disabled);
   --color-gb-prompt-bg:      var(--gb-prompt-bg);
   --color-gb-board:          var(--gb-board);
   --color-gb-board-dark:     var(--gb-board-dark);

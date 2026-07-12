@@ -44,6 +44,8 @@ export function getViewportSize() {
 export interface HandCardDrag {
   type: "hand-card";
   card: CardInstance;
+  /** Advisory only: false suppresses legal-target signals but still permits an attempt. */
+  affordable?: boolean;
 }
 
 export interface ActiveDonDrag {

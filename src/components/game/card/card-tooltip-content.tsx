@@ -22,10 +22,12 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   data,
   cardId,
   card,
+  notice,
 }: {
   data: CardData | null;
   cardId: string | undefined;
   card?: CardInstance | null;
+  notice?: string;
 }) {
   const activeEffects = useActiveEffects();
 
@@ -49,6 +51,11 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
 
   return (
     <>
+      {notice && (
+        <div className="mb-3 rounded border border-gb-signal-disabled/50 bg-gb-signal-disabled/10 px-2 py-1 text-xs font-bold text-gb-signal-disabled">
+          {notice}
+        </div>
+      )}
       <div className="font-bold text-gb-text-bright text-sm">
         {data.name}
       </div>
@@ -87,7 +94,8 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
           {data.cost != null && (
             <TooltipStat
               label="Cost"
-              value={data.cost}
+              value={effectiveCost}
+              modified={costMod}
             />
           )}
           {data.life != null && (
