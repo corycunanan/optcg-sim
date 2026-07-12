@@ -287,11 +287,33 @@ export function handleAwaitingOptionalResponse(
     nextState = markOncePerTurnUsed(nextState, block.id, sourceCardInstanceId);
   }
 
+  // OPT-453: cost payments on the prompt-resume path never flow back through
+  // the pipeline's event scan — scan them here so event-watching auto effects
+  // (e.g. CARD_REMOVED_FROM_LIFE watchers on auto-paid life-trash costs)
+  // queue exactly as they do when the same cost pays inside a pipeline run.
+  // Same filter as resume/cost.ts: the count-only CARD_TRASHED bookkeeping
+  // event carries no instance id and must not reach trigger matching.
+  let pendingTriggers = topFrame.pendingTriggers as QueuedTrigger[];
+  if (events.length > 0) {
+    const scannable = events.filter((e) =>
+      e.type !== "CARD_TRASHED" ||
+      !!(e.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId,
+    );
+    if (scannable.length > 0) {
+      const costScan = scanEventsForTriggers(nextState, scannable, controller, cardDb);
+      nextState = costScan.state;
+      replacePendingEventReferences(events, scannable, costScan.events);
+      if (costScan.triggers.length > 0) {
+        pendingTriggers = [...pendingTriggers, ...costScan.triggers];
+      }
+    }
+  }
+
   // OPT-437: the post-colon "If" gate — costs were paid inline above and the
   // chain is about to start; when false, skip every action (the paid cost
   // stands) but still drain queued triggers.
   if (!postCostConditionsMet(nextState, block, sourceCardInstanceId, controller, cardDb)) {
-    return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+    return processRemainingTriggers(nextState, pendingTriggers, cardDb, events);
   }
 
   if (topFrame.remainingActions.length > 0) {
@@ -313,7 +335,7 @@ export function handleAwaitingOptionalResponse(
     if (chainResult.pendingPrompt) {
       const newTop = peekFrame(nextState) as EffectStackFrame;
       if (newTop) {
-        nextState = updateTopFrame(nextState, { pendingTriggers: topFrame.pendingTriggers });
+        nextState = updateTopFrame(nextState, { pendingTriggers });
       }
       return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
     }
@@ -324,13 +346,13 @@ export function handleAwaitingOptionalResponse(
       nextState = chainScan.state;
       replacePendingEventReferences(events, chainResult.events, chainScan.events);
       if (chainScan.triggers.length > 0) {
-        const allTriggers = [...chainScan.triggers, ...topFrame.pendingTriggers as QueuedTrigger[]];
+        const allTriggers = [...chainScan.triggers, ...pendingTriggers];
         return processRemainingTriggers(nextState, allTriggers, cardDb, events);
       }
     }
   }
 
-  return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb, events);
+  return processRemainingTriggers(nextState, pendingTriggers, cardDb, events);
 }
 
 /**

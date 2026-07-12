@@ -350,8 +350,8 @@ export function handleAwaitingCostSelection(
   const events: PendingEvent[] = [];
   let nextState = state;
 
-  // LIFE_TO_HAND with TOP_OR_BOTTOM — player chose a position
-  if (action.type === "PLAYER_CHOICE" && cost.type === "LIFE_TO_HAND") {
+  // LIFE_TO_HAND / TRASH_FROM_LIFE with TOP_OR_BOTTOM — player chose a position
+  if (action.type === "PLAYER_CHOICE" && (cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE")) {
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
     const p = nextState.players[controller];
     if (p.life.length === 0) {
@@ -361,21 +361,53 @@ export function handleAwaitingCostSelection(
 
     const removed = position === "TOP" ? p.life.slice(0, 1) : p.life.slice(-1);
     const newLife = position === "TOP" ? p.life.slice(1) : p.life.slice(0, -1);
-    const handCards = removed.map((l) => ({
-      instanceId: l.instanceId,
-      cardId: l.cardId,
-      zone: "HAND" as const,
-      state: "ACTIVE" as const,
-      attachedDon: [] as any[],
-      turnPlayed: null,
-      controller,
-      owner: controller,
-    }));
 
-    const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-    newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
-    nextState = { ...nextState, players: newPlayers };
-    events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: 1 } });
+    if (cost.type === "TRASH_FROM_LIFE") {
+      const trashedCards = removed.map((l) => ({
+        instanceId: l.instanceId,
+        cardId: l.cardId,
+        zone: "TRASH" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [] as any[],
+        turnPlayed: null,
+        controller,
+        owner: controller,
+      }));
+      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+      newPlayers[controller] = { ...p, life: newLife, trash: [...trashedCards, ...p.trash] };
+      nextState = { ...nextState, players: newPlayers };
+      const existing = accumulatedCostRefs.get("__cost_cards_trashed") ?? { targetInstanceIds: [], count: 0 };
+      accumulatedCostRefs.set("__cost_cards_trashed", {
+        targetInstanceIds: [...existing.targetInstanceIds, ...removed.map((l) => l.instanceId)],
+        count: existing.count + removed.length,
+      });
+      events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: 1, reason: "cost" } });
+      // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
+      // Kalgara/Bonney-style watchers fire on cost payments too.
+      for (const l of removed) {
+        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+      }
+    } else {
+      const handCards = removed.map((l) => ({
+        instanceId: l.instanceId,
+        cardId: l.cardId,
+        zone: "HAND" as const,
+        state: "ACTIVE" as const,
+        attachedDon: [] as any[],
+        turnPlayed: null,
+        controller,
+        owner: controller,
+      }));
+      const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
+      newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
+      nextState = { ...nextState, players: newPlayers };
+      events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: 1 } });
+      // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
+      // already does; the cost path was missing it).
+      for (const l of removed) {
+        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+      }
+    }
   } else if (action.type === "SELECT_TARGET" && cost.type === "PLACE_FROM_TRASH_TO_DECK") {
     // OPT-371: the player chose WHICH trash cards to place. For multi-card
     // costs (unless the block shuffles afterward) chain an arrange prompt so
@@ -630,7 +662,6 @@ export function handleAwaitingCostSelection(
     // zone transitions.
     if (
       cost.type === "TRASH_FROM_HAND" ||
-      cost.type === "TRASH_FROM_LIFE" ||
       cost.type === "TRASH_OWN_CHARACTER"
     ) {
       events.push({
