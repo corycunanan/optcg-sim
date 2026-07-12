@@ -30,10 +30,14 @@ const hiddenEventCases: Array<{ name: string; event: GameEvent; secrets: string[
     event: {
       type: "CARD_RETURNED_TO_HAND",
       playerIndex: 1,
-      payload: { cardId: "HAND-SECRET", cardInstanceId: "hand-instance" },
+      payload: {
+        cardId: "HAND-SECRET",
+        cardInstanceId: "hand-instance",
+        newCardInstanceId: "new-hand-instance",
+      },
       timestamp,
     },
-    secrets: ["HAND-SECRET", "hand-instance"],
+    secrets: ["HAND-SECRET", "hand-instance", "new-hand-instance"],
   },
   {
     name: "Life card added to hand",
@@ -50,10 +54,15 @@ const hiddenEventCases: Array<{ name: string; event: GameEvent; secrets: string[
     event: {
       type: "CARD_RETURNED_TO_DECK",
       playerIndex: 1,
-      payload: { cardId: "DECK-SECRET", cardInstanceId: "deck-instance", position: "BOTTOM" },
+      payload: {
+        cardId: "DECK-SECRET",
+        cardInstanceId: "deck-instance",
+        newCardInstanceId: "new-deck-instance",
+        position: "BOTTOM",
+      },
       timestamp,
     },
-    secrets: ["DECK-SECRET", "deck-instance"],
+    secrets: ["DECK-SECRET", "deck-instance", "new-deck-instance"],
   },
   {
     name: "Life scry",
@@ -73,10 +82,13 @@ const hiddenEventCases: Array<{ name: string; event: GameEvent; secrets: string[
     event: {
       type: "CARD_REMOVED_FROM_LIFE",
       playerIndex: 1,
-      payload: { cardInstanceId: "removed-life-instance" },
+      payload: {
+        cardInstanceId: "removed-life-instance",
+        newCardInstanceId: "new-removed-life-instance",
+      },
       timestamp,
     },
-    secrets: ["removed-life-instance"],
+    secrets: ["removed-life-instance", "new-removed-life-instance"],
   },
   {
     name: "controller-only reveal",
