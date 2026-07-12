@@ -45,8 +45,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | In Review | [#279](https://github.com/corycunanan/optcg-sim/pull/279) | Resume frames separate responder control from the original owner's trailing chain. |
 | 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
 | 29 | OPT-470 | Prevent LIFE_SCRIED and hidden-zone event payloads from leaking card identities | — | — | Done | [#282](https://github.com/corycunanan/optcg-sim/pull/282) | Exhaustive event/prompt visibility contract; secret identities and internal continuations removed from client views. |
-| 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | In Review | [#283](https://github.com/corycunanan/optcg-sim/pull/283) | Typed terminal draw for stack/action exhaustion with replay-visible diagnostics. |
-| 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | Backlog | — | Wave 1 immutable-snapshot contract. |
+| 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | Done | [#283](https://github.com/corycunanan/optcg-sim/pull/283) | Typed terminal draw for stack/action exhaustion with replay-visible diagnostics. |
+| 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | In Review | [#284](https://github.com/corycunanan/optcg-sim/pull/284) | Immutable propagation metadata with frozen-state and structural-sharing regressions. |
 | 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | Backlog | — | Wave 1 card-source corrections with pipeline regressions. |
 | 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Backlog | — | Starts Wave 2 after immediate correctness closure. |
 | 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Backlog | — | Handler execution inventory and CI coverage gate. |
@@ -64,7 +64,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-467 is the Wave 1 critical path and is ready now. OPT-468 and OPT-469 are independent Wave 1 work that can proceed in parallel. OPT-471 remains blocked until all four Wave 1 tickets merge.
+**Next up:** OPT-469 is the final Wave 1 ticket. OPT-471 remains blocked until OPT-468 and OPT-469 merge.
 
 ---
 
@@ -276,3 +276,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Prompt resume explicitly checks terminal outcomes before stale-response restoration. Keep the action counter persisted across prompts; new player actions reset it at the pipeline boundary.
 - **Unresolved:** Player-stoppable loop counting under Rules 11-1-1-2/3 remains documented as a gap; OPT-468 should only change event immutability.
 - **Pointer:** PR #283; inspect `d94fb8a` for the limit propagation and session regression.
+
+### OPT-468 → OPT-469
+**From:** session on 2026-07-11 · **Commit:** `da2771e` · **PR:** [#284](https://github.com/corycunanan/optcg-sim/pull/284)
+
+- **Primer:** Pending events now carry immutable propagation metadata. Trigger scans and event-log emission return copied events, then replace references only inside caller-owned accumulators.
+- **Read first:** `workers/game/src/engine/events.ts`, `trigger-ordering.ts`, and `workers/game/src/__tests__/opt-468-event-immutability.test.ts`.
+- **Gotchas / do NOT touch:** Never mutate events held by effect-stack frames or input snapshots. De-duplication metadata must move forward through copied events while preserving event IDs and structural sharing outside the changed path.
+- **Unresolved:** None for OPT-468. Keep OPT-469 limited to the three confirmed card-source corrections and their pipeline regressions.
+- **Pointer:** PR #284; inspect `da2771e` for the immutable propagation implementation.
