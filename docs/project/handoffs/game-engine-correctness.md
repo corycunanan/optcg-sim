@@ -1,7 +1,7 @@
 ---
 linear-project: Game Engine Correctness
 linear-project-url: https://linear.app/optcg-sim/project/game-engine-correctness-c3d337079446
-last-updated: 2026-07-11
+last-updated: 2026-07-12
 ---
 
 # Game Engine Correctness — Handoff Doc
@@ -48,7 +48,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | Done | [#283](https://github.com/corycunanan/optcg-sim/pull/283) | Typed terminal draw for stack/action exhaustion with replay-visible diagnostics. |
 | 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | Done | [#284](https://github.com/corycunanan/optcg-sim/pull/284) | Immutable propagation metadata with frozen-state and structural-sharing regressions. |
 | 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | In Review | [#285](https://github.com/corycunanan/optcg-sim/pull/285) | Official text restored; three schemas corrected with full-pipeline regressions. |
-| 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Backlog | — | Starts Wave 2 after immediate correctness closure. |
+| 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | In Review | [#290](https://github.com/corycunanan/optcg-sim/pull/290) | Runtime-backed validator, atomic boot rejection, terminal dispatch faults, and CI schema/source/disposition gates. |
 | 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Backlog | — | Handler execution inventory and CI coverage gate. |
 | 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | Backlog | — | Classify 211 authored AND chains and implement the rules contract. |
 | 36 | OPT-474 | Establish one authoritative zone-transition and card-identity contract | — | OPT-468 | Backlog | — | Centralize zone-pair identity and cleanup behavior. |
@@ -60,11 +60,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 42 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
 | 43 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
 | 44 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
+| 45 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Backlog | — | Seventeen newly exposed findings; overlaps OPT-475 where conditional reveals are involved. |
+| 46 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Backlog | — | Remove the tracked source-parity exception after official-source verification. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-471 starts Wave 2 after OPT-469 merges; its authored-schema validation gate should build on the now-correct Wave 1 schema baseline.
+**Next up:** OPT-473 and OPT-472 are blocked on PR #290 merging; OPT-474 is independent and ready now.
 
 ---
 
@@ -294,3 +296,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** `scope.when_attacking` is a positive forbidden-target filter for `CANNOT_ATTACK`; OP06-026 restricts every attacker controlled by the player from targeting a Leader, not only the Character set active. The `THEN` actions remain mandatory when zero targets are chosen.
 - **Unresolved:** None for Wave 1. OPT-471 can make authored-schema validation fail closed once PR #285 merges.
 - **Pointer:** PR #285; inspect `852c88f` for the schema, source-text, prohibition, and regression changes.
+
+### OPT-471 → OPT-473
+**From:** session on 2026-07-12 · **Commit:** `9134129` · **PR:** [#290](https://github.com/corycunanan/optcg-sim/pull/290)
+
+- **Primer:** All authored schemas now pass one runtime-backed validator before atomic installation; invalid runtime dispatch ends in a typed draw instead of warning/no-op behavior. Schema semantics, local source parity, and low-confidence dispositions are explicit CI gates.
+- **Read first:** `workers/game/src/engine/schema-registry.ts`, `workers/game/src/__tests__/opt-471-authored-schema-gate.test.ts`, and the shared action-handler manifest in `effect-types.ts`/`resolver.ts`.
+- **Gotchas / do NOT touch:** `CHOOSE_VALUE` is intentionally rejected as unhandled until OPT-475 implements it. Keep implicit cost refs in the validator contract, and preserve `TRIGGERING_CARD_IN_TRASH` as a valid target. Do not fold OPT-484/OPT-485 triage into handler execution coverage.
+- **Unresolved:** OPT-484 tracks 17 newly surfaced low-confidence findings; OPT-485 tracks missing canonical source text for OP12-112. Neither blocks OPT-473.
+- **Pointer:** PR #290; inspect `9134129` for the validator, terminal fault, and gate changes.

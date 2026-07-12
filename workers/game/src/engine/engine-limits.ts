@@ -8,6 +8,7 @@ export const MAX_EFFECT_STACK_DEPTH = 100;
 export const MAX_RESOLUTION_ACTIONS = 1_000;
 
 const INFINITE_LOOP_REASON = "Unstoppable loop detected — game ends in a draw";
+const ENGINE_CONTRACT_REASON = "Engine contract failure — game ends in a draw";
 
 export function terminateForEngineLimit(
   state: GameState,
@@ -40,6 +41,37 @@ export function terminateForEngineLimit(
   );
 }
 
+export function terminateForEngineContract(
+  state: GameState,
+  diagnostic: Extract<EngineLimitDiagnostic, { kind: "ENGINE_CONTRACT" }>,
+): GameState {
+  if (state.engineOutcome) return state;
+
+  const terminal: GameState = {
+    ...state,
+    status: "FINISHED",
+    winner: null,
+    winReason: ENGINE_CONTRACT_REASON,
+    engineOutcome: { type: "ENGINE_ERROR_DRAW", diagnostic },
+    pendingPrompt: null,
+    effectStack: [],
+    turn: {
+      ...state.turn,
+      battle: null,
+      battleSubPhase: null,
+      pendingTriggerFromEffect: undefined,
+      pendingBattleDamageContinuation: undefined,
+    },
+  };
+
+  return emitEvent(
+    terminal,
+    "GAME_OVER",
+    state.turn.activePlayerIndex,
+    { winner: null, reason: ENGINE_CONTRACT_REASON, diagnostic },
+  );
+}
+
 export function consumeResolutionAction(
   state: GameState,
   actionType: string,
@@ -68,5 +100,5 @@ export function beginEngineResolution(state: GameState): GameState {
 }
 
 export function isEngineTerminated(state: GameState): boolean {
-  return state.status === "FINISHED" && state.engineOutcome?.type === "INFINITE_LOOP_DRAW";
+  return state.status === "FINISHED" && state.engineOutcome != null;
 }

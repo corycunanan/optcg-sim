@@ -811,7 +811,6 @@ export const OP11_022_SHIRAHOSHI: EffectSchema = {
             },
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
-          chain: "AND",
         },
       ],
     },
