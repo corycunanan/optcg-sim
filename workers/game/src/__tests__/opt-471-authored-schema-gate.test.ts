@@ -7,6 +7,7 @@ import {
   findLowConfidenceFindings,
   parseCardTextMarkdown,
 } from "../engine/schema-audit.js";
+import { validateSchemaSourceParity } from "../engine/schema-source-parity.js";
 import {
   getAllAuthoredSchemas,
   injectSchemasIntoCardDb,
@@ -41,6 +42,22 @@ describe("OPT-471 authoritative authored-schema gate", () => {
       }
     );
     expect(diagnostics).toEqual([]);
+  });
+
+  it("rejects a schema source export omitted from the runtime registry", () => {
+    const unregistered = {
+      card_id: "TEST-UNREGISTERED",
+      effects: [],
+    } satisfies EffectSchema;
+
+    expect(
+      validateSchemaSourceParity(
+        [{ path: "new-set.ts", schemas: { "TEST-UNREGISTERED": unregistered } }],
+        {},
+      ),
+    ).toContain(
+      "[schema-source] new-set.ts exports TEST-UNREGISTERED, but schema-registry.ts does not register it",
+    );
   });
 
   it.each([
