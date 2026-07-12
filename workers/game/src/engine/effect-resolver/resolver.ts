@@ -143,6 +143,11 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   REUSE_EFFECT: executeReuseEffect,
 };
 
+/** Runtime handler inventory consumed by the authored-action CI contract. */
+export function listRegisteredActionTypes(): ActionType[] {
+  return Object.keys(ACTION_HANDLERS).sort() as ActionType[];
+}
+
 // OPT-200: drift detection between the `ActionType` union and `ACTION_HANDLERS`.
 // Members listed here resolve through a different path or are referenced by
 // zero schemas:
