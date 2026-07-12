@@ -271,8 +271,17 @@ describe("OPT-472 simultaneous AND transactions", () => {
     expect(pending.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     expect(pending.state.activeEffects).toHaveLength(state.activeEffects.length);
 
-    const committed = resumeFromStack(
+    const rejected = resumeFromStack(
       pending.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [] },
+      cardDb,
+    );
+    expect(rejected.rejected).toBe(true);
+    expect(rejected.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(rejected.state.activeEffects).toHaveLength(state.activeEffects.length);
+
+    const committed = resumeFromStack(
+      rejected.state,
       { type: "SELECT_TARGET", selectedInstanceIds: [first.instanceId, second.instanceId] },
       cardDb,
     );
@@ -327,8 +336,51 @@ describe("OPT-472 connector validation and authored migration", () => {
       "Action type 'DRAW' cannot be used in an AND transaction",
     );
     expect(validateEffectSchema(dependent).join("\n")).toContain(
-      "depends on a result produced inside the same simultaneous group",
+      "depends on result_ref 'inside' produced inside the same simultaneous group",
     );
+
+    const nestedConsumers: Action[] = [
+      {
+        type: "MODIFY_COST",
+        target: { type: "YOUR_LEADER" },
+        params: { amount: { type: "ACTION_RESULT", ref: "inside" } },
+        chain: "AND",
+      },
+      {
+        type: "MODIFY_COST",
+        target: { type: "YOUR_LEADER" },
+        params: { amount: -1 },
+        conditions: {
+          type: "REVEALED_CARD_PROPERTY",
+          result_ref: "inside",
+          filter: { card_type: "CHARACTER" },
+        },
+        chain: "AND",
+      },
+      {
+        type: "MODIFY_COST",
+        target: {
+          type: "CHARACTER",
+          count: { exact: 1 },
+          filter: { exclude_ref: "inside" },
+        },
+        params: { amount: -1 },
+        chain: "AND",
+      },
+    ];
+    for (const consumer of nestedConsumers) {
+      const nestedDependent: EffectSchema = {
+        effects: [{
+          id: "nested-dependent",
+          category: "auto",
+          trigger: { keyword: "ON_PLAY" },
+          actions: [dependent.effects[0]!.actions![0]!, consumer],
+        }],
+      };
+      expect(validateEffectSchema(nestedDependent).join("\n")).toContain(
+        "depends on result_ref 'inside' produced inside the same simultaneous group",
+      );
+    }
 
     const valid: EffectSchema = {
       effects: [{

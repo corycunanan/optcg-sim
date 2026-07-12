@@ -538,6 +538,37 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
   return errors;
 }
 
+function collectConsumedResultRefs(
+  value: unknown,
+  consumed: Set<string>,
+  depth = 0,
+): void {
+  if (!value || typeof value !== "object" || depth > 12) return;
+  for (const [key, nested] of Object.entries(value)) {
+    if (key === "result_ref") {
+      if (
+        (value as { type?: unknown }).type === "REVEALED_CARD_PROPERTY" &&
+        typeof nested === "string"
+      ) {
+        consumed.add(nested);
+      }
+      continue;
+    }
+    if ((key === "target_ref" || key.endsWith("_ref")) && typeof nested === "string") {
+      consumed.add(nested);
+    }
+    if (
+      nested &&
+      typeof nested === "object" &&
+      (nested as { type?: unknown }).type === "ACTION_RESULT" &&
+      typeof (nested as { ref?: unknown }).ref === "string"
+    ) {
+      consumed.add((nested as { ref: string }).ref);
+    }
+    collectConsumedResultRefs(nested, consumed, depth + 1);
+  }
+}
+
 function validateActionConnectors(actions: Action[], prefix: string): string[] {
   const errors: string[] = [];
   for (let i = 1; i < actions.length; i++) {
@@ -563,10 +594,14 @@ function validateActionConnectors(actions: Action[], prefix: string): string[] {
     );
     for (let offset = 0; offset < group.length; offset++) {
       const action = group[offset];
-      if (action.target_ref && producedInsideGroup.has(action.target_ref)) {
-        errors.push(
-          `${prefix}[${start + offset}]: AND target_ref '${action.target_ref}' depends on a result produced inside the same simultaneous group`,
-        );
+      const consumedByAction = new Set<string>();
+      collectConsumedResultRefs(action, consumedByAction);
+      for (const ref of consumedByAction) {
+        if (producedInsideGroup.has(ref)) {
+          errors.push(
+            `${prefix}[${start + offset}]: AND action depends on result_ref '${ref}' produced inside the same simultaneous group`,
+          );
+        }
       }
     }
 
@@ -608,36 +643,9 @@ function validateResultReferences(actions: Action[], prefix: string): string[] {
   const produced = new Set<string>();
   const consumed = new Set<string>();
 
-  const scanConsumed = (value: unknown, depth = 0): void => {
-    if (!value || typeof value !== "object" || depth > 12) return;
-    for (const [key, nested] of Object.entries(value)) {
-      if (key === "result_ref") {
-        if (
-          (value as { type?: unknown }).type === "REVEALED_CARD_PROPERTY" &&
-          typeof nested === "string"
-        ) {
-          consumed.add(nested);
-        }
-        continue;
-      }
-      if ((key === "target_ref" || key.endsWith("_ref")) && typeof nested === "string") {
-        consumed.add(nested);
-      }
-      if (
-        nested &&
-        typeof nested === "object" &&
-        (nested as { type?: unknown }).type === "ACTION_RESULT" &&
-        typeof (nested as { ref?: unknown }).ref === "string"
-      ) {
-        consumed.add((nested as { ref: string }).ref);
-      }
-      scanConsumed(nested, depth + 1);
-    }
-  };
-
   for (const action of walkActions(actions)) {
     if (action.result_ref) produced.add(action.result_ref);
-    scanConsumed(action);
+    collectConsumedResultRefs(action, consumed);
   }
 
   const errors: string[] = [];
