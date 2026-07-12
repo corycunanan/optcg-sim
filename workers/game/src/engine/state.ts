@@ -8,7 +8,6 @@
 import type {
   CardInstance,
   DonInstance,
-  GameEvent,
   GameState,
   LifeCard,
   PendingEvent,
@@ -16,6 +15,7 @@ import type {
   Zone,
 } from "../types.js";
 import { nanoid } from "../util/nanoid.js";
+import { filterEventForPlayer, filterPromptForPlayer } from "./visibility.js";
 
 // ─── Player accessors ─────────────────────────────────────────────────────────
 
@@ -579,24 +579,17 @@ export function findCardInstance(
 
 // ─── Visibility filtering (§8-4-5) ───────────────────────────────────────────
 
-/** Event types where the payload may contain card identities from secret zones. */
-const SECRET_CARD_EVENTS = new Set([
-  "CARD_DRAWN",
-  "CARD_RETURNED_TO_HAND",
-  "CARD_ADDED_TO_HAND_FROM_LIFE",
-  "DRAW_OUTSIDE_DRAW_PHASE",
-]);
-
 /**
  * Create a player-specific view of the game state that hides secret zone data
  * from the opponent. The receiving player sees their own zones in full; the
  * opponent's hand, deck, and face-down life cards are obfuscated.
  *
- * Also filters the event log so opponent's draw/search events don't leak cardIds.
+ * Also filters the event log and pending prompt through exhaustive visibility
+ * policies. Engine-only continuation frames are never sent to either client.
  *
- * Obfuscated cards keep their `instanceId`, `zone`, `controller`, and `owner`
- * (so the client can count cards and animate placeholders) but strip `cardId`
- * to prevent identity leaks.
+ * Obfuscated cards keep their zone/controller/owner metadata for placeholder
+ * rendering, but both card identity and engine instance identity are replaced.
+ * Zone-local placeholder IDs cannot correlate a hidden card across movements.
  */
 export function filterStateForPlayer(
   state: GameState,
@@ -605,19 +598,22 @@ export function filterStateForPlayer(
   const opponentIndex = receivingPlayer === 0 ? 1 : 0;
   const opponent = state.players[opponentIndex];
 
-  const obfuscateCard = (card: CardInstance): CardInstance => ({
+  const obfuscateCard = (card: CardInstance, hiddenInstanceId: string): CardInstance => ({
     ...card,
+    instanceId: hiddenInstanceId,
     cardId: "hidden",
     attachedDon: [],
   });
 
   const filteredOpponent: PlayerState = {
     ...opponent,
-    hand: opponent.hand.map(obfuscateCard),
-    deck: opponent.deck.map(obfuscateCard),
-    life: opponent.life.map((lc) =>
+    hand: opponent.hand.map((card, index) =>
+      obfuscateCard(card, `hidden-${opponentIndex}-hand-${index}`)),
+    deck: opponent.deck.map((card, index) =>
+      obfuscateCard(card, `hidden-${opponentIndex}-deck-${index}`)),
+    life: opponent.life.map((lc, index) =>
       lc.face === "DOWN"
-        ? { ...lc, cardId: "hidden" }
+        ? { ...lc, instanceId: `hidden-${opponentIndex}-life-${index}`, cardId: "hidden" }
         : lc,
     ),
   };
@@ -625,27 +621,17 @@ export function filterStateForPlayer(
   const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
   newPlayers[opponentIndex] = filteredOpponent;
 
-  // Filter event log: strip cardId from opponent's secret-zone events
-  const filteredEventLog = state.eventLog.map((event) => {
-    if (event.playerIndex === opponentIndex && SECRET_CARD_EVENTS.has(event.type)) {
-      const payload = event.payload as Record<string, unknown>;
-      if (payload.cardId) {
-        const { cardId, ...restPayload } = payload;
-        return { ...event, payload: restPayload } as GameEvent;
-      }
-    }
-    return event;
-  });
+  const filteredEventLog = state.eventLog.map((event) =>
+    filterEventForPlayer(event, receivingPlayer));
+  const filteredPrompt = filterPromptForPlayer(state.pendingPrompt, receivingPlayer);
 
-  // Strip pendingPrompt for the player who is NOT the respondingPlayer.
-  // This prevents the non-responding player from seeing opponent hand cards
-  // leaked through the prompt's `cards` array (e.g. TRASH_FROM_HAND effects).
-  const filteredPrompt =
-    state.pendingPrompt && state.pendingPrompt.respondingPlayer !== receivingPlayer
-      ? null
-      : state.pendingPrompt;
-
-  return { ...state, players: newPlayers, eventLog: filteredEventLog, pendingPrompt: filteredPrompt };
+  return {
+    ...state,
+    players: newPlayers,
+    eventLog: filteredEventLog,
+    pendingPrompt: filteredPrompt,
+    effectStack: [],
+  };
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────

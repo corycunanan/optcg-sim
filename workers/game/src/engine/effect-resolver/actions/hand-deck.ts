@@ -199,7 +199,7 @@ export function executeReveal(
   const amount = (params.amount as number) ?? 1;
   const source = (params.source as string) ?? "DECK";
   // "BOTH" = reveal (both players see), "CONTROLLER_ONLY" = look at (private peek)
-  const visibility = (params.visibility as string) ?? "BOTH";
+  const visibility = params.visibility === "CONTROLLER_ONLY" ? "CONTROLLER_ONLY" : "BOTH";
 
   // Resolve which player's zone to reveal from
   const targetController = (action.target?.controller === "OPPONENT")
@@ -215,7 +215,12 @@ export function executeReveal(
     events.push({
       type: "CARDS_REVEALED",
       playerIndex: targetController,
-      payload: { cards: revealed.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })), source, visibility },
+      payload: {
+        cards: revealed.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })),
+        source,
+        visibility,
+        ...(visibility === "CONTROLLER_ONLY" ? { visibleTo: controller } : {}),
+      },
     });
 
     return {
@@ -234,7 +239,12 @@ export function executeReveal(
     events.push({
       type: "CARDS_REVEALED",
       playerIndex: targetController,
-      payload: { cards: [{ instanceId: topLife.instanceId, cardId: topLife.cardId }], source, visibility },
+      payload: {
+        cards: [{ instanceId: topLife.instanceId, cardId: topLife.cardId }],
+        source,
+        visibility,
+        ...(visibility === "CONTROLLER_ONLY" ? { visibleTo: controller } : {}),
+      },
     });
 
     return {
@@ -305,6 +315,7 @@ export function executeRevealHand(
     payload: {
       cards: p.hand.slice(0, count).map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })),
       source: "HAND",
+      visibility: "BOTH",
     },
   });
 

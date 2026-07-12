@@ -262,7 +262,12 @@ export interface GameEventPayloadMap {
   CARD_RETURNED_TO_DECK: { cardInstanceId: string; cardId?: string; position?: string };
   DON_SET_ACTIVE: { count: number };
   DON_RESTED: { count: number };
-  CARDS_REVEALED: { cards: Array<{ instanceId: string; cardId: string }>; source?: string; visibility?: string };
+  CARDS_REVEALED: {
+    cards: Array<{ instanceId: string; cardId: string }>;
+    source?: string;
+    visibility: "BOTH" | "CONTROLLER_ONLY";
+    visibleTo?: 0 | 1;
+  };
   EFFECTS_NEGATED: { targetInstanceIds: string[] };
   LIFE_CARD_TO_DECK: { count: number };
   LIFE_SCRIED: { cards: Array<{ instanceId: string; cardId: string }>; count: number };

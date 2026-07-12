@@ -261,10 +261,17 @@ describe("app ↔ worker contracts", () => {
     const filteredOpponent = filtered.players[1];
 
     expect(filteredOpponent.hand).toHaveLength(1);
-    expect(filteredOpponent.hand[0]).toMatchObject({ instanceId: "opponent-hand-1", cardId: "hidden" });
-    expect(filteredOpponent.deck[0]).toMatchObject({ instanceId: "opponent-deck-1", cardId: "hidden" });
-    expect(filteredOpponent.life[0]).toMatchObject({ cardId: "hidden", face: "DOWN" });
+    expect(filteredOpponent.hand[0]).toMatchObject({ instanceId: "hidden-1-hand-0", cardId: "hidden" });
+    expect(filteredOpponent.deck[0]).toMatchObject({ instanceId: "hidden-1-deck-0", cardId: "hidden" });
+    expect(filteredOpponent.life[0]).toMatchObject({
+      instanceId: "hidden-1-life-0",
+      cardId: "hidden",
+      face: "DOWN",
+    });
     expect(filteredOpponent.life[1]).toEqual(visibleOpponentLife);
-    expect(filtered.eventLog[0].payload).not.toHaveProperty("cardId");
+    expect(filtered.eventLog[0].payload).toMatchObject({
+      cardId: "hidden",
+      cardInstanceId: "hidden",
+    });
   });
 });
