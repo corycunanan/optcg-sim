@@ -44,11 +44,27 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Done | [#278](https://github.com/corycunanan/optcg-sim/pull/278) | Rule 8-4-5 gates moved-card autos to open destinations: K.O./field-trash yes; hand/deck no. |
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | In Review | [#279](https://github.com/corycunanan/optcg-sim/pull/279) | Resume frames separate responder control from the original owner's trailing chain. |
 | 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
+| 29 | OPT-470 | Prevent LIFE_SCRIED and hidden-zone event payloads from leaking card identities | — | — | In Review | [#282](https://github.com/corycunanan/optcg-sim/pull/282) | Exhaustive event/prompt visibility contract; secret identities and internal continuations removed from client views. |
+| 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | Backlog | — | Wave 1 urgent fail-closed execution work. |
+| 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | Backlog | — | Wave 1 immutable-snapshot contract. |
+| 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | Backlog | — | Wave 1 card-source corrections with pipeline regressions. |
+| 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Backlog | — | Starts Wave 2 after immediate correctness closure. |
+| 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Backlog | — | Handler execution inventory and CI coverage gate. |
+| 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | Backlog | — | Classify 211 authored AND chains and implement the rules contract. |
+| 36 | OPT-474 | Establish one authoritative zone-transition and card-identity contract | — | OPT-468 | Backlog | — | Centralize zone-pair identity and cleanup behavior. |
+| 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | Backlog | — | Wave 3 conditional-reveal closure. |
+| 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | Backlog | — | Wave 3 pregame effect closure. |
+| 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | Backlog | — | Starts deterministic architecture wave. |
+| 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Backlog | — | Typed execution dependencies and cost-handler decomposition. |
+| 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Backlog | — | Thin Durable Object composition boundary. |
+| 42 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
+| 43 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
+| 44 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** merge the open PR train — #268 (OPT-451) and #271 (OPT-450) are independent; #269 → #270 → #272 must merge in order (stacked); #273 (OPT-457) is independent. All six are review-hardened (multi-lens adversarial review, confirmed findings fixed or ticketed). Then the review-spawned backlog by value: OPT-458 (removal-prohibition gap, High), OPT-459-463.
+**Next up:** OPT-467 is the Wave 1 critical path and is ready now. OPT-468 and OPT-469 are independent Wave 1 work that can proceed in parallel. OPT-471 remains blocked until all four Wave 1 tickets merge.
 
 ---
 
@@ -242,3 +258,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Do not collapse the two controller fields; nested `OPPONENT_ACTION` prompts require both roles.
 - **Unresolved:** None. This closes the remaining Game Engine Correctness backlog identified in the Action Plan.
 - **Pointer:** PR #279; inspect `ff1aae9` for the controller-boundary fix.
+
+### OPT-470 → OPT-467
+**From:** session on 2026-07-11 · **Commit:** `0da9264` · **PR:** [#282](https://github.com/corycunanan/optcg-sim/pull/282)
+
+- **Primer:** Client state now passes through one exhaustive event/prompt visibility policy; private reveals declare their viewer, hidden zones use non-correlatable placeholder IDs, and engine continuation data is never serialized.
+- **Read first:** `workers/game/src/engine/visibility.ts`, the visibility boundary in `workers/game/src/engine/state.ts`, and `workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts`.
+- **Gotchas / do NOT touch:** Do not restore real hidden-zone instance IDs for UI animation. `CARDS_REVEALED` with `CONTROLLER_ONLY` must carry `visibleTo`; blind selection retains opaque target IDs but never card faces.
+- **Unresolved:** None for OPT-470. Keep OPT-467's stack-exhaustion terminal outcome separate from visibility filtering.
+- **Pointer:** PR #282; inspect `0da9264` for the implementation and regression matrix.
