@@ -49,7 +49,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | Done | [#284](https://github.com/corycunanan/optcg-sim/pull/284) | Immutable propagation metadata with frozen-state and structural-sharing regressions. |
 | 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | Done | [#285](https://github.com/corycunanan/optcg-sim/pull/285) | Official text restored; three schemas corrected with full-pipeline regressions. |
 | 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Done | [#290](https://github.com/corycunanan/optcg-sim/pull/290) | Runtime-backed validator, atomic boot rejection, terminal dispatch faults, and CI schema/source/disposition gates. |
-| 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | In Review | [#291](https://github.com/corycunanan/optcg-sim/pull/291) | 3,549-use inventory; 72/72 handled and executed; global and hotspot coverage ratchets. |
+| 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Done | [#291](https://github.com/corycunanan/optcg-sim/pull/291) | 3,549-use inventory; 72/72 handled and executed; global and hotspot coverage ratchets. |
 | 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | In Review | [#292](https://github.com/corycunanan/optcg-sim/pull/292) | All 210 authored connectors migrated to THEN; snapshot-locked AND transactions and validator gate added. |
 | 36 | OPT-474 | Establish one authoritative zone-transition and card-identity contract | — | OPT-468 | In Review | [#293](https://github.com/corycunanan/optcg-sim/pull/293) | Every cross-zone move creates a fresh identity through one service; exhaustive zone-pair and static guards added. |
 | 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | Backlog | — | Wave 3 conditional-reveal closure. |
@@ -67,7 +67,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Merge/review PRs #291–#293. OPT-475 and OPT-476 are blocked on PR #291; after that, begin Wave 3 with OPT-475.
+**Next up:** Review/merge PRs #292–#293, then begin Wave 3 with OPT-475; PR #291 has merged and unblocked OPT-475/OPT-476.
 
 ---
 
@@ -308,10 +308,10 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Pointer:** PR #290; inspect `9134129` for the validator, terminal fault, and gate changes.
 
 ### OPT-474 → OPT-475
-**From:** session on 2026-07-12 · **Commit:** `15cdcac` · **PR:** [#293](https://github.com/corycunanan/optcg-sim/pull/293)
+**From:** session on 2026-07-12 · **Commits:** `15cdcac` (implementation), `7cb8b42` (visibility review fix) · **PR:** [#293](https://github.com/corycunanan/optcg-sim/pull/293)
 
 - **Primer:** `zone-transition.ts` is now the single cross-zone mutation boundary. Every legal pair creates a fresh ID, strips transient state, returns attached DON!!, cleans old effect/prohibition/trigger references, remaps trigger staging, and returns explicit old/new movement facts. Actions, costs, resumes, battle, play, draw/search, setup, and mulligan paths use the contract.
 - **Read first:** `docs/game-engine/ZONE-TRANSITION-CONTRACT.md`, `workers/game/src/engine/zone-transition.ts`, the movement bridge in `triggers.ts`, and `opt-474-zone-transition-contract.test.ts`.
-- **Gotchas / do NOT touch:** Same-zone reorder operations retain identity. Leave-zone callers that need the source's own trigger must preserve its registration only until their old/new-ID event is scanned. Event payloads use the old ID for the leave fact and `newCardInstanceId` for the destination. Setup is the only construction-time adapter because no complete `GameState` exists yet.
-- **Unresolved:** No OPT-474 behavior remains open. OPT-486 tracks the pre-existing Vitest/coverage-provider version mismatch warning. OPT-475 remains blocked on PR #291, not on this PR.
-- **Pointer:** PR #293; inspect `15cdcac` for the implementation and the PR's handoff commit for verification evidence.
+- **Gotchas / do NOT touch:** Same-zone reorder operations retain identity. Leave-zone callers that need the source's own trigger must preserve its registration only until their old/new-ID event is scanned. Event payloads use the old ID for the leave fact and `newCardInstanceId` for the destination; both identity fields must be redacted from unauthorized owner-only event views. Setup is the only construction-time adapter because no complete `GameState` exists yet.
+- **Unresolved:** No OPT-474 behavior remains open. OPT-486 tracks the pre-existing Vitest/coverage-provider version mismatch warning. PR #291 has merged, so OPT-475 is ready after the current PR review queue.
+- **Pointer:** PR #293; inspect `15cdcac` for the transition implementation and `7cb8b42` for the review-driven hidden-destination-ID redaction.
