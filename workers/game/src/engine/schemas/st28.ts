@@ -141,7 +141,7 @@ export const ST28_004_KOUZUKI_MOMONOSUKE: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { once_per_turn: true, optional: true },

@@ -50,7 +50,7 @@ export const ST25_001_ALVIDA: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -121,7 +121,7 @@ export const ST25_003_CROCODILE_AND_MIHAWK: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "PLAY_CARD",

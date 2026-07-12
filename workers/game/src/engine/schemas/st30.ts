@@ -114,7 +114,7 @@ export const ST30_004_EMPORIO_IVANKOV: EffectSchema = {
       ],
       actions: [
         { type: "DRAW", params: { amount: 3 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
       flags: { optional: true },
     },
@@ -231,7 +231,7 @@ export const ST30_009_LITTLEOARS_JR: EffectSchema = {
       },
       replacement_actions: [
         { type: "TRASH_CARD", target: { type: "SELF" } },
-        { type: "DRAW", params: { amount: 1 }, chain: "AND" },
+        { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
       ],
       flags: { optional: true },
     },

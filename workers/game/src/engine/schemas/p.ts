@@ -67,7 +67,7 @@ export const P_002_I_SMELL_ADVENTURE: EffectSchema = {
         },
         {
           type: "SHUFFLE_DECK",
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "DRAW",
@@ -892,7 +892,7 @@ export const P_036_MONKEY_D_LUFFY: EffectSchema = {
           target: { type: "YOUR_LEADER" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1592,7 +1592,7 @@ export const P_062_HODY_AND_HYOUZOU: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "LIFE_TO_HAND",
@@ -1861,7 +1861,7 @@ export const P_075_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2401,7 +2401,7 @@ export const P_096_GIRL: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2531,7 +2531,7 @@ export const P_100_MARSHALL_D_TEACH: EffectSchema = {
           type: "NEGATE_EFFECTS",
           target: { type: "ALL_OPPONENT_CHARACTERS" },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2611,7 +2611,7 @@ export const P_103_PORTGAS_D_ACE: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "GIVE_DON",
@@ -2742,7 +2742,7 @@ export const P_106_MONKEY_D_LUFFY: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 2 },
           },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

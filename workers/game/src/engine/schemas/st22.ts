@@ -34,7 +34,7 @@ export const ST22_001_ACE_AND_NEWGATE: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 1, position: "TOP" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { once_per_turn: true, optional: true },
@@ -80,7 +80,7 @@ export const ST22_002_IZO: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 1, position: "BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -203,7 +203,7 @@ export const ST22_006_JOZU: EffectSchema = {
             count: { exact: 1 },
           },
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

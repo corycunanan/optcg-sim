@@ -546,7 +546,7 @@ export const EB04_013_CARROT: EffectSchema = {
         {
           type: "SET_ACTIVE",
           target: { type: "YOUR_LEADER" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -937,7 +937,7 @@ export const EB04_021_IGARAM: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1167,7 +1167,7 @@ export const EB04_026_BLUEGRASS: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1195,7 +1195,7 @@ export const EB04_027_BOA_HANCOCK: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1451,7 +1451,7 @@ export const EB04_031_KING: EffectSchema = {
         {
           type: "ADD_DON_FROM_DECK",
           params: { amount: 1, target_state: "RESTED" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1658,7 +1658,7 @@ export const EB04_036_FOXY: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "SET_REST",
@@ -1927,7 +1927,7 @@ export const EB04_041_STEALTH_BLACK: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2743,7 +2743,7 @@ export const EB04_059_BLACK_ROPE_DRAGON_TWISTER: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2812,7 +2812,7 @@ export const EB04_060_GUM_GUM_HAWK_GATLING: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

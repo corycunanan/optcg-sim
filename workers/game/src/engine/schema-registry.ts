@@ -22,6 +22,7 @@ import {
   type TargetFilter,
 } from "./effect-types.js";
 import { log } from "../lib/log.js";
+import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
 import { OP01_SCHEMAS } from "./schemas/op01.js";
 import { OP02_SCHEMAS } from "./schemas/op02.js";
 import { OP03_SCHEMAS } from "./schemas/op03.js";
@@ -328,6 +329,7 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
     for (let i = 0; i < block.actions.length; i++) {
       errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`, i === 0));
     }
+    errors.push(...validateActionConnectors(block.actions, `${prefix}.actions`));
     errors.push(...validateResultReferences(block.actions, `${prefix}.actions`));
   }
 
@@ -343,6 +345,10 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
         i === 0,
       ));
     }
+    errors.push(...validateActionConnectors(
+      block.replacement_actions,
+      `${prefix}.replacement_actions`,
+    ));
     errors.push(...validateResultReferences(
       block.replacement_actions,
       `${prefix}.replacement_actions`,
@@ -483,6 +489,9 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
       `${prefix}: First action has chain '${action.chain}' (only subsequent actions may declare a connector)`,
     );
   }
+  if (action.chain && !["THEN", "IF_DO", "AND"].includes(action.chain)) {
+    errors.push(`${prefix}: Unknown chain connector '${action.chain}'`);
+  }
 
   // OPT-409: `controller` inside Target.filter is silently ignored on normal
   // targeting paths — matchesFilter only enforces it when the caller passes
@@ -507,6 +516,10 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
               j === 0,
             ));
           }
+          errors.push(...validateActionConnectors(
+            options[i] as Action[],
+            `${prefix}.params.options[${i}]`,
+          ));
         }
       }
     }
@@ -522,6 +535,43 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
     errors.push(...validateAction(action.params.action as Action, `${prefix}.params.action`, true));
   }
 
+  return errors;
+}
+
+function validateActionConnectors(actions: Action[], prefix: string): string[] {
+  const errors: string[] = [];
+  for (let i = 1; i < actions.length; i++) {
+    if (actions[i]?.chain !== "AND") continue;
+
+    let start = i - 1;
+    while (start > 0 && actions[start]?.chain === "AND") start--;
+    let end = i;
+    while (end + 1 < actions.length && actions[end + 1]?.chain === "AND") end++;
+    const group = actions.slice(start, end + 1);
+
+    for (let offset = 0; offset < group.length; offset++) {
+      const action = group[offset];
+      if (!SIMULTANEOUS_ACTION_TYPES.has(action.type)) {
+        errors.push(
+          `${prefix}[${start + offset}]: Action type '${action.type}' cannot be used in an AND transaction; use THEN for ordered card text`,
+        );
+      }
+    }
+
+    const producedInsideGroup = new Set(
+      group.map((action) => action.result_ref).filter((ref): ref is string => Boolean(ref)),
+    );
+    for (let offset = 0; offset < group.length; offset++) {
+      const action = group[offset];
+      if (action.target_ref && producedInsideGroup.has(action.target_ref)) {
+        errors.push(
+          `${prefix}[${start + offset}]: AND target_ref '${action.target_ref}' depends on a result produced inside the same simultaneous group`,
+        );
+      }
+    }
+
+    i = end;
+  }
   return errors;
 }
 

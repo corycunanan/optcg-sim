@@ -39,7 +39,7 @@ export const ST24_001_CAPONE_GANG_BEGE: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -132,7 +132,7 @@ export const ST24_004_LAW_AND_BEPO: EffectSchema = {
             prohibition_type: "CANNOT_REFRESH",
           },
           duration: { type: "SKIP_NEXT_REFRESH" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "MODIFY_POWER",
