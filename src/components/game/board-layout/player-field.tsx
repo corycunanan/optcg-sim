@@ -2,6 +2,7 @@
 
 import type { CardDb, GameAction, PlayerState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
+import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
 import {
@@ -26,7 +27,6 @@ import {
 import { DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop-zones";
-import { isCounterEvent } from "./use-board-dnd";
 import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
 import { ZoneRef } from "./zone-ref";
