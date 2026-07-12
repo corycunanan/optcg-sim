@@ -54,7 +54,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Why this matters for OPT-417:** The legality layer should reuse this soft-disable boundary: hard-disable immutable type mismatches, but allow attempts when hidden rule mods can change legality.
 
 ### OPT-417 → OPT-418
-**From:** session on 2026-07-12 · **Commit:** pending · **PR:** pending
+**From:** session on 2026-07-12 · **Commit:** `ac9f630` · **PR:** pending
 
 - **Primer:** Main-phase hand cards now use effective cost for 35% affordability dimming and exact DON-shortfall tooltips. Drag signals are type-filtered, unaffordable attempts remain soft-enabled without lighting targets, and attack overlays register only the opponent leader plus RESTED Characters.
 - **Read first:** `src/lib/game/client-legality.ts`, `src/components/game/board-layout/hand-layer.tsx`, `src/components/game/board-layout/drop-zones.tsx`, `src/components/game/board-layout/field-card.tsx`
