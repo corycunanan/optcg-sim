@@ -307,6 +307,15 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Unresolved:** OPT-484 tracks 17 newly surfaced low-confidence findings; OPT-485 tracks missing canonical source text for OP12-112. Neither blocks OPT-473.
 - **Pointer:** PR #290; inspect `9134129` for the validator, terminal fault, and gate changes.
 
+### OPT-473 → OPT-472
+**From:** session on 2026-07-12 · **Commit:** `85fa7fd` · **PR:** [#291](https://github.com/corycunanan/optcg-sim/pull/291)
+
+- **Primer:** CI now derives 3,549 authored action uses, including action arrays on rule modifications, and requires all 72 used types to have both a registered handler and an execution-test contract. The six previously zero-covered effects handlers execute through resolver paths, and coverage ratchets guard the global worker plus effects, target-resolution, and choice-resume hotspots.
+- **Read first:** `workers/game/src/engine/action-coverage-contract.ts`, `workers/game/src/__tests__/opt-473-action-handler-coverage.test.ts`, and `workers/game/vitest.config.ts`.
+- **Gotchas / do NOT touch:** `EXECUTED_ACTION_TYPES` is intentionally static so a newly authored type fails CI until its real regression lands. OPT-472 should update this contract only if it introduces a new action type, not for `AND` migrations. Keep Wave 3 `CHOOSE_VALUE` work in OPT-475.
+- **Unresolved:** OPT-486 tracks the pre-existing Vitest 4.1.1 / coverage-v8 4.1.4 warning; it does not block the thresholds. No OPT-473 behavior remains open.
+- **Pointer:** PR #291; inspect `85fa7fd` for the inventory, execution regressions, and thresholds.
+
 ### OPT-474 → OPT-475
 **From:** session on 2026-07-12 · **Commits:** `15cdcac` (implementation), `7cb8b42` (visibility review fix) · **PR:** [#293](https://github.com/corycunanan/optcg-sim/pull/293)
 
