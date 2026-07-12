@@ -7,11 +7,11 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { motion, useReducedMotion } from "motion/react";
-import type { CardDb, CardData, CardInstance } from "@shared/game-types";
+import type { CardDb, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
+import { isCounterEligibleCard } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
-import { isCounterEvent } from "./use-board-dnd";
 
 /**
  * OPT-364: returns instanceIds present in `currentIds` that were not in
@@ -70,13 +70,6 @@ export function reconcileSeenIds(
 // card is dragged over them — the drop indicator is the gap itself. Dragging
 // a card onto a field zone still plays it (sortable coexists with the board's
 // existing droppables).
-
-function isCounterEligible(data: CardData | undefined): boolean {
-  if (!data) return false;
-  if (data.type === "Character" && data.counter != null && data.counter > 0) return true;
-  if (isCounterEvent(data)) return true;
-  return false;
-}
 
 function SortableHandCard({
   card,
@@ -251,7 +244,7 @@ export const HandLayer = React.memo(function HandLayer({
     }
 
     const eligible = counterMode
-      ? isCounterEligible(cardDb[card.cardId])
+      ? isCounterEligibleCard(cardDb[card.cardId])
       : true;
     const disabled = !enableDrag || (counterMode && !eligible);
 
