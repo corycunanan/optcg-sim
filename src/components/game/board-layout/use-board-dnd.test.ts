@@ -66,6 +66,7 @@ const db: CardDb = {
   "char-1": cardData("char-1", "Character"),
   "event-counter": cardData("event-counter", "Event", "[Counter] Draw 1 card."),
   "event-main": cardData("event-main", "Event", "[Main] Draw 1 card."),
+  "stage-1": cardData("stage-1", "Stage"),
 };
 
 describe("resolveHandCardDropAction", () => {
@@ -150,6 +151,35 @@ describe("resolveHandCardDropAction", () => {
       type: "PLAY_CARD",
       cardInstanceId: "char-1-instance",
       position: 3,
+    });
+  });
+
+  it("hard-rejects immutable card type and zone mismatches", () => {
+    const characterDrag = {
+      type: "hand-card" as const,
+      card: handCard("char-1"),
+    };
+    const stageDrag = {
+      type: "hand-card" as const,
+      card: handCard("stage-1"),
+    };
+
+    expect(
+      resolveHandCardDropAction(characterDrag, { type: "stage-zone" }, db, null)
+    ).toBeNull();
+    expect(
+      resolveHandCardDropAction(
+        stageDrag,
+        { type: "character-slot", slotIndex: 0 },
+        db,
+        null
+      )
+    ).toBeNull();
+    expect(
+      resolveHandCardDropAction(stageDrag, { type: "stage-zone" }, db, null)
+    ).toEqual({
+      type: "PLAY_CARD",
+      cardInstanceId: "stage-1-instance",
     });
   });
 });

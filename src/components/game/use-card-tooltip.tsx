@@ -14,11 +14,13 @@ export function CardTooltip({
   data,
   cardId,
   card,
+  notice,
   children,
 }: {
   data: CardData | null;
   cardId: string | undefined;
   card?: CardInstance | null;
+  notice?: string;
   children: React.ReactNode;
 }) {
   if (!data) return <>{children}</>;
@@ -31,7 +33,7 @@ export function CardTooltip({
         sideOffset={8}
         className="bg-gb-surface border-gb-border-strong rounded-md p-3 min-w-[220px] max-w-[320px] shadow-lg text-gb-text"
       >
-        <CardTooltipContent data={data} cardId={cardId} card={card} />
+        <CardTooltipContent data={data} cardId={cardId} card={card} notice={notice} />
       </TooltipContent>
     </TooltipRoot>
   );

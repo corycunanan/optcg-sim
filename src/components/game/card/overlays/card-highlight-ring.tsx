@@ -40,8 +40,8 @@ export function CardHighlightRing({
         aria-hidden
         className={cn(
           "pointer-events-none absolute inset-0 z-10 rounded",
-          "ring-4 ring-gb-accent-amber",
-          "shadow-[0_0_14px_var(--gb-accent-amber)]",
+          "ring-4 ring-gb-signal-battle",
+          "shadow-[0_0_14px_var(--gb-signal-battle)]",
           className,
         )}
         initial={{ opacity: reducedMotion ? 1 : 0.6, scale: 1 }}
@@ -64,8 +64,8 @@ export function CardHighlightRing({
         aria-hidden
         className={cn(
           "pointer-events-none absolute inset-0 z-10 rounded",
-          "ring-4 ring-gb-accent-amber",
-          "shadow-[0_0_18px_var(--gb-accent-amber)]",
+          "ring-4 ring-gb-signal-battle",
+          "shadow-[0_0_18px_var(--gb-signal-battle)]",
           className,
         )}
         initial={{ opacity: 0, scale: 1 }}
@@ -84,10 +84,10 @@ export function CardHighlightRing({
 
   const staticRingClass =
     color === "selected"
-      ? "ring-4 ring-gb-accent-green shadow-[0_0_10px_var(--gb-accent-green)]"
+      ? "ring-4 ring-gb-signal-selected shadow-[0_0_10px_var(--gb-signal-selected)]"
       : color === "blocker"
-        ? "ring-4 ring-gb-accent-blue/60"
-        : "ring-4 ring-gb-accent-amber/70";
+        ? "ring-4 ring-gb-signal-eligible/60"
+        : "ring-4 ring-gb-signal-battle/70";
 
   return (
     <div

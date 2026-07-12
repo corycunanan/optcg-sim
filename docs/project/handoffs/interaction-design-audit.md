@@ -17,8 +17,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-416 | Unify interaction grammar: drag commits, click selects | — | — | Done | [#286](https://github.com/corycunanan/optcg-sim/pull/286) | Foundation for every board interaction |
-| 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | In Review | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
-| 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Backlog | — | Critical path for trustworthy drag affordances |
+| 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | Done | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
+| 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Done | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA passed for dimming, tooltip, and drag-target signals |
 | 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Backlog | — | Independent server-authority backstop |
 | 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Backlog | — | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Backlog | — | Completes the menu verb |
@@ -29,7 +29,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-417.
+**Next up:** OPT-418 after OPT-417 VQA and merge.
 
 ---
 
@@ -52,3 +52,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Do not reintroduce printed Character counter checks; the server owns effective counter validation and OPT-418 owns visible rejection feedback.
 - **Unresolved:** The client still does not receive effective per-card counter values, so Characters without a grant remain intentionally soft-enabled rather than falsely disabled.
 - **Why this matters for OPT-417:** The legality layer should reuse this soft-disable boundary: hard-disable immutable type mismatches, but allow attempts when hidden rule mods can change legality.
+
+### OPT-417 → OPT-418
+**From:** session on 2026-07-12 · **Commit:** `ac9f630` · **PR:** #289
+
+- **Primer:** Main-phase hand cards now use effective cost for 35% affordability dimming and exact DON-shortfall tooltips. Drag signals are type-filtered, unaffordable attempts remain soft-enabled without lighting targets, and attack overlays register only the opponent leader plus RESTED Characters.
+- **Read first:** `src/lib/game/client-legality.ts`, `src/components/game/board-layout/hand-layer.tsx`, `src/components/game/board-layout/drop-zones.tsx`, `src/components/game/board-layout/field-card.tsx`
+- **Gotchas / do NOT touch:** Unaffordable cards deliberately remain draggable so the server can accept effect-modified exceptions; `HandCardDrag.affordable` suppresses target signals without blocking the attempt. Events retain nested own-field droppables but do not light individual Character or Stage zones.
+- **VQA required:** In a Main-phase game, verify effective-cost dimming and the “Need N more DON” tooltip; drag an unaffordable card and confirm no play targets light; verify Character/Stage/Event target filtering; attack and confirm the leader + RESTED Characters light while ACTIVE Characters do not.
+- **Why this matters for OPT-418:** Soft-enabled affordability and exotic attack restrictions can still be rejected by the server. OPT-418 must make those intentional backstop rejections visible without converting them into client hard-lockouts.

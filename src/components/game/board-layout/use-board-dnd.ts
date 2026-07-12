@@ -66,7 +66,11 @@ export function resolveHandCardDropAction(
     };
   }
 
-  if (dropData.type === "character-slot" && typeof dropData.slotIndex === "number") {
+  if (
+    cardData.type === "Character" &&
+    dropData.type === "character-slot" &&
+    typeof dropData.slotIndex === "number"
+  ) {
     return {
       type: "PLAY_CARD",
       cardInstanceId: dragData.card.instanceId,
@@ -74,7 +78,7 @@ export function resolveHandCardDropAction(
     };
   }
 
-  if (dropData.type === "stage-zone") {
+  if (cardData.type === "Stage" && dropData.type === "stage-zone") {
     return {
       type: "PLAY_CARD",
       cardInstanceId: dragData.card.instanceId,

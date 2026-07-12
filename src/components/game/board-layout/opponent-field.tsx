@@ -2,6 +2,7 @@
 
 import type { CardDb, PlayerState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
+import { isAttackTargetEligible } from "@/lib/game/client-legality";
 import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
 import {
@@ -124,6 +125,7 @@ export function OpponentField({
           card={opp.leader}
           cardDb={cardDb}
           activeDragType={activeDragType}
+          attackTargetEligible={isAttackTargetEligible("leader", opp.leader.state)}
           isAttacker={attackerInstanceId === opp.leader.instanceId}
           isDefender={defenderInstanceId === opp.leader.instanceId}
           counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
@@ -157,6 +159,7 @@ export function OpponentField({
             card={char}
             cardDb={cardDb}
             activeDragType={activeDragType}
+            attackTargetEligible={isAttackTargetEligible("character", char.state)}
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
