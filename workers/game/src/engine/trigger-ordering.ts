@@ -14,6 +14,7 @@ import {
   registerReplacementsForCard,
 } from "./triggers.js";
 import { pushFrame, generateFrameId } from "./effect-stack.js";
+import { isEngineTerminated } from "./engine-limits.js";
 import { findCardInstance } from "./state.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
 
@@ -97,7 +98,7 @@ export function buildTriggerSelectionPrompt(
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
-): { state: GameState; pendingPrompt: PendingPromptState } {
+): { state: GameState; pendingPrompt?: PendingPromptState } {
   const controller = triggers[0].controller;
 
   // Build choice labels from card name + effect description
@@ -140,6 +141,7 @@ export function buildTriggerSelectionPrompt(
   };
 
   const nextState = pushFrame(state, frame);
+  if (isEngineTerminated(nextState)) return { state: nextState };
 
   const pendingPrompt: PendingPromptState = {
     options: {

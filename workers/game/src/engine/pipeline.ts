@@ -39,6 +39,7 @@ import {
   evaluateWhileConditions,
 } from "./duration-tracker.js";
 import { log } from "../lib/log.js";
+import { beginEngineResolution, isEngineTerminated } from "./engine-limits.js";
 
 export interface PipelineResult {
   state: GameState;
@@ -54,6 +55,9 @@ export function runPipeline(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
 ): PipelineResult {
+  if (state.status === "IN_PROGRESS" && !state.pendingPrompt && state.effectStack.length === 0) {
+    state = beginEngineResolution(state);
+  }
   const logCtx = {
     gameId: state.id,
     turn: state.turn.number,
@@ -111,6 +115,10 @@ export function runPipeline(
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
   nextState = execResult.state;
 
+  if (isEngineTerminated(nextState)) {
+    return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
+  }
+
   if (execResult.pendingPrompt) {
     nextState = { ...nextState, pendingPrompt: execResult.pendingPrompt };
     log("pipeline.end", {
@@ -125,6 +133,10 @@ export function runPipeline(
   // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
   log("pipeline.step", { ...logCtx, step: "triggers" });
   nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard);
+
+  if (isEngineTerminated(nextState)) {
+    return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
+  }
 
   // If triggers paused for player input, skip steps 6-7 and surface the prompt
   if (nextState.pendingPrompt) {
@@ -235,6 +247,7 @@ function fireEventsAndTriggers(
 
     const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
     state = result.state;
+    if (isEngineTerminated(state)) return state;
 
     if (result.pendingPrompt) {
       state = recalculateBattlePowers(state, cardDb);
@@ -273,6 +286,10 @@ export function continuePipelineFromExecution(
     false,
   );
 
+  if (isEngineTerminated(nextState)) {
+    return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
+  }
+
   if (nextState.pendingPrompt) {
     return { state: nextState, valid: true, pendingPrompt: nextState.pendingPrompt };
   }
@@ -306,6 +323,7 @@ function processTriggerQueuePipeline(
       (next.triggeringEvent?.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId ?? null,
     );
     nextState = result.state;
+    if (isEngineTerminated(nextState)) return { state: nextState };
 
     if (result.pendingPrompt) {
       // Store remaining triggers in the top stack frame's pendingTriggers

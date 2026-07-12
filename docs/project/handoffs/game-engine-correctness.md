@@ -44,8 +44,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 26 | OPT-461 | CHARACTER_REMOVED_FROM_FIELD vs Rule 8-4-5 open-area gate | — | — | Done | [#278](https://github.com/corycunanan/optcg-sim/pull/278) | Rule 8-4-5 gates moved-card autos to open destinations: K.O./field-trash yes; hand/deck no. |
 | 27 | OPT-462 | Actions after a prompting OPPONENT_ACTION dropped on resume | — | — | In Review | [#279](https://github.com/corycunanan/optcg-sim/pull/279) | Resume frames separate responder control from the original owner's trailing chain. |
 | 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
-| 29 | OPT-470 | Prevent LIFE_SCRIED and hidden-zone event payloads from leaking card identities | — | — | In Review | [#282](https://github.com/corycunanan/optcg-sim/pull/282) | Exhaustive event/prompt visibility contract; secret identities and internal continuations removed from client views. |
-| 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | Backlog | — | Wave 1 urgent fail-closed execution work. |
+| 29 | OPT-470 | Prevent LIFE_SCRIED and hidden-zone event payloads from leaking card identities | — | — | Done | [#282](https://github.com/corycunanan/optcg-sim/pull/282) | Exhaustive event/prompt visibility contract; secret identities and internal continuations removed from client views. |
+| 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | In Review | [#283](https://github.com/corycunanan/optcg-sim/pull/283) | Typed terminal draw for stack/action exhaustion with replay-visible diagnostics. |
 | 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | Backlog | — | Wave 1 immutable-snapshot contract. |
 | 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | Backlog | — | Wave 1 card-source corrections with pipeline regressions. |
 | 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Backlog | — | Starts Wave 2 after immediate correctness closure. |
@@ -267,3 +267,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Do not restore real hidden-zone instance IDs for UI animation. `CARDS_REVEALED` with `CONTROLLER_ONLY` must carry `visibleTo`; blind selection retains opaque target IDs but never card faces.
 - **Unresolved:** None for OPT-470. Keep OPT-467's stack-exhaustion terminal outcome separate from visibility filtering.
 - **Pointer:** PR #282; inspect `0da9264` for the implementation and regression matrix.
+
+### OPT-467 → OPT-468
+**From:** session on 2026-07-11 · **Commit:** `d94fb8a` · **PR:** [#283](https://github.com/corycunanan/optcg-sim/pull/283)
+
+- **Primer:** Resolver sequences now carry a persisted action count, while every frame push is depth-bounded; either guard atomically ends the game in a draw with a typed `engineOutcome` and `GAME_OVER` diagnostic.
+- **Read first:** `workers/game/src/engine/engine-limits.ts`, `effect-stack.ts`, and `workers/game/src/__tests__/opt-467-engine-limits.test.ts`.
+- **Gotchas / do NOT touch:** Prompt resume explicitly checks terminal outcomes before stale-response restoration. Keep the action counter persisted across prompts; new player actions reset it at the pipeline boundary.
+- **Unresolved:** Player-stoppable loop counting under Rules 11-1-1-2/3 remains documented as a gap; OPT-468 should only change event immutability.
+- **Pointer:** PR #283; inspect `d94fb8a` for the limit propagation and session regression.

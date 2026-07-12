@@ -1048,7 +1048,12 @@ export class GameSession implements DurableObject {
       const resumeResult = resumeFromStack(this.gameState, action, this.cardDb);
       this.gameState = resumeResult.state;
 
-      if (resumeResult.pendingPrompt) {
+      if (this.gameState.engineOutcome?.type === "INFINITE_LOOP_DRAW") {
+        resumedGameOver = {
+          winner: null,
+          reason: this.gameState.winReason ?? "Unstoppable loop detected — game ends in a draw",
+        };
+      } else if (resumeResult.pendingPrompt) {
         if (resumedFrame.replacementBatchContinuation) {
           this.attachReplacementBatchContinuation(resumedFrame.replacementBatchContinuation);
         }
@@ -1077,13 +1082,26 @@ export class GameSession implements DurableObject {
       const resumeResult = resumeEffectChain(this.gameState, effectResumeCtx, action, this.cardDb);
       this.gameState = resumeResult.state;
 
-      if (resumeResult.pendingPrompt) {
+      if (this.gameState.engineOutcome?.type === "INFINITE_LOOP_DRAW") {
+        resumedGameOver = {
+          winner: null,
+          reason: this.gameState.winReason ?? "Unstoppable loop detected — game ends in a draw",
+        };
+      } else if (resumeResult.pendingPrompt) {
         this.gameState = { ...this.gameState, pendingPrompt: resumeResult.pendingPrompt };
       } else if (!resumeResult.resolved && resumeResult.events.length === 0) {
         // OPT-436: same rejection-restore as the stack branch.
         this.gameState = stateBeforeResume;
         responseRejected = true;
       }
+    }
+
+    if (this.gameState.engineOutcome?.type === "INFINITE_LOOP_DRAW") {
+      this.gameState = { ...this.gameState, pendingPrompt: null, effectStack: [] };
+      resumedGameOver = {
+        winner: null,
+        reason: this.gameState.winReason ?? "Unstoppable loop detected — game ends in a draw",
+      };
     }
 
     while (
@@ -1105,7 +1123,7 @@ export class GameSession implements DurableObject {
 
     // Recalculate battle powers after effect resolution — trigger effects
     // (e.g., [On Your Opponent's Attack] → MODIFY_POWER) may have changed them
-    if (this.cardDb) {
+    if (this.cardDb && this.gameState.status === "IN_PROGRESS") {
       this.gameState = recalculateBattlePowers(this.gameState, this.cardDb);
     }
 

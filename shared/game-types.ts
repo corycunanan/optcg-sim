@@ -225,6 +225,26 @@ export interface RegisteredTrigger {
   // Full type defined in M4
 }
 
+export type EngineLimitDiagnostic =
+  | {
+      kind: "EFFECT_STACK_DEPTH";
+      limit: number;
+      observed: number;
+      attemptedFrameId: string;
+    }
+  | {
+      kind: "ACTION_BUDGET";
+      limit: number;
+      observed: number;
+      actionType: string;
+      sourceCardInstanceId: string;
+    };
+
+export interface EngineTerminalOutcome {
+  type: "INFINITE_LOOP_DRAW";
+  diagnostic: EngineLimitDiagnostic;
+}
+
 // ─── Game Events (Event Bus) ──────────────────────────────────────────────────
 
 /**
@@ -258,7 +278,11 @@ export interface GameEventPayloadMap {
   DON_STATE_CHANGED: Record<string, never>;
   CARD_STATE_CHANGED: { cardInstanceId?: string; targetInstanceId?: string; newState?: string; error?: string };
   POWER_MODIFIED: { targetInstanceId: string; amount?: number; value?: number };
-  GAME_OVER: { winner?: 0 | 1 | null; reason: string };
+  GAME_OVER: {
+    winner?: 0 | 1 | null;
+    reason: string;
+    diagnostic?: EngineLimitDiagnostic;
+  };
   CARD_RETURNED_TO_DECK: { cardInstanceId: string; cardId?: string; position?: string };
   DON_SET_ACTIVE: { count: number };
   DON_RESTED: { count: number };
@@ -455,6 +479,10 @@ export interface GameState {
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
   winner: 0 | 1 | null;
   winReason: string | null;
+  /** Present when a bounded engine guard terminates resolution under Rule 11-1-1-1. */
+  engineOutcome?: EngineTerminalOutcome | null;
+  /** Actions executed in the current resolver sequence, persisted across prompts. */
+  engineActionCount?: number;
 }
 
 // ─── Card DB snapshot (loaded at game init) ───────────────────────────────────

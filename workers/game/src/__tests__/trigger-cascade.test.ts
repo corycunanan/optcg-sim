@@ -226,11 +226,16 @@ describe("trigger cascade — depth cap prevents runaway recursion", () => {
       accumulatedEvents: [],
     };
 
-    let state: GameState = { effectStack: [] } as unknown as GameState;
+    let state: GameState = {
+      effectStack: [], eventLog: [], pendingPrompt: null,
+      status: "IN_PROGRESS", winner: null, winReason: null,
+      turn: { activePlayerIndex: 0 },
+    } as unknown as GameState;
     for (let i = 0; i < 150; i++) {
       state = pushFrame(state, { ...frame, id: `f${i}` });
     }
-    expect(state.effectStack).toHaveLength(100);
-    expect(state.effectStack[99].id).toBe("f99");
+    expect(state.effectStack).toHaveLength(0);
+    expect(state.engineOutcome?.diagnostic.kind).toBe("EFFECT_STACK_DEPTH");
+    expect(state.status).toBe("FINISHED");
   });
 });

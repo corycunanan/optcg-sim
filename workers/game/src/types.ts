@@ -7,6 +7,7 @@ export type {
   Phase, PerformedAction, TurnState,
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
+  EngineLimitDiagnostic, EngineTerminalOutcome,
   GameEventType, GameEvent, GameEventPayloadMap, PendingGameEvent,
   GameState,
   CardData, KeywordSet,

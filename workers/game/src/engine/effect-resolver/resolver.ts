@@ -37,6 +37,7 @@ import * as effects from "./actions/effects.js";
 import * as battleActions from "./actions/battle-actions.js";
 import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
+import { consumeResolutionAction, isEngineTerminated } from "../engine-limits.js";
 
 import { ALL_ACTION_TYPES, TRIGGERING_CARD_REF, isOncePerTurnBlock, type ActionType } from "../effect-types.js";
 
@@ -278,6 +279,9 @@ export function resolveEffect(
       accumulatedEvents: [],
     };
     state = pushFrame(state, frame);
+    if (isEngineTerminated(state)) {
+      return { state, events, resolved: false };
+    }
 
     const pendingPrompt: PendingPromptState = {
       options: { promptType: "OPTIONAL_EFFECT", effectDescription: blockDescription, cards },
@@ -422,6 +426,7 @@ export function executeActionChain(
     state = result.state;
     events.push(...result.events);
     lastActionSucceeded = result.succeeded;
+    if (isEngineTerminated(state)) return { state, events };
 
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
@@ -449,11 +454,10 @@ export function executeActionChain(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        return {
-          state: pushFrame(result.state, continuationFrame),
-          events,
-          pendingPrompt: result.pendingPrompt,
-        };
+        const continuationState = pushFrame(result.state, continuationFrame);
+        return isEngineTerminated(continuationState)
+          ? { state: continuationState, events }
+          : { state: continuationState, events, pendingPrompt: result.pendingPrompt };
       }
 
       const ctx = result.pendingPrompt.resumeContext as import("../../types.js").ResumeContext;
@@ -485,6 +489,7 @@ export function executeActionChain(
         stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
       const updatedState = pushFrame(result.state, frame);
+      if (isEngineTerminated(updatedState)) return { state: updatedState, events };
       const prompt = { ...result.pendingPrompt, resumeContext: frame.id };
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
@@ -511,6 +516,7 @@ export function executeActionChain(
         actions.slice(i + 1),
         resultRefs,
       );
+      if (isEngineTerminated(stateWithFrame)) return { state: stateWithFrame, events };
       const drain = processRemainingTriggers(stateWithFrame, triggers, cardDb, events);
       return {
         state: drain.state,
@@ -560,6 +566,10 @@ export function executeEffectAction(
   resultRefs: Map<string, EffectResult>,
   preselectedTargets?: string[],
 ): ActionResult {
+  state = consumeResolutionAction(state, action.type, sourceCardInstanceId);
+  if (isEngineTerminated(state)) {
+    return { state, events: [], succeeded: false };
+  }
   const handler = ACTION_HANDLERS[action.type];
   if (handler) {
     return handler(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
