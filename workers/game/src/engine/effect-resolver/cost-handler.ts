@@ -284,6 +284,11 @@ export function payCosts(
         newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
         nextState = { ...nextState, players: newPlayers };
         events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: amount } });
+        // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
+        // already does; the cost path was missing it).
+        for (const l of removed) {
+          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+        }
         break;
       }
 
@@ -317,6 +322,11 @@ export function payCosts(
         costResult.cardsTrashedCount += amount;
         costResult.cardsTrashedInstanceIds.push(...removed.map((l) => l.instanceId));
         events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: amount, reason: "cost" } });
+        // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
+        // Kalgara/Bonney-style watchers fire on cost payments too.
+        for (const l of removed) {
+          events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+        }
         break;
       }
 

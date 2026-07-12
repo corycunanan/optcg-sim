@@ -382,6 +382,11 @@ export function handleAwaitingCostSelection(
         count: existing.count + removed.length,
       });
       events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: 1, reason: "cost" } });
+      // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
+      // Kalgara/Bonney-style watchers fire on cost payments too.
+      for (const l of removed) {
+        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+      }
     } else {
       const handCards = removed.map((l) => ({
         instanceId: l.instanceId,
@@ -397,6 +402,11 @@ export function handleAwaitingCostSelection(
       newPlayers[controller] = { ...p, life: newLife, hand: [...p.hand, ...handCards] };
       nextState = { ...nextState, players: newPlayers };
       events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: 1 } });
+      // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
+      // already does; the cost path was missing it).
+      for (const l of removed) {
+        events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: l.instanceId } });
+      }
     }
   } else if (action.type === "SELECT_TARGET" && cost.type === "PLACE_FROM_TRASH_TO_DECK") {
     // OPT-371: the player chose WHICH trash cards to place. For multi-card
