@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Action, EffectSchema } from "../engine/effect-types.js";
+import type { Action, EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { getEffectiveCost, getEffectivePower } from "../engine/modifiers.js";
@@ -277,11 +277,12 @@ describe("OPT-472 simultaneous AND transactions", () => {
       cardDb,
     );
     expect(committed.resolved).toBe(true);
-    expect(committed.state.activeEffects.at(-2)?.appliesTo).toEqual([
+    const committedEffects = committed.state.activeEffects as RuntimeActiveEffect[];
+    expect(committedEffects.at(-2)?.appliesTo).toEqual([
       first.instanceId,
       second.instanceId,
     ]);
-    expect(committed.state.activeEffects.at(-1)?.appliesTo).toEqual([
+    expect(committedEffects.at(-1)?.appliesTo).toEqual([
       state.players[0].leader.instanceId,
     ]);
   });
