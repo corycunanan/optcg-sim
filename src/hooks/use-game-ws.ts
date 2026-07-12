@@ -14,6 +14,12 @@ import {
 
 export type { ConnectionStatus };
 
+export interface ActionRejection {
+  action: GameAction;
+  reason: string;
+  sequence: number;
+}
+
 const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
   "ARRANGE_TOP_CARDS",
   "PLAYER_CHOICE",
@@ -44,6 +50,9 @@ export function useGameWs(
   const [canUndo, setCanUndo] = useState(false);
   const [gameError, setGameError] = useState<string | null>(null);
   const activePromptIdRef = useRef<string | null>(null);
+  const rejectionSequenceRef = useRef(0);
+  const [actionRejection, setActionRejection] =
+    useState<ActionRejection | null>(null);
 
   const url = useMemo(
     () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
@@ -53,6 +62,7 @@ export function useGameWs(
   const onMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
       case "game:state":
+        setActionRejection(null);
         setGameState(msg.state);
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
@@ -69,6 +79,7 @@ export function useGameWs(
         }
         break;
       case "game:update":
+        setActionRejection(null);
         setGameState(msg.state);
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
@@ -94,6 +105,14 @@ export function useGameWs(
         break;
       case "game:error":
         setGameError(msg.message);
+        break;
+      case "action:rejected":
+        rejectionSequenceRef.current += 1;
+        setActionRejection({
+          action: msg.action,
+          reason: msg.reason,
+          sequence: rejectionSequenceRef.current,
+        });
         break;
       case "game:over":
         setGameOver({ winner: msg.winner, reason: msg.reason });
@@ -125,10 +144,8 @@ export function useGameWs(
           ? { ...action, promptId }
           : action;
       send({ type: "game:action", action: identifiedAction });
-      // Mirror the original setLastError(null) on send: clear any stale game
-      // error so the user sees the freshest state. Transport errors are
-      // managed by useAuthedWebSocket and will repopulate if send failed.
-      setGameError(null);
+      // Keep the last rejection visible while this attempt is pending. The
+      // next accepted state update clears it; another rejection supersedes it.
     },
     [send],
   );
@@ -153,6 +170,7 @@ export function useGameWs(
     gameState,
     connectionStatus,
     lastError,
+    actionRejection,
     activePrompt,
     gameOver,
     canUndo,

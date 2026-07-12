@@ -45,6 +45,8 @@ import { useCardTransitions } from "@/hooks/use-card-transitions";
 import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type { RedistributeTransfer } from "../redistribute-don-overlay";
+import type { ActionRejection } from "@/hooks/use-game-ws";
+import { ActionFeedbackProvider } from "./action-feedback";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -62,6 +64,7 @@ export interface BoardLayoutProps {
   onLeave: () => void;
   matchClosed: boolean;
   canUndo: boolean;
+  actionRejection?: ActionRejection | null;
   /** Suppresses board-driven user input. Default `"full"` (production game).
    *  `"spectator"` and `"responseOnly"` are sandbox-only modes (OPT-290) that
    *  disable drag and right-click menus while leaving prompt modals usable. */
@@ -84,9 +87,11 @@ export function BoardLayout(props: BoardLayoutProps) {
   return (
     <ZonePositionProvider>
       <ActiveEffectsProvider value={props.activeEffects}>
-        <InteractionModeProvider value={interactionMode}>
-          <BoardLayoutInner {...props} interactionMode={interactionMode} />
-        </InteractionModeProvider>
+        <ActionFeedbackProvider rejection={props.actionRejection ?? null}>
+          <InteractionModeProvider value={interactionMode}>
+            <BoardLayoutInner {...props} interactionMode={interactionMode} />
+          </InteractionModeProvider>
+        </ActionFeedbackProvider>
       </ActiveEffectsProvider>
     </ZonePositionProvider>
   );
@@ -103,6 +108,7 @@ function BoardLayoutInner({
   connectionStatus,
   eventLog,
   activePrompt,
+  actionRejection = null,
   onAction,
   onLeave,
   matchClosed,
@@ -472,6 +478,7 @@ function BoardLayoutInner({
             canPass={bs.canPass}
             inBattle={bs.inBattle}
             activePrompt={activePrompt}
+            rejectionReason={actionRejection?.reason ?? null}
             battleInfo={bs.battleInfo}
             blockerMode={bs.inBlockStep ? {
               selectedBlockerId: bs.selectedBlockerId,

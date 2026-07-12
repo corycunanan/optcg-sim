@@ -711,14 +711,14 @@ export class GameSession implements DurableObject {
     if (!this.gameState || !this.cardDb) return;
 
     if (this.gameState.status === "FINISHED" || this.gameState.status === "ABANDONED") {
-      this.send(ws, { type: "game:error", message: "Game is already over" });
+      this.rejectAction(ws, action, "Game is already over");
       return;
     }
 
     // ── Undo: bypass pipeline entirely ──────────────────────────────────────
     if (action.type === "UNDO") {
       if (!this.canUndo(playerIndex)) {
-        this.send(ws, { type: "game:error", message: "Cannot undo right now" });
+        this.rejectAction(ws, action, "Cannot undo right now");
         return;
       }
       this.gameState = this.undoHistory.pop()!;
@@ -732,7 +732,7 @@ export class GameSession implements DurableObject {
 
     const pauseReason = this.getPauseReason(playerIndex);
     if (pauseReason && action.type !== "CONCEDE") {
-      this.send(ws, { type: "game:error", message: pauseReason });
+      this.rejectAction(ws, action, pauseReason);
       return;
     }
 
@@ -741,7 +741,7 @@ export class GameSession implements DurableObject {
     // normal game action would turn network retries into a second mutation
     // (notably a duplicate PASS advancing BLOCK_STEP).
     if (!this.gameState.pendingPrompt && promptResponseId(action)) {
-      this.send(ws, { type: "game:error", message: "That prompt response is stale" });
+      this.rejectAction(ws, action, "That prompt response is stale");
       return;
     }
 
@@ -758,29 +758,23 @@ export class GameSession implements DurableObject {
         // Fall through to the normal pipeline path below.
       } else if (expected) {
         if (playerIndex !== this.gameState.pendingPrompt.respondingPlayer) {
-          this.send(ws, { type: "game:error", message: "Waiting for opponent to respond to prompt" });
+          this.rejectAction(ws, action, "Waiting for opponent to respond to prompt");
           return;
         }
         if (!expected.includes(action.type)) {
-          this.send(ws, {
-            type: "game:error",
-            message: `Expected a ${promptType} response`,
-          });
+          this.rejectAction(ws, action, `Expected a ${promptType} response`);
           return;
         }
 
         if (prompt.promptId && promptResponseId(action) !== prompt.promptId) {
-          this.send(ws, {
-            type: "game:error",
-            message: "That prompt response is stale",
-          });
+          this.rejectAction(ws, action, "That prompt response is stale");
           return;
         }
 
         if (promptType === "ARRANGE_TOP_CARDS" && action.type === "ARRANGE_TOP_CARDS") {
           const arrangeError = validateArrangeResponse(prompt.options, action);
           if (arrangeError) {
-            this.send(ws, { type: "game:error", message: arrangeError });
+            this.rejectAction(ws, action, arrangeError);
             return;
           }
         }
@@ -788,7 +782,7 @@ export class GameSession implements DurableObject {
         if (promptType === "PLAYER_CHOICE" && action.type === "PLAYER_CHOICE") {
           const offered = prompt.options.choices.some((choice) => choice.id === action.choiceId);
           if (!offered) {
-            this.send(ws, { type: "game:error", message: "That choice is no longer available" });
+            this.rejectAction(ws, action, "That choice is no longer available");
             return;
           }
         }
@@ -799,7 +793,7 @@ export class GameSession implements DurableObject {
           const validChoice = action.choiceId === "activate" || action.choiceId === "accept"
             || action.choiceId === "skip";
           if (!validChoice) {
-            this.send(ws, { type: "game:error", message: "That choice is no longer available" });
+            this.rejectAction(ws, action, "That choice is no longer available");
             return;
           }
         }
@@ -813,7 +807,7 @@ export class GameSession implements DurableObject {
           return;
         }
       } else {
-        this.send(ws, { type: "game:error", message: "Waiting for player to respond to prompt" });
+        this.rejectAction(ws, action, "Waiting for player to respond to prompt");
         return;
       }
     }
@@ -843,7 +837,7 @@ export class GameSession implements DurableObject {
       }
 
       if (playerIndex !== expectedPlayer) {
-        this.send(ws, { type: "game:error", message: "Not your turn" });
+        this.rejectAction(ws, action, "Not your turn");
         return;
       }
     }
@@ -865,7 +859,7 @@ export class GameSession implements DurableObject {
     if (!result.valid) {
       // Restore undo history — pipeline rejected the action, nothing changed
       this.undoHistory = [];
-      this.send(ws, { type: "game:error", message: result.error ?? "Invalid action" });
+      this.rejectAction(ws, action, result.error ?? "Invalid action");
       return;
     }
 
@@ -1155,10 +1149,11 @@ export class GameSession implements DurableObject {
     // rejection from acceptance without diffing state. Surface it explicitly,
     // matching the gate paths.
     if (responseRejected) {
-      this.send(ws, {
-        type: "game:error",
-        message: "That prompt response was rejected; the pending prompt is unchanged",
-      });
+      this.rejectAction(
+        ws,
+        action,
+        "That prompt response was rejected; the pending prompt is unchanged",
+      );
     }
 
     if (this.gameState.pendingPrompt) {
@@ -1166,6 +1161,10 @@ export class GameSession implements DurableObject {
     } else {
       this.sendPendingPrompts();
     }
+  }
+
+  private rejectAction(ws: WebSocket, action: GameAction, reason: string): void {
+    this.send(ws, { type: "action:rejected", action, reason });
   }
 
   /**

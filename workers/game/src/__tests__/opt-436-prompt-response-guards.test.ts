@@ -132,9 +132,9 @@ function sessionWithOptionalPrompt(): { session: TestAccess; ws: MockWebSocket }
 
 function lastError(ws: MockWebSocket): string | undefined {
   const errors = ws.sent
-    .map((m) => JSON.parse(m) as { type: string; message?: string })
-    .filter((m) => m.type === "game:error");
-  return errors[errors.length - 1]?.message;
+    .map((m) => JSON.parse(m) as { type: string; reason?: string })
+    .filter((m) => m.type === "action:rejected");
+  return errors[errors.length - 1]?.reason;
 }
 
 // ─── Guard 1: prompt-type gate ───────────────────────────────────────────────

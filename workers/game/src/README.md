@@ -102,7 +102,8 @@ Client sends `{ type: "game:action", action: GameAction }`:
 | `game:state` | `{ state: GameState }` | On connection, reconnection |
 | `game:update` | `{ action: GameAction, state: GameState }` | After valid action |
 | `game:prompt` | `{ promptType, options }` | Engine needs player input |
-| `game:error` | `{ message: string }` | Invalid action or error |
+| `action:rejected` | `{ action: GameAction, reason: string }` | A well-formed game action was refused; enables localized client feedback |
+| `game:error` | `{ message: string }` | Transport, protocol, or connection-level error |
 | `game:over` | `{ winner: 0\|1\|null, reason }` | Game ended |
 | `game:player_disconnected` | `{ playerIndex }` | Player lost connection |
 | `game:player_reconnected` | `{ playerIndex }` | Player reconnected |

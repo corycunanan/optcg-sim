@@ -4,6 +4,7 @@ import type { ServerMessage } from "@shared/game-types";
 const mocks = vi.hoisted(() => ({
   onMessage: null as ((message: ServerMessage) => void) | null,
   send: vi.fn(),
+  stateSetters: [] as Array<ReturnType<typeof vi.fn>>,
 }));
 
 vi.mock("react", async (importActual) => {
@@ -13,10 +14,14 @@ vi.mock("react", async (importActual) => {
     useCallback: (callback: unknown) => callback,
     useMemo: (factory: () => unknown) => factory(),
     useRef: (initial: unknown) => ({ current: initial }),
-    useState: (initial: unknown) => [
-      typeof initial === "function" ? (initial as () => unknown)() : initial,
-      vi.fn(),
-    ],
+    useState: (initial: unknown) => {
+      const setter = vi.fn();
+      mocks.stateSetters.push(setter);
+      return [
+        typeof initial === "function" ? (initial as () => unknown)() : initial,
+        setter,
+      ];
+    },
   };
 });
 
@@ -41,6 +46,32 @@ describe("useGameWs prompt identity", () => {
   beforeEach(() => {
     mocks.onMessage = null;
     mocks.send.mockReset();
+    mocks.stateSetters.length = 0;
+  });
+
+  it("stores a typed rejection and does not clear it when the next action is sent", () => {
+    const game = useGameWs(
+      "game-1",
+      "https://worker.test",
+      async () => "token"
+    );
+    const rejectionSetter = mocks.stateSetters[5];
+
+    mocks.onMessage?.({
+      type: "action:rejected",
+      action: { type: "PLAY_CARD", cardInstanceId: "hand-1" },
+      reason: "Need 1 more DON!!",
+    });
+
+    expect(rejectionSetter).toHaveBeenLastCalledWith({
+      action: { type: "PLAY_CARD", cardInstanceId: "hand-1" },
+      reason: "Need 1 more DON!!",
+      sequence: 1,
+    });
+
+    rejectionSetter.mockClear();
+    game.sendAction({ type: "PLAY_CARD", cardInstanceId: "hand-1" });
+    expect(rejectionSetter).not.toHaveBeenCalled();
   });
 
   it("echoes the active server prompt ID on prompt responses", () => {

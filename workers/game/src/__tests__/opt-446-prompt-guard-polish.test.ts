@@ -63,9 +63,9 @@ type TestAccess = {
 
 function errors(ws: MockWebSocket): string[] {
   return ws.sent
-    .map((m) => JSON.parse(m) as { type: string; message?: string })
-    .filter((m) => m.type === "game:error")
-    .map((m) => m.message ?? "");
+    .map((m) => JSON.parse(m) as { type: string; reason?: string })
+    .filter((m) => m.type === "action:rejected")
+    .map((m) => m.reason ?? "");
 }
 
 function makeSession(state: GameState, cardDb: Map<string, CardData>): TestAccess {
@@ -188,8 +188,8 @@ describe("OPT-446: gate accepts the engine's 'skip' decline vocabulary", () => {
   });
 });
 
-describe("OPT-446: engine-level rejections surface a game:error", () => {
-  it("emits game:error when a same-type response is rejected and the prompt restored", async () => {
+describe("OPT-446: engine-level rejections surface action feedback", () => {
+  it("emits action:rejected when a same-type response is rejected and the prompt restored", async () => {
     const { session, ws } = sessionWithSelectPrompt();
     const stateBefore = session.gameState;
 
@@ -232,7 +232,7 @@ describe("OPT-446: engine-level rejections surface a game:error", () => {
     expect(session.gameState.pendingPrompt).toBeFalsy();
   });
 
-  it("emits game:error when a rejected selection is re-prompted (OPT-439 restore path)", async () => {
+  it("emits action:rejected when a selection is re-prompted (OPT-439 restore path)", async () => {
     const cardDb = createTestCardDb();
     const base = createBattleReadyState(cardDb);
     const target = base.players[1].characters.find((card) => card !== null)!;
@@ -273,7 +273,7 @@ describe("OPT-446: engine-level rejections surface a game:error", () => {
     expect(session.gameState.players[1].characters.some((c) => c?.instanceId === target.instanceId)).toBe(false);
   });
 
-  it("emits game:error on a rejected legacy (frame-less) DON-return choice", async () => {
+  it("emits action:rejected on a rejected legacy (frame-less) DON-return choice", async () => {
     const cardDb = createTestCardDb();
     const base = createBattleReadyState(cardDb);
     const resumeCtx: ResumeContext = {

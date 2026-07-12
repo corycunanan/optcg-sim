@@ -103,6 +103,7 @@ function ScriptedScenarioBody({ scenario }: { scenario: Scenario }) {
     activePrompt: session.game.activePrompt,
     matchClosed: session.game.matchClosed,
     canUndo: session.game.canUndo,
+    actionRejection: scenario.actionRejection ?? null,
     interactionMode: gate.interactionMode,
   };
 

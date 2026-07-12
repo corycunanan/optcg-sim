@@ -11,6 +11,7 @@ import { doubleAttackVsLifeScenario } from "./combat/double-attack-vs-life";
 import { rushAttackScenario } from "./combat/rush-attack";
 import { drawOneScenario } from "./draws/draw-1";
 import { drawTwoScenario } from "./draws/draw-2";
+import { actionRejectedScenario } from "./effects/action-rejected";
 import { peekTopThreeScenario } from "./draws/peek-top-3";
 import { characterKoedByDamageScenario } from "./ko/character-koed-by-damage";
 import { characterKoedByEffectScenario } from "./ko/character-koed-by-effect";
@@ -45,6 +46,7 @@ export const scenarios: Scenario[] = [
   characterKoedByEffectScenario,
   lifeToHandScenario,
   lifeToTrashScenario,
+  actionRejectedScenario,
   selectTargetScenario,
   arrangeTopFourScenario,
   playerChoiceThreeOptionsScenario,

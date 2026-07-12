@@ -8,13 +8,14 @@ import { cn } from "@/lib/utils";
 import { canPlayCardInZone } from "@/lib/game/client-legality";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
-import { cardEntry } from "@/lib/motion";
+import { cardEntry, cardReject, cardRejectReduced } from "@/lib/motion";
 import { Card } from "../card";
 import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
 import { DonCard } from "./don-zone";
 import { useInteractionMode } from "./interaction-mode";
+import { useCardRejection } from "./action-feedback";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
  *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
@@ -100,6 +101,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const reducedMotion = useReducedMotion();
   const interactionMode = useInteractionMode();
   const inputSuppressed = interactionMode !== "full";
+  const rejectionSequence = useCardRejection(card.instanceId);
 
   const {
     attributes,
@@ -236,15 +238,21 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // (composes via `animate` overriding scale/opacity post-mount).
   const shouldEnter = !!entering && !reducedMotion;
   const initialTarget = shouldEnter ? ENTRY_INITIAL : false;
-  const animateTarget = { scale: 1, opacity: isDragging ? 0.3 : 1 };
-  const wrapperTransition = shouldEnter
-    ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
-    : { duration: 0.15, ease: "easeOut" as const };
+  const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
+  const animateTarget = rejectionSequence
+    ? { scale: 1, ...rejectionAnimation }
+    : { scale: 1, x: 0, opacity: isDragging ? 0.3 : 1 };
+  const wrapperTransition = rejectionSequence
+    ? rejectionAnimation.transition
+    : shouldEnter
+      ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
+      : { duration: 0.15, ease: "easeOut" as const };
 
   return (
     <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
       <DropdownMenuTrigger asChild>
         <motion.div
+          key={rejectionSequence ?? "idle"}
           ref={mergedRef}
           {...attributes}
           {...listeners}
