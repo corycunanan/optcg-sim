@@ -46,8 +46,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 28 | OPT-463 | Cost-driven field exits bypass WOULD_LEAVE_FIELD replacements | — | OPT-458, OPT-459 | Done | [#276](https://github.com/corycunanan/optcg-sim/pull/276) | Cost exits now suspend for replacements; substituted payments suppress the post-colon chain per Rule 8-3-1-7. |
 | 29 | OPT-470 | Prevent LIFE_SCRIED and hidden-zone event payloads from leaking card identities | — | — | Done | [#282](https://github.com/corycunanan/optcg-sim/pull/282) | Exhaustive event/prompt visibility contract; secret identities and internal continuations removed from client views. |
 | 30 | OPT-467 | Make effect-stack overflow and infinite loops terminate with a rules-visible outcome | — | — | Done | [#283](https://github.com/corycunanan/optcg-sim/pull/283) | Typed terminal draw for stack/action exhaustion with replay-visible diagnostics. |
-| 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | In Review | [#284](https://github.com/corycunanan/optcg-sim/pull/284) | Immutable propagation metadata with frozen-state and structural-sharing regressions. |
-| 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | Backlog | — | Wave 1 card-source corrections with pipeline regressions. |
+| 31 | OPT-468 | Eliminate in-place mutation of pending events during trigger and resume processing | — | — | Done | [#284](https://github.com/corycunanan/optcg-sim/pull/284) | Immutable propagation metadata with frozen-state and structural-sharing regressions. |
+| 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | In Review | [#285](https://github.com/corycunanan/optcg-sim/pull/285) | Official text restored; three schemas corrected with full-pipeline regressions. |
 | 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Backlog | — | Starts Wave 2 after immediate correctness closure. |
 | 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Backlog | — | Handler execution inventory and CI coverage gate. |
 | 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | Backlog | — | Classify 211 authored AND chains and implement the rules contract. |
@@ -64,7 +64,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-469 is the final Wave 1 ticket. OPT-471 remains blocked until OPT-468 and OPT-469 merge.
+**Next up:** OPT-471 starts Wave 2 after OPT-469 merges; its authored-schema validation gate should build on the now-correct Wave 1 schema baseline.
 
 ---
 
@@ -285,3 +285,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Never mutate events held by effect-stack frames or input snapshots. De-duplication metadata must move forward through copied events while preserving event IDs and structural sharing outside the changed path.
 - **Unresolved:** None for OPT-468. Keep OPT-469 limited to the three confirmed card-source corrections and their pipeline regressions.
 - **Pointer:** PR #284; inspect `da2771e` for the immutable propagation implementation.
+
+### OPT-469 → OPT-471
+**From:** session on 2026-07-11 · **Commit:** `852c88f` · **PR:** [#285](https://github.com/corycunanan/optcg-sim/pull/285)
+
+- **Primer:** OP03-032 now filters battle K.O. protection by Slash attackers; OP04-042 boosts an optional Slash Character then mills; OP06-026 readies an optional qualifying Slash Character then installs a target-scoped Leader attack lock for the turn.
+- **Read first:** `workers/game/src/__tests__/opt-469-card-schema-corrections.test.ts`, the three authored blocks in `schemas/op03.ts`, `op04.ts`, and `op06.ts`, and the `scope.when_attacking` gate in `prohibitions.ts`.
+- **Gotchas / do NOT touch:** `scope.when_attacking` is a positive forbidden-target filter for `CANNOT_ATTACK`; OP06-026 restricts every attacker controlled by the player from targeting a Leader, not only the Character set active. The `THEN` actions remain mandatory when zero targets are chosen.
+- **Unresolved:** None for Wave 1. OPT-471 can make authored-schema validation fail closed once PR #285 merges.
+- **Pointer:** PR #285; inspect `852c88f` for the schema, source-text, prohibition, and regression changes.
