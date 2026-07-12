@@ -7,15 +7,19 @@
 
 import type { GameState } from "../types.js";
 import type { EffectStackFrame } from "../types.js";
+import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
 
 // ─── Stack Operations ────────────────────────────────────────────────────────
 
-const MAX_EFFECT_STACK_DEPTH = 100;
-
 export function pushFrame(state: GameState, frame: EffectStackFrame): GameState {
+  if (state.status !== "IN_PROGRESS") return state;
   if (state.effectStack.length >= MAX_EFFECT_STACK_DEPTH) {
-    console.error(`[EffectStack] Max depth (${MAX_EFFECT_STACK_DEPTH}) exceeded — possible infinite loop`);
-    return state;
+    return terminateForEngineLimit(state, {
+      kind: "EFFECT_STACK_DEPTH",
+      limit: MAX_EFFECT_STACK_DEPTH,
+      observed: state.effectStack.length + 1,
+      attemptedFrameId: frame.id,
+    });
   }
   return {
     ...state,

@@ -20,6 +20,7 @@ import type {
   EffectStackFrame,
 } from "../../types.js";
 import { generateFrameId, pushFrame } from "../effect-stack.js";
+import { isEngineTerminated } from "../engine-limits.js";
 import type { CostPaymentResult, CostSelectionResult } from "./types.js";
 import {
   detachDonToCostArea,
@@ -860,6 +861,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       nextState = pushFrame(nextState, frame);
+      if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -918,6 +920,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       nextState = pushFrame(nextState, frame);
+      if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -972,6 +975,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         nextState = pushFrame(nextState, frame);
+        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
         return {
           state: nextState,
           events,
@@ -1016,6 +1020,7 @@ export function payCostsWithSelection(
           costArrangeStage: true,
         };
         nextState = pushFrame(nextState, frame);
+        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
         return {
           state: nextState,
           events,
@@ -1076,6 +1081,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         nextState = pushFrame(nextState, frame);
+        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
         const pendingPrompt: PendingPromptState = {
           options: {
             promptType: "SELECT_TARGET",
@@ -1117,6 +1123,7 @@ export function payCostsWithSelection(
           costArrangeStage: true,
         };
         nextState = pushFrame(nextState, frame);
+        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
         return {
           state: nextState,
           events,
@@ -1163,6 +1170,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         nextState = pushFrame(nextState, frame);
+        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
 
         const pendingPrompt: PendingPromptState = {
           options: {
@@ -1208,6 +1216,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       nextState = pushFrame(nextState, frame);
+      if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
 
       const costLabel = getCostLabel(cost);
       const pendingPrompt: PendingPromptState = {
@@ -1259,6 +1268,7 @@ export function payCostsWithSelection(
           costReplacementChecked: true,
         };
         nextState = pushFrame(nextState, frame);
+        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
         return { state: nextState, events, pendingPrompt: replacement.pendingPrompt };
       }
       if (replacement.replaced) {

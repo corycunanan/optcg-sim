@@ -48,6 +48,7 @@ import {
 import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { processRemainingTriggers } from "./resume/triggers.js";
 import { promptTypeToPhase } from "./cost-handler.js";
+import { isEngineTerminated } from "../engine-limits.js";
 
 // Re-export the stable public API so existing imports keep working.
 export { processRemainingTriggers } from "./resume/triggers.js";
@@ -203,10 +204,16 @@ export function resumeFromStack(
       const result = resumeEffectChain(nextState, legacyCtx, action, cardDb);
       nextState = result.state;
       events.push(...result.events);
+      if (isEngineTerminated(nextState)) {
+        return { state: nextState, events, resolved: false };
+      }
 
       const replacementFrameWasPushed = nextState.effectStack.length > stackDepthAfterPop;
       if (result.rejected) {
         nextState = pushFrame(nextState, topFrame);
+        if (isEngineTerminated(nextState)) {
+          return { state: nextState, events, resolved: false };
+        }
         if (!result.pendingPrompt) {
           return { ...result, state: nextState };
         }
@@ -229,6 +236,9 @@ export function resumeFromStack(
             accumulatedEvents: [...topFrame.accumulatedEvents, ...result.events],
           };
           nextState = pushFrame(nextState, continuationFrame);
+          if (isEngineTerminated(nextState)) {
+            return { state: nextState, events, resolved: false };
+          }
         } else if (!replacementFrameWasPushed) {
           const promptCtx = pendingPrompt.resumeContext as ResumeContext;
           const replacementFrame: EffectStackFrame = {
@@ -246,6 +256,9 @@ export function resumeFromStack(
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
           };
           nextState = pushFrame(nextState, replacementFrame);
+          if (isEngineTerminated(nextState)) {
+            return { state: nextState, events, resolved: false };
+          }
           pendingPrompt = { ...pendingPrompt, resumeContext: replacementFrame.id };
         } else {
           const replacementFrame = peekFrame(nextState) as EffectStackFrame | null;

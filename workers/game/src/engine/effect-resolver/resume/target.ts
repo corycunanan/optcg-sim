@@ -29,6 +29,7 @@ import { applyRedistributeDonTransfers } from "../actions/don.js";
 import type { EffectResolverResult } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
 import { processRemainingTriggers } from "./triggers.js";
+import { isEngineTerminated } from "../../engine-limits.js";
 
 export interface TargetFallthrough {
   kind: "fallthrough";
@@ -163,6 +164,9 @@ export function handleSelectTargetRuleTrashForPlay(
       );
   nextState = actionResult.state;
   events.push(...actionResult.events);
+  if (isEngineTerminated(nextState)) {
+    return { kind: "terminal", result: { state: nextState, events, resolved: false } };
+  }
 
   if (actionResult.pendingPrompt) {
     return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt } };
@@ -241,6 +245,9 @@ export function handleSelectTarget(
   );
   nextState = actionResult.state;
   events.push(...actionResult.events);
+  if (isEngineTerminated(nextState)) {
+    return { kind: "terminal", result: { state: nextState, events, resolved: false } };
+  }
 
   if (actionResult.pendingPrompt) {
     return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt } };
@@ -262,6 +269,9 @@ export function handleSelectTarget(
       remainingActions,
       resultRefs,
     );
+    if (isEngineTerminated(nextState)) {
+      return { kind: "terminal", result: { state: nextState, events, resolved: false } };
+    }
     const drain = processRemainingTriggers(nextState, triggers, cardDb, events);
     return { kind: "terminal", result: { state: drain.state, events: drain.events, resolved: drain.resolved, pendingPrompt: drain.pendingPrompt } };
   }

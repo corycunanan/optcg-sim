@@ -480,8 +480,8 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **11-1-1.** Infinite loop detection | **GAP** | — | No loop detection. Risk: auto effects could create infinite loops. Need: action counter or state hash comparison |
-| **11-1-1-1.** Unstoppable loop → draw | **GAP** | — | |
+| **11-1-1.** Infinite loop detection | **PARTIAL** | `engine-limits.ts`; `opt-467-engine-limits.test.ts` | Effect-stack depth and a persisted per-resolution action budget bound nested and sequential loops. State-hash recognition of player-stoppable loops remains future work. |
+| **11-1-1-1.** Unstoppable loop → draw | **IMPL** | `engine-limits.ts`; `effect-stack.ts`; `opt-467-engine-limits.test.ts` | Exhaustion atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. |
 | **11-1-1-2/3.** Player can declare loop count | **GAP** | — | Need: prompt for loop count |
 | **11-2-1.** Cards moved secret→secret must be revealed | **GAP** | — | No reveal enforcement on secret-to-secret transfers |
 | **11-2-2.** Revealed cards become unrevealed after effect resolves | **GAP** | — | No reveal/unrevealed state tracking on cards |

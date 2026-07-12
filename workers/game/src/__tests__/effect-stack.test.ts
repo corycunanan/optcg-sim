@@ -21,8 +21,15 @@ import type { EffectStackFrame, GameState } from "../types.js";
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 function emptyState(): GameState {
-  // Minimal GameState shape: we only care about effectStack for these tests.
-  return { effectStack: [] } as unknown as GameState;
+  return {
+    effectStack: [],
+    eventLog: [],
+    pendingPrompt: null,
+    status: "IN_PROGRESS",
+    winner: null,
+    winReason: null,
+    turn: { activePlayerIndex: 0 },
+  } as unknown as GameState;
 }
 
 const stubBlock: EffectBlock = { id: "stub", category: "activate", actions: [] };
@@ -76,16 +83,29 @@ describe("pushFrame", () => {
     expect(s1.effectStack).not.toBe(s0.effectStack);
   });
 
-  it("rejects the push when stack is at MAX_EFFECT_STACK_DEPTH (100)", () => {
+  it("terminates in a rules-visible draw at MAX_EFFECT_STACK_DEPTH (100)", () => {
     let s = emptyState();
     for (let i = 0; i < 100; i++) s = pushFrame(s, makeFrame(`f${i}`));
     expect(s.effectStack).toHaveLength(100);
 
-    // 101st push is dropped — infinite-loop guard. Returns the same state.
     const s2 = pushFrame(s, makeFrame("overflow"));
-    expect(s2.effectStack).toHaveLength(100);
-    expect(s2.effectStack[99].id).toBe("f99");
-    expect(s2).toBe(s);
+    expect(s2.effectStack).toHaveLength(0);
+    expect(s2.status).toBe("FINISHED");
+    expect(s2.winner).toBeNull();
+    expect(s2.engineOutcome).toEqual({
+      type: "INFINITE_LOOP_DRAW",
+      diagnostic: {
+        kind: "EFFECT_STACK_DEPTH",
+        limit: 100,
+        observed: 101,
+        attemptedFrameId: "overflow",
+      },
+    });
+    expect(s2.eventLog.at(-1)).toMatchObject({
+      type: "GAME_OVER",
+      payload: { winner: null, diagnostic: { kind: "EFFECT_STACK_DEPTH" } },
+    });
+    expect(s.effectStack).toHaveLength(100);
   });
 });
 
