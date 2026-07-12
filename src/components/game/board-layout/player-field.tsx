@@ -26,6 +26,7 @@ import {
 import { DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop-zones";
+import { isCounterEvent } from "./use-board-dnd";
 import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
 import { ZoneRef } from "./zone-ref";
@@ -88,8 +89,7 @@ export function PlayerField({
     activeDrag?.type === "hand-card" ? cardDb[activeDrag.card.cardId] : undefined;
   const eventFieldDropActive =
     draggedHandData?.type === "Event" &&
-    (canInteract ||
-      (canDragCounter && draggedHandData.effectText?.includes("[Counter]")));
+    (canInteract || (canDragCounter && isCounterEvent(draggedHandData)));
   const characterCounterDragActive =
     canDragCounter && draggedHandData?.type === "Character";
 
@@ -142,6 +142,7 @@ export function PlayerField({
             counterTarget={
               characterCounterDragActive && defenderInstanceId === char.instanceId
             }
+            counterDragActive={characterCounterDragActive}
             eventDropTarget={eventFieldDropActive}
             onSelect={
               isBlockerEligible

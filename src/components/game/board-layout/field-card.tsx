@@ -38,6 +38,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isAttacker,
   isDefender,
   counterTarget,
+  counterDragActive,
   eventDropTarget,
   counterPulse,
   onSelect,
@@ -66,6 +67,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isDefender?: boolean;
   /** Current battle defender while a Character counter is being dragged. */
   counterTarget?: boolean;
+  /** A Character-counter drag is in progress. Board-full replacement is never
+   *  legal mid-battle, so non-defender cards must not offer the replace drop —
+   *  a missed defender drop would otherwise dispatch PLAY_CARD (SIG-6). */
+  counterDragActive?: boolean;
   /** Part of the broad own-field play surface while an Event is dragged. */
   eventDropTarget?: boolean;
   counterPulse?: boolean;
@@ -127,7 +132,11 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const acceptsCounter = !!counterTarget && activeDragType === "hand-card";
   const acceptsEvent = !!eventDropTarget && activeDragType === "hand-card";
   const acceptsHandCard =
-    !acceptsCounter && !acceptsEvent && !!boardFull && activeDragType === "hand-card";
+    !acceptsCounter &&
+    !acceptsEvent &&
+    !counterDragActive &&
+    !!boardFull &&
+    activeDragType === "hand-card";
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: acceptsCounter
       ? `counter-target-${card.instanceId}`

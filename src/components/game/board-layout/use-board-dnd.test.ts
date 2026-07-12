@@ -128,6 +128,14 @@ describe("resolveHandCardDropAction", () => {
     ).toBeNull();
   });
 
+  it("never plays a Main-only Event while a battle is in progress", () => {
+    const drag = { type: "hand-card" as const, card: handCard("event-main") };
+
+    expect(
+      resolveHandCardDropAction(drag, { type: "own-field" }, db, battle)
+    ).toBeNull();
+  });
+
   it("preserves Character play-to-slot routing", () => {
     const drag = { type: "hand-card" as const, card: handCard("char-1") };
 

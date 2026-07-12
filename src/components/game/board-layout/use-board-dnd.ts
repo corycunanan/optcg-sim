@@ -7,7 +7,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import type { CardDb, GameAction, TurnState } from "@shared/game-types";
+import type { CardData, CardDb, GameAction, TurnState } from "@shared/game-types";
 import type { DragPayload } from "./constants";
 
 type BoardDropData = {
@@ -23,6 +23,15 @@ const OWN_FIELD_DROP_TYPES = new Set([
   "don-target",
 ]);
 
+/** Single definition of "this Event can be used as a counter" — shared by the
+ * dispatch contract below, hand-card dimming, and the own-field drop surface
+ * so eligibility, affordance, and dispatch cannot drift apart. */
+export function isCounterEvent(
+  data: Pick<CardData, "type" | "effectText"> | undefined,
+): boolean {
+  return data?.type === "Event" && !!data.effectText?.includes("[Counter]");
+}
+
 /** Resolve hand-card gestures independently from dnd-kit so the interaction
  * grammar is testable as a dispatch contract. Events use the broad own-field
  * surface; Character counters affect only the current defender. */
@@ -36,7 +45,7 @@ export function resolveHandCardDropAction(
   if (!cardData || typeof dropData.type !== "string") return null;
 
   if (cardData.type === "Event" && OWN_FIELD_DROP_TYPES.has(dropData.type)) {
-    if (battle && cardData.effectText?.includes("[Counter]")) {
+    if (battle && isCounterEvent(cardData)) {
       return {
         type: "USE_COUNTER_EVENT",
         cardInstanceId: dragData.card.instanceId,

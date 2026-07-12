@@ -228,7 +228,13 @@ export const MidZone = React.memo(function MidZone({
           ) : (
             <MidZoneDisabledBtn>Block</MidZoneDisabledBtn>
           )}
-          <GameButton variant="secondary" size="sm" className={IN_BOARD_BTN} onClick={() => onAction({ type: "PASS" })}>
+          <GameButton
+            variant="secondary"
+            size="sm"
+            className={IN_BOARD_BTN}
+            data-blocker-selection-control=""
+            onClick={() => onAction({ type: "PASS" })}
+          >
             Skip
           </GameButton>
         </>
