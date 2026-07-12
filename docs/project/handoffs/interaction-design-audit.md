@@ -18,7 +18,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-416 | Unify interaction grammar: drag commits, click selects | — | — | Done | [#286](https://github.com/corycunanan/optcg-sim/pull/286) | Foundation for every board interaction |
 | 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | Done | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
-| 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | In Review | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA required for dimming, tooltip, and drag-target signals |
+| 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Done | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA passed for dimming, tooltip, and drag-target signals |
 | 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Backlog | — | Independent server-authority backstop |
 | 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Backlog | — | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Backlog | — | Completes the menu verb |
