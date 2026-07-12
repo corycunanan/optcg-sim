@@ -39,6 +39,7 @@
 
 | File | Description | Lines |
 |------|-------------|-------|
+| [GAME-ENGINE-AUDIT-2026-07.md](./GAME-ENGINE-AUDIT-2026-07.md) | Consolidated Luna Max + Terra Max audit, independent verification, and sequenced Linear hardening plan | — |
 | [GAME-ENGINE-REQUIREMENTS.md](./GAME-ENGINE-REQUIREMENTS.md) | Complete rules-to-engine mapping from Comprehensive Rules v1.2.0 | 1,079 |
 | [CARD-ANALYSIS-FINDINGS.md](./CARD-ANALYSIS-FINDINGS.md) | ~200 distinct card effect patterns identified across all 51 sets | 1,168 |
 | [CARD-EFFECT-EXAMPLES.md](./CARD-EFFECT-EXAMPLES.md) | Complex card examples collected for schema validation | 250 |
