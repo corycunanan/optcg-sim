@@ -119,7 +119,7 @@ export const ST03_005_DRACULE_MIHAWK: EffectSchema = {
       trigger: { keyword: "WHEN_ATTACKING", don_requirement: 1 },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
     },
   ],

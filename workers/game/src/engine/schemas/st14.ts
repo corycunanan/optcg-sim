@@ -276,7 +276,7 @@ export const ST14_008_HAREDAS: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
           conditions: {
             type: "CARD_ON_FIELD",
             controller: "SELF",

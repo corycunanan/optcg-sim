@@ -212,7 +212,7 @@ export const OP16_009_SPEED_JIL: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 2000 },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -384,7 +384,7 @@ export const OP16_015_MONKEY_D_LUFFY: EffectSchema = {
           target: { type: "SELF" },
           params: { value: 7000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -1060,7 +1060,7 @@ export const OP16_048_BUGGY: EffectSchema = {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: "Prisoner of Impel Down" } },
           params: { source_zone: "HAND", cost_override: "FREE" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1110,7 +1110,7 @@ export const OP16_050_MISS_OLIVE: EffectSchema = {
       costs: [{ type: "RETURN_OWN_CHARACTER_TO_HAND", amount: 1, filter: { cost_min: 2 } }],
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
       ],
       flags: { optional: true },
     },
@@ -1221,7 +1221,7 @@ export const OP16_056_MR_3_GALDINO: EffectSchema = {
           target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 }, filter: { cost_max: 9 } },
           params: { prohibition_type: "CANNOT_ATTACK" },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -1252,7 +1252,7 @@ export const OP16_057_CAPTAIN_BUGGYS_OUR_SAVIOR: EffectSchema = {
       id: "trigger_draw_trash",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "DRAW", params: { amount: 2 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" }],
+      actions: [{ type: "DRAW", params: { amount: 2 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" }],
     },
   ],
 };
@@ -1440,7 +1440,7 @@ export const OP16_066_SENGOKU: EffectSchema = {
       actions: [
         { type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED" } },
         { type: "DRAW", params: { amount: 2 }, chain: "THEN" },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
     },
   ],
@@ -1554,7 +1554,7 @@ export const OP16_073_BORSALINO: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" }, chain: "AND" },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" }, chain: "THEN" },
       ],
     },
     {
@@ -1598,7 +1598,7 @@ export const OP16_075_MONKEY_D_GARP: EffectSchema = {
       conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
       actions: [
         { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" }, chain: "AND" },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" }, chain: "THEN" },
       ],
     },
   ],
@@ -1669,7 +1669,7 @@ export const OP16_078_MARINEFORD: EffectSchema = {
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [{ type: "DON_MINUS", amount: 1 }, { type: "REST_SELF" }],
-      actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" }],
+      actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" }],
       flags: { optional: true },
     },
   ],
@@ -1864,7 +1864,7 @@ export const OP16_087_SHINOBU: EffectSchema = {
           target: { type: "CHARACTER", controller: "SELF", count: { up_to: 1 }, filter: { name: "Kouzuki Momonosuke" } },
           params: { amount: 20 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -1891,7 +1891,7 @@ export const OP16_089_DRACULE_MIHAWK: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
         {
           type: "MODIFY_COST",
           target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
@@ -1915,7 +1915,7 @@ export const OP16_090_TONY_TONY_CHOPPER: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
         { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 }, filter: { cost_max: 1 } }, chain: "THEN" },
       ],
     },
@@ -1964,7 +1964,7 @@ export const OP16_093_BARTHOLOMEW_KUMA: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
         {
           type: "GIVE_DON",
           target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { up_to: 1 } },
@@ -2070,7 +2070,7 @@ export const OP16_098_YAMATO: EffectSchema = {
   card_name: "Yamato",
   card_type: "Character",
   effects: [
-    { id: "on_play_draw_trash", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" }] },
+    { id: "on_play_draw_trash", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" }] },
     {
       id: "activate_trash_play_yamato",
       category: "activate",
@@ -2216,7 +2216,7 @@ export const OP16_103_VAN_AUGUR: EffectSchema = {
           target: { type: "LEADER_OR_CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
           params: { amount: -3000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2254,7 +2254,7 @@ export const OP16_104_CATARINA_DEVON: EffectSchema = {
           type: "PLAY_CARD",
           target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { up_to: 1 }, filter: { traits: ["Blackbeard Pirates"], cost_exact: 1 } },
           params: { source_zone: "TRASH", cost_override: "FREE" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2343,7 +2343,7 @@ export const OP16_109_DOC_Q: EffectSchema = {
       conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Blackbeard Pirates" } },
       actions: [
         { type: "DRAW", params: { amount: 1 } },
-        { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 2 }, filter: { cost_max: 1 } }, chain: "AND" },
+        { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 2 }, filter: { cost_max: 1 } }, chain: "THEN" },
       ],
     },
     { id: "trigger_reuse_on_ko", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [{ type: "REUSE_EFFECT", params: { target_effect: "ON_KO" } }] },
@@ -2461,7 +2461,7 @@ export const OP16_116_ZEHAHAHAHAHA: EffectSchema = {
         { type: "LIFE_TO_HAND", target: { type: "OPPONENT_LIFE", controller: "OPPONENT" }, params: { amount: 1, position: "TOP" }, chain: "THEN" },
       ],
     },
-    { id: "trigger_draw_trash", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [{ type: "DRAW", params: { amount: 2 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" }] },
+    { id: "trigger_draw_trash", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [{ type: "DRAW", params: { amount: 2 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" }] },
   ],
 };
 

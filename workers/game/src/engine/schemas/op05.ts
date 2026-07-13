@@ -1739,7 +1739,7 @@ export const OP05_046_DALMATIAN: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 1, position: "BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1984,7 +1984,7 @@ export const OP05_054_MONKEY_D_GARP: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 2, position: "BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2175,7 +2175,7 @@ export const OP05_058_WASTE_OF_HUMAN_LIFE: EffectSchema = {
               },
             },
           },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3526,7 +3526,7 @@ export const OP05_094_HAUTE_COUTURE_PATCHWORK: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -4014,7 +4014,7 @@ export const OP05_104_CONIS: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -4129,7 +4129,7 @@ export const OP05_109_PAGAYA: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

@@ -514,14 +514,14 @@ export const OP03_016_FLAME_EMPEROR: EffectSchema = {
           target: { type: "YOUR_LEADER" },
           params: { keyword: "DOUBLE_ATTACK" },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "MODIFY_POWER",
           target: { type: "YOUR_LEADER" },
           params: { amount: 3000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1557,7 +1557,7 @@ export const OP03_044_KAYA: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1655,7 +1655,7 @@ export const OP03_047_ZEFF: EffectSchema = {
         {
           type: "MILL",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -1886,7 +1886,7 @@ export const OP03_054_USOPPS_RUBBER_BAND: EffectSchema = {
         {
           type: "MILL",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -2130,7 +2130,7 @@ export const OP03_060_KALIFA: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2377,7 +2377,7 @@ export const OP03_069_MINORHINOCEROS: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2833,7 +2833,7 @@ export const OP03_081_KALIFA: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "MODIFY_COST",
@@ -3827,7 +3827,7 @@ export const OP03_116_SHIRAHOSHI: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -4105,7 +4105,7 @@ export const OP03_122_SOGEKING: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

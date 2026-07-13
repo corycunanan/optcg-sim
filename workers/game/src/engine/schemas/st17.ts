@@ -48,7 +48,7 @@ export const ST17_001_CROCODILE: EffectSchema = {
             count: { exact: 1 },
           },
           params: { position: "TOP", amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

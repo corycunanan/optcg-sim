@@ -166,7 +166,7 @@ export const ST13_004_EDWARD_NEWGATE: EffectSchema = {
         },
         {
           type: "REORDER_ALL_LIFE",
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -561,7 +561,7 @@ export const ST13_015_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           params: { amount: 1, position: "TOP" },
-          chain: "AND",
+          chain: "THEN",
           conditions: {
             type: "LIFE_COUNT",
             controller: "SELF",
@@ -600,7 +600,7 @@ export const ST13_016_YAMATO: EffectSchema = {
         },
         {
           type: "REORDER_ALL_LIFE",
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

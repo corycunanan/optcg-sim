@@ -422,7 +422,7 @@ export const ST06_016_WHITE_OUT: EffectSchema = {
           target: { type: "ALL_YOUR_CHARACTERS" },
           params: { prohibition_type: "CANNOT_BE_KO" },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

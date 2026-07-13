@@ -164,7 +164,7 @@ export const OP09_005_SILVERS_RAYLEIGH: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -741,7 +741,7 @@ export const OP09_022_LIM: EffectSchema = {
             filter: { traits: ["ODYSSEY"], cost_max: 5 },
           },
           params: { source_zone: "HAND", cost_override: "FREE" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -818,7 +818,7 @@ export const OP09_024_USOPP: EffectSchema = {
       },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
     },
   ],
@@ -1629,7 +1629,7 @@ export const OP09_047_KOUZUKI_ODEN: EffectSchema = {
       trigger: { keyword: "ON_KO" },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
       ],
     },
   ],
@@ -1655,7 +1655,7 @@ export const OP09_048_DRACULE_MIHAWK: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
       ],
     },
   ],
@@ -2080,7 +2080,7 @@ export const OP09_061_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "ADD_DON_FROM_DECK",
           params: { amount: 1, target_state: "RESTED" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3042,7 +3042,7 @@ export const OP09_092_MARSHALL_D_TEACH: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3105,7 +3105,7 @@ export const OP09_093_MARSHALL_D_TEACH: EffectSchema = {
           target_ref: "negated_character",
           params: { prohibition_type: "CANNOT_ATTACK" },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3218,7 +3218,7 @@ export const OP09_097_BLACK_VORTEX: EffectSchema = {
           target_ref: "negated_card",
           params: { amount: -4000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3594,7 +3594,7 @@ export const OP09_106_NICO_OLVIA: EffectSchema = {
       },
       actions: [
         { type: "DRAW", params: { amount: 3 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
     },
   ],
@@ -3692,7 +3692,7 @@ export const OP09_110_PIERRE: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
     },
     {
@@ -3964,7 +3964,7 @@ export const OP09_119_MONKEY_D_LUFFY: EffectSchema = {
           target: { type: "SELF" },
           params: { keyword: "RUSH" },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

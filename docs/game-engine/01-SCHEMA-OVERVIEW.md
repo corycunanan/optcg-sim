@@ -294,7 +294,7 @@ Any cost that involves selecting a card supports an optional `filter` field usin
 
 ## Chain Semantics
 
-Actions within an EffectBlock execute sequentially. The connector between consecutive actions determines dependency behavior, per comprehensive rules 4-10.
+Actions within an EffectBlock execute in printed order by default (Comprehensive Rule 1-3-7). The connector between consecutive actions determines dependency or explicit simultaneity, with `THEN`/`IF_DO` following rule 4-10.
 
 ```typescript
 type ChainConnector = "THEN" | "IF_DO" | "AND";
@@ -304,7 +304,9 @@ type ChainConnector = "THEN" | "IF_DO" | "AND";
 
 - **`THEN`** — Execute the next action regardless of whether the preceding action fully resolved. The canonical "Then," in card text. The second action is NOT conditional on the first succeeding.
 - **`IF_DO`** — Execute the next action only if the preceding action successfully resolved (produced a result). Maps to "If you do," in card text. If the first action was impossible or chose 0 targets, skip the second.
-- **`AND`** — Simultaneous with the preceding action. Both are part of a single atomic operation.
+- **`AND`** — Reserved for text that explicitly requires simultaneous handling; connective English “and” is still `THEN`. The engine locks conditions and targets against one group-start snapshot, gathers every target choice before mutation, then commits the allowed actions atomically. Same-group result dependencies and handlers that can open prohibition, replacement, trigger-drain, arrange, or nested-choice continuations are rejected by schema validation until they have a dedicated atomic preflight.
+
+See [Authored AND-chain audit](./AND-CHAIN-AUDIT.md) for the complete transaction contract and the 210-connector migration.
 
 ### Action Structure with Chaining
 

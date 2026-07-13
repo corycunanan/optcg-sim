@@ -135,6 +135,8 @@ export interface EffectStackFrame {
   validTargets: string[];
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
+  /** AND transaction waiting for all snapshot-locked target choices. */
+  simultaneousGroup?: import("./engine/effect-resolver/simultaneous.js").SimultaneousGroupPlan;
   /** Outer replacement batch to continue after a nested substitute prompt. */
   replacementBatchContinuation?: import("./engine/replacements.js").ReplacementBatchResumeContext;
 

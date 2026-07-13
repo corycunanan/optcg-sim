@@ -907,7 +907,7 @@ export const EB02_024_SOGEKING: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 2, position: "BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "RETURN_TO_HAND",
@@ -1685,7 +1685,7 @@ export const EB02_046_HILDON: EffectSchema = {
           },
           params: { amount: -1 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2044,7 +2044,7 @@ export const EB02_054_SANJI: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
