@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import type {
+  Announcements,
+  DragEndEvent,
+  DragStartEvent,
+  ScreenReaderInstructions,
+} from "@dnd-kit/core";
 import type { CardDb, GameAction, TurnState } from "@shared/game-types";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import type { DragPayload } from "./constants";
+import { boardKeyboardCoordinates } from "./board-keyboard-coordinates";
 
 type BoardDropData = {
   type?: unknown;
@@ -23,6 +30,44 @@ const OWN_FIELD_DROP_TYPES = new Set([
   "stage-zone",
   "don-target",
 ]);
+
+const boardScreenReaderInstructions: ScreenReaderInstructions = {
+  draggable:
+    "To pick up a card, press Enter or Space. While dragging, use the arrow keys to move between legal targets. Press Enter or Space again to drop, or Escape to cancel.",
+};
+
+export function describeBoardDrag(dragData: DragPayload, cardDb: CardDb): string {
+  switch (dragData.type) {
+    case "hand-card":
+    case "attacker":
+      return cardDb[dragData.card.cardId]?.name ?? "card";
+    case "active-don":
+      return "active DON";
+    case "redistribute-don":
+      return "attached DON";
+  }
+}
+
+export function describeBoardDrop(dropData: BoardDropData | undefined): string {
+  switch (dropData?.type) {
+    case "character-slot":
+      return `character slot ${Number(dropData.slotIndex) + 1}`;
+    case "stage-zone":
+      return "stage zone";
+    case "own-field":
+      return "your field";
+    case "counter-target":
+      return "the defending card";
+    case "don-target":
+      return "a DON attachment target";
+    case "attack-target":
+      return "an attack target";
+    case "hand-card":
+      return "another position in your hand";
+    default:
+      return "a legal target";
+  }
+}
 
 /** Resolve hand-card gestures independently from dnd-kit so the interaction
  * grammar is testable as a dispatch contract. Events use the broad own-field
@@ -104,6 +149,35 @@ export function useBoardDnd(
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: boardKeyboardCoordinates }),
+  );
+
+  const announcements = useMemo<Announcements>(
+    () => ({
+      onDragStart({ active }) {
+        const dragData = active.data.current as DragPayload;
+        return `${describeBoardDrag(dragData, cardDb)} picked up.`;
+      },
+      onDragOver({ active, over }) {
+        if (!over) return "No legal drop target.";
+        const dragData = active.data.current as DragPayload;
+        if (over.id === active.id) {
+          return `${describeBoardDrag(dragData, cardDb)} remains at its current position.`;
+        }
+        return `${describeBoardDrag(dragData, cardDb)} is over ${describeBoardDrop(over.data.current)}.`;
+      },
+      onDragEnd({ active, over }) {
+        const dragData = active.data.current as DragPayload;
+        return over && over.id !== active.id
+          ? `${describeBoardDrag(dragData, cardDb)} dropped on ${describeBoardDrop(over.data.current)}.`
+          : `${describeBoardDrag(dragData, cardDb)} was not moved.`;
+      },
+      onDragCancel({ active }) {
+        const dragData = active.data.current as DragPayload;
+        return `${describeBoardDrag(dragData, cardDb)} drag canceled.`;
+      },
+    }),
+    [cardDb],
   );
 
   function handleDragStart(event: DragStartEvent) {
@@ -169,11 +243,20 @@ export function useBoardDnd(
     }
   }
 
+  function handleDragCancel() {
+    setActiveDrag(null);
+  }
+
   return {
     activeDrag,
     activeDragType: activeDrag?.type ?? null,
     sensors,
+    accessibility: {
+      announcements,
+      screenReaderInstructions: boardScreenReaderInstructions,
+    },
     handleDragStart,
     handleDragEnd,
+    handleDragCancel,
   };
 }

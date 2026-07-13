@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useId, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { CardData, CardDb, CardInstance, GameAction, TurnState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
@@ -173,6 +173,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   animationDelay?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const descriptionId = useId();
   const zonePos = useZonePosition();
   const interactionMode = useInteractionMode();
   const inputSuppressed = interactionMode !== "full";
@@ -223,6 +224,21 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     },
     [inputSuppressed, targetSelection],
   );
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        (event.key === "Enter" || event.key === " ") &&
+        targetSelection &&
+        !targetSelection.disabledReason
+      ) {
+        event.preventDefault();
+        onTargetToggle?.();
+      }
+    },
+    [onTargetToggle, targetSelection],
+  );
+  const cardName = card ? cardDb[card.cardId]?.name ?? card.cardId : "Stage";
+  const disabledReason = targetSelection?.disabledReason ?? null;
 
   return (
     <div
@@ -249,13 +265,25 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               }
               data-target-selection={targetSelection ? "" : undefined}
               data-target-instance-id={targetSelection ? card.instanceId : undefined}
-              role={menuTriggerEnabled ? "button" : undefined}
-              tabIndex={menuTriggerEnabled ? 0 : undefined}
-              aria-label={
-                menuTriggerEnabled
-                  ? `Actions for ${cardDb[card.cardId]?.name ?? "card"}`
-                  : undefined
-              }
+              role={menuTriggerEnabled || targetSelection ? "button" : "img"}
+              tabIndex={0}
+              aria-label={[
+                cardName,
+                card.state === "RESTED" ? "rested" : "active",
+                targetSelection?.selected
+                  ? "selected"
+                  : targetSelection?.eligible
+                    ? "eligible for selection"
+                    : null,
+                disabledReason,
+                menuTriggerEnabled ? "actions available" : null,
+              ]
+                .filter(Boolean)
+                .join(". ")}
+              aria-pressed={targetSelection ? !!targetSelection.selected : undefined}
+              aria-disabled={disabledReason ? true : undefined}
+              aria-describedby={disabledReason ? descriptionId : undefined}
+              onKeyDown={handleKeyDown}
               animate={
                 rejectionSequence
                   ? rejectionAnimation
@@ -263,7 +291,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               }
               transition={rejectionSequence ? rejectionAnimation.transition : undefined}
               className={cn(
-                "relative z-[1]",
+                "relative z-[1] rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
                 (menuTriggerEnabled ||
                   (targetSelection && !targetSelection.disabledReason)) &&
                   "cursor-pointer",
@@ -286,6 +314,11 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
                 }}
                 motionDelay={animationDelay}
               />
+              {disabledReason && (
+                <span id={descriptionId} className="sr-only">
+                  {disabledReason}
+                </span>
+              )}
             </motion.div>
           </DropdownMenuTrigger>
           {onAction && (

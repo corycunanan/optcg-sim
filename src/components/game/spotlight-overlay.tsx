@@ -4,6 +4,12 @@ import { useCallback } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Eye, LayoutPanelTop, X } from "lucide-react";
 import type { CardDb } from "@shared/game-types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import {
   spotlightCardZoneKey,
@@ -116,31 +122,26 @@ export function SpotlightOverlay({
   return (
     <AnimatePresence>
       {presentation && view === "spotlight" && copy && (
-        <motion.section
+        <Dialog
           key={presentation.id}
-          data-testid="card-spotlight"
-          aria-label={`${copy.eyebrow}: ${copy.title}`}
-          className="absolute inset-0 z-50 flex items-center justify-center"
-          initial={reducedMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reducedMotion ? 0 : 0.18 }}
+          open
+          onOpenChange={(open) => {
+            if (!open) onDismiss();
+          }}
         >
-          <button
-            type="button"
-            aria-label="Dismiss card spotlight"
-            className="bg-gb-navbar/90 focus-visible:ring-gb-accent-blue absolute inset-0 cursor-default focus-visible:ring-4 focus-visible:outline-none focus-visible:ring-inset"
-            onClick={onDismiss}
-          />
-
-          <div className="border-gb-accent-amber/40 bg-gb-surface relative flex max-w-4xl flex-col items-center gap-6 rounded-lg border px-10 py-8 shadow-2xl">
+          <DialogContent
+            data-testid="card-spotlight"
+            size="xl"
+            showCloseButton={false}
+            className="border-gb-accent-amber/40 bg-gb-surface flex flex-col items-center gap-6 border px-10 py-8 shadow-2xl"
+          >
             <div className="flex flex-col items-center gap-2 text-center">
               <span className="text-gb-accent-amber text-base font-bold tracking-widest uppercase">
                 {copy.eyebrow}
               </span>
-              <h2 className="font-display text-gb-text-bright text-3xl uppercase">
+              <DialogTitle className="font-display text-gb-text-bright text-3xl uppercase">
                 {copy.title}
-              </h2>
+              </DialogTitle>
             </div>
 
             <div className="flex max-w-3xl flex-wrap items-center justify-center gap-4">
@@ -162,6 +163,7 @@ export function SpotlightOverlay({
                   variant="secondary"
                   size="lg"
                   className="focus-visible:ring-4"
+                  aria-keyshortcuts="B"
                   onClick={onToggleView}
                 >
                   <LayoutPanelTop aria-hidden="true" className="size-5" />
@@ -183,12 +185,17 @@ export function SpotlightOverlay({
             </div>
 
             {isWaiting && (
-              <p className="text-gb-text-dim text-lg">
+              <DialogDescription className="text-gb-text-dim text-lg">
                 Waiting for your opponent to finish choosing.
-              </p>
+              </DialogDescription>
             )}
-          </div>
-        </motion.section>
+            {!isWaiting && (
+              <DialogDescription className="sr-only">
+                Review the revealed cards, then dismiss this spotlight.
+              </DialogDescription>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
 
       {presentation && view === "board" && (
@@ -206,6 +213,7 @@ export function SpotlightOverlay({
             variant="amber"
             size="lg"
             className="focus-visible:ring-4"
+            aria-keyshortcuts="B"
             onClick={onToggleView}
           >
             Show spotlight

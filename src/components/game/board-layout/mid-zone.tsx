@@ -98,6 +98,28 @@ export interface TargetSelectionMode {
   onSkip: () => void;
 }
 
+export function getPromptAnnouncement(
+  activePrompt: PromptOptions | null,
+  blockerMode?: BlockerMode,
+  targetSelectionMode?: TargetSelectionMode,
+  isPromptHidden?: boolean,
+): string {
+  if (targetSelectionMode) {
+    return `Action required. ${targetSelectionMode.effectDescription || "Choose targets"}. ${targetSelectionMode.selectedCount} selected.`;
+  }
+  if (blockerMode) {
+    return blockerMode.selectedBlockerId
+      ? "Action required. Blocker selected. Confirm block or skip."
+      : "Action required. Choose a blocker or skip.";
+  }
+  if (!activePrompt) return "";
+
+  const promptName = activePrompt.promptType.replace(/_/g, " ").toLowerCase();
+  return isPromptHidden
+    ? `Action required. ${promptName} prompt hidden. Show the prompt to respond.`
+    : `Action required. ${promptName}.`;
+}
+
 function MidZoneDisabledBtn({ children }: { children: React.ReactNode }) {
   return (
     <GameButton variant="secondary" size="sm" disabled className={IN_BOARD_BTN}>
@@ -139,6 +161,13 @@ export const MidZone = React.memo(function MidZone({
   canUndo?: boolean;
   onAction: (action: GameAction) => void;
 }) {
+  const promptAnnouncement = getPromptAnnouncement(
+    activePrompt,
+    blockerMode,
+    targetSelectionMode,
+    isPromptHidden,
+  );
+
   return (
     <div
       className="absolute flex items-center justify-center px-4 gap-2"
@@ -149,6 +178,9 @@ export const MidZone = React.memo(function MidZone({
         height: MID_ZONE_H,
       }}
     >
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {promptAnnouncement}
+      </p>
       {rejectionReason && (
         <div
           role="status"

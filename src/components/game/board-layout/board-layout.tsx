@@ -10,7 +10,7 @@ import type {
   PromptOptions,
   TurnState,
 } from "@shared/game-types";
-import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
@@ -267,8 +267,10 @@ function BoardLayoutInner({
     activeDrag,
     activeDragType,
     sensors,
+    accessibility,
     handleDragStart,
     handleDragEnd,
+    handleDragCancel,
   } = useBoardDnd(
     cardDb,
     bs.battle,
@@ -380,10 +382,16 @@ function BoardLayoutInner({
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
       sensors={sensors}
+      accessibility={accessibility}
       collisionDetection={boardCollisionDetection}
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       onDragStart={(e) => { handleDragStart(e); dragTilt.handleDragStart(e); }}
       onDragMove={dragTilt.handleDragMove}
       onDragEnd={(e) => { handleDragEnd(e); dragTilt.handleDragEnd(e); }}
+      onDragCancel={(e) => {
+        handleDragCancel();
+        dragTilt.handleDragEnd(e);
+      }}
     >
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}

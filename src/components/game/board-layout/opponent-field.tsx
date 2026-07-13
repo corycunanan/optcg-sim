@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useId } from "react";
 import type { CardDb, PlayerState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isAttackTargetEligible } from "@/lib/game/client-legality";
@@ -49,6 +50,12 @@ interface OpponentFieldProps {
   onTargetToggle?: (instanceId: string) => void;
 }
 
+export function getOpponentStageTabIndex(
+  selection: TargetCardSelectionState | undefined,
+): 0 | -1 {
+  return selection ? 0 : -1;
+}
+
 export function OpponentField({
   opp,
   cardDb,
@@ -63,11 +70,26 @@ export function OpponentField({
   targetSelectionById,
   onTargetToggle,
 }: OpponentFieldProps) {
+  const stageDescriptionId = useId();
   const oppTrash = opp?.trash ?? [];
   const stage = opp?.stage ?? null;
   const stageSelection = stage
     ? targetSelectionById?.get(stage.instanceId)
     : undefined;
+  const handleStageKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        stage &&
+        stageSelection &&
+        !stageSelection.disabledReason &&
+        (event.key === "Enter" || event.key === " ")
+      ) {
+        event.preventDefault();
+        onTargetToggle?.(stage.instanceId);
+      }
+    },
+    [onTargetToggle, stage, stageSelection],
+  );
 
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
@@ -121,7 +143,28 @@ export function OpponentField({
                 ? () => onTargetToggle?.(stage.instanceId)
                 : undefined
             }
+            onKeyDown={handleStageKeyDown}
+            role={stageSelection ? "button" : "img"}
+            tabIndex={getOpponentStageTabIndex(stageSelection)}
+            aria-label={[
+              cardDb[stage.cardId]?.name ?? stage.cardId,
+              stage.state === "RESTED" ? "rested" : "active",
+              stageSelection?.selected
+                ? "selected"
+                : stageSelection?.eligible
+                  ? "eligible for selection"
+                  : null,
+              stageSelection?.disabledReason,
+            ]
+              .filter(Boolean)
+              .join(". ")}
+            aria-pressed={stageSelection ? !!stageSelection.selected : undefined}
+            aria-disabled={stageSelection?.disabledReason ? true : undefined}
+            aria-describedby={
+              stageSelection?.disabledReason ? stageDescriptionId : undefined
+            }
             className={cn(
+              "rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
               stageSelection?.disabledReason && "opacity-35",
               stageSelection && !stageSelection.disabledReason && "cursor-pointer",
             )}
@@ -142,6 +185,11 @@ export function OpponentField({
               }}
               motionDelay={refreshWave ? 0.18 : undefined}
             />
+            {stageSelection?.disabledReason && (
+              <span id={stageDescriptionId} className="sr-only">
+                {stageSelection.disabledReason}
+              </span>
+            )}
           </div>
         ) : (
           <span className="text-base font-bold text-gb-text-dim/40 leading-none select-none">

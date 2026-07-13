@@ -1,20 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  type Announcements,
+  type DragCancelEvent,
   type DragEndEvent,
+  type ScreenReaderInstructions,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   arrayMove,
   rectSortingStrategy,
+  sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { motion, useReducedMotion } from "motion/react";
@@ -32,22 +37,49 @@ import {
 import { getPortalContainer } from "./scaled-board";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
+import { useRovingFocus } from "@/hooks/use-roving-focus";
+
+const arrangeScreenReaderInstructions: ScreenReaderInstructions = {
+  draggable:
+    "While choosing, press Enter or Space to select a card. In the reorder step, press Enter or Space to pick up a card. Use the arrow keys to move it, press Enter or Space to drop, or Escape to cancel.",
+};
+
+export function getArrangeEscapeAction(
+  activeId: string | null,
+  selectedId: string | null,
+  step: 1 | 2,
+): "cancel-drag" | "clear-selection" | "hide" {
+  if (activeId) return "cancel-drag";
+  if (step === 1 && selectedId) return "clear-selection";
+  return "hide";
+}
 
 function SortableModalCard({
   card,
   cardDb,
   selected,
-  dimmed,
+  disabledReason,
+  selectable,
   reducedMotion,
   onSelect,
+  rovingTabIndex,
+  onRovingFocus,
+  onRovingKeyDown,
+  setRovingRef,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   selected?: boolean;
-  dimmed?: boolean;
+  disabledReason?: string;
+  selectable: boolean;
   reducedMotion: boolean;
   onSelect: () => void;
+  rovingTabIndex: number;
+  onRovingFocus: () => void;
+  onRovingKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
+  setRovingRef: (node: HTMLButtonElement | null) => void;
 }) {
+  const descriptionId = useId();
   const {
     attributes,
     listeners,
@@ -60,20 +92,51 @@ function SortableModalCard({
   const sortableTransform = transform
     ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
     : undefined;
+  const dimmed = !!disabledReason;
+
+  const mergedRef = (node: HTMLButtonElement | null) => {
+    setNodeRef(node);
+    setRovingRef(node);
+  };
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    onRovingKeyDown(event);
+    if (event.defaultPrevented) return;
+    if (selectable && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      if (!dimmed) onSelect();
+      return;
+    }
+    listeners?.onKeyDown?.(event);
+  }
 
   return (
-    <div
-      ref={setNodeRef}
+    <button
+      type="button"
+      ref={mergedRef}
       {...attributes}
       {...listeners}
-      onClick={onSelect}
+      tabIndex={rovingTabIndex}
+      aria-label={cardDb[card.cardId]?.name ?? card.cardId}
+      aria-pressed={selectable ? !!selected : attributes["aria-pressed"]}
+      aria-disabled={selectable && dimmed}
+      aria-describedby={
+        [attributes["aria-describedby"], dimmed ? descriptionId : null]
+          .filter(Boolean)
+          .join(" ")
+      }
+      onFocus={onRovingFocus}
+      onKeyDown={handleKeyDown}
+      onClick={() => {
+        if (selectable && !dimmed) onSelect();
+      }}
       style={{
         transform: sortableTransform,
         transition: reducedMotion ? "none" : (transition ?? undefined),
         opacity: isDragging ? 0.3 : undefined,
       }}
       className={cn(
-        "relative rounded select-none shrink-0 cursor-grab touch-none",
+        "relative shrink-0 touch-none select-none rounded border-0 bg-transparent p-0 text-left cursor-grab focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
         selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent",
         dimmed && "opacity-40",
       )}
@@ -92,7 +155,12 @@ function SortableModalCard({
           </svg>
         </div>
       )}
-    </div>
+      {dimmed && (
+        <span id={descriptionId} className="sr-only">
+          {disabledReason}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -130,9 +198,31 @@ export function ArrangeTopCardsModal({
 
   const reducedMotion = useReducedMotion() ?? false;
   const dragTilt = useDragTilt({ disabled: reducedMotion });
+  const rovingFocus = useRovingFocus<HTMLButtonElement>(
+    orderedCards.map((card) => card.instanceId),
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const announcements = useMemo<Announcements>(() => {
+    const labelFor = (id: string | number) => {
+      const card = orderedCards.find((item) => item.instanceId === String(id));
+      return card ? cardDb[card.cardId]?.name ?? card.cardId : "card";
+    };
+    return {
+      onDragStart: ({ active }) => `${labelFor(active.id)} picked up.`,
+      onDragOver: ({ active, over }) =>
+        over
+          ? `${labelFor(active.id)} moved to ${labelFor(over.id)}.`
+          : `${labelFor(active.id)} is not over a card position.`,
+      onDragEnd: ({ active, over }) =>
+        over
+          ? `${labelFor(active.id)} dropped at ${labelFor(over.id)}.`
+          : `${labelFor(active.id)} was not moved.`,
+      onDragCancel: ({ active }) => `${labelFor(active.id)} drag canceled.`,
+    };
+  }, [cardDb, orderedCards]);
 
   // If validTargets is provided, only those cards can be selected
   const canSelectCard = (instanceId: string) =>
@@ -157,6 +247,11 @@ export function ArrangeTopCardsModal({
     }
   }
 
+  function handleDragCancel(event: DragCancelEvent) {
+    dragTilt.handleDragEnd(event);
+    setActiveId(null);
+  }
+
   function handleAddToHand() {
     if (!selectedId) return;
     const next = [...keptIds, selectedId];
@@ -167,6 +262,7 @@ export function ArrangeTopCardsModal({
   }
 
   function handleSkip() {
+    setSelectedId(null);
     setStep(2);
   }
 
@@ -193,6 +289,12 @@ export function ArrangeTopCardsModal({
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
       <DialogContent
         showCloseButton={false}
+        onEscapeKeyDown={(event) => {
+          const action = getArrangeEscapeAction(activeId, selectedId, step);
+          if (action === "hide") return;
+          event.preventDefault();
+          if (action === "clear-selection") setSelectedId(null);
+        }}
         className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
       >
         <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
@@ -207,13 +309,14 @@ export function ArrangeTopCardsModal({
         <TooltipProvider delayDuration={0} disableHoverableContent>
           <DndContext
             sensors={sensors}
+            accessibility={{
+              announcements,
+              screenReaderInstructions: arrangeScreenReaderInstructions,
+            }}
             onDragStart={handleDragStart}
             onDragMove={dragTilt.handleDragMove}
             onDragEnd={handleDragEnd}
-            onDragCancel={() => {
-              dragTilt.handleDragEnd({} as DragEndEvent);
-              setActiveId(null);
-            }}
+            onDragCancel={handleDragCancel}
           >
             <div className="px-4 py-5">
               <SortableContext
@@ -227,8 +330,21 @@ export function ArrangeTopCardsModal({
                       card={card}
                       cardDb={cardDb}
                       selected={step === 1 && selectedId === card.instanceId}
-                      dimmed={step === 1 && !canSelectCard(card.instanceId)}
+                      disabledReason={
+                        step === 1 && !canSelectCard(card.instanceId)
+                          ? "This card cannot be chosen for this effect."
+                          : undefined
+                      }
+                      selectable={step === 1}
                       reducedMotion={reducedMotion}
+                      rovingTabIndex={rovingFocus.getTabIndex(card.instanceId)}
+                      onRovingFocus={() => rovingFocus.onFocus(card.instanceId)}
+                      onRovingKeyDown={(event) =>
+                        rovingFocus.onKeyDown(event, card.instanceId)
+                      }
+                      setRovingRef={(node) =>
+                        rovingFocus.setItemRef(card.instanceId, node)
+                      }
                       onSelect={() => {
                         if (step === 1 && canSelectCard(card.instanceId)) {
                           setSelectedId((prev) =>

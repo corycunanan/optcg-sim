@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/lib/game/target-selection";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
+import { useRovingFocus } from "@/hooks/use-roving-focus";
 
 const CARD_W = 80;
 
@@ -25,20 +26,41 @@ function TargetCard({
   cardDb,
   selection,
   onToggle,
+  rovingTabIndex,
+  onRovingFocus,
+  onRovingKeyDown,
+  setRovingRef,
 }: {
   card: CardInstance;
   cardDb: CardDb;
   selection: TargetCardSelectionState;
   onToggle: () => void;
+  rovingTabIndex: number;
+  onRovingFocus: () => void;
+  onRovingKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
+  setRovingRef: (node: HTMLButtonElement | null) => void;
 }) {
   const blocked = selection.disabledReason !== null;
+  const descriptionId = useId();
+  const cardName = cardDb[card.cardId]?.name ?? card.cardId;
 
   return (
-    <div
-      onClick={blocked ? undefined : onToggle}
+    <button
+      type="button"
+      ref={setRovingRef}
+      tabIndex={rovingTabIndex}
+      aria-label={cardName}
+      aria-pressed={selection.selected}
+      aria-disabled={blocked}
+      aria-describedby={blocked ? descriptionId : undefined}
+      onFocus={onRovingFocus}
+      onKeyDown={onRovingKeyDown}
+      onClick={() => {
+        if (!blocked) onToggle();
+      }}
       title={selection.disabledReason ?? undefined}
       className={cn(
-        "relative rounded select-none shrink-0 transition-[box-shadow] duration-150",
+        "relative shrink-0 select-none rounded border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
         blocked && "opacity-30 cursor-not-allowed",
         !blocked &&
           selection.selected &&
@@ -59,7 +81,12 @@ function TargetCard({
           </svg>
         </div>
       )}
-    </div>
+      {selection.disabledReason && (
+        <span id={descriptionId} className="sr-only">
+          {selection.disabledReason}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -113,6 +140,9 @@ export function SelectTargetModal({
     dualTargets,
   };
   const model = buildTargetSelectionModel(prompt, selectedIds, cardDb);
+  const rovingFocus = useRovingFocus<HTMLButtonElement>(
+    cards.map((card) => card.instanceId),
+  );
 
   function toggleCard(instanceId: string) {
     if (model.byId.get(instanceId)?.disabledReason) return;
@@ -136,6 +166,11 @@ export function SelectTargetModal({
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
       <DialogContent
         showCloseButton={false}
+        onEscapeKeyDown={(event) => {
+          if (selectedIds.size === 0) return;
+          event.preventDefault();
+          setSelectedIds(new Set());
+        }}
         className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
       >
         <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
@@ -159,6 +194,14 @@ export function SelectTargetModal({
                   card={card}
                   cardDb={cardDb}
                   selection={model.byId.get(card.instanceId)!}
+                  rovingTabIndex={rovingFocus.getTabIndex(card.instanceId)}
+                  onRovingFocus={() => rovingFocus.onFocus(card.instanceId)}
+                  onRovingKeyDown={(event) =>
+                    rovingFocus.onKeyDown(event, card.instanceId)
+                  }
+                  setRovingRef={(node) =>
+                    rovingFocus.setItemRef(card.instanceId, node)
+                  }
                   onToggle={() => toggleCard(card.instanceId)}
                 />
               ))}
