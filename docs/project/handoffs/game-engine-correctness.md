@@ -52,8 +52,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Done | [#291](https://github.com/corycunanan/optcg-sim/pull/291) | 3,549-use inventory; 72/72 handled and executed; global and hotspot coverage ratchets. |
 | 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | Done | [#292](https://github.com/corycunanan/optcg-sim/pull/292) | All 210 authored connectors migrated to THEN; snapshot-locked AND transactions and validator gate added. |
 | 36 | OPT-474 | Establish one authoritative zone-transition and card-identity contract | — | OPT-468 | Done | [#293](https://github.com/corycunanan/optcg-sim/pull/293) | Every cross-zone move creates a fresh identity through one service; exhaustive zone-pair and static guards added. |
-| 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | In Review | [#295](https://github.com/corycunanan/optcg-sim/pull/295) | Reconciled 20-card cohort; immutable reveal snapshots, CHOOSE_VALUE, prompt continuations, schemas, and execution matrix. |
-| 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | Backlog | — | Wave 3 pregame effect closure. |
+| 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | Done | [#295](https://github.com/corycunanan/optcg-sim/pull/295) | Reconciled 20-card cohort; immutable reveal snapshots, CHOOSE_VALUE, prompt continuations, schemas, and execution matrix. |
+| 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | In Review | [#296](https://github.com/corycunanan/optcg-sim/pull/296) | Persisted first-player-ordered Leader effects; Mary Geoise accept/decline, shuffle, visibility, and reconnect coverage. |
 | 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | Backlog | — | Starts deterministic architecture wave. |
 | 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Backlog | — | Typed execution dependencies and cost-handler decomposition. |
 | 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Backlog | — | Thin Durable Object composition boundary. |
@@ -67,7 +67,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review/merge PR #295; OPT-476 is independently ready because its OPT-471/473 blockers are Done.
+**Next up:** Review/merge PR #296; OPT-477 is ready because OPT-467/468/472/474 are Done.
 
 ---
 
@@ -342,3 +342,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** `START_OF_GAME_FX` runs before opening hands and must remain paused while any search/play prompt is unresolved. Persist phase/order/continuation in durable pregame state; do not rely on transient in-memory resume data or expose full-deck identities.
 - **Unresolved:** None from OPT-475. OPT-486 still tracks the pre-existing Vitest/coverage-provider version mismatch warning.
 - **Pointer:** PR #295; inspect `c84aec2` for the reveal-result and prompt-continuation contracts.
+
+### OPT-476 → OPT-477
+**From:** session on 2026-07-12 · **Commit:** `4a08c91` · **PR:** [#296](https://github.com/corycunanan/optcg-sim/pull/296)
+
+- **Primer:** `START_OF_GAME_FX` now executes both Leaders' authored rule actions in first-player order before opening hands. Per-player completion, prompts, and effect frames persist on `GameState`, so reconnects cannot repeat or skip OP13-079.
+- **Read first:** `workers/game/src/engine/pregame.ts`, `workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts`, `workers/game/src/engine/effect-resolver/action-utils.ts` (`shuffleArray`), `workers/game/src/util/nanoid.ts`, and `workers/game/src/engine/effect-stack.ts`.
+- **Gotchas / do NOT touch:** OPT-477 should centralize the randomness used by both setup and resumed full-deck search; do not special-case pregame with a second RNG contract. PR #296 may overlap `pregame.ts`, so preserve its persisted completion ledger when integrating.
+- **Unresolved:** Ambient shuffle/ID/time sources remain intentionally owned by OPT-477. OPT-486 still tracks the separate Vitest/coverage-provider version mismatch warning.
+- **Pointer:** PR #296; inspect `4a08c91` for the durable setup-effect boundary and its replay-shaped tests.
