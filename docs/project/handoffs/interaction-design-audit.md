@@ -1,7 +1,7 @@
 ---
 linear-project: Interaction Design Audit
 linear-project-url: https://linear.app/optcg-sim/project/interaction-design-audit-e427eb5d2b6b
-last-updated: 2026-07-12
+last-updated: 2026-07-13
 ---
 
 # Interaction Design Audit — Handoff Doc
@@ -20,16 +20,16 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | Done | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
 | 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Done | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA passed for dimming, tooltip, and drag-target signals |
 | 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Done | [#294](https://github.com/corycunanan/optcg-sim/pull/294) | Independent server-authority backstop |
-| 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | In Review | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
-| 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Backlog | — | Completes the menu verb |
+| 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Done | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
+| 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | In Review | [#300](https://github.com/corycunanan/optcg-sim/pull/300) | Completes the menu verb |
 | 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | Backlog | — | Add input equivalence after gestures stabilize |
-| 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | Backlog | — | Completes Event presentation and public reveals |
+| 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | In Review | [#302](https://github.com/corycunanan/optcg-sim/pull/302) | Completes Event presentation and public reveals |
 | 9 | OPT-465 | Transform-class zone transitions + pile receipt: fizzle, pile pop, floating +N delta | — | OPT-464 | Backlog | — | Builds Event fizzle on the spotlight lifecycle |
 | 10 | OPT-422 | Inspection parity, small state edges, and dead interaction code | — | OPT-421 | Backlog | — | Final cleanup and parity pass |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-420 while OPT-419 is in review.
+**Next up:** OPT-465 after PR #302 merges. OPT-421 can proceed after PR #300 merges.
 
 ---
 
@@ -79,3 +79,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** The prompt identity includes every constraint payload so selections cannot leak between prompts. Keep submission explicit; Escape and click-away clear local state. The shared model also fixes partial dual-slot selection while preserving full-slot confirmation.
 - **Unresolved:** OPT-421 still owns keyboard/ARIA equivalence for board-card selection, and OPT-464 owns spotlighting the effect source while a target prompt waits.
 - **Why this matters for OPT-420:** Effect activation should reuse the settled click/menu verb and selection vocabulary without competing with active target selection or reintroducing right-click-only discovery.
+
+### OPT-464 → OPT-465
+**From:** session on 2026-07-13 · **Commit:** `8ee3680` · **PR:** #302
+
+- **Primer:** Public Event activations, `visibility: "BOTH"` effect/search reveals, and accepted Triggers now stage in a shared center-board spotlight. Actors yield after the one-second dwell; waiting viewers hold with a keyboard board toggle until the next accepted action.
+- **Read first:** `src/lib/game/spotlight.ts`, `src/hooks/use-card-spotlight.ts`, `src/components/game/spotlight-overlay.tsx`, `src/components/game/board-layout/board-layout.tsx`
+- **Gotchas / do NOT touch:** Keep `CONTROLLER_ONLY` reveals out of the spotlight and keep non-responders limited to `promptRespondingPlayer`; private prompt options and continuation data must remain filtered. Opponent hand placement is intentionally derived from obfuscated zone-local IDs, never authoritative hand order.
+- **Why this matters for OPT-465:** Spotlight exit already supplies the public reveal-to-resolution boundary. Add transform/pile-receipt motion after that boundary, and replay `/sandbox/public-reveal-spotlight` plus `/sandbox/waiting-reveal-spotlight` to preserve dwell, waiting hold, keyboard toggle, and next-action dismissal.
