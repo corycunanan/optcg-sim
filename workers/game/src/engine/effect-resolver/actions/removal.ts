@@ -2,7 +2,7 @@
  * Action handlers: KO, RETURN_TO_HAND, RETURN_TO_DECK, TRASH_CARD, TRASH_FROM_HAND
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
+import type { ActionOf, EffectResult } from "../../effect-types.js";
 import type {
   BatchResumeMarker,
   CardData,
@@ -46,7 +46,7 @@ function filterProhibitedTargets(
 
 export function executeKO(
   state: GameState,
-  action: Action,
+  action: ActionOf<"KO">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -132,7 +132,7 @@ export function executeKO(
 
 export function executeReturnToHand(
   state: GameState,
-  action: Action,
+  action: ActionOf<"RETURN_TO_HAND">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -183,7 +183,7 @@ export function executeReturnToHand(
 
 export function executeReturnToDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"RETURN_TO_DECK">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -194,9 +194,19 @@ export function executeReturnToDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  const anyNumberTarget = action.target?.count && "any_number" in action.target.count;
+  const position = params.position ?? "BOTTOM";
+  const allValidIds =
+    preselectedTargets ??
+    computeAllValidTargets(
+      state,
+      action.target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs
+    );
+  const anyNumberTarget =
+    action.target?.count && "any_number" in action.target.count;
   if (
     !preselectedTargets
     && allValidIds.length > 0
@@ -230,7 +240,7 @@ export function executeReturnToDeck(
       controller,
       pausedAction: action,
       remainingActions: [],
-      resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+      resultRefs: [...resultRefs.entries()],
       validTargets: targetIds,
     };
     const pendingPrompt: PendingPromptState = {
@@ -304,7 +314,7 @@ export function executeReturnToDeck(
 
 export function executeTrashCard(
   state: GameState,
-  action: Action,
+  action: ActionOf<"TRASH_CARD">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -373,7 +383,7 @@ export function executeTrashCard(
 
 export function executeTrashFromHand(
   state: GameState,
-  action: Action,
+  action: ActionOf<"TRASH_FROM_HAND">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -382,10 +392,14 @@ export function executeTrashFromHand(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const targetController = (action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
-  const amount = resolveAmount(params.amount as number | { type: string }, resultRefs, state, controller, cardDb) || 1;
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
+  const amount =
+    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
   const p = state.players[targetController];
 
   let candidates = [...p.hand];
@@ -412,7 +426,7 @@ export function executeTrashFromHand(
         controller,
         pausedAction: action,
         remainingActions: [],
-        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        resultRefs: [...resultRefs.entries()],
         validTargets,
       };
       const pendingPrompt: import("../../../types.js").PendingPromptState = {

@@ -1,8 +1,6 @@
 import type {
-  BattleContext,
   CardData,
   CardInstance,
-  DonInstance,
   GameState,
   LifeCard,
   PendingPromptState,
@@ -196,11 +194,7 @@ export class SessionTransport {
     ) {
       return;
     }
-    const triggerLifeCard = (
-      battle as BattleContext & {
-        pendingTriggerLifeCard?: LifeCard;
-      }
-    ).pendingTriggerLifeCard;
+    const triggerLifeCard = battle.pendingTriggerLifeCard;
     const cardData = triggerLifeCard
       ? cardDb.get(triggerLifeCard.cardId)
       : undefined;
@@ -246,12 +240,15 @@ function isPlayerSocketAttachment(
   value: unknown
 ): value is PlayerSocketAttachment {
   if (value === null || typeof value !== "object") return false;
-  const candidate = value as Partial<PlayerSocketAttachment>;
   return (
-    candidate.type === "game-session-player-socket" &&
-    (candidate.playerIndex === 0 || candidate.playerIndex === 1) &&
-    typeof candidate.connectionId === "string" &&
-    typeof candidate.acceptedAt === "number"
+    "type" in value &&
+    value.type === "game-session-player-socket" &&
+    "playerIndex" in value &&
+    (value.playerIndex === 0 || value.playerIndex === 1) &&
+    "connectionId" in value &&
+    typeof value.connectionId === "string" &&
+    "acceptedAt" in value &&
+    typeof value.acceptedAt === "number"
   );
 }
 
@@ -266,13 +263,13 @@ function getPlayerSocketAttachment(
   }
 }
 
-function lifeCardForPrompt(card: LifeCard, playerIndex: 0 | 1) {
+function lifeCardForPrompt(card: LifeCard, playerIndex: 0 | 1): CardInstance {
   return {
     instanceId: card.instanceId,
     cardId: card.cardId,
-    zone: "LIFE" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [] as DonInstance[],
+    zone: "LIFE",
+    state: "ACTIVE",
+    attachedDon: [],
     turnPlayed: null,
     controller: playerIndex,
     owner: playerIndex,

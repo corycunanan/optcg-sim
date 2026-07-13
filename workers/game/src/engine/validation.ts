@@ -6,7 +6,6 @@
  */
 
 import type { CardData, GameAction, GameState } from "../types.js";
-import type { EffectSchema } from "./effect-types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
 import { getEffectiveCost, hasGrantedKeyword, hasRemovedKeyword, isCardNegated } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
@@ -322,7 +321,7 @@ function validateActivateEffect(
   if (!found) return null; // executeActivateEffect will no-op; keep behavior parity
 
   const cardData = cardDb.get(found.card.cardId);
-  const schema = cardData?.effectSchema as EffectSchema | null | undefined;
+  const schema = cardData?.effectSchema;
   const block = schema?.effects.find((b) => b.id === effectId);
   if (!block || block.category !== "activate" || !block.costs?.length) return null;
 

@@ -301,7 +301,11 @@ export interface GameEventPayloadMap {
   };
   EFFECTS_NEGATED: { targetInstanceIds: string[] };
   LIFE_CARD_TO_DECK: { count: number };
-  LIFE_SCRIED: { cards: Array<{ instanceId: string; cardId: string }>; count: number };
+  LIFE_SCRIED: {
+    cards: Array<{ instanceId: string; cardId: string }>;
+    count: number;
+  };
+  LIFE_REORDERED: { orderedInstanceIds: string[] };
   ATTACK_REDIRECTED: { newTargetInstanceId: string };
   CARD_REMOVED_FROM_LIFE: { cardInstanceId: string; newCardInstanceId?: string };
   EXTRA_TURN_GRANTED: Record<string, never>;
@@ -324,6 +328,66 @@ export interface GameEventPayloadMap {
 
 /** Union of all event type strings. */
 export type GameEventType = keyof GameEventPayloadMap;
+
+/** Runtime mirror used by persisted-data validators and exhaustiveness tests. */
+export const ALL_GAME_EVENT_TYPES = [
+  "PHASE_CHANGED",
+  "TURN_STARTED",
+  "TURN_ENDED",
+  "CARD_PLAYED",
+  "CARD_KO",
+  "CARD_DRAWN",
+  "CARD_TRASHED",
+  "CARD_RETURNED_TO_HAND",
+  "CARD_ADDED_TO_HAND_FROM_LIFE",
+  "LIFE_CARD_FACE_CHANGED",
+  "ATTACK_DECLARED",
+  "ATTACK_TARGET_FINAL",
+  "BLOCK_DECLARED",
+  "COUNTER_USED",
+  "BATTLE_RESOLVED",
+  "DAMAGE_DEALT",
+  "TRIGGER_ACTIVATED",
+  "DON_GIVEN_TO_CARD",
+  "DON_DETACHED",
+  "DON_PLACED_ON_FIELD",
+  "DON_STATE_CHANGED",
+  "CARD_STATE_CHANGED",
+  "POWER_MODIFIED",
+  "GAME_OVER",
+  "CARD_RETURNED_TO_DECK",
+  "DON_SET_ACTIVE",
+  "DON_RESTED",
+  "CARDS_REVEALED",
+  "EFFECTS_NEGATED",
+  "LIFE_CARD_TO_DECK",
+  "LIFE_SCRIED",
+  "LIFE_REORDERED",
+  "ATTACK_REDIRECTED",
+  "CARD_REMOVED_FROM_LIFE",
+  "EXTRA_TURN_GRANTED",
+  "EVENT_ACTIVATED_FROM_HAND",
+  "EVENT_MAIN_RESOLVED_FROM_TRASH",
+  "EVENT_TRIGGER_RESOLVED",
+  "LIFE_CARD_TURNED_FACE_UP",
+  "LIFE_CARD_TURNED_FACE_DOWN",
+  "COMBAT_VICTORY",
+  "CHARACTER_BATTLES",
+  "END_OF_BATTLE",
+  "BATTLE_ABORTED",
+  "LIFE_COUNT_BECOMES_ZERO",
+  "DRAW_OUTSIDE_DRAW_PHASE",
+  "PREGAME_PRIORITY_ROLLED",
+  "PREGAME_FIRST_PLAYER_DECIDED",
+  "MULLIGAN_DECISION",
+] as const satisfies readonly GameEventType[];
+
+type _AllGameEventTypesCovered =
+  Exclude<GameEventType, (typeof ALL_GAME_EVENT_TYPES)[number]> extends never
+    ? true
+    : never;
+const _allGameEventTypesCovered: _AllGameEventTypesCovered = true;
+void _allGameEventTypesCovered;
 
 /** Fully typed game event — discriminated union keyed by `type`. */
 export type GameEvent = {

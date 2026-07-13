@@ -21,10 +21,23 @@ import type {
   DynamicValue,
   EffectResult,
 } from "./effect-types.js";
-import type { CardData, CardInstance, GameEvent, GameEventType, GameState, PlayerState } from "../types.js";
-import { getEffectivePower, getEffectiveCost, getEffectiveCostForRead, getEffectiveFieldCost, hasGrantedAttribute } from "./modifiers.js";
+import type {
+  CardData,
+  CardInstance,
+  GameEvent,
+  GameEventType,
+  GameState,
+  PlayerState,
+} from "../types.js";
+import {
+  getEffectivePower,
+  getEffectiveCostForRead,
+  getEffectiveFieldCost,
+  hasGrantedAttribute,
+} from "./modifiers.js";
 import { hasEffectiveKeyword } from "./keywords.js";
 import { findCardInstance } from "./state.js";
+import { isPresent } from "./type-guards.js";
 
 export interface ConditionContext {
   /** The card instance the effect is on */
@@ -188,7 +201,7 @@ function evaluateSimple(
 
     case "FIELD_PURITY": {
       const p = getPlayerByController(state, cond.controller, ctx.controller);
-      const chars = p.characters.filter(Boolean) as CardInstance[];
+      const chars = p.characters.filter(isPresent);
       // OP16-022 Leader Luffy FAQ: "all your Characters are X" requires at
       // least one Character — an empty field does NOT satisfy the condition.
       if (chars.length === 0) return false;
@@ -402,8 +415,13 @@ function evaluateSimple(
     }
 
     case "BOARD_WIDE_EXISTENCE": {
-      const allChars = [...state.players[0].characters.filter(Boolean) as CardInstance[], ...state.players[1].characters.filter(Boolean) as CardInstance[]];
-      const matching = allChars.filter((c) => matchesFilter(c, cond.filter, ctx.cardDb, state));
+      const allChars = [
+        ...state.players[0].characters.filter(isPresent),
+        ...state.players[1].characters.filter(isPresent),
+      ];
+      const matching = allChars.filter((c) =>
+        matchesFilter(c, cond.filter, ctx.cardDb, state)
+      );
       if (cond.count) {
         return compareNum(matching.length, cond.count.operator, cond.count.value);
       }
@@ -423,7 +441,7 @@ function evaluateSimple(
     case "DON_GIVEN": {
       const p = getPlayerByController(state, cond.controller, ctx.controller);
       if (cond.mode === "ANY_CARD_HAS_DON") {
-        const allCards = [p.leader, ...p.characters.filter(Boolean) as CardInstance[]];
+        const allCards = [p.leader, ...p.characters.filter(isPresent)];
         return allCards.some((c) => c.attachedDon.length > 0);
       }
       // SPECIFIC_CARD mode — check if the source card has DON attached
@@ -646,27 +664,16 @@ function getDonFieldCount(p: PlayerState): number {
 }
 
 function getFieldCards(p: PlayerState): CardInstance[] {
-  const cards: CardInstance[] = [p.leader, ...p.characters.filter(Boolean) as CardInstance[]];
+  const cards: CardInstance[] = [p.leader, ...p.characters.filter(isPresent)];
   if (p.stage) cards.push(p.stage);
   return cards;
 }
 
-function findInstanceById(state: GameState, instanceId: string): CardInstance | null {
-  for (const player of state.players) {
-    if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c?.instanceId === instanceId);
-    if (char) return char;
-    if (player.stage?.instanceId === instanceId) return player.stage;
-    const hand = player.hand.find((c) => c.instanceId === instanceId);
-    if (hand) return hand;
-    const deck = player.deck.find((c) => c.instanceId === instanceId);
-    if (deck) return deck;
-    const trash = player.trash.find((c) => c.instanceId === instanceId);
-    if (trash) return trash;
-    const life = player.life.find((c: any) => c.instanceId === instanceId);
-    if (life) return life as unknown as CardInstance;
-  }
-  return null;
+function findInstanceById(
+  state: GameState,
+  instanceId: string
+): CardInstance | null {
+  return findCardInstance(state, instanceId);
 }
 
 function getMetricValue(p: PlayerState, metric: string): number {
@@ -744,8 +751,7 @@ export function cardTreatsAsAll(
   data: CardData | undefined,
   kind: "names" | "types" | "attributes",
 ): boolean {
-  const mods = (data?.effectSchema as { rule_modifications?: Array<Record<string, unknown>> } | null)
-    ?.rule_modifications ?? [];
+  const mods = data?.effectSchema?.rule_modifications ?? [];
   return mods.some(
     (m) => m.rule_type === "TREATED_AS_ALL_IDENTITIES" && m[kind] === true,
   );
@@ -1013,7 +1019,7 @@ function resolveGameStateValue(
     case "DECK_COUNT":
       return p.deck.length;
     case "RESTED_CARD_COUNT": {
-      const chars = p.characters.filter(Boolean) as CardInstance[];
+      const chars = p.characters.filter(isPresent);
       return chars.filter((c) => c.state === "RESTED").length;
     }
     default:

@@ -13,7 +13,7 @@
  *   triggers.ts — processRemainingTriggers
  */
 
-import type { Action, EffectResult } from "../effect-types.js";
+import type { EffectResult } from "../effect-types.js";
 import type {
   CardData,
   GameState,
@@ -76,9 +76,7 @@ export function resumeEffectChain(
   } = resumeCtx;
   const remainingActionsController = resumeCtx.remainingActionsController ?? controller;
 
-  const resultRefs = new Map<string, EffectResult>(
-    resultRefsEntries.map(([k, v]) => [k, v as EffectResult]),
-  );
+  const resultRefs = new Map<string, EffectResult>(resultRefsEntries);
   const events: PendingEvent[] = [];
   let nextState = state;
   let pausedActionSucceeded: boolean | undefined;
@@ -211,7 +209,7 @@ export function resumeFromStack(
   action: GameAction,
   cardDb: Map<string, CardData>,
 ): EffectResolverResult {
-  const topFrame = peekFrame(state) as EffectStackFrame | null;
+  const topFrame = peekFrame(state);
   if (!topFrame) {
     return { state, events: [], resolved: true };
   }
@@ -222,13 +220,13 @@ export function resumeFromStack(
     const plan = topFrame.simultaneousGroup;
     const actionIndex = plan.nextActionIndex;
     const pausedAction = plan.actions[actionIndex];
-    const resultRefs = new Map<string, EffectResult>(
-      plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
-    );
-    const selected = action.type === "SELECT_TARGET"
-      ? action.selectedInstanceIds ?? []
-      : null;
-    const invalid = selected === null ||
+    const resultRefs = new Map<string, EffectResult>(plan.resultRefs);
+    const selected =
+      action.type === "SELECT_TARGET"
+        ? (action.selectedInstanceIds ?? [])
+        : null;
+    const invalid =
+      selected === null ||
       selected.some((id) => !topFrame.validTargets.includes(id)) ||
       (pausedAction.target && !validateTargetConstraints(
         selected,
@@ -295,8 +293,8 @@ export function resumeFromStack(
         effectSourceInstanceId: sourceCardInstanceId,
         controller,
         remainingActionsController: topFrame.remainingActionsController,
-        pausedAction: topFrame.pausedAction as Action | null,
-        remainingActions: topFrame.remainingActions as Action[],
+        pausedAction: topFrame.pausedAction,
+        remainingActions: topFrame.remainingActions,
         resultRefs: topFrame.resultRefs,
         validTargets: topFrame.validTargets,
         ruleTrashForPlay: topFrame.ruleTrashForPlay,
@@ -367,7 +365,7 @@ export function resumeFromStack(
           }
           pendingPrompt = { ...pendingPrompt, resumeContext: replacementFrame.id };
         } else {
-          const replacementFrame = peekFrame(nextState) as EffectStackFrame | null;
+          const replacementFrame = peekFrame(nextState);
           if (replacementFrame) {
             nextState = updateTopFrame(nextState, {
               pendingTriggers: [
@@ -401,12 +399,10 @@ export function resumeFromStack(
       let nextState = popFrame(state);
 
       if (topFrame.remainingActions.length > 0) {
-        const resultRefs = new Map<string, EffectResult>(
-          topFrame.resultRefs.map(([k, v]) => [k, v as EffectResult]),
-        );
+        const resultRefs = new Map<string, EffectResult>(topFrame.resultRefs);
         const chainResult = executeActionChain(
           nextState,
-          topFrame.remainingActions as Action[],
+          topFrame.remainingActions,
           sourceCardInstanceId,
           controller,
           cardDb,
@@ -418,7 +414,7 @@ export function resumeFromStack(
         events.push(...chainResult.events);
 
         if (chainResult.pendingPrompt) {
-          const nestedFrame = peekFrame(nextState) as EffectStackFrame | null;
+          const nestedFrame = peekFrame(nextState);
           if (nestedFrame && topFrame.replacementBatchContinuation) {
             nextState = updateTopFrame(nextState, {
               replacementBatchContinuation: topFrame.replacementBatchContinuation,

@@ -29,12 +29,8 @@ import type {
   LifeCard,
   PlayerState,
 } from "../types.js";
-import type { Action, EffectSchema } from "../engine/effect-types.js";
-import {
-  CARDS,
-  createBattleReadyState,
-  createTestCardDb,
-} from "./helpers.js";
+import type { Action, ActionOf, EffectSchema } from "../engine/effect-types.js";
+import { CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";
 import {
   executeLifeScry,
   executeReorderAllLife,
@@ -199,7 +195,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     // Controller 0 scries their own top Life; look_at=1.
     const result = executeLifeScry(
       state,
-      { type: "LIFE_SCRY", params: { look_at: 1 } } as Action,
+      { type: "LIFE_SCRY", params: { look_at: 1 } } as ActionOf<"LIFE_SCRY">,
       "src-dummy",
       0,
       cardDb,
@@ -223,7 +219,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
 
     const result = executeReorderAllLife(
       state,
-      { type: "REORDER_ALL_LIFE" } as Action,
+      { type: "REORDER_ALL_LIFE" } as ActionOf<"REORDER_ALL_LIFE">,
       "src-dummy",
       0,
       cardDb,
@@ -244,7 +240,10 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
 
     const result = executeTurnLifeFaceUp(
       state,
-      { type: "TURN_LIFE_FACE_UP", params: { amount: 1, position: "TOP" } } as Action,
+      {
+        type: "TURN_LIFE_FACE_UP",
+        params: { amount: 1, position: "TOP" },
+      } as ActionOf<"TURN_LIFE_FACE_UP">,
       "src-dummy",
       0,
       cardDb,
@@ -269,7 +268,10 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
 
     const result = executeLifeToHand(
       state,
-      { type: "LIFE_TO_HAND", params: { amount: 1, position: "TOP" } } as Action,
+      {
+        type: "LIFE_TO_HAND",
+        params: { amount: 1, position: "TOP" },
+      } as ActionOf<"LIFE_TO_HAND">,
       "src-dummy",
       0,
       cardDb,
@@ -293,7 +295,10 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
 
     const result = executeTrashFromLife(
       state,
-      { type: "TRASH_FROM_LIFE", params: { amount: 1, position: "TOP" } } as Action,
+      {
+        type: "TRASH_FROM_LIFE",
+        params: { amount: 1, position: "TOP" },
+      } as ActionOf<"TRASH_FROM_LIFE">,
       "src-dummy",
       0,
       cardDb,
@@ -320,7 +325,10 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
 
     const result = executeLifeCardToDeck(
       state,
-      { type: "LIFE_CARD_TO_DECK", params: { amount: 1, position: "BOTTOM" } } as Action,
+      {
+        type: "LIFE_CARD_TO_DECK",
+        params: { amount: 1, position: "BOTTOM" },
+      } as ActionOf<"LIFE_CARD_TO_DECK">,
       "src-dummy",
       0,
       cardDb,
@@ -347,7 +355,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     // Player 0 deals 1 damage to opp (player 1) Life.
     const result = executeDealDamage(
       state,
-      { type: "DEAL_DAMAGE", params: { amount: 1 } } as Action,
+      { type: "DEAL_DAMAGE", params: { amount: 1 } } as ActionOf<"DEAL_DAMAGE">,
       "src-dummy",
       0,
       cardDb,
@@ -377,7 +385,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
 
     const dealt = executeDealDamage(
       state,
-      { type: "DEAL_DAMAGE", params: { amount: 1 } } as Action,
+      { type: "DEAL_DAMAGE", params: { amount: 1 } } as ActionOf<"DEAL_DAMAGE">,
       "src-dummy",
       0,
       cardDb,
@@ -406,7 +414,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     const p1HandBefore = state.players[1].hand.length;
     const dealt = executeDealDamage(
       state,
-      { type: "DEAL_DAMAGE", params: { amount: 1 } } as Action,
+      { type: "DEAL_DAMAGE", params: { amount: 1 } } as ActionOf<"DEAL_DAMAGE">,
       "src-dummy",
       0,
       cardDb,
@@ -441,7 +449,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
 
     const dealt = executeDealDamage(
       state,
-      { type: "DEAL_DAMAGE", params: { amount: 2 } } as Action,
+      { type: "DEAL_DAMAGE", params: { amount: 2 } } as ActionOf<"DEAL_DAMAGE">,
       "src-dummy",
       0,
       cardDb,
@@ -482,7 +490,10 @@ describe("OPT-259 F6 — SELF_TAKE_DAMAGE does not open the Trigger window", () 
 
     const result = executeSelfTakeDamage(
       state,
-      { type: "SELF_TAKE_DAMAGE", params: { amount: 1 } } as Action,
+      {
+        type: "SELF_TAKE_DAMAGE",
+        params: { amount: 1 },
+      } as ActionOf<"SELF_TAKE_DAMAGE">,
       "src-dummy",
       0,
       cardDb,

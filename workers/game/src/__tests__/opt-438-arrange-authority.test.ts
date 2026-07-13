@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { GameAction, ResumeContext } from "../types.js";
-import type { Action } from "../engine/effect-types.js";
+import type { ActionOf } from "../engine/effect-types.js";
 import { executeSearchDeck } from "../engine/effect-resolver/actions/draw-search.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
-function searchPrompt(action: Action) {
+function searchPrompt(action: ActionOf<"SEARCH_DECK">) {
   const cardDb = createTestCardDb();
   const state = createBattleReadyState(cardDb);
   const result = executeSearchDeck(

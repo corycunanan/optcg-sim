@@ -97,7 +97,6 @@ export const OP15_002_LUCY: EffectSchema = {
             count: { any_number: true },
             filter: { card_type: ["EVENT", "STAGE"] },
           },
-          params: { amount: { type: "CHOSEN_VALUE" } },
         },
         {
           type: "MODIFY_POWER",

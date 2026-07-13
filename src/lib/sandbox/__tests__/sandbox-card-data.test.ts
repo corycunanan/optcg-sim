@@ -4,7 +4,7 @@
 // this test fails loudly — that's the point.
 
 import { describe, expect, it } from "vitest";
-import type { CardData } from "@shared/game-types";
+import type { CardData } from "@engine/types";
 import { SANDBOX_CARD_DB, SANDBOX_CARD_IDS } from "../sandbox-card-data";
 
 describe("SANDBOX_CARD_DB", () => {

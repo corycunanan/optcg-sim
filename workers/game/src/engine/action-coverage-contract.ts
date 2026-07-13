@@ -1,4 +1,9 @@
-import type { Action, ActionType, EffectSchema } from "./effect-types.js";
+import {
+  getNestedActions,
+  type Action,
+  type ActionType,
+  type EffectSchema,
+} from "./effect-types.js";
 
 /**
  * Authored action types with at least one real resolver/pipeline execution
@@ -87,22 +92,7 @@ function walkActions(
 ): void {
   for (const action of actions ?? []) {
     counts.set(action.type, (counts.get(action.type) ?? 0) + 1);
-    const params = action.params;
-    if (params?.action && typeof params.action === "object") {
-      walkActions([params.action as Action], counts);
-    }
-    if (Array.isArray(params?.options)) {
-      for (const option of params.options) {
-        if (Array.isArray(option)) walkActions(option as Action[], counts);
-        else if (
-          option &&
-          typeof option === "object" &&
-          Array.isArray((option as { actions?: unknown }).actions)
-        ) {
-          walkActions((option as { actions: Action[] }).actions, counts);
-        }
-      }
-    }
+    walkActions(getNestedActions(action), counts);
   }
 }
 

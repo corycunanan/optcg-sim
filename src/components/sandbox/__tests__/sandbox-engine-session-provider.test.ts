@@ -10,11 +10,11 @@
 import { describe, expect, it } from "vitest";
 import { runPipeline } from "@engine/engine/pipeline";
 import type {
-  CardData,
   GameAction,
   KeywordSet,
   TurnState,
 } from "@shared/game-types";
+import type { CardData } from "@engine/types";
 import type { BoardLayoutProps } from "@/components/game/board-layout";
 import {
   makeCard,

@@ -8,11 +8,46 @@
  * Characters with cost 2 or less", "Cannot be K.O.'d by effects"
  */
 
-import type { EffectSchema, RuntimeProhibition, ProhibitionType, Target, TargetFilter } from "./effect-types.js";
-import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
-import { evaluateCondition, matchesFilter, type ConditionContext } from "./conditions.js";
+import type {
+  ConditionalOverride,
+  Condition,
+  RuntimeProhibition,
+  ProhibitionType,
+  Target,
+} from "./effect-types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameAction,
+  GameState,
+} from "../types.js";
+import {
+  evaluateCondition,
+  matchesFilter,
+  type ConditionContext,
+} from "./conditions.js";
 import { findCardInState, findCardInstance } from "./state.js";
 import { isCardNegated } from "./modifiers.js";
+
+function isConditionOverride(
+  override: ConditionalOverride
+): override is Condition {
+  return !("action" in override && !("type" in override));
+}
+
+function evaluateConditionalOverride(
+  state: GameState,
+  override: ConditionalOverride,
+  context: ConditionContext
+): boolean {
+  // Action-payment overrides require an interactive prompt and are not yet
+  // executable from a synchronous prohibition check. Preserve the historical
+  // behavior (prohibition remains active) while keeping the authored variant
+  // explicit and type-safe.
+  return (
+    isConditionOverride(override) && evaluateCondition(state, override, context)
+  );
+}
 
 // ─── Match-time resolution (OPT-451) ─────────────────────────────────────────
 //
@@ -141,7 +176,7 @@ export function checkProhibitions(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
 ): string | null {
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   if (prohibitions.length === 0) return null;
 
   for (const prohibition of prohibitions) {
@@ -158,7 +193,9 @@ export function checkProhibitions(
         controller: prohibition.controller,
         cardDb,
       };
-      if (evaluateCondition(state, prohibition.conditionalOverride, ctx)) {
+      if (
+        evaluateConditionalOverride(state, prohibition.conditionalOverride, ctx)
+      ) {
         continue; // Override active — skip this prohibition
       }
     }
@@ -182,7 +219,7 @@ export function applyRefreshProhibitions(
   playerIndex: 0 | 1,
   cardDb: Map<string, CardData>,
 ): { skipInstanceIds: Set<string>; nextState: GameState } {
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   const skipInstanceIds = new Set<string>();
   if (prohibitions.length === 0) return { skipInstanceIds, nextState: state };
 
@@ -229,14 +266,15 @@ export function applyRefreshProhibitions(
         controller: p.controller,
         cardDb,
       };
-      if (evaluateCondition(state, p.conditionalOverride, ctx)) continue;
+      if (evaluateConditionalOverride(state, p.conditionalOverride, ctx))
+        continue;
     }
     for (const id of affected) skipInstanceIds.add(id);
   }
 
   if (consumedIds.size === 0) return { skipInstanceIds, nextState: state };
   const remaining = prohibitions.filter((p) => !consumedIds.has(p.id));
-  return { skipInstanceIds, nextState: { ...state, prohibitions: remaining as any } };
+  return { skipInstanceIds, nextState: { ...state, prohibitions: remaining } };
 }
 
 function matchesProhibition(
@@ -324,7 +362,7 @@ function matchesProhibition(
 
       // Check if the card matches the scope filter
       if (scope.filter) {
-        if (!matchesFilter(card, scope.filter as TargetFilter, cardDb, state)) return null;
+        if (!matchesFilter(card, scope.filter, cardDb, state)) return null;
       }
 
       // Check cost_filter on scope
@@ -410,7 +448,7 @@ export function isProhibitedForCard(
   prohibitionType: ProhibitionType,
   cardDb: Map<string, CardData>,
 ): boolean {
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
 
   for (const p of prohibitions) {
     if (p.prohibitionType !== prohibitionType) continue;
@@ -431,7 +469,7 @@ export function isProhibitedForCard(
     // Scope-based matching
     if (p.scope?.filter) {
       const card = findCardOnField(state, targetInstanceId);
-      if (card && matchesFilter(card, p.scope.filter as TargetFilter, cardDb, state)) {
+      if (card && matchesFilter(card, p.scope.filter, cardDb, state)) {
         return true;
       }
     }
@@ -497,7 +535,7 @@ export function isRemovalProhibited(
   context: RemovalContext,
   cardDb: Map<string, CardData>,
 ): boolean {
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   if (prohibitions.length === 0) return false;
 
   const applicableTypes = PROHIBITION_TYPES_FOR_ACTION[context.action];
@@ -517,7 +555,8 @@ export function isRemovalProhibited(
         controller: p.controller,
         cardDb,
       };
-      if (evaluateCondition(state, p.conditionalOverride, ctx)) continue;
+      if (evaluateConditionalOverride(state, p.conditionalOverride, ctx))
+        continue;
     }
 
     // Scope: target must be covered by appliesTo, a dynamic population
@@ -529,7 +568,7 @@ export function isRemovalProhibited(
     } else if (p.target) {
       coversTarget = prohibitionTargetMatchesCard(p.target, target, p.controller, state, cardDb);
     } else if (p.scope?.filter) {
-      coversTarget = matchesFilter(target, p.scope.filter as TargetFilter, cardDb, state);
+      coversTarget = matchesFilter(target, p.scope.filter, cardDb, state);
     } else {
       coversTarget = false;
     }
@@ -554,7 +593,8 @@ export function isRemovalProhibited(
       if (!context.sourceCardInstanceId) continue;
       const source = findCardOnField(state, context.sourceCardInstanceId);
       if (!source) continue;
-      if (!matchesFilter(source, p.scope.source_filter as TargetFilter, cardDb, state)) continue;
+      if (!matchesFilter(source, p.scope.source_filter, cardDb, state))
+        continue;
     }
 
     return true;
@@ -585,7 +625,7 @@ export function isCardPlayProhibitedByEffect(
   const data = cardDb.get(card.cardId);
   if (!data) return false;
 
-  const schema = data.effectSchema as EffectSchema | null;
+  const schema = data.effectSchema;
   if (schema?.effects) {
     const ctx: ConditionContext = {
       sourceCardInstanceId: cardInstanceId,
@@ -604,7 +644,7 @@ export function isCardPlayProhibitedByEffect(
     }
   }
 
-  for (const p of state.prohibitions as RuntimeProhibition[]) {
+  for (const p of state.prohibitions) {
     if (p.prohibitionType !== "CANNOT_BE_PLAYED_BY_EFFECTS") continue;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
     if (!isProhibitionConditionMet(p, state, cardDb)) continue;

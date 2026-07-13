@@ -28,7 +28,7 @@ import type {
   PlayerChoicePrompt,
   PregameState,
 } from "../../../../shared/game-types.js";
-import type { Action, EffectSchema, StartOfGameEffect } from "./effect-types.js";
+import type { Action, StartOfGameEffect } from "./effect-types.js";
 import { dealOpeningHand, placeLifeCards, applyMulligan } from "./setup.js";
 import { emitPendingEvent } from "./events.js";
 import { executeActionChain } from "./effect-resolver/resolver.js";
@@ -227,7 +227,7 @@ function startOfGameActionsForPlayer(
   cardDb: Map<string, CardData>,
 ): Action[] {
   const leader = state.players[playerIndex].leader;
-  const schema = (cardDb.get(leader.cardId)?.effectSchema ?? null) as EffectSchema | null;
+  const schema = cardDb.get(leader.cardId)?.effectSchema ?? null;
   return (schema?.rule_modifications ?? [])
     .filter((rule): rule is StartOfGameEffect => rule.rule_type === "START_OF_GAME_EFFECT")
     .flatMap((rule) => rule.actions);

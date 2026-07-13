@@ -12,6 +12,7 @@ import type { CardData, CardInstance, GameState } from "../types.js";
 import type { CounterGrant, EffectSchema, RuleModification } from "./effect-types.js";
 import { matchesFilter } from "./conditions.js";
 import { isCardNegated } from "./modifiers.js";
+import { isPresent } from "./type-guards.js";
 
 /** Collect rule modifications from both encoding shapes of a schema. */
 function collectRuleMods(schema: EffectSchema | null | undefined): RuleModification[] {
@@ -39,7 +40,7 @@ export function getEffectiveCounterValue(
   const owner = state.players[card.owner];
   const sources: CardInstance[] = [
     owner.leader,
-    ...(owner.characters.filter(Boolean) as CardInstance[]),
+    ...owner.characters.filter(isPresent),
     ...(owner.stage ? [owner.stage] : []),
   ];
 
@@ -48,7 +49,7 @@ export function getEffectiveCounterValue(
     const sourceData = cardDb.get(source.cardId);
     if (!sourceData?.effectSchema) continue;
     if (isCardNegated(source, state, cardDb)) continue;
-    for (const mod of collectRuleMods(sourceData.effectSchema as EffectSchema)) {
+    for (const mod of collectRuleMods(sourceData.effectSchema)) {
       if (mod.rule_type !== "COUNTER_GRANT") continue;
       const grant = mod as CounterGrant;
       if (!matchesFilter(card, grant.filter, cardDb, state)) continue;

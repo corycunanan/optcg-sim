@@ -1,5 +1,4 @@
 import type { CardData, GameState } from "../types.js";
-import type { RuntimeActiveEffect } from "../engine/effect-types.js";
 import { isEffectConditionMet } from "../engine/modifiers.js";
 import { filterStateForPlayer } from "../engine/state.js";
 
@@ -8,7 +7,7 @@ export function stripInactiveEffects(
   state: GameState,
   cardDb: Map<string, CardData>
 ): GameState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const active = effects.filter((effect) =>
     isEffectConditionMet(effect, state, cardDb)
   );

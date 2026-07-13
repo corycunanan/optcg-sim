@@ -39,7 +39,7 @@ export interface SimultaneousGroupPlan {
   locks: SimultaneousActionLock[];
   nextActionIndex: number;
   followingActions: Action[];
-  resultRefs: [string, unknown][];
+  resultRefs: [string, EffectResult][];
   effectDescription?: string;
 }
 
@@ -61,25 +61,27 @@ function lockDynamicActionValues(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
 ): Action {
-  const field = action.type === "SET_BASE_POWER"
-    ? "value"
-    : action.type === "MODIFY_POWER" || action.type === "MODIFY_COST"
-      ? "amount"
-      : null;
-  if (!field || typeof action.params?.[field] === "number") return action;
-  return {
-    ...action,
-    params: {
-      ...action.params,
-      [field]: resolveAmount(
-        action.params?.[field] as number | { type: string } | undefined,
-        resultRefs,
-        state,
-        controller,
-        cardDb,
-      ),
-    },
-  };
+  if (action.type === "SET_BASE_POWER") {
+    const value = action.params?.value;
+    if (typeof value === "number" || value === undefined) return action;
+    return {
+      ...action,
+      params: {
+        value: resolveAmount(value, resultRefs, state, controller, cardDb),
+      },
+    };
+  }
+  if (action.type === "MODIFY_POWER" || action.type === "MODIFY_COST") {
+    const amount = action.params?.amount;
+    if (typeof amount === "number" || amount === undefined) return action;
+    return {
+      ...action,
+      params: {
+        amount: resolveAmount(amount, resultRefs, state, controller, cardDb),
+      },
+    };
+  }
+  return action;
 }
 
 /**
@@ -93,9 +95,7 @@ export function planSimultaneousGroup(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
 ): SimultaneousPlanningResult {
-  const resultRefs = new Map<string, EffectResult>(
-    plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
-  );
+  const resultRefs = new Map<string, EffectResult>(plan.resultRefs);
   const locks = [...plan.locks];
   const actions = [...plan.actions];
 

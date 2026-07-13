@@ -3,7 +3,7 @@ import type { GameEvent, GameState, PendingPromptState } from "../types.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { emitPendingEvent } from "../engine/events.js";
 import { executeLifeScry } from "../engine/effect-resolver/actions/life.js";
-import type { Action } from "../engine/effect-types.js";
+import type { ActionOf } from "../engine/effect-types.js";
 import {
   filterEventForPlayer,
   filterPromptForPlayer,
@@ -114,7 +114,7 @@ describe("OPT-470 hidden-information visibility contract", () => {
     const lifeCard = main.players[1].life[0];
     const result = executeLifeScry(
       main,
-      { type: "LIFE_SCRY", params: { look_at: 1 } } as Action,
+      { type: "LIFE_SCRY", params: { look_at: 1 } } as ActionOf<"LIFE_SCRY">,
       main.players[1].leader.instanceId,
       1,
       cardDb,
@@ -228,7 +228,7 @@ describe("OPT-470 hidden-information visibility contract", () => {
         effectDescription: "Choose",
       },
       respondingPlayer: 1,
-      resumeContext: { secret: "server-only" },
+      resumeContext: "server-only",
     };
 
     expect(filterPromptForPlayer(prompt, 0)).toBeNull();
@@ -244,7 +244,7 @@ describe("OPT-470 hidden-information visibility contract", () => {
         effectDescription: "Private effect text",
       },
       respondingPlayer: 1,
-      resumeContext: { secret: "server-only" },
+      resumeContext: "server-only",
     };
     const waitingView = filterStateForPlayer({ ...state, pendingPrompt }, 0);
 
@@ -270,7 +270,7 @@ describe("OPT-470 hidden-information visibility contract", () => {
         blindSelection: true,
       },
       respondingPlayer: 0,
-      resumeContext: { cardId: hiddenCard.cardId },
+      resumeContext: `hidden-card:${hiddenCard.cardId}`,
     };
 
     const filtered = filterPromptForPlayer(prompt, 0);

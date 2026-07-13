@@ -2,8 +2,13 @@
  * Action handlers: All 14 life actions
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
+import type { ActionOf, EffectResult } from "../../effect-types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameState,
+  PendingEvent,
+} from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
@@ -12,7 +17,7 @@ import { transitionCard, transitionCards } from "../../zone-transition.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ADD_TO_LIFE_FROM_DECK">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -20,9 +25,9 @@ export function executeAddToLifeFromDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const face = (params.face as "UP" | "DOWN") ?? "DOWN";
-  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+  const amount = params.amount ?? 1;
+  const face = params.face ?? "DOWN";
+  const position = params.position ?? "TOP";
 
   const p = state.players[controller];
   const count = Math.min(amount, p.deck.length);
@@ -44,7 +49,7 @@ export function executeAddToLifeFromDeck(
 // OPT-259 (F6): trashing a Life card is not damage — never fire [Trigger].
 export function executeTrashFromLife(
   state: GameState,
-  action: Action,
+  action: ActionOf<"TRASH_FROM_LIFE">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -52,12 +57,11 @@ export function executeTrashFromLife(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+  const amount = params.amount ?? 1;
+  const position = params.position ?? "TOP";
 
-  const pi = (params.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0)
-    : controller;
+  const pi: 0 | 1 =
+    params.controller === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
   const p = state.players[pi];
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
@@ -72,13 +76,17 @@ export function executeTrashFromLife(
     { position: "TOP" },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { count, reason: "life_trash", from: "LIFE" } });
+  events.push({
+    type: "CARD_TRASHED",
+    playerIndex: pi,
+    payload: { count, reason: "life_trash", from: "LIFE" },
+  });
   // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
   // Kalgara/Bonney-style watchers fire on effect-driven life trashes too.
   for (const transition of moved.transitions) {
     events.push({
       type: "CARD_REMOVED_FROM_LIFE",
-      playerIndex: pi as 0 | 1,
+      playerIndex: pi,
       payload: {
         cardInstanceId: transition.fact.oldInstanceId,
         newCardInstanceId: transition.fact.newInstanceId,
@@ -96,7 +104,7 @@ export function executeTrashFromLife(
 // OPT-259 (F6): flipping a Life face-up is not damage — never fire [Trigger].
 export function executeTurnLifeFaceUp(
   state: GameState,
-  action: Action,
+  action: ActionOf<"TURN_LIFE_FACE_UP">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -104,8 +112,8 @@ export function executeTurnLifeFaceUp(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const position = (params.position as "TOP" | "BOTTOM" | "ALL") ?? "TOP";
+  const amount = params.amount ?? 1;
+  const position = params.position ?? "TOP";
   const p = state.players[controller];
   if (p.life.length === 0) return { state, events, succeeded: false };
 
@@ -134,7 +142,7 @@ export function executeTurnLifeFaceUp(
 
 export function executeTurnLifeFaceDown(
   state: GameState,
-  action: Action,
+  action: ActionOf<"TURN_LIFE_FACE_DOWN">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -142,7 +150,7 @@ export function executeTurnLifeFaceDown(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount = params.amount ?? 1;
   const p = state.players[controller];
   if (p.life.length === 0) return { state, events, succeeded: false };
 
@@ -162,7 +170,7 @@ export function executeTurnLifeFaceDown(
 
 export function executeTurnAllLifeFaceDown(
   state: GameState,
-  _action: Action,
+  _action: ActionOf<"TURN_ALL_LIFE_FACE_DOWN">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -181,7 +189,7 @@ export function executeTurnAllLifeFaceDown(
 // Damage-driven Life→hand goes through executeDealDamage / battle damage.
 export function executeLifeToHand(
   state: GameState,
-  action: Action,
+  action: ActionOf<"LIFE_TO_HAND">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -189,13 +197,17 @@ export function executeLifeToHand(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+  const amount = params.amount ?? 1;
+  const position = params.position ?? "TOP";
   // The OPPONENT_LIFE target type implies the opponent even without an
   // explicit controller (same convention as executeReorderAllLife).
-  const targetController = (action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const targetController: 0 | 1 =
+    action.target?.type === "OPPONENT_LIFE" ||
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
   const p = state.players[targetController];
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
@@ -246,7 +258,7 @@ export function executeLifeToHand(
 // silent no-op.
 export function executeAddToLife(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ADD_TO_LIFE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -263,7 +275,7 @@ export function executeAddToLife(
 
 function executeAddToLifeFromTrash(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ADD_TO_LIFE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -272,8 +284,8 @@ function executeAddToLifeFromTrash(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const face = (params.face as "UP" | "DOWN") ?? "DOWN";
-  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+  const face = params.face ?? "DOWN";
+  const position = params.position ?? "TOP";
 
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (allValidIds.length === 0) return { state, events, succeeded: false };
@@ -303,7 +315,7 @@ function executeAddToLifeFromTrash(
 
 export function executeAddToLifeFromHand(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ADD_TO_LIFE_FROM_HAND">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -312,8 +324,8 @@ export function executeAddToLifeFromHand(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const face = (params.face as "UP" | "DOWN") ?? "DOWN";
-  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+  const face = params.face ?? "DOWN";
+  const position = params.position ?? "TOP";
 
   const p = state.players[controller];
 
@@ -329,8 +341,10 @@ export function executeAddToLifeFromHand(
     targetIds = autoSelectTargets(action.target, allValidIds);
   } else {
     // No target specified — auto-select from hand
-    const amount = (params.amount as number) ?? 1;
-    targetIds = p.hand.slice(0, Math.min(amount, p.hand.length)).map((c) => c.instanceId);
+    const amount = params.amount ?? 1;
+    targetIds = p.hand
+      .slice(0, Math.min(amount, p.hand.length))
+      .map((c) => c.instanceId);
   }
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
@@ -348,7 +362,7 @@ export function executeAddToLifeFromHand(
 
 export function executeAddToLifeFromField(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ADD_TO_LIFE_FROM_FIELD">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -364,7 +378,7 @@ export function executeAddToLifeFromField(
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   const params = action.params ?? {};
-  const face = (params.face as "UP" | "DOWN") ?? "DOWN";
+  const face = params.face ?? "DOWN";
   let nextState = state;
 
   for (const id of targetIds) {
@@ -390,7 +404,7 @@ export function executeAddToLifeFromField(
 
 export function executePlayFromLife(
   state: GameState,
-  action: Action,
+  action: ActionOf<"PLAY_FROM_LIFE">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -398,7 +412,7 @@ export function executePlayFromLife(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const position = (params.position as "TOP" | "BOTTOM") ?? "TOP";
+  const position = params.position ?? "TOP";
   const p = state.players[controller];
   if (p.life.length === 0) return { state, events, succeeded: false };
 
@@ -406,7 +420,7 @@ export function executePlayFromLife(
   const data = cardDb.get(lifeCard.cardId);
   if (!data) return { state, events, succeeded: false };
 
-  const entryState = (params.entry_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
+  const entryState = params.entry_state ?? "ACTIVE";
 
   if (data.type.toUpperCase() === "CHARACTER") {
     const moved = transitionCard(state, lifeCard.instanceId, "CHARACTER", {
@@ -442,7 +456,7 @@ export function executePlayFromLife(
 // OPT-259 (F6): Life → bottom of deck is not damage — never fire [Trigger].
 export function executeLifeCardToDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"LIFE_CARD_TO_DECK">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -450,11 +464,14 @@ export function executeLifeCardToDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
-  const targetController = (action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const amount = params.amount ?? 1;
+  const position = params.position ?? "BOTTOM";
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
   const p = state.players[targetController];
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
@@ -478,7 +495,7 @@ export function executeLifeCardToDeck(
 
 export function executeTrashFaceUpLife(
   state: GameState,
-  _action: Action,
+  _action: ActionOf<"TRASH_FACE_UP_LIFE">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -508,7 +525,7 @@ export function executeTrashFaceUpLife(
 // OPT-259 (F6): "look at top Life" (Katakuri) is not damage — never fire [Trigger].
 export function executeLifeScry(
   state: GameState,
-  action: Action,
+  action: ActionOf<"LIFE_SCRY">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -516,7 +533,7 @@ export function executeLifeScry(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const lookAt = (params.look_at as number) ?? 1;
+  const lookAt = params.look_at ?? 1;
   const p = state.players[controller];
   const count = Math.min(lookAt, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
@@ -533,7 +550,7 @@ export function executeLifeScry(
 
 export function executeDrainLifeToThreshold(
   state: GameState,
-  action: Action,
+  action: ActionOf<"DRAIN_LIFE_TO_THRESHOLD">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -541,7 +558,7 @@ export function executeDrainLifeToThreshold(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const threshold = (params.threshold as number) ?? 0;
+  const threshold = params.threshold ?? 0;
   const p = state.players[controller];
   const excess = p.life.length - threshold;
   if (excess <= 0) return { state, events, succeeded: false };
@@ -564,7 +581,7 @@ export function executeDrainLifeToThreshold(
 // OPT-259 (F6): reordering Life cards (Viola) is not damage — never fire [Trigger].
 export function executeReorderAllLife(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REORDER_ALL_LIFE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -573,9 +590,13 @@ export function executeReorderAllLife(
   const events: PendingEvent[] = [];
 
   // Determine target player — OPPONENT_LIFE target means opponent
-  const targetController = (action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const targetController: 0 | 1 =
+    action.target?.type === "OPPONENT_LIFE" ||
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
 
   const p = state.players[targetController];
   if (p.life.length <= 1) {
@@ -604,7 +625,7 @@ export function executeReorderAllLife(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: lifeCards.map((c) => c.instanceId),
   };
 

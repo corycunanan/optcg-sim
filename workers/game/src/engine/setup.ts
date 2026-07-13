@@ -18,11 +18,11 @@ import type {
   GameInitPayload,
   GameState,
   LifeCard,
+  PlayerState,
   PlayerInitData,
   TurnState,
   EngineExecutionContext,
 } from "../types.js";
-import type { EffectSchema } from "./effect-types.js";
 import { injectSchemasIntoCardDb } from "./schema-registry.js";
 import { registerTriggersForCard, registerReplacementsForCard, registerPermanentEffectsForCard } from "./triggers.js";
 import {
@@ -42,7 +42,7 @@ const OPENING_HAND_SIZE = 5;
  * negation of the Leader effect does not restore the default.
  */
 function resolveDonDeckSize(leaderData: CardData | undefined): number {
-  const schema = (leaderData?.effectSchema ?? null) as EffectSchema | null;
+  const schema = leaderData?.effectSchema ?? null;
   const override = schema?.rule_modifications?.find(
     (m): m is { rule_type: "DON_DECK_SIZE_OVERRIDE"; size: number } =>
       m.rule_type === "DON_DECK_SIZE_OVERRIDE",
@@ -102,19 +102,19 @@ export function prepareDecksAndLeaders(
   const don1 = buildDonDeck(executionContext, resolveDonDeckSize(leader1Data));
   executionContext = don1.executionContext;
 
-  const player0 = {
+  const player0: PlayerState = {
     ...p0Built.player,
-    hand: [] as CardInstance[],
+    hand: [],
     deck: arranged0.deck,
-    life: [] as LifeCard[],
+    life: [],
     donDeck: don0.deck,
   };
 
-  const player1 = {
+  const player1: PlayerState = {
     ...p1Built.player,
-    hand: [] as CardInstance[],
+    hand: [],
     deck: arranged1.deck,
-    life: [] as LifeCard[],
+    life: [],
     donDeck: don1.deck,
   };
 

@@ -2205,7 +2205,7 @@ export const OP12_061_DONQUIXOTE_ROSINANTE: EffectSchema = {
             },
             applies_to: {
               action: "MODIFY_COST",
-              filter: { name: "Trafalgar Law", costMin: 4 },
+              filter: { name: "Trafalgar Law", cost_min: 4 },
             },
           },
           duration: { type: "THIS_TURN" },

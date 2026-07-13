@@ -6,7 +6,6 @@
  */
 
 import type { CardData, GameState } from "../types.js";
-import type { EffectSchema } from "./effect-types.js";
 
 export interface DefeatResult {
   gameOver: boolean;
@@ -28,7 +27,7 @@ export function hasDelayedDeckOutLoss(
   if (!cardDb) return false;
   const leader = state.players[playerIndex].leader;
   const data = cardDb.get(leader.cardId);
-  const schema = (data?.effectSchema ?? null) as EffectSchema | null;
+  const schema = data?.effectSchema ?? null;
   const mods = schema?.rule_modifications ?? [];
   return mods.some(
     (m) =>

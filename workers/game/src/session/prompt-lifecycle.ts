@@ -3,8 +3,10 @@ import type {
   EffectStackFrame,
   GameAction,
   GameState,
+  PromptResumeContext,
   ResumeContext,
 } from "../types.js";
+import type { EffectResult } from "../engine/effect-types.js";
 import {
   recalculateBattlePowers,
   resumeBattleDamageContinuation,
@@ -23,7 +25,6 @@ import {
   resumeReplacementBatch,
   type BatchResumeResult,
   type ReplacementBatchResumeContext,
-  type ReplacementResumeContext,
 } from "../engine/replacements.js";
 import { isDeclineResponse } from "./coordinator.js";
 
@@ -54,14 +55,14 @@ export function resumePromptLifecycle(
     return { state: stateBeforeResume, responseRejected: true };
   }
 
-  const resumeContext = prompt.resumeContext as unknown as Record<
-    string,
-    unknown
-  >;
+  const resumeContext = prompt.resumeContext;
   const respondingPlayer = prompt.respondingPlayer;
   if (
-    resumeContext?.type === "PREGAME_PRIORITY_CHOICE" ||
-    resumeContext?.type === "PREGAME_MULLIGAN"
+    typeof resumeContext === "object" &&
+    resumeContext !== null &&
+    "type" in resumeContext &&
+    (resumeContext.type === "PREGAME_PRIORITY_CHOICE" ||
+      resumeContext.type === "PREGAME_MULLIGAN")
   ) {
     return {
       state: services.drainPregame(
@@ -75,18 +76,21 @@ export function resumePromptLifecycle(
   let responseRejected = false;
   let gameOver: PromptLifecycleResult["gameOver"];
 
-  if (resumeContext?.type === "REPLACEMENT") {
+  if (
+    typeof resumeContext === "object" &&
+    resumeContext !== null &&
+    "type" in resumeContext &&
+    resumeContext.type === "REPLACEMENT"
+  ) {
     const replacement = resumeReplacement(
       state,
-      resumeContext as unknown as ReplacementResumeContext,
+      resumeContext,
       !isDeclineResponse(action),
       cardDb,
       resolverExecutionServices
     );
     state = replacement.state;
-    const costFrame = state.effectStack.at(-1) as unknown as
-      | EffectStackFrame
-      | undefined;
+    const costFrame = state.effectStack.at(-1);
     if (costFrame?.costReplacementAction) {
       if (replacement.replaced) {
         const aborted = abortReplacedCost(
@@ -99,7 +103,7 @@ export function resumePromptLifecycle(
       } else {
         const resumed = resumeFromStack(
           state,
-          { ...costFrame.costReplacementAction } as GameAction,
+          { ...costFrame.costReplacementAction },
           cardDb
         );
         state = withPendingPrompt(resumed.state, resumed.pendingPrompt);
@@ -123,8 +127,13 @@ export function resumePromptLifecycle(
       state = interrupted.state;
       gameOver = interrupted.gameOver;
     }
-  } else if (resumeContext?.type === "REPLACEMENT_BATCH") {
-    const context = resumeContext as unknown as ReplacementBatchResumeContext;
+  } else if (
+    typeof resumeContext === "object" &&
+    resumeContext !== null &&
+    "type" in resumeContext &&
+    resumeContext.type === "REPLACEMENT_BATCH"
+  ) {
+    const context = resumeContext;
     const batch = resumeReplacementBatch(
       state,
       context,
@@ -158,9 +167,7 @@ export function resumePromptLifecycle(
       }
     }
   } else if (state.effectStack.length > 0) {
-    const resumedFrame = state.effectStack.at(
-      -1
-    ) as unknown as EffectStackFrame;
+    const resumedFrame = state.effectStack.at(-1)!;
     const resumed = resumeFromStack(state, action, cardDb);
     state = resumed.state;
     if (state.engineOutcome) {
@@ -208,12 +215,10 @@ export function resumePromptLifecycle(
       }
     }
   } else {
-    const resumed = resumeEffectChain(
-      state,
-      resumeContext as unknown as ResumeContext,
-      action,
-      cardDb
-    );
+    if (!isResumeContext(resumeContext)) {
+      return { state: stateBeforeResume, responseRejected: true };
+    }
+    const resumed = resumeEffectChain(state, resumeContext, action, cardDb);
     state = resumed.state;
     if (state.engineOutcome) {
       gameOver = terminalEngineOutcome(state);
@@ -264,6 +269,20 @@ export function resumePromptLifecycle(
   return { state, responseRejected, gameOver };
 }
 
+function isResumeContext(
+  context: PromptResumeContext
+): context is ResumeContext {
+  return (
+    typeof context === "object" &&
+    context !== null &&
+    "effectSourceInstanceId" in context &&
+    "controller" in context &&
+    "remainingActions" in context &&
+    "resultRefs" in context &&
+    "validTargets" in context
+  );
+}
+
 function withPendingPrompt(
   state: GameState,
   pendingPrompt: GameState["pendingPrompt"] | undefined
@@ -293,11 +312,11 @@ function recordReplacementContinuationResult(
   }
   if (index < 0) return state;
 
-  const frame = state.effectStack[index] as unknown as EffectStackFrame;
+  const frame = state.effectStack[index];
   const resultRefs = [...frame.resultRefs];
   const resultRef = frame.pausedAction?.result_ref;
   if (resultRef) {
-    const nextResult: [string, unknown] = [
+    const nextResult: [string, EffectResult] = [
       resultRef,
       { targetInstanceIds: finalizedIds, count: finalizedIds.length },
     ];
@@ -326,7 +345,7 @@ function attachReplacementBatchContinuation(
 ): GameState {
   if (state.effectStack.length === 0) return state;
   const index = state.effectStack.length - 1;
-  const frame = state.effectStack[index] as unknown as EffectStackFrame;
+  const frame = state.effectStack[index];
   return {
     ...state,
     effectStack: [
@@ -369,9 +388,8 @@ function finishReplacementBatchResult(
   );
   if (batch.events.length === 0) return { state };
 
-  const outerContinuation = (
-    state.effectStack.at(-1) as unknown as EffectStackFrame | undefined
-  )?.replacementBatchContinuation;
+  const outerContinuation =
+    state.effectStack.at(-1)?.replacementBatchContinuation;
   const pipeline = continuePipelineFromExecution(
     state,
     { state, events: batch.events },
@@ -397,7 +415,7 @@ function resumeInterruptedEffectContinuations(
     !gameOver &&
     state.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS"
   ) {
-    const frame = state.effectStack.at(-1) as unknown as EffectStackFrame;
+    const frame = state.effectStack.at(-1)!;
     const resumed = resumeFromStack(state, action, cardDb);
     state = resumed.state;
     if (resumed.pendingPrompt) {

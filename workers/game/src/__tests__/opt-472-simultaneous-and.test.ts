@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Action, EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
+import {
+  getNestedActions,
+  type Action,
+  type EffectSchema,
+  type RuntimeActiveEffect,
+} from "../engine/effect-types.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { getEffectiveCost, getEffectivePower } from "../engine/modifiers.js";
@@ -40,18 +45,7 @@ function walkActions(schema: EffectSchema): Action[] {
   const visit = (actions: Action[]): void => {
     for (const action of actions) {
       found.push(action);
-      const options = action.params?.options;
-      if (Array.isArray(options)) {
-        for (const option of options) {
-          if (Array.isArray(option)) visit(option as Action[]);
-          else if (option && typeof option === "object" && Array.isArray(option.actions)) {
-            visit(option.actions as Action[]);
-          }
-        }
-      }
-      if (action.params?.action && typeof action.params.action === "object") {
-        visit([action.params.action as Action]);
-      }
+      visit(getNestedActions(action));
     }
   };
   for (const block of schema.effects) {

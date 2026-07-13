@@ -3,6 +3,7 @@ import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
+import { isPresent } from "../../type-guards.js";
 
 /** Resolve a simple cost's numeric amount with a deterministic fallback. */
 export function resolveAmount(cost: SimpleCost, fallback = 1): number {
@@ -64,7 +65,7 @@ export function computeCostTargets(
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE": {
-      let candidates = player.characters.filter(Boolean) as CardInstance[];
+      let candidates = player.characters.filter(isPresent);
       if (cost.filter) {
         candidates = candidates.filter((c) =>
           matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),

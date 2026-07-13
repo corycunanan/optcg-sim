@@ -7,7 +7,13 @@
  * - Expiry (wave-based processing at phase boundaries)
  */
 
-import type { RuntimeActiveEffect, RuntimeProhibition, ExpiryTiming, Condition } from "./effect-types.js";
+import type {
+  RuntimeActiveEffect,
+  RuntimeProhibition,
+  ExpiryTiming,
+  Condition,
+  Action,
+} from "./effect-types.js";
 import type { GameState, CardData } from "../types.js";
 import { cleanupConsumedOneTimeModifiers, expireOneTimeModifiers } from "./modifiers.js";
 import { evaluateCondition, type ConditionContext } from "./conditions.js";
@@ -21,12 +27,14 @@ export function expireEffects(
   wave: ExpiryTiming["wave"],
   context?: ExpiryContext,
 ): GameState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
-  const remaining = effects.filter((e) => !shouldExpire(e.expiresAt, wave, context));
+  const effects = state.activeEffects;
+  const remaining = effects.filter(
+    (e) => !shouldExpire(e.expiresAt, wave, context)
+  );
 
   if (remaining.length === effects.length) return state;
 
-  return { ...state, activeEffects: remaining as any };
+  return { ...state, activeEffects: remaining };
 }
 
 /**
@@ -69,8 +77,11 @@ export function expireRefreshPhaseEffects(state: GameState): GameState {
 /**
  * Expire effects and prohibitions whose source card has left the field.
  */
-export function expireSourceLeftZone(state: GameState, instanceId: string): GameState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+export function expireSourceLeftZone(
+  state: GameState,
+  instanceId: string
+): GameState {
+  const effects = state.activeEffects;
   const remainingEffects = effects.filter((e) => {
     if (e.sourceCardInstanceId !== instanceId) return true;
     // Always remove SOURCE_LEAVES_ZONE effects
@@ -81,7 +92,7 @@ export function expireSourceLeftZone(state: GameState, instanceId: string): Game
   });
 
   // Also remove permanent prohibitions whose source left the field
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   const remainingProhibitions = prohibitions.filter((p) => {
     if (p.sourceCardInstanceId !== instanceId) return true;
     if (p.duration.type === "PERMANENT") return false;
@@ -94,8 +105,10 @@ export function expireSourceLeftZone(state: GameState, instanceId: string): Game
   if (!effectsChanged && !prohibitionsChanged) return state;
   return {
     ...state,
-    activeEffects: effectsChanged ? remainingEffects as any : state.activeEffects,
-    prohibitions: prohibitionsChanged ? remainingProhibitions as any : state.prohibitions,
+    activeEffects: effectsChanged ? remainingEffects : state.activeEffects,
+    prohibitions: prohibitionsChanged
+      ? remainingProhibitions
+      : state.prohibitions,
   };
 }
 
@@ -117,8 +130,11 @@ export function expireSourceLeftZone(state: GameState, instanceId: string): Game
  * Source-bound entries (sourceCardInstanceId === instanceId) are left to
  * expireSourceLeftZone so the two helpers don't step on each other.
  */
-export function expireTargetLeftZone(state: GameState, instanceId: string): GameState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+export function expireTargetLeftZone(
+  state: GameState,
+  instanceId: string
+): GameState {
+  const effects = state.activeEffects;
   let effectsChanged = false;
   const remainingEffects: RuntimeActiveEffect[] = [];
 
@@ -142,7 +158,7 @@ export function expireTargetLeftZone(state: GameState, instanceId: string): Game
     remainingEffects.push({ ...e, appliesTo: filteredAppliesTo });
   }
 
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   let prohibitionsChanged = false;
   const remainingProhibitions: RuntimeProhibition[] = [];
 
@@ -163,8 +179,10 @@ export function expireTargetLeftZone(state: GameState, instanceId: string): Game
   if (!effectsChanged && !prohibitionsChanged) return state;
   return {
     ...state,
-    activeEffects: effectsChanged ? remainingEffects as any : state.activeEffects,
-    prohibitions: prohibitionsChanged ? remainingProhibitions as any : state.prohibitions,
+    activeEffects: effectsChanged ? remainingEffects : state.activeEffects,
+    prohibitions: prohibitionsChanged
+      ? remainingProhibitions
+      : state.prohibitions,
   };
 }
 
@@ -173,10 +191,21 @@ export function expireTargetLeftZone(state: GameState, instanceId: string): Game
  */
 export function processScheduledActions(
   state: GameState,
-  timing: string,
-): { state: GameState; actionsToRun: Array<{ action: any; controller: 0 | 1; sourceEffectId: string }> } {
-  const scheduled = state.scheduledActions as import("./effect-types.js").RuntimeScheduledAction[];
-  const toRun: Array<{ action: any; controller: 0 | 1; sourceEffectId: string }> = [];
+  timing: string
+): {
+  state: GameState;
+  actionsToRun: Array<{
+    action: Action;
+    controller: 0 | 1;
+    sourceEffectId: string;
+  }>;
+} {
+  const scheduled = state.scheduledActions;
+  const toRun: Array<{
+    action: Action;
+    controller: 0 | 1;
+    sourceEffectId: string;
+  }> = [];
   const remaining: typeof scheduled = [];
 
   for (const entry of scheduled) {
@@ -197,7 +226,7 @@ export function processScheduledActions(
   }
 
   return {
-    state: { ...state, scheduledActions: remaining as any },
+    state: { ...state, scheduledActions: remaining },
     actionsToRun: toRun,
   };
 }
@@ -210,7 +239,7 @@ export function expireProhibitions(
   wave: ExpiryTiming["wave"],
   context?: ExpiryContext,
 ): GameState {
-  const prohibitions = state.prohibitions as import("./effect-types.js").RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   const remaining = prohibitions.filter((p) => {
     // Prefer the expiry stamped at creation (OPT-408) — "next turn" anchors
     // can't be recomputed at check time. Legacy persisted prohibitions
@@ -220,7 +249,7 @@ export function expireProhibitions(
   });
 
   if (remaining.length === prohibitions.length) return state;
-  return { ...state, prohibitions: remaining as any };
+  return { ...state, prohibitions: remaining };
 }
 
 /**
@@ -239,7 +268,7 @@ export function evaluateWhileConditions(
   state: GameState,
   cardDb: Map<string, CardData>,
 ): GameState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const remaining = effects.filter((e) => {
     if (e.expiresAt.wave !== "CONDITION_FALSE") return true;
 
@@ -262,7 +291,7 @@ export function evaluateWhileConditions(
   });
 
   if (remaining.length === effects.length) return state;
-  return { ...state, activeEffects: remaining as any };
+  return { ...state, activeEffects: remaining };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -33,15 +33,19 @@ type BuildGameInitPayloadInput = {
 };
 
 function asTestOrder(value: unknown): { life: string[]; hand: string[] } | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const order = value as Record<string, unknown>;
+  const life = order.life;
+  const hand = order.hand;
   if (
-    typeof value === "object" &&
-    value !== null &&
-    Array.isArray((value as { life?: unknown }).life) &&
-    Array.isArray((value as { hand?: unknown }).hand)
+    !Array.isArray(life) ||
+    !life.every((cardId): cardId is string => typeof cardId === "string") ||
+    !Array.isArray(hand) ||
+    !hand.every((cardId): cardId is string => typeof cardId === "string")
   ) {
-    return value as { life: string[]; hand: string[] };
+    return undefined;
   }
-  return undefined;
+  return { life, hand };
 }
 
 function buildPlayerInit(
@@ -53,7 +57,7 @@ function buildPlayerInit(
     userId,
     sleeveUrl: deck.sleeveUrl ?? null,
     donArtUrl: deck.donArtUrl ?? null,
-    testOrder: asTestOrder(deck.testOrder),
+    testOrder: asTestOrder(deck.testOrder) ?? null,
     leader: {
       cardId: leader.id,
       quantity: 1,

@@ -9,7 +9,8 @@
 // [Trigger], Stage, high-cost Character). Add a new entry below when a
 // scenario needs a card outside this set.
 
-import type { CardData } from "@shared/game-types";
+import type { CardData } from "@engine/types";
+import type { EffectSchema } from "@engine/engine/effect-types";
 import { extractKeywords } from "@/lib/game/keywords";
 
 const IMG_BASE = "https://optcg-images.corymcunanan.workers.dev/cards";
@@ -19,7 +20,7 @@ type SandboxCardInput = Omit<
   "keywords" | "effectSchema" | "imageUrl"
 > & {
   imageUrl?: string;
-  effectSchema?: unknown;
+  effectSchema?: EffectSchema;
 };
 
 function build(input: SandboxCardInput): CardData {

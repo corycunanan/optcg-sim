@@ -2,8 +2,18 @@
  * Action handlers: PLAYER_CHOICE, OPPONENT_CHOICE, OPPONENT_ACTION, REUSE_EFFECT
  */
 
-import type { Action, DynamicValue, EffectResult, EffectSchema, NumericRange } from "../../effect-types.js";
-import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
+import type {
+  ActionOf,
+  EffectResult,
+  NumericRange,
+} from "../../effect-types.js";
+import type {
+  CardData,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+  ResumeContext,
+} from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { describeActionBranch, resolveAmount } from "../action-utils.js";
 import { getActionParams } from "../../effect-types.js";
@@ -12,7 +22,7 @@ import type { EffectResolverServices } from "../services.js";
 
 export function executePlayerChoice(
   state: GameState,
-  action: Action,
+  action: ActionOf<"PLAYER_CHOICE" | "OPPONENT_CHOICE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -21,14 +31,17 @@ export function executePlayerChoice(
   services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const options = params.options as Action[][];
-  if (!options || options.length === 0) return { state, events, succeeded: false };
+  const params =
+    action.type === "PLAYER_CHOICE"
+      ? getActionParams(action, "PLAYER_CHOICE")
+      : getActionParams(action, "OPPONENT_CHOICE");
+  const options = params.options;
+  if (!options || options.length === 0)
+    return { state, events, succeeded: false };
 
   // Determine who chooses: PLAYER_CHOICE = controller, OPPONENT_CHOICE = opponent
-  const chooser = action.type === "OPPONENT_CHOICE"
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const chooser: 0 | 1 =
+    action.type === "OPPONENT_CHOICE" ? (controller === 0 ? 1 : 0) : controller;
 
   // If only one option, auto-select it (no prompt needed)
   if (options.length === 1) {
@@ -41,7 +54,7 @@ export function executePlayerChoice(
   }
 
   // Build choice labels from action types or explicit labels
-  const explicitLabels = params.labels as string[] | undefined;
+  const explicitLabels = params.labels;
   const choices = options.map((branch, i) => ({
     id: String(i),
     label: explicitLabels?.[i] ?? describeActionBranch(branch),
@@ -56,7 +69,7 @@ export function executePlayerChoice(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: [],
   };
 
@@ -99,7 +112,7 @@ function rangeMatches(
   }
   if ("min" in range) return candidate >= range.min && candidate <= range.max;
   const expected = resolveAmount(
-    range.value as number | DynamicValue,
+    range.value,
     resultRefs,
     state,
     controller,
@@ -110,7 +123,7 @@ function rangeMatches(
 
 export function executeChooseValue(
   state: GameState,
-  action: Action,
+  action: ActionOf<"CHOOSE_VALUE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -156,7 +169,7 @@ export function executeChooseValue(
       controller,
       pausedAction: action,
       remainingActions: [],
-      resultRefs: [...resultRefs.entries()].map(([key, result]) => [key, result as unknown]),
+      resultRefs: [...resultRefs.entries()],
       validTargets,
     } satisfies ResumeContext,
   };
@@ -166,7 +179,7 @@ export function executeChooseValue(
 
 export function executeOpponentAction(
   state: GameState,
-  action: Action,
+  action: ActionOf<"OPPONENT_ACTION">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -175,8 +188,8 @@ export function executeOpponentAction(
   services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const wrappedAction = params.action as Action;
+  const params = getActionParams(action, "OPPONENT_ACTION");
+  const wrappedAction = params.action;
   if (!wrappedAction) return { state, events, succeeded: false };
 
   const oppController = controller === 0 ? 1 : 0;
@@ -184,7 +197,7 @@ export function executeOpponentAction(
     state,
     wrappedAction,
     sourceCardInstanceId,
-    oppController as 0 | 1,
+    oppController,
     cardDb,
     resultRefs,
   );
@@ -194,7 +207,7 @@ export function executeOpponentAction(
 
 export function executeReuseEffect(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REUSE_EFFECT">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -203,15 +216,15 @@ export function executeReuseEffect(
   services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const targetEffect = params.target_effect as string;
+  const params = getActionParams(action, "REUSE_EFFECT");
+  const targetEffect = params.target_effect;
   const card = findCardInstance(state, sourceCardInstanceId);
   if (!card) return { state, events, succeeded: false };
 
   const data = cardDb.get(card.cardId);
   if (!data) return { state, events, succeeded: false };
 
-  const schema = data.effectSchema as EffectSchema | null;
+  const schema = data.effectSchema;
   if (!schema) return { state, events, succeeded: false };
 
   const targetBlock = schema.effects.find((b) => {

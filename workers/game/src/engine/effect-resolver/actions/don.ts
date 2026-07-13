@@ -4,15 +4,31 @@
  * REST_DON, DISTRIBUTE_DON, REDISTRIBUTE_DON, GIVE_OPPONENT_DON_TO_OPPONENT
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
-import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
+import type { ActionOf, EffectResult } from "../../effect-types.js";
+import type {
+  CardData,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+  ResumeContext,
+} from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { attachDonToCard, detachOneDon, reattachDon } from "../card-mutations.js";
-import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
+import {
+  attachDonToCard,
+  detachOneDon,
+  reattachDon,
+} from "../card-mutations.js";
+import {
+  computeAllValidTargets,
+  autoSelectTargets,
+  needsPlayerTargetSelection,
+  buildSelectTargetPrompt,
+} from "../target-resolver.js";
+import { resolveAmount } from "../action-utils.js";
 
 export function executeGiveDon(
   state: GameState,
-  action: Action,
+  action: ActionOf<"GIVE_DON">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -21,11 +37,31 @@ export function executeGiveDon(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const donState = (params.don_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  const amount = params.amount ?? 1;
+  const donState = params.don_state ?? "ACTIVE";
+  const allValidIds =
+    preselectedTargets ??
+    computeAllValidTargets(
+      state,
+      action.target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs
+    );
+  if (
+    !preselectedTargets &&
+    needsPlayerTargetSelection(action.target, allValidIds)
+  ) {
+    return buildSelectTargetPrompt(
+      state,
+      action,
+      allValidIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
@@ -46,7 +82,7 @@ export function executeGiveDon(
 
 export function executeAddDonFromDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ADD_DON_FROM_DECK">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -54,8 +90,8 @@ export function executeAddDonFromDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const targetState = (params.target_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
+  const amount = params.amount ?? 1;
+  const targetState = params.target_state ?? "ACTIVE";
 
   const p = state.players[controller];
   const count = Math.min(amount, p.donDeck.length);
@@ -256,7 +292,7 @@ function enumerateDonReturnPlans(
 
 export function executeForceOpponentDonReturn(
   state: GameState,
-  action: Action,
+  action: ActionOf<"FORCE_OPPONENT_DON_RETURN">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -264,7 +300,7 @@ export function executeForceOpponentDonReturn(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount = params.amount ?? 1;
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const p = state.players[opp];
 
@@ -331,7 +367,7 @@ export function executeForceOpponentDonReturn(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: choices.map((c) => c.id),
   };
   const pendingPrompt: PendingPromptState = {
@@ -349,7 +385,7 @@ export function executeForceOpponentDonReturn(
 
 export function executeSetDonActive(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SET_DON_ACTIVE">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -357,7 +393,7 @@ export function executeSetDonActive(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount = params.amount ?? 1;
   const p = state.players[controller];
   const restedDon = p.donCostArea.filter((d) => d.state === "RESTED");
   const count = Math.min(amount, restedDon.length);
@@ -387,7 +423,7 @@ export function executeSetDonActive(
 
 export function executeRestOpponentDon(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REST_OPPONENT_DON">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -395,8 +431,8 @@ export function executeRestOpponentDon(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const opp = controller === 0 ? 1 : 0;
+  const amount = params.amount ?? 1;
+  const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const p = state.players[opp];
   const activeDon = p.donCostArea.filter((d) => d.state === "ACTIVE");
   const count = Math.min(amount, activeDon.length);
@@ -414,7 +450,7 @@ export function executeRestOpponentDon(
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   newPlayers[opp] = { ...p, donCostArea: newDonCostArea };
 
-  events.push({ type: "DON_RESTED", playerIndex: opp as 0 | 1, payload: { count } });
+  events.push({ type: "DON_RESTED", playerIndex: opp, payload: { count } });
 
   return {
     state: { ...state, players: newPlayers },
@@ -425,15 +461,16 @@ export function executeRestOpponentDon(
 
 export function executeReturnDonToDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"RETURN_DON_TO_DECK">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount =
+    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
   const p = state.players[controller];
   const unattached = p.donCostArea.filter((d) => !d.attachedTo);
   const count = Math.min(amount, unattached.length);
@@ -467,7 +504,7 @@ export function executeReturnDonToDeck(
 
 export function executeRestDon(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REST_DON">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -475,7 +512,7 @@ export function executeRestDon(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount = params.amount ?? 1;
   const p = state.players[controller];
   const activeDon = p.donCostArea.filter((d) => d.state === "ACTIVE");
   const count = Math.min(amount, activeDon.length);
@@ -502,7 +539,7 @@ export function executeRestDon(
 
 export function executeDistributeDon(
   state: GameState,
-  action: Action,
+  action: ActionOf<"DISTRIBUTE_DON">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -511,8 +548,8 @@ export function executeDistributeDon(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amountPerTarget = (params.amount_per_target as number) ?? (params.amount as number) ?? 1;
-  const donState = (params.don_state as "ACTIVE" | "RESTED") ?? "ACTIVE";
+  const amountPerTarget = params.amount_per_target ?? params.amount ?? 1;
+  const donState = params.don_state ?? "ACTIVE";
 
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
@@ -580,7 +617,7 @@ export function applyRedistributeDonTransfers(
 
 export function executeRedistributeDon(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REDISTRIBUTE_DON">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -589,7 +626,7 @@ export function executeRedistributeDon(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount = params.amount ?? 1;
 
   // If resume is handing us preselectedTargets, this handler should not run —
   // resume.ts applies the transfers directly via applyRedistributeDonTransfers.
@@ -631,7 +668,7 @@ export function executeRedistributeDon(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: validTargetIds,
   };
 
@@ -665,7 +702,7 @@ export function executeRedistributeDon(
  */
 export function executeGiveOpponentDonToOpponent(
   state: GameState,
-  action: Action,
+  action: ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -674,11 +711,14 @@ export function executeGiveOpponentDonToOpponent(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const opp = (controller === 0 ? 1 : 0) as 0 | 1;
+  const amount = params.amount ?? 1;
+  const opp: 0 | 1 = controller === 0 ? 1 : 0;
 
-  const sourceFilter = (params.source_filter as { is_rested?: boolean; is_active?: boolean } | undefined);
-  const matchesSource = (d: { state: "ACTIVE" | "RESTED"; attachedTo: string | null }): boolean => {
+  const sourceFilter = params.source_filter;
+  const matchesSource = (d: {
+    state: "ACTIVE" | "RESTED";
+    attachedTo: string | null;
+  }): boolean => {
     if (d.attachedTo) return false;
     if (!sourceFilter) return d.state === "RESTED"; // historical default
     if (sourceFilter.is_rested === true && d.state !== "RESTED") return false;

@@ -1620,7 +1620,7 @@ export const OP04_046_QUEEN: EffectSchema = {
             look_at: 7,
             pick: { up_to: 2 },
             filter: {
-              name_any: ["Plague Rounds", "Ice Oni"],
+              name_any_of: ["Plague Rounds", "Ice Oni"],
             },
             rest_destination: "BOTTOM",
           },

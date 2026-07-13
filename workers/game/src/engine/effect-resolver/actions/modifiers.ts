@@ -3,7 +3,13 @@
  * SET_BASE_POWER, SET_POWER_TO_ZERO, COPY_POWER, SWAP_BASE_POWER
  */
 
-import type { Action, EffectResult, RuntimeActiveEffect } from "../../effect-types.js";
+import type {
+  ActionOf,
+  ActionParamsMap,
+  EffectResult,
+  RuntimeActiveEffect,
+  Target,
+} from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
@@ -15,7 +21,7 @@ import { allocateEngineRecord } from "../../execution-context.js";
 
 export function executeModifyPower(
   state: GameState,
-  action: Action,
+  action: ActionOf<"MODIFY_POWER">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -24,7 +30,7 @@ export function executeModifyPower(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "MODIFY_POWER");
-  const amount = resolveAmount(p.amount as number | { type: string }, resultRefs, state, controller, cardDb);
+  const amount = resolveAmount(p.amount, resultRefs, state, controller, cardDb);
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -52,7 +58,7 @@ export function executeModifyPower(
     timestamp: allocated.timestamp,
   };
 
-  const newActiveEffects = [...state.activeEffects, effect as any];
+  const newActiveEffects = [...state.activeEffects, effect];
 
   for (const id of targetIds) {
     events.push({
@@ -72,7 +78,7 @@ export function executeModifyPower(
 
 export function executeModifyCost(
   state: GameState,
-  action: Action,
+  action: ActionOf<"MODIFY_COST">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -81,7 +87,7 @@ export function executeModifyCost(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "MODIFY_COST");
-  const amount = resolveAmount(p.amount as number | { type: string }, resultRefs, state, controller, cardDb);
+  const amount = resolveAmount(p.amount, resultRefs, state, controller, cardDb);
   const duration = action.duration ?? { type: "THIS_TURN" as const };
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
@@ -109,7 +115,10 @@ export function executeModifyCost(
   };
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -118,7 +127,7 @@ export function executeModifyCost(
 
 export function executeGrantKeyword(
   state: GameState,
-  action: Action,
+  action: ActionOf<"GRANT_KEYWORD">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -155,7 +164,10 @@ export function executeGrantKeyword(
   };
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -164,7 +176,7 @@ export function executeGrantKeyword(
 
 export function executeGrantAttribute(
   state: GameState,
-  action: Action,
+  action: ActionOf<"GRANT_ATTRIBUTE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -185,11 +197,13 @@ export function executeGrantAttribute(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{
-      type: "GRANT_ATTRIBUTE" as any,
-      params: { attribute },
-      duration,
-    }],
+    modifiers: [
+      {
+        type: "GRANT_ATTRIBUTE",
+        params: { attribute },
+        duration,
+      },
+    ],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -198,7 +212,10 @@ export function executeGrantAttribute(
   };
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
     events,
     succeeded: true,
   };
@@ -206,7 +223,7 @@ export function executeGrantAttribute(
 
 export function executeNegateEffects(
   state: GameState,
-  action: Action,
+  action: ActionOf<"NEGATE_EFFECTS">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -255,7 +272,10 @@ export function executeNegateEffects(
   });
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, negationEffect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, negationEffect],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -266,7 +286,7 @@ export function executeNegateEffects(
 
 export function executeSetBasePower(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SET_BASE_POWER">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -274,8 +294,8 @@ export function executeSetBasePower(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const p = action.params ?? {};
-  const value = resolveAmount(p.value as number | { type: string }, resultRefs, state, controller, cardDb);
+  const p = getActionParams(action, "SET_BASE_POWER");
+  const value = resolveAmount(p.value, resultRefs, state, controller, cardDb);
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -291,7 +311,7 @@ export function executeSetBasePower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER" as any, params: { value }, duration }],
+    modifiers: [{ type: "SET_POWER", params: { value }, duration }],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -304,7 +324,10 @@ export function executeSetBasePower(
   }
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -315,22 +338,34 @@ export function executeSetBasePower(
 
 export function executeSetPowerToZero(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SET_POWER_TO_ZERO">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets?: string[],
 ): ActionResult {
-  const zeroAction = { ...action, params: { ...action.params, value: 0 } };
-  return executeSetBasePower(state, zeroAction, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
+  const zeroAction: ActionOf<"SET_BASE_POWER"> = {
+    ...action,
+    type: "SET_BASE_POWER",
+    params: { value: 0 },
+  };
+  return executeSetBasePower(
+    state,
+    zeroAction,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    preselectedTargets
+  );
 }
 
 // ─── COPY_POWER ──────────────────────────────────────────────────────────────
 
 export function executeCopyPower(
   state: GameState,
-  action: Action,
+  action: ActionOf<"COPY_POWER">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -383,7 +418,9 @@ export function executeCopyPower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER" as any, params: { value: sourcePower }, duration }],
+    modifiers: [
+      { type: "SET_POWER", params: { value: sourcePower }, duration },
+    ],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -396,7 +433,10 @@ export function executeCopyPower(
   }
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -405,7 +445,7 @@ export function executeCopyPower(
 
 type SourceResolution =
   | { directIds: string[]; target?: undefined }
-  | { target: import("../../effect-types.js").Target; directIds?: undefined };
+  | { target: Target; directIds?: undefined };
 
 /**
  * Convert COPY_POWER `params.source` / `params.source_target` to either
@@ -413,26 +453,26 @@ type SourceResolution =
  * ("OPPONENT_LEADER", "ATTACKING_CARD") are handled here.
  */
 function resolveSourceTarget(
-  params: Record<string, unknown>,
-  state: GameState,
+  params: ActionParamsMap["COPY_POWER"],
+  state: GameState
 ): SourceResolution | undefined {
   // Explicit target object takes priority
   if (params.source_target) {
-    return { target: params.source_target as import("../../effect-types.js").Target };
+    return { target: params.source_target };
   }
 
-  const source = params.source as string | Record<string, unknown> | undefined;
+  const source = params.source;
   if (!source) return undefined;
 
   // If source is already a target object (has a `type` key), use it directly
-  if (typeof source === "object" && "type" in source) {
-    return { target: source as import("../../effect-types.js").Target };
+  if (typeof source === "object") {
+    return { target: source };
   }
 
   // String shorthands
   switch (source) {
     case "OPPONENT_LEADER":
-      return { target: { type: "OPPONENT_LEADER" } as any };
+      return { target: { type: "OPPONENT_LEADER" } };
     case "ATTACKING_CARD": {
       const battle = state.turn.battle;
       if (!battle) return undefined;
@@ -447,7 +487,7 @@ function resolveSourceTarget(
 
 export function executeSwapBasePower(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SWAP_BASE_POWER">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -483,8 +523,10 @@ export function executeSwapBasePower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER" as any, params: { value: powerB }, duration }],
-    duration, expiresAt: expiry, controller,
+    modifiers: [{ type: "SET_POWER", params: { value: powerB }, duration }],
+    duration,
+    expiresAt: expiry,
+    controller,
     appliesTo: [targetIds[0]],
     timestamp: allocatedA.timestamp,
   };
@@ -493,8 +535,10 @@ export function executeSwapBasePower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER" as any, params: { value: powerA }, duration }],
-    duration, expiresAt: expiry, controller,
+    modifiers: [{ type: "SET_POWER", params: { value: powerA }, duration }],
+    duration,
+    expiresAt: expiry,
+    controller,
     appliesTo: [targetIds[1]],
     timestamp: allocatedB.timestamp,
   };
@@ -505,7 +549,10 @@ export function executeSwapBasePower(
   );
 
   return {
-    state: { ...allocatedB.state, activeEffects: [...state.activeEffects, effectA as any, effectB as any] },
+    state: {
+      ...allocatedB.state,
+      activeEffects: [...state.activeEffects, effectA, effectB],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: 2 },

@@ -1,4 +1,8 @@
-import type { Action, EffectSchema } from "./effect-types.js";
+import {
+  getNestedActions,
+  type Action,
+  type EffectSchema,
+} from "./effect-types.js";
 
 export interface CardTextRecord {
   id: string;
@@ -129,22 +133,7 @@ function collectActionTypes(schema: EffectSchema): Set<string> {
   const visit = (actions: Action[] | undefined): void => {
     for (const action of actions ?? []) {
       types.add(action.type);
-      const params = action.params;
-      if (params?.action && typeof params.action === "object") {
-        visit([params.action as Action]);
-      }
-      if (Array.isArray(params?.options)) {
-        for (const option of params.options) {
-          if (Array.isArray(option)) visit(option as Action[]);
-          else if (
-            option &&
-            typeof option === "object" &&
-            Array.isArray((option as { actions?: unknown }).actions)
-          ) {
-            visit((option as { actions: Action[] }).actions);
-          }
-        }
-      }
+      visit(getNestedActions(action));
     }
   };
 

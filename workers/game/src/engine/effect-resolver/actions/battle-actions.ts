@@ -2,18 +2,19 @@
  * Action handlers: REDIRECT_ATTACK, DEAL_DAMAGE, SELF_TAKE_DAMAGE
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
+import type { ActionOf, EffectResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { continueEffectDamageSequence } from "../../battle.js";
 import { transitionCard } from "../../zone-transition.js";
+import { resolveAmount } from "../action-utils.js";
 
 // ─── REDIRECT_ATTACK ─────────────────────────────────────────────────────────
 
 export function executeRedirectAttack(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REDIRECT_ATTACK">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -57,15 +58,16 @@ export function executeRedirectAttack(
  */
 export function executeDealDamage(
   state: GameState,
-  action: Action,
+  action: ActionOf<"DEAL_DAMAGE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>
 ): ActionResult {
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const opp = (controller === 0 ? 1 : 0) as 0 | 1;
+  const amount =
+    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
+  const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const startingLife = state.players[opp].life.length;
 
   const cont = continueEffectDamageSequence(
@@ -91,15 +93,16 @@ export function executeDealDamage(
 
 export function executeSelfTakeDamage(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SELF_TAKE_DAMAGE">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
+  const amount =
+    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
 
   let nextState = state;
   let dealt = 0;

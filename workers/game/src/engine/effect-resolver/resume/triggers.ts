@@ -5,12 +5,10 @@
  * frame on top of the stack (OPT-172).
  */
 
-import type { EffectBlock } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
   PendingEvent,
-  EffectStackFrame,
   QueuedTrigger,
 } from "../../../types.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
@@ -55,7 +53,7 @@ export function processRemainingTriggers(
   for (const trigger of turnPlayerTriggers) {
     const result = resolveEffect(
       nextState,
-      trigger.effectBlock as EffectBlock,
+      trigger.effectBlock,
       trigger.sourceCardInstanceId,
       trigger.controller,
       cardDb,
@@ -65,7 +63,7 @@ export function processRemainingTriggers(
     events.push(...result.events);
 
     if (result.pendingPrompt) {
-      const topFrame = peekFrame(nextState) as EffectStackFrame;
+      const topFrame = peekFrame(nextState);
       if (topFrame) {
         nextState = updateTopFrame(nextState, {
           pendingTriggers: nonTurnPlayerTriggers,
@@ -104,7 +102,7 @@ export function processRemainingTriggers(
   for (const trigger of nonTurnPlayerTriggers) {
     const result = resolveEffect(
       nextState,
-      trigger.effectBlock as EffectBlock,
+      trigger.effectBlock,
       trigger.sourceCardInstanceId,
       trigger.controller,
       cardDb,
@@ -114,7 +112,7 @@ export function processRemainingTriggers(
     events.push(...result.events);
 
     if (result.pendingPrompt) {
-      const topFrame = peekFrame(nextState) as EffectStackFrame;
+      const topFrame = peekFrame(nextState);
       if (topFrame) {
         nextState = updateTopFrame(nextState, {
           pendingTriggers: [],

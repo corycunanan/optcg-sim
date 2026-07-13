@@ -7,7 +7,13 @@
  * and finally executes the effect's action chain.
  */
 
-import type { Action, ChoiceCost, Cost, CostResult, EffectBlock, EffectResult, SimpleCost } from "../../effect-types.js";
+import type {
+  ChoiceCost,
+  Cost,
+  CostResult,
+  EffectResult,
+  SimpleCost,
+} from "../../effect-types.js";
 import { isOncePerTurnBlock } from "../../effect-types.js";
 import type {
   CardData,
@@ -15,7 +21,6 @@ import type {
   GameAction,
   PendingEvent,
   EffectStackFrame,
-  QueuedTrigger,
 } from "../../../types.js";
 import { popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
@@ -43,7 +48,7 @@ export function abortReplacedCost(
   frameOnStack = true,
 ): EffectResolverResult {
   let nextState = frameOnStack ? popFrame(state) : state;
-  const block = frame.effectBlock as EffectBlock;
+  const block = frame.effectBlock;
   if (isOncePerTurnBlock(block) && !frame.oncePerTurnMarked) {
     nextState = markOncePerTurnUsed(nextState, block.id, frame.sourceCardInstanceId);
   }
@@ -85,7 +90,7 @@ function finishCostsAndRunActions(
   sourceCardInstanceId: string,
   cardDb: Map<string, CardData>,
 ): EffectResolverResult {
-  const block = topFrame.effectBlock as EffectBlock;
+  const block = topFrame.effectBlock;
   if (isOncePerTurnBlock(block) && !topFrame.oncePerTurnMarked) {
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
   }
@@ -94,9 +99,7 @@ function finishCostsAndRunActions(
   // card that triggered an [On K.O.] effect) separately from cost result
   // references. Recombine both before starting the action chain so paying a
   // selectable cost cannot erase trigger identity.
-  const actionRefs = new Map<string, EffectResult>(
-    topFrame.resultRefs.map(([key, value]) => [key, value as EffectResult]),
-  );
+  const actionRefs = new Map<string, EffectResult>(topFrame.resultRefs);
   for (const [key, value] of costRefs) actionRefs.set(key, value);
   const refsForActions = actionRefs.size > 0 ? actionRefs : undefined;
 
@@ -115,7 +118,7 @@ function finishCostsAndRunActions(
     e.type !== "CARD_TRASHED" ||
     !!(e.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId,
   );
-  let pendingTriggers = topFrame.pendingTriggers as QueuedTrigger[];
+  let pendingTriggers = topFrame.pendingTriggers;
   if (scannable.length > 0) {
     const costScan = scanEventsForTriggers(state, scannable, controller, cardDb);
     state = costScan.state;
@@ -135,7 +138,7 @@ function finishCostsAndRunActions(
   if (topFrame.remainingActions.length > 0) {
     const chainResult = executeActionChain(
       state,
-      topFrame.remainingActions as Action[],
+      topFrame.remainingActions,
       sourceCardInstanceId,
       controller,
       cardDb,
@@ -145,7 +148,7 @@ function finishCostsAndRunActions(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
-      const newTop = peekFrame(state) as EffectStackFrame;
+      const newTop = peekFrame(state);
       if (newTop) {
         state = updateTopFrame(state, { pendingTriggers });
       }
@@ -185,7 +188,7 @@ function resumeAfterBranchPick(
   const events: PendingEvent[] = [];
   let nextState = popFrame(state);
 
-  const block = topFrame.effectBlock as EffectBlock;
+  const block = topFrame.effectBlock;
   const resumeResult = payCostsWithSelection(
     nextState,
     replacedCosts,
@@ -205,7 +208,7 @@ function resumeAfterBranchPick(
   events.push(...resumeResult.events);
 
   if (resumeResult.pendingPrompt) {
-    const newTop = peekFrame(nextState) as EffectStackFrame;
+    const newTop = peekFrame(nextState);
     if (newTop) {
       nextState = updateTopFrame(nextState, {
         costResultRefs: topFrame.costResultRefs,
@@ -234,11 +237,11 @@ export function handleAwaitingCostSelection(
   cardDb: Map<string, CardData>,
 ): EffectResolverResult {
   const { sourceCardInstanceId, controller } = topFrame;
-  const cost = topFrame.costs[topFrame.currentCostIndex] as Cost;
+  const cost = topFrame.costs[topFrame.currentCostIndex];
 
   // Reconstruct accumulated cost refs from the frame
   const accumulatedCostRefs = new Map<string, EffectResult>(
-    (topFrame.costResultRefs ?? []) as [string, EffectResult][],
+    topFrame.costResultRefs
   );
 
   if (action.type === "PLAYER_CHOICE" && action.choiceId === "__PAY_FIXED_COST__") {
@@ -254,9 +257,14 @@ export function handleAwaitingCostSelection(
     const nextCostIndex = topFrame.currentCostIndex + 1;
     if (nextCostIndex < topFrame.costs.length) {
       const remaining = payCostsWithSelection(
-        nextState, topFrame.costs as Cost[], nextCostIndex,
-        controller, cardDb, sourceCardInstanceId, topFrame.effectBlock as EffectBlock,
-        resolverExecutionServices,
+        nextState,
+        topFrame.costs,
+        nextCostIndex,
+        controller,
+        cardDb,
+        sourceCardInstanceId,
+        topFrame.effectBlock,
+        resolverExecutionServices
       );
       if (remaining.cannotPay) {
         return abortReplacedCost(remaining.state, topFrame, [...events, ...remaining.events], cardDb, false);
@@ -283,7 +291,7 @@ export function handleAwaitingCostSelection(
       return { state, events: [], resolved: false };
     }
 
-    const replacedCosts = [...topFrame.costs] as Cost[];
+    const replacedCosts = [...topFrame.costs];
     replacedCosts[topFrame.currentCostIndex] = chosen;
 
     return resumeAfterBranchPick(
@@ -304,7 +312,7 @@ export function handleAwaitingCostSelection(
   if (
     action.type === "PLAYER_CHOICE" &&
     cost.type === "PLACE_FROM_TRASH_TO_DECK" &&
-    (cost as SimpleCost).position === "TOP_OR_BOTTOM"
+    cost.position === "TOP_OR_BOTTOM"
   ) {
     // Only the two emitted ids are valid — a stale/malformed choiceId must
     // leave the prompt unresolved, not default to TOP.
@@ -312,8 +320,8 @@ export function handleAwaitingCostSelection(
       return { state, events: [], resolved: false };
     }
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
-    const replacedCosts = [...topFrame.costs] as Cost[];
-    replacedCosts[topFrame.currentCostIndex] = { ...(cost as SimpleCost), position } as Cost;
+    const replacedCosts = [...topFrame.costs];
+    replacedCosts[topFrame.currentCostIndex] = { ...cost, position };
 
     return resumeAfterBranchPick(
       state,
@@ -335,7 +343,7 @@ export function handleAwaitingCostSelection(
       return { state, events: [], resolved: false };
     }
 
-    const replacedCosts = [...topFrame.costs] as Cost[];
+    const replacedCosts = [...topFrame.costs];
     replacedCosts.splice(topFrame.currentCostIndex, 1, ...branch);
 
     return resumeAfterBranchPick(
@@ -404,7 +412,7 @@ export function handleAwaitingCostSelection(
       return { state, events: [], resolved: false };
     }
 
-    const needsArrange = amount > 1 && !blockShufflesDeck(topFrame.effectBlock as EffectBlock);
+    const needsArrange = amount > 1 && !blockShufflesDeck(topFrame.effectBlock);
     if (needsArrange) {
       nextState = updateTopFrame(nextState, { validTargets: selected, costArrangeStage: true });
       return {
@@ -445,8 +453,11 @@ export function handleAwaitingCostSelection(
     }
 
     const group = [sourceCardInstanceId, ...selected];
-    if (!blockShufflesDeck(topFrame.effectBlock as EffectBlock)) {
-      nextState = updateTopFrame(nextState, { validTargets: group, costArrangeStage: true });
+    if (!blockShufflesDeck(topFrame.effectBlock)) {
+      nextState = updateTopFrame(nextState, {
+        validTargets: group,
+        costArrangeStage: true,
+      });
       return {
         state: nextState,
         events,
@@ -671,7 +682,7 @@ export function handleAwaitingCostSelection(
     return { state, events, resolved: false };
   }
 
-  const block = topFrame.effectBlock as EffectBlock;
+  const block = topFrame.effectBlock;
   const nextCostIndex = topFrame.currentCostIndex + 1;
 
   // OPT-429: this cost is fully paid — retire its frame before paying the
@@ -682,8 +693,14 @@ export function handleAwaitingCostSelection(
 
   if (nextCostIndex < topFrame.costs.length) {
     const remainingCostResult = payCostsWithSelection(
-      nextState, topFrame.costs as Cost[], nextCostIndex, controller, cardDb,
-      sourceCardInstanceId, block, resolverExecutionServices,
+      nextState,
+      topFrame.costs,
+      nextCostIndex,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      block,
+      resolverExecutionServices
     );
 
     if (remainingCostResult.cannotPay) {
@@ -697,10 +714,12 @@ export function handleAwaitingCostSelection(
       // Persist accumulated cost refs and queued triggers into the new frame
       // (mirrors resumeAfterBranchPick — dropping pendingTriggers here would
       // lose triggers queued behind the cost chain).
-      const newTop = peekFrame(nextState) as EffectStackFrame;
+      const newTop = peekFrame(nextState);
       if (newTop) {
         nextState = updateTopFrame(nextState, {
-          costResultRefs: [...accumulatedCostRefs.entries()].map(([k, v]) => [k, v as any]),
+          costResultRefs: [...accumulatedCostRefs.entries()].map(
+            ([key, value]) => [key, value]
+          ),
           pendingTriggers: topFrame.pendingTriggers,
         });
       }

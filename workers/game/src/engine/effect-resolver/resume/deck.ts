@@ -21,6 +21,7 @@ import { shuffleWithEngineContext } from "../../execution-context.js";
 import { executeReturnToDeck } from "../actions/removal.js";
 import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
+import { isPresent } from "../../type-guards.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -44,10 +45,10 @@ function computeArrangeContext(
   const restOfDeck = deck.filter((c) => !removedIds.has(c.instanceId));
   const arrangedCards = ordered
     .map((id) => deck.find((c) => c.instanceId === id))
-    .filter(Boolean) as CardInstance[];
+    .filter(isPresent);
   const keptCards = keptList
     .map((id) => deck.find((c) => c.instanceId === id))
-    .filter(Boolean) as CardInstance[];
+    .filter(isPresent);
   return { restOfDeck, arrangedCards, kept: keptCards[0], keptCards };
 }
 
@@ -191,8 +192,8 @@ export function handleArrangeSearchTrashTheRest(
     return null;
   }
 
-  const sp = (pausedAction.params ?? {}) as Record<string, unknown>;
-  const restDest = (sp.rest_destination as string) ?? "TRASH";
+  const sp = getActionParams(pausedAction, "SEARCH_TRASH_THE_REST");
+  const restDest = sp.rest_destination ?? "TRASH";
 
   const p = state.players[controller];
   const keptId = action.keptCardInstanceId;
@@ -274,7 +275,12 @@ export function handleArrangeSearchAndPlay(
   const shuffleAfter = sap.shuffle_after ?? false;
   const searchFullDeck = sap.search_full_deck ?? false;
   const entryState = sap.entry_state ?? "ACTIVE";
-  const pickLimit = sap.pick?.up_to ?? 1;
+  const pickLimit =
+    sap.pick && "up_to" in sap.pick
+      ? sap.pick.up_to
+      : sap.pick && "exact" in sap.pick
+        ? sap.pick.exact
+        : (validTargets?.length ?? 1);
 
   const p = state.players[controller];
   // Multi-pick ("play up to N"): the client sends keptCardInstanceIds; the
@@ -426,7 +432,7 @@ export function handleArrangeReorderLife(
     type: "LIFE_REORDERED",
     playerIndex: targetController,
     payload: { orderedInstanceIds: ordered },
-  } as unknown as PendingEvent);
+  });
 
   return { ...state, players: newPlayers };
 }
