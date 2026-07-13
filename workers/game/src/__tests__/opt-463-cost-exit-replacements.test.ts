@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
 import type { CardData, CardInstance, Env, GameAction, GameState, PlayerState } from "../types.js";
@@ -78,7 +79,7 @@ describe("OPT-463 — replacements intercept cost-driven field exits", () => {
       actions: [{ type: "DRAW", params: { amount: 1 } }],
     };
     const initial = payCostsWithSelection(
-      state, block.costs!, 0, 0, cardDb, state.players[0].leader.instanceId, block,
+      state, block.costs!, 0, 0, cardDb, state.players[0].leader.instanceId, block, resolverExecutionServices
     );
     expect(initial.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 

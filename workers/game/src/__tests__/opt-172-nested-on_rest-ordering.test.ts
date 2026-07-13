@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-172 commit 4: rule 6-2 — drain ON_REST (CHARACTER_BECOMES_RESTED)
  * triggers between SET_REST frames.
@@ -104,7 +105,7 @@ describe("OPT-172: rule 6-2 ON_REST drain between SET_REST frames", () => {
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      [c1.instanceId, c2.instanceId],
+      [c1.instanceId, c2.instanceId], resolverExecutionServices
     );
 
     // Frame 1 rested; batch paused for trigger drain before frame 2.

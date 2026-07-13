@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-224 — CHARACTER_BECOMES_RESTED fires on every ACTIVE→RESTED transition:
  *   - Attack declaration rests the attacker
@@ -163,7 +164,7 @@ describe("OPT-224: CHARACTER_BECOMES_RESTED event publication audit", () => {
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      [target.instanceId],
+      [target.instanceId], resolverExecutionServices
     );
 
     const stateChangeEvents = result.events.filter((e) => e.type === "CARD_STATE_CHANGED");
@@ -198,7 +199,7 @@ describe("OPT-224: CHARACTER_BECOMES_RESTED event publication audit", () => {
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      [alreadyRested.instanceId],
+      [alreadyRested.instanceId], resolverExecutionServices
     );
 
     const stateChangeEvents = result.events.filter((e) => e.type === "CARD_STATE_CHANGED");
@@ -229,7 +230,7 @@ describe("OPT-224: CHARACTER_BECOMES_RESTED event publication audit", () => {
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      [active.instanceId, rested.instanceId],
+      [active.instanceId, rested.instanceId], resolverExecutionServices
     );
 
     const stateChangeEvents = result.events.filter((e) => e.type === "CARD_STATE_CHANGED");

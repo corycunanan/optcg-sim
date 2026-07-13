@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * Effect-KO replacements — the effect-KO path must scan the general removal
  * replacement events (WOULD_BE_REMOVED_FROM_FIELD / WOULD_LEAVE_FIELD), not
@@ -63,13 +64,13 @@ describe("effect-KO scans removal-from-field replacements", () => {
     };
     const promptResult = executeKO(
       state, action, "opponent-effect-source", 1, cardDb,
-      new Map<string, EffectResult>(), [allyInst.instanceId],
+      new Map<string, EffectResult>(), [allyInst.instanceId], resolverExecutionServices
     );
 
     // Marco's replacement is optional — the owner must be prompted.
     expect(promptResult.pendingPrompt).toBeDefined();
     const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb);
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
 
     // Accepting: Marco is K.O.'d instead; the ally stays on the field.
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
@@ -97,11 +98,11 @@ describe("effect-KO scans removal-from-field replacements", () => {
     };
     const promptResult = executeKO(
       state, action, "opponent-effect-source", 1, cardDb,
-      new Map<string, EffectResult>(), [allyInst.instanceId],
+      new Map<string, EffectResult>(), [allyInst.instanceId], resolverExecutionServices
     );
     expect(promptResult.pendingPrompt).toBeDefined();
     const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb);
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb, resolverExecutionServices);
 
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
     expect(remainingIds).toEqual([marcoInst.instanceId]);

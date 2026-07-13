@@ -14,6 +14,7 @@ import type {
   EffectResult,
 } from "../effect-types.js";
 import type { CardData } from "../../types.js";
+import type { EffectResolverServices } from "./services.js";
 
 export interface EffectResolverResult {
   state: GameState;
@@ -49,7 +50,8 @@ export type ActionHandler = (
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ) => ActionResult;
 
 export interface CostPaymentResult {

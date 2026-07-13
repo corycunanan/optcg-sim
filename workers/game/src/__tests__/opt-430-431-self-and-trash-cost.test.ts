@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-431 / OPT-430 — OP10-026/027's compound cost "place this Character and
  * 1 [Kin'emon] from your trash at the bottom of your deck in any order".
@@ -148,7 +149,7 @@ function block(): EffectBlock {
 describe("OPT-431: the self half is fixed to the source card", () => {
   it("selection offers only matching trash cards — never field characters", () => {
     const { state, cardDb } = setup(2);
-    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block());
+    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block(), resolverExecutionServices);
 
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     const options = pay.pendingPrompt!.options;
@@ -164,7 +165,7 @@ describe("OPT-431: the self half is fixed to the source card", () => {
       .find((c) => c !== null && c.instanceId !== SOURCE_ID)!.instanceId;
 
     // Single candidate → selection skipped, straight to the arrange stage.
-    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block());
+    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block(), resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
 
     const done = resumeFromStack(
@@ -197,7 +198,7 @@ describe("OPT-431: the self half is fixed to the source card", () => {
 
   it("a stale selection naming the source or a non-candidate is rejected", () => {
     const { state, cardDb } = setup(2);
-    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block());
+    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block(), resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const rejected = resumeFromStack(
@@ -225,7 +226,7 @@ describe("OPT-431: the self half is fixed to the source card", () => {
 
 describe("OPT-430: the self+trash group is ordered in one arrange prompt", () => {
   function reachArrange(cardDb: Map<string, CardData>, state: GameState) {
-    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block());
+    const pay = payCostsWithSelection(state, [COST], 0, 0, cardDb, SOURCE_ID, block(), resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     const afterSelect = resumeFromStack(
       pay.state,

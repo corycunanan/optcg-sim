@@ -138,6 +138,7 @@ import { validateGameInitPayload, validateClientMessage, validateNotifyEndPayloa
 import { buildGameResultCallbackPayload } from "./util/result.js";
 import { isStartOfTurnAutoPhase } from "./engine/phases.js";
 import { resumeEffectChain, resumeFromStack } from "./engine/effect-resolver/index.js";
+import { resolverExecutionServices } from "./engine/effect-resolver/resolver.js";
 import { abortReplacedCost } from "./engine/effect-resolver/resume/cost.js";
 import { recalculateBattlePowers, resumeBattleDamageContinuation } from "./engine/battle.js";
 import { isEffectConditionMet } from "./engine/modifiers.js";
@@ -986,6 +987,7 @@ export class GameSession implements DurableObject {
         resumeCtx as unknown as ReplacementResumeContext,
         accepted,
         this.cardDb,
+        resolverExecutionServices,
       );
       this.gameState = replacementResult.state;
       const costFrame = this.gameState.effectStack.at(-1) as unknown as EffectStackFrame | undefined;
@@ -1023,6 +1025,7 @@ export class GameSession implements DurableObject {
         resumeCtx as unknown as ReplacementBatchResumeContext,
         accepted,
         this.cardDb,
+        resolverExecutionServices,
       );
       this.gameState = batchResult.state;
 
@@ -1265,6 +1268,7 @@ export class GameSession implements DurableObject {
       this.gameState,
       frame.replacementBatchContinuation,
       this.cardDb,
+      resolverExecutionServices,
     );
     this.gameState = batchResult.state;
     if (batchResult.pendingPrompt) {

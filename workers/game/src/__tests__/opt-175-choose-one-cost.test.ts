@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-175 — CHOOSE_ONE_COST primitive tests
  *
@@ -98,7 +99,7 @@ describe("OPT-175: CHOOSE_ONE_COST", () => {
     expect(state.players[0].hand.length).toBeGreaterThan(0);
 
     const block = makeBlock([imuChoiceCost()]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, charId, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, charId, block, resolverExecutionServices);
 
     expect(result.pendingPrompt).toBeTruthy();
     const prompt = result.pendingPrompt!;
@@ -118,7 +119,7 @@ describe("OPT-175: CHOOSE_ONE_COST", () => {
     expect(state.players[0].characters.filter(Boolean).every((c) => c!.cardId !== CELESTIAL_CARD_ID)).toBe(true);
 
     const block = makeBlock([imuChoiceCost()]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
 
     // Should fall through to the TRASH_FROM_HAND selection prompt directly.
     expect(result.pendingPrompt).toBeTruthy();
@@ -134,7 +135,7 @@ describe("OPT-175: CHOOSE_ONE_COST", () => {
     const state = { ...base, players: newPlayers };
 
     const block = makeBlock([imuChoiceCost()]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
 
     expect(result.cannotPay).toBe(true);
     expect(result.pendingPrompt).toBeUndefined();
@@ -147,7 +148,7 @@ describe("OPT-175: CHOOSE_ONE_COST", () => {
     const { state, charId } = placeCelestialChar(base);
 
     const block = makeBlock([imuChoiceCost()]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, charId, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, charId, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     // Choose option "0" (trash Celestial Dragons character).
@@ -172,7 +173,7 @@ describe("OPT-175: CHOOSE_ONE_COST", () => {
     const { state, charId } = placeCelestialChar(base);
 
     const block = makeBlock([imuChoiceCost()]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, charId, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, charId, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     // Pick the hand branch.

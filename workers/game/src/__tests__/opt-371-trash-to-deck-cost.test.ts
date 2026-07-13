@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-371 — PLACE_FROM_TRASH_TO_DECK cost: player selection + "in any order"
  * arrangement.
@@ -69,7 +70,7 @@ describe("OPT-371: PLACE_FROM_TRASH_TO_DECK selection", () => {
     ]);
 
     const block = makeBlock([cost(2)]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(result.cannotPay).toBeFalsy();
     expect(result.pendingPrompt).toBeTruthy();
@@ -95,7 +96,7 @@ describe("OPT-371: PLACE_FROM_TRASH_TO_DECK selection", () => {
 
     // Filter to the VANILLA card's name — only trash-a / trash-c qualify.
     const block = makeBlock([cost(2, { filter: { name: CARDS.VANILLA.name } })]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(result.cannotPay).toBeFalsy();
     // Exactly amount candidates remain → no selection, straight to arrange.
@@ -112,7 +113,7 @@ describe("OPT-371: PLACE_FROM_TRASH_TO_DECK selection", () => {
     const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);
 
     const block = makeBlock([cost(2)]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(result.cannotPay).toBe(true);
   });
 });
@@ -129,7 +130,7 @@ describe("OPT-371: selection → arrange chaining", () => {
     const handBefore = state.players[0].hand.length;
 
     const block = makeBlock([cost(2)]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     // Player picks c and a (not b).
@@ -178,7 +179,7 @@ describe("OPT-371: selection → arrange chaining", () => {
     ]);
 
     const block = makeBlock([cost(2)]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(result.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
 
@@ -207,7 +208,7 @@ describe("OPT-371: selection → arrange chaining", () => {
     ]);
 
     const block = makeBlock([cost(2)]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(result.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
 
     // Response contains a bogus id and omits trash-a — the omitted card is
@@ -239,7 +240,7 @@ describe("OPT-371: arrange-skip cases", () => {
     ]);
 
     const block = makeBlock([cost(1)]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const done = resumeFromStack(
@@ -258,7 +259,7 @@ describe("OPT-371: arrange-skip cases", () => {
     const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);
 
     const block = makeBlock([cost(1)]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.cannotPay).toBeFalsy();
@@ -277,7 +278,7 @@ describe("OPT-371: arrange-skip cases", () => {
     ]);
 
     const block = makeBlock([cost(3)], { shuffleAfter: true });
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.cannotPay).toBeFalsy();
@@ -293,7 +294,7 @@ describe("OPT-371: arrange-skip cases", () => {
     ]);
 
     const block = makeBlock([cost(2)], { shuffleAfter: true });
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const done = resumeFromStack(
@@ -318,7 +319,7 @@ describe("OPT-371: malformed / out-of-order responses (Codex review)", () => {
     ]);
 
     const block = makeBlock([cost(2)]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     // A premature arrange packet must NOT pay the cost with all 4 candidates.
@@ -345,7 +346,7 @@ describe("OPT-371: malformed / out-of-order responses (Codex review)", () => {
     ]);
 
     const block = makeBlock([cost(2)]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const result = resumeFromStack(
@@ -366,7 +367,7 @@ describe("OPT-371: malformed / out-of-order responses (Codex review)", () => {
     ]);
 
     const block = makeBlock([cost(2)]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     const afterSelect = resumeFromStack(
       first.state,
       { type: "SELECT_TARGET", selectedInstanceIds: ["trash-a", "trash-b"] },
@@ -415,7 +416,7 @@ describe("OPT-371: OP05-082 Shirahoshi cost shape (REST_SELF + place 2, integrat
       cost(2, { position: "BOTTOM" }),
     ]);
 
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     // REST_SELF auto-paid — the source is already rested when selection opens.
     const sourceAfterRest = first.state.players[0].characters.find(
       (c) => c?.instanceId === SOURCE_CHAR_ID,

@@ -22,7 +22,7 @@ The audit nevertheless confirms two immediate correctness/security defects and s
 7. Trigger/resume processing mutates event objects held inside immutable game snapshots.
 8. Zone-transition identity rules are only partially centralized.
 
-The remaining findings concern deferred playable cards, deterministic replay, type safety, unbounded persistence growth, documentation drift, and concentration of responsibilities in `cost-handler.ts` and `GameSession.ts`.
+The remaining findings concern deferred playable cards, deterministic replay, type safety, unbounded persistence growth, documentation drift, and concentration of responsibilities in `GameSession.ts`. OPT-478 replaced resolver module-global dispatch and decomposed cost handling behind stable contracts.
 
 ## Verification Method
 
@@ -180,14 +180,14 @@ The remaining work is a zone-pair identity matrix and one transition service tha
 ### GE-11 — Modularity has correctness-sensitive pressure points
 
 **Severity:** Medium
-**Status:** Confirmed
+**Status:** Partially resolved — OPT-478 complete; OPT-479 remains
 **Linear:** [OPT-478](https://linear.app/optcg-sim/issue/OPT-478/replace-resolver-module-global-dispatch-and-decompose-the-1831-line) and [OPT-479](https://linear.app/optcg-sim/issue/OPT-479/decompose-gamesession-transport-authorization-orchestration-visibility)
 
-- `cost-handler.ts` is 1,831 lines and mixes payability, target selection, prompting, payment mutation, replacement handling, and resume preparation.
-- Resolver/replacement integration uses module-global callback injection; the null fallback can skip a replacement action.
+- OPT-478 reduced `cost-handler.ts` to a stable façade and split payability, target selection, prompting, payment mutation, and resume preparation into six acyclic modules guarded by architecture tests.
+- Resolver/replacement integration now requires an immutable, typed runtime service bundle; replacement execution has no nullable dispatcher or terminal fallback.
 - `GameSession.ts` is 1,774 lines and combines transport, authorization, rate limits, prompt orchestration, engine lifecycle, visibility, undo, persistence, and reconnect/timeout behavior.
 
-This is not evidence that the current behavior is broken, and GameSession's defensive controls are a strength. It is evidence that future correctness changes have a large blast radius. The deterministic execution context provides a natural dependency boundary for the decomposition.
+GameSession's defensive controls remain a strength, but its concentration still gives future correctness changes a large blast radius. OPT-479 owns that remaining decomposition. Persisted deterministic data stays in `GameState.executionContext`; executable dependencies remain outside state in resolver services.
 
 ### GE-12 — Runtime type boundaries are weak in critical paths
 

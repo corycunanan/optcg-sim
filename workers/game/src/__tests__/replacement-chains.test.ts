@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-160: replacement-chain coverage gaps.
  *
@@ -24,7 +25,6 @@ import {
   type ReplacementBatchResumeContext,
 } from "../engine/replacements.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
-import "../engine/effect-resolver/resolver.js"; // installs replacement dispatcher
 import type { Action, EffectResult, EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import { createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
@@ -151,7 +151,7 @@ describe("multiple replacement effects on the same KO batch", () => {
     };
     const result = executeKO(
       state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(),
-      [ids.aa, ids.ab],
+      [ids.aa, ids.ab], resolverExecutionServices
     );
 
     // Both replacements are non-optional → no prompt.
@@ -195,7 +195,7 @@ describe("multiple replacement effects on the same KO batch", () => {
     // First prompt: effect A asking about ally A.
     const first = executeKO(
       optState, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(),
-      [ids.aa, ids.ab],
+      [ids.aa, ids.ab], resolverExecutionServices
     );
     expect(first.pendingPrompt).toBeDefined();
     const ctx1 = first.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
@@ -205,7 +205,7 @@ describe("multiple replacement effects on the same KO batch", () => {
     expect(ctx1.pendingMatches[1].matchedTargetIds).toEqual([ids.ab]);
 
     // Accept A.
-    const afterAccept = resumeReplacementBatch(first.state, ctx1, true, cardDb);
+    const afterAccept = resumeReplacementBatch(first.state, ctx1, true, cardDb, resolverExecutionServices);
     expect(afterAccept.pendingPrompt).toBeDefined();
     const ctx2 = afterAccept.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
     expect(ctx2.currentMatchIndex).toBe(1);
@@ -213,7 +213,7 @@ describe("multiple replacement effects on the same KO batch", () => {
     expect(ctx2.protectedIds).toContain(ids.aa);
 
     // Decline B.
-    const final = resumeReplacementBatch(afterAccept.state, ctx2, false, cardDb);
+    const final = resumeReplacementBatch(afterAccept.state, ctx2, false, cardDb, resolverExecutionServices);
     expect(final.pendingPrompt).toBeUndefined();
 
     // Ally A survived (guardian A trashed); ally B was KO'd (guardian B still on field).
@@ -303,7 +303,7 @@ describe("replacement suppresses the triggered event", () => {
     };
     const result = executeKO(
       state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(),
-      [ivanInst.instanceId],
+      [ivanInst.instanceId], resolverExecutionServices
     );
 
     expect(result.pendingPrompt).toBeUndefined();

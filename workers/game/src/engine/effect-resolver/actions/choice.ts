@@ -8,44 +8,7 @@ import type { ActionResult } from "../types.js";
 import { describeActionBranch, resolveAmount } from "../action-utils.js";
 import { getActionParams } from "../../effect-types.js";
 import { findCardInstance } from "../../state.js";
-
-// These are set by the resolver module to break the circular dependency
-let _executeActionChain: (
-  state: GameState,
-  actions: Action[],
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  initialResultRefs?: Map<string, EffectResult>,
-) => { state: GameState; events: PendingEvent[]; pendingPrompt?: import("../../../types.js").PendingPromptState };
-
-let _executeEffectAction: (
-  state: GameState,
-  action: Action,
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
-) => ActionResult;
-
-let _resolveEffect: (
-  state: GameState,
-  block: import("../../effect-types.js").EffectBlock,
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-) => import("../types.js").EffectResolverResult;
-
-export function setChoiceDependencies(deps: {
-  executeActionChain: typeof _executeActionChain;
-  executeEffectAction: typeof _executeEffectAction;
-  resolveEffect: typeof _resolveEffect;
-}) {
-  _executeActionChain = deps.executeActionChain;
-  _executeEffectAction = deps.executeEffectAction;
-  _resolveEffect = deps.resolveEffect;
-}
+import type { EffectResolverServices } from "../services.js";
 
 export function executePlayerChoice(
   state: GameState,
@@ -54,6 +17,8 @@ export function executePlayerChoice(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  _preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -67,7 +32,7 @@ export function executePlayerChoice(
 
   // If only one option, auto-select it (no prompt needed)
   if (options.length === 1) {
-    const result = _executeActionChain(state, options[0], sourceCardInstanceId, controller, cardDb);
+    const result = services.executeActionChain(state, options[0], sourceCardInstanceId, controller, cardDb);
     return {
       state: result.state,
       events: [...events, ...result.events],
@@ -206,6 +171,8 @@ export function executeOpponentAction(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  _preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -213,7 +180,7 @@ export function executeOpponentAction(
   if (!wrappedAction) return { state, events, succeeded: false };
 
   const oppController = controller === 0 ? 1 : 0;
-  const result = _executeEffectAction(
+  const result = services.executeEffectAction(
     state,
     wrappedAction,
     sourceCardInstanceId,
@@ -232,6 +199,8 @@ export function executeReuseEffect(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
+  _preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -267,7 +236,7 @@ export function executeReuseEffect(
     if (restriction === "OPPONENT_TURN" && isOwnersTurn) return { state, events, succeeded: false };
   }
 
-  const resolveResult = _resolveEffect(state, targetBlock, sourceCardInstanceId, controller, cardDb);
+  const resolveResult = services.resolveEffect(state, targetBlock, sourceCardInstanceId, controller, cardDb);
   return {
     state: resolveResult.state,
     events: [...events, ...resolveResult.events],

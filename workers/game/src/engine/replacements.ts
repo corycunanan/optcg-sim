@@ -17,7 +17,6 @@
 import type {
   Action,
   CauseFilter,
-  EffectResult,
   RuntimeActiveEffect,
   Target,
   TargetFilter,
@@ -34,31 +33,7 @@ import { findCardInstance } from "./state.js";
 import { matchesFilter } from "./conditions.js";
 import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
-import { terminateForEngineContract } from "./engine-limits.js";
-
-// ─── Dispatcher injection ────────────────────────────────────────────────────
-//
-// Replacement substitutes reuse the real action handlers (SET_REST, TRASH_CARD,
-// MODIFY_POWER, etc). Importing resolver directly would create a cycle
-// (resolver → removal → replacements → resolver), so the resolver installs
-// its dispatcher here at module init via setReplacementDispatcher.
-
-type ActionChainDispatcher = (
-  state: GameState,
-  actions: Action[],
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  initialResultRefs?: Map<string, EffectResult>,
-) => { state: GameState; events: PendingEvent[]; pendingPrompt?: PendingPromptState };
-
-let executeActionChainDispatcher: ActionChainDispatcher | null = null;
-
-export function setReplacementDispatcher(
-  chainDispatcher: ActionChainDispatcher,
-): void {
-  executeActionChainDispatcher = chainDispatcher;
-}
+import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -135,6 +110,7 @@ export function checkReplacementForKO(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
   return checkReplacementForEvent(
     state,
@@ -143,6 +119,7 @@ export function checkReplacementForKO(
     cause,
     causingController,
     cardDb,
+    services,
   );
 }
 
@@ -156,6 +133,7 @@ export function checkReplacementForRemoval(
   targetInstanceId: string,
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
   // Check both specific WOULD_BE_REMOVED_FROM_FIELD and general WOULD_LEAVE_FIELD
   const result = checkReplacementForEvent(
@@ -165,6 +143,7 @@ export function checkReplacementForRemoval(
     "effect",
     causingController,
     cardDb,
+    services,
   );
   if (result.replaced || result.pendingPrompt) return result;
 
@@ -175,6 +154,7 @@ export function checkReplacementForRemoval(
     "effect",
     causingController,
     cardDb,
+    services,
   );
 }
 
@@ -221,6 +201,7 @@ function checkReplacementForEvent(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
   const effects = state.activeEffects as RuntimeActiveEffect[];
 
@@ -258,7 +239,7 @@ function checkReplacementForEvent(
     }
 
     // Non-optional: apply immediately
-    return applyReplacement(state, effect, params, targetInstanceId, cardDb);
+    return applyReplacement(state, effect, params, targetInstanceId, cardDb, services);
   }
 
   return { replaced: false, state, events: [] };
@@ -333,6 +314,7 @@ export function applyBatchReplacement(
   state: GameState,
   effectId: string,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
   const effects = state.activeEffects as RuntimeActiveEffect[];
   const effect = effects.find((e) => e.id === effectId);
@@ -340,7 +322,7 @@ export function applyBatchReplacement(
   const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
   const params = mod?.params as unknown as ReplacementParams;
   if (!params) return { replaced: false, state, events: [] };
-  return applyReplacement(state, effect, params, "", cardDb);
+  return applyReplacement(state, effect, params, "", cardDb, services);
 }
 
 /**
@@ -542,6 +524,7 @@ function applyReplacement(
   params: ReplacementParams,
   _targetInstanceId: string,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
   const events: PendingEvent[] = [];
   let nextState = state;
@@ -556,17 +539,7 @@ function applyReplacement(
   // prompt gets its own stack frame and later substitute actions are retained.
   // sourceCardInstanceId = the replacement's source (e.g. Tashigi), so that
   // target: { type: "SELF" } resolves to her, not the event's original target.
-  if (!executeActionChainDispatcher) {
-    nextState = terminateForEngineContract(nextState, {
-      kind: "ENGINE_CONTRACT",
-      contract: "REPLACEMENT_DISPATCH",
-      sourceCardInstanceId: effect.sourceCardInstanceId,
-      message: "Replacement action-chain dispatcher was not initialized",
-    });
-    return { replaced: true, state: nextState, events };
-  }
-
-  const result = executeActionChainDispatcher(
+  const result = services.executeActionChain(
     nextState,
     params.replacement_actions,
     effect.sourceCardInstanceId,
@@ -665,6 +638,7 @@ export function resumeReplacement(
   ctx: ReplacementResumeContext,
   accepted: boolean,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
   if (!accepted) {
     return { replaced: false, state, events: [] };
@@ -682,7 +656,7 @@ export function resumeReplacement(
     return { replaced: false, state, events: [] };
   }
 
-  return applyReplacement(state, effect, params, ctx.targetInstanceId, cardDb);
+  return applyReplacement(state, effect, params, ctx.targetInstanceId, cardDb, services);
 }
 
 // ─── Batch Resume (OPT-219) ──────────────────────────────────────────────────
@@ -740,6 +714,7 @@ function stepBatch(
   ctx: ReplacementBatchResumeContext,
   startMatchIndex: number,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): BatchResumeResult {
   let nextState = state;
   const events: PendingEvent[] = [];
@@ -774,7 +749,7 @@ function stepBatch(
     }
 
     // Non-optional: apply once, mark covered targets as protected.
-    const applied = applyBatchReplacement(nextState, match.effectId, cardDb);
+    const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services);
     nextState = applied.state;
     events.push(...applied.events);
     applicable.forEach((id) => protectedIds.add(id));
@@ -833,6 +808,7 @@ export function processBatchReplacements(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
   returnToDeckPosition?: "TOP" | "BOTTOM",
 ): BatchResumeResult {
   // Multiple events: scan each in order (specific first, e.g. WOULD_BE_KO
@@ -853,7 +829,7 @@ export function processBatchReplacements(
     causingController,
     returnToDeckPosition,
   };
-  return stepBatch(state, ctx, 0, cardDb);
+  return stepBatch(state, ctx, 0, cardDb, services);
 }
 
 /**
@@ -875,6 +851,7 @@ export function resumeReplacementBatch(
   ctx: ReplacementBatchResumeContext,
   accepted: boolean,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): BatchResumeResult {
   let nextState = state;
   const events: PendingEvent[] = [];
@@ -883,7 +860,7 @@ export function resumeReplacementBatch(
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
   if (accepted && currentMatch) {
     const applicable = currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id));
-    const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb);
+    const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb, services);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {
@@ -914,6 +891,7 @@ export function resumeReplacementBatch(
     ctx.currentMatchIndex + 1,
     events,
     cardDb,
+    services,
   );
 }
 
@@ -922,6 +900,7 @@ export function continueReplacementBatchAfterSubstitute(
   state: GameState,
   ctx: ReplacementBatchResumeContext,
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): BatchResumeResult {
   const protectedIds = new Set(ctx.protectedIds);
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
@@ -938,6 +917,7 @@ export function continueReplacementBatchAfterSubstitute(
     ctx.currentMatchIndex + 1,
     [],
     cardDb,
+    services,
   );
 }
 
@@ -947,8 +927,9 @@ function finishReplacementBatch(
   startMatchIndex: number,
   priorEvents: PendingEvent[],
   cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
 ): BatchResumeResult {
-  const rest = stepBatch(state, ctx, startMatchIndex, cardDb);
+  const rest = stepBatch(state, ctx, startMatchIndex, cardDb, services);
   let resumeState = rest.state;
   const resumeEvents = [...priorEvents, ...rest.events];
 

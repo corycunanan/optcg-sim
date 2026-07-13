@@ -19,7 +19,7 @@ import { getEffectiveCounterValue } from "./counter-value.js";
 import { expireBattleEffects } from "./duration-tracker.js";
 import { hasTrigger, hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
-import { resolveEffect } from "./effect-resolver/index.js";
+import { resolveEffect, resolverExecutionServices } from "./effect-resolver/index.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
@@ -1061,7 +1061,14 @@ function executeDamageStep(
         events.push({ type: "COMBAT_VICTORY", playerIndex: pi, payload: { cardInstanceId: battle.attackerInstanceId, targetInstanceId } });
 
         // Check for replacement effects before KO
-        const replacement = checkReplacementForKO(nextState, targetInstanceId, "battle", pi as 0 | 1, cardDb);
+        const replacement = checkReplacementForKO(
+          nextState,
+          targetInstanceId,
+          "battle",
+          pi as 0 | 1,
+          cardDb,
+          resolverExecutionServices,
+        );
         if (replacement.pendingPrompt) {
           events.push(...replacement.events);
           return { state: replacement.state, events, damagedPlayerIndex, pendingPrompt: replacement.pendingPrompt };

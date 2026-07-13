@@ -30,7 +30,7 @@ runPipeline() [pipeline.ts]
   │       └─ processTriggerQueuePipeline() [LIFO queue]
   │           └─ resolveEffect() [resolver.ts]
   │               ├─ evaluateCondition() [conditions.ts]
-  │               ├─ payCostsWithSelection() [cost-handler.ts]
+  │               ├─ payCostsWithSelection() [cost-handler.ts → cost/orchestrator.ts]
   │               └─ executeActionChain() [resolver.ts]
   │                   └─ ACTION_HANDLERS[action.type]() [actions/*.ts]
   │                       ├─ computeAllValidTargets() [target-resolver.ts]
@@ -59,7 +59,9 @@ runPipeline() [pipeline.ts]
 | `engine/prohibitions.ts` | Prohibition registry scanning | ~3 KB |
 | `engine/effect-resolver/resolver.ts` | Effect resolution, action chain executor | ~12 KB |
 | `engine/effect-resolver/target-resolver.ts` | Target computation, selection prompts | ~12 KB |
-| `engine/effect-resolver/cost-handler.ts` | Cost validation, payment, selection prompts | ~27 KB |
+| `engine/effect-resolver/cost-handler.ts` | Stable façade for cost APIs | <1 KB |
+| `engine/effect-resolver/cost/*.ts` | Acyclic cost payability, target, prompt, payment, resume, and orchestration modules | ~27 KB total |
+| `engine/effect-resolver/services.ts` | Typed, non-serialized resolver execution dependencies | ~2 KB |
 | `engine/effect-resolver/actions/*.ts` | 50+ action handlers (draw, modifiers, removal, life, DON, play, etc.) | — |
 | `engine/effect-resolver/modifier-layer.ts` | Power/cost/keyword recalculation | ~5 KB |
 | `engine/effect-resolver/duration-tracker.ts` | Effect expiry (turn, battle, while-condition) | ~5 KB |

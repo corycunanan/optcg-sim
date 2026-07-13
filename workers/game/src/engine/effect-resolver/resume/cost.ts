@@ -28,7 +28,7 @@ import {
   buildTrashToDeckArrangePrompt,
 } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
-import { executeActionChain, postCostConditionsMet } from "../resolver.js";
+import { executeActionChain, postCostConditionsMet, resolverExecutionServices } from "../resolver.js";
 import type { EffectResolverResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
@@ -194,6 +194,7 @@ function resumeAfterBranchPick(
     cardDb,
     sourceCardInstanceId,
     block,
+    resolverExecutionServices,
   );
 
   if (resumeResult.cannotPay) {
@@ -255,6 +256,7 @@ export function handleAwaitingCostSelection(
       const remaining = payCostsWithSelection(
         nextState, topFrame.costs as Cost[], nextCostIndex,
         controller, cardDb, sourceCardInstanceId, topFrame.effectBlock as EffectBlock,
+        resolverExecutionServices,
       );
       if (remaining.cannotPay) {
         return abortReplacedCost(remaining.state, topFrame, [...events, ...remaining.events], cardDb, false);
@@ -457,7 +459,13 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
-      const replacement = checkReplacementForRemoval(nextState, sourceCardInstanceId, controller, cardDb);
+      const replacement = checkReplacementForRemoval(
+        nextState,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resolverExecutionServices,
+      );
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
@@ -496,7 +504,13 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
-      const replacement = checkReplacementForRemoval(nextState, sourceCardInstanceId, controller, cardDb);
+      const replacement = checkReplacementForRemoval(
+        nextState,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resolverExecutionServices,
+      );
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
@@ -575,12 +589,18 @@ export function handleAwaitingCostSelection(
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.
       let replacement = cost.type === "KO_OWN_CHARACTER"
-        ? checkReplacementForKO(nextState, selected[0], "effect", controller, cardDb)
-        : checkReplacementForRemoval(nextState, selected[0], controller, cardDb);
+        ? checkReplacementForKO(nextState, selected[0], "effect", controller, cardDb, resolverExecutionServices)
+        : checkReplacementForRemoval(nextState, selected[0], controller, cardDb, resolverExecutionServices);
       // K.O. is also a general removal/leave-field event. Only advance to
       // that family when a K.O.-specific replacement did not intercept.
       if (cost.type === "KO_OWN_CHARACTER" && !replacement.replaced && !replacement.pendingPrompt) {
-        replacement = checkReplacementForRemoval(nextState, selected[0], controller, cardDb);
+        replacement = checkReplacementForRemoval(
+          nextState,
+          selected[0],
+          controller,
+          cardDb,
+          resolverExecutionServices,
+        );
       }
       events.push(...replacement.events);
       nextState = replacement.state;
@@ -663,7 +683,7 @@ export function handleAwaitingCostSelection(
   if (nextCostIndex < topFrame.costs.length) {
     const remainingCostResult = payCostsWithSelection(
       nextState, topFrame.costs as Cost[], nextCostIndex, controller, cardDb,
-      sourceCardInstanceId, block,
+      sourceCardInstanceId, block, resolverExecutionServices,
     );
 
     if (remainingCostResult.cannotPay) {
