@@ -14,6 +14,7 @@ import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js
 import { OP05_079_VIOLA } from "../engine/schemas/op05.js";
 import { findCardInstance } from "../engine/state.js";
 import { filterEventForPlayer } from "../engine/visibility.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 type ReturnSource = "CHARACTER" | "STAGE" | "HAND" | "TRASH" | "LIFE";
@@ -423,5 +424,121 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
     expect(result.state.players[0].trash).toEqual([]);
     expect(result.state.players[0].deck).toEqual(state.players[0].deck);
     expect(result.events.some((event) => event.type === "CARD_RETURNED_TO_DECK")).toBe(false);
+  });
+
+  it("preserves a non-optional replacement batch while its Trash return is arranged", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const protectedTarget = base.players[1].characters.find((card) => card !== null)!;
+    const trash = [CARDS.VANILLA, CARDS.RUSH, CARDS.BLOCKER].map((card, index): CardInstance => ({
+      instanceId: `replacement-trash-${index}`,
+      cardId: card.id,
+      zone: "TRASH",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 1,
+      owner: 1,
+    }));
+    const replacement: RuntimeActiveEffect = {
+      id: "return-trash-instead-of-ko",
+      sourceCardInstanceId: protectedTarget.instanceId,
+      sourceEffectBlockId: "return-trash-instead-of-ko-block",
+      category: "replacement",
+      modifiers: [{
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "ANY" },
+          target_filter: null,
+          replacement_actions: [{
+            type: "RETURN_TO_DECK",
+            target: {
+              type: "CARD_IN_TRASH",
+              controller: "SELF",
+              count: { exact: 3 },
+            },
+            params: { position: "BOTTOM" },
+          }],
+          optional: false,
+          once_per_turn: false,
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [protectedTarget.instanceId],
+      timestamp: 1,
+    };
+    const state: GameState = {
+      ...base,
+      players: [
+        base.players[0],
+        {
+          ...base.players[1],
+          characters: padChars([protectedTarget]),
+          trash,
+        },
+      ],
+      activeEffects: [replacement],
+    };
+    const block: EffectBlock = {
+      id: "ko-then-draw-after-replacement",
+      category: "auto",
+      actions: [
+        {
+          type: "KO",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+        },
+        { type: "DRAW", params: { amount: 1 } },
+      ],
+    };
+    const deckBefore = state.players[1].deck.length;
+    const handBefore = state.players[0].hand.length;
+
+    const first = resolveEffect(
+      state,
+      block,
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+
+    expect(first.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    expect(first.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(first.state.effectStack).toHaveLength(2);
+    expect(first.state.effectStack.at(-1)?.replacementBatchContinuation).toBeDefined();
+    expect(findCardInstance(first.state, protectedTarget.instanceId)?.zone).toBe("CHARACTER");
+    expect(first.state.players[1].trash).toEqual(trash);
+
+    const arranged = [trash[1], trash[2], trash[0]];
+    const resumed = resumePromptLifecycle(
+      { ...first.state, pendingPrompt: first.pendingPrompt! },
+      {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: "",
+        orderedInstanceIds: arranged.map((card) => card.instanceId),
+        destination: "top",
+      },
+      cardDb,
+      {
+        drainPregame: (nextState) => nextState,
+        advanceStartOfTurn: (nextState) => nextState,
+      },
+    );
+
+    expect(resumed.responseRejected).toBe(false);
+    expect(resumed.state.pendingPrompt).toBeNull();
+    expect(resumed.state.effectStack).toHaveLength(0);
+    expect(findCardInstance(resumed.state, protectedTarget.instanceId)?.zone).toBe("CHARACTER");
+    expect(resumed.state.players[1].trash).toHaveLength(0);
+    expect(resumed.state.players[1].deck).toHaveLength(deckBefore + 3);
+    expect(resumed.state.players[1].deck.slice(-3).map((card) => card.cardId)).toEqual(
+      arranged.map((card) => card.cardId),
+    );
+    expect(resumed.state.players[0].hand).toHaveLength(handBefore + 1);
+    expect(resumed.state.eventLog.some(
+      (event) => event.type === "CARD_KO" && event.payload.cardInstanceId === protectedTarget.instanceId,
+    )).toBe(false);
   });
 });
