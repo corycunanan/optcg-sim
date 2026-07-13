@@ -172,6 +172,7 @@ describe("OPT-350 DISCONNECTED broadcast debounce", () => {
         priorityDeciderIndex: 0,
         firstPlayerIndex: null,
         mulliganDecisions: [null, null],
+        startOfGameEffectsResolved: [false, false],
       },
       pendingPrompt: {
         options: {

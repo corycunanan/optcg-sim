@@ -165,16 +165,14 @@ APPLY_ONE_TIME_MODIFIER with MODIFY_COST + name/costMin filter encoded in `op12.
 
 ---
 
-## OP13 Deferred Cards (1 remaining)
+## OP13 Deferred Cards (0 remaining)
 
-### OP13-079 Imu (Start-of-game effect only)
+### ~~OP13-079 Imu (Start-of-game effect only)~~ — ENCODED
 **Tags:** `FULL_DECK_SEARCH_AND_PLAY`
 
 > Under the rules of this game ... at the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck.
 
-**Schema:** START_OF_GAME_EFFECT rule_modification with SEARCH_AND_PLAY encoded in `op13.ts`. Stage support added to resume handler.
-
-**Remaining blocker:** Engine setup (`setup.ts`) does not yet process `START_OF_GAME_EFFECT` rule modifications during game initialization. Needs game session integration to fire actions before first turn.
+**Schema:** `START_OF_GAME_EFFECT` rule modification with `SEARCH_AND_PLAY` encoded in `op13.ts`. `pregame.ts` executes both Leaders in first-player order before opening hands, persists prompt progress, and resumes Stage placement through the normal effect stack. Covered by `opt-476-start-of-game-effects.test.ts`.
 
 ---
 
@@ -368,7 +366,7 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 |---------|-------|-------|--------|
 | ~~`REVEAL_CONDITIONAL`~~ | ~~OP01-060 plus the OPT-475 20-card reconciled cohort~~ | 0 | Done |
 | ~~`HAND_ZONE_MODIFIER`~~ | ~~OP14-053~~ | 0 | Done |
-| `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
+| ~~`FULL_DECK_SEARCH_AND_PLAY`~~ | ~~OP13-079~~ | 0 | Done |
 | ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |
 | ~~`HAND_REVEAL_CONDITIONAL`~~ | ~~OP01-063, OP01-105~~ | 0 | Done |
 | ~~`NEXT_EVENT_COST_REDUCTION`~~ | ~~OP02-025, OP12-061~~ | 0 | Done |

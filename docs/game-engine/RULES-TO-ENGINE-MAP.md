@@ -240,8 +240,8 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **5-2-1-2.** Shuffle deck | **IMPL** | `setup.ts:38–39` | Fisher-Yates in `shuffleDeck()` |
 | **5-2-1-3.** Place Leader face-up | **IMPL** | `setup.ts:144–153` | Leader built with `zone: "LEADER"`, `state: "ACTIVE"` |
 | **5-2-1-4/5.** Decide first/second | **GAP** | — | Not modeled. `GameInitPayload` assumes player1 always goes first (index 0). No coin flip or choice mechanism |
-| **5-2-1-5-1.** "At the start of the game" effects | **GAP** | — | No hook for pre-game effects. Some Leaders have "At the start of the game" text |
-| **5-2-1-5-2.** Shuffle after start-of-game effects | **GAP** | — | No post-effect shuffle |
+| **5-2-1-5-1.** "At the start of the game" effects | **IMPL** | `pregame.ts → advanceStartOfGameEffects()` | Authored Leader rule modifications resolve in first-player order and pause durably on prompts; see `opt-476-start-of-game-effects.test.ts` |
+| **5-2-1-5-2.** Shuffle after start-of-game effects | **IMPL** | `actions/hand-deck.ts → executeSearchAndPlay()`, `resume/deck.ts → handleArrangeSearchAndPlay()` | Full-deck searches shuffle on match, decline, and zero-match paths; covered by `opt-476-start-of-game-effects.test.ts` |
 | **5-2-1-6.** Draw 5 cards as opening hand | **IMPL** | `setup.ts:42–43` | `drawN(shuffled, 5)` |
 | **5-2-1-6-1.** Mulligan: return all, reshuffle, redraw 5 | **IMPL** | `setup.ts → applyMulligan()` | Returns hand to deck, shuffles, draws 5. One mulligan per player |
 | **5-2-1-7.** Place life cards (top of deck → bottom of life area) | **IMPL** | `setup.ts:55–58` | Life array is reversed after drawing so `life[0]` (removed first by `removeTopLifeCard()`) is the last card drawn |

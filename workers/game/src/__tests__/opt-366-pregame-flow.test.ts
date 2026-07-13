@@ -125,7 +125,7 @@ describe("OPT-366 pregame flow", () => {
   describe("hand dealing ordering (§5-2-1-5-1 → §5-2-1-6)", () => {
     it("does not deal opening hand until START_OF_GAME_FX is past", () => {
       // After PRIORITY_CHOICE, hand is still empty. Hand is dealt during HAND_DEAL,
-      // which fires only after START_OF_GAME_FX (today's passthrough).
+      // which fires only after every START_OF_GAME_FX action has resolved.
       const { state, cardDb } = buildPregameState();
       let s = drain(state, cardDb, [5, 3]).state;
       // Phase is PRIORITY_CHOICE — hands are empty.
@@ -133,7 +133,7 @@ describe("OPT-366 pregame flow", () => {
       expect(s.players[1].hand).toHaveLength(0);
 
       s = applyChoice(s, "FIRST").state;
-      // After the first/second decision the FSM passes through START_OF_GAME_FX
+      // With no authored start effect, the FSM passes through START_OF_GAME_FX
       // and HAND_DEAL in one tick before pausing on MULLIGAN_DECISIONS.
       s = drain(s, cardDb, []).state;
       expect(s.pregame?.phase).toBe("MULLIGAN_DECISIONS");

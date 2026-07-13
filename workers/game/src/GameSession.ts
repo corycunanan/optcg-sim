@@ -1065,7 +1065,19 @@ export class GameSession implements DurableObject {
         this.gameState = stateBeforeResume;
         responseRejected = true;
       } else {
-        resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
+        if (resumeResult.events.length > 0) {
+          const pipelineResult = continuePipelineFromExecution(
+            this.gameState,
+            { state: this.gameState, events: resumeResult.events },
+            this.cardDb,
+            respondingPlayer,
+          );
+          this.gameState = pipelineResult.state;
+          resumedGameOver = pipelineResult.gameOver ?? resumedGameOver;
+        }
+        if (!this.gameState.pendingPrompt && !resumedGameOver) {
+          resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
+        }
         if (!this.gameState.pendingPrompt && !resumedGameOver) {
           resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
         }
@@ -1096,6 +1108,17 @@ export class GameSession implements DurableObject {
         winner: null,
         reason: this.gameState.winReason ?? "Unstoppable loop detected — game ends in a draw",
       };
+    }
+
+    // OPT-476: a START_OF_GAME_EFFECT uses the normal resolver stack, but the
+    // setup FSM owns what happens after that stack fully drains. Continue to
+    // the next Leader effect (or hand deal) before any turn phases can run.
+    if (
+      !this.gameState.pendingPrompt
+      && this.gameState.effectStack.length === 0
+      && this.gameState.pregame?.phase === "START_OF_GAME_FX"
+    ) {
+      this.gameState = this.drainPregame(this.gameState);
     }
 
     while (
