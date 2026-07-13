@@ -78,6 +78,18 @@ const hiddenEventCases: Array<{ name: string; event: GameEvent; secrets: string[
     secrets: ["SCRY-SECRET", "scry-instance"],
   },
   {
+    name: "Life reorder",
+    event: {
+      type: "LIFE_REORDERED",
+      playerIndex: 1,
+      payload: {
+        orderedInstanceIds: ["life-reorder-2", "life-reorder-1"],
+      },
+      timestamp,
+    },
+    secrets: ["life-reorder-2", "life-reorder-1"],
+  },
+  {
     name: "card removed from Life",
     event: {
       type: "CARD_REMOVED_FROM_LIFE",
@@ -201,6 +213,7 @@ describe("OPT-470 hidden-information visibility contract", () => {
       TRIGGER_ACTIVATED: { audience: "PUBLIC_AFTER_ACTIVATION", redactor: "CARD_IDENTITY" },
       CARDS_REVEALED: { audience: "DECLARED_BY_EVENT", redactor: "CARD_IDENTITIES" },
       LIFE_SCRIED: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITIES" },
+      LIFE_REORDERED: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITIES" },
       CARD_REMOVED_FROM_LIFE: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
     });
   });
