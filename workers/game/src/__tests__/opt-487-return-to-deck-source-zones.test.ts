@@ -9,8 +9,9 @@ import type {
 } from "../engine/effect-types.js";
 import type { CardInstance, GameState, PlayerState } from "../types.js";
 import { executeReturnToDeck } from "../engine/effect-resolver/actions/removal.js";
-import { resolveEffect } from "../engine/effect-resolver/index.js";
+import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import { OP05_079_VIOLA } from "../engine/schemas/op05.js";
 import { findCardInstance } from "../engine/state.js";
 import { filterEventForPlayer } from "../engine/visibility.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
@@ -239,5 +240,62 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
     expect(findCardInstance(result.state, target.instanceId)?.zone).toBe("CHARACTER");
     expect(findCardInstance(result.state, replacementSource.instanceId)?.state).toBe("RESTED");
     expect(result.events.some((event) => event.type === "CARD_RETURNED_TO_DECK")).toBe(false);
+  });
+
+  it("lets OP05-079's opponent select cards from their own trash", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const makeTrash = (owner: 0 | 1, index: number): CardInstance => ({
+      instanceId: `viola-trash-${owner}-${index}`,
+      cardId: CARDS.VANILLA.id,
+      zone: "TRASH",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: owner,
+      owner,
+    });
+    const controllerTrash = Array.from({ length: 4 }, (_, index) => makeTrash(0, index));
+    const opponentTrash = Array.from({ length: 4 }, (_, index) => makeTrash(1, index));
+    const state: GameState = {
+      ...base,
+      players: [
+        { ...base.players[0], trash: controllerTrash },
+        { ...base.players[1], trash: opponentTrash },
+      ],
+    };
+    const block = OP05_079_VIOLA.effects[0]!;
+    const deckBefore = state.players[1].deck.length;
+
+    const result = resolveEffect(
+      state,
+      block,
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+
+    expect(result.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
+      throw new Error("Expected OP05-079 to prompt the opponent for trash cards");
+    }
+    expect(result.pendingPrompt.options.validTargets).toEqual(
+      opponentTrash.map((card) => card.instanceId),
+    );
+
+    const selectedIds = opponentTrash.slice(0, 3).map((card) => card.instanceId);
+    const resumed = resumeFromStack(
+      result.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: selectedIds },
+      cardDb,
+    );
+
+    expect(resumed.state.players[0].trash).toEqual(controllerTrash);
+    expect(resumed.state.players[1].trash).toHaveLength(1);
+    expect(resumed.state.players[1].deck).toHaveLength(deckBefore + 3);
+    for (const selectedId of selectedIds) {
+      expect(findCardInstance(resumed.state, selectedId)).toBeNull();
+    }
   });
 });
