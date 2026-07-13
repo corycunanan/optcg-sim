@@ -11,7 +11,7 @@ import { resolveAmount, computeExpiry } from "../action-utils.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { getEffectivePower } from "../../modifiers.js";
 import { findCardInstance } from "../../state.js";
-import { nanoid } from "../../../util/nanoid.js";
+import { allocateEngineRecord } from "../../execution-context.js";
 
 export function executeModifyPower(
   state: GameState,
@@ -34,8 +34,9 @@ export function executeModifyPower(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -48,7 +49,7 @@ export function executeModifyPower(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   const newActiveEffects = [...state.activeEffects, effect as any];
@@ -62,7 +63,7 @@ export function executeModifyPower(
   }
 
   return {
-    state: { ...state, activeEffects: newActiveEffects },
+    state: { ...allocated.state, activeEffects: newActiveEffects },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -89,8 +90,9 @@ export function executeModifyCost(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -103,11 +105,11 @@ export function executeModifyCost(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -134,8 +136,9 @@ export function executeGrantKeyword(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -148,11 +151,11 @@ export function executeGrantKeyword(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -176,8 +179,9 @@ export function executeGrantAttribute(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -190,11 +194,11 @@ export function executeGrantAttribute(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
     events,
     succeeded: true,
   };
@@ -226,8 +230,9 @@ export function executeNegateEffects(
   // effects resume immediately (schema triggers were never unregistered,
   // just skipped).
   const duration = action.duration ?? { type: "THIS_TURN" as const };
+  const allocated = allocateEngineRecord(state, "active-effect");
   const negationEffect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -240,7 +245,7 @@ export function executeNegateEffects(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   events.push({
@@ -250,7 +255,7 @@ export function executeNegateEffects(
   });
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, negationEffect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, negationEffect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -280,8 +285,9 @@ export function executeSetBasePower(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -290,7 +296,7 @@ export function executeSetBasePower(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   for (const id of targetIds) {
@@ -298,7 +304,7 @@ export function executeSetBasePower(
   }
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -371,8 +377,9 @@ export function executeCopyPower(
   const targetIds = autoSelectTargets(selfTarget, targetValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -381,7 +388,7 @@ export function executeCopyPower(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   for (const id of targetIds) {
@@ -389,7 +396,7 @@ export function executeCopyPower(
   }
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -469,25 +476,27 @@ export function executeSwapBasePower(
   const powerB = dataB.power ?? 0;
   const expiry = computeExpiry(duration, state, controller);
 
+  const allocatedA = allocateEngineRecord(state, "active-effect");
+  const allocatedB = allocateEngineRecord(allocatedA.state, "active-effect");
   const effectA: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocatedA.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
     modifiers: [{ type: "SET_POWER" as any, params: { value: powerB }, duration }],
     duration, expiresAt: expiry, controller,
     appliesTo: [targetIds[0]],
-    timestamp: Date.now(),
+    timestamp: allocatedA.timestamp,
   };
   const effectB: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocatedB.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
     modifiers: [{ type: "SET_POWER" as any, params: { value: powerA }, duration }],
     duration, expiresAt: expiry, controller,
     appliesTo: [targetIds[1]],
-    timestamp: Date.now() + 1,
+    timestamp: allocatedB.timestamp,
   };
 
   events.push(
@@ -496,7 +505,7 @@ export function executeSwapBasePower(
   );
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effectA as any, effectB as any] },
+    state: { ...allocatedB.state, activeEffects: [...state.activeEffects, effectA as any, effectB as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: 2 },

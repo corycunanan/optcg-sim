@@ -8,6 +8,7 @@
 import type { GameState } from "../types.js";
 import type { EffectStackFrame } from "../types.js";
 import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
+import { allocateEngineId } from "./execution-context.js";
 
 // ─── Stack Operations ────────────────────────────────────────────────────────
 
@@ -58,8 +59,6 @@ export function updateTopFrame(
 
 // ─── Frame ID Generation ─────────────────────────────────────────────────────
 
-let frameCounter = 0;
-
-export function generateFrameId(): string {
-  return `ef_${Date.now()}_${++frameCounter}`;
+export function generateFrameId(state: GameState): { state: GameState; id: string } {
+  return allocateEngineId(state, "ef");
 }

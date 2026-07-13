@@ -487,6 +487,16 @@ export function filterStateForPlayer(
 
   return {
     ...state,
+    executionContext: {
+      version: state.executionContext.version,
+      seed: "redacted",
+      rngState: 0,
+      idCounter: 0,
+      clockEpochMs: 0,
+      clockCounter: 0,
+      actionBudget: { limit: 0, consumed: 0 },
+      trace: { gameId: state.id, traceId: "redacted" },
+    },
     players: newPlayers,
     eventLog: filteredEventLog,
     pendingPrompt: filteredPrompt,

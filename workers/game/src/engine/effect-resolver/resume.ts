@@ -300,9 +300,11 @@ export function resumeFromStack(
         if (result.rejected) {
           pendingPrompt = { ...pendingPrompt, resumeContext: topFrame.id };
         } else if (!replacementFrameWasPushed && isReplacementPrompt) {
+          const frameId = generateFrameId(nextState);
+          nextState = frameId.state;
           const continuationFrame: EffectStackFrame = {
             ...topFrame,
-            id: generateFrameId(),
+            id: frameId.id,
             phase: "INTERRUPTED_BY_TRIGGERS",
             validTargets: [],
             priorActionSucceeded: false,
@@ -314,9 +316,11 @@ export function resumeFromStack(
           }
         } else if (!replacementFrameWasPushed) {
           const promptCtx = pendingPrompt.resumeContext as ResumeContext;
+          const frameId = generateFrameId(nextState);
+          nextState = frameId.state;
           const replacementFrame: EffectStackFrame = {
             ...topFrame,
-            id: generateFrameId(),
+            id: frameId.id,
             sourceCardInstanceId: promptCtx.effectSourceInstanceId,
             controller: promptCtx.controller,
             phase: promptTypeToPhase(pendingPrompt.options.promptType),

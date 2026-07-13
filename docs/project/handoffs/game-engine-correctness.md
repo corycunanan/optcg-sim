@@ -53,8 +53,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | Done | [#292](https://github.com/corycunanan/optcg-sim/pull/292) | All 210 authored connectors migrated to THEN; snapshot-locked AND transactions and validator gate added. |
 | 36 | OPT-474 | Establish one authoritative zone-transition and card-identity contract | — | OPT-468 | Done | [#293](https://github.com/corycunanan/optcg-sim/pull/293) | Every cross-zone move creates a fresh identity through one service; exhaustive zone-pair and static guards added. |
 | 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | Done | [#295](https://github.com/corycunanan/optcg-sim/pull/295) | Reconciled 20-card cohort; immutable reveal snapshots, CHOOSE_VALUE, prompt continuations, schemas, and execution matrix. |
-| 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | In Review | [#296](https://github.com/corycunanan/optcg-sim/pull/296) | Persisted first-player-ordered Leader effects; Mary Geoise accept/decline, shuffle, visibility, and reconnect coverage. |
-| 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | Backlog | — | Starts deterministic architecture wave. |
+| 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | Done | [#296](https://github.com/corycunanan/optcg-sim/pull/296) | Persisted first-player-ordered Leader effects; Mary Geoise accept/decline, shuffle, visibility, and reconnect coverage. |
+| 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | In Review | [#297](https://github.com/corycunanan/optcg-sim/pull/297) | Persisted RNG/time/ID/budget/trace context with exact replay and restart coverage. |
 | 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Backlog | — | Typed execution dependencies and cost-handler decomposition. |
 | 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Backlog | — | Thin Durable Object composition boundary. |
 | 42 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
@@ -67,7 +67,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review/merge PR #296; OPT-477 is ready because OPT-467/468/472/474 are Done.
+**Next up:** Review/merge PR #297. OPT-478 and OPT-479 unlock when #297 merges; OPT-484–OPT-486 remain independently ready.
 
 ---
 
@@ -351,3 +351,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** OPT-477 should centralize the randomness used by both setup and resumed full-deck search; do not special-case pregame with a second RNG contract. Resumed setup events must pass through `continuePipelineFromExecution` before the FSM advances so played permanents/triggers register normally. PR #296 may overlap `pregame.ts`, so preserve its persisted completion ledger when integrating.
 - **Unresolved:** Ambient shuffle/ID/time sources remain intentionally owned by OPT-477. OPT-486 still tracks the separate Vitest/coverage-provider version mismatch warning.
 - **Pointer:** PR #296; inspect `4a08c91` for the durable setup-effect boundary and its replay-shaped tests.
+
+### OPT-477 → OPT-478
+**From:** session on 2026-07-12 · **Commit:** `df2097e` · **PR:** [#297](https://github.com/corycunanan/optcg-sim/pull/297)
+
+- **Primer:** `GameState.executionContext` now persists seeded RNG state, logical time, monotonic IDs, the resolver action budget, and trace metadata. Production entropy enters once at `GameSession`; setup, pregame, pipeline, battle, trigger/effect registration, zone transitions, resolver frames, prompts, and resume paths advance only persisted context state. Fixed contexts and JSON-restored snapshots replay byte-for-byte.
+- **Read first:** `workers/game/src/engine/execution-context.ts`, `shared/game-types.ts` (`EngineExecutionContext`), `workers/game/src/__tests__/opt-477-engine-execution-context.test.ts`, then the nullable dispatchers in `workers/game/src/engine/replacements.ts`, `effect-resolver/actions/choice.ts`, and `effect-resolver/actions/play.ts` before splitting `cost-handler.ts`.
+- **Gotchas / do NOT touch:** Keep the persisted execution context JSON/structured-clone safe—do not store dispatcher functions in `GameState`. Introduce typed, non-serialized runtime services around the persisted deterministic data when removing callback injection. All IDs, time, and random choices under `workers/game/src/engine` must continue through the adapter; the static regression intentionally rejects ambient `Date.now`, `Math.random`, `crypto`, or `nanoid`. Player-visible state must keep seed/RNG/clock/ID data redacted. Preserve legacy snapshot hydration and action-budget continuity across prompts.
+- **Unresolved:** PR #297 must merge before OPT-478 starts. PR #296 is integrated; preserve both its start-of-game continuation and deterministic context advancement. OPT-486 still tracks the pre-existing Vitest/coverage-provider version mismatch warning.
+- **Pointer:** PR #297; inspect `df2097e` for the context adapter, full engine threading, replay/source-guard tests, and architecture updates.

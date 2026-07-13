@@ -16,7 +16,7 @@ import type {
   Zone,
 } from "../types.js";
 import type { RuntimeActiveEffect, RuntimeProhibition } from "./effect-types.js";
-import { nanoid } from "../util/nanoid.js";
+import { allocateEngineId } from "./execution-context.js";
 
 export type CardZone = Exclude<Zone, "COST_AREA" | "DON_DECK">;
 export type TransitionDestination = Exclude<CardZone, "LEADER">;
@@ -246,7 +246,9 @@ function commitTransition(
     state: "RESTED" as const,
     attachedTo: null,
   }));
-  const newInstanceId = nanoid();
+  const allocated = allocateEngineId(state, "card");
+  state = allocated.state;
+  const newInstanceId = allocated.id;
   const movedCard: CardInstance = {
     ...located.card,
     instanceId: newInstanceId,

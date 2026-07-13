@@ -32,6 +32,7 @@ import type { Action, EffectSchema, StartOfGameEffect } from "./effect-types.js"
 import { dealOpeningHand, placeLifeCards, applyMulligan } from "./setup.js";
 import { emitPendingEvent } from "./events.js";
 import { executeActionChain } from "./effect-resolver/resolver.js";
+import { takeEngineRandom } from "./execution-context.js";
 
 const PRIORITY_ROLL_TIMEOUT_MS = 60_000;
 
@@ -66,7 +67,6 @@ export function advancePregame(
   state: GameState,
   cardDb: Map<string, CardData>,
   testRolls: number[] | null | undefined,
-  rng: () => number,
 ): PregameStepResult {
   let current = state;
   // Defensive: drain consecutive auto-phases until we hit a phase that pauses
@@ -76,7 +76,7 @@ export function advancePregame(
 
     switch (current.pregame.phase) {
       case "PRIORITY_ROLLING": {
-        current = runPriorityRoll(current, testRolls, rng);
+        current = runPriorityRoll(current, testRolls);
         // Transition to PRIORITY_CHOICE which pauses on a prompt.
         current = enterPriorityChoice(current);
         return { state: current, done: false };
@@ -288,13 +288,14 @@ function advanceStartOfGameEffects(
 function runPriorityRoll(
   state: GameState,
   testRolls: number[] | null | undefined,
-  rng: () => number,
 ): GameState {
   const queue = (testRolls ?? []).slice();
+  let current = state;
   const nextRoll = (): number => {
     if (queue.length > 0) return queue.shift()!;
-    // crypto-backed when available, falls back to the supplied rng
-    return rollD6(rng);
+    const random = takeEngineRandom(current);
+    current = random.state;
+    return Math.floor(random.value * 6) + 1;
   };
 
   let p0 = 0;
@@ -319,9 +320,9 @@ function runPriorityRoll(
   };
   return emitPendingEvent(
     {
-      ...state,
+      ...current,
       pregame: {
-        ...state.pregame!,
+        ...current.pregame!,
         priorityRolls: [p0, p1],
         priorityDeciderIndex,
       },
@@ -387,23 +388,6 @@ function enterMulliganDecisions(state: GameState): GameState {
     ...state,
     pregame: { ...pregame, phase: "MULLIGAN_DECISIONS" },
     pendingPrompt,
-  };
-}
-
-function rollD6(rng: () => number): number {
-  return Math.floor(rng() * 6) + 1;
-}
-
-/** crypto-backed RNG factory; falls back to Math.random when unavailable. */
-export function defaultPregameRng(): () => number {
-  return () => {
-    const g = (globalThis as unknown as { crypto?: Crypto }).crypto;
-    if (g?.getRandomValues) {
-      const buf = new Uint32Array(1);
-      g.getRandomValues(buf);
-      return buf[0] / 0x1_0000_0000;
-    }
-    return Math.random();
   };
 }
 

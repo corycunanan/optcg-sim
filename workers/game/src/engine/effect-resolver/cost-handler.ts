@@ -822,8 +822,10 @@ export function payCostsWithSelection(
         continue;
       }
 
+      const frameId = generateFrameId(nextState);
+      nextState = frameId.state;
       const frame: EffectStackFrame = {
-        id: generateFrameId(),
+        id: frameId.id,
         sourceCardInstanceId,
         controller,
         effectBlock,
@@ -881,8 +883,10 @@ export function payCostsWithSelection(
         continue;
       }
 
+      const frameId = generateFrameId(nextState);
+      nextState = frameId.state;
       const frame: EffectStackFrame = {
-        id: generateFrameId(),
+        id: frameId.id,
         sourceCardInstanceId,
         controller,
         effectBlock,
@@ -936,8 +940,10 @@ export function payCostsWithSelection(
       // flow with a concrete position (mirrors CHOOSE_ONE_COST slot
       // replacement, LIFE_TO_HAND-style Top/Bottom choices).
       if (cost.position === "TOP_OR_BOTTOM") {
+        const frameId = generateFrameId(nextState);
+        nextState = frameId.state;
         const frame: EffectStackFrame = {
-          id: generateFrameId(),
+          id: frameId.id,
           sourceCardInstanceId,
           controller,
           effectBlock,
@@ -980,8 +986,10 @@ export function payCostsWithSelection(
 
       if (!needsSelection && needsArrange) {
         // Every candidate is forced — go straight to the arrange prompt.
+        const frameId = generateFrameId(nextState);
+        nextState = frameId.state;
         const frame: EffectStackFrame = {
-          id: generateFrameId(),
+          id: frameId.id,
           sourceCardInstanceId,
           controller,
           effectBlock,
@@ -1042,8 +1050,10 @@ export function payCostsWithSelection(
       if (needsSelection) {
         // Stage 1: pick the trash cards. The arrange stage (self + picks)
         // is chained by the resume handler.
+        const frameId = generateFrameId(nextState);
+        nextState = frameId.state;
         const frame: EffectStackFrame = {
-          id: generateFrameId(),
+          id: frameId.id,
           sourceCardInstanceId,
           controller,
           effectBlock,
@@ -1083,8 +1093,10 @@ export function payCostsWithSelection(
       if (needsArrange) {
         // Every trash candidate is forced — go straight to ordering the
         // full group (always 2+ cards: self + trash).
+        const frameId = generateFrameId(nextState);
+        nextState = frameId.state;
         const frame: EffectStackFrame = {
-          id: generateFrameId(),
+          id: frameId.id,
           sourceCardInstanceId,
           controller,
           effectBlock,
@@ -1132,8 +1144,10 @@ export function payCostsWithSelection(
           return { state: nextState, events, cannotPay: true };
         }
 
+        const frameId = generateFrameId(nextState);
+        nextState = frameId.state;
         const frame: EffectStackFrame = {
-          id: generateFrameId(),
+          id: frameId.id,
           sourceCardInstanceId,
           controller,
           effectBlock,
@@ -1180,8 +1194,10 @@ export function payCostsWithSelection(
       }
 
       // Push stack frame for cost selection
+      const frameId = generateFrameId(nextState);
+      nextState = frameId.state;
       const frame: EffectStackFrame = {
-        id: generateFrameId(),
+        id: frameId.id,
         sourceCardInstanceId,
         controller,
         effectBlock,
@@ -1241,8 +1257,10 @@ export function payCostsWithSelection(
       nextState = replacement.state;
       events.push(...replacement.events);
       if (replacement.pendingPrompt) {
+        const frameId = generateFrameId(nextState);
+        nextState = frameId.state;
         const frame: EffectStackFrame = {
-          id: generateFrameId(), sourceCardInstanceId, controller, effectBlock,
+          id: frameId.id, sourceCardInstanceId, controller, effectBlock,
           phase: "AWAITING_COST_SELECTION", pausedAction: null,
           remainingActions: effectBlock.actions ?? [], resultRefs: [], validTargets: [],
           costs: workingCosts, currentCostIndex: i, costsPaid: false,

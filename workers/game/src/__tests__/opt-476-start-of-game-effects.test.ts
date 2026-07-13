@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { CardData, Env, GameAction, GameInitPayload, GameState } from "../types.js";
 import { GameSession } from "../GameSession.js";
 import { advancePregame, resumePregameFromPrompt, startPregame } from "../engine/pregame.js";
@@ -6,8 +6,6 @@ import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { prepareDecksAndLeaders } from "../engine/setup.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { CARDS, createTestPayload } from "./helpers.js";
-
-const FIXED_RNG = () => 0.5;
 
 const IMU: CardData = {
   ...CARDS.LEADER,
@@ -80,7 +78,7 @@ function chooseFirstPlayer(
   cardDb: Map<string, CardData>,
   choiceId: "FIRST" | "SECOND",
 ): GameState {
-  const rolled = advancePregame(state, cardDb, [5, 3], FIXED_RNG).state;
+  const rolled = advancePregame(state, cardDb, [5, 3]).state;
   return resumePregameFromPrompt(
     rolled,
     { type: "PLAYER_CHOICE", choiceId },
@@ -119,7 +117,7 @@ describe("OPT-476 start-of-game effects", () => {
   it("plays Imu's Mary Geoise Stage before dealing opening hands", () => {
     const { state, cardDb } = buildState([true, false], [true, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
-    const prompted = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
+    const prompted = advancePregame(chosen, cardDb, []).state;
 
     expect(prompted.pregame?.phase).toBe("START_OF_GAME_FX");
     expect(prompted.pendingPrompt?.respondingPlayer).toBe(0);
@@ -137,7 +135,7 @@ describe("OPT-476 start-of-game effects", () => {
     expect(played.players[0].hand).toHaveLength(0);
     expect(played.pregame?.phase).toBe("START_OF_GAME_FX");
 
-    const dealt = advancePregame(played, cardDb, [], FIXED_RNG).state;
+    const dealt = advancePregame(played, cardDb, []).state;
     expect(dealt.pregame?.phase).toBe("MULLIGAN_DECISIONS");
     expect(dealt.pregame?.startOfGameEffectsResolved).toEqual([true, true]);
     expect(dealt.players[0].hand).toHaveLength(5);
@@ -147,7 +145,7 @@ describe("OPT-476 start-of-game effects", () => {
   it("routes the resumed Stage play through the pipeline before pregame advances", async () => {
     const { state, cardDb } = buildState([true, false], [true, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
-    const prompted = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
+    const prompted = advancePregame(chosen, cardDb, []).state;
     const prompt = prompted.pendingPrompt;
     if (!prompt || prompt.options.promptType !== "ARRANGE_TOP_CARDS") {
       throw new Error("Expected Mary Geoise search prompt");
@@ -181,27 +179,26 @@ describe("OPT-476 start-of-game effects", () => {
   it("allows the optional play to be declined and still shuffles the deck", () => {
     const { state, cardDb } = buildState([true, false], [true, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
-    const prompted = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const prompted = advancePregame(chosen, cardDb, []).state;
+    const rngStateBeforeShuffle = prompted.executionContext.rngState;
 
     const declined = answerSearch(prompted, cardDb, false);
     expect(declined.players[0].stage).toBeNull();
     expect(declined.players[0].deck.filter((card) => card.cardId === MARY_GEOISE.id)).toHaveLength(2);
-    expect(random).toHaveBeenCalled();
-    random.mockRestore();
+    expect(declined.executionContext.rngState).not.toBe(rngStateBeforeShuffle);
   });
 
   it("resolves both Leaders in first-player order", () => {
     const { state, cardDb } = buildState([true, true], [true, true]);
     const chosen = chooseFirstPlayer(state, cardDb, "SECOND");
-    const firstPrompt = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
+    const firstPrompt = advancePregame(chosen, cardDb, []).state;
 
     expect(firstPrompt.pregame?.firstPlayerIndex).toBe(1);
     expect(firstPrompt.pendingPrompt?.respondingPlayer).toBe(1);
     expect(firstPrompt.pregame?.startOfGameEffectsResolved).toEqual([false, true]);
 
     const firstDone = answerSearch(firstPrompt, cardDb, false);
-    const secondPrompt = advancePregame(firstDone, cardDb, [], FIXED_RNG).state;
+    const secondPrompt = advancePregame(firstDone, cardDb, []).state;
     expect(secondPrompt.pendingPrompt?.respondingPlayer).toBe(0);
     expect(secondPrompt.pregame?.startOfGameEffectsResolved).toEqual([true, true]);
     expect(secondPrompt.players[0].hand).toHaveLength(0);
@@ -211,21 +208,20 @@ describe("OPT-476 start-of-game effects", () => {
   it("handles a zero-match search, shuffles, and advances without prompting", () => {
     const { state, cardDb } = buildState([true, false], [false, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
-    const result = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
+    const rngStateBeforeShuffle = chosen.executionContext.rngState;
+    const result = advancePregame(chosen, cardDb, []).state;
 
-    expect(random).toHaveBeenCalled();
+    expect(result.executionContext.rngState).not.toBe(rngStateBeforeShuffle);
     expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
     expect(result.pregame?.phase).toBe("MULLIGAN_DECISIONS");
     expect(result.pregame?.startOfGameEffectsResolved).toEqual([true, true]);
-    random.mockRestore();
   });
 
   it("does not advance an unresolved prompt and resumes after JSON persistence", () => {
     const { state, cardDb } = buildState([true, false], [true, false]);
     const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
-    const prompted = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
-    const stillPrompted = advancePregame(prompted, cardDb, [], FIXED_RNG).state;
+    const prompted = advancePregame(chosen, cardDb, []).state;
+    const stillPrompted = advancePregame(prompted, cardDb, []).state;
 
     expect(stillPrompted.pendingPrompt).toEqual(prompted.pendingPrompt);
     expect(stillPrompted.effectStack).toEqual(prompted.effectStack);

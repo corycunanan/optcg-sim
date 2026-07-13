@@ -15,8 +15,6 @@ import { isStartOfTurnAutoPhase } from "../engine/phases.js";
 import { createTestPayload, CARDS } from "./helpers.js";
 import type { GameAction, GameState } from "../types.js";
 
-const FIXED_RNG = () => 0.5;
-
 function buildPregameState(testRolls: number[] | null = null): {
   state: GameState;
   cardDb: Map<string, import("../types.js").CardData>;
@@ -33,7 +31,7 @@ function drain(
   cardDb: Map<string, import("../types.js").CardData>,
   testRolls: number[] | null,
 ): { state: GameState; done: boolean } {
-  return advancePregame(state, cardDb, testRolls, FIXED_RNG);
+  return advancePregame(state, cardDb, testRolls);
 }
 
 function applyChoice(

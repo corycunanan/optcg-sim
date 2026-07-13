@@ -24,9 +24,9 @@ import { isCostPayable } from "./effect-resolver/cost-handler.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
 import type { EffectSchema } from "./effect-types.js";
-import { nanoid } from "../util/nanoid.js";
 import { emitPendingEvent } from "./events.js";
 import { transitionCard, transitionDetachedCard } from "./zone-transition.js";
+import { allocateEngineId, takeEngineTimestamp } from "./execution-context.js";
 
 function restoreTriggerStaging(state: GameState, baseline: readonly string[]): GameState {
   const keep = new Set(baseline);
@@ -62,8 +62,10 @@ export function executeDeclareAttack(
   const defenderData = cardDb.get(defenderFound.card.cardId)!;
   const defenderPower = getEffectivePower(defenderFound.card, defenderData, nextState, cardDb);
 
+  const allocatedBattle = allocateEngineId(nextState, "battle");
+  nextState = allocatedBattle.state;
   const battle = {
-    battleId: nanoid(),
+    battleId: allocatedBattle.id,
     attackerInstanceId,
     targetInstanceId,
     attackerPower,
@@ -1198,6 +1200,8 @@ function endBattle(
   // complete, so "battled a Character" must not match. Unscoped "attacked
   // this turn" conditions still pass via the DECLARE_ATTACK entry.
   if (battle && options.aborted !== true) {
+    const stamped = takeEngineTimestamp(state);
+    state = stamped.state;
     const attackerIndex = state.turn.activePlayerIndex;
     const targetIsLeader = state.players.some(
       (pl) => pl.leader.instanceId === battle.targetInstanceId,
@@ -1210,7 +1214,7 @@ function endBattle(
           ...state.turn.actionsPerformedThisTurn,
           {
             actionType: "ATTACKED",
-            timestamp: Date.now(),
+            timestamp: stamped.timestamp,
             controller: attackerIndex,
             attackerInstanceId: battle.attackerInstanceId,
             targetType: targetIsLeader ? "LEADER" : "CHARACTER",

@@ -274,9 +274,11 @@ export function resolveEffect(
   // Step 2: Check optional flag — prompt the player before paying costs
   if (block.flags?.optional) {
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
+    const frameId = generateFrameId(state);
+    state = frameId.state;
 
     const frame: EffectStackFrame = {
-      id: generateFrameId(),
+      id: frameId.id,
       sourceCardInstanceId,
       controller,
       effectBlock: block,
@@ -404,8 +406,9 @@ function promptForSimultaneousSelection(
   );
   if (!promptResult.pendingPrompt) return { state, events: [] };
 
+  const frameId = generateFrameId(state);
   const frame: EffectStackFrame = {
-    id: generateFrameId(),
+    id: frameId.id,
     sourceCardInstanceId,
     controller,
     effectBlock: {} as EffectBlock,
@@ -424,7 +427,7 @@ function promptForSimultaneousSelection(
     accumulatedEvents: [],
     simultaneousGroup: plan,
   };
-  const nextState = pushFrame(state, frame);
+  const nextState = pushFrame(frameId.state, frame);
   if (isEngineTerminated(nextState)) return { state: nextState, events: [] };
 
   let prompt = { ...promptResult.pendingPrompt, resumeContext: frame.id };
@@ -637,8 +640,9 @@ export function executeActionChain(
       const isReplacementPrompt = rawContext?.type === "REPLACEMENT" ||
         rawContext?.type === "REPLACEMENT_BATCH";
       if (isReplacementPrompt) {
+        const frameId = generateFrameId(result.state);
         const continuationFrame: EffectStackFrame = {
-          id: generateFrameId(),
+          id: frameId.id,
           sourceCardInstanceId,
           controller,
           effectBlock: {} as EffectBlock,
@@ -657,7 +661,7 @@ export function executeActionChain(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        const continuationState = pushFrame(result.state, continuationFrame);
+        const continuationState = pushFrame(frameId.state, continuationFrame);
         return isEngineTerminated(continuationState)
           ? { state: continuationState, events }
           : { state: continuationState, events, pendingPrompt: result.pendingPrompt };
@@ -669,8 +673,9 @@ export function executeActionChain(
       // controller when an OPPONENT_ACTION flips who is acting (e.g. opponent
       // trashes from their own hand via Perona OP06-093).
       const resumeController = ctx.controller ?? controller;
+      const frameId = generateFrameId(result.state);
       const frame: EffectStackFrame = {
-        id: generateFrameId(),
+        id: frameId.id,
         sourceCardInstanceId,
         controller: resumeController,
         remainingActionsController: controller,
@@ -691,7 +696,7 @@ export function executeActionChain(
         ruleTrashForPlay: ctx.ruleTrashForPlay,
         stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
-      const updatedState = pushFrame(result.state, frame);
+      const updatedState = pushFrame(frameId.state, frame);
       if (isEngineTerminated(updatedState)) return { state: updatedState, events };
       const prompt = { ...result.pendingPrompt, resumeContext: frame.id };
       // Override with block-specific description so prompts show the triggered

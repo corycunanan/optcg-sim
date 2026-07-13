@@ -32,10 +32,10 @@ import type {
   GameEventType,
   GameState,
 } from "../types.js";
-import { nanoid } from "../util/nanoid.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter, hasBaseEffect } from "./conditions.js";
 import { isCardNegated } from "./modifiers.js";
+import { allocateEngineId, allocateEngineRecord } from "./execution-context.js";
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -51,6 +51,7 @@ export function registerTriggersForCard(
   if (!schema?.effects) return state;
 
   const newTriggers: RuntimeRegisteredTrigger[] = [];
+  let nextState = state;
 
   for (const block of schema.effects) {
     // Only auto and activate categories have triggers
@@ -62,8 +63,10 @@ export function registerTriggersForCard(
     // Check if the card is in the right zone for this trigger
     if (!isCardInValidZone(cardInstance, zone)) continue;
 
+    const allocated = allocateEngineId(nextState, "trigger");
+    nextState = allocated.state;
     newTriggers.push({
-      id: nanoid(),
+      id: allocated.id,
       sourceCardInstanceId: cardInstance.instanceId,
       effectBlockId: block.id,
       trigger: block.trigger,
@@ -76,7 +79,7 @@ export function registerTriggersForCard(
   if (newTriggers.length === 0) return state;
 
   return {
-    ...state,
+    ...nextState,
     triggerRegistry: [...state.triggerRegistry, ...newTriggers] as any,
   };
 }
@@ -113,6 +116,7 @@ export function registerPermanentEffectsForCard(
 
   const newEffects: RuntimeActiveEffect[] = [];
   const newProhibitions: RuntimeProhibition[] = [];
+  let nextState = state;
 
   for (const block of schema.effects) {
     if (block.category !== "permanent") continue;
@@ -146,8 +150,10 @@ export function registerPermanentEffectsForCard(
         }
       }
 
+      const allocated = allocateEngineRecord(nextState, "active-effect");
+      nextState = allocated.state;
       newEffects.push({
-        id: nanoid(),
+        id: allocated.id,
         sourceCardInstanceId: cardInstance.instanceId,
         sourceEffectBlockId: block.id,
         category: "permanent",
@@ -157,7 +163,7 @@ export function registerPermanentEffectsForCard(
         expiresAt,
         controller: cardInstance.controller,
         appliesTo,
-        timestamp: Date.now(),
+        timestamp: allocated.timestamp,
       });
     }
 
@@ -187,8 +193,10 @@ export function registerPermanentEffectsForCard(
             ? conditionList[0]
             : { all_of: conditionList };
 
+        const allocated = allocateEngineId(nextState, "prohibition");
+        nextState = allocated.state;
         newProhibitions.push({
-          id: nanoid(),
+          id: allocated.id,
           sourceCardInstanceId: cardInstance.instanceId,
           sourceEffectBlockId: block.id,
           prohibitionType: prohibition.type,
@@ -208,7 +216,7 @@ export function registerPermanentEffectsForCard(
   if (newEffects.length === 0 && newProhibitions.length === 0) return state;
 
   return {
-    ...state,
+    ...nextState,
     activeEffects: newEffects.length > 0
       ? [...state.activeEffects, ...newEffects as any]
       : state.activeEffects,
@@ -234,6 +242,7 @@ export function registerReplacementsForCard(
   if (!schema?.effects) return state;
 
   const newEffects: RuntimeActiveEffect[] = [];
+  let nextState = state;
 
   for (const block of schema.effects) {
     if (block.category !== "replacement") continue;
@@ -247,8 +256,10 @@ export function registerReplacementsForCard(
     // and rely on the filter at check time. Otherwise it's self-protecting.
     const hasTargetFilter = !!block.replaces.target_filter;
 
+    const allocated = allocateEngineRecord(nextState, "active-effect");
+    nextState = allocated.state;
     newEffects.push({
-      id: nanoid(),
+      id: allocated.id,
       sourceCardInstanceId: cardInstance.instanceId,
       sourceEffectBlockId: block.id,
       category: "replacement",
@@ -267,14 +278,14 @@ export function registerReplacementsForCard(
       expiresAt: { wave: "SOURCE_LEAVES_ZONE" as const },
       controller: cardInstance.controller,
       appliesTo: hasTargetFilter ? [] : [cardInstance.instanceId],
-      timestamp: Date.now(),
+      timestamp: allocated.timestamp,
     });
   }
 
   if (newEffects.length === 0) return state;
 
   return {
-    ...state,
+    ...nextState,
     activeEffects: [...state.activeEffects, ...newEffects as any],
   };
 }

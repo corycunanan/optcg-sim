@@ -8,6 +8,7 @@ export type {
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
   EngineLimitDiagnostic, EngineTerminalOutcome,
+  EngineExecutionContext,
   GameEventType, GameEvent, GameEventPayloadMap, PendingGameEvent,
   GameState,
   CardData, KeywordSet,
@@ -212,7 +213,7 @@ export interface GameInitPayload {
    * OPT-366: deterministic d6 sequence for the pregame priority roll. Each
    * roll consumes two values (one per player). When the supplied pair is a
    * tie, the next pair is consumed for the reroll, and so on. Once exhausted
-   * the engine falls back to crypto-backed randomness. Test-only.
+   * the engine falls back to the persisted execution-context RNG. Test-only.
    */
   testPriorityRolls?: number[] | null;
 }

@@ -56,6 +56,7 @@ import {
 import { registerTriggersForCard } from "../engine/triggers.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { OP02_018_MARCO } from "../engine/schemas/op02.js";
+import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ function emptyState(): GameState {
   // read/write the effect/prohibition arrays.
   return {
     id: "test",
+    executionContext: createDeterministicExecutionContext("opt-256"),
     players: [] as unknown as GameState["players"],
     turn: {
       number: 1,

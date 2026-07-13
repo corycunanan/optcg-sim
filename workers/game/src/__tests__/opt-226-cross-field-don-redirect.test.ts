@@ -28,6 +28,7 @@ import { attachDonToCard } from "../engine/effect-resolver/card-mutations.js";
 import { executeGiveOpponentDonToOpponent } from "../engine/effect-resolver/actions/don.js";
 import type { CardData, CardInstance, DonInstance, GameState, PlayerState, KeywordSet } from "../types.js";
 import type { Action } from "../engine/effect-types.js";
+import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 // ─── Factories ──────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ function emptyPlayer(playerId: string, leader: CardInstance, don: DonInstance[] 
 function makeState(p0: PlayerState, p1: PlayerState): GameState {
   return {
     id: "g",
+    executionContext: createDeterministicExecutionContext("opt-226"),
     players: [p0, p1],
     turn: { number: 1, activePlayerIndex: 0, phase: "MAIN", battleSubPhase: null, battle: null, oncePerTurnUsed: {}, actionsPerformedThisTurn: [], deckHitZeroThisTurn: [false, false] },
     activeEffects: [],

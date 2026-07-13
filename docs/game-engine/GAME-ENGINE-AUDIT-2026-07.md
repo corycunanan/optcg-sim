@@ -164,12 +164,10 @@ The remaining work is a zone-pair identity matrix and one transition service tha
 ### GE-09 — Exact replay is not deterministic
 
 **Severity:** Medium
-**Status:** Confirmed
+**Status:** Fixed by OPT-477
 **Linear:** [OPT-477](https://linear.app/optcg-sim/issue/OPT-477/introduce-an-explicit-deterministic-engineexecutioncontext-for-rng-ids)
 
-Core engine paths use `nanoid`, `Date.now()`, `Math.random()`, a crypto-backed RNG with fallback, and the module-global `frameCounter` in `effect-stack.ts:57-60`. This is acceptable for live unpredictability but contradicts the documented promise that identical state/actions produce replayable deterministic snapshots.
-
-An explicit execution context should supply RNG, time, IDs, action budget, and trace data. Production can seed it cryptographically at the GameSession boundary; tests and replays can inject recorded values.
+`GameState.executionContext` now persists seeded RNG state, a monotonic ID allocator, a logical clock, resolver action-budget accounting, and trace metadata. `GameSession` creates the production context from cryptographic entropy once; setup, pregame, the pipeline, battle, triggers, modifiers, zone transitions, effect frames, and resume paths consume and persist it. Regression coverage proves byte-equivalent execution before and after JSON serialization and rejects ambient entropy/time usage outside the adapter.
 
 ### GE-10 — Twenty card effects remain deferred
 

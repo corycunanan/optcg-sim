@@ -7,6 +7,7 @@
  */
 
 import type { GameEvent, GameEventType, GameEventPayloadMap, GameState, PendingEvent } from "../types.js";
+import { takeEngineTimestamp } from "./execution-context.js";
 
 export function withTriggerScanned(event: PendingEvent): PendingEvent {
   if (event.propagation?.triggerScanned) return event;
@@ -42,13 +43,14 @@ export function emitEvent<T extends GameEventType>(
   playerIndex: 0 | 1,
   payload: GameEventPayloadMap[T] = {} as GameEventPayloadMap[T],
 ): GameState {
+  const timed = takeEngineTimestamp(state);
   const event = {
     type,
     playerIndex,
     payload,
-    timestamp: Date.now(),
+    timestamp: timed.timestamp,
   } as GameEvent;
-  let turn = state.turn;
+  let turn = timed.state.turn;
   // Record K.O.s for ACTION_PERFORMED_THIS_TURN conditions (OP16-100
   // "if your opponent's Character has been K.O.'d during this turn").
   // playerIndex on CARD_KO is the K.O.'d character's owner.
@@ -62,7 +64,7 @@ export function emitEvent<T extends GameEventType>(
     };
   }
   return {
-    ...state,
+    ...timed.state,
     turn,
     eventLog: [...state.eventLog, event],
   };

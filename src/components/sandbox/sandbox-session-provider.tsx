@@ -17,6 +17,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { createSandboxExecutionContext } from "@/lib/sandbox/execution-context";
 import type {
   CardDb,
   GameAction,
@@ -131,6 +132,7 @@ export function buildSandboxSession(
 
   const gameState: GameState = {
     id: "sandbox",
+    executionContext: createSandboxExecutionContext(),
     players,
     turn: replayed.turn,
     pregame: null,

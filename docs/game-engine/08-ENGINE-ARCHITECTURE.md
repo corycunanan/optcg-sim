@@ -18,6 +18,8 @@
 
 5. **Prohibition registry with veto semantics.** Active prohibitions are registered in a flat, scannable collection. Before any action executes, the engine scans this registry for matching vetoes. A single match is sufficient to block the action. Per comprehensive rules 1-3-3, prohibitions always override instructions.
 
+6. **Persisted deterministic execution context.** RNG state, monotonic ID allocation, logical time, the resolver action budget, and trace metadata live in `GameState.executionContext`. Production creates one cryptographically seeded context at the `GameSession` boundary; tests and replays inject a recorded context. No core engine path reads ambient randomness or wall-clock time.
+
 ---
 
 ## Core Components
@@ -93,6 +95,7 @@ graph TB
 | **Duration Tracker** | Tracks active continuous effects and their expiry conditions. Processes expiry waves at phase boundaries. |
 | **Scheduled Action Queue** | Priority queue of deferred actions (end-of-turn obligations, future-phase triggers) processed at their designated timing. |
 | **Event Bus** | Typed event dispatcher. Actions emit events; the trigger system and other observers subscribe. |
+| **Execution Context** | Persisted source of RNG, IDs, logical timestamps, action-budget accounting, and replay trace metadata. |
 
 ---
 
@@ -103,6 +106,7 @@ The immutable state snapshot. Every field is read-only after creation. Mutations
 ```typescript
 interface GameState {
   id: string;
+  executionContext: EngineExecutionContext;
   turn: TurnState;
   players: [PlayerState, PlayerState];
   battle: BattleContext | null;
