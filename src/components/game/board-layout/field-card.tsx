@@ -111,6 +111,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const inputSuppressed = interactionMode !== "full";
   const rejectionSequence = useCardRejection(card.instanceId);
   const activation = getActivateMainState(card, cardDb, oncePerTurnUsed);
+  const sourceStateAllowsActivation =
+    !activation?.requiresActiveSelf || card.state === "ACTIVE";
   const menuTriggerEnabled =
     !!onAction &&
     canOpenActivateMainMenu({
@@ -121,7 +123,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const effectAction = activation
     ? activation.usedThisTurn
       ? ("used" as const)
-      : canActivateMain && !inputSuppressed
+      : canActivateMain && !inputSuppressed && sourceStateAllowsActivation
         ? ("available" as const)
         : ("unavailable" as const)
     : undefined;

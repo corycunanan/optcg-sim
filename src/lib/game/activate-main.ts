@@ -5,12 +5,14 @@ type ActivateMainBlock = {
   category: string;
   trigger?: { keyword?: string; once_per_turn?: boolean };
   flags?: { once_per_turn?: boolean };
+  costs?: Array<{ type?: string; target?: { type?: string } }>;
 };
 
 export interface ActivateMainState {
   effectId: string;
   oncePerTurn: boolean;
   usedThisTurn: boolean;
+  requiresActiveSelf: boolean;
 }
 
 export function getActivateMainState(
@@ -34,6 +36,11 @@ export function getActivateMainState(
   return {
     effectId: block.id,
     oncePerTurn,
+    requiresActiveSelf:
+      block.costs?.some(
+        (cost) =>
+          cost.type === "REST_SELF" && cost.target?.type !== "YOUR_LEADER",
+      ) ?? false,
     usedThisTurn:
       oncePerTurn &&
       (oncePerTurnUsed?.[block.id]?.includes(card.instanceId) ?? false),

@@ -178,10 +178,12 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     ? getActivateMainState(card, cardDb, oncePerTurnUsed)
     : null;
   const menuTriggerEnabled = !!activation && !!onAction && !inputSuppressed;
+  const sourceStateAllowsActivation =
+    !activation?.requiresActiveSelf || card?.state === "ACTIVE";
   const effectAction = activation
     ? activation.usedThisTurn
       ? ("used" as const)
-      : canActivateMain && !inputSuppressed
+      : canActivateMain && !inputSuppressed && sourceStateAllowsActivation
         ? ("available" as const)
         : ("unavailable" as const)
     : undefined;

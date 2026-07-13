@@ -62,7 +62,48 @@ describe("getActivateMainState", () => {
     expect(getActivateMainState(instance, cardDb)).toEqual({
       effectId: "activate",
       oncePerTurn: false,
+      requiresActiveSelf: false,
       usedThisTurn: false,
+    });
+  });
+
+  it("identifies REST_SELF costs that require the source card to be active", () => {
+    const cardDb: CardDb = {
+      [instance.cardId]: cardData({
+        effects: [
+          {
+            id: "activate",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            costs: [{ type: "REST_SELF" }],
+          },
+        ],
+      }),
+    };
+
+    expect(getActivateMainState(instance, cardDb)).toMatchObject({
+      requiresActiveSelf: true,
+    });
+  });
+
+  it("does not treat a leader-targeted REST_SELF cost as resting the source", () => {
+    const cardDb: CardDb = {
+      [instance.cardId]: cardData({
+        effects: [
+          {
+            id: "activate",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            costs: [
+              { type: "REST_SELF", target: { type: "YOUR_LEADER" } },
+            ],
+          },
+        ],
+      }),
+    };
+
+    expect(getActivateMainState(instance, cardDb)).toMatchObject({
+      requiresActiveSelf: false,
     });
   });
 
