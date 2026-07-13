@@ -3,8 +3,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
-import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
+import type { CardData, CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { canPlayCardInZone } from "@/lib/game/client-legality";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { cardEntry } from "@/lib/motion";
@@ -32,6 +33,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   card,
   cardDb,
   activeDragType,
+  draggedCardType,
+  playSignalActive = true,
   canAttack,
   blockerSelectable,
   selected,
@@ -57,6 +60,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
+  draggedCardType?: CardData["type"];
+  playSignalActive?: boolean;
   canAttack: boolean;
   blockerSelectable?: boolean;
   selected?: boolean;
@@ -136,7 +141,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     !acceptsEvent &&
     !counterDragActive &&
     !!boardFull &&
-    activeDragType === "hand-card";
+    activeDragType === "hand-card" &&
+    canPlayCardInZone(draggedCardType, "character");
+  const dropActive = acceptsDon || acceptsCounter || acceptsEvent || acceptsHandCard;
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: acceptsCounter
       ? `counter-target-${card.instanceId}`
@@ -152,6 +159,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
         : acceptsHandCard
           ? { type: "character-slot", slotIndex }
           : { type: "don-target", targetInstanceId: card.instanceId },
+    disabled: !dropActive,
   });
 
   const mergedRef = useCallback(
@@ -255,11 +263,14 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           className="relative flex items-center justify-center rounded-md"
         >
           <DropOverlay
-            active={acceptsDon || acceptsHandCard || acceptsCounter || acceptsEvent}
-            hovered={
-              isOver && (acceptsDon || acceptsHandCard || acceptsCounter || acceptsEvent)
+            active={
+              acceptsDon || acceptsCounter || (acceptsHandCard && !!playSignalActive)
             }
-            color={acceptsEvent ? "blue" : acceptsHandCard ? "red" : "amber"}
+            hovered={
+              isOver &&
+              (acceptsDon || acceptsCounter || (acceptsHandCard && !!playSignalActive))
+            }
+            color={acceptsHandCard ? "red" : "amber"}
           />
           <Card
             data={{ card, cardDb }}
@@ -306,6 +317,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card,
   cardDb,
   activeDragType,
+  attackTargetEligible,
   isAttacker,
   isDefender,
   counterPulse,
@@ -318,6 +330,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   card: CardInstance;
   cardDb: CardDb;
   activeDragType: string | null;
+  attackTargetEligible: boolean;
   isAttacker?: boolean;
   /** See `PlayerFieldCard.isDefender` — identical semantics on the opposing
    *  side. */
@@ -334,10 +347,11 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
-  const accepts = activeDragType === "attacker";
+  const accepts = activeDragType === "attacker" && attackTargetEligible;
   const { setNodeRef, isOver } = useDroppable({
     id: `attack-target-${card.instanceId}`,
     data: { type: "attack-target", targetInstanceId: card.instanceId },
+    disabled: !accepts,
   });
 
   const ref = useCallback(

@@ -69,7 +69,7 @@ export const ST18_002_O_NAMI: EffectSchema = {
       },
       actions: [
         { type: "TRASH_FROM_HAND", params: { amount: 1 } },
-        { type: "DRAW", params: { amount: 2 }, chain: "AND" },
+        { type: "DRAW", params: { amount: 2 }, chain: "THEN" },
       ],
     },
   ],

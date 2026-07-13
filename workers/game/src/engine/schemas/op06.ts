@@ -1003,7 +1003,7 @@ export const OP06_028_ZEO: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "LIFE_TO_HAND",
@@ -1045,7 +1045,7 @@ export const OP06_029_DARUMA: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "LIFE_TO_HAND",
@@ -1091,7 +1091,7 @@ export const OP06_030_DOSUN: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 2000 },
           duration: { type: "UNTIL_START_OF_YOUR_NEXT_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "LIFE_TO_HAND",
@@ -1225,7 +1225,7 @@ export const OP06_034_HYOUZOU: EffectSchema = {
           target: { type: "SELF" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "LIFE_TO_HAND",
@@ -1642,7 +1642,7 @@ export const OP06_045_KUZAN: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 2, position: "BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1704,7 +1704,7 @@ export const OP06_047_CHARLOTTE_PUDDING: EffectSchema = {
         {
           type: "SHUFFLE_DECK",
           target: { type: "PLAYER", controller: "OPPONENT" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "OPPONENT_ACTION",
@@ -2133,7 +2133,7 @@ export const OP06_059_WHITE_SNAKE: EffectSchema = {
         {
           type: "DRAW",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2232,7 +2232,7 @@ export const OP06_061_VINSMOKE_ICHIJI_7: EffectSchema = {
           target: { type: "SELF" },
           params: { keyword: "RUSH" },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2705,7 +2705,7 @@ export const OP06_073_SHIKI: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2986,7 +2986,7 @@ export const OP06_080_GECKO_MORIA: EffectSchema = {
             },
           },
           params: { source_zone: "TRASH", cost_override: "FREE" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3053,7 +3053,7 @@ export const OP06_082_INUPPE: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3508,7 +3508,7 @@ export const OP06_095_SHADOWS_ASGARD: EffectSchema = {
             },
           },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3521,7 +3521,7 @@ export const OP06_095_SHADOWS_ASGARD: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

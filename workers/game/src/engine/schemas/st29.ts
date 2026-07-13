@@ -33,7 +33,7 @@ export const ST29_001_MONKEY_D_LUFFY: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -360,7 +360,7 @@ export const ST29_014_RORONOA_ZORO: EffectSchema = {
             count: { up_to: 1 },
           },
           params: { amount: 1, don_state: "RESTED" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { once_per_turn: true, optional: true },
@@ -516,7 +516,7 @@ export const ST29_017_IAI_DEATH_LION_SONG: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

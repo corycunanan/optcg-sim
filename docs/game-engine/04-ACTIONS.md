@@ -27,7 +27,7 @@ interface Action {
 - `target` — What the action operates on. References the [Target](./05-TARGETING.md) type system.
 - `params` — Action-specific parameters. Each primitive defines its own params interface.
 - `duration` — How long the action's effect persists (for modifiers). See [Schema Overview — Duration Types](./01-SCHEMA-OVERVIEW.md).
-- `chain` — Connector to the next action: `THEN`, `IF_DO`, or `AND`.
+- `chain` — Connector from the preceding action: `THEN`, `IF_DO`, or `AND`. Use `AND` only for explicitly simultaneous text; ordinary connective “and” resolves in printed order and is encoded as `THEN`.
 - `target_ref` — Resolves this action's target from a prior action's `result_ref`.
 - `result_ref` — Assigns a reference ID for later actions to use via `target_ref` or `DynamicValue`.
 - `conditions` — Inline condition that gates this specific action without affecting the rest of the chain.

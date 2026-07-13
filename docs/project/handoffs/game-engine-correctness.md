@@ -50,7 +50,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 32 | OPT-469 | Correct OP03-032, OP04-042, and OP06-026 schemas against official sources | — | — | Done | [#285](https://github.com/corycunanan/optcg-sim/pull/285) | Official text restored; three schemas corrected with full-pipeline regressions. |
 | 33 | OPT-471 | Make authored-schema validation fail closed and mandatory in CI | — | OPT-470, OPT-467, OPT-468, OPT-469 | Done | [#290](https://github.com/corycunanan/optcg-sim/pull/290) | Runtime-backed validator, atomic boot rejection, terminal dispatch faults, and CI schema/source/disposition gates. |
 | 34 | OPT-473 | Execute and gate every authored action handler, including the six zero-covered handlers | — | OPT-471 | Done | [#291](https://github.com/corycunanan/optcg-sim/pull/291) | 3,549-use inventory; 72/72 handled and executed; global and hotspot coverage ratchets. |
-| 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | In Review | [#292](https://github.com/corycunanan/optcg-sim/pull/292) | All 210 authored connectors migrated to THEN; snapshot-locked AND transactions and validator gate added. |
+| 35 | OPT-472 | Define and implement true simultaneous semantics for AND action chains | — | OPT-471 | Done | [#292](https://github.com/corycunanan/optcg-sim/pull/292) | All 210 authored connectors migrated to THEN; snapshot-locked AND transactions and validator gate added. |
 | 36 | OPT-474 | Establish one authoritative zone-transition and card-identity contract | — | OPT-468 | In Review | [#293](https://github.com/corycunanan/optcg-sim/pull/293) | Every cross-zone move creates a fresh identity through one service; exhaustive zone-pair and static guards added. |
 | 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | Backlog | — | Wave 3 conditional-reveal closure. |
 | 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | Backlog | — | Wave 3 pregame effect closure. |
@@ -316,11 +316,20 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Unresolved:** OPT-486 tracks the pre-existing Vitest 4.1.1 / coverage-v8 4.1.4 warning; it does not block the thresholds. No OPT-473 behavior remains open.
 - **Pointer:** PR #291; inspect `85fa7fd` for the inventory, execution regressions, and thresholds.
 
+### OPT-472 → OPT-474
+**From:** session on 2026-07-12 · **Commits:** `bbf944c` (implementation), `b0e0267` (review hardening) · **PR:** [#292](https://github.com/corycunanan/optcg-sim/pull/292)
+
+- **Primer:** All 210 authored connective `AND` uses now resolve in printed order as `THEN`. Explicit future `AND` groups lock conditions, dynamic values, and targets against one snapshot, collect every target choice before mutation, and commit their events only after the complete group resolves.
+- **Read first:** `docs/game-engine/AND-CHAIN-AUDIT.md`, `workers/game/src/engine/effect-resolver/simultaneous.ts`, `resolver.ts`, and `workers/game/src/__tests__/opt-472-simultaneous-and.test.ts`.
+- **Gotchas / do NOT touch:** `AND` is not a spelling-level encoding for the word “and.” The simultaneous allowlist intentionally excludes handlers that can open prohibition/replacement, trigger-drain, arrange, or nested-choice continuations; add a handler only with an atomic preflight regression. Same-group result dependencies remain invalid at any nesting depth (target, dynamic amount, condition, or filter), and resume packets must satisfy the target count rather than trusting the client prompt.
+- **Unresolved:** The issue estimate said 211 authored connectors; the AST-backed source audit found and migrated 210 across 35 schema files. No unclassified authored `AND` remains. PR #292 has merged.
+- **Pointer:** PR #292; inspect `bbf944c` for the transaction planner/migration and `b0e0267` for the review-driven count/ref fail-closed guards.
+
 ### OPT-474 → OPT-475
 **From:** session on 2026-07-12 · **Commits:** `15cdcac` (implementation), `7cb8b42` (visibility review fix) · **PR:** [#293](https://github.com/corycunanan/optcg-sim/pull/293)
 
 - **Primer:** `zone-transition.ts` is now the single cross-zone mutation boundary. Every legal pair creates a fresh ID, strips transient state, returns attached DON!!, cleans old effect/prohibition/trigger references, remaps trigger staging, and returns explicit old/new movement facts. Actions, costs, resumes, battle, play, draw/search, setup, and mulligan paths use the contract.
 - **Read first:** `docs/game-engine/ZONE-TRANSITION-CONTRACT.md`, `workers/game/src/engine/zone-transition.ts`, the movement bridge in `triggers.ts`, and `opt-474-zone-transition-contract.test.ts`.
 - **Gotchas / do NOT touch:** Same-zone reorder operations retain identity. Leave-zone callers that need the source's own trigger must preserve its registration only until their old/new-ID event is scanned. Event payloads use the old ID for the leave fact and `newCardInstanceId` for the destination; both identity fields must be redacted from unauthorized owner-only event views. Setup is the only construction-time adapter because no complete `GameState` exists yet.
-- **Unresolved:** No OPT-474 behavior remains open. OPT-486 tracks the pre-existing Vitest/coverage-provider version mismatch warning. PR #291 has merged, so OPT-475 is ready after the current PR review queue.
+- **Unresolved:** No OPT-474 behavior remains open. OPT-486 tracks the pre-existing Vitest/coverage-provider version mismatch warning. PRs #291 and #292 have merged, so OPT-475 is ready after the current PR review queue.
 - **Pointer:** PR #293; inspect `15cdcac` for the transition implementation and `7cb8b42` for the review-driven hidden-destination-ID redaction.

@@ -24,6 +24,14 @@ import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import { pushBatchResumeFrame, processRemainingTriggers } from "./resume.js";
 import { setReplacementDispatcher } from "../replacements.js";
+import { buildSelectTargetPrompt } from "./target-resolver.js";
+import {
+  SIMULTANEOUS_ACTION_TYPES,
+  isSimultaneousGroupStart,
+  planSimultaneousGroup,
+  simultaneousGroupEnd,
+  type SimultaneousGroupPlan,
+} from "./simultaneous.js";
 
 // Action handlers
 import * as drawSearch from "./actions/draw-search.js";
@@ -365,10 +373,167 @@ export function resolveEffect(
 
 // ─── Action Chain ─────────────────────────────────────────────────────────────
 
-interface ChainResult {
+export interface ChainResult {
   state: GameState;
   events: PendingEvent[];
   pendingPrompt?: PendingPromptState;
+}
+
+function promptForSimultaneousSelection(
+  state: GameState,
+  plan: SimultaneousGroupPlan,
+  actionIndex: number,
+  validTargetIds: string[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ChainResult {
+  const action = plan.actions[actionIndex];
+  const resultRefs = new Map<string, EffectResult>(
+    plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
+  );
+  const promptResult = buildSelectTargetPrompt(
+    state,
+    action,
+    validTargetIds,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+  );
+  if (!promptResult.pendingPrompt) return { state, events: [] };
+
+  const frame: EffectStackFrame = {
+    id: generateFrameId(),
+    sourceCardInstanceId,
+    controller,
+    effectBlock: {} as EffectBlock,
+    phase: "AWAITING_TARGET_SELECTION",
+    pausedAction: action,
+    remainingActions: plan.followingActions,
+    resultRefs: plan.resultRefs,
+    validTargets: validTargetIds,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    simultaneousGroup: plan,
+  };
+  const nextState = pushFrame(state, frame);
+  if (isEngineTerminated(nextState)) return { state: nextState, events: [] };
+
+  let prompt = { ...promptResult.pendingPrompt, resumeContext: frame.id };
+  if (plan.effectDescription && prompt.options) {
+    prompt = {
+      ...prompt,
+      options: { ...prompt.options, effectDescription: plan.effectDescription } as typeof prompt.options,
+    };
+  }
+  return { state: nextState, events: [], pendingPrompt: prompt };
+}
+
+/**
+ * Continue an AND transaction. Planning reads one unchanged snapshot and may
+ * pause repeatedly for choices; handlers run only after every target is
+ * locked. Events are returned only after the whole group commits.
+ */
+export function continueSimultaneousGroup(
+  state: GameState,
+  plan: SimultaneousGroupPlan,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): ChainResult {
+  const unsupportedAction = plan.actions.find(
+    (action) => !SIMULTANEOUS_ACTION_TYPES.has(action.type),
+  );
+  if (unsupportedAction) {
+    const terminated = terminateForEngineContract(state, {
+      kind: "ENGINE_CONTRACT",
+      contract: "ACTION_HANDLER",
+      actionType: unsupportedAction.type,
+      sourceCardInstanceId,
+      message: `Action type '${unsupportedAction.type}' cannot commit inside an AND transaction`,
+    });
+    return { state: terminated, events: [] };
+  }
+
+  const planning = planSimultaneousGroup(
+    state,
+    plan,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+  );
+  if (planning.selection) {
+    return promptForSimultaneousSelection(
+      state,
+      planning.plan,
+      planning.selection.actionIndex,
+      planning.selection.validTargetIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+    );
+  }
+
+  const resultRefs = new Map<string, EffectResult>(
+    planning.plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
+  );
+  const events: PendingEvent[] = [];
+  const succeeded = planning.plan.actions.map(() => false);
+  let nextState = state;
+
+  for (let index = 0; index < planning.plan.actions.length; index++) {
+    const action = planning.plan.actions[index];
+    const lock = planning.plan.locks[index];
+    if (!lock?.execute) continue;
+    const result = executeEffectAction(
+      nextState,
+      action,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      lock.targetInstanceIds,
+    );
+    nextState = result.state;
+    events.push(...result.events);
+    succeeded[index] = result.succeeded;
+    if (isEngineTerminated(nextState)) return { state: nextState, events };
+    if (result.pendingPrompt || result.pendingBatchTriggers) {
+      nextState = terminateForEngineContract(nextState, {
+        kind: "ENGINE_CONTRACT",
+        contract: "ACTION_HANDLER",
+        actionType: action.type,
+        sourceCardInstanceId,
+        message: `Action type '${action.type}' opened an unsupported continuation during an AND commit`,
+      });
+      return { state: nextState, events };
+    }
+    if (action.result_ref && result.result) resultRefs.set(action.result_ref, result.result);
+  }
+
+  if (planning.plan.followingActions.length === 0) return { state: nextState, events };
+  const tail = executeActionChain(
+    nextState,
+    planning.plan.followingActions,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    planning.plan.effectDescription,
+    succeeded.at(-1) ?? false,
+  );
+  return {
+    state: tail.state,
+    events: [...events, ...tail.events],
+    ...(tail.pendingPrompt ? { pendingPrompt: tail.pendingPrompt } : {}),
+  };
 }
 
 export function executeActionChain(
@@ -388,14 +553,42 @@ export function executeActionChain(
   for (let i = 0; i < actions.length; i++) {
     const action = actions[i];
 
-    // Check chain connector
-    if (action.chain && (i > 0 || priorActionSucceeded !== undefined)) {
-      if (action.chain === "IF_DO" && !lastActionSucceeded) {
-        lastActionSucceeded = false;
-        continue;
-      }
-      // THEN: always execute
-      // AND: execute simultaneously (treated as THEN for now)
+    // A simultaneous group can itself be the dependent side of IF_DO. When
+    // the dependency failed, skip the complete group rather than allowing an
+    // AND sibling to escape as a standalone action.
+    if (
+      action.chain === "IF_DO" &&
+      (i > 0 || priorActionSucceeded !== undefined) &&
+      !lastActionSucceeded
+    ) {
+      lastActionSucceeded = false;
+      if (isSimultaneousGroupStart(actions, i)) i = simultaneousGroupEnd(actions, i);
+      continue;
+    }
+
+    if (isSimultaneousGroupStart(actions, i)) {
+      const end = simultaneousGroupEnd(actions, i);
+      const group = actions.slice(i, end + 1);
+      const plan: SimultaneousGroupPlan = {
+        actions: group,
+        locks: [],
+        nextActionIndex: 0,
+        followingActions: actions.slice(end + 1),
+        resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+        effectDescription,
+      };
+      const groupResult = continueSimultaneousGroup(
+        state,
+        plan,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+      );
+      return {
+        state: groupResult.state,
+        events: [...events, ...groupResult.events],
+        ...(groupResult.pendingPrompt ? { pendingPrompt: groupResult.pendingPrompt } : {}),
+      };
     }
 
     // Check inline conditions

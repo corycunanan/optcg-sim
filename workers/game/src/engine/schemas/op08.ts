@@ -68,7 +68,7 @@ export const OP08_002_MARCO: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 1, position: "TOP_OR_BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "MODIFY_POWER",
@@ -1602,7 +1602,7 @@ export const OP08_045_THATCH: EffectSchema = {
         {
           type: "DRAW",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1754,7 +1754,7 @@ export const OP08_050_NAMULE: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 2, position: "TOP_OR_BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2969,7 +2969,7 @@ export const OP08_084_JACK: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "KO",
@@ -3045,7 +3045,7 @@ export const OP08_086_GINRUMMY: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 2 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3688,7 +3688,7 @@ export const OP08_105_JEWELRY_BONNEY: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3704,7 +3704,7 @@ export const OP08_105_JEWELRY_BONNEY: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -4093,7 +4093,7 @@ export const OP08_115_THE_EARTH_WILL_NOT_LOSE: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -4285,7 +4285,7 @@ export const OP08_119_KAIDO_AND_LINLIN: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           params: { amount: 1, position: "TOP", controller: "OPPONENT" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },

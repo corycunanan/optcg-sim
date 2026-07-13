@@ -91,7 +91,7 @@ export const ST04_003_KAIDO: EffectSchema = {
           target: { type: "SELF" },
           params: { keyword: "RUSH" },
           duration: { type: "THIS_TURN" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -147,7 +147,7 @@ export const ST04_005_QUEEN: EffectSchema = {
       costs: [{ type: "DON_MINUS", amount: 1 }],
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
       ],
     },
   ],

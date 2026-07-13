@@ -92,11 +92,14 @@ export function PlayerField({
     (canInteract || (canDragCounter && isCounterEvent(draggedHandData)));
   const characterCounterDragActive =
     canDragCounter && draggedHandData?.type === "Character";
+  const playSignalActive =
+    activeDrag?.type !== "hand-card" || activeDrag.affordable !== false;
 
   return (
     <>
       <DroppableOwnField
         active={eventFieldDropActive}
+        signalActive={eventFieldDropActive && playSignalActive}
         style={{ left: zone2Left, top: playerTop, width: CHAR_ROW_W, height: FIELD_H }}
       />
 
@@ -119,6 +122,8 @@ export function PlayerField({
               slotIndex={i}
               label={`C${i + 1}`}
               activeDragType={activeDragType}
+              draggedCardType={draggedHandData?.type}
+              playSignalActive={playSignalActive}
               eventDropTarget={eventFieldDropActive}
               zoneKey={`p-char-${i}`}
               style={{ position: "absolute", left: pos.left, top: playerCharTop }}
@@ -133,6 +138,8 @@ export function PlayerField({
             card={char}
             cardDb={cardDb}
             activeDragType={activeDragType}
+            draggedCardType={draggedHandData?.type}
+            playSignalActive={playSignalActive}
             canAttack={canInteract && char.state === "ACTIVE"}
             blockerSelectable={isBlockerEligible}
             selected={selectedBlockerId === char.instanceId}
@@ -210,6 +217,8 @@ export function PlayerField({
         card={me?.stage ?? null}
         cardDb={cardDb}
         activeDragType={activeDragType}
+        draggedCardType={draggedHandData?.type}
+        playSignalActive={playSignalActive}
         eventDropTarget={eventFieldDropActive}
         onAction={onAction}
         zoneKey="p-stage"

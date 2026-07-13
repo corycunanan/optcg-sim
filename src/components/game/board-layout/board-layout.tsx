@@ -530,6 +530,11 @@ function BoardLayoutInner({
             cardDb={cardDb}
             enableDrag={!dndDisabled && (bs.canInteract || bs.canDragCounter)}
             counterMode={!dndDisabled && bs.canDragCounter}
+            availableDon={
+              !dndDisabled && bs.canInteract
+                ? (me?.donCostArea.filter((don) => don.state === "ACTIVE").length ?? 0)
+                : undefined
+            }
             zoneKey="p-hand"
             inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
             sleeveUrl={me?.sleeveUrl}

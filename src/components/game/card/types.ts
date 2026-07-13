@@ -61,6 +61,8 @@ export interface CardInteraction {
   clickable?: boolean;
   /** Suppress the hover tooltip (e.g. during drag). */
   tooltipDisabled?: boolean;
+  /** Advisory legality explanation shown above the card details. */
+  tooltipNotice?: string;
 }
 
 export interface CardDataProp {

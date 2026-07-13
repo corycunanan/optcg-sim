@@ -90,6 +90,12 @@ export function validateTargetConstraints(
   cardDb: Map<string, CardData>,
   resultRefs?: Map<string, EffectResult>,
 ): boolean {
+  if (new Set(selectedIds).size !== selectedIds.length) return false;
+
+  const count = target.count;
+  if (count && "exact" in count && selectedIds.length !== count.exact) return false;
+  if (count && "up_to" in count && selectedIds.length > count.up_to) return false;
+
   if (selectedIds.length === 0) {
     // Empty selection is invalid if dual_targets has exact-count slots
     if (target.dual_targets && target.dual_targets.length > 0) {

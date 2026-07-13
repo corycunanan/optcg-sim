@@ -757,7 +757,7 @@ export const OP11_021_JINBE: EffectSchema = {
         {
           type: "SET_DON_ACTIVE",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -1906,7 +1906,7 @@ export const OP11_054_NAMI: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 2, position: "TOP_OR_BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -2937,7 +2937,7 @@ export const OP11_092_HELMEPPO: EffectSchema = {
           },
           params: { source_zone: "TRASH", cost_override: "FREE" },
           result_ref: "played_character",
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "SCHEDULE_ACTION",
@@ -3306,7 +3306,7 @@ export const OP11_102_CAMIE: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           params: { amount: 1, position: "TOP", controller: "OPPONENT" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3492,7 +3492,7 @@ export const OP11_108_NEPTUNE: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
     },
@@ -3519,7 +3519,7 @@ export const OP11_109_PAPPAG: EffectSchema = {
       },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
-        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "AND" },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
     },
   ],

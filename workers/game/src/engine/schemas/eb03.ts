@@ -907,7 +907,7 @@ export const EB03_021_ALVIDA: EffectSchema = {
             filter: { base_cost_max: 3 },
           },
           params: { position: "BOTTOM" },
-          chain: "AND",
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -1350,7 +1350,7 @@ export const EB03_034_CHARLOTTE_LINLIN: EffectSchema = {
         {
           type: "PLACE_HAND_TO_DECK",
           params: { amount: 1, position: "TOP" },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "ADD_DON_FROM_DECK",
@@ -1552,7 +1552,7 @@ export const EB03_039_ULTI: EffectSchema = {
         {
           type: "TRASH_FROM_HAND",
           params: { amount: 1 },
-          chain: "AND",
+          chain: "THEN",
         },
         {
           type: "PLAY_CARD",

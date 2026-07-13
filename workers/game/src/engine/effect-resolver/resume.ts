@@ -24,8 +24,9 @@ import type {
 } from "../../types.js";
 import { generateFrameId, popFrame, peekFrame, pushFrame, updateTopFrame } from "../effect-stack.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
-import { executeActionChain } from "./resolver.js";
+import { continueSimultaneousGroup, executeActionChain } from "./resolver.js";
 import type { EffectResolverResult } from "./types.js";
+import { buildSelectTargetPrompt, validateTargetConstraints } from "./target-resolver.js";
 
 import {
   handleArrangeSearchDeck,
@@ -174,6 +175,64 @@ export function resumeFromStack(
   }
 
   const { sourceCardInstanceId, controller, phase } = topFrame;
+
+  if (phase === "AWAITING_TARGET_SELECTION" && topFrame.simultaneousGroup) {
+    const plan = topFrame.simultaneousGroup;
+    const actionIndex = plan.nextActionIndex;
+    const pausedAction = plan.actions[actionIndex];
+    const resultRefs = new Map<string, EffectResult>(
+      plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
+    );
+    const selected = action.type === "SELECT_TARGET"
+      ? action.selectedInstanceIds ?? []
+      : null;
+    const invalid = selected === null ||
+      selected.some((id) => !topFrame.validTargets.includes(id)) ||
+      (pausedAction.target && !validateTargetConstraints(
+        selected,
+        pausedAction.target,
+        state,
+        cardDb,
+        resultRefs,
+      ));
+
+    if (invalid) {
+      const reprompt = buildSelectTargetPrompt(
+        state,
+        pausedAction,
+        topFrame.validTargets,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+      );
+      return {
+        state,
+        events: [],
+        resolved: false,
+        rejected: true,
+        ...(reprompt.pendingPrompt
+          ? { pendingPrompt: { ...reprompt.pendingPrompt, resumeContext: topFrame.id } }
+          : {}),
+      };
+    }
+
+    const locks = [...plan.locks];
+    locks[actionIndex] = { execute: true, targetInstanceIds: selected };
+    const result = continueSimultaneousGroup(
+      popFrame(state),
+      { ...plan, locks, nextActionIndex: actionIndex + 1 },
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+    );
+    return {
+      state: result.state,
+      events: result.events,
+      resolved: !result.pendingPrompt && !isEngineTerminated(result.state),
+      ...(result.pendingPrompt ? { pendingPrompt: result.pendingPrompt } : {}),
+    };
+  }
 
   switch (phase) {
     case "AWAITING_OPTIONAL_RESPONSE":

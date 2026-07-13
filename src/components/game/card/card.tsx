@@ -266,7 +266,12 @@ export const Card = React.memo(function Card({
   if (!tooltipEligible) return cardElement;
 
   return (
-    <CardTooltip data={cardData} cardId={resolvedCardId} card={data?.card}>
+    <CardTooltip
+      data={cardData}
+      cardId={resolvedCardId}
+      card={data?.card}
+      notice={interaction?.tooltipNotice}
+    >
       {cardElement}
     </CardTooltip>
   );
