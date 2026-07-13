@@ -12,6 +12,7 @@ import { CardTooltip } from "../use-card-tooltip";
 import { CardBack } from "./card-back";
 import { CardFaces } from "./card-faces";
 import { CardFront } from "./card-front";
+import { CardActionBadge } from "./overlays/card-action-badge";
 import { CardCountBadge } from "./overlays/card-count-badge";
 import { CardDonBadge } from "./overlays/card-don-badge";
 import { CardHighlightRing } from "./overlays/card-highlight-ring";
@@ -255,6 +256,20 @@ export const Card = React.memo(function Card({
           transition={motionConfig.transition}
         >
           <CardDonBadge count={overlays.donCount} />
+        </motion.div>
+      )}
+
+      {overlays?.effectAction && (
+        <motion.div
+          className="pointer-events-none absolute z-20"
+          initial={false}
+          animate={{
+            right: cardRotate === 90 ? (width - height) / 2 + 4 : 4,
+            top: cardRotate === 90 ? (height - width) / 2 + 4 : 4,
+          }}
+          transition={motionConfig.transition}
+        >
+          <CardActionBadge state={overlays.effectAction} />
         </motion.div>
       )}
     </PerspectiveContainer>

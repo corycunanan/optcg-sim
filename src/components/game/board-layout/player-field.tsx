@@ -1,6 +1,6 @@
 "use client";
 
-import type { CardDb, GameAction, PlayerState } from "@shared/game-types";
+import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
@@ -39,6 +39,8 @@ interface PlayerFieldProps {
   activeDrag: DragPayload | null;
   refreshWave: boolean;
   canInteract: boolean;
+  canActivateMain: boolean;
+  oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
   canDragCounter: boolean;
   inBlockStep: boolean;
   selectedBlockerId: string | null;
@@ -65,6 +67,8 @@ export function PlayerField({
   activeDrag,
   refreshWave,
   canInteract,
+  canActivateMain,
+  oncePerTurnUsed,
   canDragCounter,
   inBlockStep,
   selectedBlockerId,
@@ -151,6 +155,8 @@ export function PlayerField({
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
+            canActivateMain={canActivateMain}
+            oncePerTurnUsed={oncePerTurnUsed}
             targetSelection={targetSelectionById?.get(char.instanceId)}
             onTargetToggle={() => onTargetToggle?.(char.instanceId)}
             counterTarget={
@@ -203,6 +209,8 @@ export function PlayerField({
           }
           eventDropTarget={eventFieldDropActive}
           counterPulse={counterPulseIds?.has(me.leader.instanceId)}
+          canActivateMain={canActivateMain}
+          oncePerTurnUsed={oncePerTurnUsed}
           targetSelection={targetSelectionById?.get(me.leader.instanceId)}
           onTargetToggle={() => onTargetToggle?.(me.leader.instanceId)}
           onAction={onAction}
@@ -229,6 +237,8 @@ export function PlayerField({
         draggedCardType={draggedHandData?.type}
         playSignalActive={playSignalActive}
         eventDropTarget={eventFieldDropActive}
+        canActivateMain={canActivateMain}
+        oncePerTurnUsed={oncePerTurnUsed}
         targetSelection={
           me?.stage ? targetSelectionById?.get(me.stage.instanceId) : undefined
         }

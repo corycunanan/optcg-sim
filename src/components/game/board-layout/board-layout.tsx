@@ -562,6 +562,12 @@ function BoardLayoutInner({
               !targetSelectionActive &&
               !spotlight.isBlockingPrompt
             }
+            canActivateMain={
+              bs.canInteract &&
+              !activePrompt &&
+              !spotlight.isBlockingPrompt
+            }
+            oncePerTurnUsed={turn?.oncePerTurnUsed}
             canDragCounter={
               bs.canDragCounter &&
               !targetSelectionActive &&

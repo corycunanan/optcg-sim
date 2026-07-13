@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import type { CardData, CardDb, CardInstance, GameAction } from "@shared/game-types";
+import type { CardData, CardDb, CardInstance, GameAction, TurnState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { canPlayCardInZone } from "@/lib/game/client-legality";
@@ -14,6 +14,7 @@ import { useInteractionMode } from "./interaction-mode";
 import { motion, useReducedMotion } from "motion/react";
 import { cardReject, cardRejectReduced } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
+import { getActivateMainState } from "@/lib/game/activate-main";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
@@ -147,6 +148,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   draggedCardType,
   playSignalActive = true,
   eventDropTarget,
+  canActivateMain,
+  oncePerTurnUsed,
   targetSelection,
   onTargetToggle,
   onAction,
@@ -160,6 +163,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   draggedCardType?: CardData["type"];
   playSignalActive?: boolean;
   eventDropTarget?: boolean;
+  canActivateMain?: boolean;
+  oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
   targetSelection?: TargetCardSelectionState;
   onTargetToggle?: () => void;
   onAction?: (action: GameAction) => void;
@@ -174,6 +179,20 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const reducedMotion = useReducedMotion();
   const rejectionSequence = useCardRejection(card?.instanceId ?? "");
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
+  const activation = card
+    ? getActivateMainState(card, cardDb, oncePerTurnUsed)
+    : null;
+  const menuTriggerEnabled =
+    !!activation && !!onAction && !inputSuppressed && !targetSelection;
+  const sourceStateAllowsActivation =
+    !activation?.requiresActiveSelf || card?.state === "ACTIVE";
+  const effectAction = activation
+    ? activation.usedThisTurn
+      ? ("used" as const)
+      : canActivateMain && !inputSuppressed && sourceStateAllowsActivation
+        ? ("available" as const)
+        : ("unavailable" as const)
+    : undefined;
   const accepts =
     !targetSelection &&
     activeDragType === "hand-card" &&
@@ -199,10 +218,10 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (inputSuppressed) return;
+      if (inputSuppressed || targetSelection) return;
       setMenuOpen(true);
     },
-    [inputSuppressed],
+    [inputSuppressed, targetSelection],
   );
 
   return (
@@ -217,11 +236,12 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
         color="blue"
       />
       {card ? (
-        <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
-          <DropdownMenuTrigger asChild>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild disabled={!menuTriggerEnabled}>
             <motion.div
               key={rejectionSequence ?? "idle"}
               onContextMenu={handleContextMenu}
+              data-effect-menu-trigger={activation ? card.instanceId : undefined}
               onClick={
                 targetSelection && !targetSelection.disabledReason
                   ? onTargetToggle
@@ -229,6 +249,13 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               }
               data-target-selection={targetSelection ? "" : undefined}
               data-target-instance-id={targetSelection ? card.instanceId : undefined}
+              role={menuTriggerEnabled ? "button" : undefined}
+              tabIndex={menuTriggerEnabled ? 0 : undefined}
+              aria-label={
+                menuTriggerEnabled
+                  ? `Actions for ${cardDb[card.cardId]?.name ?? "card"}`
+                  : undefined
+              }
               animate={
                 rejectionSequence
                   ? rejectionAnimation
@@ -237,7 +264,9 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               transition={rejectionSequence ? rejectionAnimation.transition : undefined}
               className={cn(
                 "relative z-[1]",
-                targetSelection && !targetSelection.disabledReason && "cursor-pointer",
+                (menuTriggerEnabled ||
+                  (targetSelection && !targetSelection.disabledReason)) &&
+                  "cursor-pointer",
               )}
             >
               <Card
@@ -245,6 +274,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
                 variant="field"
                 state={card.state === "RESTED" ? "rest" : "active"}
                 overlays={{
+                  effectAction,
                   highlightRing: targetSelection?.selected
                     ? "selected"
                     : targetSelection?.eligible
@@ -262,6 +292,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
             <CardActionMenuContent
               card={card}
               cardDb={cardDb}
+              activation={activation}
+              canActivateNow={effectAction === "available"}
               onAction={onAction}
               onClose={() => setMenuOpen(false)}
             />

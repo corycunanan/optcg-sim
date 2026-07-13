@@ -12,6 +12,7 @@ import { rushAttackScenario } from "./combat/rush-attack";
 import { drawOneScenario } from "./draws/draw-1";
 import { drawTwoScenario } from "./draws/draw-2";
 import { actionRejectedScenario } from "./effects/action-rejected";
+import { activateMainMenuScenario } from "./effects/activate-main-menu";
 import {
   publicRevealSpotlightScenario,
   waitingRevealSpotlightScenario,
@@ -51,6 +52,7 @@ export const scenarios: Scenario[] = [
   lifeToHandScenario,
   lifeToTrashScenario,
   actionRejectedScenario,
+  activateMainMenuScenario,
   publicRevealSpotlightScenario,
   waitingRevealSpotlightScenario,
   selectTargetScenario,
