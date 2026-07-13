@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   type Announcements,
+  type DragCancelEvent,
   type DragEndEvent,
   type ScreenReaderInstructions,
   type DragStartEvent,
@@ -42,6 +43,15 @@ const arrangeScreenReaderInstructions: ScreenReaderInstructions = {
   draggable:
     "While choosing, press Enter or Space to select a card. In the reorder step, press Enter or Space to pick up a card. Use the arrow keys to move it, press Enter or Space to drop, or Escape to cancel.",
 };
+
+export function getArrangeEscapeAction(
+  activeId: string | null,
+  selectedId: string | null,
+): "cancel-drag" | "clear-selection" | "hide" {
+  if (activeId) return "cancel-drag";
+  if (selectedId) return "clear-selection";
+  return "hide";
+}
 
 function SortableModalCard({
   card,
@@ -236,6 +246,11 @@ export function ArrangeTopCardsModal({
     }
   }
 
+  function handleDragCancel(event: DragCancelEvent) {
+    dragTilt.handleDragEnd(event);
+    setActiveId(null);
+  }
+
   function handleAddToHand() {
     if (!selectedId) return;
     const next = [...keptIds, selectedId];
@@ -273,9 +288,10 @@ export function ArrangeTopCardsModal({
       <DialogContent
         showCloseButton={false}
         onEscapeKeyDown={(event) => {
-          if (!selectedId) return;
+          const action = getArrangeEscapeAction(activeId, selectedId);
+          if (action === "hide") return;
           event.preventDefault();
-          setSelectedId(null);
+          if (action === "clear-selection") setSelectedId(null);
         }}
         className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
       >
@@ -298,10 +314,7 @@ export function ArrangeTopCardsModal({
             onDragStart={handleDragStart}
             onDragMove={dragTilt.handleDragMove}
             onDragEnd={handleDragEnd}
-            onDragCancel={() => {
-              dragTilt.handleDragEnd({} as DragEndEvent);
-              setActiveId(null);
-            }}
+            onDragCancel={handleDragCancel}
           >
             <div className="px-4 py-5">
               <SortableContext
