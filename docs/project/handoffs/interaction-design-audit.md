@@ -23,13 +23,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Done | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Done | [#300](https://github.com/corycunanan/optcg-sim/pull/300) | Completes the menu verb |
 | 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | Backlog | — | Add input equivalence after gestures stabilize |
-| 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | In Review | [#302](https://github.com/corycunanan/optcg-sim/pull/302) | Completes Event presentation and public reveals |
-| 9 | OPT-465 | Transform-class zone transitions + pile receipt: fizzle, pile pop, floating +N delta | — | OPT-464 | Backlog | — | Builds Event fizzle on the spotlight lifecycle |
+| 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | Done | [#302](https://github.com/corycunanan/optcg-sim/pull/302) | Completes Event presentation and public reveals |
+| 9 | OPT-465 | Transform-class zone transitions + pile receipt: fizzle, pile pop, floating +N delta | — | OPT-464 | In Review | [#304](https://github.com/corycunanan/optcg-sim/pull/304) | Travel remains unchanged; consumed cards fizzle and stacked zones acknowledge arrivals |
 | 10 | OPT-422 | Inspection parity, small state edges, and dead interaction code | — | OPT-421 | Backlog | — | Final cleanup and parity pass |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-465 after PR #302 merges. OPT-421 can now proceed from merged PR #300.
+**Next up:** OPT-421 can proceed now from merged PR #300. OPT-422 follows once keyboard/ARIA coverage lands.
 
 ---
 
@@ -96,3 +96,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Read first:** `src/lib/game/spotlight.ts`, `src/hooks/use-card-spotlight.ts`, `src/components/game/spotlight-overlay.tsx`, `src/components/game/board-layout/board-layout.tsx`
 - **Gotchas / do NOT touch:** Keep `CONTROLLER_ONLY` reveals out of the spotlight and keep non-responders limited to `promptRespondingPlayer`; private prompt options and continuation data must remain filtered. Dismissing a waiting reveal must keep every board action, including Activate Main, blocked until the opponent's prompt advances. Opponent hand placement is intentionally derived from obfuscated zone-local IDs, never authoritative hand order.
 - **Why this matters for OPT-465:** Spotlight exit already supplies the public reveal-to-resolution boundary. Add transform/pile-receipt motion after that boundary, and replay `/sandbox/public-reveal-spotlight` plus `/sandbox/waiting-reveal-spotlight` to preserve dwell, waiting hold, keyboard toggle, next-action dismissal, and dismissed-wait input blocking.
+
+### OPT-465 → OPT-421
+**From:** session on 2026-07-13 · **Commit:** `adfdaa7` · **PR:** #304
+
+- **Primer:** Zone motion now follows card fate: continuing cards retain travel, while K.O., discard/cost, Life-trash, Counter Event, and Event-consumption paths fizzle at their source. Deck, trash, and Life share one aggregated top-of-pile receipt after arrivals materialize.
+- **Read first:** `src/hooks/use-card-transitions.ts`, `src/components/game/board-layout/card-animation-layer.tsx`, `src/components/game/board-layout/pile-receipt.tsx`, `src/components/game/spotlight-overlay.tsx`
+- **Gotchas / do NOT touch:** Spotlight-owned transitions reserve their destination until dismissal and use a bounded last-known rectangle after the overlay unmounts. Direct-drag travel stays suppressed during the drag cooldown, but spotlight transforms must remain queued. Reduced motion keeps the 100ms fizzle cross-fade and static 700ms delta fade without pop or drift.
+- **Unresolved:** OPT-421 still owns keyboard/ARIA equivalence for attack, counter, blocker, target selection, and other core board verbs; OPT-422 remains the final Life-inspection and parity cleanup pass.
+- **Pointer:** Replay `/sandbox/play-event-transform`, `/sandbox/public-reveal-spotlight`, and `/sandbox/waiting-reveal-spotlight`; the full gate passed with 596 app tests, 1,572 worker tests, and a production build.
