@@ -22,14 +22,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Done | [#294](https://github.com/corycunanan/optcg-sim/pull/294) | Independent server-authority backstop |
 | 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Done | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Done | [#300](https://github.com/corycunanan/optcg-sim/pull/300) | Completes the menu verb |
-| 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | Backlog | — | Add input equivalence after gestures stabilize |
+| 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | In Review | [#306](https://github.com/corycunanan/optcg-sim/pull/306) | Keyboard drag, selection, prompt, and signifier equivalence |
 | 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | Done | [#302](https://github.com/corycunanan/optcg-sim/pull/302) | Completes Event presentation and public reveals |
-| 9 | OPT-465 | Transform-class zone transitions + pile receipt: fizzle, pile pop, floating +N delta | — | OPT-464 | In Review | [#304](https://github.com/corycunanan/optcg-sim/pull/304) | Travel remains unchanged; consumed cards fizzle and stacked zones acknowledge arrivals |
+| 9 | OPT-465 | Transform-class zone transitions + pile receipt: fizzle, pile pop, floating +N delta | — | OPT-464 | Done | [#304](https://github.com/corycunanan/optcg-sim/pull/304) | Travel remains unchanged; consumed cards fizzle and stacked zones acknowledge arrivals |
 | 10 | OPT-422 | Inspection parity, small state edges, and dead interaction code | — | OPT-421 | Backlog | — | Final cleanup and parity pass |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-421 can proceed now from merged PR #300. OPT-422 follows once keyboard/ARIA coverage lands.
+**Next up:** OPT-422 follows once OPT-421 PR #306 merges; it remains blocked until the keyboard/ARIA contract lands on `main`.
 
 ---
 
@@ -105,3 +105,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Spotlight-owned transitions reserve their destination until dismissal and use a bounded last-known rectangle after the overlay unmounts. Direct-drag travel stays suppressed during the drag cooldown, but spotlight transforms must remain queued. Reduced motion keeps the 100ms fizzle cross-fade and static 700ms delta fade without pop or drift.
 - **Unresolved:** OPT-421 still owns keyboard/ARIA equivalence for attack, counter, blocker, target selection, and other core board verbs; OPT-422 remains the final Life-inspection and parity cleanup pass.
 - **Pointer:** Replay `/sandbox/play-event-transform`, `/sandbox/public-reveal-spotlight`, and `/sandbox/waiting-reveal-spotlight`; the full gate passed with 596 app tests, 1,572 worker tests, and a production build.
+
+### OPT-421 → OPT-422
+**From:** session on 2026-07-13 · **Commit:** `b784d6a` · **PR:** #306
+
+- **Primer:** Board and arrange drag verbs now use dnd-kit keyboard sensors with arrow-key target navigation, Enter/Space drop, Escape cancel, and screen-reader announcements. Target grids use roving focus, board cards and pile inspection expose keyboard actions, and prompt/signifier state has ARIA equivalents.
+- **Read first:** `src/components/game/board-layout/board-keyboard-coordinates.ts`, `src/components/game/board-layout/use-board-dnd.ts`, `src/components/game/board-layout/field-card.tsx`, `src/hooks/use-roving-focus.ts`, `src/components/game/select-target-modal.tsx`
+- **Gotchas / do NOT touch:** Exclude the active draggable from board direction candidates—the DragOverlay collision rectangle can differ from the source card and otherwise traps ArrowUp on the hand item. Keep droppable measuring on `Always` because legal targets can enable only after keyboard pickup. In the arrange pick step Enter/Space select; after it advances, both keys own sorting.
+- **Unresolved:** OPT-422 still owns Life inspection parity, the remaining small-state interaction edges, and dead interaction-code removal. Mulligan cards are deliberately read-only roving list items because Keep/Redraw applies to the whole hand, not individual cards.
+- **Pointer:** Replay `/sandbox/play-character`, `/sandbox/select-target`, `/sandbox/arrange-top-4`, and `/sandbox/waiting-reveal-spotlight`; the full gate passed with 606 app tests, 1,573 worker tests, and a production build.
