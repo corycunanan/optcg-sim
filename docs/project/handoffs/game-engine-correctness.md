@@ -56,18 +56,19 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | Done | [#296](https://github.com/corycunanan/optcg-sim/pull/296) | Persisted first-player-ordered Leader effects; Mary Geoise accept/decline, shuffle, visibility, and reconnect coverage. |
 | 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | Done | [#297](https://github.com/corycunanan/optcg-sim/pull/297) | Persisted RNG/time/ID/budget/trace context with exact replay and restart coverage. |
 | 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Done | [#298](https://github.com/corycunanan/optcg-sim/pull/298) | Immutable runtime resolver services; cost façade split into six acyclic modules with architecture guards. |
-| 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | In Review | [#303](https://github.com/corycunanan/optcg-sim/pull/303) | 919-line Durable Object composition root over typed session collaborators; contract coverage locks serialization, reconnects, authorization, visibility, and persistence. |
-| 42 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
-| 43 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
-| 44 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
-| 45 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Backlog | — | Seventeen newly exposed findings; overlaps OPT-475 where conditional reveals are involved. |
-| 46 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Backlog | — | Remove the tracked source-parity exception after official-source verification. |
-| 47 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
+| 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Done | [#303](https://github.com/corycunanan/optcg-sim/pull/303) | 919-line Durable Object composition root over typed session collaborators; contract coverage locks serialization, reconnects, authorization, visibility, and persistence. |
+| 42 | OPT-487 | RETURN_TO_DECK silently ignores non-Character source zones | — | OPT-474, OPT-475 | In Review | [#305](https://github.com/corycunanan/optcg-sim/pull/305) | Canonical returns, Life-removal events, and owner-authoritative ordering for every legal source; field replacements remain field-only. |
+| 43 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
+| 44 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
+| 45 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
+| 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Backlog | — | Seventeen newly exposed findings; overlaps OPT-475 where conditional reveals are involved. |
+| 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Backlog | — | Remove the tracked source-parity exception after official-source verification. |
+| 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #303. OPT-480 and OPT-481 are unblocked when #303 merges; OPT-484 and OPT-485 remain independently ready.
+**Next up:** Review PR #305. OPT-480 and OPT-481 are ready after the current review queue; OPT-484 and OPT-485 remain independently ready.
 
 ---
 
@@ -387,3 +388,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep every state-bearing socket message behind `SessionTransport.broadcastFilteredState`; never serialize executable resolver services into `GameState`. All WebSocket actions must remain inside `SessionCoordinator.run` so overlapping messages cannot race. Preserve durable prompt IDs and complete snapshots across hibernation, and keep result-callback failures contained at the repository boundary.
 - **Unresolved:** OPT-480 still owns exhaustive runtime unions and the duplicate unused target resolver. OPT-481 intentionally owns bounds for event logs, undo history, and stored snapshots; this refactor preserves their current unbounded behavior so that policy change stays independently reviewable. OPT-486 merged in `f74d715`.
 - **Pointer:** PR #303; inspect `4a9bde6` for the boundary extraction, compatibility façade, infrastructure-dependency guards, and eight collaborator contract tests.
+
+### OPT-487 → OPT-480
+**From:** session on 2026-07-13 · **Commit:** `6dfef20` · **PR:** [#305](https://github.com/corycunanan/optcg-sim/pull/305)
+
+- **Primer:** `RETURN_TO_DECK` now commits every canonical cross-zone transition instead of discarding non-Character results. Life returns emit both movement and Life-removal events. Multi-card returns from Hand, Trash, or Life pause for an owner-authoritative order choice, including exact-count, `any_number`, and replacement-substitute effects, while removal and leave-field replacements remain Character/Stage-only.
+- **Read first:** `workers/game/src/engine/effect-resolver/card-mutations.ts`, `workers/game/src/engine/effect-resolver/actions/removal.ts`, `workers/game/src/engine/effect-resolver/resume/deck.ts`, `workers/game/src/engine/replacements.ts`, `workers/game/src/engine/schemas/op05.ts`, and `workers/game/src/__tests__/opt-487-return-to-deck-source-zones.test.ts`; then follow OPT-479's architecture guard into the runtime unions and duplicate resolver owned by OPT-480.
+- **Gotchas / do NOT touch:** Same-deck result-reference placement remains an identity-preserving reorder in `actions/removal.ts`. For nested `OPPONENT_ACTION` schemas, `SELF` is responder-relative; the responder owns both Trash selection and order under rule 3-1-7. Schema destination is authoritative over a client's arrangement payload. A non-optional replacement substitute that prompts carries `replacementBatchContinuation` on its prompt frame, with the original action-chain continuation immediately below it. Keep old/new destination identities owner-only in movement events, and retain Character/Stage prohibition and replacement behavior while tightening types.
+- **Unresolved:** The action reference still describes field-only returns; documentation reconciliation remains tracked by OPT-482. No OPT-487 runtime behavior is deferred.
+- **Pointer:** PR #305; inspect `6dfef20` for the final source-zone matrix, owner-selected ordering, replacement-stack continuation, zero-target-safe `any_number` handling, visibility checks, and field-replacement boundary. Earlier review fixes are captured in `8c50406`, `401cbae`, `ccdab6a`, and `da3ecf0`.

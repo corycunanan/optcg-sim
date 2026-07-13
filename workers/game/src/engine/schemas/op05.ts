@@ -2977,7 +2977,9 @@ export const OP05_079_VIOLA: EffectSchema = {
               type: "RETURN_TO_DECK",
               target: {
                 type: "CARD_IN_TRASH",
-                controller: "OPPONENT",
+                // OPPONENT_ACTION resolves with the opponent as controller, so
+                // SELF is the opponent's own trash.
+                controller: "SELF",
                 count: { exact: 3 },
               },
               params: { position: "BOTTOM" },

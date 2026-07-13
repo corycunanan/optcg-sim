@@ -24,7 +24,7 @@ import type {
 } from "../../types.js";
 import { generateFrameId, popFrame, peekFrame, pushFrame, updateTopFrame } from "../effect-stack.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
-import { continueSimultaneousGroup, executeActionChain } from "./resolver.js";
+import { continueSimultaneousGroup, executeActionChain, resolverExecutionServices } from "./resolver.js";
 import type { EffectResolverResult } from "./types.js";
 import { buildSelectTargetPrompt, validateTargetConstraints } from "./target-resolver.js";
 
@@ -33,6 +33,7 @@ import {
   handleArrangeSearchTrashTheRest,
   handleArrangeSearchAndPlay,
   handleArrangeReorderLife,
+  handleArrangeReturnToDeck,
 } from "./resume/deck.js";
 import {
   handleRedistributeDon,
@@ -109,6 +110,34 @@ export function resumeEffectChain(
 
   const lifeReorder = handleArrangeReorderLife(nextState, action, pausedAction, controller, events);
   if (lifeReorder) nextState = lifeReorder;
+
+  const returnToDeck = handleArrangeReturnToDeck(
+    nextState,
+    action,
+    pausedAction,
+    effectSourceInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    validTargets,
+    resolverExecutionServices,
+  );
+  if (returnToDeck) {
+    nextState = returnToDeck.state;
+    events.push(...returnToDeck.events);
+    pausedActionSucceeded = returnToDeck.succeeded;
+    if (pausedAction?.result_ref && returnToDeck.result) {
+      resultRefs.set(pausedAction.result_ref, returnToDeck.result);
+    }
+    if (returnToDeck.pendingPrompt) {
+      return {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: returnToDeck.pendingPrompt,
+      };
+    }
+  }
 
   // ── PLAYER_CHOICE branches ────────────────────────────────────────────────
   // Note: these are mutually exclusive in the original if/else-if chain.

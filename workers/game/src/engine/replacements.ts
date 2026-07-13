@@ -30,6 +30,7 @@ import type {
   PendingPromptState,
 } from "../types.js";
 import { findCardInstance } from "./state.js";
+import { updateTopFrame } from "./effect-stack.js";
 import { matchesFilter } from "./conditions.js";
 import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
@@ -176,6 +177,14 @@ function replacementMatchesTarget(
   cardDb: Map<string, CardData>,
 ): boolean {
   if (params.trigger !== event) return false;
+
+  // Removal/leave replacements describe a card leaving the field. Secret-
+  // and open-area moves such as Hand/Trash/Life -> Deck must not spend or
+  // offer a field replacement merely because the replacement is wildcarded.
+  if (event === "WOULD_BE_REMOVED_FROM_FIELD" || event === "WOULD_LEAVE_FIELD") {
+    const zone = findCardInstance(state, targetInstanceId)?.zone;
+    if (zone !== "CHARACTER" && zone !== "STAGE") return false;
+  }
 
   // appliesTo: non-empty = instance whitelist; empty = wildcard.
   if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) return false;
@@ -752,6 +761,26 @@ function stepBatch(
     const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services);
     nextState = applied.state;
     events.push(...applied.events);
+    if (applied.pendingPrompt) {
+      // executeActionChain has already pushed the substitute prompt's frame.
+      // Park this batch on that frame so the prompt lifecycle can finish the
+      // replacement before the original action continuation resumes.
+      nextState = updateTopFrame(nextState, {
+        replacementBatchContinuation: {
+          ...ctx,
+          protectedIds: [...protectedIds],
+          currentMatchIndex: i,
+        },
+      });
+      return {
+        state: nextState,
+        events,
+        protectedIds: [...protectedIds],
+        finalizedIds: [],
+        unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
+        pendingPrompt: applied.pendingPrompt,
+      };
+    }
     applicable.forEach((id) => protectedIds.add(id));
   }
 

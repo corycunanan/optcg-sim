@@ -17,7 +17,7 @@ import type {
   EffectStackFrame,
 } from "../../types.js";
 import { evaluateCondition, type ConditionContext } from "../conditions.js";
-import { pushFrame, generateFrameId } from "../effect-stack.js";
+import { popFrame, pushFrame, generateFrameId } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
 import type { EffectResolverResult, ActionResult, ActionHandler } from "./types.js";
 import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js";
@@ -661,6 +661,41 @@ export function executeActionChain(
 
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
+      const nestedPromptFrame = result.state.effectStack.at(-1) as unknown as EffectStackFrame | undefined;
+      if (nestedPromptFrame?.replacementBatchContinuation) {
+        // A non-optional replacement substitute opened its own prompt and
+        // already pushed that prompt's frame. Insert this action chain's
+        // continuation immediately below it so the substitute can finish the
+        // replacement batch before the original suffix resumes.
+        const frameId = generateFrameId(popFrame(result.state));
+        const continuationFrame: EffectStackFrame = {
+          id: frameId.id,
+          sourceCardInstanceId,
+          controller,
+          effectBlock: {} as EffectBlock,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          pausedAction: action,
+          remainingActions: actions.slice(i + 1),
+          resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+          validTargets: [],
+          priorActionSucceeded: false,
+          costs: [],
+          currentCostIndex: 0,
+          costsPaid: true,
+          oncePerTurnMarked: true,
+          costResultRefs: [],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        const continuationState = pushFrame(frameId.state, continuationFrame);
+        if (isEngineTerminated(continuationState)) return { state: continuationState, events };
+        const restoredPromptState = pushFrame(continuationState, nestedPromptFrame);
+        return isEngineTerminated(restoredPromptState)
+          ? { state: restoredPromptState, events }
+          : { state: restoredPromptState, events, pendingPrompt: result.pendingPrompt };
+      }
+
       const rawContext = result.pendingPrompt.resumeContext as { type?: unknown } | null;
       const isReplacementPrompt = rawContext?.type === "REPLACEMENT" ||
         rawContext?.type === "REPLACEMENT_BATCH";
