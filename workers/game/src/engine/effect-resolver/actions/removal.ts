@@ -197,7 +197,11 @@ export function executeReturnToDeck(
   const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   const anyNumberTarget = action.target?.count && "any_number" in action.target.count;
-  if (!preselectedTargets && (needsPlayerTargetSelection(action.target, allValidIds) || anyNumberTarget)) {
+  if (
+    !preselectedTargets
+    && allValidIds.length > 0
+    && (needsPlayerTargetSelection(action.target, allValidIds) || anyNumberTarget)
+  ) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);

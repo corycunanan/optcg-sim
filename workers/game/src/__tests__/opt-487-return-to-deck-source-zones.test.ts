@@ -392,4 +392,36 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
       arranged.map((card) => card.cardId),
     );
   });
+
+  it("resolves an any-number return with no valid cards without opening an empty prompt", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const block: EffectBlock = {
+      id: "return-zero-cards-from-trash",
+      category: "auto",
+      actions: [{
+        type: "RETURN_TO_DECK",
+        target: {
+          type: "CARD_IN_TRASH",
+          controller: "SELF",
+          count: { any_number: true },
+        },
+        params: { position: "BOTTOM" },
+      }],
+    };
+
+    const result = resolveEffect(
+      state,
+      block,
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+
+    expect(result.resolved).toBe(true);
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.state.players[0].trash).toEqual([]);
+    expect(result.state.players[0].deck).toEqual(state.players[0].deck);
+    expect(result.events.some((event) => event.type === "CARD_RETURNED_TO_DECK")).toBe(false);
+  });
 });
