@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * TRASH_FROM_HAND integration tests
  *
@@ -95,7 +96,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
       controller,
       cardDb,
       "char-0-v1",
-      block,
+      block, resolverExecutionServices
     );
 
     // Should prompt for selection (not auto-pay)
@@ -133,7 +134,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
       controller,
       cardDb,
       "char-0-v1",
-      block,
+      block, resolverExecutionServices
     );
 
     expect(costResult.pendingPrompt).toBeTruthy();

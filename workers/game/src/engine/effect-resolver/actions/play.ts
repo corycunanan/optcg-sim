@@ -5,7 +5,7 @@
 
 import type { Action, EffectBlock, EffectResult, EffectSchema } from "../../effect-types.js";
 import type { BatchResumeMarker, CardData, CardInstance, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
-import type { ActionResult, EffectResolverResult } from "../types.js";
+import type { ActionResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
@@ -14,20 +14,7 @@ import { processBatchReplacements } from "../../replacements.js";
 import { isProhibitedForCard, isCardPlayProhibitedByEffect } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { transitionCard } from "../../zone-transition.js";
-
-// Injected by the resolver module to break the circular dependency so
-// ACTIVATE_EVENT_FROM_TRASH can resolve the selected Event's [Main] block.
-let _resolveEffect: (
-  state: GameState,
-  block: EffectBlock,
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-) => EffectResolverResult;
-
-export function setPlayDependencies(deps: { resolveEffect: typeof _resolveEffect }) {
-  _resolveEffect = deps.resolveEffect;
-}
+import type { EffectResolverServices } from "../services.js";
 
 function findMainEventBlock(cardData: CardData): EffectBlock | undefined {
   const schema = cardData.effectSchema as EffectSchema | null;
@@ -398,7 +385,7 @@ export function executeSetActive(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -422,7 +409,8 @@ export function executeSetRest(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const rawValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -442,7 +430,16 @@ export function executeSetRest(
   // across the batch of targets. One prompt per matching replacement; cost
   // paid once. Protected targets drop out of the rest loop; unprotected ones
   // proceed through the per-frame ON_REST drain below.
-  const batch = processBatchReplacements(state, targetIds, "SET_REST", "WOULD_BE_RESTED", "effect", controller, cardDb);
+  const batch = processBatchReplacements(
+    state,
+    targetIds,
+    "SET_REST",
+    "WOULD_BE_RESTED",
+    "effect",
+    controller,
+    cardDb,
+    services,
+  );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
     return { state: batch.state, events, succeeded: false, pendingPrompt: batch.pendingPrompt };
@@ -550,7 +547,8 @@ export function executeActivateEventFromTrash(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
 
@@ -587,7 +585,7 @@ export function executeActivateEventFromTrash(
     payload: { cardId: eventCard.cardId, cardInstanceId: eventInstanceId },
   });
 
-  const resolveResult = _resolveEffect(state, mainBlock, eventInstanceId, controller, cardDb);
+  const resolveResult = services.resolveEffect(state, mainBlock, eventInstanceId, controller, cardDb);
 
   return {
     state: resolveResult.state,

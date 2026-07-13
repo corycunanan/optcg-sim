@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-172 commit 3: rule 6-2 — drain ON_KO triggers between KO frames.
  *
@@ -105,7 +106,7 @@ describe("OPT-172: rule 6-2 ON_KO drain between KO frames", () => {
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      [c1.instanceId, c2.instanceId],
+      [c1.instanceId, c2.instanceId], resolverExecutionServices
     );
 
     // Frame 1 KO'd; batch paused for trigger drain before frame 2.

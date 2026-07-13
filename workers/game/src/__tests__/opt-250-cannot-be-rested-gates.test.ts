@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-250 — E4: "Cannot be rested" gates every rest-inducing path.
  *
@@ -210,7 +211,7 @@ describe("OPT-250 — SET_REST action strips prohibited targets from candidates"
       1,
       cardDb,
       new Map<string, EffectResult>(),
-      [protectedId],
+      [protectedId], resolverExecutionServices
     );
 
     // Target stripped → no rest, succeeded=false (no-op consequence).
@@ -240,7 +241,7 @@ describe("OPT-250 — SET_REST action strips prohibited targets from candidates"
       1,
       cardDb,
       new Map<string, EffectResult>(),
-      [protectedId, freeId],
+      [protectedId, freeId], resolverExecutionServices
     );
 
     const protectedCard = result.state.players[0].characters.find(
@@ -290,7 +291,7 @@ describe("OPT-250 — an already-RESTED card under the prohibition stays RESTED"
       1,
       cardDb,
       new Map<string, EffectResult>(),
-      [targetId],
+      [targetId], resolverExecutionServices
     );
 
     const target = result.state.players[0].characters.find(

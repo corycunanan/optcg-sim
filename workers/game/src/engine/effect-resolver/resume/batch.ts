@@ -19,7 +19,7 @@ import type {
 } from "../../../types.js";
 import { popFrame, peekFrame, pushFrame } from "../../effect-stack.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
-import { executeActionChain } from "../resolver.js";
+import { executeActionChain, resolverExecutionServices } from "../resolver.js";
 import { executePlayCard, executeSetRest } from "../actions/play.js";
 import { executeKO } from "../actions/removal.js";
 import type { EffectResolverResult, ActionResult } from "../types.js";
@@ -158,6 +158,7 @@ function dispatchBatchResume(
         cardDb,
         resultRefs,
         marker.remainingTargetIds,
+        resolverExecutionServices,
       );
     case "SET_REST":
       return executeSetRest(
@@ -168,6 +169,7 @@ function dispatchBatchResume(
         cardDb,
         resultRefs,
         marker.remainingTargetIds,
+        resolverExecutionServices,
       );
   }
 }

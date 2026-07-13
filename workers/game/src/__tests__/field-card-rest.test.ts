@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * DON!!-inclusive rest support (OP16-033 Morley, OP16-035 Zoro).
  *
@@ -63,7 +64,7 @@ describe("FIELD_CARD target type", () => {
       type: "SET_REST",
       target: { type: "FIELD_CARD", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeSetRest(state, action, "char-0-v1", 0, cardDb, new Map<string, EffectResult>(), ["stage-1"]);
+    const result = executeSetRest(state, action, "char-0-v1", 0, cardDb, new Map<string, EffectResult>(), ["stage-1"], resolverExecutionServices);
     expect(result.succeeded).toBe(true);
     expect(result.state.players[1].stage?.state).toBe("RESTED");
   });
@@ -95,13 +96,13 @@ describe("OP16-033 Morley KO replacement (choice-of-payments)", () => {
 
   it("offers the optional replacement when DON!! can pay", () => {
     const state = setupMorley("ACTIVE");
-    const result = executeKO(state, koAction, "opp-effect", 1, cardDb, new Map<string, EffectResult>(), ["morley"]);
+    const result = executeKO(state, koAction, "opp-effect", 1, cardDb, new Map<string, EffectResult>(), ["morley"], resolverExecutionServices);
     expect(result.pendingPrompt).toBeDefined();
   });
 
   it("skips the replacement (KO proceeds) when nothing can pay", () => {
     const state = setupMorley("RESTED");
-    const result = executeKO(state, koAction, "opp-effect", 1, cardDb, new Map<string, EffectResult>(), ["morley"]);
+    const result = executeKO(state, koAction, "opp-effect", 1, cardDb, new Map<string, EffectResult>(), ["morley"], resolverExecutionServices);
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.state.players[0].trash.some((c) => c.instanceId === "morley")).toBe(false);
   });

@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-237 — C2: Character activates Event [Main] from trash.
  *
@@ -142,7 +143,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      ["evt-trash-1"],
+      ["evt-trash-1"], resolverExecutionServices
     );
 
     expect(result.succeeded).toBe(true);
@@ -170,7 +171,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      ["evt-trash-2"],
+      ["evt-trash-2"], resolverExecutionServices
     );
 
     const types = result.events.map((e) => e.type);
@@ -195,7 +196,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      ["evt-trash-3"],
+      ["evt-trash-3"], resolverExecutionServices
     );
 
     const classEvt = result.events.find((e) => e.type === "EVENT_MAIN_RESOLVED_FROM_TRASH");
@@ -226,7 +227,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       new Map<string, EffectResult>(),
       // Deliberately preselect the counter-only event — the handler must still
       // refuse it because the filter is enforced against the raw list.
-      ["evt-counter-1"],
+      ["evt-counter-1"], resolverExecutionServices
     );
 
     expect(result.succeeded).toBe(false);
@@ -250,7 +251,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       "dummy-source",
       0,
       cardDb,
-      new Map<string, EffectResult>(),
+      new Map<string, EffectResult>(), undefined, resolverExecutionServices
     );
 
     // Reiju uses `count: { up_to: 1 }`, which always prompts (player can pick 0).
@@ -278,7 +279,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       "dummy-source",
       0,
       cardDb,
-      new Map<string, EffectResult>(),
+      new Map<string, EffectResult>(), undefined, resolverExecutionServices
     );
 
     expect(result.succeeded).toBe(false);
@@ -312,7 +313,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      ["evt-costly-1"],
+      ["evt-costly-1"], resolverExecutionServices
     );
 
     expect(result.succeeded).toBe(true);
@@ -330,7 +331,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
       "dummy-source",
       0,
       cardDb,
-      new Map<string, EffectResult>(),
+      new Map<string, EffectResult>(), undefined, resolverExecutionServices
     );
 
     expect(result.succeeded).toBe(false);

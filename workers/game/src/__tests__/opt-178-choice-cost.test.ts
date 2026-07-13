@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-178 — CHOICE cost handling in cost-handler
  *
@@ -104,7 +105,7 @@ describe("OPT-178: CHOICE cost", () => {
       expect(state.players[0].hand.length).toBeGreaterThan(0);
 
       const block = makeBlock([twoPayableBranches()]);
-      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       expect(result.pendingPrompt).toBeTruthy();
       const prompt = result.pendingPrompt!;
@@ -120,7 +121,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([twoPayableBranchesWithLabels()]);
-      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       expect(result.pendingPrompt).toBeTruthy();
       const prompt = result.pendingPrompt!;
@@ -135,7 +136,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([twoPayableBranches()]);
-      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       const prompt = result.pendingPrompt!;
       if (prompt.options.promptType === "PLAYER_CHOICE") {
@@ -158,7 +159,7 @@ describe("OPT-178: CHOICE cost", () => {
 
       const block = makeBlock([oneBranchRequiresCharacter()]);
       const result = payCostsWithSelection(
-        stateNoChars, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block,
+        stateNoChars, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices
       );
 
       // Should skip PLAYER_CHOICE and go directly to the hand branch's SELECT_TARGET.
@@ -180,7 +181,7 @@ describe("OPT-178: CHOICE cost", () => {
       };
 
       const block = makeBlock([choice]);
-      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       // Only branch B is payable, it's auto-payable, so costs resolve fully.
       expect(result.pendingPrompt).toBeUndefined();
@@ -197,7 +198,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([allUnpayableBranches()]);
-      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       expect(result.cannotPay).toBe(true);
       expect(result.pendingPrompt).toBeUndefined();
@@ -212,7 +213,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([twoPayableBranches()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
       expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
       // Choose branch 0 (trash from hand).
@@ -231,7 +232,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([twoPayableBranches()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
       expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
       // Choose branch 1 (DON_REST 2 — auto-payable).
@@ -251,7 +252,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([twoPayableBranches()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       // Pick hand branch.
       const afterChoice = resumeFromStack(
@@ -284,7 +285,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([multiCostBranch()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
       expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
       // Choose branch 1 (TRASH_FROM_HAND + DON_REST).
@@ -319,7 +320,7 @@ describe("OPT-178: CHOICE cost", () => {
       const state = createBattleReadyState(cardDb);
 
       const block = makeBlock([twoPayableBranches()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
       const resumed = resumeFromStack(
         first.state,
@@ -370,7 +371,7 @@ describe("OPT-178: CHOICE cost", () => {
       const { state, charId } = placeVanillaChar(base);
 
       const block = makeBlock([handOrCharacterChoice()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
       expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
       const afterChoice = resumeFromStack(
@@ -404,7 +405,7 @@ describe("OPT-178: CHOICE cost", () => {
       const { state, charId } = placeVanillaChar(base);
 
       const block = makeBlock([handOrCharacterChoice()]);
-      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+      const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
       expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
       const afterChoice = resumeFromStack(

@@ -14,6 +14,7 @@ import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { reorderDeckCards, transitionCard, transitionCards } from "../../zone-transition.js";
+import type { EffectResolverServices } from "../services.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
 // Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
@@ -43,7 +44,8 @@ export function executeKO(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -66,7 +68,7 @@ export function executeKO(
     state, targetIds, "KO", "EFFECT", controller, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    state, attemptableIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
+    state, attemptableIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, services,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -128,7 +130,8 @@ export function executeReturnToHand(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -142,7 +145,7 @@ export function executeReturnToHand(
     state, targetIds, "RETURN_TO_HAND", "EFFECT", controller, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    state, attemptableIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb,
+    state, attemptableIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, services,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -178,7 +181,8 @@ export function executeReturnToDeck(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -209,7 +213,7 @@ export function executeReturnToDeck(
     reordered.state, crossZoneIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    reordered.state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, position,
+    reordered.state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, services, position,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {

@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * M4 Effect Engine Tests
  *
@@ -933,7 +934,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(NAMI_CARD);
-    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
+    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb, resolverExecutionServices);
 
     expect(result.replaced).toBe(true);
     // Character should still be on field (KO was prevented)
@@ -982,7 +983,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(NAMI_CARD);
-    const result = checkReplacementForKO(state, "char-2", "effect", 1, cardDb);
+    const result = checkReplacementForKO(state, "char-2", "effect", 1, cardDb, resolverExecutionServices);
 
     expect(result.replaced).toBe(false);
   });
@@ -1036,7 +1037,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(NAMI_CARD);
-    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
+    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb, resolverExecutionServices);
 
     // Should not auto-replace — returns a prompt instead
     expect(result.replaced).toBe(false);
@@ -1085,7 +1086,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(NAMI_CARD);
-    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb);
+    const result = checkReplacementForKO(state, "char-1", "effect", 1, cardDb, resolverExecutionServices);
 
     expect(result.replaced).toBe(false);
     expect(result.pendingPrompt).toBeUndefined();
@@ -1153,12 +1154,12 @@ describe("Replacement Effects", () => {
     const cardDb = makeCardDb(GREEN_ALLY, TASHIGI);
 
     // Opponent effect would remove the green ally → prompt fires for Tashigi
-    const allyResult = checkReplacementForRemoval(state, "ally-1", 1, cardDb);
+    const allyResult = checkReplacementForRemoval(state, "ally-1", 1, cardDb, resolverExecutionServices);
     expect(allyResult.pendingPrompt).toBeDefined();
     expect(allyResult.pendingPrompt!.respondingPlayer).toBe(0);
 
     // Opponent effect would remove Tashigi herself → no prompt (self-excluded)
-    const selfResult = checkReplacementForRemoval(state, "tashigi-1", 1, cardDb);
+    const selfResult = checkReplacementForRemoval(state, "tashigi-1", 1, cardDb, resolverExecutionServices);
     expect(selfResult.pendingPrompt).toBeUndefined();
     expect(selfResult.replaced).toBe(false);
   });
@@ -1212,7 +1213,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(RED_ALLY, TASHIGI);
-    const result = checkReplacementForRemoval(state, "red-1", 1, cardDb);
+    const result = checkReplacementForRemoval(state, "red-1", 1, cardDb, resolverExecutionServices);
     expect(result.replaced).toBe(false);
     expect(result.pendingPrompt).toBeUndefined();
   });
@@ -1259,7 +1260,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
 
     const cardDb = makeCardDb(ALLY);
-    const result = checkReplacementForKO(state, "source-1", "effect", 1, cardDb);
+    const result = checkReplacementForKO(state, "source-1", "effect", 1, cardDb, resolverExecutionServices);
     expect(result.replaced).toBe(false);
     expect(result.pendingPrompt).toBeUndefined();
   });
@@ -1311,7 +1312,7 @@ describe("Replacement Effects", () => {
       state,
       { type: "REPLACEMENT", effectId: "repl-tashigi", targetInstanceId: "ally-1", event: "WOULD_BE_REMOVED_FROM_FIELD" },
       true,
-      cardDb,
+      cardDb, resolverExecutionServices
     );
 
     expect(result.replaced).toBe(true);
@@ -1357,7 +1358,7 @@ describe("Replacement Effects", () => {
     state.activeEffects = [effect as any];
     const cardDb = makeCardDb(IVANKOV);
 
-    const result = checkReplacementForKO(state, "ivankov-1", "effect", 1, cardDb);
+    const result = checkReplacementForKO(state, "ivankov-1", "effect", 1, cardDb, resolverExecutionServices);
     expect(result.replaced).toBe(true);
     // Ivankov trashed (not KO'd — no DON returned to deck)
     const onField = result.state.players[0].characters.filter(Boolean);

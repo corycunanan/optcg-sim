@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-372 — PLACE_FROM_TRASH_TO_DECK honors cost.position.
  *
@@ -56,7 +57,7 @@ describe("OPT-372: position TOP", () => {
     const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);
 
     const block = makeBlock([cost(1, { position: "TOP" })]);
-    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const result = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.cannotPay).toBeFalsy();
@@ -72,7 +73,7 @@ describe("OPT-372: position TOP", () => {
     ]);
 
     const block = makeBlock([cost(2, { position: "TOP" })]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const afterSelect = resumeFromStack(
@@ -117,7 +118,7 @@ describe("OPT-372: position TOP_OR_BOTTOM prompts the player first", () => {
     ]);
 
     const block = makeBlock([cost(2, { position: "TOP_OR_BOTTOM" })]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
 
     expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
     if (first.pendingPrompt!.options.promptType === "PLAYER_CHOICE") {
@@ -158,7 +159,7 @@ describe("OPT-372: position TOP_OR_BOTTOM prompts the player first", () => {
     const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);
 
     const block = makeBlock([cost(1, { position: "TOP_OR_BOTTOM" })]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     for (const bad of ["BOTTOM", "2", "top"]) {
@@ -177,7 +178,7 @@ describe("OPT-372: position TOP_OR_BOTTOM prompts the player first", () => {
     const state = withTrash(createBattleReadyState(cardDb), [trashCard(CARDS.VANILLA.id, "a")]);
 
     const block = makeBlock([cost(1, { position: "TOP_OR_BOTTOM" })]);
-    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block);
+    const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
     expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     // Choose Bottom (id "1") — amount 1 + trash 1 → auto-pays, no more prompts.

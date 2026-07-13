@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-235 — B5: downstream-trigger suppression for "trash instead of K.O."
  *
@@ -20,7 +21,6 @@
 import { describe, it, expect } from "vitest";
 import { executeKO } from "../engine/effect-resolver/actions/removal.js";
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
-import "../engine/effect-resolver/resolver.js"; // installs replacement dispatcher
 import type {
   Action,
   EffectResult,
@@ -266,7 +266,7 @@ describe("OPT-235 — B5 replacement: ON_KO stays silent, ANY_CHARACTER_TRASHED 
       type: "KO",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim]);
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim], resolverExecutionServices);
 
     const koEvents = result.events.filter((e) => e.type === "CARD_KO");
     const trashEvents = result.events.filter((e) => e.type === "CARD_TRASHED");
@@ -300,7 +300,7 @@ describe("OPT-235 — B5 replacement: ON_KO stays silent, ANY_CHARACTER_TRASHED 
       type: "KO",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim]);
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim], resolverExecutionServices);
 
     // The redirect produced a CARD_TRASHED for Ivankov. Hand it to the matcher
     // with current state — the watcher should fire.
@@ -334,7 +334,7 @@ describe("OPT-235 — B5 replacement: ON_KO stays silent, ANY_CHARACTER_TRASHED 
       type: "KO",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim]);
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim], resolverExecutionServices);
 
     // Sweep every event the KO path produced and confirm no ON_KO match.
     for (const e of result.events) {
@@ -440,7 +440,7 @@ describe("OPT-235 — B3 full prevention: empty replacement_actions suppresses b
       type: "KO",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim]);
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.victim], resolverExecutionServices);
 
     // Neither removal event class is published for any field character.
     const removalEvents = result.events.filter(
@@ -557,7 +557,7 @@ describe("OPT-235 — Basil + Thatch interaction", () => {
       type: "KO",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [victimInst.instanceId]);
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [victimInst.instanceId], resolverExecutionServices);
 
     // Nothing left the field: victim, shield, and ivankov all still there.
     const surviving = result.state.players[0].characters
@@ -634,7 +634,7 @@ describe("OPT-235 — Basil + Thatch interaction", () => {
       type: "KO",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
-    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [victimInst.instanceId]);
+    const result = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [victimInst.instanceId], resolverExecutionServices);
 
     // Ivankov trashed, CARD_TRASHED fired for him.
     const trashEvent = result.events.find(

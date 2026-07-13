@@ -30,7 +30,12 @@ import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "../../trigge
 import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
-import { resolveEffect, executeActionChain, postCostConditionsMet } from "../resolver.js";
+import {
+  resolveEffect,
+  executeActionChain,
+  postCostConditionsMet,
+  resolverExecutionServices,
+} from "../resolver.js";
 import { executePlayCard } from "../actions/play.js";
 import { applyFieldDonReturn, decodeFieldDonReturnChoice } from "../actions/don.js";
 import type { EffectResolverResult } from "../types.js";
@@ -277,7 +282,7 @@ export function handleAwaitingOptionalResponse(
   if (topFrame.costs.length > 0) {
     const costResult = payCostsWithSelection(
       nextState, topFrame.costs as Cost[], 0, controller, cardDb,
-      sourceCardInstanceId, block,
+      sourceCardInstanceId, block, resolverExecutionServices,
     );
 
     if (costResult.cannotPay) {
