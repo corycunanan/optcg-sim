@@ -331,6 +331,11 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     matchClosed: game.matchClosed,
     canUndo: game.canUndo,
     actionRejection: game.actionRejection,
+    acceptedUpdate: game.acceptedUpdate,
+    promptRespondingPlayer:
+      game.gameState.promptRespondingPlayer ??
+      game.gameState.pendingPrompt?.respondingPlayer ??
+      (activePrompt ? game.myIndex : null),
   };
 
   const dispatch: BoardDispatch = {

@@ -110,8 +110,14 @@ describe("OPT-404: SEARCH_DECK pick to top of Life (OP16-119)", () => {
     expect(p0.hand).toHaveLength(0);
     // Rest went to the bottom of the deck in the chosen order.
     expect(p0.deck.map((c) => c.instanceId)).toEqual(["d4", "d1", "d3"]);
-    // No draw event for a card that went to Life.
-    expect(events).toHaveLength(0);
+    // The selected search result is public even when it goes to Life, but it
+    // must not emit a draw event.
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: "CARDS_REVEALED",
+        payload: expect.objectContaining({ visibility: "BOTH" }),
+      }),
+    ]);
   });
 
   it("keeps the default hand destination when pick_destination is absent", () => {
@@ -130,6 +136,7 @@ describe("OPT-404: SEARCH_DECK pick to top of Life (OP16-119)", () => {
     expect(p0.hand.map((c) => c.instanceId)).not.toContain("d2");
     expect(p0.life).toHaveLength(1);
     expect(events).toEqual([
+      expect.objectContaining({ type: "CARDS_REVEALED" }),
       expect.objectContaining({ type: "CARD_DRAWN" }),
     ]);
   });

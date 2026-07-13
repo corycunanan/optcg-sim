@@ -174,12 +174,31 @@ describe("OPT-470 hidden-information visibility contract", () => {
     expect(filterEventForPlayer(event, 0)).toEqual(event);
   });
 
+  it("keeps a Trigger private until the controller accepts activation", () => {
+    const offered: GameEvent = {
+      type: "TRIGGER_ACTIVATED",
+      playerIndex: 1,
+      payload: { cardId: "PRIVATE-TRIGGER" },
+      timestamp,
+    };
+    const activated: GameEvent = {
+      ...offered,
+      payload: { cardId: "PUBLIC-TRIGGER", activated: true },
+    };
+
+    expect(filterEventForPlayer(offered, 1)).toEqual(offered);
+    expect(JSON.stringify(filterEventForPlayer(offered, 0)))
+      .not.toContain("PRIVATE-TRIGGER");
+    expect(filterEventForPlayer(activated, 0)).toEqual(activated);
+  });
+
   it("classifies every current secret-bearing event with a redactor", () => {
     expect(GAME_EVENT_VISIBILITY).toMatchObject({
       CARD_DRAWN: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
       CARD_RETURNED_TO_HAND: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
       CARD_ADDED_TO_HAND_FROM_LIFE: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
       CARD_RETURNED_TO_DECK: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
+      TRIGGER_ACTIVATED: { audience: "PUBLIC_AFTER_ACTIVATION", redactor: "CARD_IDENTITY" },
       CARDS_REVEALED: { audience: "DECLARED_BY_EVENT", redactor: "CARD_IDENTITIES" },
       LIFE_SCRIED: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITIES" },
       CARD_REMOVED_FROM_LIFE: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
@@ -214,6 +233,26 @@ describe("OPT-470 hidden-information visibility contract", () => {
 
     expect(filterPromptForPlayer(prompt, 0)).toBeNull();
     expect(filterPromptForPlayer(prompt, 1)?.resumeContext).toBeNull();
+  });
+
+  it("shares only the responding player index with the waiting client", () => {
+    const { state } = setupGame();
+    const pendingPrompt: PendingPromptState = {
+      options: {
+        promptType: "PLAYER_CHOICE",
+        choices: [{ id: "secret", label: "Secret choice" }],
+        effectDescription: "Private effect text",
+      },
+      respondingPlayer: 1,
+      resumeContext: { secret: "server-only" },
+    };
+    const waitingView = filterStateForPlayer({ ...state, pendingPrompt }, 0);
+
+    expect(waitingView.pendingPrompt).toBeNull();
+    expect(waitingView.promptRespondingPlayer).toBe(1);
+    expect(JSON.stringify(waitingView)).not.toContain("Secret choice");
+    expect(JSON.stringify(waitingView)).not.toContain("Private effect text");
+    expect(JSON.stringify(waitingView)).not.toContain("server-only");
   });
 
   it("obfuscates card faces in a blind hidden-zone selection prompt", () => {
