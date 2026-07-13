@@ -56,17 +56,17 @@ This is the complete verb table after OPT-416–420 land. ✅ = already conforms
 |---|---|---|---|---|
 | Play a Character | Drag | Hand card → empty character slot | `PLAY_CARD {cardInstanceId, position}` | ✅ |
 | Play a Stage | Drag | Hand card → stage zone | `PLAY_CARD {cardInstanceId}` | ✅ (slot filtering: OPT-417) |
-| Play an Event (`[Main]`) | Drag | Hand card → **own field**; presents in spotlight (SP-1) and fizzles to trash after resolving (MO-8) | `PLAY_CARD {cardInstanceId}` | ✅ gesture; 🔧 OPT-464 (spotlight) |
+| Play an Event (`[Main]`) | Drag | Hand card → **own field**; presents in spotlight (SP-1) and fizzles to trash after resolving (MO-8) | `PLAY_CARD {cardInstanceId}` | ✅ (OPT-416, OPT-464, OPT-465) |
 | Replace when board full | Drag | Hand card → occupied slot | `PLAY_CARD` | ✅ |
 | Attach DON | Drag | DON token (cost area) → own card | `ATTACH_DON {targetInstanceId, count:1}` | ✅ |
 | Redistribute DON | Drag | **DON token visual on card** → own card, then Confirm | staged → `REDISTRIBUTE_DON` | ✅ |
 | Declare attack | Drag | Own active card → opponent leader / rested character | `DECLARE_ATTACK {attackerInstanceId, targetInstanceId}` | ✅ (target filtering: OPT-417) |
 | Counter (Character) | Drag | Hand card → **defending card** | `USE_COUNTER {cardInstanceId, counterTargetInstanceId}` | ✅ |
-| Counter (Event) | Drag | Hand card → **own field**; presents in spotlight (SP-1); defender comes from battle state | `USE_COUNTER_EVENT {cardInstanceId, counterTargetInstanceId}` | ✅ gesture; 🔧 OPT-464 (spotlight) |
+| Counter (Event) | Drag | Hand card → **own field**; presents in spotlight (SP-1); defender comes from battle state | `USE_COUNTER_EVENT {cardInstanceId, counterTargetInstanceId}` | ✅ (OPT-416, OPT-464, OPT-465) |
 | Select blocker | Click (toggle) + mid-zone **Block** | Eligible blocker | `DECLARE_BLOCKER {blockerInstanceId}` | ✅ |
-| Effect target (visible on board) | Click (toggle) + mid-zone **Confirm/Skip** | Ringed candidates in place | `SELECT_TARGET {selectedInstanceIds}` | 🔧 OPT-419 (was always modal) |
+| Effect target (visible on board) | Click (toggle) + mid-zone **Confirm/Skip** | Ringed candidates in place | `SELECT_TARGET {selectedInstanceIds}` | ✅ (OPT-419) |
 | Effect target (hidden/stacked zone, or mixed) | Click in `SelectTargetModal` | Modal grid | `SELECT_TARGET` | ✅ (stays modal) |
-| Activate `[Main]` effect | Menu (left-click or right-click) via ⚡ badge | Own field/stage card | `ACTIVATE_EFFECT {cardInstanceId, effectId}` | 🔧 OPT-420 (badge + left-click) |
+| Activate `[Main]` effect | Menu (left-click or right-click) via ⚡ badge | Own field/stage card | `ACTIVATE_EFFECT {cardInstanceId, effectId}` | ✅ (OPT-420) |
 | Inspect a pile | Click | Deck / trash / **life** | zone preview | 🔧 OPT-422 (life parity) |
 | Reorder hand | Drag | Hand card ↔ hand card | local only | ✅ |
 | Phase / battle-step decisions | Button | Mid-zone (`End Phase`, `Block`, `Skip`, `Pass`, `Undo`, prompt buttons) | `ADVANCE_PHASE`, `PASS`, … | ✅ |
@@ -221,7 +221,7 @@ Sequenced after the grammar lands, but the grammar must not paint it into a corn
 | OPT-464 (spotlight) | SP-1…SP-7; `CARDS_REVEALED` event-log line |
 | OPT-465 (transforms + pile receipt) | MO-8, MO-9; Philosophy #6; `cardFizzle`/`pilePop`/`pileDelta` presets |
 
-**Known current-state deviations** (owned by tickets above unless noted): every opponent card lights as an attack target; slots/stage accept any card type; no affordability dim; silent rejections cleared on send; stage drop overlay is green (migrates to blue per SIG table); `[Main]` activation is hidden behind right-click only; all zone moves share one travel animation regardless of the card's fate; **reveals are invisible** — `CARDS_REVEALED` has no UI at all and is suppressed even from the event log (rules-fidelity gap, §4).
+**Known current-state deviations:** core card actions do not yet have complete keyboard/ARIA equivalence (OPT-421), and life inspection plus the smaller parity/dead-code edges remain (OPT-422).
 
 All spec items are ticketed as of 2026-07-12: the Event play surface (G-8, gesture side) was folded into OPT-416; the spotlight surface is OPT-464; transform-class transitions + pile receipt are OPT-465.
 

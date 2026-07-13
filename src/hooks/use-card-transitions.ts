@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
+import {
+  findLatestSpotlight,
+  spotlightCardZoneKey,
+  type SpotlightCard,
+  type SpotlightPresentation,
+} from "@/lib/game/spotlight";
 
 export interface CardTransition {
   id: string;
@@ -14,11 +20,10 @@ export interface CardTransition {
   toZoneKey: string;
   playerIndex: 0 | 1;
   startedAt: number;
-  /** Marks the flight as originating from a KO event — flight layer plays
-   *  the KO shrink preset at the source zone before the trash flight.
-   *  `"don-attach"` (OPT-274) renders a DON token flying from the DON pool
-   *  onto the destination card. */
-  kind?: "ko" | "don-attach";
+  /** Transform dissolves at its source without a flight path. `don-attach`
+   *  renders a DON token flying from the DON pool onto the destination card.
+   *  An omitted kind is a standard travel transition. */
+  kind?: "transform" | "don-attach";
   /** Flight start delay in seconds (OPT-274). Used to stagger multi-card
    *  draws (`~60ms` between arrivals) and multi-DON attachments so they
    *  fan out sequentially instead of landing in a single instant. */
@@ -28,6 +33,15 @@ export interface CardTransition {
    *  Mirrors `instanceId` for character-flight kinds — split out so a
    *  DON-attach target is distinguishable from a target-zone card. */
   targetInstanceId?: string;
+  /** Number of destination cards represented by this visual. Count-only
+   *  transform events use one fizzle plus an aggregated pile receipt. */
+  arrivalCount?: number;
+  /** A transition sourced from the public spotlight waits until that
+   *  spotlight yields, preserving its dwell and waiting-player contract. */
+  waitForSpotlightId?: string;
+  /** Spotlight cards can be preview- or modal-sized; the animation ghost
+   *  must preserve that source footprint before it travels or dissolves. */
+  spotlightSourceSize?: "modal" | "preview";
 }
 
 const MAX_CONCURRENT = 8;
@@ -57,8 +71,9 @@ export function eventToTransitions(
   event: GameEvent,
   myIndex: 0 | 1 | null,
   zoneRegistry: ZonePositionRegistry | null,
+  spotlight: SpotlightPresentation | null = null
 ): CardTransition[] {
-  const single = eventToTransition(event, myIndex, zoneRegistry);
+  const single = eventToTransition(event, myIndex, zoneRegistry, spotlight);
   if (single) return [single];
 
   // DON_GIVEN_TO_CARD fans out into `count` staggered token flights.
@@ -101,25 +116,24 @@ export function eventToTransitions(
       `${prefix}-life`,
       `${prefix}-deck`,
       playerIndex,
+      "travel"
     );
   }
 
-  // CARD_TRASHED with a life-zone reason. The engine emits these with only
-  // a `count` (no individual instanceIds), so consumers fly face-down tokens
-  // from life to trash.
+  // Count-only trash events do not expose individual cards. Represent the
+  // batch with one face-down source fizzle and carry the full arrival count
+  // to the destination pile receipt.
   if (event.type === "CARD_TRASHED") {
     const { playerIndex } = event;
     const prefix = playerIndex === myIndex ? "p" : "o";
-    const reason = event.payload.reason;
-    if (LIFE_TRASH_REASONS.has(reason)) {
-      const count = Math.max(1, event.payload.count ?? 1);
-      return makeFaceDownBurst(
-        count,
-        `${prefix}-life`,
-        `${prefix}-trash`,
-        playerIndex,
-      );
-    }
+    const count = Math.max(1, event.payload.count ?? 1);
+    return makeFaceDownBurst(
+      count,
+      trashSourceZone(event.payload.from, event.payload.reason, prefix),
+      `${prefix}-trash`,
+      playerIndex,
+      "transform"
+    );
   }
 
   return [];
@@ -133,8 +147,24 @@ function makeFaceDownBurst(
   fromZoneKey: string,
   toZoneKey: string,
   playerIndex: 0 | 1,
+  kind: "travel" | "transform" = "travel"
 ): CardTransition[] {
   const startedAt = Date.now();
+  if (kind === "transform") {
+    return [
+      {
+        id: nextId(),
+        cardId: null,
+        instanceId: null,
+        fromZoneKey,
+        toZoneKey,
+        playerIndex,
+        startedAt,
+        kind: "transform",
+        arrivalCount: count,
+      },
+    ];
+  }
   const out: CardTransition[] = [];
   for (let i = 0; i < count; i++) {
     out.push({
@@ -151,10 +181,60 @@ function makeFaceDownBurst(
   return out;
 }
 
+function trashSourceZone(
+  from: string | undefined,
+  reason: string,
+  prefix: "p" | "o"
+): string {
+  switch (from?.toUpperCase()) {
+    case "HAND":
+      return `${prefix}-hand`;
+    case "LIFE":
+      return `${prefix}-life`;
+    case "DECK":
+      return `${prefix}-deck`;
+    case "STAGE":
+      return `${prefix}-stage`;
+    case "LEADER":
+      return `${prefix}-leader`;
+    case "CHARACTER":
+      return `${prefix}-char-2`;
+  }
+
+  if (LIFE_TRASH_REASONS.has(reason)) return `${prefix}-life`;
+  if (reason === "mill" || reason === "search_trash") {
+    return `${prefix}-deck`;
+  }
+  // Legacy count-only cost/effect events predate the explicit `from` field;
+  // those overwhelmingly originate in hand. New worker events set `from`.
+  return `${prefix}-hand`;
+}
+
+function matchSpotlightCard(
+  spotlight: SpotlightPresentation | null,
+  playerIndex: 0 | 1,
+  cardId: string | null,
+  instanceId: string | null
+): SpotlightCard | null {
+  if (!spotlight || spotlight.playerIndex !== playerIndex) return null;
+
+  if (instanceId) {
+    const exact = spotlight.cards.find(
+      (card) => card.instanceId === instanceId
+    );
+    if (exact) return exact;
+  }
+
+  if (!cardId) return null;
+  const matchingIds = spotlight.cards.filter((card) => card.cardId === cardId);
+  return matchingIds.length === 1 ? matchingIds[0] : null;
+}
+
 function eventToTransition(
   event: GameEvent,
   myIndex: 0 | 1 | null,
   zoneRegistry: ZonePositionRegistry | null,
+  spotlight: SpotlightPresentation | null
 ): CardTransition | null {
   const { type, playerIndex } = event;
   const prefix = playerIndex === myIndex ? "p" : "o";
@@ -163,6 +243,7 @@ function eventToTransition(
   let to: string | null = null;
   let cardId: string | null = null;
   let cardInstanceId: string | null = null;
+  let kind: CardTransition["kind"];
 
   switch (type) {
     case "CARD_PLAYED": {
@@ -173,7 +254,10 @@ function eventToTransition(
       if (p.zone === "STAGE") {
         to = `${prefix}-stage`;
       } else if (p.zone === "TRASH") {
-        to = `${prefix}-trash`;
+        // Event plays publish EVENT_ACTIVATED_FROM_HAND immediately after
+        // CARD_PLAYED. That public event owns the spotlight-linked transform;
+        // handling both would duplicate the same trash arrival.
+        return null;
       } else {
         const resolvedZone = cardInstanceId && zoneRegistry
           ? zoneRegistry.getCardZone(cardInstanceId)
@@ -182,41 +266,51 @@ function eventToTransition(
       }
       break;
     }
+    case "EVENT_ACTIVATED_FROM_HAND": {
+      const p = event.payload;
+      cardId = p.cardId ?? null;
+      cardInstanceId = p.cardInstanceId;
+      from = `${prefix}-hand`;
+      to = `${prefix}-trash`;
+      kind = "transform";
+      break;
+    }
     case "CARD_KO": {
       cardId = event.payload.cardId;
-      cardInstanceId = event.payload.cardInstanceId;
-      const resolvedZone = cardInstanceId && zoneRegistry
-        ? zoneRegistry.getCardZone(cardInstanceId)
-        : null;
+      const sourceInstanceId = event.payload.cardInstanceId;
+      cardInstanceId = event.payload.newCardInstanceId ?? sourceInstanceId;
+      const resolvedZone =
+        sourceInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(sourceInstanceId)
+          : null;
       from = resolvedZone ?? `${prefix}-char-2`;
       to = `${prefix}-trash`;
-      return {
-        id: nextId(),
-        cardId,
-        instanceId: cardInstanceId,
-        fromZoneKey: from,
-        toZoneKey: to,
-        playerIndex,
-        startedAt: Date.now(),
-        kind: "ko",
-      };
+      kind = "transform";
+      break;
     }
     case "CARD_TRASHED": {
       const p = event.payload;
       cardId = p.cardId ?? null;
-      cardInstanceId = p.cardInstanceId ?? null;
+      const sourceInstanceId = p.cardInstanceId ?? null;
+      cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
       if (!cardId && p.count) return null;
-      if (p.from === "HAND") {
-        from = `${prefix}-hand`;
-      } else if (p.from === "LIFE" || LIFE_TRASH_REASONS.has(p.reason)) {
-        from = `${prefix}-life`;
-      } else {
-        const resolvedZone = cardInstanceId && zoneRegistry
-          ? zoneRegistry.getCardZone(cardInstanceId)
+      const resolvedZone =
+        sourceInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(sourceInstanceId)
           : null;
-        from = resolvedZone ?? `${prefix}-char-2`;
-      }
+      from = resolvedZone ?? trashSourceZone(p.from, p.reason, prefix);
       to = `${prefix}-trash`;
+      kind = "transform";
+      break;
+    }
+    case "COUNTER_USED": {
+      const p = event.payload;
+      if (p.type !== "event" || !p.cardId) return null;
+      cardId = p.cardId;
+      cardInstanceId = p.cardInstanceId ?? null;
+      from = `${prefix}-hand`;
+      to = `${prefix}-trash`;
+      kind = "transform";
       break;
     }
     case "CARD_DRAWN": {
@@ -229,13 +323,15 @@ function eventToTransition(
     case "CARD_RETURNED_TO_HAND": {
       const p = event.payload;
       cardId = p.cardId;
-      cardInstanceId = p.cardInstanceId;
+      const sourceInstanceId = p.cardInstanceId;
+      cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
       if (p.source === "TRASH") {
         from = `${prefix}-trash`;
       } else {
-        const resolvedZone = cardInstanceId && zoneRegistry
-          ? zoneRegistry.getCardZone(cardInstanceId)
-          : null;
+        const resolvedZone =
+          sourceInstanceId && zoneRegistry
+            ? zoneRegistry.getCardZone(sourceInstanceId)
+            : null;
         from = resolvedZone ?? `${prefix}-char-2`;
       }
       to = `${prefix}-hand`;
@@ -251,10 +347,12 @@ function eventToTransition(
     case "CARD_RETURNED_TO_DECK": {
       const p = event.payload;
       cardId = p.cardId ?? null;
-      cardInstanceId = p.cardInstanceId;
-      const resolvedZone = cardInstanceId && zoneRegistry
-        ? zoneRegistry.getCardZone(cardInstanceId)
-        : null;
+      const sourceInstanceId = p.cardInstanceId;
+      cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
+      const resolvedZone =
+        sourceInstanceId && zoneRegistry
+          ? zoneRegistry.getCardZone(sourceInstanceId)
+          : null;
       from = resolvedZone ?? `${prefix}-char-2`;
       to = `${prefix}-deck`;
       break;
@@ -270,6 +368,24 @@ function eventToTransition(
 
   if (!from || !to) return null;
 
+  const allowSpotlightCardIdFallback =
+    type === "CARD_DRAWN" ||
+    type === "CARD_RETURNED_TO_HAND" ||
+    type === "CARD_ADDED_TO_HAND_FROM_LIFE" ||
+    type === "CARD_RETURNED_TO_DECK";
+  const spotlightCard =
+    type === "CARD_KO"
+      ? null
+      : matchSpotlightCard(
+          spotlight,
+          playerIndex,
+          cardId,
+          allowSpotlightCardIdFallback ? null : cardInstanceId
+        );
+  if (spotlightCard) {
+    from = spotlightCardZoneKey(spotlight!.id, spotlightCard);
+  }
+
   return {
     id: nextId(),
     cardId,
@@ -278,23 +394,34 @@ function eventToTransition(
     toZoneKey: to,
     playerIndex,
     startedAt: Date.now(),
+    kind,
+    waitForSpotlightId: spotlightCard ? spotlight!.id : undefined,
+    spotlightSourceSize: spotlightCard
+      ? spotlight!.cards.length === 1
+        ? "preview"
+        : "modal"
+      : undefined,
   };
 }
 
 /**
  * Apply a per-index stagger to a batch of transitions so multi-card arrivals
  * fan out sequentially instead of landing in a single instant. The first
- * transition keeps its original delay; each subsequent sibling gets an extra
- * `STAGGER_MS` delay added on top of whatever per-transition delay already
- * existed (e.g. DON-attach token offsets within the batch).
+ * travel transition keeps its original delay; each subsequent travel sibling
+ * gets an extra `STAGGER_MS` delay. Transform siblings resolve together so a
+ * simultaneous destruction does not become a misleading sequence.
  *
  * Pure helper — exported for unit tests.
  */
 export function applyBatchStagger(batch: CardTransition[]): CardTransition[] {
   if (batch.length <= 1) return batch;
-  return batch.map((t, i) => ({
+  let travelIndex = 0;
+  return batch.map((t) => ({
     ...t,
-    delay: (t.delay ?? 0) + (i * STAGGER_MS) / 1000,
+    delay:
+      t.kind === "transform"
+        ? t.delay
+        : (t.delay ?? 0) + (travelIndex++ * STAGGER_MS) / 1000,
   }));
 }
 
@@ -303,6 +430,7 @@ export function useCardTransitions(
   myIndex: 0 | 1 | null,
   isDragging: boolean,
   zoneRegistry?: ZonePositionRegistry | null,
+  activeSpotlight: SpotlightPresentation | null = null
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
   // Track the highest timestamp we've processed. Using timestamps (instead of
@@ -310,6 +438,28 @@ export function useCardTransitions(
   // eventLog with the same length but different content.
   const lastTimestampRef = useRef<number | null>(null);
   const dragCooldownRef = useRef(false);
+  const previousSpotlightIdRef = useRef<string | null>(null);
+
+  // Spotlight-linked transitions remain queued throughout the dwell/waiting
+  // state. Releasing the spotlight resets their expiry clock and makes them
+  // eligible for the animation layer on the next render.
+  useEffect(() => {
+    const currentId = activeSpotlight?.id ?? null;
+    const previousId = previousSpotlightIdRef.current;
+    previousSpotlightIdRef.current = currentId;
+    if (!previousId || previousId === currentId) return;
+
+    queueMicrotask(() => {
+      setTransitions((prev) =>
+        prev.map((transition) => {
+          if (transition.waitForSpotlightId !== previousId) return transition;
+          const released = { ...transition };
+          delete released.waitForSpotlightId;
+          return { ...released, startedAt: Date.now() };
+        })
+      );
+    });
+  }, [activeSpotlight?.id]);
 
   // After a drag ends, suppress animations briefly so the server-confirmed
   // state update doesn't produce a redundant ghost card.
@@ -329,7 +479,15 @@ export function useCardTransitions(
     // First run: seed the cursor so historic events don't replay.
     if (lastTimestampRef.current === null) {
       const last = eventLog[eventLog.length - 1];
-      lastTimestampRef.current = last ? last.timestamp : 0;
+      lastTimestampRef.current = last ? last.timestamp : -1;
+      return;
+    }
+
+    // Sandbox Reset intentionally rewinds the deterministic event sequence.
+    // Reset the cursor with it so replayable motion scenarios still exercise
+    // their first event instead of being mistaken for historic state.
+    if (eventLog.length === 0) {
+      lastTimestampRef.current = -1;
       return;
     }
 
@@ -346,22 +504,48 @@ export function useCardTransitions(
     if (newEvents.length === 0) return;
     lastTimestampRef.current = maxTs;
 
-    if (isDragging || dragCooldownRef.current) return;
-
+    const batchSpotlight = findLatestSpotlight(newEvents) ?? activeSpotlight;
     const newTransitions: CardTransition[] = [];
     for (const event of newEvents) {
-      const produced = eventToTransitions(event, myIndex, zoneRegistry ?? null);
-      for (const t of produced) newTransitions.push(t);
+      const produced = eventToTransitions(
+        event,
+        myIndex,
+        zoneRegistry ?? null,
+        batchSpotlight
+      );
+      for (const transition of produced) {
+        newTransitions.push(
+          batchSpotlight &&
+            transition.kind === "transform" &&
+            transition.waitForSpotlightId === undefined
+            ? {
+                ...transition,
+                waitForSpotlightId: batchSpotlight.id,
+              }
+            : transition
+        );
+      }
     }
 
-    if (newTransitions.length === 0) return;
+    // A direct drag already supplies the travel visual, so suppress the
+    // server-confirmed duplicate during the drag cooldown. Spotlight-owned
+    // transforms are different: they must stay queued to reserve their pile
+    // arrivals and play after the spotlight yields.
+    const presentableTransitions =
+      isDragging || dragCooldownRef.current
+        ? newTransitions.filter(
+            (transition) => transition.waitForSpotlightId !== undefined
+          )
+        : newTransitions;
+
+    if (presentableTransitions.length === 0) return;
 
     // Stagger a batch of new arrivals (OPT-274). Each transition carries its
     // own delay — DON-attach delays are already assigned per-token inside
     // `eventToTransitions`; others stagger by their position in the batch so
     // multi-card draws fan out sequentially. The stagger rides on top of any
     // existing delay (e.g. DON-attach tokens inside a bigger batch).
-    const staggered = applyBatchStagger(newTransitions);
+    const staggered = applyBatchStagger(presentableTransitions);
 
     queueMicrotask(() => {
       setTransitions((prev) => {
@@ -369,7 +553,7 @@ export function useCardTransitions(
         return combined.slice(-MAX_CONCURRENT);
       });
     });
-  }, [eventLog, myIndex, isDragging, zoneRegistry]);
+  }, [eventLog, myIndex, isDragging, zoneRegistry, activeSpotlight]);
 
   // Auto-expire old transitions
   useEffect(() => {
@@ -378,7 +562,11 @@ export function useCardTransitions(
     const timer = setTimeout(() => {
       const now = Date.now();
       setTransitions((prev) =>
-        prev.filter((t) => now - t.startedAt < AUTO_EXPIRE_MS),
+        prev.filter(
+          (t) =>
+            t.waitForSpotlightId !== undefined ||
+            now - t.startedAt < AUTO_EXPIRE_MS
+        )
       );
     }, AUTO_EXPIRE_MS);
 

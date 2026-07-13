@@ -24,23 +24,40 @@ const ZonePositionContext = createContext<ZonePositionRegistry | null>(null);
 
 export function ZonePositionProvider({ children }: { children: ReactNode }) {
   const elementsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const previousRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const cardZonesRef = useRef<Map<string, string>>(new Map());
+  // Zone-changing events arrive in the same React update that removes the
+  // source card from the board. Preserve its last registered zone so the
+  // transition layer can still dissolve/launch from the real source slot
+  // after the source element unmounts.
+  const previousCardZonesRef = useRef<Map<string, string>>(new Map());
 
   const register = useCallback((zoneKey: string, element: HTMLElement) => {
     elementsRef.current.set(zoneKey, element);
   }, []);
 
   const unregister = useCallback((zoneKey: string) => {
+    const element = elementsRef.current.get(zoneKey);
+    if (element) {
+      previousRectsRef.current.set(zoneKey, element.getBoundingClientRect());
+      if (previousRectsRef.current.size > 64) {
+        const oldestKey = previousRectsRef.current.keys().next().value;
+        if (oldestKey) previousRectsRef.current.delete(oldestKey);
+      }
+    }
     elementsRef.current.delete(zoneKey);
   }, []);
 
   const getRect = useCallback((zoneKey: string): DOMRect | null => {
     const el = elementsRef.current.get(zoneKey);
-    return el ? el.getBoundingClientRect() : null;
+    return el
+      ? el.getBoundingClientRect()
+      : (previousRectsRef.current.get(zoneKey) ?? null);
   }, []);
 
   const registerCard = useCallback((instanceId: string, zoneKey: string) => {
     cardZonesRef.current.set(instanceId, zoneKey);
+    previousCardZonesRef.current.set(instanceId, zoneKey);
   }, []);
 
   const unregisterCard = useCallback((instanceId: string) => {
@@ -48,7 +65,11 @@ export function ZonePositionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getCardZone = useCallback((instanceId: string): string | null => {
-    return cardZonesRef.current.get(instanceId) ?? null;
+    return (
+      cardZonesRef.current.get(instanceId) ??
+      previousCardZonesRef.current.get(instanceId) ??
+      null
+    );
   }, []);
 
   const registry = useMemo<ZonePositionRegistry>(() => ({

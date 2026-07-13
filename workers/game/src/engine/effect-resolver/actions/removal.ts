@@ -383,7 +383,7 @@ export function executeTrashFromHand(
     { position: "TOP", preserveSourceTriggers: true },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: moved.transitions.length, reason: "effect" } });
+  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: moved.transitions.length, reason: "effect", from: "HAND" } });
 
   return {
     state: moved.state,

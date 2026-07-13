@@ -605,6 +605,9 @@ export const variants = {
 | **Page transition** | Fade + slide up 16px, 250ms | Fade 150ms | — |
 | **List stagger** | Each item delays 30ms | — | — |
 | **Skeleton→content** | Crossfade 300ms | — | — |
+| **Zone travel** | `zoneEnter` at destination | `zoneMove` 220ms ease-out | Stagger siblings by 60ms |
+| **Card transform** | Materializes through pile receipt | `cardFizzle` 360ms ease-out | Opacity + scale + slight lift at source |
+| **Pile receipt** | `pilePop` 200ms + `pileDelta` 700ms | — | One aggregated `+N` per batch |
 
 ### Reduced Motion
 
@@ -614,6 +617,7 @@ All motion respects `prefers-reduced-motion: reduce`. When active:
 - Opacity transitions reduced to 100ms
 - No spring animations — instant state changes
 - Layout animations disabled
+- Transform exits use a 100ms cross-fade; pile deltas keep their 700ms opacity clock but remove the pop and all spatial drift
 
 ```ts
 // motion.dev automatically respects this, but we also expose:

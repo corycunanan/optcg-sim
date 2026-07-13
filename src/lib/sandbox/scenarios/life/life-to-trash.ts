@@ -1,10 +1,7 @@
 // Spectator scenario: two face-up Life cards are trashed (mirrors the
-// engine's `face_up_life` reason path) and fly as face-down tokens from the
-// life zone to the trash pile. Distinct from life-to-hand by destination: the
-// life zone routes to trash here, not hand. Per-card events (rather than the
-// engine's `count: N` shape) are emitted so each token's flight is animated
-// individually — the count-only payload is ignored by `eventToTransitions`
-// for this reason.
+// engine's `face_up_life` reason path) and dissolve at the life pile before
+// the trash pile receives them. Distinct from life-to-hand, which remains a
+// travel transition.
 
 import type { GameEvent, TurnState } from "@shared/game-types";
 import {
@@ -53,7 +50,7 @@ export const lifeToTrashScenario: Scenario = {
   title: "Face-up Life to trash",
   category: "life",
   description:
-    "Two face-up Life cards are trashed (the engine's face_up_life reason path). Each flies as a face-down token from the life zone to the trash pile, distinct from life-to-hand which routes the same source to the hand. The cardId is intentionally omitted so the flight renders as a sleeve, matching the engine's count-only emission shape.",
+    "Two face-up Life cards are trashed (the engine's face_up_life reason path). Each dissolves at the life pile and materializes through the trash receipt, distinct from life-to-hand which still travels to the hand.",
   inputMode: "spectator",
   cardsUsed: ["OP01-001", "OP01-060"],
   initialState: {

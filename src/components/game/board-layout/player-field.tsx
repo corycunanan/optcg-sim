@@ -3,7 +3,6 @@
 import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
-import { Card } from "../card";
 import { EmptySlot } from "./empty-slot";
 import {
   SQUARE,
@@ -25,11 +24,11 @@ import {
   sideCardOffsetX,
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
+import { DeckPile } from "./deck-pile";
 import { LifeZone } from "./life-zone";
 import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop-zones";
 import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
-import { ZoneRef } from "./zone-ref";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 
 interface PlayerFieldProps {
@@ -53,9 +52,8 @@ interface PlayerFieldProps {
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
-  /** Instance IDs currently flying *into* the player's trash — hides them
-   *  from the trash top/count until their flight lands (OPT-274). */
-  trashArrivingIds?: Set<string>;
+  /** Active arrivals keyed by pile zone (`p-deck`, `p-trash`, `p-life`). */
+  pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
 }
@@ -81,7 +79,7 @@ export function PlayerField({
   attackerInstanceId,
   defenderInstanceId,
   counterPulseIds,
-  trashArrivingIds,
+  pileArrivingCounts,
   targetSelectionById,
   onTargetToggle,
 }: PlayerFieldProps) {
@@ -118,6 +116,7 @@ export function PlayerField({
         cardDb={cardDb}
         zoneKey="p-life"
         sleeveUrl={me?.sleeveUrl}
+        arrivingCount={pileArrivingCounts?.get("p-life")}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
       />
 
@@ -252,24 +251,32 @@ export function PlayerField({
       />
 
       {/* Zone 3 (right): Deck + Trash */}
-      <ZoneRef zoneKey="p-deck" style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop }}>
-        <Card
-          variant="trash"
-          data={{ cardDb }}
-          faceDown
-          sleeveUrl={me?.sleeveUrl}
-          overlays={{ countBadge: me?.deck.length, label: "DECK" }}
-          interaction={{ clickable: !!me }}
-          onClick={() => me && onPreviewZone({ type: "deck", owner: "me" })}
-        />
-      </ZoneRef>
+      <DeckPile
+        count={me?.deck.length ?? 0}
+        arrivingCount={pileArrivingCounts?.get("p-deck")}
+        cardDb={cardDb}
+        sleeveUrl={me?.sleeveUrl}
+        zoneKey="p-deck"
+        style={{
+          position: "absolute",
+          left: FIELD_W - SQUARE + sideCardOffsetX,
+          top: playerTop,
+        }}
+        onClick={
+          me ? () => onPreviewZone({ type: "deck", owner: "me" }) : undefined
+        }
+      />
       <DroppableTrashZone
         trash={me?.trash ?? []}
         cardDb={cardDb}
         onClickTrash={() => me && me.trash.length > 0 && onPreviewZone({ type: "trash", owner: "me" })}
         zoneKey="p-trash"
-        arrivingInstanceIds={trashArrivingIds}
-        style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: playerTop + SQUARE + SIDE_ZONE_GAP }}
+        arrivingCount={pileArrivingCounts?.get("p-trash")}
+        style={{
+          position: "absolute",
+          left: FIELD_W - SQUARE + sideCardOffsetX,
+          top: playerTop + SQUARE + SIDE_ZONE_GAP,
+        }}
       />
     </>
   );

@@ -181,7 +181,7 @@ export function executeMill(
     { position: "TOP" },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: millCount, reason: "mill" } });
+  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: millCount, reason: "mill", from: "DECK" } });
 
   return {
     state: moved.state,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
+import type { SpotlightPresentation } from "@/lib/game/spotlight";
 import {
   applyBatchStagger,
   eventToTransitions,
@@ -60,6 +61,20 @@ describe("applyBatchStagger", () => {
     const out = applyBatchStagger(batch);
     expect(out[0].delay).toBe(0);
     expect(out[1].delay).toBeCloseTo(0.12, 5);
+  });
+
+  it("does not stagger simultaneous transform siblings or consume a travel slot", () => {
+    const batch = [
+      mkTransition({ id: "f0", kind: "transform" }),
+      mkTransition({ id: "move-0" }),
+      mkTransition({ id: "f1", kind: "transform" }),
+      mkTransition({ id: "move-1" }),
+    ];
+    const out = applyBatchStagger(batch);
+    expect(out[0].delay).toBeUndefined();
+    expect(out[1].delay).toBe(0);
+    expect(out[2].delay).toBeUndefined();
+    expect(out[3].delay).toBeCloseTo(0.06, 5);
   });
 });
 
@@ -145,6 +160,88 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
     expect(out[0].fromZoneKey).toBe("p-deck");
     expect(out[0].toZoneKey).toBe("p-hand");
     expect(out[0].kind).toBeUndefined();
+  });
+});
+
+describe("eventToTransitions — travel vs transform", () => {
+  it("classifies Character play as travel and Event activation as transform", () => {
+    const character = {
+      type: "CARD_PLAYED",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: {
+        cardId: "OP01-001",
+        cardInstanceId: "char-new",
+        zone: "CHARACTER",
+        source: "FROM_HAND",
+      },
+    } as unknown as GameEvent;
+    const event = {
+      type: "EVENT_ACTIVATED_FROM_HAND",
+      playerIndex: 0,
+      timestamp: 2,
+      payload: {
+        cardId: "OP01-030",
+        cardInstanceId: "event-trash-new",
+      },
+    } as unknown as GameEvent;
+
+    expect(
+      eventToTransitions(character, 0, mkRegistry())[0].kind
+    ).toBeUndefined();
+    const [transform] = eventToTransitions(event, 0, mkRegistry());
+    expect(transform.kind).toBe("transform");
+    expect(transform.fromZoneKey).toBe("p-hand");
+    expect(transform.toZoneKey).toBe("p-trash");
+  });
+
+  it("dissolves a KO at its remembered source and tracks the destination instance", () => {
+    const registry = mkRegistry({
+      getCardZone: (id) => (id === "char-old" ? "o-char-4" : null),
+    });
+    const event = {
+      type: "CARD_KO",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP02-087",
+        cardInstanceId: "char-old",
+        newCardInstanceId: "trash-new",
+        cause: "EFFECT",
+        preKO_donCount: 0,
+      },
+    } as unknown as GameEvent;
+
+    const [transform] = eventToTransitions(event, 0, registry);
+    expect(transform.kind).toBe("transform");
+    expect(transform.fromZoneKey).toBe("o-char-4");
+    expect(transform.toZoneKey).toBe("o-trash");
+    expect(transform.instanceId).toBe("trash-new");
+  });
+
+  it("holds a public Event transform at its spotlight anchor until dismissal", () => {
+    const spotlight = {
+      id: "EVENT-0-10",
+      kind: "EVENT",
+      playerIndex: 0,
+      timestamp: 10,
+      cards: [{ cardId: "OP01-030", instanceId: "event-new" }],
+      source: "hand",
+    } satisfies SpotlightPresentation;
+    const event = {
+      type: "EVENT_ACTIVATED_FROM_HAND",
+      playerIndex: 0,
+      timestamp: 10,
+      payload: {
+        cardId: "OP01-030",
+        cardInstanceId: "event-new",
+      },
+    } as unknown as GameEvent;
+
+    const [transform] = eventToTransitions(event, 0, mkRegistry(), spotlight);
+    expect(transform.fromZoneKey).toBe("spotlight-EVENT-0-10-event-new");
+    expect(transform.waitForSpotlightId).toBe(spotlight.id);
+    expect(transform.spotlightSourceSize).toBe("preview");
   });
 });
 
@@ -244,17 +341,19 @@ describe("eventToTransitions — life-source CARD_TRASHED (OPT-121)", () => {
     } as unknown as GameEvent;
   }
 
-  it("life_trash fans out into face-down life→trash flights", () => {
-    const out = eventToTransitions(lifeTrashEvent("life_trash", 2), 0, mkRegistry());
-    expect(out).toHaveLength(2);
-    for (const t of out) {
-      expect(t.fromZoneKey).toBe("p-life");
-      expect(t.toZoneKey).toBe("p-trash");
-      expect(t.cardId).toBeNull();
-      expect(t.instanceId).toBeNull();
-    }
-    expect(out[0].delay).toBe(0);
-    expect(out[1].delay).toBeCloseTo(0.06, 5);
+  it("life_trash becomes one face-down batch transform with an aggregated arrival", () => {
+    const out = eventToTransitions(
+      lifeTrashEvent("life_trash", 2),
+      0,
+      mkRegistry()
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].fromZoneKey).toBe("p-life");
+    expect(out[0].toZoneKey).toBe("p-trash");
+    expect(out[0].cardId).toBeNull();
+    expect(out[0].instanceId).toBeNull();
+    expect(out[0].kind).toBe("transform");
+    expect(out[0].arrivalCount).toBe(2);
   });
 
   it("face_up_life uses the same life→trash route", () => {
@@ -264,11 +363,12 @@ describe("eventToTransitions — life-source CARD_TRASHED (OPT-121)", () => {
     expect(out[0].toZoneKey).toBe("p-trash");
   });
 
-  it("non-life CARD_TRASHED with only count still returns nothing (existing behavior)", () => {
-    // search_trash, hand_wheel, mill, etc. — these emit count without a cardId
-    // and don't have a single source rect, so the flight layer skips them.
+  it("routes a count-only mill through a deck-source batch transform", () => {
     const out = eventToTransitions(lifeTrashEvent("mill", 3), 0, mkRegistry());
-    expect(out).toEqual([]);
+    expect(out).toHaveLength(1);
+    expect(out[0].fromZoneKey).toBe("p-deck");
+    expect(out[0].kind).toBe("transform");
+    expect(out[0].arrivalCount).toBe(3);
   });
 });
 
@@ -330,12 +430,12 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     expect(out[0].toZoneKey).toBe("o-trash");
   });
 
-  it("falls back to char-2 when neither from nor a life-trash reason is set", () => {
+  it("falls back to hand for legacy effect trash without an explicit source", () => {
     const out = eventToTransitions(
       trashEvent({ cardInstanceId: "x", reason: "EFFECT" }),
       0,
       registry,
     );
-    expect(out[0].fromZoneKey).toBe("p-char-2");
+    expect(out[0].fromZoneKey).toBe("p-hand");
   });
 });

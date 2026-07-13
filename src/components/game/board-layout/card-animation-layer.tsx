@@ -6,13 +6,19 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import type { CardDb } from "@shared/game-types";
 import type { CardTransition } from "@/hooks/use-card-transitions";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { cardKO, cardTransitions } from "@/lib/motion";
+import { cardFizzle, cardFizzleReduced, cardTransitions } from "@/lib/motion";
 import { getPortalContainer } from "../scaled-board";
 import { Card } from "../card";
-import { BOARD_CARD_W, BOARD_CARD_H, HAND_CARD_W, HAND_CARD_H } from "./constants";
+import {
+  BOARD_CARD_W,
+  BOARD_CARD_H,
+  HAND_CARD_W,
+  HAND_CARD_H,
+} from "./constants";
 
 const DON_TOKEN_W = 50;
 const DON_TOKEN_H = 70;
+const FILL_TRANSITION_FRAME = { width: "100%", height: "100%" } as const;
 
 interface CardAnimationLayerProps {
   transitions: CardTransition[];
@@ -28,81 +34,105 @@ function FlyingCard({
   onComplete,
   sleeveUrl,
   donArtUrl,
+  reducedMotion,
 }: {
   transition: CardTransition;
   cardDb: CardDb;
   onComplete: () => void;
   sleeveUrl?: string | null;
   donArtUrl?: string | null;
+  reducedMotion: boolean;
 }) {
   const zonePos = useZonePosition();
+  const isTransform = transition.kind === "transform";
+  const isDonAttach = transition.kind === "don-attach";
   const fromRect = zonePos.getRect(transition.fromZoneKey);
   const toRect = zonePos.getRect(transition.toZoneKey);
-  const canAnimate = !!fromRect && !!toRect;
+  const canAnimate = Boolean(
+    fromRect && (isTransform || toRect) && (!reducedMotion || isTransform)
+  );
 
   // If we can't resolve both positions, clean up immediately
   React.useEffect(() => {
     if (!canAnimate) onComplete();
   }, [canAnimate, onComplete]);
 
-  if (!canAnimate) return null;
+  if (!canAnimate || !fromRect) return null;
 
   const isFromHand = transition.fromZoneKey.endsWith("-hand");
   const isHandBound = transition.toZoneKey.endsWith("-hand");
-  const isKO = transition.kind === "ko";
-  const isDonAttach = transition.kind === "don-attach";
+  const isFromSpotlight = transition.spotlightSourceSize !== undefined;
+  const destinationRect = toRect ?? fromRect;
 
   // Flight footprint depends on kind. DON tokens are smaller than cards and
   // stay DON-sized for the entire flight; card flights size to their
   // source/destination zone.
-  const fromW = isDonAttach ? DON_TOKEN_W : isFromHand ? HAND_CARD_W : BOARD_CARD_W;
-  const fromH = isDonAttach ? DON_TOKEN_H : isFromHand ? HAND_CARD_H : BOARD_CARD_H;
-  const toW = isDonAttach ? DON_TOKEN_W : isHandBound ? HAND_CARD_W : BOARD_CARD_W;
-  const toH = isDonAttach ? DON_TOKEN_H : isHandBound ? HAND_CARD_H : BOARD_CARD_H;
+  const fromW = isDonAttach
+    ? DON_TOKEN_W
+    : isFromSpotlight
+      ? fromRect.width
+      : isFromHand
+        ? HAND_CARD_W
+        : BOARD_CARD_W;
+  const fromH = isDonAttach
+    ? DON_TOKEN_H
+    : isFromSpotlight
+      ? fromRect.height
+      : isFromHand
+        ? HAND_CARD_H
+        : BOARD_CARD_H;
+  const toW = isDonAttach
+    ? DON_TOKEN_W
+    : isHandBound
+      ? HAND_CARD_W
+      : BOARD_CARD_W;
+  const toH = isDonAttach
+    ? DON_TOKEN_H
+    : isHandBound
+      ? HAND_CARD_H
+      : BOARD_CARD_H;
 
   const fromX = fromRect.left + (fromRect.width - fromW) / 2;
   const fromY = fromRect.top + (fromRect.height - fromH) / 2;
   // Cards arriving in hand target the right edge (end of hand fan); DON
   // tokens aim for the target card's center.
-  const toX = isHandBound && !isDonAttach
-    ? toRect.right - toW
-    : toRect.left + (toRect.width - toW) / 2;
-  const toY = toRect.top + (toRect.height - toH) / 2;
+  const toX =
+    isHandBound && !isDonAttach
+      ? destinationRect.right - toW
+      : destinationRect.left + (destinationRect.width - toW) / 2;
+  const toY = destinationRect.top + (destinationRect.height - toH) / 2;
 
   // Variant tracks the destination footprint — the primitive's size token
   // matches the outer motion.div's animated `toW/toH` so the card settles
   // into the destination zone at exactly the right dimensions.
-  const variant = isDonAttach ? "don" : isHandBound ? "hand" : "field";
+  const variant = isDonAttach
+    ? "don"
+    : isFromSpotlight
+      ? "modal"
+      : isHandBound
+        ? "hand"
+        : "field";
   const isFaceDown = !transition.cardId || transition.cardId === "hidden";
 
   const delay = transition.delay ?? 0;
 
-  // KO flights get a two-phase sequence: pause at source with a shrink +
-  // opacity dip (cardKO preset), then fly to trash. `times` places the dip
-  // at ~30% of the total duration so the "shrink" reads before the flight
-  // starts. All other flights (including hand-bound + DON-attach) share a
-  // straight-line, fast easeOut tween for consistency — the arrival pop is
-  // delivered by the destination card's `cardEntry` mount animation, not by
-  // the flight layer. The entry animation composes with the flight
-  // `onAnimationComplete` cleanly via `AnimatePresence`.
+  // Transform-class cards dissolve at the source; travel cards keep the
+  // existing straight-line flight. Destination pile receipt is owned by the
+  // pile components after this transition completes.
   let animateTarget: Record<string, number | number[]>;
   let transitionConfig: Record<string, unknown>;
 
-  if (isKO) {
+  if (isTransform) {
+    const fizzle = reducedMotion ? cardFizzleReduced : cardFizzle;
     animateTarget = {
-      x: [fromX, fromX, toX],
-      y: [fromY, fromY, toY],
-      width: [fromW, fromW, toW],
-      height: [fromH, fromH, toH],
-      scale: cardKO.scale as number[],
-      opacity: cardKO.opacity as number[],
+      x: fromX,
+      y: reducedMotion ? fromY : cardFizzle.y.map((offset) => fromY + offset),
+      width: fromW,
+      height: fromH,
+      scale: reducedMotion ? 1 : (cardFizzle.scale as number[]),
+      opacity: fizzle.opacity as number[],
     };
-    transitionConfig = {
-      duration: 0.45,
-      times: [0, 0.3, 1],
-      ease: "easeOut",
-      delay,
-    };
+    transitionConfig = { ...fizzle.transition, delay };
   } else if (isDonAttach) {
     animateTarget = {
       x: toX,
@@ -136,7 +166,7 @@ function FlyingCard({
         scale: 1,
       }}
       animate={animateTarget}
-      exit={{ opacity: 0, scale: 0.95 }}
+      exit={{ opacity: 0 }}
       transition={transitionConfig}
       onAnimationComplete={onComplete}
       style={{
@@ -146,10 +176,16 @@ function FlyingCard({
       }}
     >
       {isDonAttach ? (
-        <Card variant="don" state="in-flight" artUrl={donArtUrl ?? undefined} />
+        <Card
+          variant="don"
+          state="in-flight"
+          artUrl={donArtUrl ?? undefined}
+          style={FILL_TRANSITION_FRAME}
+        />
       ) : (
         <Card
           variant={variant}
+          size={transition.spotlightSourceSize}
           state="in-flight"
           data={
             transition.cardId && transition.cardId !== "hidden"
@@ -159,6 +195,7 @@ function FlyingCard({
           faceDown={isFaceDown}
           sleeveUrl={sleeveUrl}
           interaction={{ tooltipDisabled: true }}
+          style={FILL_TRANSITION_FRAME}
         />
       )}
     </motion.div>
@@ -173,10 +210,10 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   donArtUrls,
 }: CardAnimationLayerProps) {
   const reducedMotion = useReducedMotion();
-
-  // Skip all flying animations when reduced motion is preferred
-  if (reducedMotion) return null;
-  if (transitions.length === 0) return null;
+  const readyTransitions = transitions.filter(
+    (transition) => transition.waitForSpotlightId === undefined
+  );
+  if (readyTransitions.length === 0) return null;
 
   // The layer must escape any transformed parent so `position: fixed` resolves
   // to the viewport, not the scaled subtree (`<ScaledBoard>` applies
@@ -185,9 +222,9 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   // otherwise render in place — the current layout has no transformed
   // ancestor for this layer, so this preserves today's behavior.
   const layer = (
-    <div className="fixed inset-0 z-[9999] pointer-events-none">
+    <div className="pointer-events-none fixed inset-0 z-[9999]">
       <AnimatePresence>
-        {transitions.map((t) => (
+        {readyTransitions.map((t) => (
           <FlyingCard
             key={t.id}
             transition={t}
@@ -195,6 +232,7 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
             onComplete={() => onComplete(t.id)}
             sleeveUrl={sleeveUrls?.[t.playerIndex] ?? null}
             donArtUrl={donArtUrls?.[t.playerIndex] ?? null}
+            reducedMotion={reducedMotion ?? false}
           />
         ))}
       </AnimatePresence>

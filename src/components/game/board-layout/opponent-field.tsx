@@ -22,8 +22,10 @@ import {
   sideCardOffsetX,
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
+import { DeckPile } from "./deck-pile";
 import { LifeZone } from "./life-zone";
 import { OpponentFieldCard } from "./field-card";
+import { DroppableTrashZone } from "./trash-zone";
 import { ZoneRef } from "./zone-ref";
 import { cn } from "@/lib/utils";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
@@ -41,9 +43,8 @@ interface OpponentFieldProps {
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
   donCountAdjustments?: Map<string, number>;
-  /** Instance IDs currently flying *into* the opponent's trash — hides them
-   *  from the top/count until their flight lands (OPT-274). */
-  trashArrivingIds?: Set<string>;
+  /** Active arrivals keyed by pile zone (`o-deck`, `o-trash`, `o-life`). */
+  pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
 }
@@ -58,17 +59,11 @@ export function OpponentField({
   defenderInstanceId,
   counterPulseIds,
   donCountAdjustments,
-  trashArrivingIds,
+  pileArrivingCounts,
   targetSelectionById,
   onTargetToggle,
 }: OpponentFieldProps) {
   const oppTrash = opp?.trash ?? [];
-  const visibleTrash =
-    trashArrivingIds && trashArrivingIds.size > 0
-      ? oppTrash.filter((c) => !trashArrivingIds.has(c.instanceId))
-      : oppTrash;
-  const hasTrash = visibleTrash.length > 0;
-  const topTrash = hasTrash ? visibleTrash[0] : undefined;
   const stage = opp?.stage ?? null;
   const stageSelection = stage
     ? targetSelectionById?.get(stage.instanceId)
@@ -87,32 +82,33 @@ export function OpponentField({
   return (
     <>
       {/* Zone 3 (left): Trash + Deck */}
-      <ZoneRef zoneKey="o-trash" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}>
-        <Card
-          variant="trash"
-          data={{ cardDb, card: topTrash }}
-          empty={!hasTrash}
-          emptyLabel="TRASH"
-          overlays={
-            hasTrash && visibleTrash.length > 1
-              ? { countBadge: visibleTrash.length }
-              : undefined
-          }
-          interaction={{ clickable: hasTrash }}
-          onClick={() => hasTrash && onPreviewZone({ type: "trash", owner: "opp" })}
-        />
-      </ZoneRef>
-      <ZoneRef zoneKey="o-deck" style={{ position: "absolute", left: sideCardOffsetX, top: oppTop + SQUARE + SIDE_ZONE_GAP }}>
-        <Card
-          variant="trash"
-          data={{ cardDb }}
-          faceDown
-          sleeveUrl={opp?.sleeveUrl}
-          overlays={{ countBadge: opp?.deck.length, label: "DECK" }}
-          interaction={{ clickable: !!opp }}
-          onClick={() => opp && onPreviewZone({ type: "deck", owner: "opp" })}
-        />
-      </ZoneRef>
+      <DroppableTrashZone
+        trash={oppTrash}
+        cardDb={cardDb}
+        onClickTrash={
+          oppTrash.length > 0
+            ? () => onPreviewZone({ type: "trash", owner: "opp" })
+            : undefined
+        }
+        zoneKey="o-trash"
+        arrivingCount={pileArrivingCounts?.get("o-trash")}
+        style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}
+      />
+      <DeckPile
+        count={opp?.deck.length ?? 0}
+        arrivingCount={pileArrivingCounts?.get("o-deck")}
+        cardDb={cardDb}
+        sleeveUrl={opp?.sleeveUrl}
+        zoneKey="o-deck"
+        style={{
+          position: "absolute",
+          left: sideCardOffsetX,
+          top: oppTop + SQUARE + SIDE_ZONE_GAP,
+        }}
+        onClick={
+          opp ? () => onPreviewZone({ type: "deck", owner: "opp" }) : undefined
+        }
+      />
 
       {/* Zone 2: Leader row — STG / LDR / DON */}
       <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
@@ -222,7 +218,12 @@ export function OpponentField({
         cardDb={cardDb}
         zoneKey="o-life"
         sleeveUrl={opp?.sleeveUrl}
-        style={{ position: "absolute", left: FIELD_W - SQUARE + sideCardOffsetX, top: oppTop }}
+        arrivingCount={pileArrivingCounts?.get("o-life")}
+        style={{
+          position: "absolute",
+          left: FIELD_W - SQUARE + sideCardOffsetX,
+          top: oppTop,
+        }}
       />
     </>
   );

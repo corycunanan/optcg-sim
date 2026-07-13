@@ -1,9 +1,15 @@
 "use client";
 
+import { useCallback } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Eye, LayoutPanelTop, X } from "lucide-react";
 import type { CardDb } from "@shared/game-types";
-import type { SpotlightPresentation } from "@/lib/game/spotlight";
+import { useZonePosition } from "@/contexts/zone-position-context";
+import {
+  spotlightCardZoneKey,
+  type SpotlightCard,
+  type SpotlightPresentation,
+} from "@/lib/game/spotlight";
 import { Card } from "./card";
 import { GameButton } from "./game-button";
 
@@ -45,6 +51,54 @@ function presentationCopy(
         title: `${actor} revealed ${presentation.cards.length === 1 ? "a card" : `${presentation.cards.length} cards`}`,
       };
   }
+}
+
+function SpotlightCardView({
+  presentation,
+  card,
+  index,
+  cardDb,
+  reducedMotion,
+}: {
+  presentation: SpotlightPresentation;
+  card: SpotlightCard;
+  index: number;
+  cardDb: CardDb;
+  reducedMotion: boolean;
+}) {
+  const zonePos = useZonePosition();
+  const zoneKey = spotlightCardZoneKey(presentation.id, card);
+  const ref = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) zonePos.register(zoneKey, node);
+      else zonePos.unregister(zoneKey);
+    },
+    [zoneKey, zonePos]
+  );
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={reducedMotion ? false : { y: 24, opacity: 0, scale: 0.94 }}
+      animate={{ y: 0, opacity: 1, scale: 1, rotateY: 0 }}
+      exit={
+        reducedMotion
+          ? { opacity: 0 }
+          : { opacity: 0, rotateY: 90, scale: 0.94 }
+      }
+      transition={{
+        duration: reducedMotion ? 0 : 0.24,
+        delay: reducedMotion ? 0 : index * 0.06,
+      }}
+    >
+      <Card
+        variant="modal"
+        size={presentation.cards.length === 1 ? "preview" : "modal"}
+        data={{ cardId: card.cardId, cardDb }}
+        interaction={{ tooltipDisabled: true }}
+      />
+    </motion.div>
+  );
 }
 
 export function SpotlightOverlay({
@@ -91,29 +145,14 @@ export function SpotlightOverlay({
 
             <div className="flex max-w-3xl flex-wrap items-center justify-center gap-4">
               {presentation.cards.map((card, index) => (
-                <motion.div
+                <SpotlightCardView
                   key={card.instanceId ?? `${card.cardId}-${index}`}
-                  initial={
-                    reducedMotion ? false : { y: 24, opacity: 0, scale: 0.94 }
-                  }
-                  animate={{ y: 0, opacity: 1, scale: 1, rotateY: 0 }}
-                  exit={
-                    reducedMotion
-                      ? { opacity: 0 }
-                      : { opacity: 0, rotateY: 90, scale: 0.94 }
-                  }
-                  transition={{
-                    duration: reducedMotion ? 0 : 0.24,
-                    delay: reducedMotion ? 0 : index * 0.06,
-                  }}
-                >
-                  <Card
-                    variant="modal"
-                    size={presentation.cards.length === 1 ? "preview" : "modal"}
-                    data={{ cardId: card.cardId, cardDb }}
-                    interaction={{ tooltipDisabled: true }}
-                  />
-                </motion.div>
+                  presentation={presentation}
+                  card={card}
+                  index={index}
+                  cardDb={cardDb}
+                  reducedMotion={reducedMotion ?? false}
+                />
               ))}
             </div>
 

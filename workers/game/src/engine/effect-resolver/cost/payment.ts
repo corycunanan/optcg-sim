@@ -207,7 +207,7 @@ export function payCosts(
         nextState = moved.state;
         costResult.cardsTrashedCount += moved.transitions.length;
         costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost" } });
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost", from: "HAND" } });
         break;
       }
 
@@ -246,7 +246,7 @@ export function payCosts(
         nextState = moved.state;
         costResult.cardsTrashedCount += moved.transitions.length;
         costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost" } });
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost", from: "LIFE" } });
         // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
         // Kalgara/Bonney-style watchers fire on cost payments too.
         for (const transition of moved.transitions) {

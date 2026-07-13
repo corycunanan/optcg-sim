@@ -297,6 +297,7 @@ function BoardLayoutInner({
     myIndex,
     activeDrag !== null,
     zoneRegistry,
+    spotlight.presentation,
   );
 
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
@@ -317,25 +318,19 @@ function BoardLayoutInner({
     return m.size > 0 ? m : null;
   }, [cardAnimations]);
 
-  // Cards currently flying *into* the trash zones. The trash rendering on
-  // both sides uses these sets to hide the card until its flight completes —
-  // otherwise the server-confirmed top card appears in the trash instantly
-  // while the flight ghost is still mid-air, which reads as "teleport then
-  // animation" (OPT-274 follow-up).
-  const pTrashArrivingIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const t of cardAnimations) {
-      if (t.toZoneKey === "p-trash" && t.instanceId) s.add(t.instanceId);
+  // Hold the server-confirmed top/count for every stacked pile until its
+  // travel or transform presentation completes. Count-only transforms carry
+  // an aggregated arrivalCount so one fizzle can still materialize +N cards.
+  const pileArrivingCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const transition of cardAnimations) {
+      if (!/-(deck|trash|life)$/.test(transition.toZoneKey)) continue;
+      counts.set(
+        transition.toZoneKey,
+        (counts.get(transition.toZoneKey) ?? 0) + (transition.arrivalCount ?? 1),
+      );
     }
-    return s;
-  }, [cardAnimations]);
-
-  const oTrashArrivingIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const t of cardAnimations) {
-      if (t.toZoneKey === "o-trash" && t.instanceId) s.add(t.instanceId);
-    }
-    return s;
+    return counts;
   }, [cardAnimations]);
 
   const mergedDonCountAdjustments = useMemo(() => {
@@ -504,7 +499,7 @@ function BoardLayoutInner({
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
-            trashArrivingIds={oTrashArrivingIds}
+            pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={inPlaceTargetSelection.model?.byId}
             onTargetToggle={inPlaceTargetSelection.toggle}
           />
@@ -584,7 +579,7 @@ function BoardLayoutInner({
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
-            trashArrivingIds={pTrashArrivingIds}
+            pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={inPlaceTargetSelection.model?.byId}
             onTargetToggle={inPlaceTargetSelection.toggle}
           />
