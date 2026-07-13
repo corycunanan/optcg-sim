@@ -50,6 +50,12 @@ interface OpponentFieldProps {
   onTargetToggle?: (instanceId: string) => void;
 }
 
+export function getOpponentStageTabIndex(
+  selection: TargetCardSelectionState | undefined,
+): 0 | -1 {
+  return selection ? 0 : -1;
+}
+
 export function OpponentField({
   opp,
   cardDb,
@@ -139,7 +145,7 @@ export function OpponentField({
             }
             onKeyDown={handleStageKeyDown}
             role={stageSelection ? "button" : "img"}
-            tabIndex={0}
+            tabIndex={getOpponentStageTabIndex(stageSelection)}
             aria-label={[
               cardDb[stage.cardId]?.name ?? stage.cardId,
               stage.state === "RESTED" ? "rested" : "active",
