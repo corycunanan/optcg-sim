@@ -14,6 +14,7 @@ import { useInteractionMode } from "./interaction-mode";
 import { motion, useReducedMotion } from "motion/react";
 import { cardReject, cardRejectReduced } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
+import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
 export function DropOverlay({
@@ -146,6 +147,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   draggedCardType,
   playSignalActive = true,
   eventDropTarget,
+  targetSelection,
+  onTargetToggle,
   onAction,
   zoneKey,
   style,
@@ -157,6 +160,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   draggedCardType?: CardData["type"];
   playSignalActive?: boolean;
   eventDropTarget?: boolean;
+  targetSelection?: TargetCardSelectionState;
+  onTargetToggle?: () => void;
   onAction?: (action: GameAction) => void;
   zoneKey: string;
   style: React.CSSProperties;
@@ -170,9 +175,11 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const rejectionSequence = useCardRejection(card?.instanceId ?? "");
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
   const accepts =
+    !targetSelection &&
     activeDragType === "hand-card" &&
     canPlayCardInZone(draggedCardType, "stage");
-  const acceptsEvent = activeDragType === "hand-card" && !!eventDropTarget;
+  const acceptsEvent =
+    !targetSelection && activeDragType === "hand-card" && !!eventDropTarget;
   const { setNodeRef, isOver } = useDroppable({
     id: eventDropTarget ? `own-field-stage-${zoneKey}` : `stage-zone-${zoneKey}`,
     data: { type: eventDropTarget ? "own-field" : "stage-zone" },
@@ -215,14 +222,38 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
             <motion.div
               key={rejectionSequence ?? "idle"}
               onContextMenu={handleContextMenu}
-              animate={rejectionSequence ? rejectionAnimation : { x: 0, opacity: 1 }}
+              onClick={
+                targetSelection && !targetSelection.disabledReason
+                  ? onTargetToggle
+                  : undefined
+              }
+              data-target-selection={targetSelection ? "" : undefined}
+              data-target-instance-id={targetSelection ? card.instanceId : undefined}
+              animate={
+                rejectionSequence
+                  ? rejectionAnimation
+                  : { x: 0, opacity: targetSelection?.disabledReason ? 0.35 : 1 }
+              }
               transition={rejectionSequence ? rejectionAnimation.transition : undefined}
-              className="relative z-[1]"
+              className={cn(
+                "relative z-[1]",
+                targetSelection && !targetSelection.disabledReason && "cursor-pointer",
+              )}
             >
               <Card
                 data={{ card, cardDb }}
                 variant="field"
                 state={card.state === "RESTED" ? "rest" : "active"}
+                overlays={{
+                  highlightRing: targetSelection?.selected
+                    ? "selected"
+                    : targetSelection?.eligible
+                      ? "eligible"
+                      : undefined,
+                }}
+                interaction={{
+                  tooltipNotice: targetSelection?.disabledReason ?? undefined,
+                }}
                 motionDelay={animationDelay}
               />
             </motion.div>

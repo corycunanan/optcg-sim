@@ -30,6 +30,7 @@ import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop
 import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
 import { ZoneRef } from "./zone-ref";
+import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 
 interface PlayerFieldProps {
   me: PlayerState | null;
@@ -53,6 +54,8 @@ interface PlayerFieldProps {
   /** Instance IDs currently flying *into* the player's trash — hides them
    *  from the trash top/count until their flight lands (OPT-274). */
   trashArrivingIds?: Set<string>;
+  targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
+  onTargetToggle?: (instanceId: string) => void;
 }
 
 export function PlayerField({
@@ -75,6 +78,8 @@ export function PlayerField({
   defenderInstanceId,
   counterPulseIds,
   trashArrivingIds,
+  targetSelectionById,
+  onTargetToggle,
 }: PlayerFieldProps) {
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
@@ -146,6 +151,8 @@ export function PlayerField({
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
+            targetSelection={targetSelectionById?.get(char.instanceId)}
+            onTargetToggle={() => onTargetToggle?.(char.instanceId)}
             counterTarget={
               characterCounterDragActive && defenderInstanceId === char.instanceId
             }
@@ -196,6 +203,8 @@ export function PlayerField({
           }
           eventDropTarget={eventFieldDropActive}
           counterPulse={counterPulseIds?.has(me.leader.instanceId)}
+          targetSelection={targetSelectionById?.get(me.leader.instanceId)}
+          onTargetToggle={() => onTargetToggle?.(me.leader.instanceId)}
           onAction={onAction}
           zoneKey="p-leader"
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
@@ -220,6 +229,12 @@ export function PlayerField({
         draggedCardType={draggedHandData?.type}
         playSignalActive={playSignalActive}
         eventDropTarget={eventFieldDropActive}
+        targetSelection={
+          me?.stage ? targetSelectionById?.get(me.stage.instanceId) : undefined
+        }
+        onTargetToggle={() => {
+          if (me?.stage) onTargetToggle?.(me.stage.instanceId);
+        }}
         onAction={onAction}
         zoneKey="p-stage"
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}

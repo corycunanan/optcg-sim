@@ -86,6 +86,18 @@ export interface BlockerMode {
   onBlock: () => void;
 }
 
+export interface TargetSelectionMode {
+  effectDescription: string;
+  countLabel: string;
+  selectedCount: number;
+  aggregateLabel: string | null;
+  ctaLabel: string;
+  canConfirm: boolean;
+  canSkip: boolean;
+  onConfirm: () => void;
+  onSkip: () => void;
+}
+
 function MidZoneDisabledBtn({ children }: { children: React.ReactNode }) {
   return (
     <GameButton variant="secondary" size="sm" disabled className={IN_BOARD_BTN}>
@@ -105,6 +117,7 @@ export const MidZone = React.memo(function MidZone({
   rejectionReason,
   battleInfo,
   blockerMode,
+  targetSelectionMode,
   isPromptHidden,
   onShowPrompt,
   canUndo,
@@ -120,6 +133,7 @@ export const MidZone = React.memo(function MidZone({
   rejectionReason: string | null;
   battleInfo: BattleInfo | null;
   blockerMode?: BlockerMode;
+  targetSelectionMode?: TargetSelectionMode;
   isPromptHidden?: boolean;
   onShowPrompt?: () => void;
   canUndo?: boolean;
@@ -154,7 +168,7 @@ export const MidZone = React.memo(function MidZone({
       {battleInfo && <BattleDisplay info={battleInfo} />}
 
       {/* Hidden modal prompt indicator */}
-      {activePrompt && isPromptHidden && (
+      {activePrompt && !targetSelectionMode && isPromptHidden && (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-base text-gb-accent-amber font-bold">
             &#x26A1; ACTION REQUIRED
@@ -166,7 +180,7 @@ export const MidZone = React.memo(function MidZone({
       )}
 
       {/* Active prompt (suppressed when blockerMode or modal handles the UI) */}
-      {activePrompt && !blockerMode && !isPromptHidden && (
+      {activePrompt && !blockerMode && !targetSelectionMode && !isPromptHidden && (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-base text-gb-accent-amber font-bold">
             &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
@@ -199,6 +213,44 @@ export const MidZone = React.memo(function MidZone({
           {"optional" in activePrompt && (activePrompt as { optional?: boolean }).optional &&
             (activePrompt.promptType as string) !== "OPTIONAL_EFFECT" && (
             <GameButton variant="secondary" size="sm" className={IN_BOARD_BTN} onClick={() => onAction({ type: "PASS" })}>
+              Skip
+            </GameButton>
+          )}
+        </div>
+      )}
+
+      {targetSelectionMode && (
+        <div className="flex min-w-0 items-center gap-2" data-target-selection-control="">
+          <span className="shrink-0 text-base font-bold text-gb-accent-amber" aria-hidden>
+            &#x26A1;
+          </span>
+          <span className="max-w-[320px] truncate text-base text-gb-text-bright">
+            {targetSelectionMode.effectDescription || "Choose targets"}
+          </span>
+          <span className="shrink-0 text-base text-gb-text-dim">
+            {targetSelectionMode.countLabel} &mdash; {targetSelectionMode.selectedCount} selected
+          </span>
+          {targetSelectionMode.aggregateLabel && (
+            <span className="shrink-0 text-base text-gb-text-subtle">
+              &middot; {targetSelectionMode.aggregateLabel}
+            </span>
+          )}
+          <GameButton
+            variant={targetSelectionMode.canConfirm ? "green" : "secondary"}
+            size="sm"
+            className={IN_BOARD_BTN}
+            disabled={!targetSelectionMode.canConfirm}
+            onClick={targetSelectionMode.onConfirm}
+          >
+            {targetSelectionMode.ctaLabel}
+          </GameButton>
+          {targetSelectionMode.canSkip && (
+            <GameButton
+              variant="secondary"
+              size="sm"
+              className={IN_BOARD_BTN}
+              onClick={targetSelectionMode.onSkip}
+            >
               Skip
             </GameButton>
           )}

@@ -14,6 +14,7 @@ import { RevealTriggerModal } from "../reveal-trigger-modal";
 import { GameDeckPreviewModal } from "../deck-preview-modal";
 import { TrashPreviewModal } from "../trash-preview-modal";
 import { RedistributeDonOverlay, type RedistributeTransfer } from "../redistribute-don-overlay";
+import { selectTargetPromptKey } from "@/lib/game/target-selection";
 
 interface BoardModalsProps {
   activePrompt: PromptOptions | null;
@@ -30,6 +31,7 @@ interface BoardModalsProps {
   opp: PlayerState | null;
   redistributeTransfers: RedistributeTransfer[];
   onRedistributeUndo: () => void;
+  selectTargetInPlace?: boolean;
 }
 
 export function BoardModals({
@@ -44,6 +46,7 @@ export function BoardModals({
   opp,
   redistributeTransfers,
   onRedistributeUndo,
+  selectTargetInPlace = false,
 }: BoardModalsProps) {
   return (
     <>
@@ -65,9 +68,10 @@ export function BoardModals({
         )}
 
       {activePrompt?.promptType === "SELECT_TARGET" &&
+        !selectTargetInPlace &&
         activePrompt.cards.length > 0 && (
           <SelectTargetModal
-            key={activePrompt.validTargets.join(",")}
+            key={selectTargetPromptKey(activePrompt)}
             cards={activePrompt.cards}
             validTargets={activePrompt.validTargets}
             effectDescription={activePrompt.effectDescription}
