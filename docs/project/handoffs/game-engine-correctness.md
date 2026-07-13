@@ -390,10 +390,10 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Pointer:** PR #303; inspect `4a9bde6` for the boundary extraction, compatibility façade, infrastructure-dependency guards, and eight collaborator contract tests.
 
 ### OPT-487 → OPT-480
-**From:** session on 2026-07-13 · **Commit:** `ccdab6a` · **PR:** [#305](https://github.com/corycunanan/optcg-sim/pull/305)
+**From:** session on 2026-07-13 · **Commit:** `da3ecf0` · **PR:** [#305](https://github.com/corycunanan/optcg-sim/pull/305)
 
 - **Primer:** `RETURN_TO_DECK` now commits every canonical cross-zone transition instead of discarding non-Character results. Life returns emit both movement and Life-removal events. Multi-card returns from Hand, Trash, or Life pause for an owner-authoritative order choice, including exact-count and `any_number` effects, while removal and leave-field replacements remain Character/Stage-only.
 - **Read first:** `workers/game/src/engine/effect-resolver/card-mutations.ts`, `workers/game/src/engine/effect-resolver/actions/removal.ts`, `workers/game/src/engine/effect-resolver/resume/deck.ts`, `workers/game/src/engine/replacements.ts`, `workers/game/src/engine/schemas/op05.ts`, and `workers/game/src/__tests__/opt-487-return-to-deck-source-zones.test.ts`; then follow OPT-479's architecture guard into the runtime unions and duplicate resolver owned by OPT-480.
 - **Gotchas / do NOT touch:** Same-deck result-reference placement remains an identity-preserving reorder in `actions/removal.ts`. For nested `OPPONENT_ACTION` schemas, `SELF` is responder-relative; the responder owns both Trash selection and order under rule 3-1-7. Schema destination is authoritative over a client's arrangement payload. Keep old/new destination identities owner-only in movement events, and retain Character/Stage prohibition and replacement behavior while tightening types.
 - **Unresolved:** The action reference still describes field-only returns; documentation reconciliation remains tracked by OPT-482. No OPT-487 runtime behavior is deferred.
-- **Pointer:** PR #305; inspect `ccdab6a` for the final source-zone matrix, owner-selected ordering, `any_number` continuation, visibility checks, and field-replacement boundary. Earlier review fixes are captured in `8c50406` and `401cbae`.
+- **Pointer:** PR #305; inspect `da3ecf0` for the final source-zone matrix, owner-selected ordering, zero-target-safe `any_number` continuation, visibility checks, and field-replacement boundary. Earlier review fixes are captured in `8c50406`, `401cbae`, and `ccdab6a`.
