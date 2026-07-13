@@ -36,6 +36,8 @@ export type CardState =
 
 export type CardSize = "field" | "hand" | "modal" | "preview" | "don";
 
+export type CardActionBadgeState = "available" | "unavailable" | "used";
+
 export type HighlightRingColor =
   | "selected"
   | "invalid"
@@ -49,6 +51,8 @@ export interface CardOverlays {
   donCount?: number;
   /** Count badge (trash count, life count, deck size) — top-right corner. */
   countBadge?: number;
+  /** Activate: Main affordance — amber at top-right, dimmed when unavailable. */
+  effectAction?: CardActionBadgeState;
   /** Highlight ring color — selection / valid / invalid target feedback. */
   highlightRing?: HighlightRingColor;
   /** Optional label rendered on empty/face-down placeholders. */

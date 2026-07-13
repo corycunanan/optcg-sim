@@ -130,6 +130,7 @@ Requirements:
 - **SIG-7 — Overlays light only for legal drops (OPT-417).** During an attacker drag, only the opponent leader + rested characters get overlays; character slots light only for Characters, the stage zone only for Stages; hand cards the player cannot afford don't start a play-drag glow at all. Registering a droppable ≙ asserting legality.
 - **SIG-8 — Ineligible = dimmed + explained.** The canonical dim is the counter-mode hand treatment: `opacity 0.35` + drag disabled (`hand-layer.tsx`). Affordability dimming (OPT-417) reuses it identically, with a tooltip reason ("Need 2 more DON"). **Soft-disable where effects could plausibly change legality** (cost mods, attack restrictions): dim but allow the attempt, so an OPT-415-class lockout cannot recur. Hard-disable only for immutable rules (card type → zone).
 - **SIG-9 — The ⚡ glyph means "action available/required," everywhere.** Mid-zone prompts (`⚡ ACTION REQUIRED`), the action-menu item, and the OPT-420 effect badge share it. The badge: amber ⚡ on the card corner when the card has an `[Activate: Main]` effect, full-strength when usable now (your turn, Main phase), dimmed otherwise; `text-base` minimum (inside-board floor).
+  - **Implementation:** `getActivateMainState` is the shared schema/once-per-turn resolver for the card badge and action menu. The Card primitive owns the corner overlay; field-card and stage wrappers own click/keyboard precedence and right-click aliasing.
 
 ### 3.4 Cursor vocabulary
 
