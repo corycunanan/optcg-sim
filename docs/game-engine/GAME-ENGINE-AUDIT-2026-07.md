@@ -180,14 +180,14 @@ The remaining work is a zone-pair identity matrix and one transition service tha
 ### GE-11 — Modularity has correctness-sensitive pressure points
 
 **Severity:** Medium
-**Status:** Partially resolved — OPT-478 complete; OPT-479 remains
+**Status:** Resolved — OPT-478 and OPT-479 complete
 **Linear:** [OPT-478](https://linear.app/optcg-sim/issue/OPT-478/replace-resolver-module-global-dispatch-and-decompose-the-1831-line) and [OPT-479](https://linear.app/optcg-sim/issue/OPT-479/decompose-gamesession-transport-authorization-orchestration-visibility)
 
 - OPT-478 reduced `cost-handler.ts` to a stable façade and split payability, target selection, prompting, payment mutation, and resume preparation into six acyclic modules guarded by architecture tests.
 - Resolver/replacement integration now requires an immutable, typed runtime service bundle; replacement execution has no nullable dispatcher or terminal fallback.
-- `GameSession.ts` is 1,774 lines and combines transport, authorization, rate limits, prompt orchestration, engine lifecycle, visibility, undo, persistence, and reconnect/timeout behavior.
+- `GameSession.ts` is now a sub-1,000-line Durable Object composition root over typed authorization, rate-limit, transport, visibility, persistence, command-coordination, and prompt-lifecycle modules.
 
-GameSession's defensive controls remain a strength, but its concentration still gives future correctness changes a large blast radius. OPT-479 owns that remaining decomposition. Persisted deterministic data stays in `GameState.executionContext`; executable dependencies remain outside state in resolver services.
+The defensive behavior is preserved by collaborator contracts for reconnect authority, stale prompts, alarms, filtered state, storage restoration, and token replay. Persisted deterministic data stays in `GameState.executionContext`; executable dependencies remain outside state in resolver services and session coordinators.
 
 ### GE-12 — Runtime type boundaries are weak in critical paths
 

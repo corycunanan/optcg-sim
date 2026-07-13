@@ -295,7 +295,7 @@ PendingPromptState {
 }
 ```
 
-When the player responds, `GameSession.resumeFromPrompt()` delegates to `resumeFromStack()`, which reads the top frame from `effectStack`, processes the response, and either produces a new prompt or pops the frame and continues.
+When the player responds, `GameSession` delegates to `session/prompt-lifecycle.ts`. That infrastructure-free coordinator routes replacement, stack, pregame, and battle continuations through `resumeFromStack()` and the normal pipeline, returning a complete state for the Durable Object boundary to persist and publish.
 
 ## Modifier Layer System (modifiers.ts)
 
