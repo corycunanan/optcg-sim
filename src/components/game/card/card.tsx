@@ -63,6 +63,7 @@ export const Card = React.memo(function Card({
   className,
   style,
   onClick,
+  ariaLabel,
 }: CardProps) {
   const reducedMotion = useReducedMotion();
   const { width, height } = resolveSize(variant, size);
@@ -97,6 +98,16 @@ export const Card = React.memo(function Card({
   const tiltY = useSpring(tiltYRaw, TILT_SPRING);
   const tiltEnabled = !reducedMotion && motionConfig.whileHover !== undefined;
   const interactionRef = React.useRef<HTMLDivElement>(null);
+  const clickable = !!onClick || !!interaction?.clickable;
+
+  const handleKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!onClick || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      onClick();
+    },
+    [onClick],
+  );
 
   const handlePointerMove = React.useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -125,10 +136,15 @@ export const Card = React.memo(function Card({
     return (
       <div
         onClick={onClick}
+        onKeyDown={handleKeyDown}
+        role={clickable ? "button" : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        aria-label={clickable ? ariaLabel ?? emptyLabel ?? overlays?.label : undefined}
         className={cn(
           "flex items-center justify-center rounded border border-dashed",
           "border-gb-border-strong/30 bg-gb-board/50",
-          interaction?.clickable && "cursor-pointer",
+          clickable &&
+            "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
           className,
         )}
         style={{ width, height, ...style }}
@@ -160,9 +176,17 @@ export const Card = React.memo(function Card({
     <PerspectiveContainer
       width={width}
       height={height}
-      className={className}
       style={style}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? ariaLabel ?? cardData?.name ?? overlays?.label : undefined}
+      className={cn(
+        clickable &&
+          "cursor-pointer rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+        className,
+      )}
     >
       {/* Outer layer owns state rotation (rest = 90°) / opacity / filter.
           Nesting the interaction layer inside means hover/tap transforms

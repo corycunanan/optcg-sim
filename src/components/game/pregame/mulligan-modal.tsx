@@ -2,6 +2,7 @@
 
 import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import { useRovingFocus } from "@/hooks/use-roving-focus";
 import { GameButton } from "../game-button";
 
 interface MulliganModalProps {
@@ -26,8 +27,17 @@ export function MulliganModal({
   cardDb,
   onAction,
 }: MulliganModalProps) {
+  const rovingFocus = useRovingFocus<HTMLDivElement>(
+    myHand.map((card) => card.instanceId),
+  );
+
   return (
-    <div className="bg-gb-board/90 fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mulligan"
+      className="bg-gb-board/90 fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 backdrop-blur-sm"
+    >
       <div className="flex flex-col items-center gap-2">
         <h2 className="text-gb-text-bright text-2xl font-bold uppercase tracking-widest">
           Mulligan
@@ -41,14 +51,22 @@ export function MulliganModal({
 
       {isResponder && (
         <>
-          <div className="flex gap-3">
+          <div className="flex gap-3" role="list" aria-label="Opening hand">
             {myHand.map((card) => {
               const data = cardDb[card.cardId];
               return (
                 <div
                   key={card.instanceId}
+                  ref={(node) => rovingFocus.setItemRef(card.instanceId, node)}
+                  role="listitem"
+                  tabIndex={rovingFocus.getTabIndex(card.instanceId)}
+                  aria-label={data?.name ?? card.cardId}
+                  onFocus={() => rovingFocus.onFocus(card.instanceId)}
+                  onKeyDown={(event) =>
+                    rovingFocus.onKeyDown(event, card.instanceId)
+                  }
                   className={cn(
-                    "border-gb-border-strong w-card-thumb aspect-card overflow-hidden rounded-md border-2 shadow-md",
+                    "border-gb-border-strong w-card-thumb aspect-card overflow-hidden rounded-md border-2 shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
                   )}
                 >
                   {data?.imageUrl ? (

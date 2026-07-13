@@ -1,6 +1,11 @@
 import { useCallback, useRef } from "react";
 import { useMotionValue, useSpring } from "motion/react";
-import type { DragMoveEvent, DragStartEvent, DragEndEvent } from "@dnd-kit/core";
+import type {
+  DragCancelEvent,
+  DragEndEvent,
+  DragMoveEvent,
+  DragStartEvent,
+} from "@dnd-kit/core";
 
 /**
  * Max tilt per axis. Matches the pointer-tilt ceiling from OPT-275 so drag
@@ -101,7 +106,7 @@ export function useDragTilt(options?: { disabled?: boolean }) {
   );
 
   const handleDragEnd = useCallback(
-    (_event: DragEndEvent) => {
+    (_event: DragEndEvent | DragCancelEvent) => {
       rawTiltX.set(0);
       rawTiltY.set(0);
     },

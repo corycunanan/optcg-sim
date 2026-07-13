@@ -36,6 +36,7 @@ export function DeckPile({
           overlays={{ countBadge: visibleCount, label: "DECK" }}
           interaction={{ clickable: !!onClick }}
           onClick={onClick}
+          ariaLabel={`Inspect deck, ${visibleCount} cards`}
         />
       </PileReceipt>
     </ZoneRef>

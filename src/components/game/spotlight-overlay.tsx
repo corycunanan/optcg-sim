@@ -119,6 +119,8 @@ export function SpotlightOverlay({
         <motion.section
           key={presentation.id}
           data-testid="card-spotlight"
+          role="dialog"
+          aria-modal="true"
           aria-label={`${copy.eyebrow}: ${copy.title}`}
           className="absolute inset-0 z-50 flex items-center justify-center"
           initial={reducedMotion ? false : { opacity: 0 }}
@@ -162,6 +164,7 @@ export function SpotlightOverlay({
                   variant="secondary"
                   size="lg"
                   className="focus-visible:ring-4"
+                  aria-keyshortcuts="B"
                   onClick={onToggleView}
                 >
                   <LayoutPanelTop aria-hidden="true" className="size-5" />
@@ -206,6 +209,7 @@ export function SpotlightOverlay({
             variant="amber"
             size="lg"
             className="focus-visible:ring-4"
+            aria-keyshortcuts="B"
             onClick={onToggleView}
           >
             Show spotlight

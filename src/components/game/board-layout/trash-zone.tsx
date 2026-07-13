@@ -58,6 +58,7 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
           }
           interaction={{ clickable: !!onClickTrash }}
           onClick={onClickTrash}
+          ariaLabel={`Inspect trash, ${visibleTrash.length} cards`}
           className="relative z-[1]"
         />
       </PileReceipt>

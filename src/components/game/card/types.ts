@@ -105,6 +105,8 @@ export interface CardProps {
   className?: string;
   style?: React.CSSProperties;
   onClick?: () => void;
+  /** Accessible action name for clickable card/pile surfaces. */
+  ariaLabel?: string;
 }
 
 export type ResolvedCardData = {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -108,6 +108,7 @@ function SortableHandCard({
    *  (card added/removed/reordered) instead of every render. */
   layoutDep: number;
 }) {
+  const descriptionId = useId();
   const rejectionSequence = useCardRejection(card.instanceId);
   const {
     attributes,
@@ -125,6 +126,7 @@ function SortableHandCard({
   const cardState = isDragging ? "dragging" : "active";
   const opacity = isDragging ? 0.3 : dimmed ? 0.35 : 1;
   const rejectionPreset = reducedMotion ? cardRejectReduced : cardReject;
+  const cardName = cardDb[card.cardId]?.name ?? card.cardId;
   const rejectionOpacity = rejectionPreset.opacity.map((value, index, values) =>
     index === 0 || index === values.length - 1 ? opacity : value,
   );
@@ -149,6 +151,21 @@ function SortableHandCard({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
+        role="button"
+        tabIndex={hidden ? -1 : attributes.tabIndex}
+        aria-label={[
+          cardName,
+          tooltipNotice,
+          disabled && !tooltipNotice ? "not available for the current action" : null,
+        ]
+          .filter(Boolean)
+          .join(". ")}
+        aria-disabled={disabled || dimmed}
+        aria-describedby={
+          [attributes["aria-describedby"], tooltipNotice ? descriptionId : null]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
         style={{
           transform: sortableTransform,
           transition: reducedMotion ? "none" : (transition ?? undefined),
@@ -156,6 +173,7 @@ function SortableHandCard({
           visibility: hidden ? "hidden" : undefined,
           touchAction: "none",
         }}
+        className="rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
       >
         <motion.div
           key={rejectionSequence ?? "idle"}
@@ -183,6 +201,11 @@ function SortableHandCard({
                   : undefined
             }
           />
+          {tooltipNotice && (
+            <span id={descriptionId} className="sr-only">
+              {tooltipNotice}
+            </span>
+          )}
         </motion.div>
       </div>
     </motion.div>
@@ -289,6 +312,10 @@ export const HandLayer = React.memo(function HandLayer({
             availableDon,
           );
     const unaffordable = affordability?.affordable === false;
+    const disabledReason =
+      counterMode && !eligible
+        ? "This card cannot be used as a counter."
+        : affordability?.reason;
 
     return (
       <SortableHandCard
@@ -298,7 +325,7 @@ export const HandLayer = React.memo(function HandLayer({
         disabled={disabled}
         dimmed={(counterMode && !eligible) || unaffordable}
         affordable={affordability?.affordable}
-        tooltipNotice={affordability?.reason}
+        tooltipNotice={disabledReason}
         hidden={isInFlight}
         reducedMotion={reducedMotion}
         style={marginStyle}

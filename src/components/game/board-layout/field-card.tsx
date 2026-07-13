@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useId, useState } from "react";
 import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardData, CardDb, CardInstance, GameAction, TurnState } from "@shared/game-types";
@@ -110,6 +110,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   entering?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const descriptionId = useId();
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
   const interactionMode = useInteractionMode();
@@ -264,6 +265,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // (user-chosen blocker or effect target) > eligible candidate.
   const selectionSelected = !!selected || !!targetSelection?.selected;
   const selectionEligible = !!blockerSelectable || !!targetSelection?.eligible;
+  const selectionControl = !!blockerSelectable || !!targetSelection;
+  const disabledReason = targetSelection?.disabledReason ?? null;
+  const cardName = cardDb[card.cardId]?.name ?? card.cardId;
   const highlightRing = counterPulse
     ? ("counter" as const)
     : isAttacker
@@ -295,6 +299,58 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
       : { duration: 0.15, ease: "easeOut" as const };
 
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        if (targetSelection && !targetSelection.disabledReason) {
+          event.preventDefault();
+          onTargetToggle?.();
+          return;
+        }
+        if (!targetSelection && blockerSelectable) {
+          event.preventDefault();
+          onSelect?.();
+          return;
+        }
+        // On a card that can both attack and open an effect menu, Enter owns
+        // the menu verb while Space remains the keyboard drag verb. Radix
+        // receives Enter; dnd-kit receives Space.
+        if (menuTriggerEnabled && event.key === "Enter") return;
+      }
+      listeners?.onKeyDown?.(event);
+    },
+    [
+      blockerSelectable,
+      listeners,
+      menuTriggerEnabled,
+      onSelect,
+      onTargetToggle,
+      targetSelection,
+    ],
+  );
+
+  const ariaDescriptionIds = [
+    canAttack ? attributes["aria-describedby"] : null,
+    disabledReason ? descriptionId : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const ariaLabel = [
+    cardName,
+    card.state === "RESTED" ? "rested" : "active",
+    donCount > 0 ? `${donCount} DON attached` : null,
+    selectionSelected
+      ? "selected"
+      : selectionEligible
+        ? "eligible for selection"
+        : null,
+    disabledReason,
+    canAttack ? "draggable attacker" : null,
+    menuTriggerEnabled ? "actions available" : null,
+  ]
+    .filter(Boolean)
+    .join(". ");
+
   return (
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild disabled={!menuTriggerEnabled}>
@@ -303,6 +359,19 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           ref={mergedRef}
           {...attributes}
           {...listeners}
+          role={canAttack || selectionControl || menuTriggerEnabled ? "button" : "img"}
+          tabIndex={0}
+          aria-label={ariaLabel}
+          aria-pressed={
+            selectionControl
+              ? selectionSelected
+              : canAttack
+                ? attributes["aria-pressed"]
+                : undefined
+          }
+          aria-disabled={disabledReason ? true : undefined}
+          aria-roledescription={canAttack ? attributes["aria-roledescription"] : undefined}
+          aria-describedby={ariaDescriptionIds || undefined}
           onClick={
             targetSelection && !targetSelection.disabledReason
               ? onTargetToggle
@@ -314,11 +383,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           data-effect-menu-trigger={activation ? card.instanceId : undefined}
           data-target-selection={targetSelection ? "" : undefined}
           data-target-instance-id={targetSelection ? card.instanceId : undefined}
-          aria-label={
-            menuTriggerEnabled
-              ? `Actions for ${cardDb[card.cardId]?.name ?? "card"}`
-              : undefined
-          }
+          onKeyDown={handleKeyDown}
           onContextMenu={handleContextMenu}
           initial={initialTarget}
           animate={animateTarget}
@@ -329,7 +394,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             height: SQUARE,
           }}
           className={cn(
-            "relative flex items-center justify-center rounded-md",
+            "relative flex touch-none items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
             targetSelection
               ? targetSelection.disabledReason
                 ? "cursor-default"
@@ -372,13 +437,18 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
                 donListeners?.onPointerDown?.(e);
               }}
               className={cn(
-                "absolute bottom-0 right-0 z-20 origin-bottom-right scale-75 cursor-grab rounded animate-pulse",
+                "absolute bottom-0 right-0 z-20 origin-bottom-right scale-75 touch-none cursor-grab rounded animate-pulse focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
                 isDonDragging ? "opacity-30" : "opacity-100",
               )}
               aria-label="Drag attached DON"
             >
               <DonCard donArtUrl={donArtUrl} />
             </div>
+          )}
+          {disabledReason && (
+            <span id={descriptionId} className="sr-only">
+              {disabledReason}
+            </span>
           )}
         </motion.div>
       </DropdownMenuTrigger>
@@ -434,6 +504,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   entering?: boolean;
 }) {
   const zonePos = useZonePosition();
+  const descriptionId = useId();
   const reducedMotion = useReducedMotion();
   const accepts =
     !targetSelection && activeDragType === "attacker" && attackTargetEligible;
@@ -483,6 +554,23 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
 
   const shouldEnter = !!entering && !reducedMotion;
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
+  const cardName = cardDb[card.cardId]?.name ?? card.cardId;
+  const disabledReason = targetSelection?.disabledReason ?? null;
+  const selectionControl = !!targetSelection;
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (
+        (event.key === "Enter" || event.key === " ") &&
+        targetSelection &&
+        !targetSelection.disabledReason
+      ) {
+        event.preventDefault();
+        onTargetToggle?.();
+      }
+    },
+    [onTargetToggle, targetSelection],
+  );
 
   return (
     <motion.div
@@ -498,11 +586,31 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
           ? onTargetToggle
           : undefined
       }
+      onKeyDown={handleKeyDown}
+      role={selectionControl ? "button" : "img"}
+      tabIndex={0}
+      aria-label={[
+        cardName,
+        card.state === "RESTED" ? "rested" : "active",
+        donCount > 0 ? `${donCount} DON attached` : null,
+        targetSelection?.selected
+          ? "selected"
+          : targetSelection?.eligible
+            ? "eligible for selection"
+            : null,
+        disabledReason,
+        accepts ? "legal attack target" : null,
+      ]
+        .filter(Boolean)
+        .join(". ")}
+      aria-pressed={selectionControl ? !!targetSelection?.selected : undefined}
+      aria-disabled={disabledReason ? true : undefined}
+      aria-describedby={disabledReason ? descriptionId : undefined}
       data-target-selection={targetSelection ? "" : undefined}
       data-target-instance-id={targetSelection ? card.instanceId : undefined}
       style={{ ...style, width: SQUARE, height: SQUARE }}
       className={cn(
-        "relative flex items-center justify-center rounded-md",
+        "relative flex items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
         targetSelection && !targetSelection.disabledReason
           ? "cursor-pointer"
           : "cursor-default",
@@ -520,6 +628,11 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         motionDelay={animationDelay}
         className="relative z-[1]"
       />
+      {disabledReason && (
+        <span id={descriptionId} className="sr-only">
+          {disabledReason}
+        </span>
+      )}
     </motion.div>
   );
 });

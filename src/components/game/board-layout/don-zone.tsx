@@ -67,6 +67,7 @@ function DraggableDonCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      aria-label="Drag active DON"
       initial={entering ? ENTRY_INITIAL : false}
       animate={{ scale: 1, opacity: isDragging ? 0.3 : 1 }}
       transition={entering ? cardEntry : undefined}
@@ -75,6 +76,7 @@ function DraggableDonCard({
         zIndex: index,
         cursor: disabled ? "default" : "grab",
       }}
+      className="touch-none rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
     >
       <Card
         variant="don"
