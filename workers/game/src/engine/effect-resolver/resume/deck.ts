@@ -7,7 +7,7 @@
  * updated state, or null to fall through to the next branch.
  */
 
-import type { Action } from "../../effect-types.js";
+import type { Action, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type {
   CardData,
@@ -18,6 +18,9 @@ import type {
 } from "../../../types.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
+import { executeReturnToDeck } from "../actions/removal.js";
+import type { EffectResolverServices } from "../services.js";
+import type { ActionResult } from "../types.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -73,6 +76,42 @@ function resolveRestDestination(
 }
 
 // ─── Branch handlers ────────────────────────────────────────────────────────
+
+export function handleArrangeReturnToDeck(
+  state: GameState,
+  action: GameAction,
+  pausedAction: Action | null,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  validTargets: string[] | undefined,
+  services: EffectResolverServices,
+): ActionResult | null {
+  if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "RETURN_TO_DECK") {
+    return null;
+  }
+
+  const valid = validTargets ?? [];
+  const validSet = new Set(valid);
+  const ordered = [...new Set(action.orderedInstanceIds.filter((id) => validSet.has(id)))];
+  const seen = new Set(ordered);
+  for (const id of valid) {
+    if (!seen.has(id)) ordered.push(id);
+  }
+
+  return executeReturnToDeck(
+    state,
+    pausedAction,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    ordered,
+    services,
+    true,
+  );
+}
 
 export function handleArrangeSearchDeck(
   state: GameState,

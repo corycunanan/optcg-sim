@@ -3,7 +3,14 @@
  */
 
 import type { Action, EffectResult } from "../../effect-types.js";
-import type { BatchResumeMarker, CardData, GameState, PendingEvent } from "../../../types.js";
+import type {
+  BatchResumeMarker,
+  CardData,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+  ResumeContext,
+} from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { resolveAmount } from "../action-utils.js";
 import { koCharacter, returnToHand, returnToDeck, trashCharacter } from "../card-mutations.js";
@@ -183,16 +190,59 @@ export function executeReturnToDeck(
   resultRefs: Map<string, EffectResult>,
   preselectedTargets: string[] | undefined,
   services: EffectResolverServices,
+  arrangementResolved = false,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
   const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+  const anyNumberTarget = action.target?.count && "any_number" in action.target.count;
+  if (!preselectedTargets && (needsPlayerTargetSelection(action.target, allValidIds) || anyNumberTarget)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
+
+  // Rule 3-1-7: when multiple cards enter a new area simultaneously, their
+  // owner chooses the order. Hidden/open-area sources newly supported by
+  // OPT-487 must pause before their identities are reset and committed.
+  const sourceCards = targetIds.flatMap((id) => {
+    const card = findCardInstance(state, id);
+    return card ? [card] : [];
+  });
+  const owner = sourceCards[0]?.owner;
+  const sourceZone = sourceCards[0]?.zone;
+  const needsArrange = !arrangementResolved &&
+    targetIds.length > 1 &&
+    owner !== undefined &&
+    (sourceZone === "HAND" || sourceZone === "TRASH" || sourceZone === "LIFE") &&
+    sourceCards.length === targetIds.length &&
+    sourceCards.every((card) => card.owner === owner && card.zone === sourceZone);
+  if (needsArrange) {
+    const sourceCard = findCardInstance(state, sourceCardInstanceId);
+    const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+    const resumeContext: ResumeContext = {
+      effectSourceInstanceId: sourceCardInstanceId,
+      controller,
+      pausedAction: action,
+      remainingActions: [],
+      resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+      validTargets: targetIds,
+    };
+    const pendingPrompt: PendingPromptState = {
+      options: {
+        promptType: "ARRANGE_TOP_CARDS",
+        cards: sourceCards,
+        effectDescription: sourceData?.effectText ?? `Place the cards at the ${position === "TOP" ? "top" : "bottom"} of the deck in any order`,
+        canSendToBottom: position === "BOTTOM",
+        validTargets: [],
+        maxKeep: 0,
+      },
+      respondingPlayer: owner,
+      resumeContext,
+    };
+    return { state, events, succeeded: false, pendingPrompt };
+  }
 
   const sameDeckIds = targetIds.filter((id) => findCardInstance(state, id)?.zone === "DECK");
   const reordered = reorderDeckCards(state, sameDeckIds, position);
@@ -223,10 +273,18 @@ export function executeReturnToDeck(
   let nextState = batch.state;
   const finalIds = batch.unprotectedIds;
   const finalizedIds: string[] = [...reordered.reorderedInstanceIds];
-  for (const id of finalIds) {
+  const finalizedByOldId = new Map<string, ReturnType<typeof returnToDeck>>();
+  const executionOrder = position === "TOP" ? [...finalIds].reverse() : finalIds;
+  for (const id of executionOrder) {
     const result = returnToDeck(nextState, id, position);
     if (result) {
       nextState = result.state;
+      finalizedByOldId.set(id, result);
+    }
+  }
+  for (const id of finalIds) {
+    const result = finalizedByOldId.get(id);
+    if (result) {
       events.push(...result.events);
       finalizedIds.push(result.transition.newInstanceId);
     }

@@ -245,9 +245,9 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
   it("lets OP05-079's opponent select cards from their own trash", () => {
     const cardDb = createTestCardDb();
     const base = createBattleReadyState(cardDb);
-    const makeTrash = (owner: 0 | 1, index: number): CardInstance => ({
+    const makeTrash = (owner: 0 | 1, index: number, cardId: string): CardInstance => ({
       instanceId: `viola-trash-${owner}-${index}`,
-      cardId: CARDS.VANILLA.id,
+      cardId,
       zone: "TRASH",
       state: "ACTIVE",
       attachedDon: [],
@@ -255,8 +255,10 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
       controller: owner,
       owner,
     });
-    const controllerTrash = Array.from({ length: 4 }, (_, index) => makeTrash(0, index));
-    const opponentTrash = Array.from({ length: 4 }, (_, index) => makeTrash(1, index));
+    const controllerTrash = [CARDS.VANILLA, CARDS.RUSH, CARDS.BLOCKER, CARDS.COUNTER]
+      .map((card, index) => makeTrash(0, index, card.id));
+    const opponentTrash = [CARDS.VANILLA, CARDS.RUSH, CARDS.BLOCKER]
+      .map((card, index) => makeTrash(1, index, card.id));
     const state: GameState = {
       ...base,
       players: [
@@ -276,26 +278,118 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
     );
 
     expect(result.pendingPrompt?.respondingPlayer).toBe(1);
-    expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
-      throw new Error("Expected OP05-079 to prompt the opponent for trash cards");
+    expect(result.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (result.pendingPrompt?.options.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Expected OP05-079 to prompt the opponent to arrange their trash cards");
     }
-    expect(result.pendingPrompt.options.validTargets).toEqual(
+    expect(result.pendingPrompt.options.cards.map((card) => card.instanceId)).toEqual(
       opponentTrash.map((card) => card.instanceId),
     );
 
-    const selectedIds = opponentTrash.slice(0, 3).map((card) => card.instanceId);
+    const arranged = [opponentTrash[2], opponentTrash[0], opponentTrash[1]];
     const resumed = resumeFromStack(
       result.state,
-      { type: "SELECT_TARGET", selectedInstanceIds: selectedIds },
+      {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: "",
+        orderedInstanceIds: arranged.map((card) => card.instanceId),
+        destination: "top",
+      },
       cardDb,
     );
 
     expect(resumed.state.players[0].trash).toEqual(controllerTrash);
-    expect(resumed.state.players[1].trash).toHaveLength(1);
+    expect(resumed.state.players[1].trash).toHaveLength(0);
     expect(resumed.state.players[1].deck).toHaveLength(deckBefore + 3);
-    for (const selectedId of selectedIds) {
+    expect(resumed.state.players[1].deck.slice(-3).map((card) => card.cardId)).toEqual(
+      arranged.map((card) => card.cardId),
+    );
+    for (const selectedId of opponentTrash.map((card) => card.instanceId)) {
       expect(findCardInstance(resumed.state, selectedId)).toBeNull();
     }
+  });
+
+  it("preserves any-number selection before arranging a multi-card Trash return", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const trash = [CARDS.VANILLA, CARDS.RUSH, CARDS.BLOCKER].map((card, index): CardInstance => ({
+      instanceId: `any-number-trash-${index}`,
+      cardId: card.id,
+      zone: "TRASH",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 0,
+      owner: 0,
+    }));
+    const state: GameState = {
+      ...base,
+      players: [
+        { ...base.players[0], trash },
+        base.players[1],
+      ],
+    };
+    const block: EffectBlock = {
+      id: "return-any-number-from-trash",
+      category: "auto",
+      actions: [{
+        type: "RETURN_TO_DECK",
+        target: {
+          type: "CARD_IN_TRASH",
+          controller: "SELF",
+          count: { any_number: true },
+        },
+        params: { position: "BOTTOM" },
+      }],
+    };
+    const deckBefore = state.players[0].deck.length;
+
+    const selection = resolveEffect(
+      state,
+      block,
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+
+    expect(selection.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    if (selection.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
+      throw new Error("Expected an any-number target selection");
+    }
+    expect(selection.pendingPrompt.options.countMin).toBe(0);
+    expect(selection.pendingPrompt.options.countMax).toBe(3);
+
+    const selected = [trash[0], trash[2]];
+    const arrange = resumeFromStack(
+      selection.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: selected.map((card) => card.instanceId) },
+      cardDb,
+    );
+
+    expect(arrange.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (arrange.pendingPrompt?.options.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Expected selected Trash cards to be arranged");
+    }
+    expect(arrange.pendingPrompt.options.cards.map((card) => card.instanceId)).toEqual(
+      selected.map((card) => card.instanceId),
+    );
+
+    const arranged = [...selected].reverse();
+    const done = resumeFromStack(
+      arrange.state,
+      {
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: "",
+        orderedInstanceIds: arranged.map((card) => card.instanceId),
+        destination: "top",
+      },
+      cardDb,
+    );
+
+    expect(done.state.players[0].trash.map((card) => card.instanceId)).toEqual([trash[1].instanceId]);
+    expect(done.state.players[0].deck).toHaveLength(deckBefore + 2);
+    expect(done.state.players[0].deck.slice(-2).map((card) => card.cardId)).toEqual(
+      arranged.map((card) => card.cardId),
+    );
   });
 });
