@@ -8,6 +8,7 @@ export interface AppliedCostSelection {
   events: PendingEvent[];
 }
 
+/** Apply a validated cost-selection response and return its movement events. */
 export function applyCostSelection(
   state: GameState,
   cost: Cost,

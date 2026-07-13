@@ -49,6 +49,7 @@ export function buildTrashToDeckArrangePrompt(
   };
 }
 
+/** Build the player-facing instruction for a cost-selection prompt. */
 export function getCostLabel(cost: Cost): string {
   const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
   switch (cost.type) {
@@ -70,10 +71,12 @@ export function getCostLabel(cost: Cost): string {
   }
 }
 
+/** Summarize every cost in a choice branch for its option label. */
 export function deriveBranchLabel(branch: Cost[]): string {
   return branch.map((c) => getCostLabel(c)).join(" + ");
 }
 
+/** Return the action verb used by the cost prompt's confirmation button. */
 export function getCostCtaLabel(cost: Cost): string {
   switch (cost.type) {
     case "TRASH_FROM_HAND":
@@ -94,6 +97,7 @@ export function getCostCtaLabel(cost: Cost): string {
   }
 }
 
+/** Map a pending prompt type to the effect-stack phase that resumes it. */
 export function promptTypeToPhase(promptType: string): EffectStackFrame["phase"] {
   switch (promptType) {
     case "OPTIONAL_EFFECT": return "AWAITING_OPTIONAL_RESPONSE";

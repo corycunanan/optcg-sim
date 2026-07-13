@@ -178,7 +178,7 @@ export function payCosts(
         if (!result) return null;
         nextState = result.state;
         events.push(...result.events);
-        costResult.cardsTrashedCount = 1;
+        costResult.cardsTrashedCount += 1;
         costResult.cardsTrashedInstanceIds.push(sourceCardInstanceId);
         break;
       }
@@ -201,7 +201,7 @@ export function payCosts(
         const toTrash = trashable.slice(0, amount);
         const moved = transitionCards(nextState, toTrash.map((c) => c.instanceId), "TRASH", { position: "TOP" });
         nextState = moved.state;
-        costResult.cardsTrashedCount = moved.transitions.length;
+        costResult.cardsTrashedCount += moved.transitions.length;
         costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
         events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost" } });
         break;

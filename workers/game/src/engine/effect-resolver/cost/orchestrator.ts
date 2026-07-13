@@ -3,7 +3,7 @@ import type { ChoiceCost, Cost, CostResult, EffectBlock, SimpleCost } from "../.
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
 import { generateFrameId, pushFrame } from "../../effect-stack.js";
 import { isEngineTerminated } from "../../engine-limits.js";
-import { checkReplacementForKO, checkReplacementForRemoval } from "../../replacements.js";
+import { checkReplacementForRemoval } from "../../replacements.js";
 import type { CostSelectionResult } from "../types.js";
 import { costResultToEntries } from "../types.js";
 import type { EffectResolverServices } from "../services.js";
@@ -498,18 +498,13 @@ export function payCostsWithSelection(
       return undefined;
     })();
     if (fixedExitTarget) {
-      let replacement = cost.type === "KO_OWN_CHARACTER"
-        ? checkReplacementForKO(nextState, fixedExitTarget, "effect", controller, cardDb, services)
-        : checkReplacementForRemoval(nextState, fixedExitTarget, controller, cardDb, services);
-      if (cost.type === "KO_OWN_CHARACTER" && !replacement.replaced && !replacement.pendingPrompt) {
-        replacement = checkReplacementForRemoval(
-          nextState,
-          fixedExitTarget,
-          controller,
-          cardDb,
-          services,
-        );
-      }
+      const replacement = checkReplacementForRemoval(
+        nextState,
+        fixedExitTarget,
+        controller,
+        cardDb,
+        services,
+      );
       nextState = replacement.state;
       events.push(...replacement.events);
       if (replacement.pendingPrompt) {

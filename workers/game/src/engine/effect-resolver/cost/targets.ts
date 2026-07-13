@@ -4,6 +4,7 @@ import type { CardData, CardInstance, GameState, PlayerState } from "../../../ty
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 
+/** Resolve a simple cost's numeric amount with a deterministic fallback. */
 export function resolveAmount(cost: SimpleCost, fallback = 1): number {
   return typeof cost.amount === "number" ? cost.amount : fallback;
 }
@@ -24,6 +25,7 @@ function getRestCostCandidates(player: PlayerState, filter?: TargetFilter): Card
   ];
 }
 
+/** Return instance IDs that can satisfy a player-selected cost. */
 export function computeCostTargets(
   state: GameState,
   cost: Cost,
@@ -131,6 +133,7 @@ export function computeCostTargets(
   }
 }
 
+/** Materialize prompt-safe card records for the supplied valid target IDs. */
 export function getCostCards(
   state: GameState,
   cost: Cost,

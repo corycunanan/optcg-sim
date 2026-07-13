@@ -386,7 +386,9 @@ export function executeSetActive(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets: string[] | undefined,
+  _services: EffectResolverServices,
 ): ActionResult {
+  void _services;
   const events: PendingEvent[] = [];
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {

@@ -22,6 +22,7 @@ const SELECTION_COST_TYPES: Set<string> = new Set([
   "ADD_OWN_CHARACTER_TO_LIFE",
 ]);
 
+/** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
   if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") return true;
   // Life is an ordered hidden zone — the only choice a life cost can offer is

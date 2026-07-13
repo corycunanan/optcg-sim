@@ -18,7 +18,7 @@ import type { EffectSchema, EffectBlock, Cost } from "../engine/effect-types.js"
 import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { executeActionChain, executeEffectAction } from "../engine/effect-resolver/resolver.js";
-import { payCostsWithSelection, applyCostSelection } from "../engine/effect-resolver/cost-handler.js";
+import { payCosts, payCostsWithSelection, applyCostSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { pushFrame, peekFrame, popFrame } from "../engine/effect-stack.js";
 import type { Action } from "../engine/effect-types.js";
@@ -51,6 +51,23 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TRASH_FROM_HAND cost selection flow", () => {
+  it("accumulates trash totals across self and hand cost steps", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const sourceCardInstanceId = state.players[0].characters[0]!.instanceId;
+
+    const result = payCosts(
+      state,
+      [{ type: "TRASH_SELF" }, { type: "TRASH_FROM_HAND", amount: 1 }],
+      0,
+      cardDb,
+      sourceCardInstanceId,
+    );
+
+    expect(result?.costResult.cardsTrashedCount).toBe(2);
+    expect(result?.costResult.cardsTrashedInstanceIds).toHaveLength(2);
+  });
+
   it("applyCostSelection actually removes cards from hand", () => {
     const { state } = setupGame();
     const controller = 0 as const;
