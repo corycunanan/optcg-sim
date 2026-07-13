@@ -61,9 +61,9 @@ function battleSession(): { session: TestAccess; ws: MockWebSocket } {
 
 function errors(ws: MockWebSocket): string[] {
   return ws.sent
-    .map((payload) => JSON.parse(payload) as { type: string; message?: string })
-    .filter((message) => message.type === "game:error")
-    .map((message) => message.message ?? "");
+    .map((payload) => JSON.parse(payload) as { type: string; reason?: string })
+    .filter((message) => message.type === "action:rejected")
+    .map((message) => message.reason ?? "");
 }
 
 describe("OPT-448: prompt identity cannot fall through as a plain action", () => {

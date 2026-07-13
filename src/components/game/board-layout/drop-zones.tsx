@@ -11,6 +11,9 @@ import { Card } from "../card";
 import { SQUARE } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
 import { useInteractionMode } from "./interaction-mode";
+import { motion, useReducedMotion } from "motion/react";
+import { cardReject, cardRejectReduced } from "@/lib/motion";
+import { useCardRejection } from "./action-feedback";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
 export function DropOverlay({
@@ -163,6 +166,9 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const zonePos = useZonePosition();
   const interactionMode = useInteractionMode();
   const inputSuppressed = interactionMode !== "full";
+  const reducedMotion = useReducedMotion();
+  const rejectionSequence = useCardRejection(card?.instanceId ?? "");
+  const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
   const accepts =
     activeDragType === "hand-card" &&
     canPlayCardInZone(draggedCardType, "stage");
@@ -206,8 +212,11 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
       {card ? (
         <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
           <DropdownMenuTrigger asChild>
-            <div
+            <motion.div
+              key={rejectionSequence ?? "idle"}
               onContextMenu={handleContextMenu}
+              animate={rejectionSequence ? rejectionAnimation : { x: 0, opacity: 1 }}
+              transition={rejectionSequence ? rejectionAnimation.transition : undefined}
               className="relative z-[1]"
             >
               <Card
@@ -216,7 +225,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
                 state={card.state === "RESTED" ? "rest" : "active"}
                 motionDelay={animationDelay}
               />
-            </div>
+            </motion.div>
           </DropdownMenuTrigger>
           {onAction && (
             <CardActionMenuContent

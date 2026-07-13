@@ -144,6 +144,18 @@ const board = {
         times: [0, 0.35, 1] as number[],
       },
     },
+    /** Server rejection: three short horizontal oscillations while the card
+     *  flashes into the shared disabled treatment, then recovers. */
+    reject: {
+      x: [0, -4, 4, -4, 4, -4, 4, 0] as number[],
+      opacity: [1, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 1] as number[],
+      transition: { duration: 0.36, ease: "easeOut" as const },
+    },
+    /** Reduced-motion rejection: retain only the disabled-state flash. */
+    rejectReduced: {
+      opacity: [1, 0.35, 1] as number[],
+      transition: { duration: 0.1, ease: "easeOut" as const },
+    },
     /** Summon entry (OPT-274). Pop-in after a card lands in its destination
      *  zone — scale up from 0.9 and fade from 0 with a short bouncy spring.
      *  Composes with whatever ambient state (active/rest/attacking) the
@@ -210,6 +222,8 @@ export const cardAttackerPulse = board.card.attackerPulse;
 export const cardBlockerHighlight = board.card.blockerHighlight;
 export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
+export const cardReject = board.card.reject;
+export const cardRejectReduced = board.card.rejectReduced;
 export const cardEntry = board.card.entry;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;

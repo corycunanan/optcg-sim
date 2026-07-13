@@ -19,7 +19,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-416 | Unify interaction grammar: drag commits, click selects | — | — | Done | [#286](https://github.com/corycunanan/optcg-sim/pull/286) | Foundation for every board interaction |
 | 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | Done | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
 | 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Done | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA passed for dimming, tooltip, and drag-target signals |
-| 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Backlog | — | Independent server-authority backstop |
+| 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | In Review | [#294](https://github.com/corycunanan/optcg-sim/pull/294) | Independent server-authority backstop |
 | 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Backlog | — | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Backlog | — | Completes the menu verb |
 | 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | Backlog | — | Add input equivalence after gestures stabilize |
@@ -61,3 +61,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Unaffordable cards deliberately remain draggable so the server can accept effect-modified exceptions; `HandCardDrag.affordable` suppresses target signals without blocking the attempt. Events retain nested own-field droppables but do not light individual Character or Stage zones.
 - **VQA required:** In a Main-phase game, verify effective-cost dimming and the “Need N more DON” tooltip; drag an unaffordable card and confirm no play targets light; verify Character/Stage/Event target filtering; attack and confirm the leader + RESTED Characters light while ACTIVE Characters do not.
 - **Why this matters for OPT-418:** Soft-enabled affordability and exotic attack restrictions can still be rejected by the server. OPT-418 must make those intentional backstop rejections visible without converting them into client hard-lockouts.
+
+### OPT-418 → OPT-419
+**From:** session on 2026-07-12 · **Commit:** `e20a610` · **PR:** #294
+
+- **Primer:** Well-formed server refusals now arrive as typed `action:rejected` messages carrying the attempted action and reason. The client keeps that rejection until an accepted state update, renders the reason in the mid-zone, and maps card-sourced actions to localized grey shake/dim feedback.
+- **Read first:** `shared/game-types.ts`, `src/hooks/use-game-ws.ts`, `src/components/game/board-layout/action-feedback.tsx`, `src/components/game/board-layout/mid-zone.tsx`
+- **Gotchas / do NOT touch:** Keep protocol/transport failures on `game:error`; `action:rejected` is only for well-formed game actions. Do not clear rejection state when sending the next attempt—accepted `game:state`/`game:update` owns that transition.
+- **Unresolved:** In-place `SELECT_TARGET` presentation remains entirely in OPT-419. Its accepted selection should reuse the existing board selection grammar; rejected submissions already map the first selected instance to localized feedback.
+- **Pointer:** `git show e20a610`; replay `/sandbox/action-rejected` for the settled mid-zone and motion treatment.

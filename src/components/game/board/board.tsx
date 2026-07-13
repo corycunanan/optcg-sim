@@ -11,6 +11,7 @@ import type {
 } from "@shared/game-types";
 import { BoardLayout } from "../board-layout";
 import type { InteractionMode } from "../board-layout/interaction-mode";
+import type { ActionRejection } from "@/hooks/use-game-ws";
 import { useBoardScale } from "../scaled-board";
 
 export interface BoardState {
@@ -27,6 +28,7 @@ export interface BoardState {
   activePrompt: PromptOptions | null;
   matchClosed: boolean;
   canUndo: boolean;
+  actionRejection?: ActionRejection | null;
   interactionMode?: InteractionMode;
 }
 

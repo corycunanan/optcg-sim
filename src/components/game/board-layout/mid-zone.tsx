@@ -102,6 +102,7 @@ export const MidZone = React.memo(function MidZone({
   canPass,
   inBattle,
   activePrompt,
+  rejectionReason,
   battleInfo,
   blockerMode,
   isPromptHidden,
@@ -116,6 +117,7 @@ export const MidZone = React.memo(function MidZone({
   canPass: boolean;
   inBattle: boolean;
   activePrompt: PromptOptions | null;
+  rejectionReason: string | null;
   battleInfo: BattleInfo | null;
   blockerMode?: BlockerMode;
   isPromptHidden?: boolean;
@@ -133,6 +135,21 @@ export const MidZone = React.memo(function MidZone({
         height: MID_ZONE_H,
       }}
     >
+      {rejectionReason && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex min-w-0 items-center gap-2 text-base"
+        >
+          <span className="text-gb-accent-amber font-bold" aria-hidden>
+            &#x26A1;
+          </span>
+          <span className="text-gb-text-dim truncate">
+            Not available &mdash; {rejectionReason}
+          </span>
+        </div>
+      )}
+
       {/* Battle display */}
       {battleInfo && <BattleDisplay info={battleInfo} />}
 

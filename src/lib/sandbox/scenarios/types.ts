@@ -87,4 +87,10 @@ export interface Scenario {
   script?: ScenarioStep[];
   inputMode: "spectator" | "interactive";
   expectedResponse?: ExpectedResponse;
+  /** Optional static server rejection used to exercise localized feedback. */
+  actionRejection?: {
+    action: GameAction;
+    reason: string;
+    sequence: number;
+  };
 }

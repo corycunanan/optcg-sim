@@ -13,6 +13,8 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { getCardAffordability } from "@/lib/game/client-legality";
 import { isCounterEligibleCard } from "@/lib/game/counter-eligibility";
 import { Card } from "../card";
+import { cardReject, cardRejectReduced } from "@/lib/motion";
+import { useCardRejection } from "./action-feedback";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
 
 /**
@@ -106,6 +108,7 @@ function SortableHandCard({
    *  (card added/removed/reordered) instead of every render. */
   layoutDep: number;
 }) {
+  const rejectionSequence = useCardRejection(card.instanceId);
   const {
     attributes,
     listeners,
@@ -121,6 +124,10 @@ function SortableHandCard({
 
   const cardState = isDragging ? "dragging" : "active";
   const opacity = isDragging ? 0.3 : dimmed ? 0.35 : 1;
+  const rejectionPreset = reducedMotion ? cardRejectReduced : cardReject;
+  const rejectionOpacity = rejectionPreset.opacity.map((value, index, values) =>
+    index === 0 || index === values.length - 1 ? opacity : value,
+  );
 
   const sortableTransform = transform
     ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
@@ -151,9 +158,18 @@ function SortableHandCard({
         }}
       >
         <motion.div
+          key={rejectionSequence ?? "idle"}
           initial={false}
-          animate={{ opacity }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
+          animate={
+            rejectionSequence
+              ? { ...rejectionPreset, opacity: rejectionOpacity }
+              : { x: 0, opacity }
+          }
+          transition={
+            rejectionSequence
+              ? rejectionPreset.transition
+              : { duration: 0.15, ease: "easeOut" }
+          }
         >
           <Card
             data={{ card, cardDb }}

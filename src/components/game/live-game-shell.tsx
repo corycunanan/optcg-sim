@@ -330,6 +330,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     activePrompt,
     matchClosed: game.matchClosed,
     canUndo: game.canUndo,
+    actionRejection: game.actionRejection,
   };
 
   const dispatch: BoardDispatch = {
