@@ -26,6 +26,27 @@ describe("filterStateForPlayer", () => {
     }
   });
 
+  it("redacts deterministic execution secrets from both player views", () => {
+    const state = getMainPhaseState();
+    const original = state.executionContext;
+
+    for (const receivingPlayer of [0, 1] as const) {
+      const filtered = filterStateForPlayer(state, receivingPlayer);
+      expect(filtered.executionContext).toEqual({
+        version: 1,
+        seed: "redacted",
+        rngState: 0,
+        idCounter: 0,
+        clockEpochMs: 0,
+        clockCounter: 0,
+        actionBudget: { limit: 0, consumed: 0 },
+        trace: { gameId: state.id, traceId: "redacted" },
+      });
+      expect(filtered.executionContext.seed).not.toBe(original.seed);
+      expect(filtered.executionContext.rngState).not.toBe(original.rngState);
+    }
+  });
+
   it("obfuscates opponent hand card identities", () => {
     const state = getMainPhaseState();
     const filtered = filterStateForPlayer(state, 0);

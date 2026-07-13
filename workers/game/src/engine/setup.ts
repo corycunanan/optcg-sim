@@ -28,6 +28,7 @@ import { registerTriggersForCard, registerReplacementsForCard, registerPermanent
 import {
   allocateContextId,
   createDeterministicExecutionContext,
+  ensureExecutionContext,
   shuffleWithContext,
 } from "./execution-context.js";
 
@@ -168,11 +169,12 @@ export function prepareDecksAndLeaders(
  * mulligan cycle — caller is responsible for sequencing.
  */
 export function dealOpeningHand(state: GameState, playerIndex: 0 | 1): GameState {
-  const player = state.players[playerIndex];
-  const drawn = drawN(player.deck, OPENING_HAND_SIZE, state.executionContext);
-  const newPlayers = [...state.players] as typeof state.players;
+  const current = ensureExecutionContext(state);
+  const player = current.players[playerIndex];
+  const drawn = drawN(player.deck, OPENING_HAND_SIZE, current.executionContext);
+  const newPlayers = [...current.players] as typeof current.players;
   newPlayers[playerIndex] = { ...player, hand: drawn.cards, deck: drawn.remaining };
-  return { ...state, players: newPlayers, executionContext: drawn.executionContext };
+  return { ...current, players: newPlayers, executionContext: drawn.executionContext };
 }
 
 /**
@@ -185,8 +187,9 @@ export function placeLifeCards(
   state: GameState,
   cardDb: Map<string, CardData>,
 ): GameState {
-  const newPlayers = [...state.players] as typeof state.players;
-  let executionContext = state.executionContext;
+  const current = ensureExecutionContext(state);
+  const newPlayers = [...current.players] as typeof current.players;
+  let executionContext = current.executionContext;
   for (const playerIndex of [0, 1] as const) {
     const player = newPlayers[playerIndex];
     const leaderData = cardDb.get(player.leader.cardId);
@@ -198,7 +201,7 @@ export function placeLifeCards(
       .reverse();
     newPlayers[playerIndex] = { ...player, life, deck: drawn.remaining };
   }
-  return { ...state, players: newPlayers, executionContext };
+  return { ...current, players: newPlayers, executionContext };
 }
 
 /**
@@ -231,8 +234,9 @@ export function applyMulligan(
   state: GameState,
   playerIndex: 0 | 1,
 ): GameState {
-  const player = state.players[playerIndex];
-  let executionContext = state.executionContext;
+  const current = ensureExecutionContext(state);
+  const player = current.players[playerIndex];
+  let executionContext = current.executionContext;
 
   // Return hand to deck and reshuffle
   const returned = player.hand.map((card) => {
@@ -255,10 +259,10 @@ export function applyMulligan(
   // Draw 5 new cards
   const drawn = drawN(shuffled.values, 5, executionContext);
 
-  const newPlayers = [...state.players] as typeof state.players;
+  const newPlayers = [...current.players] as typeof current.players;
   newPlayers[playerIndex] = { ...player, hand: drawn.cards, deck: drawn.remaining };
 
-  return { ...state, players: newPlayers, executionContext: drawn.executionContext };
+  return { ...current, players: newPlayers, executionContext: drawn.executionContext };
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────

@@ -116,7 +116,11 @@ import {
   resumePregameFromPrompt,
   startPregame,
 } from "./engine/pregame.js";
-import { allocateEngineId, createProductionExecutionContext } from "./engine/execution-context.js";
+import {
+  allocateEngineId,
+  createProductionExecutionContext,
+  ensureExecutionContext,
+} from "./engine/execution-context.js";
 import { continuePipelineFromExecution, runPipeline } from "./engine/pipeline.js";
 import {
   continueReplacementBatchAfterSubstitute,
@@ -1522,7 +1526,7 @@ export class GameSession implements DurableObject {
     const stored = await this.state.storage.get<StoredSession>("session");
     if (!stored) return false;
 
-    this.gameState = stored.state;
+    this.gameState = ensureExecutionContext(stored.state);
     this.cardDb = new Map(Object.entries(stored.cardDb));
     this.gameMode = stored.mode ?? "PVP";
     this.testPriorityRolls = stored.testPriorityRolls ?? null;

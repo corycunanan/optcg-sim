@@ -9,7 +9,13 @@ import {
 } from "../engine/execution-context.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
-import { buildInitialState } from "../engine/setup.js";
+import {
+  applyMulligan,
+  buildInitialState,
+  dealOpeningHand,
+  placeLifeCards,
+  prepareDecksAndLeaders,
+} from "../engine/setup.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import type { CardData, GameState } from "../types.js";
 import { CARDS, createTestPayload } from "./helpers.js";
@@ -147,5 +153,24 @@ describe("OPT-477 deterministic EngineExecutionContext", () => {
       });
 
     expect(offenders).toEqual([]);
+  });
+
+  it("hydrates pre-OPT-477 pregame snapshots before setup transitions", () => {
+    const { state: prepared, cardDb } = prepareDecksAndLeaders(createTestPayload(), FIXED_CONTEXT());
+    const legacy = structuredClone(prepared) as Partial<GameState>;
+    delete legacy.executionContext;
+
+    const withHand = dealOpeningHand(legacy as GameState, 0);
+    expect(withHand.executionContext.seed).toBe(`legacy:${prepared.id}`);
+    expect(withHand.players[0].hand).toHaveLength(5);
+
+    const withLife = placeLifeCards(legacy as GameState, cardDb);
+    expect(withLife.executionContext).toBeDefined();
+    expect(withLife.players[0].life).toHaveLength(5);
+
+    const mulliganBase = dealOpeningHand(legacy as GameState, 0);
+    const mulligan = applyMulligan(mulliganBase, 0);
+    expect(mulligan.executionContext).toBeDefined();
+    expect(mulligan.players[0].hand).toHaveLength(5);
   });
 });
