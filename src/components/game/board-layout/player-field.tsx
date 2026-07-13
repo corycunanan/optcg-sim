@@ -269,7 +269,9 @@ export function PlayerField({
       <DroppableTrashZone
         trash={me?.trash ?? []}
         cardDb={cardDb}
-        onClickTrash={() => me && me.trash.length > 0 && onPreviewZone({ type: "trash", owner: "me" })}
+        onClickTrash={me && me.trash.length > 0
+          ? () => onPreviewZone({ type: "trash", owner: "me" })
+          : undefined}
         zoneKey="p-trash"
         arrivingCount={pileArrivingCounts?.get("p-trash")}
         style={{

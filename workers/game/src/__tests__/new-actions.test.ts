@@ -2,7 +2,7 @@
  * Tests for new action types added to effect-resolver.ts
  *
  * Covers: RETURN_TO_DECK, PLAY_CARD, SET_DON_ACTIVE, TRASH_CARD,
- * NEGATE_EFFECTS, MODIFY_COST, HAND_WHEEL, SHUFFLE_DECK,
+ * NEGATE_EFFECTS, MODIFY_COST, MILL, HAND_WHEEL, SHUFFLE_DECK,
  * REST_OPPONENT_DON, RETURN_DON_TO_DECK, REVEAL,
  * Life card actions: TURN_LIFE_FACE_UP, TURN_LIFE_FACE_DOWN,
  * LIFE_TO_HAND, ADD_TO_LIFE_FROM_HAND, LIFE_CARD_TO_DECK,
@@ -272,7 +272,27 @@ describe("MODIFY_COST action", () => {
   });
 });
 
-// ─── HAND_WHEEL Tests ──────────────────────────────────────────────────────────
+// ─── MILL / HAND_WHEEL Tests ───────────────────────────────────────────────────
+
+describe("MILL action", () => {
+  it("publishes deck provenance for the trash batch", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const block = makeEffectBlock({
+      actions: [{ type: "MILL", params: { amount: 2 } }],
+    });
+
+    const result = resolveEffect(state, block, "char-0-v1", 0, cardDb);
+    const trashed = result.events.find((event) => event.type === "CARD_TRASHED");
+
+    expect(result.resolved).toBe(true);
+    expect(trashed?.payload).toMatchObject({
+      count: 2,
+      reason: "mill",
+      from: "DECK",
+    });
+  });
+});
 
 describe("HAND_WHEEL action", () => {
   it("trashes cards then draws cards", () => {
@@ -298,6 +318,12 @@ describe("HAND_WHEEL action", () => {
     expect(result.state.players[0].deck.length).toBe(origDeckSize - 2);
     // Trash grew by 2
     expect(result.state.players[0].trash.length).toBe(origTrashSize + 2);
+    const trashed = result.events.find((event) => event.type === "CARD_TRASHED");
+    expect(trashed?.payload).toMatchObject({
+      count: 2,
+      reason: "hand_wheel",
+      from: "HAND",
+    });
   });
 });
 
@@ -613,6 +639,12 @@ describe("Life card actions", () => {
     expect(result.resolved).toBe(true);
     expect(result.state.players[0].life.length).toBe(origLifeLen - 2);
     expect(result.state.players[0].trash.length).toBe(origTrashLen + 2);
+    const trashed = result.events.find((event) => event.type === "CARD_TRASHED");
+    expect(trashed?.payload).toMatchObject({
+      count: 2,
+      reason: "face_up_life",
+      from: "LIFE",
+    });
     // All remaining life should be face down
     expect(result.state.players[0].life.every((l) => l.face === "DOWN")).toBe(true);
   });

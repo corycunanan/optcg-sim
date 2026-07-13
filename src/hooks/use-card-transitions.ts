@@ -122,8 +122,14 @@ export function eventToTransitions(
 
   // Count-only trash events do not expose individual cards. Represent the
   // batch with one face-down source fizzle and carry the full arrival count
-  // to the destination pile receipt.
-  if (event.type === "CARD_TRASHED") {
+  // to the destination pile receipt. Instance- or card-bearing events must
+  // stay on the singular path above so they retain their real source zone.
+  if (
+    event.type === "CARD_TRASHED" &&
+    !event.payload.cardId &&
+    !event.payload.cardInstanceId &&
+    !event.payload.newCardInstanceId
+  ) {
     const { playerIndex } = event;
     const prefix = playerIndex === myIndex ? "p" : "o";
     const count = Math.max(1, event.payload.count ?? 1);
@@ -293,7 +299,7 @@ function eventToTransition(
       cardId = p.cardId ?? null;
       const sourceInstanceId = p.cardInstanceId ?? null;
       cardInstanceId = p.newCardInstanceId ?? sourceInstanceId;
-      if (!cardId && p.count) return null;
+      if (!cardId && !sourceInstanceId && !p.newCardInstanceId) return null;
       const resolvedZone =
         sourceInstanceId && zoneRegistry
           ? zoneRegistry.getCardZone(sourceInstanceId)

@@ -438,4 +438,31 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     );
     expect(out[0].fromZoneKey).toBe("p-hand");
   });
+
+  it("keeps instance-bearing count payloads on the registered per-card path", () => {
+    const sourceInstanceId = "stage-old";
+    const out = eventToTransitions(
+      trashEvent({
+        cardInstanceId: sourceInstanceId,
+        newCardInstanceId: "trash-new",
+        count: 1,
+        reason: "stage_replaced",
+      }),
+      0,
+      mkRegistry({
+        getCardZone: (instanceId) =>
+          instanceId === sourceInstanceId ? "p-stage" : null,
+      }),
+    );
+
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      cardId: null,
+      instanceId: "trash-new",
+      fromZoneKey: "p-stage",
+      toZoneKey: "p-trash",
+      kind: "transform",
+    });
+    expect(out[0].arrivalCount).toBeUndefined();
+  });
 });

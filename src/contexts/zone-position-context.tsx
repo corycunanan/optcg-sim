@@ -21,6 +21,18 @@ export interface ZonePositionRegistry {
 }
 
 const ZonePositionContext = createContext<ZonePositionRegistry | null>(null);
+const MAX_POSITION_HISTORY = 64;
+
+function rememberLatest<T>(history: Map<string, T>, key: string, value: T) {
+  // Refresh insertion order when an existing card moves so eviction remains
+  // least-recently-recorded rather than first-ever-recorded.
+  history.delete(key);
+  history.set(key, value);
+  if (history.size > MAX_POSITION_HISTORY) {
+    const oldestKey = history.keys().next().value;
+    if (oldestKey) history.delete(oldestKey);
+  }
+}
 
 export function ZonePositionProvider({ children }: { children: ReactNode }) {
   const elementsRef = useRef<Map<string, HTMLElement>>(new Map());
@@ -39,11 +51,7 @@ export function ZonePositionProvider({ children }: { children: ReactNode }) {
   const unregister = useCallback((zoneKey: string) => {
     const element = elementsRef.current.get(zoneKey);
     if (element) {
-      previousRectsRef.current.set(zoneKey, element.getBoundingClientRect());
-      if (previousRectsRef.current.size > 64) {
-        const oldestKey = previousRectsRef.current.keys().next().value;
-        if (oldestKey) previousRectsRef.current.delete(oldestKey);
-      }
+      rememberLatest(previousRectsRef.current, zoneKey, element.getBoundingClientRect());
     }
     elementsRef.current.delete(zoneKey);
   }, []);
@@ -57,7 +65,7 @@ export function ZonePositionProvider({ children }: { children: ReactNode }) {
 
   const registerCard = useCallback((instanceId: string, zoneKey: string) => {
     cardZonesRef.current.set(instanceId, zoneKey);
-    previousCardZonesRef.current.set(instanceId, zoneKey);
+    rememberLatest(previousCardZonesRef.current, instanceId, zoneKey);
   }, []);
 
   const unregisterCard = useCallback((instanceId: string) => {
