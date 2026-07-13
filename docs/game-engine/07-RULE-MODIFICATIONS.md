@@ -414,7 +414,7 @@ The engine hooks into the deck-out check. When a player would lose from deck-out
 
 ## Start of Game Effects (10.8)
 
-Actions performed during game setup, after deck validation and mulligan but before the first turn. These are one-shot effects resolved as part of the setup sequence.
+Actions performed during game setup after the first player is decided but before opening hands are dealt. These are one-shot effects resolved as part of the persisted pregame sequence.
 
 ```typescript
 interface StartOfGameEffect {
@@ -439,18 +439,11 @@ OP13-079 Imu — "at the start of the game, play up to 1 {Mary Geoise} type Stag
     "rule_type": "START_OF_GAME_EFFECT",
     "actions": [
       {
-        "type": "FULL_DECK_SEARCH",
-        "target": {
-          "type": "STAGE_CARD",
-          "source_zone": "DECK",
-          "count": { "up_to": 1 },
-          "filter": {
-            "card_type": "STAGE",
-            "traits": ["Mary Geoise"]
-          }
-        },
+        "type": "SEARCH_AND_PLAY",
         "params": {
-          "destination": "PLAY"
+          "search_full_deck": true,
+          "filter": { "card_type": "STAGE", "traits": ["Mary Geoise"] },
+          "shuffle_after": true
         }
       }
     ]
@@ -463,12 +456,16 @@ OP13-079 Imu — "at the start of the game, play up to 1 {Mary Geoise} type Stag
 Start-of-game effects resolve in this order within the game setup:
 
 1. Deck validation (including `DECK_RESTRICTION` checks)
-2. DON!! deck construction (including `DON_DECK_SIZE_OVERRIDE`)
-3. Mulligan
-4. **Start-of-game effects** resolve (both players, turn-order player first)
-5. First turn begins
+2. Deck/DON!! construction and Leader placement
+3. First/second player decision
+4. **Start-of-game effects** resolve (both players, first player first)
+5. Opening hands and mulligans
+6. Life placement
+7. First turn begins
 
 If both players have start-of-game effects, the player going first resolves theirs first (per comprehensive rules on simultaneous setup effects).
+
+The runtime entry point is `pregame.ts → advanceStartOfGameEffects()`. Its per-player completion ledger, pending prompt, and resolver frame are all part of `GameState`, so reconnects and Durable Object hibernation cannot repeat or skip an effect. Integration coverage lives in `opt-476-start-of-game-effects.test.ts`.
 
 ---
 

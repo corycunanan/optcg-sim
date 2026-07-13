@@ -454,6 +454,8 @@ export interface PregameState {
   firstPlayerIndex: 0 | 1 | null;
   /** Per-player mulligan decision. null = pending, true = redrew, false = kept. */
   mulliganDecisions: [boolean | null, boolean | null];
+  /** START_OF_GAME_EFFECT resolution ledger, indexed by player. */
+  startOfGameEffectsResolved: [boolean, boolean];
 }
 
 export interface EngineExecutionContext {

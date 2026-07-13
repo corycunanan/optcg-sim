@@ -12,9 +12,9 @@
  * with the player's response. The DO calls `advancePregame` after init and
  * after each prompt response until `pregame === null` (FSM finished).
  *
- * START_OF_GAME_FX is intentionally a passthrough today (delegated to OPT-365
- * for OP13-079 Imu's Mary Geoise stage play). The phase exists so the ordering
- * is locked in: priority decision → start-of-game effects → hand deal.
+ * START_OF_GAME_FX resolves authored Leader rule modifications in first-player
+ * order. Prompt/effect-stack state lives on GameState so Durable Object
+ * hibernation cannot skip or repeat a partially resolved setup effect.
  */
 
 import type {
@@ -28,8 +28,10 @@ import type {
   PlayerChoicePrompt,
   PregameState,
 } from "../../../../shared/game-types.js";
+import type { Action, EffectSchema, StartOfGameEffect } from "./effect-types.js";
 import { dealOpeningHand, placeLifeCards, applyMulligan } from "./setup.js";
 import { emitPendingEvent } from "./events.js";
+import { executeActionChain } from "./effect-resolver/resolver.js";
 import { takeEngineRandom } from "./execution-context.js";
 
 const PRIORITY_ROLL_TIMEOUT_MS = 60_000;
@@ -51,6 +53,7 @@ export function startPregame(state: GameState): GameState {
     priorityDeciderIndex: null,
     firstPlayerIndex: null,
     mulliganDecisions: [null, null],
+    startOfGameEffectsResolved: [false, false],
   };
   return { ...state, pregame };
 }
@@ -82,11 +85,13 @@ export function advancePregame(
         // Awaiting prompt response.
         return { state: current, done: false };
       case "START_OF_GAME_FX": {
-        // OPT-365 owns this — today it is a passthrough.
-        current = {
-          ...current,
-          pregame: { ...current.pregame, phase: "HAND_DEAL" },
-        };
+        if (current.pendingPrompt || current.effectStack.length > 0) {
+          return { state: current, done: false };
+        }
+        current = advanceStartOfGameEffects(current, cardDb);
+        if (current.pendingPrompt || current.effectStack.length > 0) {
+          return { state: current, done: false };
+        }
         continue;
       }
       case "HAND_DEAL": {
@@ -210,10 +215,69 @@ export function resumePregameFromPrompt(
 export function isPregamePromptResponse(state: GameState): boolean {
   return state.pregame !== null
     && (state.pregame.phase === "PRIORITY_CHOICE"
-      || state.pregame.phase === "MULLIGAN_DECISIONS");
+      || state.pregame.phase === "MULLIGAN_DECISIONS"
+      || state.pregame.phase === "START_OF_GAME_FX");
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
+
+function startOfGameActionsForPlayer(
+  state: GameState,
+  playerIndex: 0 | 1,
+  cardDb: Map<string, CardData>,
+): Action[] {
+  const leader = state.players[playerIndex].leader;
+  const schema = (cardDb.get(leader.cardId)?.effectSchema ?? null) as EffectSchema | null;
+  return (schema?.rule_modifications ?? [])
+    .filter((rule): rule is StartOfGameEffect => rule.rule_type === "START_OF_GAME_EFFECT")
+    .flatMap((rule) => rule.actions);
+}
+
+function advanceStartOfGameEffects(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const pregame = state.pregame;
+  if (!pregame || pregame.firstPlayerIndex === null) return state;
+
+  const resolved = [
+    ...(pregame.startOfGameEffectsResolved ?? [false, false]),
+  ] as [boolean, boolean];
+  const first = pregame.firstPlayerIndex;
+  const order: [0 | 1, 0 | 1] = [first, first === 0 ? 1 : 0];
+  const controller = order.find((playerIndex) => !resolved[playerIndex]);
+  if (controller === undefined) {
+    return { ...state, pregame: { ...pregame, phase: "HAND_DEAL", startOfGameEffectsResolved: resolved } };
+  }
+
+  // Mark before execution so a persisted prompt resumes exactly once. The
+  // phase cannot advance until that prompt and its effect-stack frame drain.
+  resolved[controller] = true;
+  const markedState: GameState = {
+    ...state,
+    pregame: { ...pregame, startOfGameEffectsResolved: resolved },
+  };
+  const actions = startOfGameActionsForPlayer(markedState, controller, cardDb);
+  if (actions.length === 0) return markedState;
+
+  const leader = markedState.players[controller].leader;
+  const result = executeActionChain(
+    markedState,
+    actions,
+    leader.instanceId,
+    controller,
+    cardDb,
+    undefined,
+    cardDb.get(leader.cardId)?.effectText ?? "Start-of-game effect",
+  );
+  let nextState = result.state;
+  for (const event of result.events) {
+    nextState = emitPendingEvent(nextState, event, controller);
+  }
+  return result.pendingPrompt
+    ? { ...nextState, pendingPrompt: result.pendingPrompt }
+    : nextState;
+}
 
 /**
  * Roll 2d6 for priority. Re-rolls on tie until a winner is found. The final
