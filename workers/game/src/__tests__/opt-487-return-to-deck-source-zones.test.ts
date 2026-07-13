@@ -157,6 +157,20 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
       expect(opponentView).not.toContain(target.instanceId);
       expect(opponentView).not.toContain(destination.instanceId);
       expect(opponentView).not.toContain(target.cardId);
+
+      const lifeRemoved = result.events.find((event) => event.type === "CARD_REMOVED_FROM_LIFE");
+      if (source === "LIFE") {
+        expect(lifeRemoved).toMatchObject({
+          type: "CARD_REMOVED_FROM_LIFE",
+          playerIndex: 0,
+          payload: {
+            cardInstanceId: target.instanceId,
+            newCardInstanceId: destination.instanceId,
+          },
+        });
+      } else {
+        expect(lifeRemoved).toBeUndefined();
+      }
     },
   );
 

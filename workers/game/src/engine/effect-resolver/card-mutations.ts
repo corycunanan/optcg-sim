@@ -322,13 +322,24 @@ export function returnToDeck(
   // The transition service rejects Leaders and same-zone deck moves. Every
   // other card zone is a legal source for an authored RETURN_TO_DECK action.
   if (!moved) return null;
+  const events: PendingEvent[] = [{
+    type: "CARD_RETURNED_TO_DECK",
+    playerIndex: moved.fact.owner,
+    payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position },
+  }];
+  if (moved.fact.source === "LIFE") {
+    events.push({
+      type: "CARD_REMOVED_FROM_LIFE",
+      playerIndex: moved.fact.owner,
+      payload: {
+        cardInstanceId: moved.fact.oldInstanceId,
+        newCardInstanceId: moved.fact.newInstanceId,
+      },
+    });
+  }
   return {
     state: moved.state,
     transition: moved.fact,
-    events: [{
-      type: "CARD_RETURNED_TO_DECK",
-      playerIndex: moved.fact.owner,
-      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position },
-    }],
+    events,
   };
 }
