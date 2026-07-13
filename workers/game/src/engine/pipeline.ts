@@ -40,6 +40,7 @@ import {
 } from "./duration-tracker.js";
 import { log } from "../lib/log.js";
 import { beginEngineResolution, isEngineTerminated } from "./engine-limits.js";
+import { takeEngineTimestamp } from "./execution-context.js";
 
 export interface PipelineResult {
   state: GameState;
@@ -193,11 +194,13 @@ function fireEventsAndTriggers(
     // not enqueue the same triggers a second time here.
     if (pendingEvent.propagation?.triggerScanned) continue;
 
+    const timed = takeEngineTimestamp(state);
+    state = timed.state;
     const gameEvent = {
       type: pendingEvent.type,
       playerIndex: pendingEvent.playerIndex ?? pi,
       payload: pendingEvent.payload ?? {},
-      timestamp: Date.now(),
+      timestamp: timed.timestamp,
     } as GameEvent;
 
     // Counter event cards go hand → trash and are never registered in the
@@ -410,15 +413,16 @@ function recordAction(
   action: GameAction,
   actedCard?: ActedCardSnapshot,
 ): GameState {
+  const timed = takeEngineTimestamp(state);
   return {
-    ...state,
+    ...timed.state,
     turn: {
-      ...state.turn,
+      ...timed.state.turn,
       actionsPerformedThisTurn: [
-        ...state.turn.actionsPerformedThisTurn,
+        ...timed.state.turn.actionsPerformedThisTurn,
         {
           actionType: action.type,
-          timestamp: Date.now(),
+          timestamp: timed.timestamp,
           // OPT-443: card-acting actions carry who acted and a printed-property
           // snapshot so ACTIVATED_EVENT / PLAYED_CHARACTER / USED_BLOCKER
           // conditions can scope by controller, category, and base cost.

@@ -7,10 +7,11 @@ import type { Action, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { resolveAmount, shuffleArray } from "../action-utils.js";
+import { resolveAmount } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
+import { shuffleWithEngineContext } from "../../execution-context.js";
 
 export function executePlaceHandToDeck(
   state: GameState,
@@ -167,12 +168,12 @@ export function executeShuffleDeck(
     ? (controller === 0 ? 1 : 0) as 0 | 1
     : controller;
   const p = state.players[targetController];
-  const shuffled = shuffleArray([...p.deck]);
+  const shuffled = shuffleWithEngineContext(state, p.deck);
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[targetController] = { ...p, deck: shuffled };
+  newPlayers[targetController] = { ...p, deck: shuffled.values };
 
   return {
-    state: { ...state, players: newPlayers },
+    state: { ...shuffled.state, players: newPlayers },
     events,
     succeeded: true,
   };
@@ -378,8 +379,10 @@ export function executeSearchAndPlay(
     }
     if (shuffleAfter) {
       const pp = nextState.players[controller];
+      const shuffled = shuffleWithEngineContext(nextState, pp.deck);
+      nextState = shuffled.state;
       const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-      newPlayers[controller] = { ...pp, deck: shuffleArray([...pp.deck]) };
+      newPlayers[controller] = { ...pp, deck: shuffled.values };
       nextState = { ...nextState, players: newPlayers };
     }
     return { state: nextState, events, succeeded: false };

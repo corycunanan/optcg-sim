@@ -140,7 +140,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **3-1-2.** "The field" = Leader + Character + Stage + Cost areas | **IMPL** | `state.ts → isOnField()` | Returns true for LEADER, CHARACTER, STAGE, COST_AREA |
 | **3-1-4.** Card counts are open info | **IMPL** | `PlayerState` has all zone arrays; client can count | |
 | **3-1-5.** Open vs secret areas | **IMPL** | `state.ts → isOpenArea()`, `isSecretArea()` | Open: LEADER, CHARACTER, STAGE, COST_AREA, DON_DECK, TRASH. Secret: HAND, DECK, LIFE |
-| **3-1-6.** Zone transition strips effects, new card identity | **IMPL** | `state.ts → moveCard()` | New `instanceId` via `nanoid()`, `attachedDon` cleared, state reset to ACTIVE |
+| **3-1-6.** Zone transition strips effects, new card identity | **IMPL** | `zone-transition.ts`; `execution-context.ts` | New `instanceId` from the persisted monotonic allocator, `attachedDon` cleared, state reset to ACTIVE |
 | **3-1-6-1.** DON!! zone transition strips effects | **IMPL** | `moveCard()` strips `attachedDon` | |
 | **3-1-7.** Owner decides order of simultaneous placements | **PARTIAL** | `trigger-ordering.ts` | Trigger ordering exists; simultaneous zone placement ordering not fully covered |
 | **3-1-8.** Order hidden when multiple cards go secret→secret | **GAP** | — | No visibility control for simultaneous zone transitions |

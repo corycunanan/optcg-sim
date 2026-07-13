@@ -20,11 +20,16 @@ import type {
   LifeCard,
   PlayerInitData,
   TurnState,
+  EngineExecutionContext,
 } from "../types.js";
 import type { EffectSchema } from "./effect-types.js";
-import { nanoid } from "../util/nanoid.js";
 import { injectSchemasIntoCardDb } from "./schema-registry.js";
 import { registerTriggersForCard, registerReplacementsForCard, registerPermanentEffectsForCard } from "./triggers.js";
+import {
+  allocateContextId,
+  createDeterministicExecutionContext,
+  shuffleWithContext,
+} from "./execution-context.js";
 
 const DEFAULT_DON_DECK_SIZE = 10;
 const OPENING_HAND_SIZE = 5;
@@ -57,7 +62,10 @@ function resolveDonDeckSize(leaderData: CardData | undefined): number {
  * START_OF_GAME_EFFECT rule_modifications are available the moment the FSM
  * enters the START_OF_GAME_FX phase (before the hand is dealt).
  */
-export function prepareDecksAndLeaders(payload: GameInitPayload): {
+export function prepareDecksAndLeaders(
+  payload: GameInitPayload,
+  initialExecutionContext: EngineExecutionContext = createDeterministicExecutionContext(payload.gameId),
+): {
   state: GameState;
   cardDb: Map<string, CardData>;
 } {
@@ -72,34 +80,41 @@ export function prepareDecksAndLeaders(payload: GameInitPayload): {
 
   injectSchemasIntoCardDb(cardDb);
 
-  const [p0State, p0Deck] = buildPlayerDeck(payload.player1, 0 as const, cardDb);
-  const [p1State, p1Deck] = buildPlayerDeck(payload.player2, 1 as const, cardDb);
+  let executionContext = initialExecutionContext;
+  const p0Built = buildPlayerDeck(payload.player1, 0 as const, cardDb, executionContext);
+  executionContext = p0Built.executionContext;
+  const p1Built = buildPlayerDeck(payload.player2, 1 as const, cardDb, executionContext);
+  executionContext = p1Built.executionContext;
 
   const leader0Data = cardDb.get(payload.player1.leader.cardId);
   const leader1Data = cardDb.get(payload.player2.leader.cardId);
   const leaderLife0 = leader0Data?.life ?? leader0Data?.cost ?? 5;
   const leaderLife1 = leader1Data?.life ?? leader1Data?.cost ?? 5;
 
-  const arrangedDeck0 = arrangeDeck(p0Deck, leaderLife0, payload.player1.testOrder);
-  const arrangedDeck1 = arrangeDeck(p1Deck, leaderLife1, payload.player2.testOrder);
+  const arranged0 = arrangeDeck(p0Built.deck, leaderLife0, payload.player1.testOrder, executionContext);
+  executionContext = arranged0.executionContext;
+  const arranged1 = arrangeDeck(p1Built.deck, leaderLife1, payload.player2.testOrder, executionContext);
+  executionContext = arranged1.executionContext;
 
-  const donDeck0 = buildDonDeck(0 as const, resolveDonDeckSize(leader0Data));
-  const donDeck1 = buildDonDeck(1 as const, resolveDonDeckSize(leader1Data));
+  const don0 = buildDonDeck(executionContext, resolveDonDeckSize(leader0Data));
+  executionContext = don0.executionContext;
+  const don1 = buildDonDeck(executionContext, resolveDonDeckSize(leader1Data));
+  executionContext = don1.executionContext;
 
   const player0 = {
-    ...p0State,
+    ...p0Built.player,
     hand: [] as CardInstance[],
-    deck: arrangedDeck0,
+    deck: arranged0.deck,
     life: [] as LifeCard[],
-    donDeck: donDeck0,
+    donDeck: don0.deck,
   };
 
   const player1 = {
-    ...p1State,
+    ...p1Built.player,
     hand: [] as CardInstance[],
-    deck: arrangedDeck1,
+    deck: arranged1.deck,
     life: [] as LifeCard[],
-    donDeck: donDeck1,
+    donDeck: don1.deck,
   };
 
   const turn: TurnState = {
@@ -116,6 +131,7 @@ export function prepareDecksAndLeaders(payload: GameInitPayload): {
 
   let state: GameState = {
     id: payload.gameId,
+    executionContext,
     players: [player0, player1],
     turn,
     pregame: null,
@@ -153,10 +169,10 @@ export function prepareDecksAndLeaders(payload: GameInitPayload): {
  */
 export function dealOpeningHand(state: GameState, playerIndex: 0 | 1): GameState {
   const player = state.players[playerIndex];
-  const [hand, remaining] = drawN(player.deck, OPENING_HAND_SIZE);
+  const drawn = drawN(player.deck, OPENING_HAND_SIZE, state.executionContext);
   const newPlayers = [...state.players] as typeof state.players;
-  newPlayers[playerIndex] = { ...player, hand, deck: remaining };
-  return { ...state, players: newPlayers };
+  newPlayers[playerIndex] = { ...player, hand: drawn.cards, deck: drawn.remaining };
+  return { ...state, players: newPlayers, executionContext: drawn.executionContext };
 }
 
 /**
@@ -170,17 +186,19 @@ export function placeLifeCards(
   cardDb: Map<string, CardData>,
 ): GameState {
   const newPlayers = [...state.players] as typeof state.players;
+  let executionContext = state.executionContext;
   for (const playerIndex of [0, 1] as const) {
     const player = newPlayers[playerIndex];
     const leaderData = cardDb.get(player.leader.cardId);
     const leaderLife = leaderData?.life ?? leaderData?.cost ?? 5;
-    const [lifeCards, remainingDeck] = drawN(player.deck, leaderLife);
-    const life: LifeCard[] = lifeCards
+    const drawn = drawN(player.deck, leaderLife, executionContext);
+    executionContext = drawn.executionContext;
+    const life: LifeCard[] = drawn.cards
       .map((c) => ({ instanceId: c.instanceId, cardId: c.cardId, face: "DOWN" as const }))
       .reverse();
-    newPlayers[playerIndex] = { ...player, life, deck: remainingDeck };
+    newPlayers[playerIndex] = { ...player, life, deck: drawn.remaining };
   }
-  return { ...state, players: newPlayers };
+  return { ...state, players: newPlayers, executionContext };
 }
 
 /**
@@ -189,11 +207,14 @@ export function placeLifeCards(
  * tests and non-PVP entry points that don't exercise the priority / mulligan
  * UX. PVP games drive the FSM in `engine/pregame.ts` instead.
  */
-export function buildInitialState(payload: GameInitPayload): {
+export function buildInitialState(
+  payload: GameInitPayload,
+  initialExecutionContext?: EngineExecutionContext,
+): {
   state: GameState;
   cardDb: Map<string, CardData>;
 } {
-  const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
+  const { state: prepared, cardDb } = prepareDecksAndLeaders(payload, initialExecutionContext);
   let state = dealOpeningHand(prepared, 0);
   state = dealOpeningHand(state, 1);
   state = placeLifeCards(state, cardDb);
@@ -211,27 +232,33 @@ export function applyMulligan(
   playerIndex: 0 | 1,
 ): GameState {
   const player = state.players[playerIndex];
+  let executionContext = state.executionContext;
 
   // Return hand to deck and reshuffle
-  const returned = player.hand.map((card) => ({
-    ...card,
-    instanceId: nanoid(),
-    zone: "DECK" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: card.owner,
-  }));
+  const returned = player.hand.map((card) => {
+    const allocated = allocateContextId(executionContext, "card");
+    executionContext = allocated.context;
+    return {
+      ...card,
+      instanceId: allocated.id,
+      zone: "DECK" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: card.owner,
+    };
+  });
   const combined = [...returned, ...player.deck];
-  const reshuffled = shuffleDeck(combined);
+  const shuffled = shuffleWithContext(executionContext, combined);
+  executionContext = shuffled.context;
 
   // Draw 5 new cards
-  const [newHand, newDeck] = drawN(reshuffled, 5);
+  const drawn = drawN(shuffled.values, 5, executionContext);
 
   const newPlayers = [...state.players] as typeof state.players;
-  newPlayers[playerIndex] = { ...player, hand: newHand, deck: newDeck };
+  newPlayers[playerIndex] = { ...player, hand: drawn.cards, deck: drawn.remaining };
 
-  return { ...state, players: newPlayers };
+  return { ...state, players: newPlayers, executionContext: drawn.executionContext };
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
@@ -242,11 +269,15 @@ function buildPlayerDeck(
   playerData: PlayerInitData,
   playerIndex: 0 | 1,
   cardDb: Map<string, CardData>,
-): [PartialPlayerState, CardInstance[]] {
+  initialExecutionContext: EngineExecutionContext,
+): { player: PartialPlayerState; deck: CardInstance[]; executionContext: EngineExecutionContext } {
   void cardDb;
+  let executionContext = initialExecutionContext;
+  const leaderId = allocateContextId(executionContext, "card");
+  executionContext = leaderId.context;
 
   const leader: CardInstance = {
-    instanceId: nanoid(),
+    instanceId: leaderId.id,
     cardId: playerData.leader.cardId,
     zone: "LEADER",
     state: "ACTIVE",
@@ -260,8 +291,10 @@ function buildPlayerDeck(
   const deckCards: CardInstance[] = [];
   for (const entry of playerData.deck) {
     for (let i = 0; i < entry.quantity; i++) {
+      const allocated = allocateContextId(executionContext, "card");
+      executionContext = allocated.context;
       deckCards.push({
-        instanceId: nanoid(),
+        instanceId: allocated.id,
         cardId: entry.cardId,
         zone: "DECK",
         state: "ACTIVE",
@@ -294,16 +327,20 @@ function buildPlayerDeck(
     donArtUrl: playerData.donArtUrl ?? null,
   };
 
-  return [partialState, deckCards];
+  return { player: partialState, deck: deckCards, executionContext };
 }
 
-function buildDonDeck(owner: 0 | 1, size: number = DEFAULT_DON_DECK_SIZE): DonInstance[] {
-  return Array.from({ length: size }, () => ({
-    instanceId: nanoid(),
-    state: "ACTIVE" as const,
-    attachedTo: null,
-  }));
-  void owner;
+function buildDonDeck(
+  initialExecutionContext: EngineExecutionContext,
+  size: number = DEFAULT_DON_DECK_SIZE,
+): { deck: DonInstance[]; executionContext: EngineExecutionContext } {
+  let executionContext = initialExecutionContext;
+  const deck = Array.from({ length: size }, () => {
+    const allocated = allocateContextId(executionContext, "don");
+    executionContext = allocated.context;
+    return { instanceId: allocated.id, state: "ACTIVE" as const, attachedTo: null };
+  });
+  return { deck, executionContext };
 }
 
 /**
@@ -321,12 +358,17 @@ function arrangeDeck(
   expandedDeck: CardInstance[],
   leaderLife: number,
   testOrder?: { life: string[]; hand: string[] } | null,
-): CardInstance[] {
-  if (!testOrder) return shuffleDeck(expandedDeck);
+  initialExecutionContext: EngineExecutionContext = createDeterministicExecutionContext("setup"),
+): { deck: CardInstance[]; executionContext: EngineExecutionContext } {
+  if (!testOrder) {
+    const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
+    return { deck: shuffled.values, executionContext: shuffled.context };
+  }
 
   if (testOrder.life.length !== leaderLife || testOrder.hand.length !== OPENING_HAND_SIZE) {
     console.warn("Invalid testOrder size, falling back to shuffle");
-    return shuffleDeck(expandedDeck);
+    const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
+    return { deck: shuffled.values, executionContext: shuffled.context };
   }
 
   const pool = new Map<string, CardInstance[]>();
@@ -347,7 +389,8 @@ function arrangeDeck(
     const instance = consume(cardId);
     if (!instance) {
       console.warn("Invalid testOrder.hand card, falling back to shuffle");
-      return shuffleDeck(expandedDeck);
+      const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
+      return { deck: shuffled.values, executionContext: shuffled.context };
     }
     handInstances.push(instance);
   }
@@ -357,37 +400,42 @@ function arrangeDeck(
     const instance = consume(cardId);
     if (!instance) {
       console.warn("Invalid testOrder.life card, falling back to shuffle");
-      return shuffleDeck(expandedDeck);
+      const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
+      return { deck: shuffled.values, executionContext: shuffled.context };
     }
     lifeInstances.push(instance);
   }
 
   const rest: CardInstance[] = [];
   for (const arr of pool.values()) rest.push(...arr);
-  return [...handInstances, ...lifeInstances, ...shuffleDeck(rest)];
+  const shuffled = shuffleWithContext(initialExecutionContext, rest);
+  return {
+    deck: [...handInstances, ...lifeInstances, ...shuffled.values],
+    executionContext: shuffled.context,
+  };
 }
 
-function shuffleDeck(cards: CardInstance[]): CardInstance[] {
-  const arr = [...cards];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function drawN(deck: CardInstance[], n: number): [CardInstance[], CardInstance[]] {
+function drawN(
+  deck: CardInstance[],
+  n: number,
+  initialExecutionContext: EngineExecutionContext,
+): { cards: CardInstance[]; remaining: CardInstance[]; executionContext: EngineExecutionContext } {
+  let executionContext = initialExecutionContext;
   // Setup precedes a complete GameState, so it cannot call transitionCard;
   // apply the same identity boundary while dealing the opening hand.
-  const hand = deck.slice(0, n).map((c) => ({
-    ...c,
-    instanceId: nanoid(),
-    zone: "HAND" as const,
-    state: "ACTIVE" as const,
-    attachedDon: [],
-    turnPlayed: null,
-    controller: c.owner,
-  }));
+  const hand = deck.slice(0, n).map((c) => {
+    const allocated = allocateContextId(executionContext, "card");
+    executionContext = allocated.context;
+    return {
+      ...c,
+      instanceId: allocated.id,
+      zone: "HAND" as const,
+      state: "ACTIVE" as const,
+      attachedDon: [],
+      turnPlayed: null,
+      controller: c.owner,
+    };
+  });
   const remaining = deck.slice(n);
-  return [hand, remaining];
+  return { cards: hand, remaining, executionContext };
 }

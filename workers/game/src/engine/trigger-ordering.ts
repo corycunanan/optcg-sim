@@ -18,6 +18,7 @@ import { isEngineTerminated } from "./engine-limits.js";
 import { findCardInstance } from "./state.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
 import { withTriggerScanned } from "./events.js";
+import { takeEngineTimestamp } from "./execution-context.js";
 
 // ─── scanEventsForTriggers ──────────────────────────────────────────────────
 
@@ -61,11 +62,13 @@ export function scanEventsForTriggers(
     // same triggers a second time.
     if (event.propagation?.triggerScanned) continue;
 
+    const timed = takeEngineTimestamp(nextState);
+    nextState = timed.state;
     const gameEvent = {
       type: event.type,
       playerIndex: event.playerIndex ?? defaultController,
       payload: event.payload ?? {},
-      timestamp: Date.now(),
+      timestamp: timed.timestamp,
     } as import("../types.js").GameEvent;
 
     const matched = matchTriggersForEvent(nextState, gameEvent, cardDb);
@@ -118,8 +121,9 @@ export function buildTriggerSelectionPrompt(
     choices.push({ id: "done", label: "Done — skip remaining triggers" });
   }
 
+  const frameId = generateFrameId(state);
   const frame: EffectStackFrame = {
-    id: generateFrameId(),
+    id: frameId.id,
     sourceCardInstanceId: triggers[0].sourceCardInstanceId,
     controller,
     effectBlock: triggers[0].effectBlock as EffectBlock,
@@ -138,7 +142,7 @@ export function buildTriggerSelectionPrompt(
     accumulatedEvents: [],
   };
 
-  const nextState = pushFrame(state, frame);
+  const nextState = pushFrame(frameId.state, frame);
   if (isEngineTerminated(nextState)) return { state: nextState };
 
   const pendingPrompt: PendingPromptState = {

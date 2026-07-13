@@ -36,6 +36,7 @@ import type {
   PartialPlayerState,
 } from "@/lib/sandbox/scenarios/types";
 import { runPipeline } from "@engine/engine/pipeline";
+import { createSandboxExecutionContext } from "@/lib/sandbox/execution-context";
 import type {
   SandboxGameSession,
   SandboxGameSessionGame,
@@ -62,6 +63,7 @@ export interface SandboxEngineSession {
 export function hydrateToGameState(partial: PartialGameState): GameState {
   return {
     id: "sandbox",
+    executionContext: createSandboxExecutionContext(),
     players: [
       hydratePlayer(partial.players[0]),
       hydratePlayer(partial.players[1]),

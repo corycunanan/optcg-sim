@@ -22,17 +22,6 @@ const THIS_WAY_TO_COST_REF: Record<string, string> = {
   CARDS_PLACED_TO_DECK_THIS_WAY: "__cost_cards_placed_to_deck",
 };
 
-// ─── Shuffle ──────────────────────────────────────────────────────────────────
-
-export function shuffleArray<T>(array: T[]): T[] {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
 // ─── Choice Label Generation ─────────────────────────────────────────────────
 
 export const ACTION_LABELS: Record<string, string> = {

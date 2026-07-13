@@ -16,8 +16,8 @@ import type {
   GameAction,
   PendingEvent,
 } from "../../../types.js";
-import { shuffleArray } from "../action-utils.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
+import { shuffleWithEngineContext } from "../../execution-context.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -321,7 +321,9 @@ export function handleArrangeSearchAndPlay(
   }
 
   if (shuffleAfter) {
-    newDeck = shuffleArray(newDeck);
+    const shuffled = shuffleWithEngineContext(nextState, newDeck);
+    nextState = shuffled.state;
+    newDeck = shuffled.values;
   }
 
   const current = nextState.players[controller];

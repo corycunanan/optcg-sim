@@ -17,11 +17,13 @@ import {
 } from "../engine/effect-stack.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 import type { EffectStackFrame, GameState } from "../types.js";
+import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 function emptyState(): GameState {
   return {
+    executionContext: createDeterministicExecutionContext("effect-stack-test"),
     effectStack: [],
     eventLog: [],
     pendingPrompt: null,
@@ -197,12 +199,17 @@ describe("updateTopFrame", () => {
 describe("generateFrameId", () => {
   it("produces unique ids across rapid calls", () => {
     const ids = new Set<string>();
-    for (let i = 0; i < 1000; i++) ids.add(generateFrameId());
+    let state = emptyState();
+    for (let i = 0; i < 1000; i++) {
+      const generated = generateFrameId(state);
+      state = generated.state;
+      ids.add(generated.id);
+    }
     expect(ids.size).toBe(1000);
   });
 
-  it("ids follow the ef_<ts>_<n> shape", () => {
-    const id = generateFrameId();
-    expect(id).toMatch(/^ef_\d+_\d+$/);
+  it("ids follow the persisted monotonic ef namespace", () => {
+    const { id } = generateFrameId(emptyState());
+    expect(id).toMatch(/^ef_[0-9a-z]{8}$/);
   });
 });

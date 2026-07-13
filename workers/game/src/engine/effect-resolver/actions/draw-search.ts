@@ -6,10 +6,11 @@ import type { Action, EffectResult, TargetFilter } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
-import { resolveAmount, shuffleArray } from "../action-utils.js";
+import { resolveAmount } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
+import { shuffleWithEngineContext } from "../../execution-context.js";
 
 export function executeDraw(
   state: GameState,
@@ -217,10 +218,10 @@ export function executeFullDeckSearch(
   if (validTargets.length === 0) {
     // No matching cards — still shuffle if required
     if (shuffleAfter) {
-      const shuffled = shuffleArray([...p.deck]);
+      const shuffled = shuffleWithEngineContext(state, p.deck);
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[controller] = { ...p, deck: shuffled };
-      return { state: { ...state, players: newPlayers }, events, succeeded: false };
+      newPlayers[controller] = { ...p, deck: shuffled.values };
+      return { state: { ...shuffled.state, players: newPlayers }, events, succeeded: false };
     }
     return { state, events, succeeded: false };
   }

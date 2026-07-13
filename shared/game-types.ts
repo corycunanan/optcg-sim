@@ -456,10 +456,28 @@ export interface PregameState {
   mulliganDecisions: [boolean | null, boolean | null];
 }
 
+export interface EngineExecutionContext {
+  version: 1;
+  /** Persisted seed used to reproduce every pseudo-random outcome. */
+  seed: string;
+  /** Current deterministic PRNG state. */
+  rngState: number;
+  /** Monotonic namespace shared by cards, frames, prompts, and runtime effects. */
+  idCounter: number;
+  /** Persisted logical clock origin and monotonic offset. */
+  clockEpochMs: number;
+  clockCounter: number;
+  /** Resolver action budget, persisted across prompts. */
+  actionBudget: { limit: number; consumed: number };
+  /** Replay/diagnostic correlation metadata. */
+  trace: { gameId: string; traceId: string };
+}
+
 // ─── Game State ───────────────────────────────────────────────────────────────
 
 export interface GameState {
   id: string;
+  executionContext: EngineExecutionContext;
   players: [PlayerState, PlayerState];
   turn: TurnState;
   // OPT-366: pre-game flow state. null once the game is past §5-2-1-8.

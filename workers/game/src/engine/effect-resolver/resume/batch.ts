@@ -22,10 +22,10 @@ import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { executeActionChain } from "../resolver.js";
 import { executePlayCard, executeSetRest } from "../actions/play.js";
 import { executeKO } from "../actions/removal.js";
-import { nanoid } from "../../../util/nanoid.js";
 import type { EffectResolverResult, ActionResult } from "../types.js";
 import { processRemainingTriggers } from "./triggers.js";
 import { replacePendingEventReferences } from "../../events.js";
+import { generateFrameId } from "../../effect-stack.js";
 
 /**
  * Loop in case the re-entered handler completes cleanly (no prompt, no new
@@ -187,8 +187,9 @@ export function pushBatchResumeFrame(
   remainingActions: Action[],
   resultRefs: Map<string, EffectResult>,
 ): GameState {
+  const generated = generateFrameId(state);
   const frame: EffectStackFrame = {
-    id: nanoid(),
+    id: generated.id,
     sourceCardInstanceId,
     controller,
     effectBlock,
@@ -207,5 +208,5 @@ export function pushBatchResumeFrame(
     accumulatedEvents: [],
     batchResumeMarker: marker,
   };
-  return pushFrame(state, frame);
+  return pushFrame(generated.state, frame);
 }

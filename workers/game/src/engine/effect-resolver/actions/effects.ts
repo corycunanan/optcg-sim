@@ -12,7 +12,7 @@ import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { resolveAmount, computeExpiry, computeProhibitionExpiry } from "../action-utils.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
-import { nanoid } from "../../../util/nanoid.js";
+import { allocateEngineId, allocateEngineRecord } from "../../execution-context.js";
 
 export function executeApplyProhibition(
   state: GameState,
@@ -40,8 +40,9 @@ export function executeApplyProhibition(
     targetIds = autoSelectTargets(action.target, allValidIds);
   }
 
+  const allocated = allocateEngineId(state, "prohibition");
   const prohibition: import("../../effect-types.js").RuntimeProhibition = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     prohibitionType: prohibType as any,
@@ -55,7 +56,7 @@ export function executeApplyProhibition(
   };
 
   return {
-    state: { ...state, prohibitions: [...state.prohibitions, prohibition as any] },
+    state: { ...allocated.state, prohibitions: [...state.prohibitions, prohibition as any] },
     events,
     succeeded: true,
   };
@@ -75,8 +76,9 @@ export function executeScheduleAction(
   const scheduledAction = params.action as Action;
   const boundTo = params.bound_to as string | null ?? null;
 
+  const allocated = allocateEngineId(state, "scheduled-action");
   const entry: import("../../effect-types.js").RuntimeScheduledAction = {
-    id: nanoid(),
+    id: allocated.id,
     timing: timing as any,
     action: scheduledAction,
     boundToInstanceId: boundTo,
@@ -85,7 +87,7 @@ export function executeScheduleAction(
   };
 
   return {
-    state: { ...state, scheduledActions: [...state.scheduledActions, entry as any] },
+    state: { ...allocated.state, scheduledActions: [...state.scheduledActions, entry as any] },
     events,
     succeeded: true,
   };
@@ -107,8 +109,9 @@ export function executeApplyOneTimeModifier(
 
   if (!modification || !appliesTo) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineId(state, "one-time-modifier");
   const otm: import("../../effect-types.js").RuntimeOneTimeModifier = {
-    id: nanoid(),
+    id: allocated.id,
     appliesTo: appliesTo as any,
     modification,
     expires,
@@ -117,7 +120,7 @@ export function executeApplyOneTimeModifier(
   };
 
   return {
-    state: { ...state, oneTimeModifiers: [...state.oneTimeModifiers, otm as any] },
+    state: { ...allocated.state, oneTimeModifiers: [...state.oneTimeModifiers, otm as any] },
     events,
     succeeded: true,
   };
@@ -146,8 +149,9 @@ export function executeSetCost(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const allocated = allocateEngineRecord(state, "active-effect");
   const effect: RuntimeActiveEffect = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
@@ -156,11 +160,11 @@ export function executeSetCost(
     expiresAt: computeExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
-    timestamp: Date.now(),
+    timestamp: allocated.timestamp,
   };
 
   return {
-    state: { ...state, activeEffects: [...state.activeEffects, effect as any] },
+    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -217,8 +221,9 @@ export function executeNegateTriggerType(
 
   const targetController = affectedController === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
 
+  const allocated = allocateEngineId(state, "prohibition");
   const prohibition: import("../../effect-types.js").RuntimeProhibition = {
-    id: nanoid(),
+    id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     prohibitionType: prohibType as any,
@@ -233,7 +238,7 @@ export function executeNegateTriggerType(
   };
 
   return {
-    state: { ...state, prohibitions: [...state.prohibitions, prohibition as any] },
+    state: { ...allocated.state, prohibitions: [...state.prohibitions, prohibition as any] },
     events,
     succeeded: true,
   };

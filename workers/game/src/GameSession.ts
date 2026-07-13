@@ -113,10 +113,10 @@ function validateArrangeResponse(
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import {
   advancePregame,
-  defaultPregameRng,
   resumePregameFromPrompt,
   startPregame,
 } from "./engine/pregame.js";
+import { allocateEngineId, createProductionExecutionContext } from "./engine/execution-context.js";
 import { continuePipelineFromExecution, runPipeline } from "./engine/pipeline.js";
 import {
   continueReplacementBatchAfterSubstitute,
@@ -302,7 +302,10 @@ export class GameSession implements DurableObject {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
+    const { state: prepared, cardDb } = prepareDecksAndLeaders(
+      payload,
+      createProductionExecutionContext(payload.gameId),
+    );
 
     this.cardDb = cardDb;
     this.gameMode = payload.mode;
@@ -334,7 +337,6 @@ export class GameSession implements DurableObject {
       state,
       this.cardDb,
       this.testPriorityRolls,
-      defaultPregameRng(),
     );
     if (!result.done) return result.state;
     // FSM drained — run normal start-of-turn auto-phases for the first player.
@@ -1497,11 +1499,12 @@ export class GameSession implements DurableObject {
   private async persist(): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
     if (this.gameState.pendingPrompt && !this.gameState.pendingPrompt.promptId) {
+      const allocated = allocateEngineId(this.gameState, "prompt");
       this.gameState = {
-        ...this.gameState,
+        ...allocated.state,
         pendingPrompt: {
           ...this.gameState.pendingPrompt,
-          promptId: crypto.randomUUID(),
+          promptId: allocated.id,
         },
       };
     }

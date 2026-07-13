@@ -8,6 +8,7 @@ import type { EffectSchema, EffectBlock, EffectResult } from "../engine/effect-t
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import { OP07_118_SABO } from "../engine/schemas/op07.js";
+import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 function noKeywords() {
   return { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false };
@@ -79,6 +80,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
 
     const state: GameState = {
       id: "test-op07-118",
+      executionContext: createDeterministicExecutionContext("test-op07-118"),
       status: "IN_PROGRESS",
       winner: null,
       players: [makePlayer(0), makePlayer(1)],

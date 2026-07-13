@@ -17,6 +17,7 @@ import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { OP12_034_PERONA } from "../engine/schemas/op12.js";
 import { CARDS, createTestCardDb } from "./helpers.js";
+import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 function noKeywords() {
   return { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false };
@@ -82,6 +83,7 @@ function buildState(leaderCardId: string, deckCardIds: string[]): GameState {
 
   return {
     id: "test-op12-034",
+    executionContext: createDeterministicExecutionContext("opt-attribute-case"),
     status: "IN_PROGRESS",
     winner: null,
     players: [

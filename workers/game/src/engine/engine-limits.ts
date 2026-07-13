@@ -3,6 +3,7 @@ import type {
   GameState,
 } from "../types.js";
 import { emitEvent } from "./events.js";
+import { ensureExecutionContext } from "./execution-context.js";
 
 export const MAX_EFFECT_STACK_DEPTH = 100;
 export const MAX_RESOLUTION_ACTIONS = 1_000;
@@ -78,24 +79,41 @@ export function consumeResolutionAction(
   sourceCardInstanceId: string,
 ): GameState {
   if (state.status !== "IN_PROGRESS") return state;
-  const observed = (state.engineActionCount ?? 0) + 1;
-  if (observed > MAX_RESOLUTION_ACTIONS) {
-    return terminateForEngineLimit(state, {
+  const current = ensureExecutionContext(state);
+  const observed = Math.max(
+    current.executionContext.actionBudget.consumed,
+    current.engineActionCount ?? 0,
+  ) + 1;
+  const limit = current.executionContext.actionBudget.limit;
+  if (observed > limit) {
+    return terminateForEngineLimit(current, {
       kind: "ACTION_BUDGET",
-      limit: MAX_RESOLUTION_ACTIONS,
+      limit,
       observed,
       actionType,
       sourceCardInstanceId,
     });
   }
-  return { ...state, engineActionCount: observed };
+  return {
+    ...current,
+    engineActionCount: observed,
+    executionContext: {
+      ...current.executionContext,
+      actionBudget: { ...current.executionContext.actionBudget, consumed: observed },
+    },
+  };
 }
 
 export function beginEngineResolution(state: GameState): GameState {
+  const current = ensureExecutionContext(state);
   return {
-    ...state,
+    ...current,
     engineActionCount: 0,
     engineOutcome: null,
+    executionContext: {
+      ...current.executionContext,
+      actionBudget: { ...current.executionContext.actionBudget, consumed: 0 },
+    },
   };
 }
 

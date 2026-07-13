@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState, KeywordSet } from "../types.js";
 import type { TreatedAsAllIdentities } from "../engine/effect-types.js";
 import { matchesFilter, evaluateCondition } from "../engine/conditions.js";
+import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 // ─── Card + state factories ──────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ function emptyPlayer(playerId: string, leader: CardInstance): PlayerState {
 function makeState(p0: PlayerState, p1: PlayerState): GameState {
   return {
     id: "g",
+    executionContext: createDeterministicExecutionContext("opt-227"),
     players: [p0, p1],
     turn: { number: 1, activePlayerIndex: 0, phase: "MAIN", battleSubPhase: null, battle: null, oncePerTurnUsed: {}, actionsPerformedThisTurn: [], deckHitZeroThisTurn: [false, false] },
     activeEffects: [],
