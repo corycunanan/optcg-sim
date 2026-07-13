@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CardData, GameInitPayload, GameState } from "../types.js";
+import type { CardData, Env, GameAction, GameInitPayload, GameState } from "../types.js";
+import { GameSession } from "../GameSession.js";
 import { advancePregame, resumePregameFromPrompt, startPregame } from "../engine/pregame.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { prepareDecksAndLeaders } from "../engine/setup.js";
@@ -17,9 +18,35 @@ const IMU: CardData = {
 
 const MARY_GEOISE: CardData = {
   ...CARDS.STAGE,
-  id: "MARY-GEOISE-STAGE",
+  id: "OP05-097",
   name: "Mary Geoise",
   types: ["Mary Geoise"],
+};
+
+class MockWebSocket {
+  sent: string[] = [];
+  send(payload: string): void { this.sent.push(payload); }
+  close(): void {}
+  serializeAttachment(): void {}
+  deserializeAttachment(): unknown { return null; }
+}
+
+class MockDurableObjectState {
+  storage = {
+    put: async () => undefined,
+    get: async () => undefined,
+    setAlarm: async () => undefined,
+    deleteAlarm: async () => undefined,
+  };
+  acceptWebSocket(): void {}
+  getWebSockets(): WebSocket[] { return []; }
+  getTags(): string[] { return []; }
+}
+
+type TestSession = {
+  gameState: GameState;
+  cardDb: Map<string, CardData>;
+  handleAction(ws: WebSocket, playerIndex: 0 | 1, action: GameAction): Promise<void>;
 };
 
 function withImu(
@@ -115,6 +142,40 @@ describe("OPT-476 start-of-game effects", () => {
     expect(dealt.pregame?.startOfGameEffectsResolved).toEqual([true, true]);
     expect(dealt.players[0].hand).toHaveLength(5);
     expect(dealt.players[1].hand).toHaveLength(5);
+  });
+
+  it("routes the resumed Stage play through the pipeline before pregame advances", async () => {
+    const { state, cardDb } = buildState([true, false], [true, false]);
+    const chosen = chooseFirstPlayer(state, cardDb, "FIRST");
+    const prompted = advancePregame(chosen, cardDb, [], FIXED_RNG).state;
+    const prompt = prompted.pendingPrompt;
+    if (!prompt || prompt.options.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Expected Mary Geoise search prompt");
+    }
+    const revealedIds = prompt.options.cards.map((card) => card.instanceId);
+    const session = new GameSession(
+      new MockDurableObjectState() as unknown as DurableObjectState,
+      { GAME_WORKER_SECRET: "test", NEXTJS_URL: "https://app.example.test" } as Env,
+    ) as unknown as TestSession;
+    session.gameState = prompted;
+    session.cardDb = cardDb;
+
+    await session.handleAction(new MockWebSocket() as unknown as WebSocket, 0, {
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: revealedIds[0],
+      orderedInstanceIds: revealedIds.slice(1),
+      destination: "bottom",
+    });
+
+    const stage = session.gameState.players[0].stage;
+    expect(stage?.cardId).toBe(MARY_GEOISE.id);
+    expect(session.gameState.activeEffects).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceCardInstanceId: stage?.instanceId,
+        sourceEffectBlockId: "permanent_play_cost_reduction",
+      }),
+    ]));
+    expect(session.gameState.pregame?.phase).toBe("MULLIGAN_DECISIONS");
   });
 
   it("allows the optional play to be declined and still shuffles the deck", () => {

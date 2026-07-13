@@ -1065,7 +1065,19 @@ export class GameSession implements DurableObject {
         this.gameState = stateBeforeResume;
         responseRejected = true;
       } else {
-        resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
+        if (resumeResult.events.length > 0) {
+          const pipelineResult = continuePipelineFromExecution(
+            this.gameState,
+            { state: this.gameState, events: resumeResult.events },
+            this.cardDb,
+            respondingPlayer,
+          );
+          this.gameState = pipelineResult.state;
+          resumedGameOver = pipelineResult.gameOver ?? resumedGameOver;
+        }
+        if (!this.gameState.pendingPrompt && !resumedGameOver) {
+          resumedGameOver = this.completeReplacementBatchContinuation(resumedFrame) ?? resumedGameOver;
+        }
         if (!this.gameState.pendingPrompt && !resumedGameOver) {
           resumedGameOver = this.resumeInterruptedEffectContinuations(action) ?? resumedGameOver;
         }
