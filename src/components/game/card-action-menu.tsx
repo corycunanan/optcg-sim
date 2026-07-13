@@ -8,10 +8,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui";
+import type { ActivateMainState } from "@/lib/game/activate-main";
 
 interface CardActionMenuContentProps {
   card: CardInstance;
   cardDb: CardDb;
+  activation: ActivateMainState | null;
+  canActivateNow: boolean;
   onAction: (action: GameAction) => void;
   onClose: () => void;
 }
@@ -23,35 +26,33 @@ interface CardActionMenuContentProps {
 export function CardActionMenuContent({
   card,
   cardDb,
+  activation,
+  canActivateNow,
   onAction,
   onClose,
 }: CardActionMenuContentProps) {
   const data = cardDb[card.cardId];
-  const schema = data?.effectSchema as {
-    effects?: Array<{
-      id: string;
-      category: string;
-      trigger?: { keyword?: string };
-    }>;
-  } | null;
-
-  const activateBlock = schema?.effects?.find(
-    (e) =>
-      e.category === "activate" &&
-      e.trigger?.keyword === "ACTIVATE_MAIN",
-  );
-
-  const hasMainEffect = !!activateBlock;
+  const hasMainEffect = !!activation;
+  const activationDisabled =
+    !activation || !canActivateNow || activation.usedThisTurn;
 
   const handleActivate = useCallback(() => {
-    if (!hasMainEffect || !activateBlock) return;
+    if (!activation || activationDisabled) return;
     onAction({
       type: "ACTIVATE_EFFECT",
       cardInstanceId: card.instanceId,
-      effectId: activateBlock.id,
+      effectId: activation.effectId,
     });
     onClose();
-  }, [hasMainEffect, activateBlock, card.instanceId, onAction, onClose]);
+  }, [activation, activationDisabled, card.instanceId, onAction, onClose]);
+
+  const actionLabel = !activation
+    ? "No [Main] effect"
+    : activation.usedThisTurn
+      ? "Used this turn"
+      : !canActivateNow
+        ? "Available during your Main phase"
+        : "Activate [Main] effect";
 
   return (
     <DropdownMenuContent
@@ -69,15 +70,13 @@ export function CardActionMenuContent({
       <DropdownMenuSeparator className="bg-gb-border" />
       <DropdownMenuItem
         onClick={handleActivate}
-        disabled={!hasMainEffect}
+        disabled={activationDisabled}
         className="text-sm text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised"
       >
         <span className="text-xs shrink-0">
           {hasMainEffect ? "\u26A1" : "\u2014"}
         </span>
-        <span>
-          {hasMainEffect ? "Activate [Main] effect" : "No [Main] effect"}
-        </span>
+        <span>{actionLabel}</span>
       </DropdownMenuItem>
     </DropdownMenuContent>
   );

@@ -19,13 +19,14 @@ type SandboxCardInput = Omit<
   "keywords" | "effectSchema" | "imageUrl"
 > & {
   imageUrl?: string;
+  effectSchema?: unknown;
 };
 
 function build(input: SandboxCardInput): CardData {
   return {
     ...input,
     keywords: extractKeywords(input.effectText, input.triggerText),
-    effectSchema: null,
+    effectSchema: input.effectSchema ?? null,
     imageUrl: input.imageUrl ?? `${IMG_BASE}/${input.id}.webp`,
   };
 }
@@ -75,6 +76,16 @@ const SANDBOX_CARDS: SandboxCardInput[] = [
     effectText:
       "[Activate: Main] [Once Per Turn] You can trash 1 {Land of Wano} type card from your hand: Set up to 2 of your DON!! cards as active.",
     triggerText: null,
+    effectSchema: {
+      effects: [
+        {
+          id: "activate_set_don_active",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          flags: { once_per_turn: true },
+        },
+      ],
+    },
   },
 
   // ─── Red roster ─────────────────────────────────────────────
@@ -232,6 +243,26 @@ const SANDBOX_CARDS: SandboxCardInput[] = [
     effectText:
       "[Activate: Main] You may place 2 cards from your hand at the bottom of your deck in any order and rest this Stage: If your Leader has the {Cross Guild} type, draw 2 cards.",
     triggerText: null,
+    effectSchema: {
+      effects: [
+        {
+          id: "activate_draw",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          costs: [
+            { type: "PLACE_HAND_TO_DECK", amount: 2, position: "BOTTOM" },
+            { type: "REST_SELF" },
+          ],
+          post_cost_conditions: {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Cross Guild" },
+          },
+          flags: { optional: true },
+          actions: [{ type: "DRAW", params: { amount: 2 } }],
+        },
+      ],
+    },
   },
 
   // ─── Green roster ───────────────────────────────────────────

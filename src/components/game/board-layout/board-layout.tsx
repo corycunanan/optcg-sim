@@ -502,6 +502,8 @@ function BoardLayoutInner({
             activeDrag={activeDrag}
             refreshWave={refreshWave}
             canInteract={bs.canInteract}
+            canActivateMain={bs.canInteract && !activePrompt}
+            oncePerTurnUsed={turn?.oncePerTurnUsed}
             canDragCounter={bs.canDragCounter}
             inBlockStep={bs.inBlockStep}
             selectedBlockerId={bs.selectedBlockerId}

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
-import type { CardData, CardDb, CardInstance, GameAction } from "@shared/game-types";
+import type { CardData, CardDb, CardInstance, GameAction, TurnState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { canPlayCardInZone } from "@/lib/game/client-legality";
 import { useZonePosition } from "@/contexts/zone-position-context";
@@ -16,6 +16,10 @@ import { DropOverlay } from "./drop-zones";
 import { DonCard } from "./don-zone";
 import { useInteractionMode } from "./interaction-mode";
 import { useCardRejection } from "./action-feedback";
+import {
+  canOpenActivateMainMenu,
+  getActivateMainState,
+} from "@/lib/game/activate-main";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
  *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
@@ -45,6 +49,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   counterDragActive,
   eventDropTarget,
   counterPulse,
+  canActivateMain,
+  oncePerTurnUsed,
   onSelect,
   onAction,
   zoneKey,
@@ -80,6 +86,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   /** Part of the broad own-field play surface while an Event is dragged. */
   eventDropTarget?: boolean;
   counterPulse?: boolean;
+  canActivateMain?: boolean;
+  oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
   zoneKey?: string;
@@ -102,6 +110,21 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const interactionMode = useInteractionMode();
   const inputSuppressed = interactionMode !== "full";
   const rejectionSequence = useCardRejection(card.instanceId);
+  const activation = getActivateMainState(card, cardDb, oncePerTurnUsed);
+  const menuTriggerEnabled =
+    !!onAction &&
+    canOpenActivateMainMenu({
+      hasEffect: !!activation,
+      hasSelectionAction: !!onSelect,
+      inputSuppressed,
+    });
+  const effectAction = activation
+    ? activation.usedThisTurn
+      ? ("used" as const)
+      : canActivateMain && !inputSuppressed
+        ? ("available" as const)
+        : ("unavailable" as const)
+    : undefined;
 
   const {
     attributes,
@@ -196,6 +219,17 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     if (zoneKey) zonePos.registerCard(card.instanceId, zoneKey);
   }, [card.instanceId, zoneKey, zonePos]);
 
+  // Radix opens menus on pointer-down, before dnd-kit's 8px activation
+  // threshold can distinguish a click from a drag. Close that provisional
+  // menu as soon as this card's drag begins so combat owns the gesture.
+  useDndMonitor({
+    onDragStart(event) {
+      if (event.active.id === `attacker-${card.instanceId}`) {
+        setMenuOpen(false);
+      }
+    },
+  });
+
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -249,8 +283,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       : { duration: 0.15, ease: "easeOut" as const };
 
   return (
-    <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
-      <DropdownMenuTrigger asChild>
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+      <DropdownMenuTrigger asChild disabled={!menuTriggerEnabled}>
         <motion.div
           key={rejectionSequence ?? "idle"}
           ref={mergedRef}
@@ -258,6 +292,12 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           {...listeners}
           onClick={onSelect}
           data-blocker-selection={blockerSelectable ? "" : undefined}
+          data-effect-menu-trigger={activation ? card.instanceId : undefined}
+          aria-label={
+            menuTriggerEnabled
+              ? `Actions for ${cardDb[card.cardId]?.name ?? "card"}`
+              : undefined
+          }
           onContextMenu={handleContextMenu}
           initial={initialTarget}
           animate={animateTarget}
@@ -266,7 +306,11 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             ...style,
             width: SQUARE,
             height: SQUARE,
-            cursor: canAttack ? "grab" : blockerSelectable ? "pointer" : "default",
+            cursor: canAttack
+              ? "grab"
+              : blockerSelectable || menuTriggerEnabled
+                ? "pointer"
+                : "default",
           }}
           className="relative flex items-center justify-center rounded-md"
         >
@@ -284,7 +328,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             data={{ card, cardDb }}
             variant="field"
             state={cardState}
-            overlays={{ donCount, highlightRing }}
+            overlays={{ donCount, highlightRing, effectAction }}
             motionDelay={animationDelay}
             className="relative z-[1]"
           />
@@ -313,6 +357,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
         <CardActionMenuContent
           card={card}
           cardDb={cardDb}
+          activation={activation}
+          canActivateNow={effectAction === "available"}
           onAction={onAction}
           onClose={() => setMenuOpen(false)}
         />

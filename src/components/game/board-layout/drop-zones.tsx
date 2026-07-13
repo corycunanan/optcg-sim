@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import type { CardData, CardDb, CardInstance, GameAction } from "@shared/game-types";
+import type { CardData, CardDb, CardInstance, GameAction, TurnState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { canPlayCardInZone } from "@/lib/game/client-legality";
@@ -14,6 +14,7 @@ import { useInteractionMode } from "./interaction-mode";
 import { motion, useReducedMotion } from "motion/react";
 import { cardReject, cardRejectReduced } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
+import { getActivateMainState } from "@/lib/game/activate-main";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
 export function DropOverlay({
@@ -146,6 +147,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   draggedCardType,
   playSignalActive = true,
   eventDropTarget,
+  canActivateMain,
+  oncePerTurnUsed,
   onAction,
   zoneKey,
   style,
@@ -157,6 +160,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   draggedCardType?: CardData["type"];
   playSignalActive?: boolean;
   eventDropTarget?: boolean;
+  canActivateMain?: boolean;
+  oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
   onAction?: (action: GameAction) => void;
   zoneKey: string;
   style: React.CSSProperties;
@@ -169,6 +174,17 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const reducedMotion = useReducedMotion();
   const rejectionSequence = useCardRejection(card?.instanceId ?? "");
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
+  const activation = card
+    ? getActivateMainState(card, cardDb, oncePerTurnUsed)
+    : null;
+  const menuTriggerEnabled = !!activation && !!onAction && !inputSuppressed;
+  const effectAction = activation
+    ? activation.usedThisTurn
+      ? ("used" as const)
+      : canActivateMain && !inputSuppressed
+        ? ("available" as const)
+        : ("unavailable" as const)
+    : undefined;
   const accepts =
     activeDragType === "hand-card" &&
     canPlayCardInZone(draggedCardType, "stage");
@@ -210,19 +226,31 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
         color="blue"
       />
       {card ? (
-        <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setMenuOpen(false); }}>
-          <DropdownMenuTrigger asChild>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild disabled={!menuTriggerEnabled}>
             <motion.div
               key={rejectionSequence ?? "idle"}
               onContextMenu={handleContextMenu}
+              data-effect-menu-trigger={activation ? card.instanceId : undefined}
+              role={menuTriggerEnabled ? "button" : undefined}
+              tabIndex={menuTriggerEnabled ? 0 : undefined}
+              aria-label={
+                menuTriggerEnabled
+                  ? `Actions for ${cardDb[card.cardId]?.name ?? "card"}`
+                  : undefined
+              }
               animate={rejectionSequence ? rejectionAnimation : { x: 0, opacity: 1 }}
               transition={rejectionSequence ? rejectionAnimation.transition : undefined}
-              className="relative z-[1]"
+              className={cn(
+                "relative z-[1]",
+                menuTriggerEnabled && "cursor-pointer",
+              )}
             >
               <Card
                 data={{ card, cardDb }}
                 variant="field"
                 state={card.state === "RESTED" ? "rest" : "active"}
+                overlays={{ effectAction }}
                 motionDelay={animationDelay}
               />
             </motion.div>
@@ -231,6 +259,8 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
             <CardActionMenuContent
               card={card}
               cardDb={cardDb}
+              activation={activation}
+              canActivateNow={effectAction === "available"}
               onAction={onAction}
               onClose={() => setMenuOpen(false)}
             />
