@@ -22,6 +22,22 @@
 
 7. **Explicit runtime services.** Executable resolver dependencies are passed through the typed, immutable `EffectResolverServices` bundle. Runtime functions never enter persisted `GameState`, and replacement execution cannot fall back to a missing module-global dispatcher.
 
+8. **Thin Durable Object boundary.** `GameSession` composes typed session collaborators instead of owning transport, authorization, rate limits, prompt continuation, visibility, and persistence directly. Engine-facing coordinators have no Cloudflare, WebSocket, storage, or network dependency.
+
+## Durable Session Boundary
+
+| Module                        | Contract                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `session/authorization.ts`    | Verifies game-scoped tokens, applies Solitaire side-selection policy, and consumes token JTIs once.             |
+| `session/rate-limiter.ts`     | Owns independent action, malformed-message, and upgrade token buckets without transport side effects.           |
+| `session/transport.ts`        | Owns authoritative sockets, reconnect debounce, prompt delivery, and filtered fan-out.                          |
+| `session/visibility.ts`       | Produces the only per-player state representation allowed across the socket boundary.                           |
+| `session/persistence.ts`      | Saves/restores complete session snapshots, allocates durable prompt IDs, schedules alarms, and reports results. |
+| `session/coordinator.ts`      | Serializes commands and applies session-level action, prompt, turn, undo, and presence policy.                  |
+| `session/prompt-lifecycle.ts` | Drains effect, replacement, pregame, and battle prompt continuations without infrastructure dependencies.       |
+
+`GameSession.ts` remains the Durable Object composition root: it validates HTTP/WebSocket envelopes, invokes these contracts, and orders persistence before client-visible terminal broadcasts.
+
 ---
 
 ## Core Components

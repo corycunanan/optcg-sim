@@ -111,7 +111,7 @@ Deployed as Next.js API routes on Vercel.
 
 Stateful game sessions running on Cloudflare's edge network:
 
-- Each `GameSession` is a Durable Object with its own WebSocket connections and SQLite persistence
+- Each `GameSession` is a thin Durable Object composition root over typed transport, authorization, coordination, visibility, and persistence collaborators
 - Full game rules engine: 7-step action pipeline, effect resolver with 50+ action handlers, trigger system, modifier layers
 - 51 card schema sets loaded via `schema-registry.ts` for automated effect resolution
 - Validates every player action against the rules engine before applying
