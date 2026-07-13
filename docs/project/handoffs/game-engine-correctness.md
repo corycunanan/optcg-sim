@@ -55,19 +55,19 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 37 | OPT-475 | Implement the 19 deferred conditional-reveal card effects or exclude them from playable formats | — | OPT-471, OPT-473 | Done | [#295](https://github.com/corycunanan/optcg-sim/pull/295) | Reconciled 20-card cohort; immutable reveal snapshots, CHOOSE_VALUE, prompt continuations, schemas, and execution matrix. |
 | 38 | OPT-476 | Execute OP13-079 START_OF_GAME_EFFECT in the pregame state machine | — | OPT-471, OPT-473 | Done | [#296](https://github.com/corycunanan/optcg-sim/pull/296) | Persisted first-player-ordered Leader effects; Mary Geoise accept/decline, shuffle, visibility, and reconnect coverage. |
 | 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | Done | [#297](https://github.com/corycunanan/optcg-sim/pull/297) | Persisted RNG/time/ID/budget/trace context with exact replay and restart coverage. |
-| 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | In Review | [#298](https://github.com/corycunanan/optcg-sim/pull/298) | Immutable runtime resolver services; cost façade split into six acyclic modules with architecture guards. |
+| 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Done | [#298](https://github.com/corycunanan/optcg-sim/pull/298) | Immutable runtime resolver services; cost façade split into six acyclic modules with architecture guards. |
 | 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Backlog | — | Thin Durable Object composition boundary. |
 | 42 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
 | 43 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
 | 44 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
 | 45 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Backlog | — | Seventeen newly exposed findings; overlaps OPT-475 where conditional reveals are involved. |
 | 46 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Backlog | — | Remove the tracked source-parity exception after official-source verification. |
-| 47 | OPT-486 | Align Vitest and coverage provider versions | — | — | Backlog | — | Remove the unsupported 4.1.1/4.1.4 coverage-tool mismatch warning. |
+| 47 | OPT-486 | Align Vitest and coverage provider versions | — | — | In Review | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review/merge PR #298. OPT-479 is ready in parallel; OPT-480 waits for both OPT-478 and OPT-479. OPT-484–OPT-486 remain independently ready.
+**Next up:** Review/merge PR #301. OPT-479 is now active; OPT-480 waits for OPT-479. OPT-484 and OPT-485 remain independently ready.
 
 ---
 
@@ -369,3 +369,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep functions out of persisted `GameState.executionContext`; `GameSession` is the production composition boundary and must pass runtime services explicitly. Do not reintroduce initialization-order setters or bypass the cost façade—the architecture test enforces both dependency direction and the exact module inventory.
 - **Unresolved:** OPT-479 owns only the remaining `GameSession` concentration. OPT-480 stays blocked until both architecture tickets merge; OPT-486 still tracks the pre-existing Vitest/coverage-provider mismatch warning.
 - **Pointer:** PR #298; inspect `bce6adb` for the service contract, call-site threading, cost split, architecture gates, and documentation updates.
+
+### OPT-486 → OPT-479
+**From:** session on 2026-07-13 · **Commit:** `2302301` · **PR:** [#301](https://github.com/corycunanan/optcg-sim/pull/301)
+
+- **Primer:** Root and worker Vitest plus the worker V8 coverage provider are pinned exactly to 4.1.4. The regenerated lockfile contains one supported 4.1.4 test/coverage graph, and the worker coverage gate no longer emits the mixed-version warning.
+- **Read first:** `workers/game/src/GameSession.ts`, its focused test files under `workers/game/src/__tests__/`, and the OPT-478 handoff immediately above before choosing collaborator boundaries.
+- **Gotchas / do NOT touch:** Keep `GameSession` as the Durable Object composition root, preserve persisted deterministic execution context from OPT-477, and do not move Cloudflare WebSocket/storage dependencies into engine modules. PR #301 only changes test tooling and can merge independently.
+- **Unresolved:** OPT-479 owns the remaining 1,800-line session responsibility concentration. Its contract tests must cover reconnects, stale prompts, alarms, filtered state, and storage restoration before extraction is considered complete.
+- **Pointer:** PR #301 for the clean Vitest 4.1.4 verification baseline; PR #298 for the runtime service composition pattern that OPT-479 must preserve.
