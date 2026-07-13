@@ -309,7 +309,7 @@ export default function CardPreviewPage() {
                   variant="field"
                   state="active"
                   faceDown={flip(false)}
-                  overlays={{ highlightRing: "blocker" }}
+                  overlays={{ highlightRing: "eligible" }}
                 />
               </Labeled>
               <Labeled label="blocker-selected">

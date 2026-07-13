@@ -25,6 +25,8 @@ import { DonZone } from "./don-zone";
 import { LifeZone } from "./life-zone";
 import { OpponentFieldCard } from "./field-card";
 import { ZoneRef } from "./zone-ref";
+import { cn } from "@/lib/utils";
+import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 
 interface OpponentFieldProps {
   opp: PlayerState | null;
@@ -42,6 +44,8 @@ interface OpponentFieldProps {
   /** Instance IDs currently flying *into* the opponent's trash — hides them
    *  from the top/count until their flight lands (OPT-274). */
   trashArrivingIds?: Set<string>;
+  targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
+  onTargetToggle?: (instanceId: string) => void;
 }
 
 export function OpponentField({
@@ -55,6 +59,8 @@ export function OpponentField({
   counterPulseIds,
   donCountAdjustments,
   trashArrivingIds,
+  targetSelectionById,
+  onTargetToggle,
 }: OpponentFieldProps) {
   const oppTrash = opp?.trash ?? [];
   const visibleTrash =
@@ -63,6 +69,10 @@ export function OpponentField({
       : oppTrash;
   const hasTrash = visibleTrash.length > 0;
   const topTrash = hasTrash ? visibleTrash[0] : undefined;
+  const stage = opp?.stage ?? null;
+  const stageSelection = stage
+    ? targetSelectionById?.get(stage.instanceId)
+    : undefined;
 
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
@@ -106,13 +116,37 @@ export function OpponentField({
 
       {/* Zone 2: Leader row — STG / LDR / DON */}
       <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
-        {opp?.stage ? (
-          <Card
-            variant="field"
-            data={{ card: opp.stage, cardDb }}
-            state={opp.stage.state === "RESTED" ? "rest" : "active"}
-            motionDelay={refreshWave ? 0.18 : undefined}
-          />
+        {stage ? (
+          <div
+            data-target-selection={stageSelection ? "" : undefined}
+            data-target-instance-id={stageSelection ? stage.instanceId : undefined}
+            onClick={
+              stageSelection && !stageSelection.disabledReason
+                ? () => onTargetToggle?.(stage.instanceId)
+                : undefined
+            }
+            className={cn(
+              stageSelection?.disabledReason && "opacity-35",
+              stageSelection && !stageSelection.disabledReason && "cursor-pointer",
+            )}
+          >
+            <Card
+              variant="field"
+              data={{ card: stage, cardDb }}
+              state={stage.state === "RESTED" ? "rest" : "active"}
+              overlays={{
+                highlightRing: stageSelection?.selected
+                  ? "selected"
+                  : stageSelection?.eligible
+                    ? "eligible"
+                    : undefined,
+              }}
+              interaction={{
+                tooltipNotice: stageSelection?.disabledReason ?? undefined,
+              }}
+              motionDelay={refreshWave ? 0.18 : undefined}
+            />
+          </div>
         ) : (
           <span className="text-base font-bold text-gb-text-dim/40 leading-none select-none">
             STG
@@ -129,6 +163,8 @@ export function OpponentField({
           isAttacker={attackerInstanceId === opp.leader.instanceId}
           isDefender={defenderInstanceId === opp.leader.instanceId}
           counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
+          targetSelection={targetSelectionById?.get(opp.leader.instanceId)}
+          onTargetToggle={() => onTargetToggle?.(opp.leader.instanceId)}
           zoneKey="o-leader"
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
@@ -163,6 +199,8 @@ export function OpponentField({
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             counterPulse={counterPulseIds?.has(char.instanceId)}
+            targetSelection={targetSelectionById?.get(char.instanceId)}
+            onTargetToggle={() => onTargetToggle?.(char.instanceId)}
             zoneKey={`o-char-${i}`}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}

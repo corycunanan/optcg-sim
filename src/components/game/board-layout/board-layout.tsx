@@ -47,6 +47,7 @@ import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type { RedistributeTransfer } from "../redistribute-don-overlay";
 import type { ActionRejection } from "@/hooks/use-game-ws";
 import { ActionFeedbackProvider } from "./action-feedback";
+import { useInPlaceTargetSelection } from "./use-in-place-target-selection";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -209,6 +210,19 @@ function BoardLayoutInner({
     return map;
   }, [redistributePrompt, redistributeTransfers]);
 
+  /* ── In-place SELECT_TARGET prompt state ────────────────────── */
+
+  const selectTargetPrompt =
+    activePrompt?.promptType === "SELECT_TARGET" ? activePrompt : null;
+  const inPlaceTargetSelection = useInPlaceTargetSelection({
+    prompt: selectTargetPrompt,
+    me,
+    opp,
+    cardDb,
+    onAction,
+  });
+  const targetSelectionActive = !!inPlaceTargetSelection.prompt;
+
   /* ── Derived state from extracted hooks ───────────────────────────── */
 
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
@@ -238,7 +252,7 @@ function BoardLayoutInner({
     onAction,
     handleRedistributeDrop,
     reorderPlayerHand,
-    dndDisabled,
+    dndDisabled || targetSelectionActive,
   );
 
   const reducedMotion = useReducedMotion();
@@ -468,14 +482,16 @@ function BoardLayoutInner({
             counterPulseIds={counterPulseIds}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
             trashArrivingIds={oTrashArrivingIds}
+            targetSelectionById={inPlaceTargetSelection.model?.byId}
+            onTargetToggle={inPlaceTargetSelection.toggle}
           />
 
           <MidZone
             top={midTop}
             isMyTurn={isMyTurn}
             phase={bs.phase}
-            canEndPhase={bs.canEndPhase}
-            canPass={bs.canPass}
+            canEndPhase={bs.canEndPhase && !activePrompt}
+            canPass={bs.canPass && !activePrompt}
             inBattle={bs.inBattle}
             activePrompt={activePrompt}
             rejectionReason={actionRejection?.reason ?? null}
@@ -489,6 +505,21 @@ function BoardLayoutInner({
                 }
               },
             } : undefined}
+            targetSelectionMode={
+              inPlaceTargetSelection.prompt && inPlaceTargetSelection.model
+                ? {
+                    effectDescription: inPlaceTargetSelection.prompt.effectDescription,
+                    countLabel: inPlaceTargetSelection.model.countLabel,
+                    selectedCount: inPlaceTargetSelection.model.selectedCount,
+                    aggregateLabel: inPlaceTargetSelection.model.aggregateLabel,
+                    ctaLabel: inPlaceTargetSelection.prompt.ctaLabel,
+                    canConfirm: inPlaceTargetSelection.model.canConfirm,
+                    canSkip: inPlaceTargetSelection.prompt.countMin === 0,
+                    onConfirm: inPlaceTargetSelection.confirm,
+                    onSkip: inPlaceTargetSelection.skip,
+                  }
+                : undefined
+            }
             isPromptHidden={isPromptHidden}
             onShowPrompt={() => setHiddenPromptType(null)}
             canUndo={canUndo}
@@ -501,10 +532,10 @@ function BoardLayoutInner({
             activeDragType={activeDragType}
             activeDrag={activeDrag}
             refreshWave={refreshWave}
-            canInteract={bs.canInteract}
+            canInteract={bs.canInteract && !targetSelectionActive}
             canActivateMain={bs.canInteract && !activePrompt}
             oncePerTurnUsed={turn?.oncePerTurnUsed}
-            canDragCounter={bs.canDragCounter}
+            canDragCounter={bs.canDragCounter && !targetSelectionActive}
             inBlockStep={bs.inBlockStep}
             selectedBlockerId={bs.selectedBlockerId}
             setSelectedBlockerId={bs.setSelectedBlockerId}
@@ -517,6 +548,8 @@ function BoardLayoutInner({
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             trashArrivingIds={pTrashArrivingIds}
+            targetSelectionById={inPlaceTargetSelection.model?.byId}
+            onTargetToggle={inPlaceTargetSelection.toggle}
           />
         </div>
       </div>
@@ -537,8 +570,12 @@ function BoardLayoutInner({
           <HandLayer
             cards={playerOrderedHand}
             cardDb={cardDb}
-            enableDrag={!dndDisabled && (bs.canInteract || bs.canDragCounter)}
-            counterMode={!dndDisabled && bs.canDragCounter}
+            enableDrag={
+              !dndDisabled &&
+              !targetSelectionActive &&
+              (bs.canInteract || bs.canDragCounter)
+            }
+            counterMode={!dndDisabled && !targetSelectionActive && bs.canDragCounter}
             availableDon={
               !dndDisabled && bs.canInteract
                 ? (me?.donCostArea.filter((don) => don.state === "ACTIVE").length ?? 0)
@@ -563,6 +600,7 @@ function BoardLayoutInner({
         opp={opp}
         redistributeTransfers={redistributeTransfers}
         onRedistributeUndo={() => updateRedistributeTransfers((prev) => prev.slice(0, -1))}
+        selectTargetInPlace={targetSelectionActive}
       />
     </div>
 

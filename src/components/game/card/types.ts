@@ -40,9 +40,8 @@ export type CardActionBadgeState = "available" | "unavailable" | "used";
 
 export type HighlightRingColor =
   | "selected"
-  | "valid"
   | "invalid"
-  | "blocker"
+  | "eligible"
   | "attacker"
   | "defender"
   | "counter";

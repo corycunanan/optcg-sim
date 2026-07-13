@@ -20,7 +20,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | Done | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
 | 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Done | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA passed for dimming, tooltip, and drag-target signals |
 | 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Done | [#294](https://github.com/corycunanan/optcg-sim/pull/294) | Independent server-authority backstop |
-| 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | In Review | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
+| 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Done | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | In Review | [#300](https://github.com/corycunanan/optcg-sim/pull/300) | Completes the menu verb |
 | 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | Backlog | — | Add input equivalence after gestures stabilize |
 | 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | Backlog | — | Completes Event presentation and public reveals |
@@ -29,7 +29,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** Review and merge PRs #299 and #300. OPT-421 needs both; OPT-464 needs #299.
+**Next up:** Review and merge PR #300. OPT-421 needs #300; OPT-464 is ready after #299.
 
 ---
 

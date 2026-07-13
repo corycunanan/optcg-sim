@@ -20,6 +20,7 @@ import {
   canOpenActivateMainMenu,
   getActivateMainState,
 } from "@/lib/game/activate-main";
+import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
  *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
@@ -51,6 +52,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   counterPulse,
   canActivateMain,
   oncePerTurnUsed,
+  targetSelection,
+  onTargetToggle,
   onSelect,
   onAction,
   zoneKey,
@@ -88,6 +91,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   counterPulse?: boolean;
   canActivateMain?: boolean;
   oncePerTurnUsed?: TurnState["oncePerTurnUsed"];
+  targetSelection?: TargetCardSelectionState;
+  onTargetToggle?: () => void;
   onSelect?: () => void;
   onAction?: (action: GameAction) => void;
   zoneKey?: string;
@@ -117,7 +122,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     !!onAction &&
     canOpenActivateMainMenu({
       hasEffect: !!activation,
-      hasSelectionAction: !!onSelect,
+      hasSelectionAction: !!onSelect || !!targetSelection,
       inputSuppressed,
     });
   const effectAction = activation
@@ -136,7 +141,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   } = useDraggable({
     id: `attacker-${card.instanceId}`,
     data: { type: "attacker", card } satisfies AttackerDrag,
-    disabled: !canAttack || inputSuppressed,
+    disabled: !canAttack || inputSuppressed || !!targetSelection,
   });
 
   const acceptsDon = activeDragType === "active-don" || activeDragType === "redistribute-don";
@@ -236,10 +241,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (inputSuppressed) return;
+      if (inputSuppressed || targetSelection) return;
       setMenuOpen(true);
     },
-    [inputSuppressed],
+    [inputSuppressed, targetSelection],
   );
 
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
@@ -256,17 +261,19 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // live in one place and can compose with motion presets. Precedence (top
   // wins): counter flash (transient) > attacker (current aggressor) > defender
   // (OPT-274 — current battle target, same amber pulse as attacker) > selected
-  // (user-chosen blocker) > blockerSelectable (eligible candidate).
+  // (user-chosen blocker or effect target) > eligible candidate.
+  const selectionSelected = !!selected || !!targetSelection?.selected;
+  const selectionEligible = !!blockerSelectable || !!targetSelection?.eligible;
   const highlightRing = counterPulse
     ? ("counter" as const)
     : isAttacker
       ? ("attacker" as const)
       : isDefender
         ? ("defender" as const)
-        : selected
+        : selectionSelected
           ? ("selected" as const)
-          : blockerSelectable
-            ? ("blocker" as const)
+          : selectionEligible
+            ? ("eligible" as const)
             : undefined;
 
   // Entry pop (OPT-274): only triggers on first render when the parent
@@ -277,7 +284,11 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
   const animateTarget = rejectionSequence
     ? { scale: 1, ...rejectionAnimation }
-    : { scale: 1, x: 0, opacity: isDragging ? 0.3 : 1 };
+    : {
+        scale: 1,
+        x: 0,
+        opacity: isDragging ? 0.3 : targetSelection?.disabledReason ? 0.35 : 1,
+      };
   const wrapperTransition = rejectionSequence
     ? rejectionAnimation.transition
     : shouldEnter
@@ -292,9 +303,17 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           ref={mergedRef}
           {...attributes}
           {...listeners}
-          onClick={onSelect}
+          onClick={
+            targetSelection && !targetSelection.disabledReason
+              ? onTargetToggle
+              : targetSelection
+                ? undefined
+                : onSelect
+          }
           data-blocker-selection={blockerSelectable ? "" : undefined}
           data-effect-menu-trigger={activation ? card.instanceId : undefined}
+          data-target-selection={targetSelection ? "" : undefined}
+          data-target-instance-id={targetSelection ? card.instanceId : undefined}
           aria-label={
             menuTriggerEnabled
               ? `Actions for ${cardDb[card.cardId]?.name ?? "card"}`
@@ -308,13 +327,19 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             ...style,
             width: SQUARE,
             height: SQUARE,
-            cursor: canAttack
-              ? "grab"
-              : blockerSelectable || menuTriggerEnabled
-                ? "pointer"
-                : "default",
           }}
-          className="relative flex items-center justify-center rounded-md"
+          className={cn(
+            "relative flex items-center justify-center rounded-md",
+            targetSelection
+              ? targetSelection.disabledReason
+                ? "cursor-default"
+                : "cursor-pointer"
+              : canAttack
+                ? "cursor-grab"
+                : blockerSelectable || menuTriggerEnabled
+                  ? "cursor-pointer"
+                  : "cursor-default",
+          )}
         >
           <DropOverlay
             active={
@@ -331,6 +356,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             variant="field"
             state={cardState}
             overlays={{ donCount, highlightRing, effectAction }}
+            interaction={{
+              tooltipNotice: targetSelection?.disabledReason ?? undefined,
+            }}
             motionDelay={animationDelay}
             className="relative z-[1]"
           />
@@ -377,6 +405,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   isAttacker,
   isDefender,
   counterPulse,
+  targetSelection,
+  onTargetToggle,
   zoneKey,
   style,
   animationDelay,
@@ -392,6 +422,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
    *  side. */
   isDefender?: boolean;
   counterPulse?: boolean;
+  targetSelection?: TargetCardSelectionState;
+  onTargetToggle?: () => void;
   zoneKey?: string;
   style: React.CSSProperties;
   animationDelay?: number;
@@ -403,7 +435,8 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
-  const accepts = activeDragType === "attacker" && attackTargetEligible;
+  const accepts =
+    !targetSelection && activeDragType === "attacker" && attackTargetEligible;
   const { setNodeRef, isOver } = useDroppable({
     id: `attack-target-${card.instanceId}`,
     data: { type: "attack-target", targetInstanceId: card.instanceId },
@@ -442,7 +475,11 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
       ? ("attacker" as const)
       : isDefender
         ? ("defender" as const)
-        : undefined;
+        : targetSelection?.selected
+          ? ("selected" as const)
+          : targetSelection?.eligible
+            ? ("eligible" as const)
+            : undefined;
 
   const shouldEnter = !!entering && !reducedMotion;
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
@@ -451,10 +488,25 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     <motion.div
       ref={ref}
       initial={shouldEnter ? ENTRY_INITIAL : false}
-      animate={ENTRY_ANIMATE}
+      animate={{
+        ...ENTRY_ANIMATE,
+        opacity: targetSelection?.disabledReason ? 0.35 : 1,
+      }}
       transition={shouldEnter ? cardEntry : { duration: 0 }}
+      onClick={
+        targetSelection && !targetSelection.disabledReason
+          ? onTargetToggle
+          : undefined
+      }
+      data-target-selection={targetSelection ? "" : undefined}
+      data-target-instance-id={targetSelection ? card.instanceId : undefined}
       style={{ ...style, width: SQUARE, height: SQUARE }}
-      className="relative flex items-center justify-center rounded-md"
+      className={cn(
+        "relative flex items-center justify-center rounded-md",
+        targetSelection && !targetSelection.disabledReason
+          ? "cursor-pointer"
+          : "cursor-default",
+      )}
     >
       <DropOverlay active={accepts} hovered={isOver && accepts} color="red" />
       <Card
@@ -462,6 +514,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         variant="field"
         state={cardState}
         overlays={{ donCount, highlightRing }}
+        interaction={{
+          tooltipNotice: targetSelection?.disabledReason ?? undefined,
+        }}
         motionDelay={animationDelay}
         className="relative z-[1]"
       />

@@ -11,61 +11,39 @@ import {
   DialogFooter,
   TooltipProvider,
 } from "@/components/ui";
+import {
+  buildTargetSelectionModel,
+  type TargetCardSelectionState,
+} from "@/lib/game/target-selection";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
 
 const CARD_W = 80;
 
-type DualSlot = { validIds: string[]; countMin: number; countMax: number };
-
-function canAssignDualTargets(selectedIds: string[], slots: DualSlot[]): boolean {
-  const counts = slots.map(() => 0);
-  const validSets = slots.map((s) => new Set(s.validIds));
-
-  function backtrack(idx: number): boolean {
-    if (idx === selectedIds.length) {
-      return slots.every((s, i) => counts[i] >= s.countMin);
-    }
-    const id = selectedIds[idx];
-    for (let s = 0; s < slots.length; s++) {
-      if (validSets[s].has(id) && counts[s] < slots[s].countMax) {
-        counts[s]++;
-        if (backtrack(idx + 1)) return true;
-        counts[s]--;
-      }
-    }
-    return false;
-  }
-
-  return backtrack(0);
-}
-
 function TargetCard({
   card,
   cardDb,
-  selected,
-  invalid,
-  disabledReason,
+  selection,
   onToggle,
 }: {
   card: CardInstance;
   cardDb: CardDb;
-  selected: boolean;
-  invalid: boolean;
-  disabledReason: string | null;
+  selection: TargetCardSelectionState;
   onToggle: () => void;
 }) {
-  const blocked = invalid || disabledReason !== null;
+  const blocked = selection.disabledReason !== null;
 
   return (
     <div
       onClick={blocked ? undefined : onToggle}
-      title={disabledReason ?? undefined}
+      title={selection.disabledReason ?? undefined}
       className={cn(
         "relative rounded select-none shrink-0 transition-[box-shadow] duration-150",
         blocked && "opacity-30 cursor-not-allowed",
-        !blocked && selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent cursor-pointer",
-        !blocked && !selected && "cursor-pointer",
+        !blocked &&
+          selection.selected &&
+          "ring-2 ring-gb-signal-selected ring-offset-1 ring-offset-transparent cursor-pointer",
+        !blocked && !selection.selected && "cursor-pointer",
       )}
     >
       <Card
@@ -74,8 +52,8 @@ function TargetCard({
         data={{ card, cardId: card.cardId, cardDb }}
         interaction={{ tooltipDisabled: blocked }}
       />
-      {selected && (
-        <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
+      {selection.selected && (
+        <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-signal-selected flex items-center justify-center">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -121,110 +99,38 @@ export function SelectTargetModal({
   onAction,
 }: SelectTargetModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  const validSet = new Set(validTargets);
-  const selectedCards = cards.filter((c) => selectedIds.has(c.instanceId));
-
-  const aggregateSum = aggregateConstraint
-    ? selectedCards.reduce((sum, c) => {
-        const v = cardDb[c.cardId]?.[aggregateConstraint.property];
-        return sum + (v ?? 0);
-      }, 0)
-    : 0;
-
-  const takenNames = new Set<string>();
-  const takenColors = new Set<string>();
-  if (uniquenessConstraint) {
-    for (const c of selectedCards) {
-      const data = cardDb[c.cardId];
-      if (!data) continue;
-      if (uniquenessConstraint.field === "name") takenNames.add(data.name);
-      else for (const col of data.color) takenColors.add(col);
-    }
-  }
-
-  const takenDistNames = new Set<string>();
-  if (namedDistribution) {
-    for (const c of selectedCards) {
-      const data = cardDb[c.cardId];
-      if (data) takenDistNames.add(data.name);
-    }
-  }
-
-  function getDisabledReason(card: CardInstance): string | null {
-    if (selectedIds.has(card.instanceId)) return null;
-    const data = cardDb[card.cardId];
-    if (!data) return null;
-
-    if (aggregateConstraint) {
-      const v = data[aggregateConstraint.property] ?? 0;
-      const next = aggregateSum + v;
-      if (
-        (aggregateConstraint.operator === "<=" || aggregateConstraint.operator === "==") &&
-        next > aggregateConstraint.value
-      ) {
-        return `Adding this would exceed ${aggregateConstraint.value} ${aggregateConstraint.property}`;
-      }
-    }
-
-    if (uniquenessConstraint) {
-      if (uniquenessConstraint.field === "name" && takenNames.has(data.name)) {
-        return `Already selected a card named "${data.name}"`;
-      }
-      if (uniquenessConstraint.field === "color" && data.color.some((col) => takenColors.has(col))) {
-        return "Already selected a card of this color";
-      }
-    }
-
-    if (namedDistribution && takenDistNames.has(data.name)) {
-      return `Only one "${data.name}" allowed`;
-    }
-
-    if (dualTargets) {
-      const candidate = [...selectedIds, card.instanceId];
-      if (!canAssignDualTargets(candidate, dualTargets.slots)) {
-        return "No valid slot assignment with this card";
-      }
-    }
-
-    return null;
-  }
+  const prompt = {
+    promptType: "SELECT_TARGET" as const,
+    cards,
+    validTargets,
+    effectDescription,
+    countMin,
+    countMax,
+    ctaLabel,
+    aggregateConstraint,
+    uniquenessConstraint,
+    namedDistribution,
+    dualTargets,
+  };
+  const model = buildTargetSelectionModel(prompt, selectedIds, cardDb);
 
   function toggleCard(instanceId: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(instanceId)) {
-        next.delete(instanceId);
-      } else if (next.size < countMax) {
-        next.add(instanceId);
-      }
+    if (model.byId.get(instanceId)?.disabledReason) return;
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(instanceId)) next.delete(instanceId);
+      else next.add(instanceId);
       return next;
     });
   }
 
   function handleConfirm() {
-    if (selectedIds.size < countMin) return;
-    onAction({ type: "SELECT_TARGET", selectedInstanceIds: [...selectedIds] });
+    if (!model.canConfirm) return;
+    onAction({
+      type: "SELECT_TARGET",
+      selectedInstanceIds: model.selectedCards.map((card) => card.instanceId),
+    });
   }
-
-  let aggregateOk = true;
-  if (aggregateConstraint) {
-    const { operator, value } = aggregateConstraint;
-    if (operator === "<=") aggregateOk = aggregateSum <= value;
-    else if (operator === ">=") aggregateOk = aggregateSum >= value;
-    else aggregateOk = aggregateSum === value;
-  }
-  const dualTargetsOk = dualTargets
-    ? canAssignDualTargets([...selectedIds], dualTargets.slots)
-    : true;
-  const canConfirm = selectedIds.size >= countMin && aggregateOk && dualTargetsOk;
-
-  const countLabel =
-    countMin === countMax
-      ? `Select ${countMin}`
-      : countMin === 0
-        ? `Select up to ${countMax}`
-        : `Select ${countMin}–${countMax}`;
 
   return (
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
@@ -252,9 +158,7 @@ export function SelectTargetModal({
                   key={card.instanceId}
                   card={card}
                   cardDb={cardDb}
-                  selected={selectedIds.has(card.instanceId)}
-                  invalid={!validSet.has(card.instanceId)}
-                  disabledReason={getDisabledReason(card)}
+                  selection={model.byId.get(card.instanceId)!}
                   onToggle={() => toggleCard(card.instanceId)}
                 />
               ))}
@@ -264,28 +168,23 @@ export function SelectTargetModal({
 
         <DialogFooter className="flex-row items-center justify-between px-4 py-3 border-t border-gb-border pt-3">
           <span className="text-xs text-gb-text-dim">
-            {countLabel}
-            {selectedIds.size > 0 && (
+            {model.countLabel}
+            {model.selectedCount > 0 && (
               <span className="text-gb-text-subtle ml-1">
-                — {selectedIds.size} selected
+                \u2014 {model.selectedCount} selected
               </span>
             )}
-            {aggregateConstraint && (
-              <span
-                className={cn(
-                  "ml-2 font-medium",
-                  aggregateOk ? "text-gb-text-bright" : "text-gb-accent-red",
-                )}
-              >
-                · Total {aggregateConstraint.property}: {aggregateSum} {aggregateConstraint.operator} {aggregateConstraint.value}
+            {model.aggregateLabel && (
+              <span className="ml-2 font-medium text-gb-text-bright">
+                \u00b7 {model.aggregateLabel}
               </span>
             )}
           </span>
           <GameButton
-            variant={canConfirm ? "amber" : "secondary"}
+            variant={model.canConfirm ? "amber" : "secondary"}
             size="sm"
             onClick={handleConfirm}
-            disabled={!canConfirm}
+            disabled={!model.canConfirm}
           >
             {ctaLabel}
           </GameButton>
