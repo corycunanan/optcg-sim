@@ -47,9 +47,10 @@ const arrangeScreenReaderInstructions: ScreenReaderInstructions = {
 export function getArrangeEscapeAction(
   activeId: string | null,
   selectedId: string | null,
+  step: 1 | 2,
 ): "cancel-drag" | "clear-selection" | "hide" {
   if (activeId) return "cancel-drag";
-  if (selectedId) return "clear-selection";
+  if (step === 1 && selectedId) return "clear-selection";
   return "hide";
 }
 
@@ -261,6 +262,7 @@ export function ArrangeTopCardsModal({
   }
 
   function handleSkip() {
+    setSelectedId(null);
     setStep(2);
   }
 
@@ -288,7 +290,7 @@ export function ArrangeTopCardsModal({
       <DialogContent
         showCloseButton={false}
         onEscapeKeyDown={(event) => {
-          const action = getArrangeEscapeAction(activeId, selectedId);
+          const action = getArrangeEscapeAction(activeId, selectedId, step);
           if (action === "hide") return;
           event.preventDefault();
           if (action === "clear-selection") setSelectedId(null);
