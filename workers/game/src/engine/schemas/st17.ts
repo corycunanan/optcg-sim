@@ -49,6 +49,11 @@ export const ST17_001_CROCODILE: EffectSchema = {
           },
           params: { position: "TOP", amount: 1 },
           chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits: ["The Seven Warlords of the Sea"] },
+          },
         },
       ],
     },

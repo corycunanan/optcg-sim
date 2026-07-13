@@ -2023,7 +2023,7 @@ export const OP12_058_I_WILL_MAKE_WHITEBEARD_THE_KING: EffectSchema = {
         },
         {
           type: "PLAY_CARD",
-          target: { type: "SELECTED_CARDS", ref: "revealed" },
+          target: { type: "SELECTED_CARDS", ref: "revealed", count: { up_to: 1 } },
           params: { source_zone: "DECK", cost_override: "FREE" },
           chain: "THEN",
           result_ref: "played",

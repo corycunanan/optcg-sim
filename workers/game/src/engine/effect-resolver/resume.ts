@@ -42,6 +42,7 @@ import {
 import {
   handlePlayerChoiceStateDistribution,
   handlePlayerChoiceDonReturn,
+  handleChooseValue,
   handlePlayerChoiceBranch,
   handleAwaitingOptionalResponse,
   handleAwaitingTriggerOrderSelection,
@@ -79,6 +80,7 @@ export function resumeEffectChain(
   );
   const events: PendingEvent[] = [];
   let nextState = state;
+  let pausedActionSucceeded: boolean | undefined;
 
   // Player skipped the optional effect
   if (action.type === "PASS") {
@@ -120,9 +122,15 @@ export function resumeEffectChain(
     if (donReturn?.kind === "fallthrough") {
       nextState = donReturn.state;
     } else {
-      const playerChoice = handlePlayerChoiceBranch(nextState, action, resumeCtx, resultRefs, cardDb, events);
-      if (playerChoice?.kind === "terminal") return playerChoice.result;
-      if (playerChoice?.kind === "fallthrough") nextState = playerChoice.state;
+      const chooseValue = handleChooseValue(nextState, action, resumeCtx, resultRefs);
+      if (chooseValue?.kind === "terminal") return chooseValue.result;
+      if (chooseValue?.kind === "fallthrough") {
+        nextState = chooseValue.state;
+      } else {
+        const playerChoice = handlePlayerChoiceBranch(nextState, action, resumeCtx, resultRefs, cardDb, events);
+        if (playerChoice?.kind === "terminal") return playerChoice.result;
+        if (playerChoice?.kind === "fallthrough") nextState = playerChoice.state;
+      }
     }
   }
 
@@ -138,7 +146,10 @@ export function resumeEffectChain(
 
   const selectTarget = handleSelectTarget(nextState, action, resumeCtx, resultRefs, cardDb, events);
   if (selectTarget?.kind === "terminal") return selectTarget.result;
-  if (selectTarget?.kind === "fallthrough") nextState = selectTarget.state;
+  if (selectTarget?.kind === "fallthrough") {
+    nextState = selectTarget.state;
+    pausedActionSucceeded = selectTarget.succeeded;
+  }
 
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume
   //         where pausedAction is null) ────────────────────────────────────
@@ -150,6 +161,8 @@ export function resumeEffectChain(
       remainingActionsController,
       cardDb,
       resultRefs,
+      undefined,
+      pausedActionSucceeded,
     );
     nextState = chainResult.state;
     events.push(...chainResult.events);

@@ -273,7 +273,7 @@ export const ST13_007_SABO_COST2: EffectSchema = {
         },
         {
           type: "PLAY_CARD",
-          target: { type: "SELECTED_CARDS", ref: "revealed_life" },
+          target: { type: "SELECTED_CARDS", ref: "revealed_life", count: { up_to: 1 } },
           params: { source_zone: "LIFE", cost_override: "FREE" },
           chain: "THEN",
           conditions: {
@@ -318,7 +318,7 @@ export const ST13_010_PORTGAS_D_ACE_COST2: EffectSchema = {
         },
         {
           type: "PLAY_CARD",
-          target: { type: "SELECTED_CARDS", ref: "revealed_life" },
+          target: { type: "SELECTED_CARDS", ref: "revealed_life", count: { up_to: 1 } },
           params: { source_zone: "LIFE", cost_override: "FREE" },
           chain: "THEN",
           conditions: {
@@ -363,7 +363,7 @@ export const ST13_014_MONKEY_D_LUFFY_COST2: EffectSchema = {
         },
         {
           type: "PLAY_CARD",
-          target: { type: "SELECTED_CARDS", ref: "revealed_life" },
+          target: { type: "SELECTED_CARDS", ref: "revealed_life", count: { up_to: 1 } },
           params: { source_zone: "LIFE", cost_override: "FREE" },
           chain: "THEN",
           conditions: {

@@ -204,6 +204,11 @@ export const ST22_006_JOZU: EffectSchema = {
           },
           params: { amount: 1 },
           chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
         },
       ],
     },

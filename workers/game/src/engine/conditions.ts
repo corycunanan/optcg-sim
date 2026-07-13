@@ -497,10 +497,32 @@ function evaluateSimple(
       if (!ctx.resultRefs) return false;
       const result = ctx.resultRefs.get(cond.result_ref);
       if (!result || result.targetInstanceIds.length === 0) return false;
-      for (const instanceId of result.targetInstanceIds) {
-        const card = findInstanceById(state, instanceId);
-        if (!card) continue;
-        if (matchesFilter(card, cond.filter, ctx.cardDb, state)) return true;
+      const revealedCards: CardInstance[] = result.revealedCards
+        ? result.revealedCards.map((snapshot) => ({
+            instanceId: snapshot.instanceId,
+            cardId: snapshot.cardId,
+            zone: snapshot.source === "LIFE_TOP" ? "LIFE" : "DECK",
+            state: "ACTIVE",
+            attachedDon: [],
+            turnPlayed: null,
+            controller: snapshot.controller,
+            owner: snapshot.controller,
+          }))
+        : result.targetInstanceIds.flatMap((instanceId) => {
+            const card = findInstanceById(state, instanceId);
+            return card ? [card] : [];
+          });
+      for (const card of revealedCards) {
+        if (cond.filter && !matchesFilter(card, cond.filter, ctx.cardDb, state)) continue;
+        if (cond.compare) {
+          const data = ctx.cardDb.get(card.cardId);
+          if (!data) continue;
+          const expected = resolveConditionNumericValue(cond.compare.value, ctx.resultRefs);
+          if (expected === null) continue;
+          const actual = cond.compare.property === "COST" ? (data.cost ?? 0) : 0;
+          if (!compareNum(actual, cond.compare.operator, expected)) continue;
+        }
+        if (cond.filter || cond.compare) return true;
       }
       return false;
     }
@@ -508,6 +530,20 @@ function evaluateSimple(
     default:
       return true;
   }
+}
+
+function resolveConditionNumericValue(
+  value: number | DynamicValue,
+  resultRefs: Map<string, EffectResult>,
+): number | null {
+  if (typeof value === "number") return value;
+  if (value.type === "FIXED") return value.value;
+  if (value.type === "ACTION_RESULT") return resultRefs.get(value.ref)?.count ?? null;
+  if (value.type === "CHOSEN_VALUE") {
+    const chosen = resultRefs.get(value.ref)?.value;
+    return typeof chosen === "number" && Number.isInteger(chosen) ? chosen : null;
+  }
+  return null;
 }
 
 /**

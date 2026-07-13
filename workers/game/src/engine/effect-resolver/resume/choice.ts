@@ -153,6 +153,32 @@ export function handlePlayerChoiceDonReturn(
   return { kind: "fallthrough", state: applied.state };
 }
 
+export function handleChooseValue(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+): ChoiceBranchResult {
+  const { pausedAction, validTargets } = resumeCtx;
+  if (action.type !== "PLAYER_CHOICE" || !pausedAction || pausedAction.type !== "CHOOSE_VALUE") {
+    return null;
+  }
+  if (!validTargets?.includes(action.choiceId)) {
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
+  }
+  const match = /^choose-value:(-?\d+)$/.exec(action.choiceId);
+  const value = match ? Number(match[1]) : Number.NaN;
+  if (!Number.isSafeInteger(value) || !pausedAction.result_ref) {
+    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
+  }
+  resultRefs.set(pausedAction.result_ref, {
+    targetInstanceIds: [],
+    count: 1,
+    value,
+  });
+  return { kind: "fallthrough", state };
+}
+
 /**
  * Generic PLAYER_CHOICE / OPPONENT_CHOICE branch-picker resume.
  * In the original `if/else if`, this is the `else` side of the
