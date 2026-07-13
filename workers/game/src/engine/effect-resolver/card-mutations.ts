@@ -319,7 +319,9 @@ export function returnToDeck(
     position,
     preserveSourceTriggers: true,
   });
-  if (!moved || moved.fact.source !== "CHARACTER") return null;
+  // The transition service rejects Leaders and same-zone deck moves. Every
+  // other card zone is a legal source for an authored RETURN_TO_DECK action.
+  if (!moved) return null;
   return {
     state: moved.state,
     transition: moved.fact,

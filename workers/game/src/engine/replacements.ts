@@ -177,6 +177,14 @@ function replacementMatchesTarget(
 ): boolean {
   if (params.trigger !== event) return false;
 
+  // Removal/leave replacements describe a card leaving the field. Secret-
+  // and open-area moves such as Hand/Trash/Life -> Deck must not spend or
+  // offer a field replacement merely because the replacement is wildcarded.
+  if (event === "WOULD_BE_REMOVED_FROM_FIELD" || event === "WOULD_LEAVE_FIELD") {
+    const zone = findCardInstance(state, targetInstanceId)?.zone;
+    if (zone !== "CHARACTER" && zone !== "STAGE") return false;
+  }
+
   // appliesTo: non-empty = instance whitelist; empty = wildcard.
   if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) return false;
 
