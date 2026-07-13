@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "@shared/game-types";
-import { eventToSpotlight, findLatestSpotlight } from "./spotlight";
+import {
+  eventToSpotlight,
+  findLatestSpotlight,
+  shouldBlockBoardForSpotlight,
+} from "./spotlight";
 
 function event<T extends GameEvent>(value: T): T {
   return value;
@@ -120,5 +124,20 @@ describe("eventToSpotlight", () => {
       kind: "REVEAL",
       cards: [{ cardId: "RESULT-1" }],
     });
+  });
+});
+
+describe("shouldBlockBoardForSpotlight", () => {
+  it("keeps a waiting player's board blocked after the reveal is dismissed", () => {
+    expect(shouldBlockBoardForSpotlight(false, 1, 0)).toBe(true);
+  });
+
+  it("releases the responder's board when the reveal is dismissed", () => {
+    expect(shouldBlockBoardForSpotlight(false, 1, 1)).toBe(false);
+  });
+
+  it("blocks both players while the spotlight is visible", () => {
+    expect(shouldBlockBoardForSpotlight(true, null, 0)).toBe(true);
+    expect(shouldBlockBoardForSpotlight(true, null, 1)).toBe(true);
   });
 });

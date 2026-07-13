@@ -136,6 +136,12 @@ function BoardLayoutInner({
     myIndex,
     promptRespondingPlayer,
   });
+  const dispatchBoardAction = useCallback(
+    (action: GameAction) => {
+      if (!spotlight.isBlockingPrompt) onAction(action);
+    },
+    [onAction, spotlight.isBlockingPrompt]
+  );
   const boardPrompt = spotlight.isBlockingPrompt ? null : activePrompt;
   const promptType = boardPrompt?.promptType ?? null;
   const [hiddenPromptType, setHiddenPromptType] = useState<string | null>(null);
@@ -235,7 +241,7 @@ function BoardLayoutInner({
     me,
     opp,
     cardDb,
-    onAction,
+    onAction: dispatchBoardAction,
   });
   const targetSelectionActive = !!inPlaceTargetSelection.prompt;
 
@@ -266,7 +272,7 @@ function BoardLayoutInner({
   } = useBoardDnd(
     cardDb,
     bs.battle,
-    onAction,
+    dispatchBoardAction,
     handleRedistributeDrop,
     reorderPlayerHand,
     dndDisabled || targetSelectionActive || spotlight.isBlockingPrompt,
@@ -507,17 +513,19 @@ function BoardLayoutInner({
             top={midTop}
             isMyTurn={isMyTurn}
             phase={bs.phase}
-            canEndPhase={bs.canEndPhase && !boardPrompt}
-            canPass={bs.canPass && !boardPrompt}
+            canEndPhase={
+              bs.canEndPhase && !boardPrompt && !spotlight.isBlockingPrompt
+            }
+            canPass={bs.canPass && !boardPrompt && !spotlight.isBlockingPrompt}
             inBattle={bs.inBattle}
             activePrompt={boardPrompt}
             rejectionReason={actionRejection?.reason ?? null}
             battleInfo={bs.battleInfo}
-            blockerMode={bs.inBlockStep ? {
+            blockerMode={bs.inBlockStep && !spotlight.isBlockingPrompt ? {
               selectedBlockerId: bs.selectedBlockerId,
               onBlock: () => {
                 if (bs.selectedBlockerId) {
-                  onAction({ type: "DECLARE_BLOCKER", blockerInstanceId: bs.selectedBlockerId });
+                  dispatchBoardAction({ type: "DECLARE_BLOCKER", blockerInstanceId: bs.selectedBlockerId });
                   bs.setSelectedBlockerId(null);
                 }
               },
@@ -539,8 +547,8 @@ function BoardLayoutInner({
             }
             isPromptHidden={isPromptHidden}
             onShowPrompt={() => setHiddenPromptType(null)}
-            canUndo={canUndo}
-            onAction={onAction}
+            canUndo={canUndo && !spotlight.isBlockingPrompt}
+            onAction={dispatchBoardAction}
           />
 
           <PlayerField
@@ -549,12 +557,20 @@ function BoardLayoutInner({
             activeDragType={activeDragType}
             activeDrag={activeDrag}
             refreshWave={refreshWave}
-            canInteract={bs.canInteract && !targetSelectionActive}
-            canDragCounter={bs.canDragCounter && !targetSelectionActive}
-            inBlockStep={bs.inBlockStep}
+            canInteract={
+              bs.canInteract &&
+              !targetSelectionActive &&
+              !spotlight.isBlockingPrompt
+            }
+            canDragCounter={
+              bs.canDragCounter &&
+              !targetSelectionActive &&
+              !spotlight.isBlockingPrompt
+            }
+            inBlockStep={bs.inBlockStep && !spotlight.isBlockingPrompt}
             selectedBlockerId={bs.selectedBlockerId}
             setSelectedBlockerId={bs.setSelectedBlockerId}
-            onAction={onAction}
+            onAction={dispatchBoardAction}
             onPreviewZone={setZonePreview}
             redistributeSourceIds={redistributeSourceIds}
             pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
@@ -624,7 +640,7 @@ function BoardLayoutInner({
         isPromptHidden={isPromptHidden}
         onHide={() => setHiddenPromptType(promptType)}
         cardDb={cardDb}
-        onAction={onAction}
+        onAction={dispatchBoardAction}
         zonePreview={zonePreview}
         onCloseZonePreview={() => setZonePreview(null)}
         me={me}

@@ -16,6 +16,17 @@ export interface SpotlightPresentation {
   timestamp: number;
 }
 
+/** Keep board actions inert while a spotlight is visible or another player answers. */
+export function shouldBlockBoardForSpotlight(
+  hasActiveSpotlight: boolean,
+  promptRespondingPlayer: 0 | 1 | null,
+  myIndex: 0 | 1 | null
+): boolean {
+  const waitingForOtherPlayer =
+    promptRespondingPlayer !== null && promptRespondingPlayer !== myIndex;
+  return hasActiveSpotlight || waitingForOtherPlayer;
+}
+
 function isPublicCardId(cardId: string | undefined): cardId is string {
   return Boolean(cardId && cardId !== "hidden");
 }

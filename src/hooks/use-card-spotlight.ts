@@ -11,6 +11,7 @@ import type { GameEvent } from "@shared/game-types";
 import type { AcceptedGameUpdate } from "@/hooks/use-game-ws";
 import {
   findLatestSpotlight,
+  shouldBlockBoardForSpotlight,
   type SpotlightPresentation,
 } from "@/lib/game/spotlight";
 
@@ -81,11 +82,11 @@ export function useCardSpotlight({
     }
   }, [acceptedUpdate?.sequence, eventLog]);
 
-  const isWaiting = Boolean(
-    active &&
+  const isWaitingForOtherPlayer = Boolean(
     promptRespondingPlayer !== null &&
     promptRespondingPlayer !== myIndex
   );
+  const isWaiting = Boolean(active && isWaitingForOtherPlayer);
 
   const dismiss = useCallback(() => setActive(null), []);
   const toggleView = useCallback(() => {
@@ -120,6 +121,10 @@ export function useCardSpotlight({
     isWaiting,
     dismiss,
     toggleView,
-    isBlockingPrompt: active !== null,
+    isBlockingPrompt: shouldBlockBoardForSpotlight(
+      active !== null,
+      promptRespondingPlayer,
+      myIndex
+    ),
   };
 }
