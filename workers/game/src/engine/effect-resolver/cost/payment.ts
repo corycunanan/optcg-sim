@@ -10,6 +10,10 @@ import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { computeCostTargets } from "./targets.js";
 import { applyCostSelection } from "./resume.js";
 
+/**
+ * Pay every fixed cost in order and aggregate the resources paid across steps.
+ * Returns null when any step cannot be completed from the evolving game state.
+ */
 export function payCosts(
   state: GameState,
   costs: Cost[],
@@ -128,7 +132,7 @@ export function payCosts(
         const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
         newPlayers[controller] = { ...p, donCostArea: newDonCostArea };
         nextState = { ...nextState, players: newPlayers };
-        costResult.donRestedCount = rested;
+        costResult.donRestedCount += rested;
         break;
       }
 
@@ -310,7 +314,7 @@ export function payCosts(
         const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
         newPlayers[controller] = { ...p, donCostArea: newDonCostArea };
         nextState = { ...nextState, players: newPlayers };
-        costResult.donRestedCount = rested;
+        costResult.donRestedCount += rested;
         break;
       }
 

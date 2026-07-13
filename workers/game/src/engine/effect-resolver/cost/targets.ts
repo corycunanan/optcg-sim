@@ -9,6 +9,7 @@ export function resolveAmount(cost: SimpleCost, fallback = 1): number {
   return typeof cost.amount === "number" ? cost.amount : fallback;
 }
 
+/** Return active field cards that can be offered for a rest cost. */
 function getRestCostCandidates(player: PlayerState, filter?: TargetFilter): CardInstance[] {
   const explicitType = filter?.card_type;
   const cardTypes = explicitType

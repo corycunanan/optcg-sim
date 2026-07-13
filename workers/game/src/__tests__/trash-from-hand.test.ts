@@ -51,6 +51,21 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TRASH_FROM_HAND cost selection flow", () => {
+  it("accumulates rested DON totals across DON_REST aliases", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+
+    const result = payCosts(
+      state,
+      [{ type: "DON_REST", amount: 1 }, { type: "REST_DON", amount: 2 }],
+      0,
+      cardDb,
+    );
+
+    expect(result?.costResult.donRestedCount).toBe(3);
+    expect(result?.state.players[0].donCostArea.filter((don) => don.state === "RESTED")).toHaveLength(3);
+  });
+
   it("accumulates trash totals across self and hand cost steps", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
