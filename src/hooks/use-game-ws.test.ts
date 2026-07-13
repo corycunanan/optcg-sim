@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ServerMessage } from "@shared/game-types";
+import type { GameState, ServerMessage } from "@shared/game-types";
 
 const mocks = vi.hoisted(() => ({
   onMessage: null as ((message: ServerMessage) => void) | null,
@@ -119,6 +119,35 @@ describe("useGameWs prompt identity", () => {
     expect(mocks.send).toHaveBeenCalledWith({
       type: "game:action",
       action: { type: "ADVANCE_PHASE" },
+    });
+  });
+
+  it("publishes a monotonic sequence for accepted game updates", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+    const acceptedUpdateSetter = mocks.stateSetters[6];
+    const state = {
+      status: "IN_PROGRESS",
+      pendingPrompt: null,
+    } as GameState;
+
+    mocks.onMessage?.({
+      type: "game:update",
+      action: { type: "ADVANCE_PHASE" },
+      state,
+    });
+    mocks.onMessage?.({
+      type: "game:update",
+      action: { type: "CONCEDE" },
+      state,
+    });
+
+    expect(acceptedUpdateSetter).toHaveBeenNthCalledWith(1, {
+      action: { type: "ADVANCE_PHASE" },
+      sequence: 1,
+    });
+    expect(acceptedUpdateSetter).toHaveBeenNthCalledWith(2, {
+      action: { type: "CONCEDE" },
+      sequence: 2,
     });
   });
 });

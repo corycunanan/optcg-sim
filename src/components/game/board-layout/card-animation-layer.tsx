@@ -73,7 +73,7 @@ function FlyingCard({
   // matches the outer motion.div's animated `toW/toH` so the card settles
   // into the destination zone at exactly the right dimensions.
   const variant = isDonAttach ? "don" : isHandBound ? "hand" : "field";
-  const isFaceDown = !transition.cardId;
+  const isFaceDown = !transition.cardId || transition.cardId === "hidden";
 
   const delay = transition.delay ?? 0;
 
@@ -152,7 +152,9 @@ function FlyingCard({
           variant={variant}
           state="in-flight"
           data={
-            transition.cardId ? { cardId: transition.cardId, cardDb } : undefined
+            transition.cardId && transition.cardId !== "hidden"
+              ? { cardId: transition.cardId, cardDb }
+              : undefined
           }
           faceDown={isFaceDown}
           sleeveUrl={sleeveUrl}

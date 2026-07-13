@@ -10,6 +10,7 @@ import type {
 type EventVisibilityPolicy =
   | { audience: "PUBLIC" }
   | { audience: "OWNER_ONLY"; redactor: "CARD_IDENTITY" | "CARD_IDENTITIES" }
+  | { audience: "PUBLIC_AFTER_ACTIVATION"; redactor: "CARD_IDENTITY" }
   | { audience: "DECLARED_BY_EVENT"; redactor: "CARD_IDENTITIES" };
 
 const PUBLIC = { audience: "PUBLIC" } as const;
@@ -38,7 +39,10 @@ export const GAME_EVENT_VISIBILITY = {
   COUNTER_USED: PUBLIC,
   BATTLE_RESOLVED: PUBLIC,
   DAMAGE_DEALT: PUBLIC,
-  TRIGGER_ACTIVATED: PUBLIC,
+  TRIGGER_ACTIVATED: {
+    audience: "PUBLIC_AFTER_ACTIVATION",
+    redactor: "CARD_IDENTITY",
+  },
   DON_GIVEN_TO_CARD: PUBLIC,
   DON_DETACHED: PUBLIC,
   DON_PLACED_ON_FIELD: PUBLIC,
@@ -120,6 +124,13 @@ export function filterEventForPlayer(
 ): GameEvent {
   const policy = GAME_EVENT_VISIBILITY[event.type];
   if (policy.audience === "PUBLIC") return event;
+
+  if (policy.audience === "PUBLIC_AFTER_ACTIVATION") {
+    if (event.type !== "TRIGGER_ACTIVATED") return redactEventIdentities(event);
+    return event.payload.activated === true || event.playerIndex === receivingPlayer
+      ? event
+      : redactEventIdentities(event);
+  }
 
   if (policy.audience === "OWNER_ONLY") {
     return event.playerIndex === receivingPlayer ? event : redactEventIdentities(event);

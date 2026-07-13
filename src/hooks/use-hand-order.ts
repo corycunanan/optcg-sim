@@ -92,3 +92,52 @@ export function useHandOrder(hand: CardInstance[]) {
 
   return { orderedHand, reorder };
 }
+
+/**
+ * Preserve existing face-down opponent cards while inserting newly observed
+ * placeholders at non-authoritative visual positions. This prevents a public
+ * reveal returning to hand from remaining trackable at the server's append
+ * position. The engine order remains untouched.
+ */
+export function mergeHiddenHandOrder(
+  previousOrder: readonly string[],
+  hand: readonly CardInstance[],
+  random: () => number = Math.random,
+): CardInstance[] {
+  const byId = new Map(hand.map((card) => [card.instanceId, card]));
+  const orderedIds = previousOrder.filter((id) => byId.has(id));
+  const known = new Set(orderedIds);
+
+  for (const card of hand) {
+    if (known.has(card.instanceId)) continue;
+    const index = Math.floor(random() * (orderedIds.length + 1));
+    orderedIds.splice(index, 0, card.instanceId);
+    known.add(card.instanceId);
+  }
+
+  return orderedIds.map((id) => byId.get(id)).filter(Boolean) as CardInstance[];
+}
+
+function hiddenVisualScore(instanceId: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < instanceId.length; index += 1) {
+    hash ^= instanceId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Client-only visual order for an opponent's fully hidden hand. Sorting by a
+ * hash of zone-local placeholder IDs gives each new card a stable,
+ * non-authoritative insertion point without retaining secret engine order.
+ */
+export function useHiddenHandOrder(hand: CardInstance[]) {
+  return useMemo(() => {
+    let cardIndex = 0;
+    return mergeHiddenHandOrder([], hand, () => {
+      const card = hand[cardIndex++];
+      return card ? hiddenVisualScore(card.instanceId) / 0x1_0000_0000 : 0;
+    });
+  }, [hand]);
+}

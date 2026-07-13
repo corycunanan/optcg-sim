@@ -93,4 +93,6 @@ export interface Scenario {
     reason: string;
     sequence: number;
   };
+  /** Optional public prompt owner for waiting-player presentation scenarios. */
+  promptRespondingPlayer?: 0 | 1 | null;
 }

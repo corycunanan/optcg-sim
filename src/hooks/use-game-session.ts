@@ -3,7 +3,10 @@
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameWs } from "@/hooks/use-game-ws";
-import type { ActionRejection } from "@/hooks/use-game-ws";
+import type {
+  AcceptedGameUpdate,
+  ActionRejection,
+} from "@/hooks/use-game-ws";
 import { useCardDatabase } from "@/hooks/use-card-database";
 import { useRemoteGameStatus } from "@/hooks/use-remote-game-status";
 import { useGameFinalizer } from "@/hooks/use-game-finalizer";
@@ -24,6 +27,7 @@ export interface GameSessionGame {
   connectionStatus: string;
   lastError: string | null;
   actionRejection: ActionRejection | null;
+  acceptedUpdate: AcceptedGameUpdate | null;
   activePrompt: PromptOptions | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   sendAction: (action: GameAction) => void;
@@ -121,6 +125,7 @@ export function useGameSession(
     connectionStatus,
     lastError,
     actionRejection,
+    acceptedUpdate,
     activePrompt,
     gameOver,
     canUndo,
@@ -308,6 +313,7 @@ export function useGameSession(
       connectionStatus,
       lastError: lastError ?? cardDbError,
       actionRejection,
+      acceptedUpdate,
       activePrompt,
       gameOver,
       sendAction,

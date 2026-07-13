@@ -500,6 +500,7 @@ export function filterStateForPlayer(
     players: newPlayers,
     eventLog: filteredEventLog,
     pendingPrompt: filteredPrompt,
+    promptRespondingPlayer: state.pendingPrompt?.respondingPlayer ?? null,
     effectStack: [],
   };
 }

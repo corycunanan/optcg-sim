@@ -12,7 +12,7 @@ interface EventLogProps {
 }
 
 /** Human-readable label for a game event */
-function formatEvent(
+export function formatEvent(
   event: GameEvent,
   cardDb: CardDb,
   myIndex: 0 | 1 | null,
@@ -60,8 +60,26 @@ function formatEvent(
     case "DAMAGE_DEALT":
       return { icon: "💥", text: `${who} took damage`, accent: "text-gb-accent-red" };
     case "TRIGGER_ACTIVATED": {
+      if (event.payload.activated !== true) return null;
       const name = cardName(event.payload.cardId);
       return { icon: "⚡", text: `Trigger: ${name}`, accent: "text-gb-accent-purple" };
+    }
+    case "CARDS_REVEALED": {
+      const count = event.payload.cards.length;
+      if (event.payload.visibility === "CONTROLLER_ONLY") {
+        if (event.payload.visibleTo !== myIndex) return null;
+        return {
+          icon: "👁️",
+          text: `${who} looked at ${count} ${count === 1 ? "card" : "cards"}`,
+          accent: "text-gb-accent-blue",
+        };
+      }
+      const names = event.payload.cards.map((card) => cardName(card.cardId));
+      return {
+        icon: "👁️",
+        text: `${who} revealed ${names.join(", ")}`,
+        accent: "text-gb-accent-amber",
+      };
     }
     case "DON_GIVEN_TO_CARD": {
       const count = event.payload.count;
