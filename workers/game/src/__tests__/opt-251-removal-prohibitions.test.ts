@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-251 (E5) — "Cannot be removed from field by opp's effects" vs narrow
  * "cannot be K.O.'d".
@@ -510,7 +511,7 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
       0,
       cardDb,
       new Map(),
-      [targetId],
+      [targetId], resolverExecutionServices
     );
 
     // Target still on field; no CARD_KO event emitted for it.
@@ -539,7 +540,7 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
       0,
       cardDb,
       new Map(),
-      [targetId],
+      [targetId], resolverExecutionServices
     );
 
     expect(result.events.find((e) => e.type === "CARD_RETURNED_TO_HAND")).toBeUndefined();
@@ -564,7 +565,7 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
       0,
       cardDb,
       new Map(),
-      [targetId],
+      [targetId], resolverExecutionServices
     );
 
     expect(result.events.find((e) => e.type === "CARD_RETURNED_TO_HAND")).toBeTruthy();
@@ -590,7 +591,7 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
       0,
       cardDb,
       new Map(),
-      [targetId],
+      [targetId], resolverExecutionServices
     );
 
     const stillThere = result.state.players[1].characters.find((c) => c?.instanceId === targetId);
@@ -672,7 +673,7 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
       1, // P1 is the causing controller — their own effect
       cardDb,
       new Map(),
-      [targetId],
+      [targetId], resolverExecutionServices
     );
 
     expect(result.events.find((e) => e.type === "CARD_RETURNED_TO_HAND")).toBeTruthy();

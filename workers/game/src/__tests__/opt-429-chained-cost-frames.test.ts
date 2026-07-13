@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-429 — chaining two selectable costs must not orphan an effect-stack
  * frame.
@@ -110,7 +111,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     const state = stateWithChoices(cardDb);
     const block = chainedCostBlock();
 
-    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     expect(pay.state.effectStack).toHaveLength(1);
 
@@ -151,7 +152,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     const state = stateWithChoices(cardDb);
     const block = chainedCostBlock();
 
-    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
     const queuedTrigger: QueuedTrigger = {
       sourceCardInstanceId: pay.state.players[0].leader.instanceId,
       controller: 0,
@@ -197,7 +198,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     const state = createBattleReadyState(cardDb);
     const block = chainedCostBlock();
 
-    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const queuedTrigger: QueuedTrigger = {
@@ -234,7 +235,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     const cardDb = createTestCardDb();
     const state = stateWithChoices(cardDb);
     const block = chainedCostBlock();
-    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
 
     const session = new GameSession(
       new MockDurableObjectState() as unknown as DurableObjectState,

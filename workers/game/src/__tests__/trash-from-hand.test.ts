@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * TRASH_FROM_HAND integration tests
  *
@@ -17,7 +18,7 @@ import type { EffectSchema, EffectBlock, Cost } from "../engine/effect-types.js"
 import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./helpers.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { executeActionChain, executeEffectAction } from "../engine/effect-resolver/resolver.js";
-import { payCostsWithSelection, applyCostSelection } from "../engine/effect-resolver/cost-handler.js";
+import { payCosts, payCostsWithSelection, applyCostSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { pushFrame, peekFrame, popFrame } from "../engine/effect-stack.js";
 import type { Action } from "../engine/effect-types.js";
@@ -50,6 +51,38 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TRASH_FROM_HAND cost selection flow", () => {
+  it("accumulates rested DON totals across DON_REST aliases", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+
+    const result = payCosts(
+      state,
+      [{ type: "DON_REST", amount: 1 }, { type: "REST_DON", amount: 2 }],
+      0,
+      cardDb,
+    );
+
+    expect(result?.costResult.donRestedCount).toBe(3);
+    expect(result?.state.players[0].donCostArea.filter((don) => don.state === "RESTED")).toHaveLength(3);
+  });
+
+  it("accumulates trash totals across self and hand cost steps", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const sourceCardInstanceId = state.players[0].characters[0]!.instanceId;
+
+    const result = payCosts(
+      state,
+      [{ type: "TRASH_SELF" }, { type: "TRASH_FROM_HAND", amount: 1 }],
+      0,
+      cardDb,
+      sourceCardInstanceId,
+    );
+
+    expect(result?.costResult.cardsTrashedCount).toBe(2);
+    expect(result?.costResult.cardsTrashedInstanceIds).toHaveLength(2);
+  });
+
   it("applyCostSelection actually removes cards from hand", () => {
     const { state } = setupGame();
     const controller = 0 as const;
@@ -95,7 +128,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
       controller,
       cardDb,
       "char-0-v1",
-      block,
+      block, resolverExecutionServices
     );
 
     // Should prompt for selection (not auto-pay)
@@ -133,7 +166,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
       controller,
       cardDb,
       "char-0-v1",
-      block,
+      block, resolverExecutionServices
     );
 
     expect(costResult.pendingPrompt).toBeTruthy();

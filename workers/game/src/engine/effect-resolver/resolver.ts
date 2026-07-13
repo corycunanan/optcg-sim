@@ -23,8 +23,8 @@ import type { EffectResolverResult, ActionResult, ActionHandler } from "./types.
 import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import { pushBatchResumeFrame, processRemainingTriggers } from "./resume.js";
-import { setReplacementDispatcher } from "../replacements.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
+import type { EffectResolverServices } from "./services.js";
 import {
   SIMULTANEOUS_ACTION_TYPES,
   isSimultaneousGroupStart,
@@ -43,7 +43,7 @@ import * as play from "./actions/play.js";
 import * as handDeck from "./actions/hand-deck.js";
 import * as effects from "./actions/effects.js";
 import * as battleActions from "./actions/battle-actions.js";
-import { executeChooseValue, executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
+import { executeChooseValue, executePlayerChoice, executeOpponentAction, executeReuseEffect } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
 import { consumeResolutionAction, isEngineTerminated, terminateForEngineContract } from "../engine-limits.js";
 
@@ -114,7 +114,16 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   GIVE_OPPONENT_DON_TO_OPPONENT: don.executeGiveOpponentDonToOpponent,
 
   // Play / state
-  PLAY_CARD: play.executePlayCard,
+  PLAY_CARD: (state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets) =>
+    play.executePlayCard(
+      state,
+      action,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      preselectedTargets,
+    ),
   PLAY_SELF: play.executePlaySelf,
   SET_ACTIVE: play.executeSetActive,
   SET_REST: play.executeSetRest,
@@ -182,22 +191,31 @@ if (_missingActionHandlers.length > 0) {
   );
 }
 
-// Wire up circular dependencies for choice handlers
-setChoiceDependencies({
-  executeActionChain,
-  executeEffectAction,
-  resolveEffect,
-});
-
-// OPT-237: ACTIVATE_EVENT_FROM_TRASH recursively resolves the target Event's
-// [Main] block, so play.ts needs a reference back to resolveEffect.
-play.setPlayDependencies({ resolveEffect });
-
-// Install the action dispatcher for replacement effects so their substitute
-// actions (SET_REST, TRASH_CARD, MODIFY_POWER, …) run through the real
-// handlers. Registered here to avoid a resolver → replacements → resolver
-// import cycle.
-setReplacementDispatcher(executeActionChain);
+/** Construction-complete recursive services shared by every resolver frame. */
+const completeResolverServices: EffectResolverServices = {
+  executeActionChain: (state, actions, sourceCardInstanceId, controller, cardDb, initialResultRefs) =>
+    executeActionChain(state, actions, sourceCardInstanceId, controller, cardDb, initialResultRefs),
+  executeEffectAction: (
+    state,
+    action,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    preselectedTargets,
+  ) => executeEffectAction(
+    state,
+    action,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    preselectedTargets,
+  ),
+  resolveEffect: (state, block, sourceCardInstanceId, controller, cardDb) =>
+    resolveEffect(state, block, sourceCardInstanceId, controller, cardDb),
+};
+export const resolverExecutionServices = Object.freeze(completeResolverServices);
 
 // ─── Post-cost condition gate (OPT-437) ──────────────────────────────────────
 
@@ -316,7 +334,14 @@ export function resolveEffect(
   let costResult: CostResult | undefined;
   if (block.costs && block.costs.length > 0) {
     const costPayResult = payCostsWithSelection(
-      state, block.costs, 0, controller, cardDb, sourceCardInstanceId, block,
+      state,
+      block.costs,
+      0,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      block,
+      resolverExecutionServices,
     );
 
     if (costPayResult.cannotPay) {
@@ -780,7 +805,16 @@ export function executeEffectAction(
   }
   const handler = ACTION_HANDLERS[action.type];
   if (handler) {
-    return handler(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
+    return handler(
+      state,
+      action,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      preselectedTargets,
+      resolverExecutionServices,
+    );
   }
   // Boot validation makes this unreachable for authored schemas. Treat any
   // untrusted/runtime drift as a rules-visible terminal engine contract fault.

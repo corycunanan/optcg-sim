@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-446 — prompt-guard polish.
  *
@@ -134,7 +135,7 @@ function sessionWithSelectPrompt(): { session: TestAccess; ws: MockWebSocket } {
     id: "opt446-select-block",
     costs: [{ type: "PLACE_FROM_TRASH_TO_DECK", amount: 2 } as Cost],
   } as EffectBlock;
-  const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+  const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
   expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
   const session = makeSession(

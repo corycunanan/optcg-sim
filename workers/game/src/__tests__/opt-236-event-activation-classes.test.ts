@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-236 — C1: Split EVENT_ACTIVATED into three distinct event classes.
  *
@@ -225,7 +226,7 @@ describe("OPT-236 — event class emission", () => {
       0,
       cardDb,
       new Map<string, EffectResult>(),
-      [evtInstance.instanceId],
+      [evtInstance.instanceId], resolverExecutionServices
     );
 
     const emitted = result.events.map((e) => e.type);

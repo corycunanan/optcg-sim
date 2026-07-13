@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * First-pass schema smoke coverage for ST30 / OP16 encodings.
  */
@@ -88,12 +89,12 @@ describe("ST30 / OP16 first-pass schema smoke", () => {
       1,
       cardDb,
       new Map<string, EffectResult>(),
-      [allyInst.instanceId],
+      [allyInst.instanceId], resolverExecutionServices
     );
 
     expect(promptResult.pendingPrompt).toBeDefined();
     const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb);
+    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
 
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
     expect(remainingIds).toEqual([allyInst.instanceId]);

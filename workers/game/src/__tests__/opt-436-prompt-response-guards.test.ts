@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-436 — duplicate/mismatched prompt responses must not wedge the match.
  *
@@ -102,7 +103,7 @@ function sessionWithSelectPrompt(): { session: TestAccess; ws: MockWebSocket } {
   state = { ...state, players: newPlayers };
 
   const block = makeBlock([{ type: "PLACE_FROM_TRASH_TO_DECK", amount: 2 } as Cost]);
-  const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block);
+  const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
   expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
   const session = new GameSession(

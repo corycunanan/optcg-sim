@@ -1,3 +1,4 @@
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-453 — Deck-placement costs complete the canonical zone transition.
  *
@@ -205,7 +206,7 @@ describe("OPT-453 — compound self+trash cost: DON return and fresh identity", 
     const block = OP10_026_KINEMON.effects[0] as EffectBlock;
 
     // Single candidate → straight to arrange.
-    const pay = payCostsWithSelection(state, [cost], 0, 0, cardDb, source.instanceId, block);
+    const pay = payCostsWithSelection(state, [cost], 0, 0, cardDb, source.instanceId, block, resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
     const done = resumeFromStack(
       pay.state,

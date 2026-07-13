@@ -20,6 +20,8 @@
 
 6. **Persisted deterministic execution context.** RNG state, monotonic ID allocation, logical time, the resolver action budget, and trace metadata live in `GameState.executionContext`. Production creates one cryptographically seeded context at the `GameSession` boundary; tests and replays inject a recorded context. No core engine path reads ambient randomness or wall-clock time.
 
+7. **Explicit runtime services.** Executable resolver dependencies are passed through the typed, immutable `EffectResolverServices` bundle. Runtime functions never enter persisted `GameState`, and replacement execution cannot fall back to a missing module-global dispatcher.
+
 ---
 
 ## Core Components
@@ -87,7 +89,7 @@ graph TB
 | **Cost Calculator** | Computes effective costs for playing cards and activating effects, accounting for cost modifiers and the modifier layer system. |
 | **Defeat Checker** | Evaluates state-based loss conditions (life-out, deck-out) after every pipeline execution. |
 | **Trigger System** | Registers, matches, and queues triggers from active effect blocks when game events are emitted. |
-| **Effect Resolver** | Resolves a queued trigger or activated effect: evaluates conditions, pays costs, executes the action chain. |
+| **Effect Resolver** | Resolves a queued trigger or activated effect: evaluates conditions, pays costs, and executes the action chain through explicit runtime services. Cost orchestration delegates to acyclic payability, target, prompt, payment, and resume modules behind the stable `cost-handler.ts` façade. |
 | **Target Resolver** | Evaluates target specifications against the current game state, applying filters, count constraints, and aggregate constraints. |
 | **Modifier Layer System** | Computes effective power and cost for any card by applying ordered modifier layers to the base printed value. |
 | **Prohibition Registry** | Flat collection of active "cannot X" restrictions, scanned at pipeline step 2. |
@@ -96,6 +98,7 @@ graph TB
 | **Scheduled Action Queue** | Priority queue of deferred actions (end-of-turn obligations, future-phase triggers) processed at their designated timing. |
 | **Event Bus** | Typed event dispatcher. Actions emit events; the trigger system and other observers subscribe. |
 | **Execution Context** | Persisted source of RNG, IDs, logical timestamps, action-budget accounting, and replay trace metadata. |
+| **Resolver Services** | Immutable, non-serialized function dependencies used by action, cost, resume, and replacement execution. |
 
 ---
 
