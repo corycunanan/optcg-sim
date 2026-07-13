@@ -371,7 +371,7 @@ export function handleAwaitingCostSelection(
         targetInstanceIds: [...existing.targetInstanceIds, ...moved.transitions.map((transition) => transition.fact.newInstanceId)],
         count: existing.count + moved.transitions.length,
       });
-      events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: 1, reason: "cost" } });
+      events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: 1, reason: "cost", from: "LIFE" } });
       // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
       // Kalgara/Bonney-style watchers fire on cost payments too.
       for (const transition of moved.transitions) {
@@ -664,7 +664,7 @@ export function handleAwaitingCostSelection(
       events.push({
         type: "CARD_TRASHED",
         playerIndex: controller,
-        payload: { count: selected.length, reason: "cost" },
+        payload: { count: selected.length, reason: "cost", from: cost.type === "TRASH_FROM_HAND" ? "HAND" : "CHARACTER" },
       });
     }
   } else {

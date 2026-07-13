@@ -72,7 +72,7 @@ export function executeTrashFromLife(
     { position: "TOP" },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { count, reason: "life_trash" } });
+  events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { count, reason: "life_trash", from: "LIFE" } });
   // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
   // Kalgara/Bonney-style watchers fire on effect-driven life trashes too.
   for (const transition of moved.transitions) {
@@ -496,7 +496,7 @@ export function executeTrashFaceUpLife(
     { position: "TOP" },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: faceUp.length, reason: "face_up_life" } });
+  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: faceUp.length, reason: "face_up_life", from: "LIFE" } });
 
   return {
     state: moved.state,

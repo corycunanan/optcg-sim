@@ -81,6 +81,15 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
 
     expect(result?.costResult.cardsTrashedCount).toBe(2);
     expect(result?.costResult.cardsTrashedInstanceIds).toHaveLength(2);
+    const handTrash = result?.events.find(
+      (event) =>
+        event.type === "CARD_TRASHED" && event.payload?.from === "HAND",
+    );
+    expect(handTrash?.payload).toMatchObject({
+      count: 1,
+      reason: "cost",
+      from: "HAND",
+    });
   });
 
   it("applyCostSelection actually removes cards from hand", () => {
@@ -197,6 +206,14 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
     expect(handAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
     expect(trashAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
     expect(handAfter.length).toBe(handBefore.length - 1);
+    const trashed = resumeResult.events.find(
+      (event) => event.type === "CARD_TRASHED",
+    );
+    expect(trashed?.payload).toMatchObject({
+      count: 1,
+      reason: "cost",
+      from: "HAND",
+    });
   });
 
   it("TRASH_FROM_HAND as action (not cost) with preselection works", () => {
@@ -240,11 +257,27 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
 
       const handAfter = resumeResult.state.players[controller].hand;
       expect(handAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
+      const trashed = resumeResult.events.find(
+        (event) => event.type === "CARD_TRASHED",
+      );
+      expect(trashed?.payload).toMatchObject({
+        count: 1,
+        reason: "effect",
+        from: "HAND",
+      });
     } else {
       // Single card → auto-selected, no prompt
       expect(chainResult.pendingPrompt).toBeUndefined();
       const handAfter = chainResult.state.players[controller].hand;
       expect(handAfter.length).toBe(0);
+      const trashed = chainResult.events.find(
+        (event) => event.type === "CARD_TRASHED",
+      );
+      expect(trashed?.payload).toMatchObject({
+        count: 1,
+        reason: "effect",
+        from: "HAND",
+      });
     }
   });
 });

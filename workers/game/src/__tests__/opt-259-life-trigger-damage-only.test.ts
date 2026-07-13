@@ -301,7 +301,12 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     );
 
     expect(result.succeeded).toBe(true);
-    expect(result.events.some((e) => e.type === "CARD_TRASHED")).toBe(true);
+    const trashed = result.events.find((event) => event.type === "CARD_TRASHED");
+    expect(trashed?.payload).toMatchObject({
+      count: 1,
+      reason: "life_trash",
+      from: "LIFE",
+    });
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
     expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
     expect(result.state.players[0].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);

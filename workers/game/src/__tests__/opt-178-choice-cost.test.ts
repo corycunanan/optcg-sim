@@ -397,6 +397,14 @@ describe("OPT-178: CHOICE cost", () => {
       expect(p0.characters.some((c) => c?.instanceId === charId)).toBe(true);
       // DRAW resolved.
       expect(p0.deck.length).toBe(deckSizeBefore - 1);
+      const trashed = final.events.find(
+        (event) => event.type === "CARD_TRASHED",
+      );
+      expect(trashed?.payload).toMatchObject({
+        count: 1,
+        reason: "cost",
+        from: "HAND",
+      });
     });
 
     it("branch 1 (character): player picks character branch → character-pick prompt → effect resolves", () => {
@@ -435,6 +443,14 @@ describe("OPT-178: CHOICE cost", () => {
       expect(p0.hand.length).toBe(handSizeBefore + 1);
       // DRAW resolved.
       expect(p0.deck.length).toBe(deckSizeBefore - 1);
+      const trashed = final.events.find(
+        (event) => event.type === "CARD_TRASHED",
+      );
+      expect(trashed?.payload).toMatchObject({
+        count: 1,
+        reason: "cost",
+        from: "CHARACTER",
+      });
     });
   });
 });

@@ -1,7 +1,7 @@
 // Spectator scenario: an Event card resolves from hand to trash, and an
 // opponent Character ([On K.O.] holder) is K.O.'d as the effect's payload.
-// Exercises the `kind: "ko"` flight when the cause is EFFECT rather than
-// BATTLE — same shrink + trash flight, but with no preceding rest visual.
+// Exercises the transform-class source fizzle when the cause is EFFECT rather
+// than BATTLE — no trash flight and no preceding rest visual.
 // Minotaur is chosen as the defender so the [On K.O.] trigger lights up the
 // trigger-animation chain in `card-animation-layer`.
 
@@ -52,6 +52,16 @@ const playEvent: GameEvent = {
   timestamp: 1,
 };
 
+const activateEvent: GameEvent = {
+  type: "EVENT_ACTIVATED_FROM_HAND",
+  playerIndex: 0,
+  payload: {
+    cardId: EVENT_CARD.cardId,
+    cardInstanceId: EVENT_CARD.instanceId,
+  },
+  timestamp: 2,
+};
+
 const koTarget: GameEvent = {
   type: "CARD_KO",
   playerIndex: 1,
@@ -63,7 +73,7 @@ const koTarget: GameEvent = {
     causeCardInstanceId: EVENT_CARD.instanceId,
     preKO_donCount: 0,
   },
-  timestamp: 2,
+  timestamp: 3,
 };
 
 export const characterKoedByEffectScenario: Scenario = {
@@ -71,7 +81,7 @@ export const characterKoedByEffectScenario: Scenario = {
   title: "Character K.O.'d by effect",
   category: "ko",
   description:
-    "An Event card resolves from hand to trash, and an opponent Character with an [On K.O.] trigger is K.O.'d as the effect's target. Exercises the kind: \"ko\" flight when cause is EFFECT — no rest precedes the K.O., and the effect-source flight overlaps the K.O. shrink for sequencing visibility.",
+    "An Event card and an opponent Character with an [On K.O.] trigger are consumed in sequence. Both dissolve at their source and materialize through the destination trash pile receipt; the K.O. has no preceding rest visual.",
   inputMode: "spectator",
   cardsUsed: ["OP01-001", "OP01-030", "OP01-060", "OP02-087"],
   initialState: {
@@ -115,7 +125,8 @@ export const characterKoedByEffectScenario: Scenario = {
   },
   script: [
     { type: "event", event: playEvent },
-    { type: "wait", ms: 400 },
+    { type: "event", event: activateEvent },
+    { type: "wait", ms: 1600 },
     { type: "event", event: koTarget },
   ],
 };

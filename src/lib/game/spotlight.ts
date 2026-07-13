@@ -16,6 +16,16 @@ export interface SpotlightPresentation {
   timestamp: number;
 }
 
+/** Stable zone-registry key for a card staged in the public spotlight. The
+ *  transition layer uses the same key to start travel/transform exits from
+ *  the card's actual center-board footprint. */
+export function spotlightCardZoneKey(
+  presentationId: string,
+  card: SpotlightCard
+): string {
+  return `spotlight-${presentationId}-${card.instanceId ?? card.cardId}`;
+}
+
 /** Keep board actions inert while a spotlight is visible or another player answers. */
 export function shouldBlockBoardForSpotlight(
   hasActiveSpotlight: boolean,
@@ -70,8 +80,7 @@ export function eventToSpotlight(
             instanceId: event.payload.cardInstanceId,
           },
         ],
-        source:
-          event.type === "EVENT_ACTIVATED_FROM_HAND" ? "hand" : "trash",
+        source: event.type === "EVENT_ACTIVATED_FROM_HAND" ? "hand" : "trash",
       };
     }
     case "COUNTER_USED": {

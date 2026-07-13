@@ -5,23 +5,23 @@ import type { CardDb, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { Card } from "../card";
 import { BOARD_CARD_W, BOARD_CARD_H } from "./constants";
+import { PileReceipt } from "./pile-receipt";
 
 export const DroppableTrashZone = React.memo(function DroppableTrashZone({
   trash,
   cardDb,
   onClickTrash,
   zoneKey,
-  arrivingInstanceIds,
+  arrivingCount = 0,
   style,
 }: {
   trash: CardInstance[];
   cardDb: CardDb;
   onClickTrash?: () => void;
   zoneKey?: string;
-  /** Instance IDs currently flying into this trash zone — hidden from the
-   *  top-card render + count until their flight completes, so the trash
-   *  doesn't pop to the new top before the ghost lands (OPT-274). */
-  arrivingInstanceIds?: Set<string>;
+  /** Number of cards still traveling/transforming into this pile. The new
+   *  top/count stay held until the transition completes. */
+  arrivingCount?: number;
   style?: React.CSSProperties;
 }) {
   const zonePos = useZonePosition();
@@ -33,13 +33,10 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
         else zonePos.unregister(zoneKey);
       }
     },
-    [zoneKey, zonePos],
+    [zoneKey, zonePos]
   );
 
-  const visibleTrash =
-    arrivingInstanceIds && arrivingInstanceIds.size > 0
-      ? trash.filter((c) => !arrivingInstanceIds.has(c.instanceId))
-      : trash;
+  const visibleTrash = arrivingCount > 0 ? trash.slice(arrivingCount) : trash;
   const topCard = visibleTrash.length > 0 ? visibleTrash[0] : undefined;
 
   return (
@@ -48,18 +45,22 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
       className="relative flex items-center justify-center"
       style={{ ...style, width: BOARD_CARD_W, height: BOARD_CARD_H }}
     >
-      <Card
-        variant="trash"
-        data={{ cardDb, card: topCard }}
-        empty={!topCard}
-        emptyLabel="TRASH"
-        overlays={
-          visibleTrash.length > 1 ? { countBadge: visibleTrash.length } : undefined
-        }
-        interaction={{ clickable: !!onClickTrash }}
-        onClick={onClickTrash}
-        className="relative z-[1]"
-      />
+      <PileReceipt visibleCount={visibleTrash.length}>
+        <Card
+          variant="trash"
+          data={{ cardDb, card: topCard }}
+          empty={!topCard}
+          emptyLabel="TRASH"
+          overlays={
+            visibleTrash.length > 1
+              ? { countBadge: visibleTrash.length }
+              : undefined
+          }
+          interaction={{ clickable: !!onClickTrash }}
+          onClick={onClickTrash}
+          className="relative z-[1]"
+        />
+      </PileReceipt>
     </div>
   );
 });

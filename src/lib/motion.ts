@@ -8,6 +8,7 @@
  * - motionPresets.variants — enter/exit animation states
  * - motionPresets.board.card — hover, tap, hand interactions
  * - motionPresets.board.flight — zone-to-zone card movement
+ * - motionPresets.board.pile — stacked-zone receipt feedback
  */
 
 // ─── UI Transitions ──────────────────────────────────────────────────
@@ -156,6 +157,21 @@ const board = {
       opacity: [1, 0.35, 1] as number[],
       transition: { duration: 0.1, ease: "easeOut" as const },
     },
+    /** Transform-class exit for cards that are destroyed or consumed
+     *  (OPT-465). Dissolves at the source instead of implying that the card
+     *  still exists along a travel path to the destination pile. */
+    fizzle: {
+      opacity: [1, 0] as number[],
+      scale: [1, 0.85] as number[],
+      y: [0, -12] as number[],
+      transition: { duration: 0.36, ease: "easeOut" as const },
+    },
+    /** Reduced-motion transform exit: retain the state change as a short
+     *  cross-fade without scale or spatial drift. */
+    fizzleReduced: {
+      opacity: [1, 0] as number[],
+      transition: { duration: 0.1, ease: "easeOut" as const },
+    },
     /** Summon entry (OPT-274). Pop-in after a card lands in its destination
      *  zone — scale up from 0.9 and fade from 0 with a short bouncy spring.
      *  Composes with whatever ambient state (active/rest/attacking) the
@@ -193,6 +209,49 @@ const board = {
      *  `zoneMove` timing so multi-flight batches read as a coherent set. */
     donAttach: { duration: 0.22, ease: "easeOut" as const },
   },
+  pile: {
+    /** Destination-pile receipt: one quick top-card pulse after a batch has
+     *  fully arrived. A short rise plus critically damped spring settle keeps
+     *  the full acknowledgment at 200ms without bounce. */
+    pop: {
+      peak: { scale: 1.06 },
+      peakTransition: { duration: 0.06, ease: "easeOut" as const },
+      settled: { scale: 1 },
+      settleTransition: {
+        type: "spring" as const,
+        visualDuration: 0.14,
+        bounce: 0,
+      },
+    },
+    /** Floating +N arrival acknowledgment. The component supplies the text;
+     *  this preset owns the full opacity + transform path. */
+    delta: {
+      initial: { opacity: 0, y: 0 },
+      animate: {
+        opacity: [0, 1, 1, 0] as number[],
+        y: [0, -4, -12, -20] as number[],
+      },
+      transition: {
+        duration: 0.7,
+        ease: "easeOut" as const,
+        times: [0, 0.15, 0.55, 1] as number[],
+      },
+    },
+    /** Reduced-motion pile delta: preserve the count acknowledgment on the
+     *  same clock, but remove all spatial movement. */
+    deltaReduced: {
+      initial: { opacity: 0 },
+      animate: { opacity: [0, 1, 1, 0] as number[] },
+      transition: {
+        duration: 0.7,
+        ease: "easeOut" as const,
+        times: [0, 0.15, 0.55, 1] as number[],
+      },
+    },
+    /** Debounce window for folding staggered siblings into one +N receipt.
+     *  It is slightly longer than the 60ms flight stagger. */
+    aggregateWindowMs: 80,
+  },
   stateChange: {
     /** Resting (attack/block/cost): decisive, snappy */
     rest: { type: "spring" as const, stiffness: 300, damping: 25 },
@@ -224,8 +283,14 @@ export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
 export const cardReject = board.card.reject;
 export const cardRejectReduced = board.card.rejectReduced;
+export const cardFizzle = board.card.fizzle;
+export const cardFizzleReduced = board.card.fizzleReduced;
 export const cardEntry = board.card.entry;
 export const handCardHover = board.card.handHover;
 export const cardTransitions = board.flight;
+export const pilePop = board.pile.pop;
+export const pileDelta = board.pile.delta;
+export const pileDeltaReduced = board.pile.deltaReduced;
+export const pileReceiptAggregateWindowMs = board.pile.aggregateWindowMs;
 export const cardRest = board.stateChange.rest;
 export const cardActivate = board.stateChange.activate;

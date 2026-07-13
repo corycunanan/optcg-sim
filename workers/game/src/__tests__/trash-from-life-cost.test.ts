@@ -81,7 +81,12 @@ describe("TRASH_FROM_LIFE cost — deterministic top-of-life payment (EB03-055)"
     expect(p0.life.some((l) => l.instanceId === topLifeId)).toBe(false);
     // …and the Straw Hat Crew gate passed: −1 (cost) +2 (added from deck).
     expect(p0.life.length).toBe(lifeBefore.length + 1);
-    expect(step.events.some((e) => e.type === "CARD_TRASHED")).toBe(true);
+    const trashed = step.events.find((event) => event.type === "CARD_TRASHED");
+    expect(trashed?.payload).toMatchObject({
+      count: 1,
+      reason: "cost",
+      from: "LIFE",
+    });
   });
 
   it("still pays the cost when the post-cost leader gate fails", () => {
@@ -136,7 +141,12 @@ describe("TRASH_FROM_LIFE cost — TOP_OR_BOTTOM offers a position choice (OP03-
     expect(p0.life.some((l) => l.instanceId === bottomLifeId)).toBe(false);
     // …then "add up to 1 from the top of your deck": −1 +1.
     expect(p0.life.length).toBe(lifeBefore.length);
-    expect(step.events.some((e) => e.type === "CARD_TRASHED")).toBe(true);
+    const trashed = step.events.find((event) => event.type === "CARD_TRASHED");
+    expect(trashed?.payload).toMatchObject({
+      count: 1,
+      reason: "cost",
+      from: "LIFE",
+    });
   });
 });
 
