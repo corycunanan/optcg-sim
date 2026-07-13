@@ -104,6 +104,15 @@ function ScriptedScenarioBody({ scenario }: { scenario: Scenario }) {
     matchClosed: session.game.matchClosed,
     canUndo: session.game.canUndo,
     actionRejection: scenario.actionRejection ?? null,
+    acceptedUpdate: runner.eventLog.length > 0
+      ? {
+          action: { type: "MANUAL_EFFECT", description: "Sandbox event" },
+          sequence: runner.eventLog.length,
+        }
+      : null,
+    promptRespondingPlayer:
+      scenario.promptRespondingPlayer ??
+      (runner.activePrompt ? session.game.myIndex : null),
     interactionMode: gate.interactionMode,
   };
 
@@ -168,6 +177,8 @@ function PlaygroundScenarioBody({ scenario }: { scenario: Scenario }) {
     activePrompt: session.game.activePrompt,
     matchClosed: session.game.matchClosed,
     canUndo: session.game.canUndo,
+    promptRespondingPlayer:
+      session.game.gameState.pendingPrompt?.respondingPlayer ?? null,
     interactionMode: "full",
   };
 

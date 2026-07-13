@@ -20,6 +20,11 @@ export interface ActionRejection {
   sequence: number;
 }
 
+export interface AcceptedGameUpdate {
+  action: GameAction;
+  sequence: number;
+}
+
 const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
   "ARRANGE_TOP_CARDS",
   "PLAYER_CHOICE",
@@ -53,6 +58,9 @@ export function useGameWs(
   const rejectionSequenceRef = useRef(0);
   const [actionRejection, setActionRejection] =
     useState<ActionRejection | null>(null);
+  const acceptedUpdateSequenceRef = useRef(0);
+  const [acceptedUpdate, setAcceptedUpdate] =
+    useState<AcceptedGameUpdate | null>(null);
 
   const url = useMemo(
     () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
@@ -80,6 +88,11 @@ export function useGameWs(
         break;
       case "game:update":
         setActionRejection(null);
+        acceptedUpdateSequenceRef.current += 1;
+        setAcceptedUpdate({
+          action: msg.action,
+          sequence: acceptedUpdateSequenceRef.current,
+        });
         setGameState(msg.state);
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
@@ -171,6 +184,7 @@ export function useGameWs(
     connectionStatus,
     lastError,
     actionRejection,
+    acceptedUpdate,
     activePrompt,
     gameOver,
     canUndo,

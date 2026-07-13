@@ -491,6 +491,12 @@ export interface GameState {
   oneTimeModifiers: ActiveOneTimeModifier[];
   triggerRegistry: RegisteredTrigger[];
   pendingPrompt: PendingPromptState | null;
+  /**
+   * Public transport-only prompt ownership metadata. The engine leaves this
+   * unset; `filterStateForPlayer` populates it after stripping private prompt
+   * contents so non-responding clients can present waiting-state UI safely.
+   */
+  promptRespondingPlayer?: 0 | 1 | null;
   effectStack: EffectStackFrame[];
   // Log
   eventLog: GameEvent[];

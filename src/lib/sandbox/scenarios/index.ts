@@ -12,6 +12,10 @@ import { rushAttackScenario } from "./combat/rush-attack";
 import { drawOneScenario } from "./draws/draw-1";
 import { drawTwoScenario } from "./draws/draw-2";
 import { actionRejectedScenario } from "./effects/action-rejected";
+import {
+  publicRevealSpotlightScenario,
+  waitingRevealSpotlightScenario,
+} from "./effects/public-reveal-spotlight";
 import { peekTopThreeScenario } from "./draws/peek-top-3";
 import { characterKoedByDamageScenario } from "./ko/character-koed-by-damage";
 import { characterKoedByEffectScenario } from "./ko/character-koed-by-effect";
@@ -47,6 +51,8 @@ export const scenarios: Scenario[] = [
   lifeToHandScenario,
   lifeToTrashScenario,
   actionRejectedScenario,
+  publicRevealSpotlightScenario,
+  waitingRevealSpotlightScenario,
   selectTargetScenario,
   arrangeTopFourScenario,
   playerChoiceThreeOptionsScenario,

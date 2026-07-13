@@ -25,7 +25,7 @@ import {
 import { midTop, computeBoardScaling } from "./board-geometry";
 import { useBoardDnd } from "./use-board-dnd";
 import { boardCollisionDetection } from "./board-collision";
-import { useHandOrder } from "@/hooks/use-hand-order";
+import { useHandOrder, useHiddenHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
@@ -45,9 +45,14 @@ import { useCardTransitions } from "@/hooks/use-card-transitions";
 import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type { RedistributeTransfer } from "../redistribute-don-overlay";
-import type { ActionRejection } from "@/hooks/use-game-ws";
+import type {
+  AcceptedGameUpdate,
+  ActionRejection,
+} from "@/hooks/use-game-ws";
 import { ActionFeedbackProvider } from "./action-feedback";
 import { useInPlaceTargetSelection } from "./use-in-place-target-selection";
+import { useCardSpotlight } from "@/hooks/use-card-spotlight";
+import { SpotlightOverlay } from "../spotlight-overlay";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -66,6 +71,8 @@ export interface BoardLayoutProps {
   matchClosed: boolean;
   canUndo: boolean;
   actionRejection?: ActionRejection | null;
+  acceptedUpdate?: AcceptedGameUpdate | null;
+  promptRespondingPlayer?: 0 | 1 | null;
   /** Suppresses board-driven user input. Default `"full"` (production game).
    *  `"spectator"` and `"responseOnly"` are sandbox-only modes (OPT-290) that
    *  disable drag and right-click menus while leaving prompt modals usable. */
@@ -110,6 +117,8 @@ function BoardLayoutInner({
   eventLog,
   activePrompt,
   actionRejection = null,
+  acceptedUpdate = null,
+  promptRespondingPlayer = null,
   onAction,
   onLeave,
   matchClosed,
@@ -121,7 +130,14 @@ function BoardLayoutInner({
   const dndDisabled = interactionMode !== "full";
   const zoneRegistry = useZonePosition();
   const viewport = viewportSize;
-  const promptType = activePrompt?.promptType ?? null;
+  const spotlight = useCardSpotlight({
+    eventLog,
+    acceptedUpdate,
+    myIndex,
+    promptRespondingPlayer,
+  });
+  const boardPrompt = spotlight.isBlockingPrompt ? null : activePrompt;
+  const promptType = boardPrompt?.promptType ?? null;
   const [hiddenPromptType, setHiddenPromptType] = useState<string | null>(null);
   const isPromptHidden = hiddenPromptType === promptType;
   const [zonePreview, setZonePreview] = useState<
@@ -132,7 +148,7 @@ function BoardLayoutInner({
 
   /* ── Redistribute DON prompt state ───────────────────────────── */
 
-  const redistributePrompt = activePrompt?.promptType === "REDISTRIBUTE_DON" ? activePrompt : null;
+  const redistributePrompt = boardPrompt?.promptType === "REDISTRIBUTE_DON" ? boardPrompt : null;
   const redistributePromptKey = redistributePrompt
     ? [
         redistributePrompt.validSourceCardIds.join(","),
@@ -213,7 +229,7 @@ function BoardLayoutInner({
   /* ── In-place SELECT_TARGET prompt state ────────────────────── */
 
   const selectTargetPrompt =
-    activePrompt?.promptType === "SELECT_TARGET" ? activePrompt : null;
+    boardPrompt?.promptType === "SELECT_TARGET" ? boardPrompt : null;
   const inPlaceTargetSelection = useInPlaceTargetSelection({
     prompt: selectTargetPrompt,
     me,
@@ -239,6 +255,7 @@ function BoardLayoutInner({
   const { orderedHand: playerOrderedHand, reorder: reorderPlayerHand } = useHandOrder(
     me?.hand ?? [],
   );
+  const opponentOrderedHand = useHiddenHandOrder(opp?.hand ?? []);
 
   const {
     activeDrag,
@@ -252,7 +269,7 @@ function BoardLayoutInner({
     onAction,
     handleRedistributeDrop,
     reorderPlayerHand,
-    dndDisabled || targetSelectionActive,
+    dndDisabled || targetSelectionActive || spotlight.isBlockingPrompt,
   );
 
   const reducedMotion = useReducedMotion();
@@ -330,7 +347,7 @@ function BoardLayoutInner({
   }, [donCountAdjustments, inFlightDonAdjustByCard]);
 
   const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
-  const oppHandAnim = useHandAnimationState(cardAnimations, opp?.hand ?? [], "o-hand");
+  const oppHandAnim = useHandAnimationState(cardAnimations, opponentOrderedHand, "o-hand");
 
   /* ── Sleeve/DON URLs per player index ────────────────────────── */
 
@@ -454,7 +471,7 @@ function BoardLayoutInner({
             zoom: boardScale,
           }}
         >
-          <HandLayer cards={opp?.hand ?? []} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={opp?.sleeveUrl} />
+          <HandLayer cards={opponentOrderedHand} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={opp?.sleeveUrl} />
         </div>
       </div>
 
@@ -490,10 +507,10 @@ function BoardLayoutInner({
             top={midTop}
             isMyTurn={isMyTurn}
             phase={bs.phase}
-            canEndPhase={bs.canEndPhase && !activePrompt}
-            canPass={bs.canPass && !activePrompt}
+            canEndPhase={bs.canEndPhase && !boardPrompt}
+            canPass={bs.canPass && !boardPrompt}
             inBattle={bs.inBattle}
-            activePrompt={activePrompt}
+            activePrompt={boardPrompt}
             rejectionReason={actionRejection?.reason ?? null}
             battleInfo={bs.battleInfo}
             blockerMode={bs.inBlockStep ? {
@@ -570,10 +587,16 @@ function BoardLayoutInner({
             cardDb={cardDb}
             enableDrag={
               !dndDisabled &&
+              !spotlight.isBlockingPrompt &&
               !targetSelectionActive &&
               (bs.canInteract || bs.canDragCounter)
             }
-            counterMode={!dndDisabled && !targetSelectionActive && bs.canDragCounter}
+            counterMode={
+              !dndDisabled &&
+              !spotlight.isBlockingPrompt &&
+              !targetSelectionActive &&
+              bs.canDragCounter
+            }
             availableDon={
               !dndDisabled && bs.canInteract
                 ? (me?.donCostArea.filter((don) => don.state === "ACTIVE").length ?? 0)
@@ -586,8 +609,18 @@ function BoardLayoutInner({
         </div>
       </div>
 
+      <SpotlightOverlay
+        presentation={spotlight.presentation}
+        cardDb={cardDb}
+        myIndex={myIndex}
+        isWaiting={spotlight.isWaiting}
+        view={spotlight.view}
+        onDismiss={spotlight.dismiss}
+        onToggleView={spotlight.toggleView}
+      />
+
       <BoardModals
-        activePrompt={activePrompt}
+        activePrompt={boardPrompt}
         isPromptHidden={isPromptHidden}
         onHide={() => setHiddenPromptType(promptType)}
         cardDb={cardDb}

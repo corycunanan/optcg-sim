@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CardInstance } from "@shared/game-types";
-import { computeReorderedCustomOrder, mergeHandOrder } from "./use-hand-order";
+import {
+  computeReorderedCustomOrder,
+  mergeHandOrder,
+  mergeHiddenHandOrder,
+} from "./use-hand-order";
 
 function makeCard(instanceId: string, cardId = "OP01-001"): CardInstance {
   return {
@@ -81,5 +85,24 @@ describe("computeReorderedCustomOrder", () => {
     const currentHand = [makeCard("A"), makeCard("B"), makeCard("C"), makeCard("D")];
     const result = computeReorderedCustomOrder(["A", "B", "C"], currentHand, "D", "A");
     expect(result).toEqual(["D", "A", "B", "C"]);
+  });
+});
+
+describe("mergeHiddenHandOrder", () => {
+  it("inserts a newly observed hidden card at a visual random position", () => {
+    const hand = [makeCard("A"), makeCard("B"), makeCard("C"), makeCard("D")];
+    const random = () => 0.34;
+    const result = mergeHiddenHandOrder(["A", "B", "C"], hand, random)
+      .map((card) => card.instanceId);
+
+    expect(result).toEqual(["A", "D", "B", "C"]);
+  });
+
+  it("preserves surviving hidden cards and drops removed placeholders", () => {
+    const hand = [makeCard("A"), makeCard("C")];
+    const result = mergeHiddenHandOrder(["C", "B", "A"], hand)
+      .map((card) => card.instanceId);
+
+    expect(result).toEqual(["C", "A"]);
   });
 });

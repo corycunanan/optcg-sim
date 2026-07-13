@@ -104,6 +104,15 @@ export function handleArrangeSearchDeck(
   const pickDest = (sp.pick_destination ?? "HAND").toUpperCase();
   let nextState = state;
   if (validatedKeptId && kept) {
+    events.push({
+      type: "CARDS_REVEALED",
+      playerIndex: controller,
+      payload: {
+        cards: [{ instanceId: kept.instanceId, cardId: kept.cardId }],
+        source: "search",
+        visibility: "BOTH",
+      },
+    });
     if (pickDest === "LIFE" || pickDest === "LIFE_TOP") {
       // OP16-119: picked card goes to the top of Life (face-down unless the
       // schema says otherwise).
@@ -162,6 +171,15 @@ export function handleArrangeSearchTrashTheRest(
 
   let nextState = state;
   if (validatedKeptId && kept) {
+    events.push({
+      type: "CARDS_REVEALED",
+      playerIndex: controller,
+      payload: {
+        cards: [{ instanceId: kept.instanceId, cardId: kept.cardId }],
+        source: "search",
+        visibility: "BOTH",
+      },
+    });
     const moved = transitionCard(nextState, kept.instanceId, "HAND");
     if (moved) {
       nextState = moved.state;
