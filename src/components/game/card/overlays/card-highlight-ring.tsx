@@ -13,8 +13,7 @@ import type { HighlightRingColor } from "../types";
  *
  * Ring → visual treatment map:
  *   selected → green static (blocker chosen, target-picker selection)
- *   valid    → amber static (drop-target affordance)
- *   blocker  → blue static (eligible but not yet chosen)
+ *   eligible → blue static (eligible but not yet chosen)
  *   attacker → amber pulse (OPT-273 attacker glow, sustained loop)
  *   defender → amber pulse (OPT-274 defender glow — same treatment as
  *              attacker so both participants in the active battle read as
@@ -85,9 +84,7 @@ export function CardHighlightRing({
   const staticRingClass =
     color === "selected"
       ? "ring-4 ring-gb-signal-selected shadow-[0_0_10px_var(--gb-signal-selected)]"
-      : color === "blocker"
-        ? "ring-4 ring-gb-signal-eligible/60"
-        : "ring-4 ring-gb-signal-battle/70";
+      : "ring-4 ring-gb-signal-eligible/60";
 
   return (
     <div

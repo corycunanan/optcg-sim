@@ -19,8 +19,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-416 | Unify interaction grammar: drag commits, click selects | — | — | Done | [#286](https://github.com/corycunanan/optcg-sim/pull/286) | Foundation for every board interaction |
 | 2 | OPT-415 | Bug: hand dims/disables rule-mod-granted counter cards the server would accept (OPT-400 mismatch) | — | — | Done | [#288](https://github.com/corycunanan/optcg-sim/pull/288) | Fix the known legality lockout before expanding the legality layer |
 | 3 | OPT-417 | Client-side legality layer: highlights become a trustworthy contract | — | OPT-416, OPT-415 | Done | [#289](https://github.com/corycunanan/optcg-sim/pull/289) | Browser VQA passed for dimming, tooltip, and drag-target signals |
-| 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | In Review | [#294](https://github.com/corycunanan/optcg-sim/pull/294) | Independent server-authority backstop |
-| 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | Backlog | — | Reuses selection grammar and legality signals |
+| 4 | OPT-418 | Visible rejection feedback when the server refuses an action | — | — | Done | [#294](https://github.com/corycunanan/optcg-sim/pull/294) | Independent server-authority backstop |
+| 5 | OPT-419 | In-place effect targeting: SELECT_TARGET on the board when candidates are visible | — | OPT-416, OPT-417 | In Review | [#299](https://github.com/corycunanan/optcg-sim/pull/299) | Reuses selection grammar and legality signals |
 | 6 | OPT-420 | Effect activation discoverability: badge + left-click menu | — | OPT-416 | Backlog | — | Completes the menu verb |
 | 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | Backlog | — | Add input equivalence after gestures stabilize |
 | 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | Backlog | — | Completes Event presentation and public reveals |
@@ -29,7 +29,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-418 after OPT-417 VQA and merge.
+**Next up:** OPT-420 while OPT-419 is in review.
 
 ---
 
@@ -70,3 +70,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep protocol/transport failures on `game:error`; `action:rejected` is only for well-formed game actions. Do not clear rejection state when sending the next attempt—accepted `game:state`/`game:update` owns that transition.
 - **Unresolved:** In-place `SELECT_TARGET` presentation remains entirely in OPT-419. Its accepted selection should reuse the existing board selection grammar; rejected submissions already map the first selected instance to localized feedback.
 - **Pointer:** `git show e20a610`; replay `/sandbox/action-rejected` for the settled mid-zone and motion treatment.
+
+### OPT-419 → OPT-420
+**From:** session on 2026-07-12 · **Commit:** `233329a` · **PR:** #299
+
+- **Primer:** Fully visible battlefield `SELECT_TARGET` prompts now use the real board cards, blue eligible and green selected rings, explained disabled states, and explicit mid-zone Confirm/Skip controls. Hidden, stacked, and mixed-zone prompts remain modal.
+- **Read first:** `src/lib/game/target-selection.ts`, `src/components/game/board-layout/use-in-place-target-selection.ts`, `src/components/game/board-layout/field-card.tsx`, `src/components/game/board-layout/mid-zone.tsx`
+- **Gotchas / do NOT touch:** The prompt identity includes every constraint payload so selections cannot leak between prompts. Keep submission explicit; Escape and click-away clear local state. The shared model also fixes partial dual-slot selection while preserving full-slot confirmation.
+- **Unresolved:** OPT-421 still owns keyboard/ARIA equivalence for board-card selection, and OPT-464 owns spotlighting the effect source while a target prompt waits.
+- **Why this matters for OPT-420:** Effect activation should reuse the settled click/menu verb and selection vocabulary without competing with active target selection or reintroducing right-click-only discovery.

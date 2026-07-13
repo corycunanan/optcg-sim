@@ -1,10 +1,10 @@
 // Interactive scenario: a SELECT_TARGET prompt over three opponent
-// Characters. Verifies the modal renders, valid targets get the highlight
-// ring, the input gate (OPT-290) drops non-SELECT_TARGET actions and any
+// Characters. Verifies visible candidates render in place with eligible and
+// selected rings, the input gate (OPT-290) drops non-SELECT_TARGET actions and any
 // SELECT_TARGET response that doesn't pick one of the three valid IDs, and
 // that resolvePrompt advances the runner to "ended".
 
-import type { CardInstance, TurnState } from "@shared/game-types";
+import type { TurnState } from "@shared/game-types";
 import {
   makeCard,
   makeDonStack,
@@ -54,7 +54,7 @@ export const selectTargetScenario: Scenario = {
   title: "Select Target",
   category: "prompts",
   description:
-    "A SELECT_TARGET prompt over three opponent Characters. Demonstrates the input gate: only a SELECT_TARGET action whose chosen instanceId belongs to the valid set advances playback past the prompt.",
+    "A SELECT_TARGET prompt over three visible opponent Characters. Choose on the real board cards, then confirm in the mid-zone; non-candidates stay dimmed and explained.",
   inputMode: "interactive",
   cardsUsed: ["OP05-010", "ST01-006", "OP01-010"],
   initialState: {

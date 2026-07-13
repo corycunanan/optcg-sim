@@ -38,9 +38,8 @@ export type CardSize = "field" | "hand" | "modal" | "preview" | "don";
 
 export type HighlightRingColor =
   | "selected"
-  | "valid"
   | "invalid"
-  | "blocker"
+  | "eligible"
   | "attacker"
   | "defender"
   | "counter";
