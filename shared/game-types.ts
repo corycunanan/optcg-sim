@@ -263,10 +263,10 @@ export interface GameEventPayloadMap {
   TURN_STARTED: Record<string, never>;
   TURN_ENDED: Record<string, never>;
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
-  CARD_KO: { cardInstanceId: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number };
+  CARD_KO: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
-  CARD_TRASHED: { cardId?: string; cardInstanceId?: string; count?: number; reason: string; from?: string };
-  CARD_RETURNED_TO_HAND: { cardInstanceId: string; cardId: string; source?: string };
+  CARD_TRASHED: { cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
+  CARD_RETURNED_TO_HAND: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
   CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
   LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
   ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };
@@ -290,7 +290,7 @@ export interface GameEventPayloadMap {
     reason: string;
     diagnostic?: EngineLimitDiagnostic;
   };
-  CARD_RETURNED_TO_DECK: { cardInstanceId: string; cardId?: string; position?: string };
+  CARD_RETURNED_TO_DECK: { cardInstanceId: string; newCardInstanceId?: string; cardId?: string; position?: string };
   DON_SET_ACTIVE: { count: number };
   DON_RESTED: { count: number };
   CARDS_REVEALED: {
@@ -303,7 +303,7 @@ export interface GameEventPayloadMap {
   LIFE_CARD_TO_DECK: { count: number };
   LIFE_SCRIED: { cards: Array<{ instanceId: string; cardId: string }>; count: number };
   ATTACK_REDIRECTED: { newTargetInstanceId: string };
-  CARD_REMOVED_FROM_LIFE: { cardInstanceId: string };
+  CARD_REMOVED_FROM_LIFE: { cardInstanceId: string; newCardInstanceId?: string };
   EXTRA_TURN_GRANTED: Record<string, never>;
   EVENT_ACTIVATED_FROM_HAND: { cardId?: string; cardInstanceId: string; costReducedAmount?: number };
   EVENT_MAIN_RESOLVED_FROM_TRASH: { cardId?: string; cardInstanceId: string };

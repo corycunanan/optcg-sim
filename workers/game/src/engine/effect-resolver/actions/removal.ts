@@ -13,6 +13,7 @@ import { findCardInstance } from "../../state.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
+import { transitionCard, transitionCards } from "../../zone-transition.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
 // Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
@@ -87,7 +88,7 @@ export function executeKO(
       nextState = result.state;
       events.push(...result.events);
       frameEvents.push(...result.events);
-      koedIds.push(id);
+      koedIds.push(result.transition.newInstanceId);
     }
 
     if (frameEvents.length > 0 && i + 1 < unprotectedIds.length) {
@@ -158,7 +159,7 @@ export function executeReturnToHand(
     if (result) {
       nextState = result.state;
       events.push(...result.events);
-      finalizedIds.push(id);
+      finalizedIds.push(result.transition.newInstanceId);
     }
   }
 
@@ -208,7 +209,7 @@ export function executeReturnToDeck(
     if (result) {
       nextState = result.state;
       events.push(...result.events);
-      finalizedIds.push(id);
+      finalizedIds.push(result.transition.newInstanceId);
     }
   }
 
@@ -258,24 +259,26 @@ export function executeTrashCard(
       if (result) {
         nextState = result.state;
         events.push(...result.events);
-        trashedIds.push(id);
+        trashedIds.push(result.transition.newInstanceId);
       }
     } else {
-      // For hand/deck cards, move to trash
-      for (const [pi, player] of nextState.players.entries()) {
-        const inHand = player.hand.findIndex((c) => c.instanceId === id);
-        if (inHand !== -1) {
-          const card = player.hand[inHand];
-          const newHand = player.hand.filter((_, i) => i !== inHand);
-          const newTrash = [{ ...card, zone: "TRASH" as const }, ...player.trash];
-          const newPlayers = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-          newPlayers[pi] = { ...player, hand: newHand, trash: newTrash };
-          nextState = { ...nextState, players: newPlayers };
-          trashedIds.push(id);
-          events.push({ type: "CARD_TRASHED", playerIndex: pi as 0 | 1, payload: { cardInstanceId: id, reason: "effect" } });
-          break;
-        }
-      }
+      const moved = transitionCard(nextState, id, "TRASH", {
+        position: "TOP",
+        preserveSourceTriggers: true,
+      });
+      if (!moved) continue;
+      nextState = moved.state;
+      trashedIds.push(moved.fact.newInstanceId);
+      events.push({
+        type: "CARD_TRASHED",
+        playerIndex: moved.fact.owner,
+        payload: {
+          cardInstanceId: moved.fact.oldInstanceId,
+          newCardInstanceId: moved.fact.newInstanceId,
+          cardId: moved.fact.cardId,
+          reason: "effect",
+        },
+      });
     }
   }
 
@@ -354,19 +357,22 @@ export function executeTrashFromHand(
   const toTrash = selectedIds
     ? candidates.filter((c) => selectedIds.includes(c.instanceId))
     : candidates.slice(0, amount);
-  const toTrashIds = new Set(toTrash.map((c) => c.instanceId));
-  const newHand = p.hand.filter((c) => !toTrashIds.has(c.instanceId));
-  const newTrash = [...toTrash.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
+  const moved = transitionCards(
+    state,
+    toTrash.map((card) => card.instanceId),
+    "TRASH",
+    { position: "TOP", preserveSourceTriggers: true },
+  );
 
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[targetController] = { ...p, hand: newHand, trash: newTrash };
-
-  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: toTrash.length, reason: "effect" } });
+  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: moved.transitions.length, reason: "effect" } });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
-    succeeded: toTrash.length > 0,
-    result: { targetInstanceIds: toTrash.map((c) => c.instanceId), count: toTrash.length },
+    succeeded: moved.transitions.length > 0,
+    result: {
+      targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
+      count: moved.transitions.length,
+    },
   };
 }

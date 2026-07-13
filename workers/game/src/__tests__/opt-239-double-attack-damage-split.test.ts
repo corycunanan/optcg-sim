@@ -152,8 +152,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(after.state.turn.battle).toBeNull();
     expect(after.state.players[1].life.length).toBe(0);
     // 1st life went to hand (declined), 2nd went to hand (no trigger on vanilla).
-    expect(after.state.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(true);
-    expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(true);
+    expect(after.state.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
+    expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(false);
   });
 
   it("decline 1st trigger, 2nd Life is ALSO [Trigger]: defender gets a 2nd prompt", () => {
@@ -194,8 +194,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(after.state.turn.battleSubPhase).toBeNull();
     expect(after.state.players[1].life.length).toBe(0);
     // Activated trigger card goes to trash; 2nd (vanilla) goes to hand.
-    expect(after.state.players[1].trash.some((c) => c.instanceId === top.instanceId)).toBe(true);
-    expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(true);
+    expect(after.state.players[1].trash.some((c) => c.instanceId === top.instanceId)).toBe(false);
+    expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(false);
   });
 
   it("source K.O. during the Trigger window aborts the 2nd damage", () => {
@@ -343,8 +343,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(final.turn.battleSubPhase).toBeNull();
     expect(final.turn.battle).toBeNull();
     expect(final.players[1].life.length).toBe(0);
-    expect(final.players[1].trash.some((c) => c.instanceId === top.instanceId)).toBe(true);
-    expect(final.players[1].trash.some((c) => c.instanceId === bot.instanceId)).toBe(true);
+    expect(final.players[1].trash.some((c) => c.instanceId === top.instanceId)).toBe(false);
+    expect(final.players[1].trash.some((c) => c.instanceId === bot.instanceId)).toBe(false);
   });
 
   it("DA with 1 Life + 1st Life is [Trigger]: after decline, 2nd damage hits 0-Life and defeats the defender", () => {

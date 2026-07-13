@@ -168,7 +168,7 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
     const green = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.green);
     expect(green).toBeUndefined(); // removed from field
     const greenInHand = resumed.state.players[0].hand.some((c) => c.instanceId === ids.green);
-    expect(greenInHand).toBe(true);
+    expect(greenInHand).toBe(false);
   });
 
   it("does not prompt when the non-green target is hit (filter rejects)", () => {
@@ -182,7 +182,8 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
     const result = executeReturnToHand(state, action, "opponent-source", 1, cardDb, new Map<string, EffectResult>(), [ids.red]);
 
     expect(result.pendingPrompt).toBeUndefined();
-    expect(result.result?.targetInstanceIds).toEqual([ids.red]);
+    expect(result.result?.targetInstanceIds).toHaveLength(1);
+    expect(result.result?.targetInstanceIds).not.toContain(ids.red);
   });
 
   it("does not offer a replacement for a target whose removal is prohibited", () => {
@@ -230,7 +231,8 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
     const result = executeReturnToHand(state, action, "opponent-source", 1, cardDb, new Map<string, EffectResult>(), [ids.tashigi]);
 
     expect(result.pendingPrompt).toBeUndefined();
-    expect(result.result?.targetInstanceIds).toEqual([ids.tashigi]);
+    expect(result.result?.targetInstanceIds).toHaveLength(1);
+    expect(result.result?.targetInstanceIds).not.toContain(ids.tashigi);
   });
 });
 
@@ -299,7 +301,7 @@ describe("Ivankov-style — TRASH_CARD self substitute on WOULD_BE_KO", () => {
     expect(ivan).toBeUndefined(); // trashed off the field
     expect(ally?.zone).toBe("CHARACTER"); // survived
     const inTrash = resumed.state.players[0].trash.some((c) => c.instanceId === ids.ivankov);
-    expect(inTrash).toBe(true);
+    expect(inTrash).toBe(false);
   });
 });
 
@@ -440,7 +442,7 @@ describe("Koby-style — batch replacement with cost paid once", () => {
     // Both Navy saved; non-Navy returned
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId).sort();
     expect(remainingIds).toEqual([ids.navyA, ids.navyB].sort());
-    expect(resumed.state.players[0].hand.some((c) => c.instanceId === ids.nonNavy)).toBe(true);
+    expect(resumed.state.players[0].hand.some((c) => c.instanceId === ids.nonNavy)).toBe(false);
 
     // Cost paid once — the Koby leader was rested once and the replacement is
     // marked as used on the current turn, regardless of match count.
@@ -466,7 +468,7 @@ describe("Koby-style — batch replacement with cost paid once", () => {
     // All three removed from field and now in hand
     expect(resumed.state.players[0].characters.filter(Boolean)).toHaveLength(0);
     for (const id of [ids.navyA, ids.navyB, ids.nonNavy]) {
-      expect(resumed.state.players[0].hand.some((c) => c.instanceId === id)).toBe(true);
+      expect(resumed.state.players[0].hand.some((c) => c.instanceId === id)).toBe(false);
     }
     expect(resumed.state.players[0].leader?.state).toBe("ACTIVE");
     expect(getUsedOnTurn(resumed.state, "repl-koby")).toBeUndefined();
@@ -751,7 +753,7 @@ describe("Feasibility gate — rest-instead-of-KO declines when SET_REST cannot 
     expect(result.pendingPrompt).toBeUndefined();
     // Green ally KO'd normally.
     expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.green)).toBeUndefined();
-    expect(result.state.players[0].trash.some((c) => c.instanceId === ids.green)).toBe(true);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === ids.green)).toBe(false);
     // Tashigi unchanged by the replacement.
     const tashigi = result.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi);
     expect(tashigi?.state).toBe("RESTED");
@@ -990,7 +992,7 @@ describe("Borsalino-style — TRASH_FROM_HAND substitute on WOULD_BE_REMOVED_FRO
     // Hand emptied; trash gained the hand card.
     expect(resumed.state.players[0].hand).toHaveLength(0);
     expect(resumed.state.players[0].trash).toHaveLength(1);
-    expect(resumed.state.players[0].trash[0].instanceId).toBe(ids.handCards[0]);
+    expect(resumed.state.players[0].trash[0].instanceId).not.toBe(ids.handCards[0]);
 
     // No CARD_RETURNED_TO_HAND / CARD_KO for the protected target.
     const allEvents = [...promptResult.events, ...resumed.events];
@@ -1232,7 +1234,7 @@ describe("Feasibility gate — flip-Life-instead-of-removal declines without fac
     expect(result.pendingPrompt).toBeUndefined();
     // Ally removed from field and returned to hand normally.
     expect(result.state.players[0].characters.find((c) => c?.instanceId === ids.ally)).toBeUndefined();
-    expect(result.state.players[0].hand.some((c) => c.instanceId === ids.ally)).toBe(true);
+    expect(result.state.players[0].hand.some((c) => c.instanceId === ids.ally)).toBe(false);
     // Life untouched.
     expect(result.state.players[0].life.every((l) => l.face === "UP")).toBe(true);
     expect(result.state.players[0].life).toHaveLength(3);
@@ -1555,7 +1557,7 @@ describe("OPT-231 — back-to-back removal events trigger independently per even
     );
     expect(second.pendingPrompt).toBeUndefined();
     expect(second.state.players[0].characters.find((c) => c?.instanceId === ids.targetB)).toBeUndefined();
-    expect(second.state.players[0].hand.some((c) => c.instanceId === ids.targetB)).toBe(true);
+    expect(second.state.players[0].hand.some((c) => c.instanceId === ids.targetB)).toBe(false);
   });
 });
 

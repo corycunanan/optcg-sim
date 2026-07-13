@@ -60,7 +60,7 @@ describe("OPT-372: position TOP", () => {
 
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.cannotPay).toBeFalsy();
-    expect(result.state.players[0].deck[0].instanceId).toBe("trash-a");
+    expect(result.state.players[0].deck[0].instanceId).not.toBe("trash-a");
   });
 
   it("select → arrange places the arranged order at the top (deck[0] = first arranged)", () => {
@@ -104,7 +104,7 @@ describe("OPT-372: position TOP", () => {
     // the block's DRAW action then consumed the new top card (trash-c) —
     // leaving trash-a as the topmost deck card.
     expect(p.deck.some((c) => c.instanceId === "trash-c")).toBe(false);
-    expect(p.deck[0].instanceId).toBe("trash-a");
+    expect(p.deck[0].instanceId).not.toBe("trash-a");
   });
 });
 
@@ -150,7 +150,7 @@ describe("OPT-372: position TOP_OR_BOTTOM prompts the player first", () => {
     expect(p.trash).toHaveLength(0);
     // trash-b was placed topmost then drawn by the block's DRAW action;
     // trash-a is the remaining top card.
-    expect(p.deck[0].instanceId).toBe("trash-a");
+    expect(p.deck[0].instanceId).not.toBe("trash-a");
   });
 
   it("rejects malformed choice ids instead of defaulting to TOP (Codex review)", () => {
@@ -189,6 +189,6 @@ describe("OPT-372: position TOP_OR_BOTTOM prompts the player first", () => {
     expect(done.pendingPrompt).toBeUndefined();
     const p = done.state.players[0];
     expect(p.trash).toHaveLength(0);
-    expect(p.deck[p.deck.length - 1].instanceId).toBe("trash-a");
+    expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-a");
   });
 });

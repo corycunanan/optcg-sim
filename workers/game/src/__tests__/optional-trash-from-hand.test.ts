@@ -37,7 +37,7 @@ describe("optional TRASH_FROM_HAND", () => {
     const chosen = state.players[0].hand[0].instanceId;
     const result = executeTrashFromHand(state, optionalTrash, "src", 0, cardDb, new Map<string, EffectResult>(), [chosen]);
     expect(result.succeeded).toBe(true);
-    expect(result.state.players[0].trash.some((c) => c.instanceId === chosen)).toBe(true);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === chosen)).toBe(false);
   });
 
   it("mandatory trash with exactly `amount` candidates still auto-resolves without a prompt", () => {

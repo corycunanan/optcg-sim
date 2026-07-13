@@ -9,6 +9,7 @@ import { getActionParams } from "../../effect-types.js";
 import { resolveAmount, shuffleArray } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
+import { transitionCards } from "../../zone-transition.js";
 
 export function executeDraw(
   state: GameState,
@@ -28,11 +29,7 @@ export function executeDraw(
   if (drawCount === 0) return { state, events, succeeded: false };
 
   const drawn = player.deck.slice(0, drawCount);
-  const newDeck = player.deck.slice(drawCount);
-  const newHand = [...player.hand, ...drawn.map((c) => ({ ...c, zone: "HAND" as const }))];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...player, deck: newDeck, hand: newHand };
+  const moved = transitionCards(state, drawn.map((card) => card.instanceId), "HAND");
 
   for (const card of drawn) {
     events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
@@ -43,10 +40,13 @@ export function executeDraw(
   }
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: drawn.map((c) => c.instanceId), count: drawCount },
+    result: {
+      targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
+      count: moved.transitions.length,
+    },
   };
 }
 
@@ -173,19 +173,23 @@ export function executeMill(
   if (millCount === 0) return { state, events, succeeded: false };
 
   const milled = player.deck.slice(0, millCount);
-  const newDeck = player.deck.slice(millCount);
-  const newTrash = [...milled.map((c) => ({ ...c, zone: "TRASH" as const })), ...player.trash];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...player, deck: newDeck, trash: newTrash };
+  const moved = transitionCards(
+    state,
+    milled.map((card) => card.instanceId),
+    "TRASH",
+    { position: "TOP" },
+  );
 
   events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: millCount, reason: "mill" } });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: milled.map((c) => c.instanceId), count: millCount },
+    result: {
+      targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
+      count: moved.transitions.length,
+    },
   };
 }
 

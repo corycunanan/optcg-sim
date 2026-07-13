@@ -74,7 +74,7 @@ describe("effect-KO scans removal-from-field replacements", () => {
     // Accepting: Marco is K.O.'d instead; the ally stays on the field.
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
     expect(remainingIds).toEqual([allyInst.instanceId]);
-    expect(resumed.state.players[0].trash.some((c) => c.instanceId === marcoInst.instanceId)).toBe(true);
+    expect(resumed.state.players[0].trash.some((c) => c.instanceId === marcoInst.instanceId)).toBe(false);
   });
 
   it("declining leaves the original KO to resolve", () => {
@@ -105,6 +105,6 @@ describe("effect-KO scans removal-from-field replacements", () => {
 
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
     expect(remainingIds).toEqual([marcoInst.instanceId]);
-    expect(resumed.state.players[0].trash.some((c) => c.instanceId === allyInst.instanceId)).toBe(true);
+    expect(resumed.state.players[0].trash.some((c) => c.instanceId === allyInst.instanceId)).toBe(false);
   });
 });

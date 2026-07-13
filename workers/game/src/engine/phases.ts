@@ -10,17 +10,16 @@ import {
   getActivePlayerIndex,
   returnAttachedDonToCostArea,
   activateAllRested,
-  moveCard,
   placeDonFromDeck,
 } from "./state.js";
 import {
   expireEndOfTurnEffects,
-  expireProhibitions,
   expireRefreshPhaseEffects,
   processScheduledActions,
 } from "./duration-tracker.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { applyRefreshProhibitions } from "./prohibitions.js";
+import { transitionCard } from "./zone-transition.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
@@ -69,10 +68,11 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
       if (!isFirstPlayerTurnOne) {
         const drawn = nextState.players[pi].deck[0];
         if (drawn) {
-          nextState = moveCard(nextState, drawn.instanceId, "HAND");
-          // moveCard assigns a new instanceId; find the card that just arrived in hand
-          const arrivedCard = nextState.players[pi].hand[nextState.players[pi].hand.length - 1];
-          events.push({ type: "CARD_DRAWN", playerIndex: pi, payload: { cardId: drawn.cardId, cardInstanceId: arrivedCard?.instanceId } });
+          const moved = transitionCard(nextState, drawn.instanceId, "HAND");
+          if (moved) {
+            nextState = moved.state;
+            events.push({ type: "CARD_DRAWN", playerIndex: pi, payload: { cardId: drawn.cardId, cardInstanceId: moved.fact.newInstanceId } });
+          }
         }
         // Deck-out is checked in step 7 (defeat.ts)
       }

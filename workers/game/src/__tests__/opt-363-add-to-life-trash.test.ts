@@ -132,10 +132,10 @@ describe("OPT-363 — executeAddToLife (CARD_IN_TRASH)", () => {
     expect(result.state.players[0].trash.find((c) => c.instanceId === "trash-tbp-1")).toBeUndefined();
     expect(result.state.players[0].life.length).toBe(lifeBefore + 1);
     expect(result.state.players[0].life[0]).toMatchObject({
-      instanceId: "trash-tbp-1",
       cardId: THRILLER_BARK_ID,
       face: "UP",
     });
+    expect(result.state.players[0].life[0].instanceId).not.toBe("trash-tbp-1");
   });
 
   it("respects position: BOTTOM and face: DOWN", () => {
@@ -170,7 +170,8 @@ describe("OPT-363 — executeAddToLife (CARD_IN_TRASH)", () => {
 
     expect(result.succeeded).toBe(true);
     const life = result.state.players[0].life;
-    expect(life[life.length - 1]).toMatchObject({ instanceId: "trash-tbp-2", face: "DOWN" });
+    expect(life[life.length - 1]).toMatchObject({ cardId: THRILLER_BARK_ID, face: "DOWN" });
+    expect(life[life.length - 1].instanceId).not.toBe("trash-tbp-2");
   });
 
   it("emits a SELECT_TARGET prompt when multiple candidates and no preselected ids", () => {
@@ -349,10 +350,10 @@ describe("OPT-363 — OP14-104 Gecko Moria CHOICE branches", () => {
     expect(p0.trash.find((c) => c.instanceId === trashId)).toBeUndefined();
     expect(p0.life.length).toBe(lifeBefore + 1);
     expect(p0.life[0]).toMatchObject({
-      instanceId: trashId,
       cardId: THRILLER_BARK_ID,
       face: "UP",
     });
+    expect(p0.life[0].instanceId).not.toBe(trashId);
   });
 
   it("choosing the PLAY_CARD branch still works (regression guard for branch 0)", () => {

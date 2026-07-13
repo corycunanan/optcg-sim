@@ -355,7 +355,14 @@ export function matchTriggersForEvent(
     if (!reg.trigger || !reg.effectBlock) continue;
 
     // Check if the source card is still in a valid zone
-    const sourceCard = findCardInstance(state, reg.sourceCardInstanceId);
+    const movementPayload = event.payload as {
+      cardInstanceId?: string;
+      newCardInstanceId?: string;
+    } | undefined;
+    const transitionedSourceId = movementPayload?.cardInstanceId === reg.sourceCardInstanceId
+      ? movementPayload.newCardInstanceId
+      : undefined;
+    const sourceCard = findCardInstance(state, transitionedSourceId ?? reg.sourceCardInstanceId);
     if (!sourceCard) continue;
 
     // ON_KO exception (Rule 10-2-17): self-referencing ON_KO triggers activate
@@ -386,8 +393,19 @@ export function matchTriggersForEvent(
     }
 
     // Match the trigger against the event
-    if (matchesTrigger(reg.trigger, event, state, sourceCard, cardDb)) {
-      matched.push({ trigger: reg, effectBlock: reg.effectBlock });
+    const eventForSource = transitionedSourceId && event.payload && "cardInstanceId" in event.payload
+      ? {
+          ...event,
+          payload: { ...event.payload, cardInstanceId: transitionedSourceId },
+        } as GameEvent
+      : event;
+    if (matchesTrigger(reg.trigger, eventForSource, state, sourceCard, cardDb)) {
+      matched.push({
+        trigger: transitionedSourceId
+          ? { ...reg, sourceCardInstanceId: transitionedSourceId }
+          : reg,
+        effectBlock: reg.effectBlock,
+      });
     }
   }
 

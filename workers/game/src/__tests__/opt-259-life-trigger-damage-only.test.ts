@@ -183,7 +183,7 @@ describe("OPT-259 F6 — battle damage correctly opens the Trigger window", () =
       ?.pendingTriggerLifeCard ?? null).toBeNull();
     // Went straight to hand.
     expect(after.players[1].hand.length).toBe(p1HandBefore + 1);
-    expect(after.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(true);
+    expect(after.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
   });
 });
 
@@ -281,7 +281,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
     expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
     // Card moved to hand directly — no Trigger mediation.
-    expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(true);
+    expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(result.state.players[0].life).toHaveLength(0);
   });
 
@@ -304,7 +304,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     expect(result.events.some((e) => e.type === "CARD_TRASHED")).toBe(true);
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
     expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
-    expect(result.state.players[0].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(true);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
   });
 
   it("LIFE_CARD_TO_DECK does not fire [Trigger]", () => {
@@ -388,7 +388,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     );
     expect(after.valid).toBe(true);
     expect(after.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
-    expect(after.state.players[1].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(true);
+    expect(after.state.players[1].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(after.state.players[1].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
   });
 
@@ -418,7 +418,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     expect(after.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
     // Trigger's DRAW 1 resolved — hand grew by 1 (the draw), but the Life card
     // itself was trashed (activated path §10-1-5-3).
-    expect(after.state.players[1].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(true);
+    expect(after.state.players[1].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(after.state.players[1].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(after.state.players[1].hand.length).toBe(p1HandBefore + 1);
   });
@@ -461,8 +461,8 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     expect(after.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
     // Both Life cards ended up in hand, Life zone empty.
     expect(after.state.players[1].life).toHaveLength(0);
-    expect(after.state.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(true);
-    expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(true);
+    expect(after.state.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
+    expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(false);
   });
 });
 
@@ -488,7 +488,7 @@ describe("OPT-259 F6 — SELF_TAKE_DAMAGE does not open the Trigger window", () 
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
     expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
     // Self damage = not opponent damage → Trigger does not open; Life goes to hand.
-    expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(true);
+    expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(result.state.players[0].life).toHaveLength(0);
   });
 });

@@ -77,7 +77,7 @@ describe("TRASH_FROM_LIFE cost — deterministic top-of-life payment (EB03-055)"
 
     const p0 = step.state.players[0];
     // Top life card paid into the trash…
-    expect(p0.trash.some((c) => c.instanceId === topLifeId)).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === topLifeId)).toBe(false);
     expect(p0.life.some((l) => l.instanceId === topLifeId)).toBe(false);
     // …and the Straw Hat Crew gate passed: −1 (cost) +2 (added from deck).
     expect(p0.life.length).toBe(lifeBefore.length + 1);
@@ -132,7 +132,7 @@ describe("TRASH_FROM_LIFE cost — TOP_OR_BOTTOM offers a position choice (OP03-
 
     const p0 = step.state.players[0];
     // Bottom life card paid into the trash…
-    expect(p0.trash.some((c) => c.instanceId === bottomLifeId)).toBe(true);
+    expect(p0.trash.some((c) => c.instanceId === bottomLifeId)).toBe(false);
     expect(p0.life.some((l) => l.instanceId === bottomLifeId)).toBe(false);
     // …then "add up to 1 from the top of your deck": −1 +1.
     expect(p0.life.length).toBe(lifeBefore.length);

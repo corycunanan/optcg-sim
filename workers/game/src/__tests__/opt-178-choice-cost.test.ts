@@ -274,7 +274,7 @@ describe("OPT-178: CHOICE cost", () => {
       const p0 = final.state.players[0];
       // Card was trashed from hand.
       expect(p0.hand.find((c) => c.instanceId === selectedId)).toBeUndefined();
-      expect(p0.trash.find((c) => c.instanceId === selectedId)).toBeTruthy();
+      expect(p0.trash.find((c) => c.instanceId === selectedId)).toBeUndefined();
       // DRAW 1 should have fired.
       expect(p0.deck.length).toBe(deckSizeBefore - 1);
     });
@@ -308,7 +308,7 @@ describe("OPT-178: CHOICE cost", () => {
 
       const p0 = final.state.players[0];
       // Hand card was trashed.
-      expect(p0.trash.find((c) => c.instanceId === selectedId)).toBeTruthy();
+      expect(p0.trash.find((c) => c.instanceId === selectedId)).toBeUndefined();
       // DON_REST also paid (≥1 DON rested).
       const restedDon = p0.donCostArea.filter((d) => d.state === "RESTED");
       expect(restedDon.length).toBeGreaterThanOrEqual(1);
@@ -391,7 +391,7 @@ describe("OPT-178: CHOICE cost", () => {
 
       const p0 = final.state.players[0];
       // Hand card trashed.
-      expect(p0.trash.find((c) => c.instanceId === handCardId)).toBeTruthy();
+      expect(p0.trash.find((c) => c.instanceId === handCardId)).toBeUndefined();
       // Character untouched.
       expect(p0.characters.some((c) => c?.instanceId === charId)).toBe(true);
       // DRAW resolved.
@@ -429,7 +429,7 @@ describe("OPT-178: CHOICE cost", () => {
       const p0 = final.state.players[0];
       // Character trashed from field.
       expect(p0.characters.some((c) => c?.instanceId === charId)).toBe(false);
-      expect(p0.trash.find((c) => c.instanceId === charId)).toBeTruthy();
+      expect(p0.trash.find((c) => c.instanceId === charId)).toBeUndefined();
       // Hand only gained the DRAW card — character branch did not take from hand.
       expect(p0.hand.length).toBe(handSizeBefore + 1);
       // DRAW resolved.

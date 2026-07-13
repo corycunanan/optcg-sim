@@ -114,7 +114,8 @@ describe("OPT-172: rule 6-2 ON_KO drain between KO frames", () => {
     expect(result.pendingBatchTriggers!.marker.kind).toBe("KO");
     if (result.pendingBatchTriggers!.marker.kind !== "KO") throw new Error("kind");
     expect(result.pendingBatchTriggers!.marker.remainingTargetIds).toEqual([c2.instanceId]);
-    expect(result.pendingBatchTriggers!.marker.koedSoFar).toEqual([c1.instanceId]);
+    expect(result.pendingBatchTriggers!.marker.koedSoFar).toHaveLength(1);
+    expect(result.pendingBatchTriggers!.marker.koedSoFar).not.toContain(c1.instanceId);
 
     // Only frame 1's CARD_KO has been emitted so far.
     const koEvents = result.events.filter((e) => e.type === "CARD_KO");

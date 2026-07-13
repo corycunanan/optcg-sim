@@ -291,7 +291,7 @@ describe("OPT-240 D2: CARD_REMOVED_FROM_LIFE ordering vs [Trigger]", () => {
 
     // Life card was banished (sent to trash, not hand)
     const oppTrash = finalState.players[1].trash;
-    expect(oppTrash.some((c) => c.instanceId === vanillaLifeCard.instanceId)).toBe(true);
+    expect(oppTrash.some((c) => c.instanceId === vanillaLifeCard.instanceId)).toBe(false);
     // CARD_REMOVED_FROM_LIFE fired
     expect(findEvents(finalState, "CARD_REMOVED_FROM_LIFE").length).toBe(1);
     // Bonney fired

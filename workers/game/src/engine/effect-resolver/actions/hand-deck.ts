@@ -10,6 +10,7 @@ import type { ActionResult } from "../types.js";
 import { resolveAmount, shuffleArray } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
+import { transitionCards } from "../../zone-transition.js";
 
 export function executePlaceHandToDeck(
   state: GameState,
@@ -57,22 +58,16 @@ export function executePlaceHandToDeck(
 
   // Resolve selected cards
   const selectedIds = preselectedTargets ?? p.hand.slice(-amount).map((c) => c.instanceId);
-  const selectedSet = new Set(selectedIds);
-  const toPlace = p.hand.filter((c) => selectedSet.has(c.instanceId));
-  const newHand = p.hand.filter((c) => !selectedSet.has(c.instanceId));
-  const placedCards = toPlace.map((c) => ({ ...c, zone: "DECK" as const }));
-  const newDeck = position === "BOTTOM"
-    ? [...p.deck, ...placedCards]
-    : [...placedCards, ...p.deck];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, hand: newHand, deck: newDeck };
+  const moved = transitionCards(state, selectedIds, "DECK", { position });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: toPlace.map((c) => c.instanceId), count: toPlace.length },
+    result: {
+      targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
+      count: moved.transitions.length,
+    },
   };
 }
 
@@ -90,19 +85,18 @@ export function executeReturnHandToDeck(
   const p = state.players[controller];
   if (p.hand.length === 0) return { state, events, succeeded: false };
 
-  const deckCards = p.hand.map((c) => ({ ...c, zone: "DECK" as const }));
-  const newDeck = position === "BOTTOM"
-    ? [...p.deck, ...deckCards]
-    : [...deckCards, ...p.deck];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, hand: [], deck: newDeck };
+  const moved = transitionCards(
+    state,
+    p.hand.map((card) => card.instanceId),
+    "DECK",
+    { position },
+  );
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: [], count: deckCards.length },
+    result: { targetInstanceIds: [], count: moved.transitions.length },
   };
 }
 
@@ -126,26 +120,24 @@ export function executeHandWheel(
   if (toTrashCount === 0 && trashCount > 0) return { state, events, succeeded: false };
 
   const trashed = p.hand.slice(0, toTrashCount);
-  const newHand = p.hand.slice(toTrashCount);
-  const newTrash = [...trashed.map((c) => ({ ...c, zone: "TRASH" as const })), ...p.trash];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
-  let nextState = { ...state, players: newPlayers };
+  let nextState = transitionCards(
+    state,
+    trashed.map((card) => card.instanceId),
+    "TRASH",
+    { position: "TOP" },
+  ).state;
 
   events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: toTrashCount, reason: "hand_wheel" } });
 
   // Draw cards
   const actualDraw = Math.min(drawCount, nextState.players[controller].deck.length);
   if (actualDraw > 0) {
-    const pp = nextState.players[controller];
-    const drawn = pp.deck.slice(0, actualDraw);
-    const remainingDeck = pp.deck.slice(actualDraw);
-    const updatedHand = [...pp.hand, ...drawn.map((c) => ({ ...c, zone: "HAND" as const }))];
-
-    const np = [...nextState.players] as [typeof nextState.players[0], typeof nextState.players[1]];
-    np[controller] = { ...pp, deck: remainingDeck, hand: updatedHand };
-    nextState = { ...nextState, players: np };
+    const drawn = nextState.players[controller].deck.slice(0, actualDraw);
+    nextState = transitionCards(
+      nextState,
+      drawn.map((card) => card.instanceId),
+      "HAND",
+    ).state;
 
     for (const card of drawn) {
       events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
@@ -358,7 +350,7 @@ export function executeSearchAndPlay(
     let nextState = state;
     if (!searchFullDeck) {
       const restOfDeck = p.deck.slice(searchPool.length);
-      const arrangedCards = searchPool.map((c) => ({ ...c, zone: "DECK" as const }));
+      const arrangedCards = [...searchPool];
       const newDeck = restDest.toUpperCase() === "BOTTOM"
         ? [...restOfDeck, ...arrangedCards]
         : [...arrangedCards, ...restOfDeck];

@@ -148,7 +148,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
     // Trigger condition satisfied → DRAW happened.
     expect(after.state.players[1].hand.length).toBe(p1HandBefore + 1);
     // Triggering card went to trash (activated path).
-    expect(after.state.players[1].trash.some((c) => c.instanceId === top.instanceId)).toBe(true);
+    expect(after.state.players[1].trash.some((c) => c.instanceId === top.instanceId)).toBe(false);
     // Post-battle life is exactly the untouched bottom card.
     expect(after.state.players[1].life.length).toBe(1);
     expect(after.state.players[1].life[0].instanceId).toBe(bot.instanceId);

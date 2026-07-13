@@ -102,6 +102,7 @@ function redactEventIdentities(event: GameEvent): GameEvent {
 
   if ("cardId" in payload) redactedPayload.cardId = HIDDEN_IDENTITY;
   if ("cardInstanceId" in payload) redactedPayload.cardInstanceId = HIDDEN_IDENTITY;
+  if ("newCardInstanceId" in payload) redactedPayload.newCardInstanceId = HIDDEN_IDENTITY;
   if (Array.isArray(payload.cards)) {
     redactedPayload.cards = payload.cards.map((card) => ({
       ...(card as Record<string, unknown>),

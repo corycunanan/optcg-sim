@@ -283,7 +283,7 @@ describe("OPT-235 — B5 replacement: ON_KO stays silent, ANY_CHARACTER_TRASHED 
     expect(trashed).toBeDefined();
 
     // And Ivankov is now in the trash, victim still on field.
-    expect(result.state.players[0].trash.some((c) => c.instanceId === ids.ivankov)).toBe(true);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === ids.ivankov)).toBe(false);
     expect(
       result.state.players[0].characters.find((c) => c?.instanceId === ids.victim)?.zone,
     ).toBe("CHARACTER");

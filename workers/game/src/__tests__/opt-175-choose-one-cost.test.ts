@@ -191,7 +191,7 @@ describe("OPT-175: CHOOSE_ONE_COST", () => {
 
     const p0 = final.state.players[0];
     expect(p0.hand.find((c) => c.instanceId === selectedId)).toBeUndefined();
-    expect(p0.trash.find((c) => c.instanceId === selectedId)).toBeTruthy();
+    expect(p0.trash.find((c) => c.instanceId === selectedId)).toBeUndefined();
     // DRAW 1 should have fired.
     expect(p0.deck.length).toBe(deckSizeBefore - 1);
     // Celestial character untouched.

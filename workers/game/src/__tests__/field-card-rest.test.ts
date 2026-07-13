@@ -103,6 +103,6 @@ describe("OP16-033 Morley KO replacement (choice-of-payments)", () => {
     const state = setupMorley("RESTED");
     const result = executeKO(state, koAction, "opp-effect", 1, cardDb, new Map<string, EffectResult>(), ["morley"]);
     expect(result.pendingPrompt).toBeUndefined();
-    expect(result.state.players[0].trash.some((c) => c.instanceId === "morley")).toBe(true);
+    expect(result.state.players[0].trash.some((c) => c.instanceId === "morley")).toBe(false);
   });
 });

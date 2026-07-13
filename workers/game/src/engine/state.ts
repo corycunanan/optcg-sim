@@ -14,8 +14,9 @@ import type {
   PlayerState,
   Zone,
 } from "../types.js";
-import { nanoid } from "../util/nanoid.js";
 import { filterEventForPlayer, filterPromptForPlayer } from "./visibility.js";
+import { transitionCard } from "./zone-transition.js";
+export { moveCard } from "./zone-transition.js";
 
 // ─── Player accessors ─────────────────────────────────────────────────────────
 
@@ -79,131 +80,6 @@ export function findCardInState(
     }
   }
   return null;
-}
-
-// ─── Zone transition ──────────────────────────────────────────────────────────
-
-/**
- * Move a card from one zone to another.
- * Per rules §3-1-6: zone transitions strip all modifiers and assign a new instanceId.
- * DON!! attached to the card are returned to the cost area, rested (rules §6-5-5-4).
- *
- * This is the core mutation — all card movements go through here.
- */
-export function moveCard(
-  state: GameState,
-  instanceId: string,
-  destination: Zone,
-  options: { toFront?: boolean; slotIndex?: number } = {},
-): GameState {
-  const found = findCardInState(state, instanceId);
-  if (!found) return state; // impossible action → silent no-op (rules §1-3-2)
-
-  const { card, playerIndex } = found;
-  const player = state.players[playerIndex];
-
-  // Return attached DON!! to cost area, rested
-  const detachedDon: DonInstance[] = card.attachedDon.map((d) => ({
-    ...d,
-    state: "RESTED" as const,
-    attachedTo: null,
-  }));
-
-  // New instanceId for the destination card (rules §3-1-6)
-  const newInstanceId = nanoid();
-  const movedCard: CardInstance = {
-    ...card,
-    instanceId: newInstanceId,
-    zone: destination,
-    state: "ACTIVE",   // cards enter new zones active by default (rules §3-7-5, §3-8-4, §3-9-3)
-    attachedDon: [],   // DON!! stripped on zone transition
-    turnPlayed: destination === "CHARACTER" || destination === "LEADER" ? card.turnPlayed : null,
-  };
-
-  // Remove card from its current zone
-  let updatedPlayer = removeCardFromZone(player, card);
-
-  // Add detached DON!! to cost area
-  if (detachedDon.length > 0) {
-    updatedPlayer = {
-      ...updatedPlayer,
-      donCostArea: [...updatedPlayer.donCostArea, ...detachedDon],
-    };
-  }
-
-  // Add card to destination zone
-  updatedPlayer = addCardToZone(updatedPlayer, movedCard, options);
-
-  const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
-  newPlayers[playerIndex] = updatedPlayer;
-
-  return { ...state, players: newPlayers };
-}
-
-function removeCardFromZone(player: PlayerState, card: CardInstance): PlayerState {
-  const remove = (arr: CardInstance[]) => arr.filter((c) => c.instanceId !== card.instanceId);
-
-  switch (card.zone) {
-    case "LEADER":
-      return player; // Leader cannot be removed (rules §3-6-3)
-    case "CHARACTER": {
-      const charIdx = player.characters.findIndex((c) => c?.instanceId === card.instanceId);
-      if (charIdx === -1) return player;
-      const newChars = [...player.characters] as (typeof player.characters);
-      newChars[charIdx] = null;
-      return { ...player, characters: newChars };
-    }
-    case "STAGE":
-      return { ...player, stage: null };
-    case "HAND":
-      return { ...player, hand: remove(player.hand) };
-    case "DECK":
-      return { ...player, deck: remove(player.deck) };
-    case "TRASH":
-      return { ...player, trash: remove(player.trash) };
-    case "REMOVED_FROM_GAME":
-      return { ...player, removedFromGame: remove(player.removedFromGame) };
-    case "LIFE":
-      return { ...player, life: player.life.filter((l) => l.instanceId !== card.instanceId) };
-    case "COST_AREA":
-    case "DON_DECK":
-      return player; // DON!! movement handled separately
-  }
-}
-
-function addCardToZone(
-  player: PlayerState,
-  card: CardInstance,
-  options: { toFront?: boolean; slotIndex?: number },
-): PlayerState {
-  switch (card.zone) {
-    case "CHARACTER": {
-      const targetSlot = options.slotIndex != null && player.characters[options.slotIndex] === null
-        ? options.slotIndex
-        : player.characters.indexOf(null);
-      if (targetSlot === -1) return player; // board full
-      const newChars = [...player.characters] as (typeof player.characters);
-      newChars[targetSlot] = card;
-      return { ...player, characters: newChars };
-    }
-    case "STAGE":
-      return { ...player, stage: card };
-    case "HAND":
-      return { ...player, hand: [...player.hand, card] };
-    case "DECK":
-      return options.toFront
-        ? { ...player, deck: [card, ...player.deck] }
-        : { ...player, deck: [...player.deck, card] };
-    case "TRASH":
-      return { ...player, trash: [card, ...player.trash] }; // top of trash = most recent
-    case "REMOVED_FROM_GAME":
-      return { ...player, removedFromGame: [...player.removedFromGame, card] };
-    case "LEADER":
-    case "LIFE":
-    case "COST_AREA":
-    case "DON_DECK":
-      return player; // not reached via standard card movement
-  }
 }
 
 // ─── Life area ────────────────────────────────────────────────────────────────
@@ -508,21 +384,15 @@ export function drawCards(
     const player = current.players[playerIndex];
     if (player.deck.length === 0) break;
 
-    const [drawn, ...remaining] = player.deck;
-    const handCard: CardInstance = { ...drawn, zone: "HAND" };
-
-    const newPlayers: [PlayerState, PlayerState] = [...current.players] as [PlayerState, PlayerState];
-    newPlayers[playerIndex] = {
-      ...player,
-      deck: remaining,
-      hand: [...player.hand, handCard],
-    };
-    current = { ...current, players: newPlayers };
+    const drawn = player.deck[0];
+    const moved = transitionCard(current, drawn.instanceId, "HAND");
+    if (!moved) break;
+    current = moved.state;
 
     events.push({
       type: "CARD_DRAWN",
       playerIndex,
-      payload: { cardId: handCard.cardId, cardInstanceId: handCard.instanceId },
+      payload: { cardId: drawn.cardId, cardInstanceId: moved.fact.newInstanceId },
     });
   }
 
@@ -564,17 +434,7 @@ export function findCardInstance(
   state: GameState,
   instanceId: string,
 ): CardInstance | null {
-  for (const player of state.players) {
-    if (player.leader.instanceId === instanceId) return player.leader;
-    const char = player.characters.find((c) => c?.instanceId === instanceId);
-    if (char) return char;
-    if (player.stage?.instanceId === instanceId) return player.stage;
-    const hand = player.hand.find((c) => c.instanceId === instanceId);
-    if (hand) return hand;
-    const trash = player.trash.find((c) => c.instanceId === instanceId);
-    if (trash) return trash;
-  }
-  return null;
+  return findCardInState(state, instanceId)?.card ?? null;
 }
 
 // ─── Visibility filtering (§8-4-5) ───────────────────────────────────────────

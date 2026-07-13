@@ -3,55 +3,41 @@
  */
 
 import type { GameState, PendingEvent, DonInstance } from "../../types.js";
+import { transitionCard, type ZoneTransitionFact } from "../zone-transition.js";
+
+type CardMutationResult = {
+  state: GameState;
+  events: PendingEvent[];
+  transition: ZoneTransitionFact;
+};
 
 export function koCharacter(
   state: GameState,
   instanceId: string,
   causingController: 0 | 1,
-): { state: GameState; events: PendingEvent[] } | null {
-  for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
-    if (charIdx === -1) continue;
-
-    const char = player.characters[charIdx]!;
-    const newChars = [...player.characters] as (typeof player.characters);
-    newChars[charIdx] = null;
-
-    // Return attached DON!! to cost area
-    const returnedDon = char.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
-
-    const newTrash = [{ ...char, zone: "TRASH" as const, attachedDon: [], state: "ACTIVE" as const }, ...player.trash];
-
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      characters: newChars,
-      trash: newTrash,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
-
-    const isOpponentEffect = causingController !== pi;
-
-    return {
-      state: { ...state, players: newPlayers },
-      events: [{
-        type: "CARD_KO",
-        playerIndex: pi as 0 | 1,
-        payload: {
-          cardInstanceId: instanceId,
-          cardId: char.cardId,
-          cause: isOpponentEffect ? "OPPONENT_EFFECT" : "EFFECT",
-          causingController,
-          preKO_donCount: char.attachedDon.length,
-        },
-      }],
-    };
-  }
-  return null;
+): CardMutationResult | null {
+  const moved = transitionCard(state, instanceId, "TRASH", {
+    position: "TOP",
+    preserveSourceTriggers: true,
+  });
+  if (!moved || moved.fact.source !== "CHARACTER") return null;
+  const owner = moved.fact.owner;
+  return {
+    state: moved.state,
+    transition: moved.fact,
+    events: [{
+      type: "CARD_KO",
+      playerIndex: owner,
+      payload: {
+        cardInstanceId: instanceId,
+        newCardInstanceId: moved.fact.newInstanceId,
+        cardId: moved.fact.cardId,
+        cause: causingController !== owner ? "OPPONENT_EFFECT" : "EFFECT",
+        causingController,
+        preKO_donCount: moved.fact.detachedDonInstanceIds.length,
+      },
+    }],
+  };
 }
 
 /**
@@ -63,47 +49,22 @@ export function trashCharacter(
   instanceId: string,
   causingController: 0 | 1,
   reason: "effect" | "cost" = "effect",
-): { state: GameState; events: PendingEvent[] } | null {
+): CardMutationResult | null {
   void causingController;
-  for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
-    if (charIdx === -1) continue;
-
-    const char = player.characters[charIdx]!;
-    const newChars = [...player.characters] as (typeof player.characters);
-    newChars[charIdx] = null;
-
-    // Return attached DON!! to cost area
-    const returnedDon = char.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
-
-    const newTrash = [{ ...char, zone: "TRASH" as const, attachedDon: [], state: "ACTIVE" as const }, ...player.trash];
-
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      characters: newChars,
-      trash: newTrash,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
-
-    return {
-      state: { ...state, players: newPlayers },
-      events: [{
-        type: "CARD_TRASHED",
-        playerIndex: pi as 0 | 1,
-        payload: {
-          cardInstanceId: instanceId,
-          cardId: char.cardId,
-          reason,
-        },
-      }],
-    };
-  }
-  return null;
+  const moved = transitionCard(state, instanceId, "TRASH", {
+    position: "TOP",
+    preserveSourceTriggers: true,
+  });
+  if (!moved || moved.fact.source !== "CHARACTER") return null;
+  return {
+    state: moved.state,
+    transition: moved.fact,
+    events: [{
+      type: "CARD_TRASHED",
+      playerIndex: moved.fact.owner,
+      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, reason },
+    }],
+  };
 }
 
 /**
@@ -115,40 +76,21 @@ export function trashStage(
   state: GameState,
   instanceId: string,
   reason: "effect" | "cost" = "effect",
-): { state: GameState; events: PendingEvent[] } | null {
-  for (const [pi, player] of state.players.entries()) {
-    if (player.stage?.instanceId !== instanceId) continue;
-
-    const stage = player.stage;
-    const returnedDon = stage.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
-    const newTrash = [{ ...stage, zone: "TRASH" as const, attachedDon: [], state: "ACTIVE" as const }, ...player.trash];
-
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      stage: null,
-      trash: newTrash,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
-
-    return {
-      state: { ...state, players: newPlayers },
-      events: [{
-        type: "CARD_TRASHED",
-        playerIndex: pi as 0 | 1,
-        payload: {
-          cardInstanceId: stage.instanceId,
-          cardId: stage.cardId,
-          reason,
-        },
-      }],
-    };
-  }
-  return null;
+): CardMutationResult | null {
+  const moved = transitionCard(state, instanceId, "TRASH", {
+    position: "TOP",
+    preserveSourceTriggers: true,
+  });
+  if (!moved || moved.fact.source !== "STAGE") return null;
+  return {
+    state: moved.state,
+    transition: moved.fact,
+    events: [{
+      type: "CARD_TRASHED",
+      playerIndex: moved.fact.owner,
+      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, reason },
+    }],
+  };
 }
 
 /**
@@ -200,67 +142,23 @@ export function detachDonToCostArea(
 export function returnToHand(
   state: GameState,
   instanceId: string,
-): { state: GameState; events: PendingEvent[] } | null {
-  for (const [pi, player] of state.players.entries()) {
-    // Check characters first
-    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
-    if (charIdx !== -1) {
-      const char = player.characters[charIdx]!;
-      const newChars = [...player.characters] as (typeof player.characters);
-      newChars[charIdx] = null;
-
-      // Return attached DON!! to cost area
-      const returnedDon = char.attachedDon.map((d) => ({
-        ...d,
-        state: "RESTED" as const,
-        attachedTo: null,
-      }));
-
-      const newHand = [...player.hand, { ...char, zone: "HAND" as const, attachedDon: [], state: "ACTIVE" as const }];
-
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[pi] = {
-        ...player,
-        characters: newChars,
-        hand: newHand,
-        donCostArea: [...player.donCostArea, ...returnedDon],
-      };
-
-      return {
-        state: { ...state, players: newPlayers },
-        events: [{
-          type: "CARD_RETURNED_TO_HAND",
-          playerIndex: pi as 0 | 1,
-          payload: { cardInstanceId: instanceId, cardId: char.cardId },
-        }],
-      };
-    }
-
-    // Check trash (for "add from trash to hand" effects)
-    const trashIdx = player.trash.findIndex((c) => c.instanceId === instanceId);
-    if (trashIdx !== -1) {
-      const card = player.trash[trashIdx];
-      const newTrash = player.trash.filter((_, i) => i !== trashIdx);
-      const newHand = [...player.hand, { ...card, zone: "HAND" as const, state: "ACTIVE" as const }];
-
-      const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-      newPlayers[pi] = {
-        ...player,
-        trash: newTrash,
-        hand: newHand,
-      };
-
-      return {
-        state: { ...state, players: newPlayers },
-        events: [{
-          type: "CARD_RETURNED_TO_HAND",
-          playerIndex: pi as 0 | 1,
-          payload: { cardInstanceId: instanceId, cardId: card.cardId, source: "TRASH" },
-        }],
-      };
-    }
-  }
-  return null;
+): CardMutationResult | null {
+  const moved = transitionCard(state, instanceId, "HAND", { preserveSourceTriggers: true });
+  if (!moved || !["CHARACTER", "TRASH"].includes(moved.fact.source)) return null;
+  return {
+    state: moved.state,
+    transition: moved.fact,
+    events: [{
+      type: "CARD_RETURNED_TO_HAND",
+      playerIndex: moved.fact.owner,
+      payload: {
+        cardInstanceId: instanceId,
+        newCardInstanceId: moved.fact.newInstanceId,
+        cardId: moved.fact.cardId,
+        ...(moved.fact.source === "TRASH" ? { source: "TRASH" as const } : {}),
+      },
+    }],
+  };
 }
 
 export function setCardState(state: GameState, instanceId: string, newState: "ACTIVE" | "RESTED"): GameState {
@@ -416,43 +314,19 @@ export function returnToDeck(
   state: GameState,
   instanceId: string,
   position: "TOP" | "BOTTOM" = "BOTTOM",
-): { state: GameState; events: PendingEvent[] } | null {
-  for (const [pi, player] of state.players.entries()) {
-    const charIdx = player.characters.findIndex((c) => c?.instanceId === instanceId);
-    if (charIdx === -1) continue;
-
-    const char = player.characters[charIdx]!;
-    const newChars = [...player.characters] as (typeof player.characters);
-    newChars[charIdx] = null;
-
-    // Return attached DON!! to cost area
-    const returnedDon = char.attachedDon.map((d) => ({
-      ...d,
-      state: "RESTED" as const,
-      attachedTo: null,
-    }));
-
-    const deckCard = { ...char, zone: "DECK" as const, attachedDon: [], state: "ACTIVE" as const };
-    const newDeck = position === "BOTTOM"
-      ? [...player.deck, deckCard]
-      : [deckCard, ...player.deck];
-
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = {
-      ...player,
-      characters: newChars,
-      deck: newDeck,
-      donCostArea: [...player.donCostArea, ...returnedDon],
-    };
-
-    return {
-      state: { ...state, players: newPlayers },
-      events: [{
-        type: "CARD_RETURNED_TO_DECK",
-        playerIndex: pi as 0 | 1,
-        payload: { cardInstanceId: instanceId, cardId: char.cardId, position },
-      }],
-    };
-  }
-  return null;
+): CardMutationResult | null {
+  const moved = transitionCard(state, instanceId, "DECK", {
+    position,
+    preserveSourceTriggers: true,
+  });
+  if (!moved || moved.fact.source !== "CHARACTER") return null;
+  return {
+    state: moved.state,
+    transition: moved.fact,
+    events: [{
+      type: "CARD_RETURNED_TO_DECK",
+      playerIndex: moved.fact.owner,
+      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position },
+    }],
+  };
 }

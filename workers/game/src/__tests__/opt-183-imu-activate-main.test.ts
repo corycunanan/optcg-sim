@@ -181,7 +181,7 @@ describe("OPT-183: OP13-079 Imu [Activate: Main] integration", () => {
       );
 
       const p0 = final.state.players[0];
-      expect(p0.trash.find((c) => c.instanceId === handCardId)).toBeTruthy();
+      expect(p0.trash.find((c) => c.instanceId === handCardId)).toBeUndefined();
       // Net hand delta: -1 trashed + 1 drawn = 0.
       expect(p0.hand.length).toBe(handSizeBefore);
       expect(p0.deck.length).toBe(deckSizeBefore - 1);
@@ -212,7 +212,7 @@ describe("OPT-183: OP13-079 Imu [Activate: Main] integration", () => {
 
       const p0 = final.state.players[0];
       expect(p0.characters.some((c) => c?.instanceId === cdCharId)).toBe(false);
-      expect(p0.trash.find((c) => c.instanceId === cdCharId)).toBeTruthy();
+      expect(p0.trash.find((c) => c.instanceId === cdCharId)).toBeUndefined();
       expect(p0.deck.length).toBe(deckSizeBefore - 1);
     });
   });

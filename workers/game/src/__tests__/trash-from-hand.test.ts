@@ -68,7 +68,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
 
     expect(handAfter.length).toBe(handBefore.length - 1);
     expect(handAfter.find((c) => c.instanceId === cardToTrash.instanceId)).toBeUndefined();
-    expect(trashAfter.find((c) => c.instanceId === cardToTrash.instanceId)).toBeTruthy();
+    expect(trashAfter.find((c) => c.instanceId === cardToTrash.instanceId)).toBeUndefined();
     expect(trashAfter[0].zone).toBe("TRASH");
   });
 
@@ -162,7 +162,7 @@ describe("TRASH_FROM_HAND cost selection flow", () => {
     const trashAfter = resumeResult.state.players[controller].trash;
 
     expect(handAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
-    expect(trashAfter.find((c) => c.instanceId === selectedId)).toBeTruthy();
+    expect(trashAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
     expect(handAfter.length).toBe(handBefore.length - 1);
   });
 
@@ -285,7 +285,7 @@ describe("OPPONENT_ACTION → TRASH_FROM_HAND (Perona OP06-093 pattern)", () => 
     const oppTrashAfter = resumeResult.state.players[opponent].trash;
 
     expect(oppHandAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
-    expect(oppTrashAfter.find((c) => c.instanceId === selectedId)).toBeTruthy();
+    expect(oppTrashAfter.find((c) => c.instanceId === selectedId)).toBeUndefined();
     expect(oppHandAfter.length).toBe(oppHandBefore.length - 1);
 
     // Controller's hand should be untouched

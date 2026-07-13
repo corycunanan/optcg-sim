@@ -9,11 +9,11 @@ import type { ActionResult, EffectResolverResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
-import { nanoid } from "../../../util/nanoid.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { processBatchReplacements } from "../../replacements.js";
 import { isProhibitedForCard, isCardPlayProhibitedByEffect } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
+import { transitionCard } from "../../zone-transition.js";
 
 // Injected by the resolver module to break the circular dependency so
 // ACTIVATE_EVENT_FROM_TRASH can resolve the selected Event's [Main] block.
@@ -54,16 +54,6 @@ type FrameResult = {
   pendingPrompt?: PendingPromptState;
   failed?: boolean;
 };
-
-function removeFromSourceZone(
-  player: GameState["players"][0],
-  card: CardInstance,
-): GameState["players"][0] {
-  if (card.zone === "HAND") return { ...player, hand: player.hand.filter((c) => c.instanceId !== card.instanceId) };
-  if (card.zone === "TRASH") return { ...player, trash: player.trash.filter((c) => c.instanceId !== card.instanceId) };
-  if (card.zone === "DECK") return { ...player, deck: player.deck.filter((c) => c.instanceId !== card.instanceId) };
-  return { ...player, hand: player.hand.filter((c) => c.instanceId !== card.instanceId) };
-}
 
 function playOneCharacter(
   state: GameState,
@@ -124,27 +114,17 @@ function playOneCharacter(
     return { state, events, pendingPrompt };
   }
 
-  const p = removeFromSourceZone(p0, card);
-  const newChar: CardInstance = {
-    ...card,
-    instanceId: nanoid(),
-    zone: "CHARACTER",
-    state: entryState,
-    attachedDon: [],
+  const moved = transitionCard(state, card.instanceId, "CHARACTER", {
+    slotIndex: slotIdx,
+    entryState,
     turnPlayed: state.turn.number,
-    controller,
-    owner: controller,
-  };
-  const newPlayers = [...state.players] as [GameState["players"][0], GameState["players"][1]];
-  const newChars = [...p.characters] as (typeof p.characters);
-  newChars[slotIdx] = newChar;
-  newPlayers[controller] = { ...p, characters: newChars };
-  const nextState = { ...state, players: newPlayers };
+  });
+  if (!moved) return { state, events, failed: true };
   events.push({
     type: "CARD_PLAYED",
     playerIndex: controller,
     payload: {
-      cardInstanceId: newChar.instanceId,
+      cardInstanceId: moved.fact.newInstanceId,
       cardId: card.cardId,
       zone: "CHARACTER",
       source: "BY_EFFECT",
@@ -152,7 +132,7 @@ function playOneCharacter(
       sourceZone: card.zone,
     },
   });
-  return { state: nextState, events, playedId: newChar.instanceId };
+  return { state: moved.state, events, playedId: moved.fact.newInstanceId };
 }
 
 function playOneStage(
@@ -161,30 +141,36 @@ function playOneStage(
   controller: 0 | 1,
 ): FrameResult {
   const events: PendingEvent[] = [];
-  const p = removeFromSourceZone(state.players[controller], card);
-  const newStage: CardInstance = {
-    ...card,
-    instanceId: nanoid(),
-    zone: "STAGE",
-    state: "ACTIVE",
-    attachedDon: [],
-    turnPlayed: state.turn.number,
-    controller,
-    owner: controller,
-  };
-  let newTrash = p.trash;
-  if (p.stage) {
-    newTrash = [{ ...p.stage, zone: "TRASH" as const }, ...newTrash];
+  let nextState = state;
+  const existingStage = nextState.players[controller].stage;
+  if (existingStage) {
+    const replaced = transitionCard(nextState, existingStage.instanceId, "TRASH", {
+      position: "TOP",
+      preserveSourceTriggers: true,
+    });
+    if (!replaced) return { state, events, failed: true };
+    nextState = replaced.state;
+    events.push({
+      type: "CARD_TRASHED",
+      playerIndex: controller,
+      payload: {
+        cardInstanceId: existingStage.instanceId,
+        newCardInstanceId: replaced.fact.newInstanceId,
+        cardId: existingStage.cardId,
+        reason: "stage_replaced",
+      },
+    });
   }
-  const newPlayers = [...state.players] as [GameState["players"][0], GameState["players"][1]];
-  newPlayers[controller] = { ...p, stage: newStage, trash: newTrash };
-  const nextState = { ...state, players: newPlayers };
+  const moved = transitionCard(nextState, card.instanceId, "STAGE", {
+    turnPlayed: state.turn.number,
+  });
+  if (!moved) return { state, events, failed: true };
   events.push({
     type: "CARD_PLAYED",
     playerIndex: controller,
-    payload: { cardInstanceId: newStage.instanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT", sourceZone: card.zone },
+    payload: { cardInstanceId: moved.fact.newInstanceId, cardId: card.cardId, zone: "STAGE", source: "BY_EFFECT", sourceZone: card.zone },
   });
-  return { state: nextState, events, playedId: newStage.instanceId };
+  return { state: moved.state, events, playedId: moved.fact.newInstanceId };
 }
 
 export type PlayCardResumeFrame = {
@@ -387,64 +373,22 @@ export function executePlaySelf(
   // Only characters can be played to field via PLAY_SELF
   if (data.type.toUpperCase() !== "CHARACTER") return { state, events, succeeded: false };
 
-  // Find which player owns this card and remove from source zone
-  for (const [pi, player] of state.players.entries()) {
-    const inHand = player.hand.findIndex((c) => c.instanceId === sourceCardInstanceId);
-    const inTrash = player.trash.findIndex((c) => c.instanceId === sourceCardInstanceId);
-    const inDeck = player.deck.findIndex((c) => c.instanceId === sourceCardInstanceId);
-
-    let updatedPlayer = { ...player };
-    let found = false;
-
-    if (inHand !== -1) {
-      updatedPlayer = { ...updatedPlayer, hand: player.hand.filter((_, i) => i !== inHand) };
-      found = true;
-    } else if (inTrash !== -1) {
-      updatedPlayer = { ...updatedPlayer, trash: player.trash.filter((_, i) => i !== inTrash) };
-      found = true;
-    } else if (inDeck !== -1) {
-      updatedPlayer = { ...updatedPlayer, deck: player.deck.filter((_, i) => i !== inDeck) };
-      found = true;
-    }
-
-    if (!found) continue;
-
-    const newChar: CardInstance = {
-      ...card,
-      instanceId: nanoid(),
-      zone: "CHARACTER",
-      state: "ACTIVE",
-      attachedDon: [],
-      turnPlayed: state.turn.number,
-      controller: pi as 0 | 1,
-      owner: pi as 0 | 1,
-    };
-
-    const slotIdx = updatedPlayer.characters.indexOf(null);
-    if (slotIdx !== -1) {
-      const newChars = [...updatedPlayer.characters] as (typeof updatedPlayer.characters);
-      newChars[slotIdx] = newChar;
-      updatedPlayer = { ...updatedPlayer, characters: newChars };
-    }
-
-    const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-    newPlayers[pi] = updatedPlayer;
-
-    events.push({
-      type: "CARD_PLAYED",
-      playerIndex: pi as 0 | 1,
-      payload: { cardInstanceId: newChar.instanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF", sourceZone: card.zone },
-    });
-
-    return {
-      state: { ...state, players: newPlayers },
-      events,
-      succeeded: true,
-      result: { targetInstanceIds: [newChar.instanceId], count: 1 },
-    };
-  }
-
-  return { state, events, succeeded: false };
+  const moved = transitionCard(state, sourceCardInstanceId, "CHARACTER", {
+    entryState: "ACTIVE",
+    turnPlayed: state.turn.number,
+  });
+  if (!moved) return { state, events, succeeded: false };
+  events.push({
+    type: "CARD_PLAYED",
+    playerIndex: moved.fact.owner,
+    payload: { cardInstanceId: moved.fact.newInstanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF", sourceZone: card.zone },
+  });
+  return {
+    state: moved.state,
+    events,
+    succeeded: true,
+    result: { targetInstanceIds: [moved.fact.newInstanceId], count: 1 },
+  };
 }
 
 export function executeSetActive(
@@ -581,22 +525,19 @@ export function executeActivateEventFromHand(
   if (cardIdx === -1) return { state, events, succeeded: false };
 
   const eventCard = p.hand[cardIdx];
-  const newHand = p.hand.filter((_, i) => i !== cardIdx);
-  const newTrash = [{ ...eventCard, zone: "TRASH" as const }, ...p.trash];
-
-  const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
-  newPlayers[controller] = { ...p, hand: newHand, trash: newTrash };
+  const moved = transitionCard(state, eventInstanceId, "TRASH", { position: "TOP" });
+  if (!moved) return { state, events, succeeded: false };
 
   // Effect-driven activation bypasses the normal cost-payment step, so no
   // printed cost was "reduced" by a modifier — OPT-238 Crocodile should not
   // fire on this path.
-  events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: eventCard.instanceId, costReducedAmount: 0 } });
+  events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: moved.fact.newInstanceId, costReducedAmount: 0 } });
 
   return {
-    state: { ...state, players: newPlayers },
+    state: moved.state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: [eventInstanceId], count: 1 },
+    result: { targetInstanceIds: [moved.fact.newInstanceId], count: 1 },
   };
 }
 
