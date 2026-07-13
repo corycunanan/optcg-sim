@@ -513,7 +513,12 @@ export type SourceContext = "KO_BY_EFFECT" | "KO_IN_BATTLE" | "REMOVAL_BY_EFFECT
 export interface RevealedCardPropertyCondition {
   type: "REVEALED_CARD_PROPERTY";
   result_ref: string;
-  filter: TargetFilter;
+  filter?: TargetFilter;
+  compare?: {
+    property: "COST";
+    operator: NumericOperator;
+    value: number | DynamicValue;
+  };
 }
 
 // ─── Numeric Ranges ───────────────────────────────────────────────────────────
@@ -530,7 +535,7 @@ export type DynamicValue =
   | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number; filter?: TargetFilter }
   | { type: "GAME_STATE"; source: GameStateSource; controller?: Controller }
   | { type: "ACTION_RESULT"; ref: string }
-  | { type: "CHOSEN_VALUE" };
+  | { type: "CHOSEN_VALUE"; ref: string };
 
 export type DynamicSource =
   | "CARDS_TRASHED_THIS_WAY"
@@ -708,7 +713,6 @@ export const ALL_ACTION_TYPES = [
  */
 export const ACTION_TYPES_WITHOUT_RESOLVER_HANDLER = [
   "RETURN_ATTACHED_DON_TO_COST",
-  "CHOOSE_VALUE",
   "GRANT_COUNTER",
   "REMOVE_PROHIBITION",
 ] as const satisfies readonly ActionType[];
@@ -796,6 +800,11 @@ export interface ActionParamsMap {
   // Choice/meta
   PLAYER_CHOICE: { options: Action[][]; labels?: string[] };
   OPPONENT_CHOICE: { options: Action[][]; labels?: string[] };
+  CHOOSE_VALUE: {
+    domain: "COST" | "POWER" | "NUMBER";
+    constraints?: NumericRange;
+    step?: number;
+  };
   OPPONENT_ACTION: { action: Action };
 
   // Effects/scheduling
@@ -825,7 +834,6 @@ export interface ActionParamsMap {
   DISTRIBUTE_DON: Record<string, unknown>;
   RETURN_ATTACHED_DON_TO_COST: Record<string, unknown>;
   REMOVE_PROHIBITION: Record<string, unknown>;
-  CHOOSE_VALUE: Record<string, unknown>;
   WIN_GAME: Record<string, unknown>;
   EXTRA_TURN: Record<string, unknown>;
   REDIRECT_ATTACK: Record<string, unknown>;
@@ -1445,10 +1453,18 @@ export interface EffectResolutionContext {
   costResults: CostResult;
 }
 
+export interface RevealedCardSnapshot {
+  instanceId: string;
+  cardId: string;
+  source: "DECK" | "DECK_TOP" | "LIFE_TOP";
+  controller: 0 | 1;
+}
+
 export interface EffectResult {
   targetInstanceIds: string[];
   count: number;
   value?: unknown;
+  revealedCards?: RevealedCardSnapshot[];
 }
 
 export interface CostResult {

@@ -4,6 +4,11 @@ Cards whose effect schemas were too complex to encode on the first pass. Each en
 
 Cards are removed from this list once they are encoded in `workers/game/src/engine/schemas/`.
 
+**OPT-475 closure:** the conditional-reveal cohort was reconciled from the stale
+19-card audit count to 20 cards (OP08-049 was still partial). All 20 now have
+complete authored schemas and machine-checked execution coverage; their entries
+remain below as historical disposition records.
+
 ---
 
 ## Blocker Categories
@@ -53,9 +58,9 @@ On K.O. full-deck SEARCH_AND_PLAY encoded in `op02.ts`.
 
 ---
 
-## OP07 Deferred Cards (1 remaining)
+## OP07 Deferred Cards (0 remaining)
 
-### OP07-048 Donquixote Doflamingo
+### ~~OP07-048 Donquixote Doflamingo~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] [Once Per Turn] ➁: Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea} type Character card with a cost of 4 or less, you may play that card rested. Then, place the rest at the bottom of your deck.
@@ -71,9 +76,9 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-## OP08 Deferred Cards (1 remaining)
+## OP08 Deferred Cards (0 remaining)
 
-### OP08-049 Speed Jil
+### ~~OP08-049 Speed Jil~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Play] Reveal 1 card from the top of your deck and place it at the top or bottom of your deck. If the revealed card's type includes "Whitebeard Pirates", this Character gains [Rush] during this turn.
@@ -84,9 +89,9 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-## OP11 Deferred Cards (6 remaining)
+## OP11 Deferred Cards (0 remaining)
 
-### OP11-066 Charlotte Brûlée
+### ~~OP11-066 Charlotte Oven~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] You may rest this Character: Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, K.O. up to 1 of your opponent's Characters with a base cost of 3 or less. Then, add up to 1 DON!! card from your DON!! deck and rest it.
@@ -95,7 +100,7 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-### OP11-071 Charlotte Linlin
+### ~~OP11-071 Charlotte Perospero~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] [Once Per Turn] You may trash 1 card from your hand: Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, draw 1 card and add up to 1 DON!! card from your DON!! deck and set it as active.
@@ -104,7 +109,7 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-### OP11-073 Charlotte Katakuri
+### ~~OP11-073 Charlotte Linlin~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Your Opponent's Attack] [Once Per Turn] DON!! −5: Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, up to 1 of your Leader gains +2000 power during this turn.
@@ -113,7 +118,7 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-### OP11-074 Charlotte Cracker
+### ~~OP11-074 Streusen~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] [Once Per Turn] DON!! −1, You may rest this Character: Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, rest up to 1 of your opponent's Characters with a cost of 4 or less.
@@ -122,7 +127,7 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-### OP11-079 Mochi Mochi no Mi
+### ~~OP11-079 When Two Men Are Fighting the Last Thing I Need Is Some Half-Hearted Assistance!!!!~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Counter] Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, up to 1 of your Leader or Character cards gains +5000 power during this battle.
@@ -131,7 +136,7 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-### OP11-081 Flaming Mochi
+### ~~OP11-081 Cognac Mama-Mash~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Main] Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, K.O. up to 1 of your opponent's Characters with a base cost of 8 or less.
@@ -142,9 +147,9 @@ Hand cost reduction + Blocker fully encoded in `op07.ts`.
 
 ---
 
-## OP12 Deferred Cards (2 remaining)
+## OP12 Deferred Cards (0 remaining)
 
-### OP12-058 I Will Make Whitebeard the King of the Pirates
+### ~~OP12-058 I Will Make Whitebeard the King of the Pirates~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Main] If your Leader's type includes "Whitebeard Pirates", reveal 1 card from the top of your deck. If that card is a Character card with a type including "Whitebeard Pirates" and a cost of 9 or less, you may play that card. If you do, that Character gains [Rush] during this turn.
@@ -173,9 +178,9 @@ APPLY_ONE_TIME_MODIFIER with MODIFY_COST + name/costMin filter encoded in `op12.
 
 ---
 
-## OP14 Deferred Cards (1 remaining)
+## OP14 Deferred Cards (0 remaining)
 
-### OP14-044 Edward.Newgate (On Play effect only)
+### ~~OP14-044 Edward.Newgate (On Play effect only)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards and trash 1 card from your hand.
@@ -193,14 +198,14 @@ SET_POWER with dynamic GAME_STATE LEADER_BASE_POWER value encoded in `op14.ts`.
 
 ---
 
-## OP15 Deferred Cards (1 remaining)
+## OP15 Deferred Cards (0 remaining)
 
 ### ~~OP15-013 Pincers~~ — ENCODED
 Hand cost reduction + Blocker fully encoded in `op15.ts`.
 
 ---
 
-### OP15-065 Goro
+### ~~OP15-065 Goro~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Play] Reveal 1 card from the top of your deck. If the revealed card has a cost of 2 or less, add up to 1 DON!! card from your DON!! deck and rest it.
@@ -216,9 +221,9 @@ Hand cost reduction + On Play fully encoded in `op15.ts`.
 
 ---
 
-## ST13 Deferred Cards (3 remaining)
+## ST13 Deferred Cards (0 remaining)
 
-### ST13-007 Sabo (cost 2)
+### ~~ST13-007 Sabo (cost 2)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Sabo] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
@@ -232,7 +237,7 @@ On Play with TURN_LIFE_FACE_DOWN cost fully encoded in `st13.ts`.
 
 ---
 
-### ST13-010 Portgas.D.Ace (cost 2)
+### ~~ST13-010 Portgas.D.Ace (cost 2)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Portgas.D.Ace] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
@@ -241,7 +246,7 @@ On Play with TURN_LIFE_FACE_DOWN cost fully encoded in `st13.ts`.
 
 ---
 
-### ST13-014 Monkey.D.Luffy (cost 2)
+### ~~ST13-014 Monkey.D.Luffy (cost 2)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] You may trash this Character: Reveal 1 card from the top of your Life cards. If that card is a [Monkey.D.Luffy] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.
@@ -250,9 +255,9 @@ On Play with TURN_LIFE_FACE_DOWN cost fully encoded in `st13.ts`.
 
 ---
 
-## ST17 Deferred Cards (1 remaining)
+## ST17 Deferred Cards (0 remaining)
 
-### ST17-001 Crocodile
+### ~~ST17-001 Crocodile~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Play] Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea} type card, draw 2 cards and place 1 card from your hand at the top of your deck.
@@ -268,9 +273,9 @@ Blocker + Activate Main with TURN_LIFE_FACE_UP cost fully encoded in `st20.ts`.
 
 ---
 
-## ST22 Deferred Cards (5 remaining)
+## ST22 Deferred Cards (0 remaining)
 
-### ST22-003 Edward.Newgate (On Play effect only)
+### ~~ST22-003 Edward.Newgate (On Play effect only)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards.
@@ -283,7 +288,7 @@ Blocker + Activate Main with TURN_LIFE_FACE_UP cost fully encoded in `st20.ts`.
 
 ---
 
-### ST22-006 Jozu
+### ~~ST22-006 Jozu~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [On Play] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", draw 2 cards and trash 1 card from your hand.
@@ -294,7 +299,7 @@ Blocker + Activate Main with TURN_LIFE_FACE_UP cost fully encoded in `st20.ts`.
 
 ---
 
-### ST22-007 Squard
+### ~~ST22-007 Squard~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Activate: Main] [Once Per Turn] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", give up to 1 rested DON!! card to your Leader or 1 of your Characters.
@@ -305,7 +310,7 @@ Blocker + Activate Main with TURN_LIFE_FACE_UP cost fully encoded in `st20.ts`.
 
 ---
 
-### ST22-012 Marco (When Attacking effect only)
+### ~~ST22-012 Marco (When Attacking effect only)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [When Attacking] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", this Character gains +1000 power until the end of your opponent's next turn.
@@ -318,7 +323,7 @@ Blocker + Activate Main with TURN_LIFE_FACE_UP cost fully encoded in `st20.ts`.
 
 ---
 
-### ST22-016 Take That Back!! (Counter effect only)
+### ~~ST22-016 Take That Back!! (Counter effect only)~~ — ENCODED
 **Tags:** `REVEAL_CONDITIONAL`
 
 > [Counter] Reveal 1 card from the top of your deck. If that card's type includes "Whitebeard Pirates", up to 1 of your Leader or Character cards gains +4000 power during this battle.
@@ -361,7 +366,7 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 
 | Blocker | Cards | Count | Effort |
 |---------|-------|-------|--------|
-| `REVEAL_CONDITIONAL` | OP01-060, OP07-048, OP08-049, OP11-066/071/073/074/079/081, OP12-058, OP14-044, OP15-065, ST13-007/010/014, ST17-001, ST22-003/006/007/012/016 | 19 | Medium |
+| ~~`REVEAL_CONDITIONAL`~~ | ~~OP01-060 plus the OPT-475 20-card reconciled cohort~~ | 0 | Done |
 | ~~`HAND_ZONE_MODIFIER`~~ | ~~OP14-053~~ | 0 | Done |
 | `FULL_DECK_SEARCH_AND_PLAY` | OP13-079 (schema done, needs setup.ts integration) | 1 | Low |
 | ~~`LIFE_FACE_COST`~~ | ~~ST13-009, ST20-001, P-106~~ | 0 | Done |

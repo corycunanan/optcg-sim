@@ -13,7 +13,7 @@ import { findCardInstance } from "../../state.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
-import { transitionCard, transitionCards } from "../../zone-transition.js";
+import { reorderDeckCards, transitionCard, transitionCards } from "../../zone-transition.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
 // Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
@@ -190,11 +190,26 @@ export function executeReturnToDeck(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const sameDeckIds = targetIds.filter((id) => findCardInstance(state, id)?.zone === "DECK");
+  const reordered = reorderDeckCards(state, sameDeckIds, position);
+  const crossZoneIds = targetIds.filter((id) => !sameDeckIds.includes(id));
+  if (crossZoneIds.length === 0) {
+    return {
+      state: reordered.state,
+      events,
+      succeeded: reordered.reorderedInstanceIds.length > 0,
+      result: {
+        targetInstanceIds: reordered.reorderedInstanceIds,
+        count: reordered.reorderedInstanceIds.length,
+      },
+    };
+  }
+
   const attemptableIds = filterProhibitedTargets(
-    state, targetIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
+    reordered.state, crossZoneIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, position,
+    reordered.state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, position,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -203,7 +218,7 @@ export function executeReturnToDeck(
 
   let nextState = batch.state;
   const finalIds = batch.unprotectedIds;
-  const finalizedIds: string[] = [];
+  const finalizedIds: string[] = [...reordered.reorderedInstanceIds];
   for (const id of finalIds) {
     const result = returnToDeck(nextState, id, position);
     if (result) {

@@ -3915,6 +3915,300 @@ export const OP11_119_KOBY: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ─── OPT-475 conditional-reveal closure ──────────────────────────────────────
+
+export const OP11_066_CHARLOTTE_OVEN: EffectSchema = {
+  card_id: "OP11-066",
+  card_name: "Charlotte Oven",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_choose_reveal_ko",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "REST_SELF" }],
+      flags: { optional: true },
+      actions: [
+        { type: "CHOOSE_VALUE", params: { domain: "COST" }, result_ref: "chosen_cost" },
+        {
+          type: "REVEAL",
+          target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" },
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+          chain: "THEN",
+        },
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { base_cost_max: 3 },
+          },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+        {
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "RESTED" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+export const OP11_071_CHARLOTTE_PEROSPERO: EffectSchema = {
+  card_id: "OP11-071",
+  card_name: "Charlotte Perospero",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_choose_reveal_draw_don",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      flags: { once_per_turn: true, optional: true },
+      actions: [
+        { type: "CHOOSE_VALUE", params: { domain: "COST" }, result_ref: "chosen_cost" },
+        {
+          type: "REVEAL",
+          target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" },
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+          chain: "THEN",
+        },
+        {
+          type: "DRAW",
+          params: { amount: 1 },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+        {
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "ACTIVE" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP11_073_CHARLOTTE_LINLIN: EffectSchema = {
+  card_id: "OP11-073",
+  card_name: "Charlotte Linlin",
+  card_type: "Character",
+  effects: [
+    {
+      id: "big_mom_pirates_rush",
+      category: "permanent",
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Big Mom Pirates" },
+      },
+      modifiers: [
+        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "RUSH" } },
+      ],
+    },
+    {
+      id: "opponent_attack_choose_reveal_buff",
+      category: "auto",
+      trigger: { keyword: "ON_OPPONENT_ATTACK" },
+      costs: [{ type: "DON_MINUS", amount: 5 }],
+      flags: { once_per_turn: true, optional: true },
+      actions: [
+        { type: "CHOOSE_VALUE", params: { domain: "COST" }, result_ref: "chosen_cost" },
+        {
+          type: "REVEAL",
+          target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" },
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+          chain: "THEN",
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: 2000 },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP11_074_STREUSEN: EffectSchema = {
+  card_id: "OP11-074",
+  card_name: "Streusen",
+  card_type: "Character",
+  effects: [
+    {
+      id: "activate_choose_reveal_rest",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "DON_MINUS", amount: 1 }, { type: "REST_SELF" }],
+      flags: { once_per_turn: true, optional: true },
+      actions: [
+        { type: "CHOOSE_VALUE", params: { domain: "COST" }, result_ref: "chosen_cost" },
+        {
+          type: "REVEAL",
+          target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" },
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+          chain: "THEN",
+        },
+        {
+          type: "SET_REST",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 4 },
+          },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP11_079_HALF_HEARTED_ASSISTANCE: EffectSchema = {
+  card_id: "OP11-079",
+  card_name: "When Two Men Are Fighting the Last Thing I Need Is Some Half-Hearted Assistance!!!!",
+  card_type: "Event",
+  effects: [
+    {
+      id: "counter_choose_reveal_buff",
+      category: "auto",
+      trigger: { keyword: "COUNTER_EVENT" },
+      actions: [
+        { type: "CHOOSE_VALUE", params: { domain: "COST" }, result_ref: "chosen_cost" },
+        {
+          type: "REVEAL",
+          target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" },
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+          chain: "THEN",
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { up_to: 1 } },
+          params: { amount: 5000 },
+          duration: { type: "THIS_BATTLE" },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: "trigger_draw",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    },
+  ],
+};
+
+export const OP11_081_COGNAC_MAMA_MASH: EffectSchema = {
+  card_id: "OP11-081",
+  card_name: "Cognac Mama-Mash",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_choose_reveal_ko",
+      category: "auto",
+      trigger: { keyword: "MAIN_EVENT" },
+      actions: [
+        { type: "CHOOSE_VALUE", params: { domain: "COST" }, result_ref: "chosen_cost" },
+        {
+          type: "REVEAL",
+          target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" },
+          params: { amount: 1, source: "DECK_TOP" },
+          result_ref: "revealed",
+          chain: "THEN",
+        },
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { base_cost_max: 8 },
+          },
+          chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            compare: {
+              property: "COST",
+              operator: "==",
+              value: { type: "CHOSEN_VALUE", ref: "chosen_cost" },
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: "trigger_add_don",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }],
+    },
+  ],
+};
+
 export const OP11_SCHEMAS: Record<string, EffectSchema> = {
   // Red
   "OP11-001": OP11_001_KOBY,
@@ -3973,14 +4267,20 @@ export const OP11_SCHEMAS: Record<string, EffectSchema> = {
   "OP11-062": OP11_062_CHARLOTTE_KATAKURI,
   "OP11-063": OP11_063_LITTLE_SADI,
   "OP11-065": OP11_065_CHARLOTTE_ANANA,
+  "OP11-066": OP11_066_CHARLOTTE_OVEN,
   "OP11-067": OP11_067_CHARLOTTE_KATAKURI,
   "OP11-069": OP11_069_CHARLOTTE_BRULEE,
   "OP11-070": OP11_070_CHARLOTTE_PUDDING,
+  "OP11-071": OP11_071_CHARLOTTE_PEROSPERO,
   "OP11-072": OP11_072_CHARLOTTE_MONT_DOR,
+  "OP11-073": OP11_073_CHARLOTTE_LINLIN,
+  "OP11-074": OP11_074_STREUSEN,
   "OP11-075": OP11_075_JAGUAR_D_SAUL,
   "OP11-076": OP11_076_HANNYABAL,
   "OP11-077": OP11_077_RANDOLPH,
+  "OP11-079": OP11_079_HALF_HEARTED_ASSISTANCE,
   "OP11-080": OP11_080_GEAR_TWO,
+  "OP11-081": OP11_081_COGNAC_MAMA_MASH,
   // Black
   "OP11-082": OP11_082_ARAMAKI,
   "OP11-083": OP11_083_CARIBOU,

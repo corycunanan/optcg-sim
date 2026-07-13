@@ -2,10 +2,11 @@
  * Action handlers: PLAYER_CHOICE, OPPONENT_CHOICE, OPPONENT_ACTION, REUSE_EFFECT
  */
 
-import type { Action, EffectResult, EffectSchema } from "../../effect-types.js";
+import type { Action, DynamicValue, EffectResult, EffectSchema, NumericRange } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { describeActionBranch } from "../action-utils.js";
+import { describeActionBranch, resolveAmount } from "../action-utils.js";
+import { getActionParams } from "../../effect-types.js";
 import { findCardInstance } from "../../state.js";
 
 // These are set by the resolver module to break the circular dependency
@@ -105,6 +106,97 @@ export function executePlayerChoice(
   };
 
   return { state, events, succeeded: false, pendingPrompt };
+}
+
+function compareNumeric(left: number, operator: string, right: number): boolean {
+  switch (operator) {
+    case "==": return left === right;
+    case "!=": return left !== right;
+    case "<": return left < right;
+    case "<=": return left <= right;
+    case ">": return left > right;
+    case ">=": return left >= right;
+    default: return false;
+  }
+}
+
+function rangeMatches(
+  candidate: number,
+  range: NumericRange,
+  state: GameState,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): boolean {
+  if ("any_of" in range) {
+    return range.any_of.some((part) =>
+      rangeMatches(candidate, part, state, controller, cardDb, resultRefs));
+  }
+  if ("min" in range) return candidate >= range.min && candidate <= range.max;
+  const expected = resolveAmount(
+    range.value as number | DynamicValue,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
+  return compareNumeric(candidate, range.operator, expected);
+}
+
+export function executeChooseValue(
+  state: GameState,
+  action: Action,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const params = getActionParams(action, "CHOOSE_VALUE");
+  const defaults = params.domain === "POWER"
+    ? { min: 0, max: 12000, step: 1000 }
+    : { min: 0, max: 10, step: 1 };
+  const explicitBounds = params.constraints && "min" in params.constraints
+    ? params.constraints
+    : null;
+  const min = explicitBounds?.min ?? defaults.min;
+  const max = explicitBounds?.max ?? defaults.max;
+  const step = params.step ?? defaults.step;
+  if (!Number.isInteger(min) || !Number.isInteger(max) || !Number.isInteger(step) || step <= 0 || min > max) {
+    return { state, events: [], succeeded: false };
+  }
+
+  const values: number[] = [];
+  for (let value = min; value <= max && values.length <= 100; value += step) {
+    if (!params.constraints || rangeMatches(value, params.constraints, state, controller, cardDb, resultRefs)) {
+      values.push(value);
+    }
+  }
+  if (values.length === 0 || values.length > 100) {
+    return { state, events: [], succeeded: false };
+  }
+
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const validTargets = values.map((value) => `choose-value:${value}`);
+  const pendingPrompt: PendingPromptState = {
+    options: {
+      promptType: "PLAYER_CHOICE",
+      choices: values.map((value) => ({ id: `choose-value:${value}`, label: String(value) })),
+      effectDescription: sourceData?.effectText ?? "Choose a value.",
+      source: "EFFECT",
+    },
+    respondingPlayer: controller,
+    resumeContext: {
+      effectSourceInstanceId: sourceCardInstanceId,
+      controller,
+      pausedAction: action,
+      remainingActions: [],
+      resultRefs: [...resultRefs.entries()].map(([key, result]) => [key, result as unknown]),
+      validTargets,
+    } satisfies ResumeContext,
+  };
+
+  return { state, events: [], succeeded: false, pendingPrompt };
 }
 
 export function executeOpponentAction(

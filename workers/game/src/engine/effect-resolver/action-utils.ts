@@ -138,6 +138,11 @@ export function resolveAmount(
     return result?.count ?? 0;
   }
 
+  if (dv.type === "CHOSEN_VALUE") {
+    const chosen = resultRefs.get(dv.ref)?.value;
+    return typeof chosen === "number" && Number.isInteger(chosen) ? chosen : 0;
+  }
+
   // Fallback for PER_COUNT without state (legacy calls)
   if (dv.type === "PER_COUNT") {
     return dv.multiplier ?? 1;

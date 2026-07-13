@@ -1610,7 +1610,7 @@ export const OP07_048_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
         },
         {
           type: "PLAY_CARD",
-          target: { type: "SELECTED_CARDS", ref: "revealed" },
+          target: { type: "SELECTED_CARDS", ref: "revealed", count: { up_to: 1 } },
           params: { source_zone: "DECK", cost_override: "FREE", entry_state: "RESTED" },
           chain: "THEN",
           conditions: {

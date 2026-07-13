@@ -1711,6 +1711,17 @@ export const OP08_049_SPEED_JIL: EffectSchema = {
           result_ref: "revealed",
         },
         {
+          type: "PLAYER_CHOICE",
+          params: {
+            labels: ["Place at top", "Place at bottom"],
+            options: [
+              [{ type: "RETURN_TO_DECK", target_ref: "revealed", params: { position: "TOP" } }],
+              [{ type: "RETURN_TO_DECK", target_ref: "revealed", params: { position: "BOTTOM" } }],
+            ],
+          },
+          chain: "THEN",
+        },
+        {
           type: "GRANT_KEYWORD",
           target: { type: "SELF" },
           params: { keyword: "RUSH" },

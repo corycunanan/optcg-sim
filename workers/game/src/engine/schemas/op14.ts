@@ -1688,6 +1688,11 @@ export const OP14_044_EDWARD_NEWGATE: EffectSchema = {
           },
           params: { amount: 1 },
           chain: "THEN",
+          conditions: {
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed",
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
         },
       ],
     },

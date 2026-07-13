@@ -35,6 +35,7 @@ import { replacePendingEventReferences } from "../../events.js";
 export interface TargetFallthrough {
   kind: "fallthrough";
   state: GameState;
+  succeeded?: boolean;
 }
 
 export interface TargetTerminal {
@@ -281,5 +282,5 @@ export function handleSelectTarget(
     resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
   }
 
-  return { kind: "fallthrough", state: nextState };
+  return { kind: "fallthrough", state: nextState, succeeded: actionResult.succeeded };
 }

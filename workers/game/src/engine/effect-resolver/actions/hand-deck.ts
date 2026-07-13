@@ -219,7 +219,16 @@ export function executeReveal(
       state,
       events,
       succeeded: true,
-      result: { targetInstanceIds: revealed.map((c) => c.instanceId), count },
+      result: {
+        targetInstanceIds: revealed.map((c) => c.instanceId),
+        count,
+        revealedCards: revealed.map((card) => ({
+          instanceId: card.instanceId,
+          cardId: card.cardId,
+          source,
+          controller: targetController,
+        })),
+      },
     };
   }
 
@@ -243,7 +252,16 @@ export function executeReveal(
       state,
       events,
       succeeded: true,
-      result: { targetInstanceIds: [topLife.instanceId], count: 1 },
+      result: {
+        targetInstanceIds: [topLife.instanceId],
+        count: 1,
+        revealedCards: [{
+          instanceId: topLife.instanceId,
+          cardId: topLife.cardId,
+          source,
+          controller: targetController,
+        }],
+      },
     };
   }
 

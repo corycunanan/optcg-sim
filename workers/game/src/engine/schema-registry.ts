@@ -493,6 +493,20 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
     errors.push(`${prefix}: Unknown chain connector '${action.chain}'`);
   }
 
+  if (action.type === "CHOOSE_VALUE") {
+    if (!action.result_ref) {
+      errors.push(`${prefix}: CHOOSE_VALUE requires 'result_ref'`);
+    }
+    const domain = action.params?.domain;
+    if (!domain || !["COST", "POWER", "NUMBER"].includes(String(domain))) {
+      errors.push(`${prefix}: CHOOSE_VALUE requires domain COST, POWER, or NUMBER`);
+    }
+    const step = action.params?.step;
+    if (step !== undefined && (!Number.isInteger(step) || Number(step) <= 0)) {
+      errors.push(`${prefix}: CHOOSE_VALUE step must be a positive integer`);
+    }
+  }
+
   // OPT-409: `controller` inside Target.filter is silently ignored on normal
   // targeting paths — matchesFilter only enforces it when the caller passes
   // the optional filterController argument, which the target-resolver never
@@ -560,7 +574,8 @@ function collectConsumedResultRefs(
     if (
       nested &&
       typeof nested === "object" &&
-      (nested as { type?: unknown }).type === "ACTION_RESULT" &&
+      ((nested as { type?: unknown }).type === "ACTION_RESULT" ||
+        (nested as { type?: unknown }).type === "CHOSEN_VALUE") &&
       typeof (nested as { ref?: unknown }).ref === "string"
     ) {
       consumed.add((nested as { ref: string }).ref);

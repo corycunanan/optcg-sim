@@ -365,6 +365,41 @@ export function transitionCards(
   };
 }
 
+/**
+ * Same-zone deck placement is ordering, not a zone transition: the card keeps
+ * its identity and transient state. This is the explicit OPT-474 exception
+ * used by reveal effects that place the revealed top card at the top/bottom.
+ */
+export function reorderDeckCards(
+  state: GameState,
+  instanceIds: readonly string[],
+  position: "TOP" | "BOTTOM",
+): { state: GameState; reorderedInstanceIds: string[] } {
+  const requested = new Set(instanceIds);
+  const reorderedInstanceIds: string[] = [];
+  const players = [...state.players] as [PlayerState, PlayerState];
+
+  for (const playerIndex of [0, 1] as const) {
+    const player = players[playerIndex];
+    const selected = instanceIds.flatMap((instanceId) => {
+      const card = player.deck.find((candidate) => candidate.instanceId === instanceId);
+      return card ? [card] : [];
+    });
+    if (selected.length === 0) continue;
+    const rest = player.deck.filter((card) => !requested.has(card.instanceId));
+    players[playerIndex] = {
+      ...player,
+      deck: position === "TOP" ? [...selected, ...rest] : [...rest, ...selected],
+    };
+    reorderedInstanceIds.push(...selected.map((card) => card.instanceId));
+  }
+
+  return {
+    state: reorderedInstanceIds.length > 0 ? { ...state, players } : state,
+    reorderedInstanceIds,
+  };
+}
+
 /** Backward-compatible state-only wrapper. Prefer transitionCard for facts. */
 export function moveCard(
   state: GameState,

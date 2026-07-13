@@ -83,7 +83,7 @@ describe("OPT-471 authoritative authored-schema gate", () => {
     ],
     [
       "missing handler",
-      schema([{ type: "CHOOSE_VALUE" }]),
+      schema([{ type: "GRANT_COUNTER" }]),
       "has no resolver handler",
     ],
     ["malformed schema", { effects: "not-an-array" }, "Missing or non-array"],

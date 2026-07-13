@@ -43,7 +43,7 @@ import * as play from "./actions/play.js";
 import * as handDeck from "./actions/hand-deck.js";
 import * as effects from "./actions/effects.js";
 import * as battleActions from "./actions/battle-actions.js";
-import { executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
+import { executeChooseValue, executePlayerChoice, executeOpponentAction, executeReuseEffect, setChoiceDependencies } from "./actions/choice.js";
 import { log } from "../../lib/log.js";
 import { consumeResolutionAction, isEngineTerminated, terminateForEngineContract } from "../engine-limits.js";
 
@@ -147,6 +147,7 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   // Choice
   PLAYER_CHOICE: executePlayerChoice,
   OPPONENT_CHOICE: executePlayerChoice, // same handler, chooser determined inside
+  CHOOSE_VALUE: executeChooseValue,
   OPPONENT_ACTION: executeOpponentAction,
   REUSE_EFFECT: executeReuseEffect,
 };
@@ -161,7 +162,7 @@ export function listRegisteredActionTypes(): ActionType[] {
 // zero schemas:
 //   - RETURN_ATTACHED_DON_TO_COST is shared with the Cost union and resolves
 //     through cost-handler.ts.
-//   - CHOOSE_VALUE / GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
+//   - GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
 //     union but referenced by zero schemas. Schema validation rejects authored
 //     uses until a real handler is registered.
 //
