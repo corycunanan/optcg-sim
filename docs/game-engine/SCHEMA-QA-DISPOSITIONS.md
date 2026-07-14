@@ -34,8 +34,3 @@ cohort remains deferred.
 | ST12-017 | Incorrect — corrected        | The schema hard-coded the unplayed revealed card to the deck bottom. It now uses `TOP_OR_BOTTOM`, and the arrange prompt exposes and executes both official destinations.                                                            |
 | ST22-011 | Incorrect — corrected        | The power action could boost any Leader. It now filters the target to a type including Whitebeard Pirates; direct Leader targeting now enforces authored filters.                                                                    |
 | ST22-017 | Implemented / false positive | A filtered two-card Whitebeard Pirates `REVEAL_FROM_HAND` cost precedes the draw and cost-5 Character bottom-deck action; the Trigger return is also encoded.                                                                        |
-
-## Source parity exceptions
-
-- OP12-112 — canonical source entry is missing and tracked by
-  [OPT-485](https://linear.app/optcg-sim/issue/OPT-485/restore-missing-op12-112-canonical-card-source-entry).
