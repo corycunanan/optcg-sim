@@ -54,6 +54,16 @@ export function getArrangeEscapeAction(
   return "hide";
 }
 
+export function getArrangeDestinations(
+  restDestination: string | undefined,
+  canSendToBottom: boolean,
+): ("top" | "bottom")[] {
+  if (restDestination?.toUpperCase() === "TOP_OR_BOTTOM") {
+    return ["bottom", "top"];
+  }
+  return [canSendToBottom ? "bottom" : "top"];
+}
+
 function SortableModalCard({
   card,
   cardDb,
@@ -168,6 +178,7 @@ interface ArrangeTopCardsModalProps {
   cards: CardInstance[];
   effectDescription: string;
   canSendToBottom: boolean;
+  restDestination?: string;
   /** If provided, only these instanceIds may be selected to add to hand */
   validTargets?: string[];
   /** How many cards may be kept ("up to N"). Defaults to 1. */
@@ -182,6 +193,7 @@ export function ArrangeTopCardsModal({
   cards: initialCards,
   effectDescription,
   canSendToBottom,
+  restDestination,
   validTargets,
   maxKeep = 1,
   cardDb,
@@ -197,6 +209,7 @@ export function ArrangeTopCardsModal({
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion() ?? false;
+  const destinations = getArrangeDestinations(restDestination, canSendToBottom);
   const dragTilt = useDragTilt({ disabled: reducedMotion });
   const rovingFocus = useRovingFocus<HTMLButtonElement>(
     orderedCards.map((card) => card.instanceId),
@@ -413,15 +426,17 @@ export function ArrangeTopCardsModal({
               </GameButton>
             </>
           )}
-          {step === 2 && (
-            <GameButton
-              variant="amber"
-              size="sm"
-              onClick={() => handleSend(canSendToBottom ? "bottom" : "top")}
-            >
-              {canSendToBottom ? "Place at Bottom" : "Place on Top"}
-            </GameButton>
-          )}
+          {step === 2 &&
+            destinations.map((destination) => (
+              <GameButton
+                key={destination}
+                variant="amber"
+                size="sm"
+                onClick={() => handleSend(destination)}
+              >
+                {destination === "bottom" ? "Place at Bottom" : "Place on Top"}
+              </GameButton>
+            ))}
         </DialogFooter>
       </DialogContent>
     </Dialog>

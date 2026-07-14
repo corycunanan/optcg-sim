@@ -329,10 +329,16 @@ export function computeAllValidTargets(
 
   switch (targetType) {
     case "SELF": return [sourceCardInstanceId];
-    case "YOUR_LEADER": return [state.players[controller].leader.instanceId];
+    case "YOUR_LEADER": {
+      const leader = state.players[controller].leader;
+      if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs)) return [];
+      return [leader.instanceId];
+    }
     case "OPPONENT_LEADER": {
       const opp = controller === 0 ? 1 : 0;
-      return [state.players[opp].leader.instanceId];
+      const leader = state.players[opp].leader;
+      if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs)) return [];
+      return [leader.instanceId];
     }
     case "ALL_YOUR_CHARACTERS":
       return state.players[controller].characters.filter(Boolean).map((c) => c!.instanceId);

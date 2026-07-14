@@ -58,6 +58,7 @@ export function BoardModals({
             cards={activePrompt.cards}
             effectDescription={activePrompt.effectDescription}
             canSendToBottom={activePrompt.canSendToBottom}
+            restDestination={activePrompt.restDestination}
             validTargets={activePrompt.validTargets}
             maxKeep={activePrompt.maxKeep}
             cardDb={cardDb}

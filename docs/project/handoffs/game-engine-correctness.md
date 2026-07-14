@@ -58,17 +58,17 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Done | [#298](https://github.com/corycunanan/optcg-sim/pull/298) | Immutable runtime resolver services; cost façade split into six acyclic modules with architecture guards. |
 | 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Done | [#303](https://github.com/corycunanan/optcg-sim/pull/303) | 919-line Durable Object composition root over typed session collaborators; contract coverage locks serialization, reconnects, authorization, visibility, and persistence. |
 | 42 | OPT-487 | RETURN_TO_DECK silently ignores non-Character source zones | — | OPT-474, OPT-475 | Done | [#305](https://github.com/corycunanan/optcg-sim/pull/305) | Canonical returns, Life-removal events, and owner-authoritative ordering for every legal source; field replacements remain field-only. |
-| 43 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | In Review | [#307](https://github.com/corycunanan/optcg-sim/pull/307) | Exhaustive action/event/runtime unions, validated unknown-data boundaries, and dead resolver removal. |
+| 43 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Done | [#307](https://github.com/corycunanan/optcg-sim/pull/307) | Merged 2026-07-14 (`e206d0f`) after all three Codex review threads were addressed and resolved. |
 | 44 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
 | 45 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
-| 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Backlog | — | Seventeen newly exposed findings; overlaps OPT-475 where conditional reveals are involved. |
+| 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | In Review | [#309](https://github.com/corycunanan/optcg-sim/pull/309) | Fifteen implemented detector false positives; ST12-017 and ST22-011 corrected with pipeline/UI regressions and evidence-backed dispositions. |
 | 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Backlog | — | Remove the tracked source-parity exception after official-source verification. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #307, then implement OPT-481. OPT-484 and OPT-485 remain independently ready; OPT-482 closes the project after implementation tickets land.
+**Next up:** Review PR #309, then implement OPT-481. OPT-485 remains independently ready; OPT-482 closes the project after implementation tickets land.
 
 ---
 
@@ -406,3 +406,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep the two intentional double assertions confined to Cloudflare storage and the final validated persistence boundary; the static regression enforces that allowance. Preserve `ActionParamsMap`/handler exhaustiveness when adding action types. OPT-481 must bound histories without weakening snapshot validation or discarding state required to resume a pending prompt/effect stack.
 - **Unresolved:** OPT-481 owns event-log, undo-history, and persisted-snapshot growth policy. OPT-484 and OPT-485 remain independent schema/source work; OPT-482 remains the final documentation reconciliation.
 - **Pointer:** PR #307; `pnpm verify` passes with 613 app tests, 1,591 worker tests, 2,319 validated card schemas, 3,574 authored action uses, 73/73 handler coverage, and a production build.
+
+### OPT-484 → OPT-485
+**From:** session on 2026-07-14 · **Commit:** `8ebcc78` · **PR:** [#309](https://github.com/corycunanan/optcg-sim/pull/309)
+
+- **Primer:** All 17 low-confidence findings now have source-backed dispositions: 15 are implemented detector false positives, ST12-017 now preserves the official top-or-bottom deck choice end to end, and ST22-011 now restricts its power boost to Whitebeard Pirates Leaders. Direct Leader targets enforce authored filters.
+- **Read first:** `docs/game-engine/SCHEMA-QA-DISPOSITIONS.md`, `workers/game/src/__tests__/opt-484-low-confidence-schema-findings.test.ts`, `workers/game/src/engine/effect-resolver/target-resolver.ts`, and the `ARRANGE_TOP_CARDS` prompt path in `actions/hand-deck.ts` plus `src/components/game/arrange-top-cards-modal.tsx`; for OPT-485, start at the OP12-112 source-parity exception and canonical card-source loader.
+- **Gotchas / do NOT touch:** The low-confidence detector is intentionally coarse; keep explicit dispositions fail closed instead of weakening the gate. Preserve `restDestination: "TOP_OR_BOTTOM"` through the prompt so both UI actions remain legal. Leader target filters now apply to both `YOUR_LEADER` and `OPPONENT_LEADER`; do not bypass them with deterministic auto-targeting.
+- **Unresolved:** No OPT-484 card remains deferred. OP12-112 is still the sole source-parity exception and belongs to OPT-485 after official-source verification.
+- **Pointer:** PR #309; the verified baseline is 615 app tests, 1,600 worker tests with coverage, 2,319 validated schemas, 3,574 authored action uses, 73/73 handler coverage, and a production build.
