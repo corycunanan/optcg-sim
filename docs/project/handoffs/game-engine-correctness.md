@@ -59,8 +59,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Done | [#303](https://github.com/corycunanan/optcg-sim/pull/303) | 919-line Durable Object composition root over typed session collaborators; contract coverage locks serialization, reconnects, authorization, visibility, and persistence. |
 | 42 | OPT-487 | RETURN_TO_DECK silently ignores non-Character source zones | — | OPT-474, OPT-475 | Done | [#305](https://github.com/corycunanan/optcg-sim/pull/305) | Canonical returns, Life-removal events, and owner-authoritative ordering for every legal source; field replacements remain field-only. |
 | 43 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Done | [#307](https://github.com/corycunanan/optcg-sim/pull/307), [#308](https://github.com/corycunanan/optcg-sim/pull/308) | Base work merged in `e206d0f`; review-driven pick-limit corrections merged 2026-07-14 in `874b1b3` after exact-head Codex approval and green checks. |
-| 44 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | In Review | [#311](https://github.com/corycunanan/optcg-sim/pull/311) | Bounded event/undo retention, separate immutable card data, payload budgets, legacy compaction, and atomic failure rollback. |
-| 45 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
+| 44 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Done | [#311](https://github.com/corycunanan/optcg-sim/pull/311) | Merged 2026-07-14 (`fc7e3b0`). Bounded event/undo retention, separate immutable card data, payload budgets, legacy compaction, and atomic failure rollback. |
+| 45 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | In Review | [#312](https://github.com/corycunanan/optcg-sim/pull/312) | Executable evidence links, exact schema catalogs, reconciled deferred inventory, scoped architecture guarantees, and final closure risks. |
 | 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Done | [#309](https://github.com/corycunanan/optcg-sim/pull/309) | Fifteen implemented detector false positives plus ST12-017/ST22-011 corrections merged 2026-07-14 in `22ae230`. |
 | 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Done | [#310](https://github.com/corycunanan/optcg-sim/pull/310) | Official text and the source-parity gate merged 2026-07-14 in `5cac50c`. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
@@ -68,7 +68,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #311, then implement OPT-482 to reconcile the final documentation and close the project.
+**Next up:** Review PR #312. After merge, the Game Engine Correctness project is complete — no follow-up tickets remain in the Action Plan.
 
 ---
 
@@ -433,3 +433,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Preserve causal `CARD_PLAYED`, `CARD_KO`, `CARD_RETURNED_TO_HAND`, and `CARD_STATE_CHANGED` anchors for live source identities. Keep legacy restore compaction, snapshot validation, prompt/effect-stack state, atomic initial card-DB writes, and in-memory rollback on failed persistence.
 - **Unresolved:** PR #311 must merge before OPT-482 begins. OPT-485 is already merged, so OPT-482 is the sole remaining project ticket after this PR.
 - **Pointer:** Full `pnpm verify` passes with 615 app tests, 1,612 worker tests with coverage, 2,319 validated schemas, 3,574 authored action uses, 73/73 handler coverage, and a production build.
+
+### OPT-482 → Project closure
+**From:** session on 2026-07-14 · **Commit:** `820db34` · **PR:** [#312](https://github.com/corycunanan/optcg-sim/pull/312)
+
+- **Primer:** Rules-map statuses now cite named regressions; all 76 supported action types and 25 target types are cataloged exactly once; the 38-card historical deferred inventory reconciles to zero open deferrals; architecture claims are limited to tested snapshot and recorded-context guarantees; and the consolidated audit records closure evidence for GE-01 through GE-14.
+- **Read first:** `docs/game-engine/RULES-TO-ENGINE-MAP.md`, `workers/game/src/engine/schemas/check-doc-drift.sh`, `docs/game-engine/DEFERRED-CARD-EFFECTS.md`, and `docs/game-engine/GAME-ENGINE-AUDIT-2026-07.md`.
+- **Gotchas / do NOT touch:** Keep the documentation gate fail closed when adding action or target types, changing deferred-card dispositions, or moving executable tests. Do not broaden snapshot immutability into a recursive-freeze claim or deterministic replay beyond the same recorded `EngineExecutionContext`.
+- **Unresolved:** No Backlog or Todo ticket remains in the Action Plan. The audit intentionally preserves residual platform risks for player-stoppable loops, generic secret-to-secret reveal/order rules, scoped snapshot immutability, and the one-checkpoint undo/history policy; these are documented risks, not hidden project deferrals.
+- **Pointer:** Full `pnpm verify` passes with 615 app tests, 1,612 worker tests at 79.05% statement / 69.15% branch coverage, 2,319 validated schemas, 3,574 authored action uses with 73/73 handled and executed, and a production build.

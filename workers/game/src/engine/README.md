@@ -1,13 +1,19 @@
 # Game Engine — Architecture Reference
 
-The OPTCG game engine is a **purely immutable**, **event-driven** state machine that processes player actions through a deterministic 7-step pipeline. All state mutations return new `GameState` snapshots, enabling replay, undo, and network resync.
+The OPTCG game engine is an **event-driven**, snapshot-oriented state machine
+that processes player actions through a seven-step pipeline. Transition APIs
+treat their input state as read-only and return a new `GameState`; production
+does not recursively freeze every snapshot. Given the same initial state,
+action sequence, and recorded `EngineExecutionContext`, covered setup,
+resolution, prompt, and resume paths produce byte-equivalent output across a
+JSON restart.
 
 ## File Map
 
 | File | Purpose |
 |------|---------|
 | `pipeline.ts` | **Entry point.** 7-step action processing pipeline (`runPipeline()`) |
-| `state.ts` | Immutable state mutations and zone management (`moveCard`, `drawCards`, etc.) |
+| `state.ts` | Copy-on-write state transitions and zone management (`moveCard`, `drawCards`, etc.) |
 | `execute.ts` | Step 4 — action dispatcher (routes `GameAction` → state mutation) |
 | `validation.ts` | Step 1 — action legality checks (phase, cost, zone, timing) |
 | `prohibitions.ts` | Step 2 — effect-based vetoes (`CANNOT_ATTACK`, `CANNOT_BLOCK`, etc.) |
@@ -316,9 +322,12 @@ getEffectiveCost(cardData, state, instanceId):
 
 ## State Mutation Conventions
 
-### Immutability
+### Snapshot update contract
 
-Every mutation returns a new object. Never mutate in place:
+Transition helpers must not mutate their input snapshot. Return copied state
+slices for every changed path. Deep-frozen regressions enforce this for event
+propagation and trigger resume; review and focused tests extend the convention
+to other paths.
 
 ```typescript
 // Correct

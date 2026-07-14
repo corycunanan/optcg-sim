@@ -9,7 +9,7 @@ The game worker is a Cloudflare Worker using Durable Objects for real-time game 
 | `index.ts` | Worker entry point — HTTP routing, dispatches to Durable Object |
 | `GameSession.ts` | Durable Object — WebSocket handler, action routing, prompt/resume loop, reconnection |
 | `types.ts` | `Env`, `GameInitPayload`, `ResumeContext`, `EffectStackFrame`, `QueuedTrigger`, shared worker types |
-| `engine/` | Pure game engine (see `engine/README.md`) |
+| `engine/` | Snapshot-oriented game engine with recorded-context determinism (see `engine/README.md`) |
 
 ## Architecture Overview
 

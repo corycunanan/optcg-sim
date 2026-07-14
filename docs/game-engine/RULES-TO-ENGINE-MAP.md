@@ -15,6 +15,21 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **GAP** | No implementation; requires new code |
 | **N/A** | Not relevant to the engine (cosmetic, deck construction only, etc.) |
 
+### Executable Evidence for Reconciled Contracts
+
+Statuses below are derived from executable tests, not implementation names
+alone. An **IMPL** row links the regression that would fail if the contract
+drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
+
+| Contract | Status | Executable evidence | Residual rule risk |
+|---|---|---|---|
+| First/second selection | **IMPL** | [`opt-366-pregame-flow.test.ts`](../../workers/game/src/__tests__/opt-366-pregame-flow.test.ts) — winner chooses either seat and first-turn rules follow the selected player | None in the engine pregame flow |
+| Player-selected Character overflow | **IMPL** | [`opt-171-rule-3-7-6-1.test.ts`](../../workers/game/src/__tests__/opt-171-rule-3-7-6-1.test.ts) and [`opt-114-mid-batch-overflow.test.ts`](../../workers/game/src/__tests__/opt-114-mid-batch-overflow.test.ts) — single and batched effect plays pause for the controller's choice and rule-trash without K.O. triggers | None for direct or effect-driven Character play |
+| Mid-battle combatant removal | **IMPL** | [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) — attacker/target removal aborts before damage and still emits end-of-battle cleanup | None for Attack, Block, or Counter removal before Damage Step |
+| Loop handling | **PARTIAL** | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) — action-budget or stack-depth exhaustion ends atomically in a replay-visible draw | Repeated-state recognition and player-declared counts for stoppable loops (§11-1-1-2/3) are not modeled |
+| Start-of-game effects | **IMPL** | [`opt-476-start-of-game-effects.test.ts`](../../workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts) — both Leaders resolve in first-player order across play, decline, zero-match, shuffle, persistence, and resume paths | Only authored `START_OF_GAME_EFFECT` rule modifications execute; new mechanics still require schemas |
+| Hidden-zone confidentiality | **PARTIAL** | [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) — events, prompts, continuation data, faces, and instance IDs are redacted per viewer | Generic secret-to-secret reveal/order enforcement (§3-1-8, §11-2) is not universal |
+
 **Engine file index** (all under `workers/game/src/engine/`):
 
 | File | Purpose |
@@ -142,8 +157,8 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **3-1-5.** Open vs secret areas | **IMPL** | `state.ts → isOpenArea()`, `isSecretArea()` | Open: LEADER, CHARACTER, STAGE, COST_AREA, DON_DECK, TRASH. Secret: HAND, DECK, LIFE |
 | **3-1-6.** Zone transition strips effects, new card identity | **IMPL** | `zone-transition.ts`; `execution-context.ts` | New `instanceId` from the persisted monotonic allocator, `attachedDon` cleared, state reset to ACTIVE |
 | **3-1-6-1.** DON!! zone transition strips effects | **IMPL** | `moveCard()` strips `attachedDon` | |
-| **3-1-7.** Owner decides order of simultaneous placements | **PARTIAL** | `trigger-ordering.ts` | Trigger ordering exists; simultaneous zone placement ordering not fully covered |
-| **3-1-8.** Order hidden when multiple cards go secret→secret | **GAP** | — | No visibility control for simultaneous zone transitions |
+| **3-1-7.** Owner decides order of simultaneous placements | **PARTIAL** | `effect-resolver/resume/deck.ts`; [`opt-487-return-to-deck-source-zones.test.ts`](../../workers/game/src/__tests__/opt-487-return-to-deck-source-zones.test.ts) | Owner-authoritative ordering is enforced for current multi-card deck returns; no universal simultaneous-placement abstraction covers every zone pair |
+| **3-1-8.** Order hidden when multiple cards go secret→secret | **PARTIAL** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Card faces and stable IDs are hidden from unauthorized viewers, but a generic secret-to-secret order/reveal contract is not implemented |
 
 ### 3-2 to 3-10. Individual Area Rules
 
@@ -153,15 +168,15 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **3-2-3.** Multiple deck moves happen one-by-one | **PARTIAL** | — | `drawN()` in `setup.ts` moves multiple at once via `slice`. Functionally equivalent but doesn't emit per-card events for trigger detection |
 | **3-2-4.** Shuffle | **IMPL** | `shuffleDeck()` in `setup.ts` | Fisher-Yates shuffle |
 | **3-3-1/2.** DON!! deck: open area | **IMPL** | `PlayerState.donDeck: DonInstance[]` | |
-| **3-4-1/2.** Hand: secret to opponent | **IMPL** | `PlayerState.hand: CardInstance[]` | WS layer filters opponent hand |
+| **3-4-1/2.** Hand: secret to opponent | **IMPL** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Opponent snapshots receive counts and non-correlatable placeholders, not card faces or stable instance IDs |
 | **3-5-1/2.** Trash: open, face-up stack | **IMPL** | `PlayerState.trash: CardInstance[]`, index 0 = top | |
 | **3-6-1/2/3.** Leader area: open, cannot be moved | **IMPL** | `removeCardFromZone()` returns player unchanged for LEADER zone | |
 | **3-7-3.** Playing = placing in Character area | **IMPL** | `executePlayCard()` calls `moveCard(state, id, "CHARACTER")` | |
 | **3-7-4.** Summoning sickness | **IMPL** | `keywords.ts → canAttackThisTurn()` | Checks `turnPlayed === turn.number` |
 | **3-7-5.** Characters enter active | **IMPL** | `moveCard()` sets `state: "ACTIVE"` on zone entry | |
 | **3-7-6.** Max 5 Characters | **IMPL** | `executePlayCard()` checks `characters.length >= 5` | |
-| **3-7-6-1.** 5-card overflow: trash 1, then play | **PARTIAL** | `executePlayCard()` auto-trashes oldest | Rules say the player *chooses* which Character to trash. Engine auto-trashes the oldest (`characters[0]`). Should prompt via `SELECT_CARD_TO_TRASH` |
-| **3-7-6-1-1.** Overflow trash is rule processing, no effects apply | **PARTIAL** | — | Current implementation emits `CARD_TRASHED` with reason "overflow" but the distinction from K.O. is event-type based |
+| **3-7-6-1.** 5-card overflow: trash 1, then play | **IMPL** | `validation.ts`; `effect-resolver/actions/play.ts`; `effect-resolver/resume/target.ts`; [`opt-171-rule-3-7-6-1.test.ts`](../../workers/game/src/__tests__/opt-171-rule-3-7-6-1.test.ts) | Direct play requires a selected slot; effect play opens a controller-only target prompt, including mid-batch continuation |
+| **3-7-6-1-1.** Overflow trash is rule processing, no effects apply | **IMPL** | `execute.ts`; `effect-resolver/resume/target.ts`; [`opt-171-rule-3-7-6-1.test.ts`](../../workers/game/src/__tests__/opt-171-rule-3-7-6-1.test.ts) | Emits `CARD_TRASHED` with overflow/rule-trash context, never `CARD_KO`; On K.O. does not fire |
 | **3-8-3/4/5.** Stage: max 1, enter active | **IMPL** | `executePlayCard()` trashes existing stage before placing new | |
 | **3-8-5-1.** Stage overflow: trash existing, then play | **IMPL** | `execute.ts:110–114` | |
 | **3-9-1/2/3.** Cost area: DON!! cards, open, enter active | **IMPL** | `PlayerState.donCostArea`, `placeDonFromDeck()` sets active | |
@@ -239,13 +254,13 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 |------|--------|----------------|-------|
 | **5-2-1-2.** Shuffle deck | **IMPL** | `setup.ts:38–39` | Fisher-Yates in `shuffleDeck()` |
 | **5-2-1-3.** Place Leader face-up | **IMPL** | `setup.ts:144–153` | Leader built with `zone: "LEADER"`, `state: "ACTIVE"` |
-| **5-2-1-4/5.** Decide first/second | **GAP** | — | Not modeled. `GameInitPayload` assumes player1 always goes first (index 0). No coin flip or choice mechanism |
-| **5-2-1-5-1.** "At the start of the game" effects | **IMPL** | `pregame.ts → advanceStartOfGameEffects()` | Authored Leader rule modifications resolve in first-player order and pause durably on prompts; see `opt-476-start-of-game-effects.test.ts` |
-| **5-2-1-5-2.** Shuffle after start-of-game effects | **IMPL** | `actions/hand-deck.ts → executeSearchAndPlay()`, `resume/deck.ts → handleArrangeSearchAndPlay()` | Full-deck searches shuffle on match, decline, and zero-match paths; covered by `opt-476-start-of-game-effects.test.ts` |
+| **5-2-1-4/5.** Decide first/second | **IMPL** | `pregame.ts → enterPriorityChoice()` / `handlePregameAction()`; [`opt-366-pregame-flow.test.ts`](../../workers/game/src/__tests__/opt-366-pregame-flow.test.ts) | A deterministic 2d6 priority roll chooses the deciding player, who can select first or second; `firstPlayerIndex` drives subsequent setup and turn rules |
+| **5-2-1-5-1.** "At the start of the game" effects | **IMPL** | `pregame.ts → advanceStartOfGameEffects()`; [`opt-476-start-of-game-effects.test.ts`](../../workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts) | Authored Leader rule modifications resolve in first-player order and pause durably on prompts |
+| **5-2-1-5-2.** Shuffle after start-of-game effects | **IMPL** | `actions/hand-deck.ts → executeSearchAndPlay()`, `resume/deck.ts → handleArrangeSearchAndPlay()`; [`opt-476-start-of-game-effects.test.ts`](../../workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts) | Full-deck searches shuffle on match, decline, and zero-match paths |
 | **5-2-1-6.** Draw 5 cards as opening hand | **IMPL** | `setup.ts:42–43` | `drawN(shuffled, 5)` |
 | **5-2-1-6-1.** Mulligan: return all, reshuffle, redraw 5 | **IMPL** | `setup.ts → applyMulligan()` | Returns hand to deck, shuffles, draws 5. One mulligan per player |
 | **5-2-1-7.** Place life cards (top of deck → bottom of life area) | **IMPL** | `setup.ts:55–58` | Life array is reversed after drawing so `life[0]` (removed first by `removeTopLifeCard()`) is the last card drawn |
-| **5-2-1-8.** First player begins | **IMPL** | `setup.ts:80–88` | `activePlayerIndex: 0`, `phase: "REFRESH"` |
+| **5-2-1-8.** First player begins | **IMPL** | `pregame.ts`; [`opt-366-pregame-flow.test.ts`](../../workers/game/src/__tests__/opt-366-pregame-flow.test.ts) | `activePlayerIndex` is assigned from the selected `firstPlayerIndex`, not a fixed seat |
 
 ---
 
@@ -319,7 +334,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **7-1-1-1.** Declare attack by resting attacker | **IMPL** | `battle.ts:33` | `setCardState(state, pi, attackerInstanceId, "RESTED")` |
 | **7-1-1-2.** Select target: opponent's Leader or rested Character | **IMPL** | `validation.ts:160–168` | Validates target is opponent's Leader or rested Character |
 | **7-1-1-3.** [When Attacking] / [On Your Opponent's Attack] / [When Attacked] activate | **IMPL** | `triggers.ts → matchTriggersForEvent()` | Matches WHEN_ATTACKING, ON_OPPONENTS_ATTACK, WHEN_ATTACKED trigger keywords |
-| **7-1-1-4.** Card moved areas during Attack Step → skip to End of Battle | **PARTIAL** | — | Triggers can move cards during attack step; no explicit check that skips to End of Battle if attacker/target leaves |
+| **7-1-1-4.** Card moved areas during Attack Step → skip to End of Battle | **IMPL** | `battle.ts → executeDamageStep()`; [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) | Combatants are revalidated before Damage Step; removal emits `BATTLE_ABORTED` and `END_OF_BATTLE` without damage |
 
 ### 7-1-2. Block Step
 
@@ -327,7 +342,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 |------|--------|----------------|-------|
 | **7-1-2-1.** Defender can activate [Blocker] once per battle | **IMPL** | `executeDeclareBlocker()` + `validation.ts → validateDeclareBlocker()` | Rests blocker, replaces target. `blockerActivated` enforced |
 | **7-1-2-2.** [On Block] effects activate | **IMPL** | `triggers.ts` | ON_BLOCK trigger keyword matched on blocker declaration events |
-| **7-1-2-3.** Card moved areas during Block Step → skip to End of Battle | **PARTIAL** | — | Same as 7-1-1-4 |
+| **7-1-2-3.** Card moved areas during Block Step → skip to End of Battle | **IMPL** | `battle.ts → executeDamageStep()`; [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) | Same pre-damage combatant guard as 7-1-1-4 |
 
 ### 7-1-3. Counter Step
 
@@ -337,7 +352,7 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 | **7-1-3-2.** Defender can use Symbol Counters and Counter Events | **IMPL** | `executeUseCounter()`, `executeUseCounterEvent()` in `battle.ts` | |
 | **7-1-3-2-1.** Symbol Counter: trash Character from hand, add power | **IMPL** | `battle.ts:140–182` | Trashes card, adds `counterValue` to `counterPowerAdded` |
 | **7-1-3-2-2.** Counter Event: pay cost, trash, activate [Counter] | **IMPL** | `battle.ts:186–211` + `effect-resolver/` | Cost paid, card trashed, effect resolved via schema |
-| **7-1-3-3.** Card moved areas during Counter Step → skip to End of Battle | **PARTIAL** | — | Same as 7-1-1-4 |
+| **7-1-3-3.** Card moved areas during Counter Step → skip to End of Battle | **IMPL** | `battle.ts → executeDamageStep()`; [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) | Same pre-damage combatant guard as 7-1-1-4 |
 
 ### 7-1-4. Damage Step
 
@@ -480,62 +495,44 @@ Each section mirrors the Comprehensive Rules. Rules are grouped by engine file/f
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **11-1-1.** Infinite loop detection | **PARTIAL** | `engine-limits.ts`; `opt-467-engine-limits.test.ts` | Effect-stack depth and a persisted per-resolution action budget bound nested and sequential loops. State-hash recognition of player-stoppable loops remains future work. |
-| **11-1-1-1.** Unstoppable loop → draw | **IMPL** | `engine-limits.ts`; `effect-stack.ts`; `opt-467-engine-limits.test.ts` | Exhaustion atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. |
+| **11-1-1.** Infinite loop detection | **PARTIAL** | `engine-limits.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Effect-stack depth and a persisted per-resolution action budget bound nested and sequential loops. State-hash recognition of player-stoppable loops remains future work. |
+| **11-1-1-1.** Unstoppable loop → draw | **IMPL** | `engine-limits.ts`; `effect-stack.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Exhaustion atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. |
 | **11-1-1-2/3.** Player can declare loop count | **GAP** | — | Need: prompt for loop count |
-| **11-2-1.** Cards moved secret→secret must be revealed | **GAP** | — | No reveal enforcement on secret-to-secret transfers |
-| **11-2-2.** Revealed cards become unrevealed after effect resolves | **GAP** | — | No reveal/unrevealed state tracking on cards |
-| **11-3.** Viewing secret areas | **PARTIAL** | `effect-resolver/actions/draw-search.ts` | SEARCH_DECK and FULL_DECK_SEARCH let players view deck cards; no generic "look at" for life area |
+| **11-2-1.** Cards moved secret→secret must be revealed | **GAP** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Viewer-specific redaction is enforced, but there is no generic zone-transition rule that publishes required reveals |
+| **11-2-2.** Revealed cards become unrevealed after effect resolves | **PARTIAL** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Reveal visibility is event-scoped rather than stored on cards; current prompts/events do not leak after resolution, but no generic reveal lifecycle exists |
+| **11-3.** Viewing secret areas | **IMPL** | `effect-resolver/actions/draw-search.ts`, `life.ts`, `hand-deck.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Deck, Life, and hand views use viewer-scoped prompts/events and hide data from non-viewers |
 
 ---
 
 ## Remaining Gaps
 
-The following items still require implementation:
-
-### Setup & Game Flow
-
-1. **First/Second Choice** — Let the winning player choose to go first or second, rather than hardcoding player1 = first.
-   - Rules: 5-2-1-4, 5-2-1-5
-
-2. **"At the Start of the Game" Effects** — Pre-game effect hook for Leaders with start-of-game text.
-   - Rules: 5-2-1-5-1, 5-2-1-5-2
-
-3. **Character Overflow Player Choice** — Prompt the player to choose which Character to trash (instead of auto-trashing oldest).
-   - Rules: 3-7-6-1
-
-### Battle Step Integrity
-
-4. **Mid-Battle Zone Check** — After Attack Step, Block Step, and Counter Step, check if attacker or target left the battlefield. If so, skip to End of Battle.
-   - Rules: 7-1-1-4, 7-1-2-3, 7-1-3-3
+The following residual items are not covered by the reconciled executable
+contracts above:
 
 ### Edge Cases & Misc
 
-5. **Infinite Loop Detection** — Track repeated game states; if detected, prompt players for loop count or declare draw.
+1. **Player-Stoppable Loop Semantics** — Recognize repeated game states and prompt eligible players for loop counts. Unstoppable/budget-exhausting execution already terminates in a draw.
    - Rules: 11-1-1 to 11-1-1-3
 
-6. **Secret-to-Secret Reveal Enforcement** — When a card moves between two secret areas, reveal it to both players.
+2. **Secret-to-Secret Reveal Enforcement** — When a rule requires a card moving between secret areas to be revealed, publish that reveal without exposing unrelated order or stable identity.
    - Rules: 11-2-1, 11-2-2
 
-7. **Attached DON!! State** — Clarify whether attached DON!! should have ACTIVE/RESTED state or a third "attached" state.
+3. **Attached DON!! State** — Clarify whether attached DON!! should have ACTIVE/RESTED state or a third "attached" state.
    - Rules: 4-4-2
 
-8. **Rest vs Activate Conflict** — Explicit resolution when an effect tries to both rest and activate a card.
+4. **Rest vs Activate Conflict** — Explicit resolution when an effect tries to both rest and activate a card.
    - Rules: 1-3-8
 
 ---
 
 ## Priority Tiers
 
-### Tier 1 — Required for correct battle behavior
-Items 4
+### Tier 1 — Required for current card mechanics
+None identified by this reconciliation.
 
-### Tier 2 — Required for specific card mechanics
-Items 1, 2, 3
-
-### Tier 3 — Correctness & edge cases
-Items 5, 6, 7, 8
+### Tier 2 — Rules-completeness edge cases
+Items 1, 2, 3, 4
 
 ---
 
-_Updated from `docs/rules/rule_comprehensive.md` v1.2.0 and engine source as of 2026-04-08_
+_Updated from `docs/rules/rule_comprehensive.md` v1.2.0 and executable engine evidence as of 2026-07-14._

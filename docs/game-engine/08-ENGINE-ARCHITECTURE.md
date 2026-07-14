@@ -8,7 +8,7 @@
 
 ## Architectural Principles
 
-1. **Immutable state snapshots.** Every game state is a complete, frozen snapshot. Mutations produce a new snapshot rather than modifying the previous one. This enables undo, replay, rollback on failed cost payment, and deterministic server-client reconciliation.
+1. **Snapshot-oriented, copy-on-write transitions.** Engine transition APIs treat their input `GameState` as read-only and return a new state value. Deep-frozen regressions cover trigger scanning and resume propagation, but production snapshots are not recursively frozen at runtime. This contract supports the bounded undo checkpoint, failed-persistence rollback, network resync, and byte-equivalent replay under the same recorded execution context.
 
 2. **Single action pipeline.** Every game mutation — player actions, rule processing, effect resolution — flows through the same seven-step pipeline. There is no backdoor. This guarantees that prohibitions, replacements, triggers, and modifiers are always evaluated, regardless of what initiated the change.
 
@@ -49,7 +49,7 @@
 graph TB
   subgraph gameStateManager [Game State Manager]
     stateStore["State Store"]
-    snapshotHistory["Snapshot History"]
+    undoCheckpoint["Undo Checkpoint"]
   end
 
   subgraph rulesEngine [Rules Engine]
@@ -100,8 +100,8 @@ graph TB
 
 | Component | Responsibility |
 |-----------|---------------|
-| **State Store** | Holds the current immutable game state snapshot. Produces new snapshots on mutation. |
-| **Snapshot History** | Ordered list of prior snapshots for undo, replay, and rollback. |
+| **State Store** | Holds the authoritative current game state. Transition APIs return a new value and must not mutate the input snapshot. |
+| **Undo Checkpoint** | Keeps at most one safe prior state for undo; prompts, effect stacks, battles, and terminal actions clear it. Recorded replay uses the execution context and action stream, not an unbounded snapshot list. |
 | **Phase FSM** | Finite state machine governing the turn phase sequence: REFRESH, DRAW, DON, MAIN, END. Tracks sub-states for battle (ATTACK_STEP through END_OF_BATTLE). |
 | **Action Validator** | Checks whether a proposed action is legal in the current phase and game state, before it enters the pipeline. |
 | **Combat Resolver** | Manages the battle sub-state machine: attacker/target tracking, power comparison, damage application, bail-out checks. |
@@ -123,7 +123,10 @@ graph TB
 
 ## Game State Model
 
-The immutable state snapshot. Every field is read-only after creation. Mutations produce a new `GameState` with the changed fields.
+The authoritative state value. Engine APIs treat it as read-only and use
+copy-on-write updates for changed slices. TypeScript does not recursively mark
+every nested field `readonly`, and production does not deep-freeze snapshots;
+the enforced regressions cover the correctness-sensitive trigger/resume paths.
 
 ```typescript
 interface GameState {
