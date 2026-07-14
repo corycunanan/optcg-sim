@@ -170,17 +170,32 @@ GameSession.resumeFromPrompt():
 
 ## Persistence
 
-State is stored in DO storage as:
+The current `GameState` is the authoritative checkpoint. Durable Object storage
+uses two values so the immutable card catalog is not serialized and rewritten
+after every action:
 
 ```typescript
-StoredSession {
-  state: GameState;
-  cardDb: Record<string, CardData>;  // Map serialized to object
-  mulliganDone: [boolean, boolean];
-}
+"session"         -> state + mode + one undo checkpoint + history summary
+"session:card-db" -> Record<string, CardData> written once per game
 ```
 
-Persisted after every valid action. On DO wake from hibernation, `loadFromStorage()` reconstructs in-memory state.
+Persistence and player broadcasts retain the newest 256 detailed events plus
+up to 128 older causal anchors needed by active cards or resolver frames. Older
+events are folded into bounded per-type/per-player diagnostic counts and a
+timestamp range. Full-state undo retains exactly one safe checkpoint and is
+cleared across prompts, effect stacks, battles, and terminal actions.
+
+Each write records approximate serialized byte metrics. The session and card DB
+values warn at 1,000,000 bytes and fail before mutation at 1,500,000 bytes,
+leaving headroom below Cloudflare's current 2 MB SQLite-backed Durable Object
+key/value limit. Batch initialization writes the checkpoint and card DB
+atomically. Failed action/response persistence restores the previous in-memory
+checkpoint before rejecting the client message.
+
+Persisted after every valid action. On DO wake from hibernation,
+`loadFromStorage()` validates the checkpoint, summary, undo window, and card DB
+before reconstructing in-memory state. See the official
+[Durable Object limits](https://developers.cloudflare.com/durable-objects/platform/limits/).
 
 ## Authentication
 

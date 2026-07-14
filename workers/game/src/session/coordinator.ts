@@ -10,6 +10,7 @@ import type {
 import { isStartOfTurnAutoPhase } from "../engine/phases.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { setPlayerConnected } from "../engine/state.js";
+import { boundUndoHistory } from "./history.js";
 
 type DurablePromptType = Extract<
   PromptType,
@@ -162,7 +163,7 @@ export class SessionCoordinator {
     action: GameAction,
     cardDb: Map<string, CardData>
   ): SessionActionResult {
-    const undoHistory = [...initialUndoHistory];
+    const undoHistory = boundUndoHistory(initialUndoHistory);
     if (
       initialState.status === "FINISHED" ||
       initialState.status === "ABANDONED"
