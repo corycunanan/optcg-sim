@@ -4,6 +4,7 @@
  */
 
 import { after, NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { SendFriendRequestSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
@@ -107,6 +108,16 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(req, 201);
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // The partial unique index on the unordered user pair is the source of
+      // truth here. A reciprocal request may have won the race after the
+      // friendly pre-check above, so do not fan out a request that was not
+      // persisted.
+      return apiError("Request already pending", 409);
+    }
     console.error("Friend request create error:", error);
     return apiError("Failed to send request", 500);
   }

@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const friendRequestFindFirstMock = vi.fn();
 const friendRequestDeleteMock = vi.fn();
+const friendRequestDeleteManyMock = vi.fn();
 const friendshipCreateMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
@@ -25,6 +27,7 @@ vi.mock("@/lib/db", () => ({
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
       delete: (...args: unknown[]) => friendRequestDeleteMock(...args),
+      deleteMany: (...args: unknown[]) => friendRequestDeleteManyMock(...args),
     },
     friendship: {
       create: (...args: unknown[]) => friendshipCreateMock(...args),
@@ -57,6 +60,7 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   friendRequestFindFirstMock.mockReset();
   friendRequestDeleteMock.mockReset();
+  friendRequestDeleteManyMock.mockReset();
   friendshipCreateMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
@@ -83,15 +87,21 @@ beforeEach(() => {
       image: null,
     },
   });
-  transactionMock.mockResolvedValue([
-    {
-      id: "ship-1",
-      userAId: "user-accepter",
-      userBId: "user-sender",
-      createdAt: new Date("2026-05-02T12:00:00.000Z"),
-    },
-    {},
-  ]);
+  friendshipCreateMock.mockResolvedValue({
+    id: "ship-1",
+    userAId: "user-accepter",
+    userBId: "user-sender",
+    createdAt: new Date("2026-05-02T12:00:00.000Z"),
+  });
+  friendRequestDeleteManyMock.mockResolvedValue({ count: 1 });
+  transactionMock.mockImplementation(async (callback) => {
+    if (typeof callback !== "function")
+      throw new Error("Expected transaction callback");
+    return callback({
+      friendship: { create: friendshipCreateMock },
+      friendRequest: { deleteMany: friendRequestDeleteManyMock },
+    });
+  });
   notifyUserMock.mockResolvedValue(undefined);
 });
 
@@ -147,6 +157,31 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(429);
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent when a concurrent acceptance already created the friendship", async () => {
+    friendshipCreateMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      })
+    );
+    const { request, params } = buildRequest({ action: "accept" });
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(friendRequestDeleteManyMock).toHaveBeenCalledTimes(1);
+    expect(friendRequestDeleteManyMock).toHaveBeenCalledWith({
+      where: {
+        status: "PENDING",
+        OR: [
+          { fromUserId: "user-accepter", toUserId: "user-sender" },
+          { fromUserId: "user-sender", toUserId: "user-accepter" },
+        ],
+      },
+    });
     expect(notifyUserMock).not.toHaveBeenCalled();
   });
 });

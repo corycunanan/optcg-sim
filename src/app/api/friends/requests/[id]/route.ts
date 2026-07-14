@@ -3,6 +3,7 @@
  */
 
 import { after, NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiAction, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { FriendRequestActionSchema } from "@/lib/validators/friends";
@@ -49,10 +50,49 @@ export async function PUT(
       // Create friendship with userA < userB lexicographically
       const [userAId, userBId] = [req.fromUserId, userId].sort();
 
-      const [friendship] = await prisma.$transaction([
-        prisma.friendship.create({ data: { userAId, userBId } }),
-        prisma.friendRequest.delete({ where: { id } }),
-      ]);
+      let friendship;
+      try {
+        friendship = await prisma.$transaction(async (tx) => {
+          const createdFriendship = await tx.friendship.create({
+            data: { userAId, userBId },
+          });
+
+          // Delete every pending row for this unordered pair. The migration
+          // prevents new reciprocal rows, while this also clears any legacy
+          // rows that may remain during a racing acceptance.
+          await tx.friendRequest.deleteMany({
+            where: {
+              status: "PENDING",
+              OR: [
+                { fromUserId: userAId, toUserId: userBId },
+                { fromUserId: userBId, toUserId: userAId },
+              ],
+            },
+          });
+
+          return createdFriendship;
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          // Another acceptance already created the canonical friendship. The
+          // caller still gets a successful, idempotent response; only the
+          // winning transaction may emit the acceptance event.
+          await prisma.friendRequest.deleteMany({
+            where: {
+              status: "PENDING",
+              OR: [
+                { fromUserId: userAId, toUserId: userBId },
+                { fromUserId: userBId, toUserId: userAId },
+              ],
+            },
+          });
+          return apiAction();
+        }
+        throw error;
+      }
 
       // The accepter's user info, sent to the original sender so their
       // sidebar can append the new friend without a refetch.
