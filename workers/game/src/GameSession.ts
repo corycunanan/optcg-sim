@@ -643,12 +643,7 @@ export class GameSession implements DurableObject {
     if (result.gameOver) {
       this.undoHistory = [];
       await this.writeResultToDb();
-      this.broadcastFilteredState((s) => ({
-        type: "game:update",
-        action,
-        state: s,
-        canUndo: false,
-      }));
+      this.broadcastGameUpdate(action, playerIndex, false);
       this.broadcast({
         type: "game:over",
         winner: result.gameOver.winner,
@@ -657,12 +652,7 @@ export class GameSession implements DurableObject {
       return;
     }
 
-    this.broadcastFilteredState((s) => ({
-      type: "game:update",
-      action,
-      state: s,
-      canUndo: result.canUndo,
-    }));
+    this.broadcastGameUpdate(action, playerIndex, result.canUndo);
 
     // Send prompts if a player input is required
     if (this.gameState.pendingPrompt) {
@@ -684,7 +674,7 @@ export class GameSession implements DurableObject {
 
   private async resumeFromPrompt(
     ws: WebSocket,
-    _playerIndex: 0 | 1,
+    playerIndex: 0 | 1,
     action: GameAction
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
@@ -721,12 +711,7 @@ export class GameSession implements DurableObject {
     if (result.gameOver) {
       this.undoHistory = [];
       await this.writeResultToDb();
-      this.broadcastFilteredState((s) => ({
-        type: "game:update",
-        action,
-        state: s,
-        canUndo: false,
-      }));
+      this.broadcastGameUpdate(action, playerIndex, false);
       this.broadcast({
         type: "game:over",
         winner: result.gameOver.winner,
@@ -734,11 +719,7 @@ export class GameSession implements DurableObject {
       });
       return;
     }
-    this.broadcastFilteredState((s) => ({
-      type: "game:update",
-      action,
-      state: s,
-    }));
+    this.broadcastGameUpdate(action, playerIndex);
 
     // OPT-446: engine-level rejections previously answered with only a
     // game:update echoing the rejected action — the sender couldn't tell
@@ -844,7 +825,10 @@ export class GameSession implements DurableObject {
    * face-down life cards are obfuscated (§8-4-5).
    */
   private broadcastFilteredState(
-    build: (filteredState: GameState) => ServerMessage,
+    build: (
+      filteredState: GameState,
+      recipientPlayerIndex: 0 | 1
+    ) => ServerMessage,
     exclude?: WebSocket
   ): void {
     if (!this.gameState || !this.cardDb) return;
@@ -854,6 +838,24 @@ export class GameSession implements DurableObject {
       build,
       exclude
     );
+  }
+
+  /**
+   * A game update's state is filtered for every recipient. Its action echo is
+   * private to the acting player: prompt responses can contain opaque IDs and
+   * ordering from hidden zones that the visible state intentionally omits.
+   */
+  private broadcastGameUpdate(
+    action: GameAction,
+    actingPlayerIndex: 0 | 1,
+    canUndo?: boolean
+  ): void {
+    this.broadcastFilteredState((state, recipientPlayerIndex) => ({
+      type: "game:update",
+      ...(recipientPlayerIndex === actingPlayerIndex ? { action } : {}),
+      state,
+      ...(canUndo === undefined ? {} : { canUndo }),
+    }));
   }
 
   private broadcastExcept(exclude: WebSocket, msg: ServerMessage): void {

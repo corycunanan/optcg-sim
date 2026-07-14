@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
-import type { CardData, Env, GameState } from "../types.js";
+import type { CardData, Env, GameAction, GameState } from "../types.js";
 import { setupGame } from "./factories.js";
 
 class MockWebSocket {
@@ -61,6 +61,11 @@ type GameSessionTestAccess = {
   getWebSocketForPlayer(playerIndex: 0 | 1): WebSocket | null;
   sendEffectPrompt(prompt: NonNullable<GameState["pendingPrompt"]>): void;
   broadcastFilteredState(build: (filteredState: GameState) => { type: "game:state"; state: GameState }): void;
+  broadcastGameUpdate(
+    action: GameAction,
+    actingPlayerIndex: 0 | 1,
+    canUndo?: boolean,
+  ): void;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
 };
 
@@ -158,5 +163,47 @@ describe("OPT-337 authoritative player WebSocket policy", () => {
     expect(parseMessages(activePlayer1).map((message) => (message as { type: string }).type)).toEqual([
       "game:state",
     ]);
+  });
+});
+
+describe("OPT-497 game:update action visibility", () => {
+  it("keeps hidden prompt-response IDs and ordering out of the opponent update", () => {
+    const { session } = createSession();
+    const player0 = new MockWebSocket();
+    const player1 = new MockWebSocket();
+    session.acceptAuthoritativePlayerSocket(0, player0 as unknown as WebSocket);
+    session.acceptAuthoritativePlayerSocket(1, player1 as unknown as WebSocket);
+    player0.sent = [];
+    player1.sent = [];
+
+    const arrange = {
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: "secret-kept-card",
+      keptCardInstanceIds: ["secret-kept-card"],
+      orderedInstanceIds: ["secret-bottom-card", "secret-kept-card"],
+      destination: "bottom",
+    } satisfies GameAction;
+    session.broadcastGameUpdate(arrange, 0);
+
+    const select = {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["secret-target-card"],
+    } satisfies GameAction;
+    session.broadcastGameUpdate(select, 0);
+
+    const actorUpdates = parseMessages(player0) as Array<{
+      type: string;
+      action?: GameAction;
+    }>;
+    const opponentUpdates = parseMessages(player1) as Array<{
+      type: string;
+      action?: GameAction;
+    }>;
+
+    expect(actorUpdates.map((message) => message.action)).toEqual([arrange, select]);
+    expect(opponentUpdates.map((message) => message.action)).toEqual([undefined, undefined]);
+    expect(JSON.stringify(opponentUpdates)).not.toContain("secret-kept-card");
+    expect(JSON.stringify(opponentUpdates)).not.toContain("secret-bottom-card");
+    expect(JSON.stringify(opponentUpdates)).not.toContain("secret-target-card");
   });
 });

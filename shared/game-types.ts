@@ -641,7 +641,7 @@ export type GameAction =
 // Server → Client
 export type ServerMessage =
   | { type: "game:state"; state: GameState; canUndo?: boolean }
-  | { type: "game:update"; action: GameAction; state: GameState; canUndo?: boolean }
+  | { type: "game:update"; action?: GameAction; state: GameState; canUndo?: boolean }
   | { type: "game:prompt"; promptId?: string; options: PromptOptions }
   | { type: "action:rejected"; action: GameAction; reason: string }
   | { type: "game:error"; message: string }

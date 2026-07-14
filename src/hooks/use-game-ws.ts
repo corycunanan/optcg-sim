@@ -21,7 +21,7 @@ export interface ActionRejection {
 }
 
 export interface AcceptedGameUpdate {
-  action: GameAction;
+  action?: GameAction;
   sequence: number;
 }
 

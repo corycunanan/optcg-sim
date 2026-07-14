@@ -136,13 +136,19 @@ export class SessionTransport {
   broadcastFilteredState(
     state: GameState,
     cardDb: Map<string, CardData>,
-    build: (filteredState: GameState) => ServerMessage,
+    build: (
+      filteredState: GameState,
+      recipientPlayerIndex: 0 | 1
+    ) => ServerMessage,
     exclude?: WebSocket
   ): void {
     for (const playerIndex of [0, 1] as const) {
       const ws = this.playerSocket(playerIndex);
       if (!ws || ws === exclude) continue;
-      this.send(ws, build(visibleStateForPlayer(state, cardDb, playerIndex)));
+      this.send(
+        ws,
+        build(visibleStateForPlayer(state, cardDb, playerIndex), playerIndex)
+      );
     }
   }
 
