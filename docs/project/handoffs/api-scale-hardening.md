@@ -37,5 +37,5 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Primer:** Friend requests now rely on a PostgreSQL partial unique expression index for the unordered pending-pair invariant; route-level P2002 handling preserves stable API and realtime semantics.
 - **Read first:** `prisma/migrations/20260714215000_friend_request_unordered_pending_unique/migration.sql`, `src/app/api/friends/requests/route.ts`, `src/app/api/friends/requests/[id]/route.ts`.
 - **Gotchas / do NOT touch:** Keep raw partial-expression indexes in migrations rather than Prisma schema declarations; Prisma cannot model this invariant directly.
-- **Unresolved:** Run `pnpm test:db:friends` against a disposable migrated development database before merging; it creates and cleans up isolated users.
+- **Unresolved:** none — `pnpm test:db:friends` passed against the approved non-production migrated database on 2026-07-14.
 - **Why this matters for OPT-381:** Its WAITING-lobby invariant follows the same sequence: deterministically deduplicate existing rows, add a partial unique index, then translate the winning database constraint into the route’s expected conflict response.
