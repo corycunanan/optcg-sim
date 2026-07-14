@@ -111,14 +111,20 @@ export function executeHandWheel(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const trashCount =
-    resolveAmount(params.trash_count, resultRefs, state, controller, cardDb) ||
-    params.amount ||
-    0;
-  const drawCount =
-    resolveAmount(params.draw_count, resultRefs, state, controller, cardDb) ||
-    params.amount ||
-    0;
+  const trashCount = resolveAmount(
+    params.trash_count ?? params.amount ?? 0,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
+  const drawCount = resolveAmount(
+    params.draw_count ?? params.amount ?? 0,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
 
   const p = state.players[controller];
 

@@ -469,8 +469,13 @@ export function executeReturnDonToDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount =
-    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
+  const amount = resolveAmount(
+    params.amount ?? 1,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
   const p = state.players[controller];
   const unattached = p.donCostArea.filter((d) => !d.attachedTo);
   const count = Math.min(amount, unattached.length);

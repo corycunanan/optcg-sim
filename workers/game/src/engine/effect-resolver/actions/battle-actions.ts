@@ -65,8 +65,13 @@ export function executeDealDamage(
   resultRefs: Map<string, EffectResult>
 ): ActionResult {
   const params = action.params ?? {};
-  const amount =
-    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
+  const amount = resolveAmount(
+    params.amount ?? 1,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const startingLife = state.players[opp].life.length;
 
@@ -101,8 +106,13 @@ export function executeSelfTakeDamage(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount =
-    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
+  const amount = resolveAmount(
+    params.amount ?? 1,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
 
   let nextState = state;
   let dealt = 0;

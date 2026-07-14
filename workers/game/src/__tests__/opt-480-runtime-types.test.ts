@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "../../../../shared/game-types.js";
-import type { Action, ActionType } from "../engine/effect-types.js";
+import type { Action, ActionType, EffectResult } from "../engine/effect-types.js";
+import { executeDealDamage } from "../engine/effect-resolver/actions/battle-actions.js";
+import { executeReturnDonToDeck } from "../engine/effect-resolver/actions/don.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { parseCardData } from "../util/validate.js";
 import { CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";
@@ -190,6 +192,73 @@ describe("OPT-480 runtime type boundaries", () => {
 
     expect(targetResolver).not.toContain("resolveTargetInstances");
     expect(publicApi).not.toContain("resolveTargetInstances");
+  });
+
+  it("preserves zero dynamic amounts for damage and DON!! returns", () => {
+    const cardDb = createTestCardDb();
+    const initial = createBattleReadyState(cardDb);
+    const players = [...initial.players] as typeof initial.players;
+    players[1] = {
+      ...players[1],
+      life: [
+        {
+          instanceId: "zero-amount-life",
+          cardId: CARDS.VANILLA.id,
+          face: "DOWN",
+        },
+      ],
+    };
+    const state = { ...initial, players };
+    const resultRefs = new Map<string, EffectResult>([
+      ["zero", { targetInstanceIds: [], count: 0 }],
+    ]);
+    const amount = { type: "ACTION_RESULT" as const, ref: "zero" };
+
+    const damage = executeDealDamage(
+      state,
+      { type: "DEAL_DAMAGE", params: { amount } },
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+      resultRefs,
+    );
+    const returnedDon = executeReturnDonToDeck(
+      state,
+      { type: "RETURN_DON_TO_DECK", params: { amount } },
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+      resultRefs,
+    );
+
+    expect(damage.state.players[1].life).toEqual(state.players[1].life);
+    expect(damage.events).toEqual([]);
+    expect(damage.succeeded).toBe(false);
+    expect(damage.result?.count).toBe(0);
+    expect(returnedDon.state.players[0].donCostArea).toEqual(
+      state.players[0].donCostArea,
+    );
+    expect(returnedDon.state.players[0].donDeck).toEqual(
+      state.players[0].donDeck,
+    );
+    expect(returnedDon.events).toEqual([]);
+    expect(returnedDon.succeeded).toBe(false);
+  });
+
+  it("does not truthiness-default resolved action amounts", () => {
+    const sources = readTypeScriptTree(
+      new URL("../engine/effect-resolver/actions/", import.meta.url),
+      "actions",
+    );
+    const offenders = sources.flatMap(({ path, source }) =>
+      [
+        ...stripTypeScriptComments(source).matchAll(
+          /resolveAmount\([^;]*?\)\s*\|\|/g,
+        ),
+      ].map(() => path),
+    );
+
+    expect(offenders).toEqual([]);
   });
 });
 

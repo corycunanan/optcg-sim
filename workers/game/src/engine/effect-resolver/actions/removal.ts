@@ -398,8 +398,13 @@ export function executeTrashFromHand(
         ? 1
         : 0
       : controller;
-  const amount =
-    resolveAmount(params.amount, resultRefs, state, controller, cardDb) || 1;
+  const amount = resolveAmount(
+    params.amount ?? 1,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
   const p = state.players[targetController];
 
   let candidates = [...p.hand];
