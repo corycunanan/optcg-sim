@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { handleArrangeSearchAndPlay } from "../engine/effect-resolver/resume/deck.js";
 import type { Action } from "../engine/effect-types.js";
+import { OP02_030_ODEN } from "../engine/schemas/op02.js";
 import type { CardData, CardInstance, GameAction, GameState, KeywordSet, PendingEvent, PlayerState } from "../types.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
@@ -63,6 +64,35 @@ function arrange(kept: string[], ordered: string[]): GameAction {
 }
 
 describe("SEARCH_AND_PLAY multi-pick", () => {
+  it("defaults omitted production pick limits to one", () => {
+    const productionAction = OP02_030_ODEN.effects
+      .flatMap((effect) => effect.actions ?? [])
+      .find((action) => action.type === "SEARCH_AND_PLAY");
+    expect(productionAction).toBeDefined();
+    if (!productionAction) throw new Error("OP02-030 SEARCH_AND_PLAY is missing");
+
+    const state = setup();
+    const deckBefore = state.players[0].deck.length;
+    const charsBefore = state.players[0].characters.filter(Boolean).length;
+    const events: PendingEvent[] = [];
+    const next = handleArrangeSearchAndPlay(
+      state,
+      arrange(["d1", "d2", "d3"], []),
+      productionAction,
+      0,
+      cardDb,
+      events,
+      ["d1", "d2", "d3"],
+    );
+
+    expect(next).not.toBeNull();
+    expect(next!.players[0].characters.filter(Boolean)).toHaveLength(
+      charsBefore + 1,
+    );
+    expect(next!.players[0].deck).toHaveLength(deckBefore - 1);
+    expect(events.filter((event) => event.type === "CARD_PLAYED")).toHaveLength(1);
+  });
+
   it("plays two kept characters and bottoms the rest", () => {
     const state = setup();
     const deckBefore = state.players[0].deck.length;

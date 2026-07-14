@@ -280,7 +280,7 @@ export function handleArrangeSearchAndPlay(
       ? sap.pick.up_to
       : sap.pick && "exact" in sap.pick
         ? sap.pick.exact
-        : (validTargets?.length ?? 1);
+        : 1;
 
   const p = state.players[controller];
   // Multi-pick ("play up to N"): the client sends keptCardInstanceIds; the
