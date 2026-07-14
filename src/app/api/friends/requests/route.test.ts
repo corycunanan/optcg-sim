@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
@@ -147,6 +148,20 @@ describe("POST /api/friends/requests", () => {
 
     expect(res.status).toBe(409);
     expect(friendRequestCreateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 without fanout when the unordered-pair index wins a race", async () => {
+    friendRequestCreateMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      })
+    );
+
+    const res = await POST(buildRequest());
+
+    expect(res.status).toBe(409);
     expect(notifyUserMock).not.toHaveBeenCalled();
   });
 });
