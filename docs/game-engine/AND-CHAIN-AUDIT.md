@@ -41,8 +41,15 @@ All families remain ordered because rule 1-3-7 applies top-to-bottom unless the 
 1. Evaluate every inline condition and dynamic numeric value against the group-start snapshot.
 2. Lock every target and collect every target-selection prompt before mutating state.
 3. Reject result references produced inside the same group; simultaneous siblings cannot depend on an uncommitted result.
-4. Commit independently possible actions as one transaction. Impossible members are skipped without canceling their siblings (rule 1-3-2).
+4. Commit independently possible allowlisted actions in one non-interruptible phase. Impossible members are skipped without canceling their siblings (rule 1-3-2).
 5. Publish the group's events only after the complete group commits.
 6. Reject handlers whose prohibition, replacement, trigger-drain, arrange, or nested-choice paths could interrupt the commit. This gives those interactions an explicit fail-closed ordering contract instead of allowing a partially committed group; they require a dedicated atomic preflight before joining the allowlist.
 
 Only action handlers on the explicit simultaneous-safe allowlist may be authored with `AND`. This fail-closed boundary prevents a new handler from silently exposing partial state through a replacement, trigger-drain, arrange, or nested-choice continuation.
+
+## Residual caveat dispositions (OPT-498)
+
+- **Atomicity is preflight- and allowlist-contingent, not rollback-based.** The engine locks conditions, values, and targets before mutation and withholds events until commit completes, but it does not provide a generic state rollback when an allowlisted handler reports that an independently possible member did not resolve. The allowlist therefore remains restricted to non-continuing handlers whose mutations are fully described by the locked plan. Any unexpected continuation terminates through the typed engine-contract outcome. Adding a handler requires a dedicated atomic-preflight regression; broad transactional rollback is not implied by the current contract.
+- **A following `IF_DO` has no defined whole-group success rule.** Authored-schema validation rejects `IF_DO` immediately after an `AND` group, and runtime drift terminates before any group member commits. This replaces the former last-member-only behavior with a fail-closed boundary until a card requires explicit all-member, any-member, or printed-final-member semantics.
+
+The authored registry still contains zero `AND` connectors, so neither limitation is exercised by a playable card. The source-audit regression and connector validator keep that disposition explicit.

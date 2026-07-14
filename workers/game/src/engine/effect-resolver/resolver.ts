@@ -511,6 +511,18 @@ export function continueSimultaneousGroup(
     return { state: terminated, events: [] };
   }
 
+  const dependentTail = plan.followingActions[0];
+  if (dependentTail?.chain === "IF_DO") {
+    const terminated = terminateForEngineContract(state, {
+      kind: "ENGINE_CONTRACT",
+      contract: "ACTION_HANDLER",
+      actionType: dependentTail.type,
+      sourceCardInstanceId,
+      message: "IF_DO cannot follow an AND transaction until group-success semantics are defined",
+    });
+    return { state: terminated, events: [] };
+  }
+
   const planning = planSimultaneousGroup(
     state,
     plan,
@@ -532,7 +544,6 @@ export function continueSimultaneousGroup(
 
   const resultRefs = new Map<string, EffectResult>(planning.plan.resultRefs);
   const events: PendingEvent[] = [];
-  const succeeded = planning.plan.actions.map(() => false);
   let nextState = state;
 
   for (let index = 0; index < planning.plan.actions.length; index++) {
@@ -550,7 +561,6 @@ export function continueSimultaneousGroup(
     );
     nextState = result.state;
     events.push(...result.events);
-    succeeded[index] = result.succeeded;
     if (isEngineTerminated(nextState)) return { state: nextState, events };
     if (result.pendingPrompt || result.pendingBatchTriggers) {
       nextState = terminateForEngineContract(nextState, {
@@ -574,7 +584,6 @@ export function continueSimultaneousGroup(
     cardDb,
     resultRefs,
     planning.plan.effectDescription,
-    succeeded.at(-1) ?? false,
   );
   return {
     state: tail.state,

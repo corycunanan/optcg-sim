@@ -621,6 +621,12 @@ function validateActionConnectors(actions: Action[], prefix: string): string[] {
       }
     }
 
+    if (actions[end + 1]?.chain === "IF_DO") {
+      errors.push(
+        `${prefix}[${end + 1}]: IF_DO cannot follow an AND transaction until group-success semantics are defined`,
+      );
+    }
+
     i = end;
   }
   return errors;

@@ -199,6 +199,49 @@ describe("OPT-472 simultaneous AND transactions", () => {
     expect(result.state.activeEffects).toHaveLength(state.activeEffects.length);
   });
 
+  it("terminates before commit when IF_DO follows an AND group", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const result = executeActionChain(
+      state,
+      [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: 1000 },
+        },
+        {
+          type: "MODIFY_COST",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: -1 },
+          chain: "AND",
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: 1000 },
+          chain: "IF_DO",
+        },
+      ],
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+
+    expect(result.state.activeEffects).toHaveLength(state.activeEffects.length);
+    expect(result.state).toMatchObject({
+      status: "FINISHED",
+      engineOutcome: {
+        type: "ENGINE_ERROR_DRAW",
+        diagnostic: {
+          kind: "ENGINE_CONTRACT",
+          contract: "ACTION_HANDLER",
+          actionType: "MODIFY_POWER",
+        },
+      },
+    });
+  });
+
   it("locks dynamic values against the group-start snapshot", () => {
     const cardDb = createTestCardDb();
     const base = createBattleReadyState(cardDb);
@@ -325,12 +368,41 @@ describe("OPT-472 connector validation and authored migration", () => {
         ],
       }],
     };
+    const ambiguousIfDo: EffectSchema = {
+      effects: [{
+        id: "ambiguous-if-do",
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [
+          {
+            type: "MODIFY_POWER",
+            target: { type: "YOUR_LEADER" },
+            params: { amount: 1000 },
+          },
+          {
+            type: "MODIFY_COST",
+            target: { type: "YOUR_LEADER" },
+            params: { amount: -1 },
+            chain: "AND",
+          },
+          {
+            type: "MODIFY_POWER",
+            target: { type: "YOUR_LEADER" },
+            params: { amount: 1000 },
+            chain: "IF_DO",
+          },
+        ],
+      }],
+    };
 
     expect(validateEffectSchema(unsupported).join("\n")).toContain(
       "Action type 'DRAW' cannot be used in an AND transaction",
     );
     expect(validateEffectSchema(dependent).join("\n")).toContain(
       "depends on result_ref 'inside' produced inside the same simultaneous group",
+    );
+    expect(validateEffectSchema(ambiguousIfDo).join("\n")).toContain(
+      "IF_DO cannot follow an AND transaction until group-success semantics are defined",
     );
 
     const nestedConsumers: Action[] = [
