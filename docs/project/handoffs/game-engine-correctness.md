@@ -64,14 +64,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Done | [#309](https://github.com/corycunanan/optcg-sim/pull/309) | Fifteen implemented detector false positives plus ST12-017/ST22-011 corrections merged 2026-07-14 in `22ae230`. |
 | 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Done | [#310](https://github.com/corycunanan/optcg-sim/pull/310) | Official text and the source-parity gate merged 2026-07-14 in `5cac50c`. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
-| 49 | OPT-496 | Redact turn-scoped pending Trigger Life cards | — | — | In Review | [#313](https://github.com/corycunanan/optcg-sim/pull/313) | Owner-only turn continuations now match the Trigger event visibility policy; opponent deck previews remain intentionally public. |
+| 49 | OPT-496 | Redact turn-scoped pending Trigger Life cards | — | — | Done | [#313](https://github.com/corycunanan/optcg-sim/pull/313) | Merged 2026-07-14 (`b9df1dd`). Owner-only turn continuations now match the Trigger event visibility policy; opponent deck previews remain intentionally public. |
 | 50 | OPT-497 | Filter raw client actions in game:update broadcasts | — | — | Done | [#314](https://github.com/corycunanan/optcg-sim/pull/314) | Merged 2026-07-14 (`de3f336`). Opponent updates no longer echo action payloads, preventing hidden prompt-response IDs and ordering from crossing the socket boundary. |
-| 51 | OPT-498 | Terminate remaining warn-and-continue engine paths | — | — | In Review | [#315](https://github.com/corycunanan/optcg-sim/pull/315) | Runtime action drift and malformed deterministic setup data now fail closed; ambiguous AND-to-IF_DO semantics are rejected before commit. |
+| 51 | OPT-498 | Terminate remaining warn-and-continue engine paths | — | — | Done | [#315](https://github.com/corycunanan/optcg-sim/pull/315) | Merged 2026-07-14 (`3817e0f`). Runtime action drift and malformed deterministic setup data now fail closed; ambiguous AND-to-IF_DO semantics are rejected before commit. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #315. The project closes after it merges.
+**Next up:** Nothing. PRs #313–#315 merged 2026-07-14; the Game Engine Correctness project is complete and OPT-466 is closed.
 
 ---
 

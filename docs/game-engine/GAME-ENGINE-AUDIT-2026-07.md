@@ -70,7 +70,7 @@ The Wrangler dry-run bundled the worker and exited successfully. It also reporte
 
 | Finding | Final status | Executable / machine-checked evidence |
 |---|---|---|
-| GE-01 hidden information | Resolved by OPT-470 | [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) classifies secret-bearing events/prompts, enforces viewer-scoped reveals, strips continuations, and replaces stable hidden IDs. |
+| GE-01 hidden information | Resolved by OPT-470; reopened and re-closed by OPT-496/497 | [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) classifies secret-bearing events/prompts, enforces viewer-scoped reveals, strips continuations, and replaces stable hidden IDs. The closure sanity check found two same-class leaks outside its coverage: unredacted `turn.*` pending-trigger Life cards (fixed by OPT-496, regression cases added to the same suite) and the raw client action echoed to both sockets in `game:update` (fixed by OPT-497, gated in [`opt-337-authoritative-socket.test.ts`](../../workers/game/src/__tests__/opt-337-authoritative-socket.test.ts)). |
 | GE-02 stack/loop fail-open | Resolved by OPT-467 | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) proves sequential-budget and nested-stack exhaustion terminate atomically in a persisted draw. |
 | GE-03 disputed schemas | Resolved by OPT-469 | [`opt-469-card-schema-corrections.test.ts`](../../workers/game/src/__tests__/opt-469-card-schema-corrections.test.ts) covers source filters, target behavior, prohibitions, and corrected official text. |
 | GE-04 unexecuted handlers | Resolved by OPT-473 | [`opt-473-action-handler-coverage.test.ts`](../../workers/game/src/__tests__/opt-473-action-handler-coverage.test.ts) plus the generated inventory gate report 3,574 authored uses, 73 authored types, 73 handled, and 73 executed. |
@@ -90,6 +90,15 @@ The full `pnpm verify` gate passes on the closure branch: lint completes with
 zero errors, root and worker type checks pass, `schema:check` produces the
 counts above, 615 app tests and 1,612 worker tests pass, worker coverage is
 79.05% statements / 69.15% branches, and the Next.js production build succeeds.
+
+An independent closure sanity check on 2026-07-14 (full-gate re-run plus an
+adversarial audit of the OPT-467/470/471/472 closure suites and an engine-wide
+fail-open/nondeterminism sweep) confirmed every other closure claim and
+produced three follow-ups, all merged the same day: OPT-496 and OPT-497 (the
+GE-01 amendments above) and OPT-498, which converted the last
+warn-and-continue drift paths (`ADD_TO_LIFE` target drift, malformed
+deterministic setup orders) to typed fail-closed outcomes. `pnpm verify`
+passes on `main` with all three merged.
 
 ## Original Findings and Final Dispositions
 
