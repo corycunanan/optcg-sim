@@ -7,7 +7,7 @@ import type { ActionOf, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { resolveAmount } from "../action-utils.js";
+import { getSearchAndPlayPickLimit, resolveAmount } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
@@ -431,12 +431,7 @@ export function executeSearchAndPlay(
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
       validTargets,
-      maxKeep:
-        sap.pick && "up_to" in sap.pick
-          ? sap.pick.up_to
-          : sap.pick && "exact" in sap.pick
-            ? sap.pick.exact
-            : validTargets.length,
+      maxKeep: getSearchAndPlayPickLimit(sap),
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,

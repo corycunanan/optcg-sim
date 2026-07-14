@@ -7,8 +7,9 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { executeSearchAndPlay } from "../engine/effect-resolver/actions/hand-deck.js";
 import { handleArrangeSearchAndPlay } from "../engine/effect-resolver/resume/deck.js";
-import type { Action } from "../engine/effect-types.js";
+import type { Action, ActionOf } from "../engine/effect-types.js";
 import { OP02_030_ODEN } from "../engine/schemas/op02.js";
 import type { CardData, CardInstance, GameAction, GameState, KeywordSet, PendingEvent, PlayerState } from "../types.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
@@ -27,6 +28,14 @@ const impelChar: CardData = {
   effectText: "", triggerText: null, keywords: noKeywords(), effectSchema: null, imageUrl: null,
 };
 cardDb.set(impelChar.id, impelChar);
+const wanoChar: CardData = {
+  ...impelChar,
+  id: "WANO-CHAR",
+  name: "Wano Retainer",
+  color: ["Green"],
+  types: ["Land of Wano"],
+};
+cardDb.set(wanoChar.id, wanoChar);
 
 function deckInstance(cardId: string, instanceId: string): CardInstance {
   return {
@@ -40,17 +49,27 @@ const pausedAction: Action = {
   params: { look_at: 5, pick: { up_to: 2 }, filter: { traits: ["Impel Down"] }, rest_destination: "BOTTOM" },
 };
 
-function setup(): GameState {
+function setup(cardId = impelChar.id): GameState {
   const base = createBattleReadyState(cardDb);
   const deck = [
-    deckInstance(impelChar.id, "d1"),
-    deckInstance(impelChar.id, "d2"),
-    deckInstance(impelChar.id, "d3"),
+    deckInstance(cardId, "d1"),
+    deckInstance(cardId, "d2"),
+    deckInstance(cardId, "d3"),
     ...base.players[0].deck.slice(3),
   ];
   const players = [...base.players] as [PlayerState, PlayerState];
   players[0] = { ...players[0], deck };
   return { ...base, players };
+}
+
+function productionOdenSearchAction(): ActionOf<"SEARCH_AND_PLAY"> {
+  const action = OP02_030_ODEN.effects
+    .flatMap((effect) => effect.actions ?? [])
+    .find((candidate) => candidate.type === "SEARCH_AND_PLAY");
+  if (!action || action.type !== "SEARCH_AND_PLAY") {
+    throw new Error("OP02-030 SEARCH_AND_PLAY is missing");
+  }
+  return action;
 }
 
 function arrange(kept: string[], ordered: string[]): GameAction {
@@ -64,13 +83,26 @@ function arrange(kept: string[], ordered: string[]): GameAction {
 }
 
 describe("SEARCH_AND_PLAY multi-pick", () => {
-  it("defaults omitted production pick limits to one", () => {
-    const productionAction = OP02_030_ODEN.effects
-      .flatMap((effect) => effect.actions ?? [])
-      .find((action) => action.type === "SEARCH_AND_PLAY");
-    expect(productionAction).toBeDefined();
-    if (!productionAction) throw new Error("OP02-030 SEARCH_AND_PLAY is missing");
+  it("advertises one selection for omitted production pick limits", () => {
+    const state = setup(wanoChar.id);
+    const result = executeSearchAndPlay(
+      state,
+      productionOdenSearchAction(),
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+      new Map(),
+    );
 
+    expect(result.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (result.pendingPrompt?.options.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Expected OP02-030 to create an arrange prompt");
+    }
+    expect(result.pendingPrompt.options.maxKeep).toBe(1);
+    expect(result.pendingPrompt.options.validTargets).toHaveLength(3);
+  });
+
+  it("defaults omitted production pick limits to one", () => {
     const state = setup();
     const deckBefore = state.players[0].deck.length;
     const charsBefore = state.players[0].characters.filter(Boolean).length;
@@ -78,7 +110,7 @@ describe("SEARCH_AND_PLAY multi-pick", () => {
     const next = handleArrangeSearchAndPlay(
       state,
       arrange(["d1", "d2", "d3"], []),
-      productionAction,
+      productionOdenSearchAction(),
       0,
       cardDb,
       events,

@@ -22,6 +22,7 @@ import { executeReturnToDeck } from "../actions/removal.js";
 import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
 import { isPresent } from "../../type-guards.js";
+import { getSearchAndPlayPickLimit } from "../action-utils.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -275,12 +276,7 @@ export function handleArrangeSearchAndPlay(
   const shuffleAfter = sap.shuffle_after ?? false;
   const searchFullDeck = sap.search_full_deck ?? false;
   const entryState = sap.entry_state ?? "ACTIVE";
-  const pickLimit =
-    sap.pick && "up_to" in sap.pick
-      ? sap.pick.up_to
-      : sap.pick && "exact" in sap.pick
-        ? sap.pick.exact
-        : 1;
+  const pickLimit = getSearchAndPlayPickLimit(sap);
 
   const p = state.players[controller];
   // Multi-pick ("play up to N"): the client sends keptCardInstanceIds; the
