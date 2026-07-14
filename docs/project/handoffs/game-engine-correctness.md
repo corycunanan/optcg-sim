@@ -62,7 +62,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 44 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
 | 45 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
 | 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | In Review | [#309](https://github.com/corycunanan/optcg-sim/pull/309) | Fifteen implemented detector false positives; ST12-017 and ST22-011 corrected with pipeline/UI regressions and evidence-backed dispositions. |
-| 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Backlog | — | Remove the tracked source-parity exception after official-source verification. |
+| 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | In Review | [#310](https://github.com/corycunanan/optcg-sim/pull/310) | Official text restored; the existing schema matches, and the source-parity exception is removed. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
@@ -415,3 +415,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** The low-confidence detector is intentionally coarse; keep explicit dispositions fail closed instead of weakening the gate. Preserve `restDestination: "TOP_OR_BOTTOM"` through the prompt so both UI actions remain legal. Leader target filters now apply to both `YOUR_LEADER` and `OPPONENT_LEADER`; do not bypass them with deterministic auto-targeting.
 - **Unresolved:** No OPT-484 card remains deferred. OP12-112 is still the sole source-parity exception and belongs to OPT-485 after official-source verification.
 - **Pointer:** PR #309; the verified baseline is 615 app tests, 1,600 worker tests with coverage, 2,319 validated schemas, 3,574 authored action uses, 73/73 handler coverage, and a production build.
+
+### OPT-485 → OPT-481
+**From:** session on 2026-07-14 · **Commit:** `b7e7259` · **PR:** [#310](https://github.com/corycunanan/optcg-sim/pull/310)
+
+- **Primer:** OP12-112 Baby 5 now has canonical local source text verified against Bandai's official card list. Its existing multicolored-Leader Trigger schema already matched, and the last source-parity exception is gone.
+- **Read first:** `workers/game/src/session/coordinator.ts`, `workers/game/src/session/persistence.ts`, and `workers/game/src/__tests__/opt-480-runtime-types.test.ts` for OPT-481's event-log, undo-history, and persisted-snapshot bounds.
+- **Gotchas / do NOT touch:** Preserve pending prompt/effect-stack state and snapshot validation while bounding histories. OPT-485 changed no runtime engine behavior.
+- **Unresolved:** None for OPT-485. OPT-481 remains the next independent implementation ticket; OPT-482 stays blocked on OPT-481.
+- **Pointer:** PR #310; inspect `b7e7259` for the canonical source restoration and exception removal.
