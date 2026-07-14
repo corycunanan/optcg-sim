@@ -24,6 +24,8 @@
 
 8. **Thin Durable Object boundary.** `GameSession` composes typed session collaborators instead of owning transport, authorization, rate limits, prompt continuation, visibility, and persistence directly. Engine-facing coordinators have no Cloudflare, WebSocket, storage, or network dependency.
 
+9. **Bounded durable history.** The current state is the authoritative restore checkpoint. Socket-visible history keeps 256 recent events plus at most 128 condition-critical anchors; older events become bounded diagnostic counts. Undo keeps one safe checkpoint. The immutable per-game card DB is stored separately, and approximate payload budgets reject a write before Cloudflare's 2 MB per-value ceiling.
+
 ## Durable Session Boundary
 
 | Module                        | Contract                                                                                                        |
@@ -32,7 +34,8 @@
 | `session/rate-limiter.ts`     | Owns independent action, malformed-message, and upgrade token buckets without transport side effects.           |
 | `session/transport.ts`        | Owns authoritative sockets, reconnect debounce, prompt delivery, and filtered fan-out.                          |
 | `session/visibility.ts`       | Produces the only per-player state representation allowed across the socket boundary.                           |
-| `session/persistence.ts`      | Saves/restores complete session snapshots, allocates durable prompt IDs, schedules alarms, and reports results. |
+| `session/history.ts`          | Defines recent-event, causal-anchor, diagnostic-summary, and single-checkpoint undo retention.                |
+| `session/persistence.ts`      | Compacts and size-checks snapshots, stores the card DB separately, validates restore data, schedules alarms, and reports results. |
 | `session/coordinator.ts`      | Serializes commands and applies session-level action, prompt, turn, undo, and presence policy.                  |
 | `session/prompt-lifecycle.ts` | Drains effect, replacement, pregame, and battle prompt continuations without infrastructure dependencies.       |
 
@@ -134,7 +137,7 @@ interface GameState {
   scheduledActions: ScheduledActionEntry[];
   oneTimeModifiers: ActiveOneTimeModifier[];
   triggerRegistry: RegisteredTrigger[];
-  eventLog: GameEvent[];
+  eventLog: GameEvent[]; // bounded recent history + live causal anchors
 }
 
 interface TurnState {

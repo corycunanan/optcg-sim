@@ -586,6 +586,8 @@ export class GameSession implements DurableObject {
     action: GameAction
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
+    const previousState = this.gameState;
+    const previousUndoHistory = this.undoHistory;
     const result = this.coordinator.executeAction(
       this.gameState,
       this.undoHistory,
@@ -604,7 +606,23 @@ export class GameSession implements DurableObject {
       await this.resumeFromPrompt(ws, playerIndex, action);
       return;
     }
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      this.gameState = previousState;
+      this.undoHistory = previousUndoHistory;
+      log("session.persist_failed", {
+        gameId: previousState.id,
+        actionType: action.type,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      this.rejectAction(
+        ws,
+        action,
+        "The action could not be saved; game state was not changed",
+      );
+      return;
+    }
 
     if (result.kind === "undo") {
       this.broadcastFilteredState((state) => ({
@@ -670,6 +688,8 @@ export class GameSession implements DurableObject {
     action: GameAction
   ): Promise<void> {
     if (!this.gameState || !this.cardDb) return;
+    const previousState = this.gameState;
+    const previousUndoHistory = this.undoHistory;
     this.undoHistory = [];
     const result = resumePromptLifecycle(this.gameState, action, this.cardDb, {
       drainPregame: (state) => this.drainPregame(state),
@@ -680,7 +700,23 @@ export class GameSession implements DurableObject {
     // Surface REVEAL_TRIGGER as a durable prompt before persisting
     this.surfaceRevealTriggerIfNeeded();
 
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      this.gameState = previousState;
+      this.undoHistory = previousUndoHistory;
+      log("session.persist_failed", {
+        gameId: previousState.id,
+        actionType: action.type,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      this.rejectAction(
+        ws,
+        action,
+        "The response could not be saved; the prompt is still pending",
+      );
+      return;
+    }
 
     if (result.gameOver) {
       this.undoHistory = [];

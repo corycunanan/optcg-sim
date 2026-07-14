@@ -1,4 +1,9 @@
-import type { CardData, GameState, LobbyMode } from "../types.js";
+import type {
+  CardData,
+  GameEventType,
+  GameState,
+  LobbyMode,
+} from "../types.js";
 import { ALL_GAME_EVENT_TYPES } from "../../../../shared/game-types.js";
 import { ALL_ACTION_TYPES } from "../engine/effect-types.js";
 import {
@@ -11,8 +16,22 @@ import {
   type TokenJtiStorage,
 } from "../util/token-replay.js";
 import { parseCardData } from "../util/validate.js";
+import {
+  compactSessionHistory,
+  emptyEventHistorySummary,
+  type EventHistorySummary,
+} from "./history.js";
+
+export const SESSION_STORAGE_KEY = "session";
+export const SESSION_CARD_DB_STORAGE_KEY = "session:card-db";
+/** SQLite-backed Durable Object values are limited to 2 MB; keep 25% headroom. */
+export const SESSION_VALUE_HARD_LIMIT_BYTES = 1_500_000;
+export const SESSION_VALUE_SOFT_LIMIT_BYTES = 1_000_000;
+export const SESSION_STORAGE_FORMAT_VERSION = 2;
 
 export interface SessionStorage extends TokenJtiStorage {
+  put(key: string, value: unknown): Promise<void>;
+  put(entries: Record<string, unknown>): Promise<void>;
   setAlarm(timestamp: number): Promise<void>;
   deleteAlarm(): Promise<void>;
 }
@@ -26,6 +45,7 @@ export interface SessionSnapshot {
 }
 
 export interface StoredSession {
+  formatVersion: 1 | 2;
   state: GameState;
   cardDb: Record<string, CardData>;
   /** Legacy OPT-366 field retained for structured-clone compatibility. */
@@ -33,6 +53,38 @@ export interface StoredSession {
   mode?: LobbyMode;
   testPriorityRolls?: number[] | null;
   undoHistory?: GameState[];
+  historySummary: EventHistorySummary;
+}
+
+interface PersistedSession {
+  formatVersion: 2;
+  state: GameState;
+  mode: LobbyMode;
+  testPriorityRolls: number[] | null;
+  undoHistory: GameState[];
+  historySummary: EventHistorySummary;
+}
+
+export interface SessionPersistenceMetrics {
+  sessionBytes: number;
+  cardDbBytes: number;
+  recentEventCount: number;
+  compactedEventCount: number;
+  undoSnapshotCount: number;
+  softLimitExceeded: boolean;
+}
+
+export class SessionPersistenceLimitError extends Error {
+  constructor(
+    readonly valueName: "session" | "cardDb",
+    readonly bytes: number,
+    readonly limitBytes: number,
+  ) {
+    super(
+      `${valueName} persistence payload is ${bytes} bytes; limit is ${limitBytes} bytes`,
+    );
+    this.name = "SessionPersistenceLimitError";
+  }
 }
 
 export interface ResultCallbackConfig {
@@ -42,6 +94,11 @@ export interface ResultCallbackConfig {
 
 /** Durable storage and result-callback boundary for a GameSession. */
 export class SessionRepository {
+  private historySummary = emptyEventHistorySummary();
+  private persistedGameId: string | null = null;
+  private cardDbBytes = 0;
+  private lastMetrics: SessionPersistenceMetrics | null = null;
+
   constructor(
     private readonly storage: SessionStorage,
     private readonly resultCallback: ResultCallbackConfig,
@@ -53,29 +110,113 @@ export class SessionRepository {
   }
 
   async save(snapshot: SessionSnapshot): Promise<SessionSnapshot> {
-    const state = ensurePromptId(snapshot.state);
-    const stored: StoredSession = {
-      state,
-      cardDb: Object.fromEntries(snapshot.cardDb),
+    const promptedState = ensurePromptId(snapshot.state);
+    const compacted = compactSessionHistory(
+      promptedState,
+      snapshot.undoHistory,
+      this.historySummary,
+    );
+    const stored: PersistedSession = {
+      formatVersion: SESSION_STORAGE_FORMAT_VERSION,
+      state: compacted.state,
       mode: snapshot.mode,
       testPriorityRolls: snapshot.testPriorityRolls,
-      undoHistory: snapshot.undoHistory,
+      undoHistory: compacted.undoHistory,
+      historySummary: compacted.historySummary,
     };
-    await this.storage.put("session", stored);
-    return { ...snapshot, state };
+    const sessionBytes = serializedByteLength(stored);
+    assertWithinValueLimit("session", sessionBytes);
+
+    const needsCardDb = this.persistedGameId !== compacted.state.id;
+    let cardDbRecord: Record<string, CardData> | null = null;
+    let cardDbBytes = this.cardDbBytes;
+    if (needsCardDb) {
+      cardDbRecord = Object.fromEntries(snapshot.cardDb);
+      cardDbBytes = serializedByteLength(cardDbRecord);
+      assertWithinValueLimit("cardDb", cardDbBytes);
+    }
+
+    if (cardDbRecord) {
+      await this.storage.put({
+        [SESSION_CARD_DB_STORAGE_KEY]: cardDbRecord,
+        [SESSION_STORAGE_KEY]: stored,
+      });
+    } else {
+      await this.storage.put(SESSION_STORAGE_KEY, stored);
+    }
+
+    this.historySummary = compacted.historySummary;
+    this.persistedGameId = compacted.state.id;
+    this.cardDbBytes = cardDbBytes;
+    this.lastMetrics = {
+      sessionBytes,
+      cardDbBytes,
+      recentEventCount: compacted.state.eventLog.length,
+      compactedEventCount: compacted.historySummary.compactedEventCount,
+      undoSnapshotCount: compacted.undoHistory.length,
+      softLimitExceeded:
+        sessionBytes > SESSION_VALUE_SOFT_LIMIT_BYTES ||
+        cardDbBytes > SESSION_VALUE_SOFT_LIMIT_BYTES,
+    };
+    if (this.lastMetrics.softLimitExceeded) {
+      console.warn("[GameSession] persistence soft limit exceeded", {
+        ...this.lastMetrics,
+        hardLimitBytes: SESSION_VALUE_HARD_LIMIT_BYTES,
+      });
+    }
+    return {
+      ...snapshot,
+      state: compacted.state,
+      undoHistory: compacted.undoHistory,
+    };
   }
 
   async load(): Promise<SessionSnapshot | null> {
-    const raw = await this.storage.get<unknown>("session");
+    const raw = await this.storage.get<unknown>(SESSION_STORAGE_KEY);
     if (!raw) return null;
-    const stored = parseStoredSession(raw);
+    const embeddedCardDb =
+      isRecord(raw) && isRecord(raw.cardDb) ? raw.cardDb : undefined;
+    const separateCardDb = embeddedCardDb
+      ? undefined
+      : await this.storage.get<unknown>(SESSION_CARD_DB_STORAGE_KEY);
+    const stored = parseStoredSession(raw, separateCardDb);
+    const restoredState = ensureExecutionContext(stored.state);
+    const restoredUndoHistory = (stored.undoHistory ?? []).map((snapshot) =>
+      ensureExecutionContext(snapshot),
+    );
+    const compacted = compactSessionHistory(
+      restoredState,
+      restoredUndoHistory,
+      stored.historySummary,
+    );
+    this.historySummary = compacted.historySummary;
+    this.persistedGameId = embeddedCardDb ? null : stored.state.id;
+    this.cardDbBytes = serializedByteLength(stored.cardDb);
+    this.lastMetrics = {
+      sessionBytes: serializedByteLength(raw),
+      cardDbBytes: this.cardDbBytes,
+      recentEventCount: compacted.state.eventLog.length,
+      compactedEventCount: compacted.historySummary.compactedEventCount,
+      undoSnapshotCount: compacted.undoHistory.length,
+      softLimitExceeded:
+        serializedByteLength(raw) > SESSION_VALUE_SOFT_LIMIT_BYTES ||
+        this.cardDbBytes > SESSION_VALUE_SOFT_LIMIT_BYTES,
+    };
     return {
-      state: ensureExecutionContext(stored.state),
+      state: compacted.state,
       cardDb: new Map(Object.entries(stored.cardDb)),
       mode: stored.mode ?? "PVP",
       testPriorityRolls: stored.testPriorityRolls ?? null,
-      undoHistory: stored.undoHistory ?? [],
+      undoHistory: compacted.undoHistory,
     };
+  }
+
+  getHistorySummary(): EventHistorySummary {
+    return cloneHistorySummary(this.historySummary);
+  }
+
+  getLastMetrics(): SessionPersistenceMetrics | null {
+    return this.lastMetrics ? { ...this.lastMetrics } : null;
   }
 
   async writeResult(state: GameState): Promise<void> {
@@ -367,12 +508,23 @@ function parseStoredGameState(raw: unknown): GameState {
   return raw as unknown as GameState;
 }
 
-export function parseStoredSession(raw: unknown): StoredSession {
-  if (!isRecord(raw) || !isRecord(raw.cardDb)) {
+export function parseStoredSession(
+  raw: unknown,
+  separateCardDb?: unknown,
+): StoredSession {
+  if (!isRecord(raw)) {
+    throw new Error("Stored session must be an object");
+  }
+  const rawCardDb = isRecord(raw.cardDb) ? raw.cardDb : separateCardDb;
+  if (!isRecord(rawCardDb)) {
     throw new Error("Stored session must contain a cardDb object");
   }
+  const formatVersion = raw.formatVersion ?? 1;
+  if (formatVersion !== 1 && formatVersion !== 2) {
+    throw new Error("Stored session formatVersion is invalid");
+  }
   const cardDb: Record<string, CardData> = {};
-  for (const [key, value] of Object.entries(raw.cardDb)) {
+  for (const [key, value] of Object.entries(rawCardDb)) {
     const card = parseCardData(value);
     if (card.id !== key)
       throw new Error(
@@ -392,12 +544,84 @@ export function parseStoredSession(raw: unknown): StoredSession {
   if (!Array.isArray(undoHistoryRaw))
     throw new Error("Stored session undoHistory is invalid");
   return {
+    formatVersion,
     state: parseStoredGameState(raw.state),
     cardDb,
     mode,
     testPriorityRolls,
     undoHistory: undoHistoryRaw.map(parseStoredGameState),
+    historySummary: parseEventHistorySummary(raw.historySummary),
   };
+}
+
+function parseEventHistorySummary(raw: unknown): EventHistorySummary {
+  if (raw === undefined) return emptyEventHistorySummary();
+  if (
+    !isRecord(raw) ||
+    raw.version !== 1 ||
+    !isNonNegativeInteger(raw.compactedEventCount) ||
+    !isNullableFiniteNumber(raw.firstCompactedTimestamp) ||
+    !isNullableFiniteNumber(raw.lastCompactedTimestamp) ||
+    !isRecord(raw.byType) ||
+    !Array.isArray(raw.byPlayer) ||
+    raw.byPlayer.length !== 2 ||
+    !raw.byPlayer.every(isNonNegativeInteger)
+  ) {
+    throw new Error("Stored session historySummary is invalid");
+  }
+
+  const byType: EventHistorySummary["byType"] = {};
+  for (const [eventType, count] of Object.entries(raw.byType)) {
+    if (!isKnownEventType(eventType) || !isNonNegativeInteger(count)) {
+      throw new Error("Stored session historySummary is invalid");
+    }
+    byType[eventType] = count;
+  }
+  const byPlayer: [number, number] = [raw.byPlayer[0], raw.byPlayer[1]];
+  const summarizedByType = Object.values(byType).reduce(
+    (total, count) => total + (count ?? 0),
+    0,
+  );
+  if (
+    summarizedByType !== raw.compactedEventCount ||
+    byPlayer[0] + byPlayer[1] !== raw.compactedEventCount ||
+    !hasValidSummaryTimestampRange(
+      raw.compactedEventCount,
+      raw.firstCompactedTimestamp,
+      raw.lastCompactedTimestamp,
+    )
+  ) {
+    throw new Error("Stored session historySummary is invalid");
+  }
+  return {
+    version: 1,
+    compactedEventCount: raw.compactedEventCount,
+    firstCompactedTimestamp: raw.firstCompactedTimestamp,
+    lastCompactedTimestamp: raw.lastCompactedTimestamp,
+    byType,
+    byPlayer,
+  };
+}
+
+function hasValidSummaryTimestampRange(
+  count: number,
+  first: number | null,
+  last: number | null,
+): boolean {
+  if (count === 0) return first === null && last === null;
+  return first !== null && last !== null && first <= last;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isKnownEventType(value: string): value is GameEventType {
+  return KNOWN_EVENT_TYPES.has(value);
+}
+
+function isNullableFiniteNumber(value: unknown): value is number | null {
+  return value === null || (typeof value === "number" && Number.isFinite(value));
 }
 
 function isPriorityRollSequence(value: unknown): value is number[] | null {
@@ -423,5 +647,32 @@ function ensurePromptId(state: GameState): GameState {
       ...state.pendingPrompt,
       promptId: allocated.id,
     },
+  };
+}
+
+function serializedByteLength(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+function assertWithinValueLimit(
+  valueName: "session" | "cardDb",
+  bytes: number,
+): void {
+  if (bytes > SESSION_VALUE_HARD_LIMIT_BYTES) {
+    throw new SessionPersistenceLimitError(
+      valueName,
+      bytes,
+      SESSION_VALUE_HARD_LIMIT_BYTES,
+    );
+  }
+}
+
+function cloneHistorySummary(
+  summary: EventHistorySummary,
+): EventHistorySummary {
+  return {
+    ...summary,
+    byType: { ...summary.byType },
+    byPlayer: [...summary.byPlayer],
   };
 }

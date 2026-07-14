@@ -94,7 +94,7 @@ GameState {
   prohibitions: RuntimeProhibition[]      // Effect-based action vetoes
   scheduledActions: RuntimeScheduledAction[]
   triggerRegistry: RuntimeRegisteredTrigger[]  // All registered auto-triggers
-  eventLog: GameEvent[]                   // Full event history
+  eventLog: GameEvent[]                   // Recent history + live causal anchors
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED"
   winner: 0 | 1 | null
   pendingPrompt: PendingPromptState | null  // Awaiting player input

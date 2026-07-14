@@ -22,8 +22,19 @@ class MemoryStorage implements SessionStorage {
     return this.data.get(key) as T | undefined;
   }
 
-  async put(key: string, value: unknown): Promise<void> {
-    this.data.set(key, value);
+  async put(key: string, value: unknown): Promise<void>;
+  async put(entries: Record<string, unknown>): Promise<void>;
+  async put(
+    keyOrEntries: string | Record<string, unknown>,
+    value?: unknown,
+  ): Promise<void> {
+    if (typeof keyOrEntries === "string") {
+      this.data.set(keyOrEntries, value);
+      return;
+    }
+    for (const [key, entry] of Object.entries(keyOrEntries)) {
+      this.data.set(key, entry);
+    }
   }
 
   async setAlarm(timestamp: number): Promise<void> {
