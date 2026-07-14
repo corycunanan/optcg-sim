@@ -1,13 +1,15 @@
 # Deferred Card Effects
 
-Cards whose effect schemas were too complex to encode on the first pass. Each entry documents the card, its effect text, the specific blocker(s), and which engine feature would unblock it.
-
-Cards are removed from this list once they are encoded in `workers/game/src/engine/schemas/`.
+Historical inventory of card effects that were too complex to encode on the
+first pass. Each entry records the original blocker and its final disposition.
+The authoritative schemas live in `workers/game/src/engine/schemas/`; the
+fail-closed schema gate and action-coverage inventory determine playability.
 
 **OPT-475 closure:** the conditional-reveal cohort was reconciled from the stale
 19-card audit count to 20 cards (OP08-049 was still partial). All 20 now have
 complete authored schemas and machine-checked execution coverage; their entries
-remain below as historical disposition records.
+remain below as historical disposition records. **Remaining deferred cards: 0.**
+No playable-format exclusion is active for this cohort.
 
 ---
 
@@ -374,9 +376,13 @@ Already encoded in `p.ts` with TURN_LIFE_FACE_UP cost. Cost handler already supp
 
 ---
 
-## M4.5 QA Findings — Additional Cards Needing Engine Work
+## M4.5 QA Findings — Final Disposition
 
-Identified by the Phase 1 validation sweep (F9 engine coverage check + low-confidence encoding detector). These cards have schemas encoded with action types that have no engine handler, or card text that doesn't cleanly map to the schema's action types.
+The Phase 1 validation sweep mixed genuine gaps with coarse-detector false
+positives. The runtime-backed schema gate now requires every authored action to
+have a handler and executable coverage, and every low-confidence finding must
+have a disposition in this document or
+[SCHEMA-QA-DISPOSITIONS.md](SCHEMA-QA-DISPOSITIONS.md).
 
 ### ~~Cards Using Unhandled Action Types (F9)~~ — ALL RESOLVED
 
@@ -386,25 +392,39 @@ to process player card selections.
 
 `ADD_TO_LIFE` (EB02-057) was a false positive — the schema correctly uses `ADD_TO_LIFE_FROM_FIELD`.
 
-### Low-Confidence Encodings (Card Text / Schema Mismatch)
+### Low-Confidence Encodings
 
-| Pattern | Count | Cards |
+The current detector reports 51 findings across 50 unique cards. It is
+intentionally conservative: composite search/play actions, reveal costs,
+permanent hand modifiers, and reference-driven targets do not satisfy its
+single-action heuristics even when the authored schema is complete.
+
+OPT-484 re-ran the 17-card cohort recorded in
+[SCHEMA-QA-DISPOSITIONS.md](SCHEMA-QA-DISPOSITIONS.md): 15 were implemented
+false positives and 2 real schema/UI defects (ST12-017 and ST22-011), both
+corrected with executable regressions. Other current findings already have
+encoded historical entries above. The remaining coarse-detector false
+positives are grouped here so the disposition gate reflects current runtime
+output rather than the stale `~80` estimate:
+
+| Pattern | Cards | Disposition |
 |---|---|---|
-| `REVEAL_WITHOUT_ACTION` | 18 | OP06-057, OP06-119, OP08-040/044/052/054/055, OP14-044, ST11-001, ST12-010/013/017, ST22-001/003/011/012/016/017 |
-| `HAND_COST_REDUCTION` | 10 | EB04-061, OP07-064, OP11-023, OP15-013/021/102, PRB02-014, ST23-001/002, ST26-001 |
-| `SEARCH_TRASH_THE_REST` | 9 | EB01-009, EB02-025/056, OP01-116, OP06-003, OP08-007, OP11-051, OP14-010, ST12-013 |
-| `TURN_LIFE_FACE` | 7 | EB03-053/056, OP10-099, OP12-102, OP13-109, P-106, ST29-008 |
-| `BASE_POWER_BECOMES` | 6 | EB01-061, EB04-003/052, OP04-069, OP06-009, OP14-053 |
-| `PLAY_FROM_DECK` | 4 | OP02-030, OP08-071/073, OP13-079 |
-| `SAME_NAME_AS_TRASHED` | 1 | EB02-039 |
-| `NEXT_TIME_YOU_PLAY` | 1 | OP12-061 |
+| `SEARCH_TRASH_THE_REST` | OP01-116, OP06-003, OP08-007, OP11-051, OP14-010, EB01-009, EB02-025, ST12-013 | Implemented with `SEARCH_AND_PLAY` (and ST12-013's separate `DECK_SCRY`); the heuristic does not recognize composite play/rest handling. |
+| `BASE_POWER_BECOMES` | OP04-069, OP06-009, EB01-061, EB04-003 | Implemented with `COPY_POWER` or the permanent set-power modifier layer; the heuristic only recognizes the action-form base-power setter. |
+| `REVEAL_WITHOUT_ACTION` | OP06-057, OP06-119, OP08-040, ST11-001, ST12-010, ST12-013, ST22-001 | Implemented by `SEARCH_AND_PLAY`, `SEARCH_DECK`, or `REVEAL_FROM_HAND` costs; the heuristic only recognizes an action literally named `REVEAL`. |
+| `PLAY_FROM_DECK` | OP08-071 | Implemented as a named `PLAY_CARD` target from `DECK`, followed by `SHUFFLE_DECK`. |
+| `HAND_COST_REDUCTION` | OP11-023, EB04-061, PRB02-014 | Implemented as conditional hand-zone `MODIFY_COST` permanent modifiers; the detector always flags this high-risk wording for review. |
+| `SAME_NAME_AS_TRASHED` | EB02-039 | Implemented with the implicit `__cost_cards_trashed` result and `name_matching_ref`; semantic validation and post-cost regressions cover the reference. |
+
+All 51 findings have a checked-in disposition. None remains deferred or
+silently playable with a known partial effect.
 
 ### Totals
 
-| Category | Count |
-|---|---|
-| Original deferrals (pre-QA) | 24 |
-| ~~NEW: unhandled action types (F9)~~ | ~~50~~ 0 (all handlers exist) |
-| NEW: low-confidence encodings (LC) | 56 |
-| Overlap (flagged by multiple sources) | ~24 |
-| **Total unique cards needing work** | **~80** |
+| Category | Current inventory | Open / deferred | Playable exclusions |
+|---|---:|---:|---:|
+| Historical card entries in this document | 38 cards | 0 | 0 |
+| OPT-475 conditional-reveal cohort (subset above, reconciled from 19) | 20 cards | 0 | 0 |
+| Runtime low-confidence detector | 51 findings / 50 cards | 0 | 0 |
+| Authored action inventory | 3,574 uses / 73 authored types | 0 unhandled or unexecuted | 0 |
+| **Tracked cards still needing disposition** | — | **0** | **0** |

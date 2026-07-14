@@ -137,6 +137,7 @@ These map to printed bracket tags on cards:
 |-----------|---------|-------|
 | `[On Play]` | `{ keyword: "ON_PLAY" }` | When card enters field from hand |
 | `[When Attacking]` | `{ keyword: "WHEN_ATTACKING" }` | When this card attacks |
+| `[When Attacked]` | `{ keyword: "WHEN_ATTACKED" }` | When this card becomes the attack target |
 | `[On K.O.]` | `{ keyword: "ON_KO" }` | When this card is K.O.'d |
 | `[On Block]` | `{ keyword: "ON_BLOCK" }` | When this card blocks |
 | `[On Your Opponent's Attack]` | `{ keyword: "ON_OPPONENT_ATTACK" }` | When opponent declares attack |
@@ -171,6 +172,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When a Character is K.O.'d" | `{ event: "ANY_CHARACTER_KO" }` |
 | "When a Character is trashed" | `{ event: "ANY_CHARACTER_TRASHED" }` |
 | "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` |
+| "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
 | "When an Event is activated (from hand)" | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
@@ -183,6 +185,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When this Character battles and K.O.'s" | `{ event: "COMBAT_VICTORY" }` |
 | "When this Character battles" | `{ event: "CHARACTER_BATTLES" }` |
 | "At end of battle" | `{ event: "END_OF_BATTLE" }` |
+| "When a battle ends because a combatant left the field" | `{ event: "BATTLE_ABORTED" }` |
 | "When Life reaches 0" | `{ event: "LIFE_COUNT_BECOMES_ZERO" }` |
 | "When card added to hand from Life" | `{ event: "CARD_ADDED_TO_HAND_FROM_LIFE" }` |
 | "When you draw outside Draw Phase" | `{ event: "DRAW_OUTSIDE_DRAW_PHASE" }` |
@@ -336,6 +339,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 |------|-----------|
 | `REST_SELF` | "Rest this card" |
 | `TRASH_SELF` | "Trash this card" (not K.O.) |
+| `PLACE_SELF_TO_DECK` | "Place this card at the bottom of the owner's deck" |
 
 ### Hand Costs
 
@@ -355,6 +359,8 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `TRASH_OWN_CHARACTER` | "Trash your Character" |
 | `RETURN_OWN_CHARACTER_TO_HAND` | "Return your Character to hand" |
 | `PLACE_OWN_CHARACTER_TO_DECK` | "Place Character at deck bottom" |
+| `ADD_OWN_CHARACTER_TO_LIFE` | "Add your Character to Life" |
+| `TRASH_OWN_STAGE` | "Trash your Stage" |
 
 ### Other Costs
 
@@ -369,6 +375,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `GIVE_OPPONENT_DON` | "Give DON!! to opponent" |
 | `RETURN_ATTACHED_DON_TO_COST` | "Return attached DON!!" |
 | `PLACE_SELF_AND_HAND_TO_DECK` | "Place this card and hand to deck" |
+| `PLACE_SELF_AND_TRASH_TO_DECK` | "Place this card and cards from trash to deck" |
 | `REST_DON` | "Rest N DON!!" (as cost) |
 
 ### Branched Costs ("A or B")
@@ -415,6 +422,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `TRASH_CARD` | "Trash" (not K.O.) | Target |
 | `TRASH_FROM_HAND` | "Trash N from hand" | `{ amount: N }` |
 | `PLAY_CARD` | "Play from hand/trash/life" | Target, source zone |
+| `ADD_TO_LIFE` | "Add card from trash to Life" | `CARD_IN_TRASH` target, `{ face, position }` |
 | `MILL` | "Trash N from top of deck" | `{ amount: N }` |
 | `DECK_SCRY` | "Look at N, arrange" | `{ amount: N, position: "TOP" }` |
 
@@ -517,7 +525,6 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `SET_COST` | "Set cost to N" | `{ value: N }` |
 | `SWAP_BASE_POWER` | "Swap base power" | Target |
 | `COPY_POWER` | "Copy power" | Target |
-| `SET_POWER_TO_ZERO` | "Set power to 0" | Target |
 
 ### Flow / Meta
 
@@ -563,6 +570,7 @@ actions: [
 | `OPPONENT_LEADER` | Opponent's Leader | N/A |
 | `CHARACTER` | Character(s) on field | `"SELF"` / `"OPPONENT"` / `"EITHER"` |
 | `LEADER_OR_CHARACTER` | Leader or Character | Controller required |
+| `FIELD_CARD` | Character or Stage on field | Controller required |
 | `ALL_YOUR_CHARACTERS` | Every Character you control | N/A |
 | `ALL_OPPONENT_CHARACTERS` | Every opponent Character | N/A |
 | `CHARACTER_CARD` | Character in a zone | Requires `source_zone` |
@@ -580,6 +588,8 @@ actions: [
 | `PLAYER` | Player (for direct actions) | Controller |
 | `SELECTED_CARDS` | Previously selected cards | Via `target_ref` |
 | `OPPONENT_LIFE` | Opponent's Life zone | N/A |
+| `TRIGGERING_CARD` | Exact card instance that caused the resolving trigger | Seeded runtime reference |
+| `TRIGGERING_CARD_IN_TRASH` | Triggering card only if its current instance is in trash | Seeded source-identity reference |
 
 ### Count Modes
 

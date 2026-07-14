@@ -1,28 +1,31 @@
 # Game Engine Audit — Consolidated Luna Max + Terra Max Review
 
 **Audit date:** 2026-07-11
+**Closure review:** 2026-07-14
 **Scope:** `workers/game`, shared game types, authored effect schemas, engine documentation, and the Game Engine Correctness Linear project
-**Disposition:** Conditionally sound beta; not correctness-closure-ready
+**Disposition:** Game Engine Correctness scope is closure-ready; documented residual rules-completeness and operational tradeoffs remain
 **Linear parent:** [OPT-466 — Game engine audit hardening and correctness closure](https://linear.app/optcg-sim/issue/OPT-466/game-engine-audit-hardening-and-correctness-closure)
 
 ## Executive Summary
 
-The two independent audits agree on the important conclusion: this is a strong beta / mature prototype with substantial rules coverage, not a rewrite candidate, but several documented engine contracts are not yet enforced strongly enough to certify it as a production rules platform.
+The two independent audits correctly identified a strong beta / mature prototype
+with substantial rules coverage and a set of concrete contracts that still
+needed enforcement. The Game Engine Correctness project has now closed every
+actionable finding from GE-01 through GE-14 with executable regressions,
+fail-closed validation, bounded persistence, and reconciled documentation.
 
-The current branch has a healthy core: 126 worker test files and 1,410 passing tests, strict worker and root type checks, a passing production build, a passing Wrangler dry-run, an explicit seven-stage pipeline, and good coverage in battle, pipeline, and resolver code. The resolver also has a boot-time ActionType/handler drift guard, and GameSession contains meaningful defenses for authentication, reconnects, prompt identity, stale responses, visibility filtering, rate limits, persistence, and timeouts.
+Closure means the audited hardening scope is ready: hidden views are
+viewer-scoped, engine-limit failures are atomic draws, disputed schemas match
+their sources, every authored action type is handled and executed, simultaneous
+chains and zone identity have explicit contracts, recorded-context replay is
+byte-equivalent, session responsibilities are decomposed, runtime boundaries
+validate unknown data, and durable history is bounded.
 
-The audit nevertheless confirms two immediate correctness/security defects and six other high-severity contract gaps:
-
-1. `LIFE_SCRIED` exposes face-down Life identities to the opponent through the event log.
-2. Effect-stack exhaustion silently drops the next frame and permits partially resolved state to continue.
-3. Three named card schemas disagree with official card sources.
-4. Six live action handlers have no execution coverage despite 128 authored uses.
-5. Schema validation is not a trustworthy release gate and malformed schemas are still injected at runtime.
-6. `AND` is documented as simultaneous but implemented as `THEN` across 211 authored occurrences.
-7. Trigger/resume processing mutates event objects held inside immutable game snapshots.
-8. Zone-transition identity rules are only partially centralized.
-
-The remaining findings concern deferred playable cards, deterministic replay, type safety, unbounded persistence growth, documentation drift, and concentration of responsibilities in `GameSession.ts`. OPT-478 replaced resolver module-global dispatch and decomposed cost handling behind stable contracts.
+It does **not** mean every Comprehensive Rules edge case is implemented. The
+remaining risks are explicit below, especially player-stoppable loop semantics,
+generic secret-to-secret reveal/order rules, the scoped (not recursively frozen)
+snapshot immutability guarantee, and the deliberate one-checkpoint undo/history
+retention policy.
 
 ## Verification Method
 
@@ -37,9 +40,12 @@ The audit was consolidated and independently checked against the current branch 
 - Checked the existing Game Engine Correctness project before filing new work, including completed identity work in OPT-453.
 - Classified every claim as confirmed, partially confirmed, stale/reconciled, or not reproduced.
 
-## Reproduced Baseline
+## Original Reproduced Baseline — 2026-07-11
 
-| Check                     |                     Current result | Interpretation                                               |
+This table preserves the measurements that opened the project. It is historical
+evidence, not the closure branch's current result.
+
+| Check                     |                       Audit result | Interpretation                                               |
 | ------------------------- | ---------------------------------: | ------------------------------------------------------------ |
 | Worker tests              |     126 files, 1,410 tests passing | Confirms both audits' test baseline                          |
 | All covered worker files  | 74.17% statements, 64.05% branches | Terra's ~74% figure refers to the full coverage set          |
@@ -60,7 +66,35 @@ The mixed Vitest 4.1.1 / coverage-v8 4.1.4 versions emit a warning during covera
 
 The Wrangler dry-run bundled the worker and exited successfully. It also reported that the sandbox prevented writing its optional debug log under `~/Library/Preferences/.wrangler/logs`; that logging warning did not affect the bundle or dry-run result.
 
-## Consolidated Findings
+## Closure Evidence — 2026-07-14
+
+| Finding | Final status | Executable / machine-checked evidence |
+|---|---|---|
+| GE-01 hidden information | Resolved by OPT-470 | [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) classifies secret-bearing events/prompts, enforces viewer-scoped reveals, strips continuations, and replaces stable hidden IDs. |
+| GE-02 stack/loop fail-open | Resolved by OPT-467 | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) proves sequential-budget and nested-stack exhaustion terminate atomically in a persisted draw. |
+| GE-03 disputed schemas | Resolved by OPT-469 | [`opt-469-card-schema-corrections.test.ts`](../../workers/game/src/__tests__/opt-469-card-schema-corrections.test.ts) covers source filters, target behavior, prohibitions, and corrected official text. |
+| GE-04 unexecuted handlers | Resolved by OPT-473 | [`opt-473-action-handler-coverage.test.ts`](../../workers/game/src/__tests__/opt-473-action-handler-coverage.test.ts) plus the generated inventory gate report 3,574 authored uses, 73 authored types, 73 handled, and 73 executed. |
+| GE-05 schema gate fail-open | Resolved by OPT-471 | [`opt-471-authored-schema-gate.test.ts`](../../workers/game/src/__tests__/opt-471-authored-schema-gate.test.ts) validates 2,319 schemas, source/disposition parity, boot-time failure, and terminal unknown-action handling. |
+| GE-06 `AND` semantics | Resolved by OPT-472 | [`opt-472-simultaneous-and.test.ts`](../../workers/game/src/__tests__/opt-472-simultaneous-and.test.ts) locks targets from one snapshot and commits grouped actions without exposing partial prompt state. |
+| GE-07 event immutability | Resolved by OPT-468 | [`opt-468-event-immutability.test.ts`](../../workers/game/src/__tests__/opt-468-event-immutability.test.ts) runs trigger scan/resume against deeply frozen input events and snapshots. |
+| GE-08 zone identity | Resolved by OPT-474 | [`opt-474-zone-transition-contract.test.ts`](../../workers/game/src/__tests__/opt-474-zone-transition-contract.test.ts) enforces the zone-pair identity/cleanup matrix and guards direct zone-array mutation. |
+| GE-09 deterministic replay | Resolved by OPT-477 | [`opt-477-engine-execution-context.test.ts`](../../workers/game/src/__tests__/opt-477-engine-execution-context.test.ts) proves byte-equivalent setup, frames, prompts, IDs, timestamps, shuffles, and JSON-restart resume under the same context. |
+| GE-10 deferred cards/start-of-game | Resolved by OPT-475/476 | [`opt-475-conditional-reveal.test.ts`](../../workers/game/src/__tests__/opt-475-conditional-reveal.test.ts), [`opt-476-start-of-game-effects.test.ts`](../../workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts), and [the disposition inventory](DEFERRED-CARD-EFFECTS.md) leave zero tracked deferred cards or playable exclusions. |
+| GE-11 architecture pressure | Resolved by OPT-478/479 | [`opt-478-resolver-architecture.test.ts`](../../workers/game/src/__tests__/opt-478-resolver-architecture.test.ts) and [`opt-479-session-boundaries.test.ts`](../../workers/game/src/__tests__/opt-479-session-boundaries.test.ts) enforce dependency direction and collaborator contracts. |
+| GE-12 runtime boundaries | Resolved by OPT-480 | [`opt-480-runtime-types.test.ts`](../../workers/game/src/__tests__/opt-480-runtime-types.test.ts) enforces mapped discriminated unions, validated unknown-data boundaries, cast limits, and removal of the duplicate resolver. |
+| GE-13 unbounded persistence | Resolved by OPT-481 | [`opt-481-persistence-bounds.test.ts`](../../workers/game/src/__tests__/opt-481-persistence-bounds.test.ts) covers event/anchor compaction, one-checkpoint undo, payload budgets, legacy restore, and atomic failure rollback. |
+| GE-14 documentation drift | Resolved by OPT-482 | [`check-doc-drift.sh`](../../workers/game/src/engine/schemas/check-doc-drift.sh), now part of `schema:check`, requires all 76 supported action types and 25 target types exactly once and validates rules-map test links. |
+| GE-15 test-change metric | Informational | The unreproducible historical ratio remains excluded from closure evidence. |
+
+The full `pnpm verify` gate passes on the closure branch: lint completes with
+zero errors, root and worker type checks pass, `schema:check` produces the
+counts above, 615 app tests and 1,612 worker tests pass, worker coverage is
+79.05% statements / 69.15% branches, and the Next.js production build succeeds.
+
+## Original Findings and Final Dispositions
+
+The sections below preserve the discovery evidence and original reproduction
+language. The closure table above is authoritative for current status.
 
 ### GE-01 — Hidden-information leak in Life scry events
 
@@ -169,13 +203,18 @@ The remaining work is a zone-pair identity matrix and one transition service tha
 
 `GameState.executionContext` now persists seeded RNG state, a monotonic ID allocator, a logical clock, resolver action-budget accounting, and trace metadata. `GameSession` creates the production context from cryptographic entropy once; setup, pregame, the pipeline, battle, triggers, modifiers, zone transitions, effect frames, and resume paths consume and persist it. Regression coverage proves byte-equivalent execution before and after JSON serialization and rejects ambient entropy/time usage outside the adapter.
 
-### GE-10 — Twenty card effects remain deferred
+### GE-10 — Deferred card and start-of-game cohort
 
 **Severity:** Medium
-**Status:** Confirmed
+**Status:** Resolved by OPT-475 and OPT-476
 **Linear:** [OPT-475](https://linear.app/optcg-sim/issue/OPT-475/implement-the-19-deferred-conditional-reveal-card-effects-or-exclude) and [OPT-476](https://linear.app/optcg-sim/issue/OPT-476/execute-op13-079-start_of_game_effect-in-the-pregame-state-machine)
 
-`DEFERRED-CARD-EFFECTS.md` currently identifies 19 conditional-reveal effects plus OP13-079's start-of-game effect. The OP13-079 schema is authored, but `pregame.ts:84-90` intentionally treats `START_OF_GAME_FX` as a pass-through. Until implemented, these cards must either be rejected from playable formats or clearly marked partial; silently loading a partial card is a correctness failure.
+The original 19-card conditional-reveal count omitted partially encoded
+OP08-049; the reconciled cohort is 20. All 20 have complete schemas and
+pipeline regressions. OP13-079 now executes in the persisted pregame state
+machine in first-player order, including play, decline, zero-match, shuffle,
+reconnect, and resume paths. The current disposition inventory has zero tracked
+deferred cards and zero playable exclusions.
 
 ### GE-11 — Modularity has correctness-sensitive pressure points
 
@@ -192,32 +231,46 @@ The defensive behavior is preserved by collaborator contracts for reconnect auth
 ### GE-12 — Runtime type boundaries are weak in critical paths
 
 **Severity:** Medium
-**Status:** Confirmed; current count differs slightly from the original audit
+**Status:** Resolved by OPT-480
 **Linear:** [OPT-480](https://linear.app/optcg-sim/issue/OPT-480/tighten-engine-runtime-types-and-remove-the-duplicate-unused-target)
 
-The current engine + GameSession paths contain 83 `as any` casts and 84 `unknown` occurrences. Some are reasonable at external boundaries, but action parameters, runtime prohibitions/effects, target filters, stored state, and dispatcher internals also rely on them. The duplicate `resolveTargetInstances` implementation at `target-resolver.ts:591-805` has no call sites and duplicates the active `computeAllValidTargets` surface.
-
-Boundary data should be validated once, with exhaustive discriminated unions inside the engine. The unused resolver should be removed.
+Actions, events, prompts, persisted state, and session messages now cross
+unknown-data boundaries through runtime validation and remain mapped
+discriminated unions inside correctness-critical code. Resolver handlers are
+exhaustive over exact action variants, intentional boundary assertions are
+localized and regression-counted, and the duplicate unused target resolver and
+export are removed.
 
 ### GE-13 — Persistence and history grow without an explicit bound
 
 **Severity:** Medium
-**Status:** Confirmed as a scalability risk
+**Status:** Resolved by OPT-481
 **Linear:** [OPT-481](https://linear.app/optcg-sim/issue/OPT-481/bound-event-log-undo-history-and-durable-object-persistence-growth)
 
-Every event appends to `GameState.eventLog` (`events.ts:39`). `GameSession.persist` writes full state, card DB, and undo history on each persistence cycle (`GameSession.ts:1479-1497`). No cap, checkpoint/compaction scheme, or storage-size budget is evident.
-
-The risk is not demonstrated data loss today; it is unbounded serialization and Durable Object storage growth over long games. Retention, replay, diagnostics, and undo requirements need an explicit bounded design.
+The current `GameState` is the authoritative restore checkpoint. Persistence
+and broadcasts retain 256 recent events plus at most 128 condition-critical
+anchors, fold older events into bounded diagnostic counters, keep one safe undo
+checkpoint, and store the immutable card DB separately. Approximate payload
+budgets warn at 1 MB and reject before mutation at 1.5 MB; legacy restore and
+failed writes compact or roll back atomically.
 
 ### GE-14 — Rules and schema documentation are stale
 
 **Severity:** Low
-**Status:** Confirmed, but one reported count is stale
+**Status:** Resolved by OPT-482
 **Linear:** [OPT-482](https://linear.app/optcg-sim/issue/OPT-482/reconcile-rules-schema-and-architecture-docs-to-executable-engine)
 
-`RULES-TO-ENGINE-MAP.md` still marks first/second choice, player-selected Character overflow, and mid-battle abort behavior as gaps/partials even though current code and tests implement them. Architecture documents promise immutable deterministic snapshots more strongly than the implementation warrants.
+The rules map now derives the reconciled first/second, overflow, battle-abort,
+loop-limit, start-of-game, and hidden-view statuses from named executable tests.
+The schema README catalogs all 76 supported action types and 25 target types
+exactly once. Deferred and low-confidence inventories match the fail-closed
+playability gates, and architecture prose scopes immutability to copy-on-write
+transition contracts and determinism to a recorded execution context.
 
-The Luna report said the schema README was missing nine current action types. A current ActionType-to-README comparison finds one missing catalog entry: `ADD_TO_LIFE`. The finding is still valid as documentation drift, but the count of nine is stale.
+The prior “nine missing action types” count was stale: the exact catalog defect
+was one missing `ADD_TO_LIFE` row plus a duplicated `SET_POWER_TO_ZERO` row.
+`check-doc-drift.sh`, now in `schema:check`, verifies exact runtime-catalog
+parity and that rules-map executable-test links resolve.
 
 ### GE-15 — Test-change discipline metric is not reproducible as stated
 
@@ -233,7 +286,7 @@ Terra reported that 72 of 75 recent engine-changing commits also changed tests. 
 - Resolver boot-time ActionType/handler drift detection is an effective safeguard.
 - Cost, prompt, trigger, replacement, battle, and resume concerns are already split into recognizable modules even though two hotspots remain oversized.
 - GameSession serializes actions and contains substantial protection for auth, stale/duplicate prompts, reconnects, visibility, rate limiting, persistence, and timeouts.
-- Current first/second choice, player-selected overflow, and mid-battle abort behavior are stronger than the stale rules map suggests.
+- The rules map links current first/second choice, player-selected overflow, and mid-battle abort behavior directly to executable regressions.
 - Strict root and worker TypeScript checks, the production build, and the worker bundle all pass.
 
 ## Project Plan and Linear Sequence
@@ -278,7 +331,7 @@ The plan is tracked under [OPT-466](https://linear.app/optcg-sim/issue/OPT-466/g
 
 ## Closure Criteria
 
-The engine can be considered correctness-closure-ready when:
+The audited Game Engine Correctness scope is correctness-closure-ready because:
 
 1. Every urgent/high issue above is complete with pipeline-level regressions.
 2. No hidden-zone identity reaches an unauthorized state, event, or prompt view.
@@ -290,4 +343,36 @@ The engine can be considered correctness-closure-ready when:
 8. Persistence has a measured bound for a maximum-length legal game.
 9. Rules and schema documentation are generated from or linked directly to executable evidence.
 
-Until those criteria are met, the appropriate release description is **healthy core, conditionally sound, not rules-platform closure-ready**.
+All nine criteria are satisfied by the closure evidence above. This conclusion
+closes the audited hardening project; it does not claim exhaustive
+Comprehensive Rules coverage or eliminate the residual risks below.
+
+## Final Residual Risk
+
+1. **Player-stoppable loops remain a rules-completeness gap.** Stack-depth and
+   action-budget exhaustion terminate atomically in a draw, but the engine does
+   not hash repeated states or ask eligible players to declare loop counts under
+   §11-1-1-2/3.
+2. **Hidden-zone confidentiality is stronger than generic reveal semantics.**
+   Viewer-specific events, prompts, faces, stable IDs, and continuation data are
+   protected. A universal secret-to-secret transition contract for required
+   reveals and owner-chosen hidden order is still partial.
+3. **Snapshot immutability is a transition contract, not a runtime deep freeze.**
+   Deep-frozen regressions cover the prior trigger/resume defect, and transition
+   APIs use copy-on-write updates. Future paths can still violate the convention
+   unless focused tests or broader static enforcement are added.
+4. **Determinism is contextual.** Byte-equivalent replay requires the same
+   initial state, action/response sequence, and recorded
+   `EngineExecutionContext`. Production contexts intentionally start from fresh
+   cryptographic entropy.
+5. **Bounded history is a deliberate product tradeoff.** The worker retains 256
+   recent events, at most 128 live causal anchors, bounded summaries, and one
+   undo checkpoint. It does not provide an unbounded user-visible history or
+   multi-step undo; long-term archival would be a separate system.
+6. **The documentation gate verifies structure, not every prose claim.** Runtime
+   action/target catalog parity and executable-test links are machine-checked.
+   Rule interpretation and narrative architecture changes still require review
+   against executable behavior.
+
+The appropriate release description is **audited correctness-hardening scope
+closed, with explicit residual rules-platform gaps**.
