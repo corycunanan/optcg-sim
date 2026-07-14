@@ -21,11 +21,13 @@ export { getActionParams } from "../effect-types.js";
 
 export function getSearchAndPlayPickLimit(
   params: ActionParamsMap["SEARCH_AND_PLAY"],
+  validTargetCount: number,
 ): number {
   const pick = params.pick;
-  if (pick && "up_to" in pick) return pick.up_to;
-  if (pick && "exact" in pick) return pick.exact;
-  return 1;
+  if (!pick) return 1;
+  if ("up_to" in pick) return pick.up_to;
+  if ("exact" in pick) return pick.exact;
+  return validTargetCount;
 }
 
 function findCardInstanceForDV(state: GameState, instanceId: string): CardInstance | null {

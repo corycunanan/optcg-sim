@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { getSearchAndPlayPickLimit } from "../engine/effect-resolver/action-utils.js";
 import { executeSearchAndPlay } from "../engine/effect-resolver/actions/hand-deck.js";
 import { handleArrangeSearchAndPlay } from "../engine/effect-resolver/resume/deck.js";
 import type { Action, ActionOf } from "../engine/effect-types.js";
@@ -83,6 +84,13 @@ function arrange(kept: string[], ordered: string[]): GameAction {
 }
 
 describe("SEARCH_AND_PLAY multi-pick", () => {
+  it.each([
+    { pick: { all: true } as const },
+    { pick: { any_number: true } as const },
+  ])("allows the full valid pool for $pick", (params) => {
+    expect(getSearchAndPlayPickLimit(params, 3)).toBe(3);
+  });
+
   it("advertises one selection for omitted production pick limits", () => {
     const state = setup(wanoChar.id);
     const result = executeSearchAndPlay(

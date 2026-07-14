@@ -276,7 +276,8 @@ export function handleArrangeSearchAndPlay(
   const shuffleAfter = sap.shuffle_after ?? false;
   const searchFullDeck = sap.search_full_deck ?? false;
   const entryState = sap.entry_state ?? "ACTIVE";
-  const pickLimit = getSearchAndPlayPickLimit(sap);
+  const searchValid = validTargets ?? [];
+  const pickLimit = getSearchAndPlayPickLimit(sap, searchValid.length);
 
   const p = state.players[controller];
   // Multi-pick ("play up to N"): the client sends keptCardInstanceIds; the
@@ -285,7 +286,6 @@ export function handleArrangeSearchAndPlay(
   const requestedKept = action.keptCardInstanceIds?.length
     ? action.keptCardInstanceIds
     : (action.keptCardInstanceId ? [action.keptCardInstanceId] : []);
-  const searchValid = validTargets ?? [];
   const keptIds = [...new Set(requestedKept)]
     .filter((id) => searchValid.includes(id))
     .slice(0, pickLimit);
