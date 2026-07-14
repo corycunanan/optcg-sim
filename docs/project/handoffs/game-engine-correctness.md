@@ -64,11 +64,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Done | [#309](https://github.com/corycunanan/optcg-sim/pull/309) | Fifteen implemented detector false positives plus ST12-017/ST22-011 corrections merged 2026-07-14 in `22ae230`. |
 | 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Done | [#310](https://github.com/corycunanan/optcg-sim/pull/310) | Official text and the source-parity gate merged 2026-07-14 in `5cac50c`. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
+| 49 | OPT-497 | game:update broadcasts echo the raw client action unfiltered to both players | — | — | In Review | [#314](https://github.com/corycunanan/optcg-sim/pull/314) | Opponent updates no longer echo action payloads, preventing hidden prompt-response IDs and ordering from crossing the socket boundary. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #312. After merge, the Game Engine Correctness project is complete — no follow-up tickets remain in the Action Plan.
+**Next up:** Review PR #314. After merge, the Game Engine Correctness project is complete — no follow-up tickets remain in the Action Plan.
 
 ---
 
@@ -442,3 +443,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep the documentation gate fail closed when adding action or target types, changing deferred-card dispositions, or moving executable tests. Do not broaden snapshot immutability into a recursive-freeze claim or deterministic replay beyond the same recorded `EngineExecutionContext`.
 - **Unresolved:** No Backlog or Todo ticket remains in the Action Plan. The audit intentionally preserves residual platform risks for player-stoppable loops, generic secret-to-secret reveal/order rules, scoped snapshot immutability, and the one-checkpoint undo/history policy; these are documented risks, not hidden project deferrals.
 - **Pointer:** Full `pnpm verify` passes with 615 app tests, 1,612 worker tests at 79.05% statement / 69.15% branch coverage, 2,319 validated schemas, 3,574 authored action uses with 73/73 handled and executed, and a production build.
+
+### OPT-497 → Project closure
+**From:** session on 2026-07-14 · **Commit:** `4fff01a` · **PR:** [#314](https://github.com/corycunanan/optcg-sim/pull/314)
+
+- **Primer:** `game:update` now includes the raw action only for the player who submitted it. The opponent receives the same individually filtered state with no action field, closing hidden-zone identity and ordering leaks for every prompt response.
+- **Read first:** `workers/game/src/GameSession.ts` (`broadcastGameUpdate`), `workers/game/src/session/transport.ts`, `shared/game-types.ts`, and `workers/game/src/__tests__/opt-337-authoritative-socket.test.ts`.
+- **Gotchas / do NOT touch:** Keep state-bearing updates on `broadcastFilteredState`; future recipient-specific metadata must use its player-index callback rather than a shared closure. `game:update.action` is optional on the client protocol because an opponent update intentionally omits it.
+- **Unresolved:** None. Review the full socket payload rather than only the visible state whenever adding a new broadcast field.
+- **Pointer:** `4fff01a`; `pnpm verify` passes with 615 app tests, 1,613 worker tests with coverage, schema checks, and a production build.
