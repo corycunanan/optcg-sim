@@ -23,7 +23,6 @@ import { resolveEffect, resolverExecutionServices } from "./effect-resolver/inde
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
-import type { EffectSchema } from "./effect-types.js";
 import { emitPendingEvent } from "./events.js";
 import { transitionCard, transitionDetachedCard } from "./zone-transition.js";
 import { allocateEngineId, takeEngineTimestamp } from "./execution-context.js";
@@ -283,7 +282,7 @@ export function executeRevealTrigger(
   reveal: boolean,
   cardDb: Map<string, CardData>,
 ): ExecuteResult {
-  const battle = state.turn.battle as typeof state.turn.battle & { pendingTriggerLifeCard?: LifeCard };
+  const battle = state.turn.battle;
   // OPT-259 (F6): effect-sourced damage parks its pending Trigger on turn
   // state rather than battle state. Route to the effect-damage resolver when
   // no battle trigger is pending.
@@ -330,7 +329,7 @@ export function executeRevealTrigger(
         payload: { cardId: lifeCard.cardId, cardInstanceId: triggerInstanceId },
       });
     }
-    const schema = triggerCardData?.effectSchema as EffectSchema | null;
+    const schema = triggerCardData?.effectSchema;
     if (schema?.effects) {
       const triggerBlock = schema.effects.find(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
@@ -428,7 +427,7 @@ export function executeRevealTrigger(
   // (OPT-239 / qa_rules.md:229-231). If the Character was not DA, or we just
   // dealt the final damage, the continuation will exit via endBattle.
   const cleanedBattle = { ...battle };
-  delete (cleanedBattle as Partial<typeof cleanedBattle & { pendingTriggerLifeCard?: LifeCard }>).pendingTriggerLifeCard;
+  delete cleanedBattle.pendingTriggerLifeCard;
   const remainingBefore = cleanedBattle.damagesRemaining ?? 1;
   cleanedBattle.damagesRemaining = Math.max(0, remainingBefore - 1);
   nextState = { ...nextState, turn: { ...nextState.turn, battle: cleanedBattle } };
@@ -496,7 +495,7 @@ function executeRevealEffectDamageTrigger(
         payload: { cardId: lifeCard.cardId, cardInstanceId: triggerInstanceId },
       });
     }
-    const schema = triggerCardData?.effectSchema as EffectSchema | null;
+    const schema = triggerCardData?.effectSchema;
     if (schema?.effects) {
       const triggerBlock = schema.effects.find(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
@@ -1161,7 +1160,7 @@ export function canOfferTrigger(
   const cardData = cardDb.get(cardId);
   if (!cardData || !hasTrigger(cardData)) return false;
 
-  const schema = cardData.effectSchema as EffectSchema | null;
+  const schema = cardData.effectSchema;
   const block = schema?.effects?.find(
     (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
   );

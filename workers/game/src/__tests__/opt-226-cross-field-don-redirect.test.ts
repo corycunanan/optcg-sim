@@ -26,8 +26,15 @@
 import { describe, it, expect } from "vitest";
 import { attachDonToCard } from "../engine/effect-resolver/card-mutations.js";
 import { executeGiveOpponentDonToOpponent } from "../engine/effect-resolver/actions/don.js";
-import type { CardData, CardInstance, DonInstance, GameState, PlayerState, KeywordSet } from "../types.js";
-import type { Action } from "../engine/effect-types.js";
+import type {
+  CardData,
+  CardInstance,
+  DonInstance,
+  GameState,
+  PlayerState,
+  KeywordSet,
+} from "../types.js";
+import type { ActionOf } from "../engine/effect-types.js";
 import { createDeterministicExecutionContext } from "../engine/execution-context.js";
 
 // ─── Factories ──────────────────────────────────────────────────────────────
@@ -211,11 +218,11 @@ describe("OPT-226: GIVE_OPPONENT_DON_TO_OPPONENT source_filter honors FAQ ruling
 
   it("default (no source_filter) → picks a RESTED DON (OP15-008 pattern)", () => {
     const state = oneOnOneField();
-    const action: Action = {
+    const action: ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT"> = {
       type: "GIVE_OPPONENT_DON_TO_OPPONENT",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
       params: { amount: 1 },
-    } as unknown as Action;
+    };
 
     const res = executeGiveOpponentDonToOpponent(state, action, "src", 0, cardDb, new Map(), ["p1c1"]);
     expect(res.succeeded).toBe(true);
@@ -231,11 +238,11 @@ describe("OPT-226: GIVE_OPPONENT_DON_TO_OPPONENT source_filter honors FAQ ruling
     const state = oneOnOneField();
     state.players[1].donCostArea = [makeDon("p1-active", "ACTIVE"), makeDon("p1-rested", "RESTED")];
 
-    const action: Action = {
+    const action: ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT"> = {
       type: "GIVE_OPPONENT_DON_TO_OPPONENT",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
       params: { amount: 1, source_filter: { is_rested: false } },
-    } as unknown as Action;
+    };
 
     const res = executeGiveOpponentDonToOpponent(state, action, "src", 0, cardDb, new Map(), ["p1c1"]);
     expect(res.succeeded).toBe(true);
@@ -253,11 +260,11 @@ describe("OPT-226: GIVE_OPPONENT_DON_TO_OPPONENT source_filter honors FAQ ruling
     p1.characters[0] = p1Char;
     const state = makeState(p0, p1);
 
-    const action: Action = {
+    const action: ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT"> = {
       type: "GIVE_OPPONENT_DON_TO_OPPONENT",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
       params: { amount: 1, source_filter: { is_rested: true } },
-    } as unknown as Action;
+    };
 
     const res = executeGiveOpponentDonToOpponent(state, action, "src", 0, cardDb, new Map(), ["p1c1"]);
     expect(res.succeeded).toBe(false);
@@ -276,11 +283,11 @@ describe("OPT-226: GIVE_OPPONENT_DON_TO_OPPONENT source_filter honors FAQ ruling
     p1.characters[0] = p1Char;
     const state = makeState(p0, p1);
 
-    const action: Action = {
+    const action: ActionOf<"GIVE_OPPONENT_DON_TO_OPPONENT"> = {
       type: "GIVE_OPPONENT_DON_TO_OPPONENT",
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
       params: { amount: 3, source_filter: { is_rested: true } },
-    } as unknown as Action;
+    };
 
     const res = executeGiveOpponentDonToOpponent(state, action, "src", 0, cardDb, new Map(), ["p1c1"]);
     // Only 2 rested DONs available — we attach 2 and stop; the ACTIVE one stays.

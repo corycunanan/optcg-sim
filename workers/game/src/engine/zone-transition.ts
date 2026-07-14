@@ -15,7 +15,6 @@ import type {
   PlayerState,
   Zone,
 } from "../types.js";
-import type { RuntimeActiveEffect, RuntimeProhibition } from "./effect-types.js";
 import { allocateEngineId } from "./execution-context.js";
 
 export type CardZone = Exclude<Zone, "COST_AREA" | "DON_DECK">;
@@ -201,7 +200,7 @@ function stripOldIdentity(
   oldId: string,
   preserveSourceTriggers: boolean,
 ): GameState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const activeEffects = effects.flatMap((effect) => {
     if (
       effect.sourceCardInstanceId === oldId &&
@@ -212,7 +211,7 @@ function stripOldIdentity(
     const dynamic = effect.modifiers.some((modifier) => modifier.target?.type !== undefined && modifier.target.type !== "SELF");
     return appliesTo.length > 0 || dynamic ? [{ ...effect, appliesTo }] : [];
   });
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   const nextProhibitions = prohibitions.flatMap((prohibition) => {
     if (prohibition.sourceCardInstanceId === oldId && prohibition.duration.type === "PERMANENT") return [];
     if (!prohibition.appliesTo.includes(oldId)) return [prohibition];
@@ -221,8 +220,8 @@ function stripOldIdentity(
   });
   return {
     ...state,
-    activeEffects: activeEffects as GameState["activeEffects"],
-    prohibitions: nextProhibitions as GameState["prohibitions"],
+    activeEffects,
+    prohibitions: nextProhibitions,
     triggerRegistry: preserveSourceTriggers
       ? state.triggerRegistry
       : state.triggerRegistry.filter((trigger) => trigger.sourceCardInstanceId !== oldId),

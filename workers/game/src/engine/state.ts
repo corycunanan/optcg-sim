@@ -16,6 +16,7 @@ import type {
 } from "../types.js";
 import { filterEventForPlayer, filterPromptForPlayer } from "./visibility.js";
 import { transitionCard } from "./zone-transition.js";
+import { isPresent } from "./type-guards.js";
 export { moveCard } from "./zone-transition.js";
 
 // ─── Player accessors ─────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ export function findCardInState(
     const idx = pi as 0 | 1;
     const allCards = [
       player.leader,
-      ...player.characters.filter(Boolean) as CardInstance[],
+      ...player.characters.filter(isPresent),
       ...(player.stage ? [player.stage] : []),
       ...player.hand,
       ...player.deck,

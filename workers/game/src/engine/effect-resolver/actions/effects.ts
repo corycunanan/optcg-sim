@@ -4,19 +4,36 @@
  */
 
 import type {
-  Action,
+  ActionOf,
   EffectResult,
+  ProhibitionType,
   RuntimeActiveEffect,
+  RuntimeOneTimeModifier,
+  RuntimeProhibition,
+  RuntimeScheduledAction,
 } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { resolveAmount, computeExpiry, computeProhibitionExpiry } from "../action-utils.js";
-import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
-import { allocateEngineId, allocateEngineRecord } from "../../execution-context.js";
+import {
+  resolveAmount,
+  computeExpiry,
+  computeProhibitionExpiry,
+  getActionParams,
+} from "../action-utils.js";
+import {
+  computeAllValidTargets,
+  autoSelectTargets,
+  needsPlayerTargetSelection,
+  buildSelectTargetPrompt,
+} from "../target-resolver.js";
+import {
+  allocateEngineId,
+  allocateEngineRecord,
+} from "../../execution-context.js";
 
 export function executeApplyProhibition(
   state: GameState,
-  action: Action,
+  action: ActionOf<"APPLY_PROHIBITION">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -24,8 +41,7 @@ export function executeApplyProhibition(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const prohibType = params.prohibition_type as string;
+  const params = getActionParams(action, "APPLY_PROHIBITION");
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
   // Player-level prohibitions (e.g., CANNOT_PLAY_FROM_HAND) have no card targets;
@@ -41,22 +57,25 @@ export function executeApplyProhibition(
   }
 
   const allocated = allocateEngineId(state, "prohibition");
-  const prohibition: import("../../effect-types.js").RuntimeProhibition = {
+  const prohibition: RuntimeProhibition = {
     id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
-    prohibitionType: prohibType as any,
-    scope: params.scope as any ?? {},
+    prohibitionType: params.prohibition_type,
+    scope: params.scope ?? {},
     duration,
     expiresAt: computeProhibitionExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
     usesRemaining: null,
-    conditionalOverride: params.conditional_override as any,
+    conditionalOverride: params.conditional_override,
   };
 
   return {
-    state: { ...allocated.state, prohibitions: [...state.prohibitions, prohibition as any] },
+    state: {
+      ...allocated.state,
+      prohibitions: [...state.prohibitions, prohibition],
+    },
     events,
     succeeded: true,
   };
@@ -64,30 +83,30 @@ export function executeApplyProhibition(
 
 export function executeScheduleAction(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SCHEDULE_ACTION">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const timing = (params.timing as string) ?? "END_OF_THIS_TURN";
-  const scheduledAction = params.action as Action;
-  const boundTo = params.bound_to as string | null ?? null;
+  const params = getActionParams(action, "SCHEDULE_ACTION");
 
   const allocated = allocateEngineId(state, "scheduled-action");
-  const entry: import("../../effect-types.js").RuntimeScheduledAction = {
+  const entry: RuntimeScheduledAction = {
     id: allocated.id,
-    timing: timing as any,
-    action: scheduledAction,
-    boundToInstanceId: boundTo,
+    timing: params.timing ?? "END_OF_THIS_TURN",
+    action: params.action,
+    boundToInstanceId: params.bound_to ?? null,
     sourceEffectId: sourceCardInstanceId,
     controller,
   };
 
   return {
-    state: { ...allocated.state, scheduledActions: [...state.scheduledActions, entry as any] },
+    state: {
+      ...allocated.state,
+      scheduledActions: [...state.scheduledActions, entry],
+    },
     events,
     succeeded: true,
   };
@@ -95,32 +114,34 @@ export function executeScheduleAction(
 
 export function executeApplyOneTimeModifier(
   state: GameState,
-  action: Action,
+  action: ActionOf<"APPLY_ONE_TIME_MODIFIER">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const modification = params.modification as import("../../effect-types.js").Modifier;
-  const appliesTo = params.applies_to as { action: string; filter?: import("../../effect-types.js").TargetFilter };
+  const params = getActionParams(action, "APPLY_ONE_TIME_MODIFIER");
   const expires = action.duration ?? { type: "THIS_TURN" as const };
 
-  if (!modification || !appliesTo) return { state, events, succeeded: false };
+  if (!params.modification || !params.applies_to)
+    return { state, events, succeeded: false };
 
   const allocated = allocateEngineId(state, "one-time-modifier");
-  const otm: import("../../effect-types.js").RuntimeOneTimeModifier = {
+  const otm: RuntimeOneTimeModifier = {
     id: allocated.id,
-    appliesTo: appliesTo as any,
-    modification,
+    appliesTo: params.applies_to,
+    modification: params.modification,
     expires,
     consumed: false,
     controller,
   };
 
   return {
-    state: { ...allocated.state, oneTimeModifiers: [...state.oneTimeModifiers, otm as any] },
+    state: {
+      ...allocated.state,
+      oneTimeModifiers: [...state.oneTimeModifiers, otm],
+    },
     events,
     succeeded: true,
   };
@@ -130,7 +151,7 @@ export function executeApplyOneTimeModifier(
 
 export function executeSetCost(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SET_COST">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -138,8 +159,14 @@ export function executeSetCost(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const value = resolveAmount(params.value as number | { type: string }, resultRefs, state, controller, cardDb);
+  const params = getActionParams(action, "SET_COST");
+  const value = resolveAmount(
+    params.value,
+    resultRefs,
+    state,
+    controller,
+    cardDb
+  );
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
@@ -155,7 +182,7 @@ export function executeSetCost(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_COST" as any, params: { value }, duration }],
+    modifiers: [{ type: "SET_COST", params: { value }, duration }],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -164,7 +191,10 @@ export function executeSetCost(
   };
 
   return {
-    state: { ...allocated.state, activeEffects: [...state.activeEffects, effect as any] },
+    state: {
+      ...allocated.state,
+      activeEffects: [...state.activeEffects, effect],
+    },
     events,
     succeeded: true,
     result: { targetInstanceIds: targetIds, count: targetIds.length },
@@ -175,7 +205,7 @@ export function executeSetCost(
 
 export function executeWinGame(
   state: GameState,
-  _action: Action,
+  _action: ActionOf<"WIN_GAME">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -185,7 +215,7 @@ export function executeWinGame(
   events.push({ type: "GAME_OVER", playerIndex: controller, payload: { reason: "card_effect" } });
 
   return {
-    state: { ...state, status: "FINISHED" as any, winner: controller },
+    state: { ...state, status: "FINISHED", winner: controller },
     events,
     succeeded: true,
   };
@@ -195,50 +225,52 @@ export function executeWinGame(
 
 export function executeNegateTriggerType(
   state: GameState,
-  action: Action,
+  action: ActionOf<"NEGATE_TRIGGER_TYPE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const triggerType = params.trigger_type as import("../../effect-types.js").KeywordTriggerType;
-  const affectedController = params.affected_controller as string ?? "OPPONENT";
+  const params = getActionParams(action, "NEGATE_TRIGGER_TYPE");
+  const triggerType = params.trigger_type;
+  const affectedController = params.affected_controller ?? "OPPONENT";
   const duration = action.duration ?? { type: "THIS_TURN" as const };
 
   // Map trigger type to prohibition type. The prohibitionType is informational
   // here — OPT-260 wires trigger-type negation through the scope.triggerType
   // check in matchTriggersForEvent, so any non-null trigger-type prohibition
   // is consumed by its scope, not by its type.
-  const prohibMap: Record<string, string> = {
-    "ON_PLAY": "CANNOT_ACTIVATE_ON_PLAY",
-    "WHEN_ATTACKING": "CANNOT_ACTIVATE_EFFECT",
-    "ON_KO": "CANNOT_ACTIVATE_EFFECT",
-    "BLOCKER": "CANNOT_ACTIVATE_BLOCKER",
+  const prohibMap: Partial<Record<typeof triggerType, ProhibitionType>> = {
+    ON_PLAY: "CANNOT_ACTIVATE_ON_PLAY",
+    WHEN_ATTACKING: "CANNOT_ACTIVATE_EFFECT",
+    ON_KO: "CANNOT_ACTIVATE_EFFECT",
   };
   const prohibType = prohibMap[triggerType] ?? "CANNOT_ACTIVATE_EFFECT";
 
   const targetController = affectedController === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
 
   const allocated = allocateEngineId(state, "prohibition");
-  const prohibition: import("../../effect-types.js").RuntimeProhibition = {
+  const prohibition: RuntimeProhibition = {
     id: allocated.id,
     sourceCardInstanceId,
     sourceEffectBlockId: "",
-    prohibitionType: prohibType as any,
+    prohibitionType: prohibType,
     scope: { triggerType },
     duration,
     // Anchor expiry to the caster ("your ... turn" in card text), not the
     // affected player stored in `controller`.
     expiresAt: computeProhibitionExpiry(duration, state, controller),
-    controller: targetController as 0 | 1,
+    controller: targetController,
     appliesTo: [],
     usesRemaining: null,
   };
 
   return {
-    state: { ...allocated.state, prohibitions: [...state.prohibitions, prohibition as any] },
+    state: {
+      ...allocated.state,
+      prohibitions: [...state.prohibitions, prohibition],
+    },
     events,
     succeeded: true,
   };
@@ -248,7 +280,7 @@ export function executeNegateTriggerType(
 
 export function executeExtraTurn(
   state: GameState,
-  _action: Action,
+  _action: ActionOf<"EXTRA_TURN">,
   _sourceCardInstanceId: string,
   _controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -260,7 +292,11 @@ export function executeExtraTurn(
     extraTurnsPending: (state.turn.extraTurnsPending ?? 0) + 1,
   };
 
-  events.push({ type: "EXTRA_TURN_GRANTED", playerIndex: state.turn.activePlayerIndex as 0 | 1, payload: {} });
+  events.push({
+    type: "EXTRA_TURN_GRANTED",
+    playerIndex: state.turn.activePlayerIndex,
+    payload: {},
+  });
 
   return {
     state: { ...state, turn: newTurn },

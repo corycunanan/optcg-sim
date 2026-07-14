@@ -13,15 +13,14 @@
  *     simultaneous same-player group (§8-6)
  */
 
-import type { Action, Cost, EffectBlock, EffectResult } from "../../effect-types.js";
-import { isOncePerTurnBlock } from "../../effect-types.js";
+import type { EffectResult } from "../../effect-types.js";
+import { getActionParams, isOncePerTurnBlock } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
   GameAction,
   PendingEvent,
   EffectStackFrame,
-  QueuedTrigger,
   ResumeContext,
 } from "../../../types.js";
 import { popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
@@ -116,8 +115,8 @@ export function handlePlayerChoiceStateDistribution(
   if (actionResult.pendingPrompt) {
     return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt } };
   }
-  if (actionResult.result && (pausedAction as any).result_ref) {
-    resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+  if (actionResult.result && pausedAction.result_ref) {
+    resultRefs.set(pausedAction.result_ref, actionResult.result);
   }
 
   // Fall through to remainingActions processing below.
@@ -206,7 +205,7 @@ export function handlePlayerChoiceBranch(
   }
 
   let nextState = state;
-  const options = (pausedAction.params?.options as Action[][]) ?? [];
+  const options = getActionParams(pausedAction, pausedAction.type).options;
   const chosenIndex = parseInt(action.choiceId, 10);
   const chosenBranch = options[chosenIndex];
   if (chosenBranch) {
@@ -222,11 +221,11 @@ export function handlePlayerChoiceBranch(
     events.push(...branchResult.events);
 
     if (branchResult.pendingPrompt) {
-      const replacementFrame = peekFrame(nextState) as EffectStackFrame | null;
+      const replacementFrame = peekFrame(nextState);
       if (replacementFrame && remainingActions.length > 0) {
         nextState = updateTopFrame(nextState, {
           remainingActions: [
-            ...(replacementFrame.remainingActions as Action[]),
+            ...replacementFrame.remainingActions,
             ...remainingActions,
           ],
         });
@@ -247,9 +246,7 @@ export function handlePlayerChoiceBranch(
 function popFrameById(state: GameState, frameId: string): GameState {
   return {
     ...state,
-    effectStack: state.effectStack.filter(
-      (f) => (f as unknown as EffectStackFrame).id !== frameId,
-    ) as GameState["effectStack"],
+    effectStack: state.effectStack.filter((frame) => frame.id !== frameId),
   };
 }
 
@@ -268,8 +265,11 @@ export function handleAwaitingOptionalResponse(
   const events: PendingEvent[] = [];
   let nextState = state;
 
-  if (action.type === "PASS" || (action.type === "PLAYER_CHOICE" && action.choiceId === "skip")) {
-    const declinedBlock = topFrame.effectBlock as EffectBlock;
+  if (
+    action.type === "PASS" ||
+    (action.type === "PLAYER_CHOICE" && action.choiceId === "skip")
+  ) {
+    const declinedBlock = topFrame.effectBlock;
     nextState = popFrame(nextState);
     if (declinedBlock.flags?.lock_on_decline) {
       nextState = markOncePerTurnUsed(nextState, declinedBlock.id, sourceCardInstanceId);
@@ -277,12 +277,18 @@ export function handleAwaitingOptionalResponse(
     return processRemainingTriggers(nextState, topFrame.pendingTriggers, cardDb);
   }
 
-  const block = topFrame.effectBlock as EffectBlock;
+  const block = topFrame.effectBlock;
   let costRefs: Map<string, EffectResult> | undefined;
   if (topFrame.costs.length > 0) {
     const costResult = payCostsWithSelection(
-      nextState, topFrame.costs as Cost[], 0, controller, cardDb,
-      sourceCardInstanceId, block, resolverExecutionServices,
+      nextState,
+      topFrame.costs,
+      0,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      block,
+      resolverExecutionServices
     );
 
     if (costResult.cannotPay) {
@@ -301,7 +307,7 @@ export function handleAwaitingOptionalResponse(
     }
 
     if (costResult.pendingPrompt) {
-      const newTop = peekFrame(nextState) as EffectStackFrame;
+      const newTop = peekFrame(nextState);
       if (newTop && newTop.id !== topFrame.id) {
         nextState = popFrameById(nextState, topFrame.id);
         nextState = updateTopFrame(nextState, {
@@ -324,7 +330,7 @@ export function handleAwaitingOptionalResponse(
   // queue exactly as they do when the same cost pays inside a pipeline run.
   // Same filter as resume/cost.ts: the count-only CARD_TRASHED bookkeeping
   // event carries no instance id and must not reach trigger matching.
-  let pendingTriggers = topFrame.pendingTriggers as QueuedTrigger[];
+  let pendingTriggers = topFrame.pendingTriggers;
   if (events.length > 0) {
     const scannable = events.filter((e) =>
       e.type !== "CARD_TRASHED" ||
@@ -348,13 +354,11 @@ export function handleAwaitingOptionalResponse(
   }
 
   if (topFrame.remainingActions.length > 0) {
-    const actionRefs = new Map<string, EffectResult>(
-      topFrame.resultRefs.map(([key, value]) => [key, value as EffectResult]),
-    );
+    const actionRefs = new Map<string, EffectResult>(topFrame.resultRefs);
     for (const [key, value] of costRefs ?? []) actionRefs.set(key, value);
     const chainResult = executeActionChain(
       nextState,
-      topFrame.remainingActions as Action[],
+      topFrame.remainingActions,
       sourceCardInstanceId,
       controller,
       cardDb,
@@ -364,7 +368,7 @@ export function handleAwaitingOptionalResponse(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
-      const newTop = peekFrame(nextState) as EffectStackFrame;
+      const newTop = peekFrame(nextState);
       if (newTop) {
         nextState = updateTopFrame(nextState, { pendingTriggers });
       }
@@ -400,8 +404,8 @@ export function handleAwaitingTriggerOrderSelection(
   const events: PendingEvent[] = [];
   let nextState = state;
 
-  const simultaneous = (topFrame.simultaneousTriggers ?? []) as QueuedTrigger[];
-  const savedPendingTriggers = topFrame.pendingTriggers as QueuedTrigger[];
+  const simultaneous = topFrame.simultaneousTriggers;
+  const savedPendingTriggers = topFrame.pendingTriggers;
 
   // "Done" — player opted to skip remaining optional triggers
   if (action.type === "PLAYER_CHOICE" && action.choiceId === "done") {
@@ -428,7 +432,7 @@ export function handleAwaitingTriggerOrderSelection(
   // Resolve the chosen trigger
   const result = resolveEffect(
     nextState,
-    chosenTrigger.effectBlock as EffectBlock,
+    chosenTrigger.effectBlock,
     chosenTrigger.sourceCardInstanceId,
     chosenTrigger.controller,
     cardDb,
@@ -441,7 +445,7 @@ export function handleAwaitingTriggerOrderSelection(
   // Merge simultaneousTriggers into pendingTriggers so processRemainingTriggers
   // will re-detect the 2+ same-player group and re-prompt for ordering.
   if (result.pendingPrompt) {
-    const newTop = peekFrame(nextState) as EffectStackFrame | null;
+    const newTop = peekFrame(nextState);
     if (newTop) {
       nextState = updateTopFrame(nextState, {
         pendingTriggers: [...remaining, ...savedPendingTriggers],
@@ -473,7 +477,7 @@ export function handleAwaitingTriggerOrderSelection(
       nextState = nestedResult.state;
       // nestedResult.events already includes our prior events (passed as priorEvents)
       if (nestedResult.pendingPrompt) {
-        const newTop = peekFrame(nextState) as EffectStackFrame | null;
+        const newTop = peekFrame(nextState);
         if (newTop) {
           nextState = updateTopFrame(nextState, {
             pendingTriggers: [...remaining, ...savedPendingTriggers],
@@ -499,7 +503,7 @@ export function handleAwaitingTriggerOrderSelection(
     // Auto-resolve the last one
     const lastResult = resolveEffect(
       nextState,
-      remaining[0].effectBlock as EffectBlock,
+      remaining[0].effectBlock,
       remaining[0].sourceCardInstanceId,
       remaining[0].controller,
       cardDb,
@@ -508,7 +512,7 @@ export function handleAwaitingTriggerOrderSelection(
     events.push(...lastResult.events);
 
     if (lastResult.pendingPrompt) {
-      const newTop = peekFrame(nextState) as EffectStackFrame | null;
+      const newTop = peekFrame(nextState);
       if (newTop) {
         nextState = updateTopFrame(nextState, {
           pendingTriggers: savedPendingTriggers,
@@ -538,7 +542,7 @@ export function handleAwaitingTriggerOrderSelection(
         const nestedResult = processRemainingTriggers(nextState, scanResult2.triggers, cardDb, events);
         nextState = nestedResult.state;
         if (nestedResult.pendingPrompt) {
-          const newTop = peekFrame(nextState) as EffectStackFrame | null;
+          const newTop = peekFrame(nextState);
           if (newTop) {
             nextState = updateTopFrame(nextState, { pendingTriggers: savedPendingTriggers });
           }

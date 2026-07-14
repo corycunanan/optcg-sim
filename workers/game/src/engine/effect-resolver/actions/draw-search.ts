@@ -2,8 +2,14 @@
  * Action handlers: DRAW, SEARCH_DECK, SEARCH_TRASH_THE_REST, FULL_DECK_SEARCH, DECK_SCRY, MILL
  */
 
-import type { Action, EffectResult, TargetFilter } from "../../effect-types.js";
-import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
+import type { ActionOf, EffectResult } from "../../effect-types.js";
+import type {
+  CardData,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+  ResumeContext,
+} from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
 import { resolveAmount } from "../action-utils.js";
@@ -14,7 +20,7 @@ import { shuffleWithEngineContext } from "../../execution-context.js";
 
 export function executeDraw(
   state: GameState,
-  action: Action,
+  action: ActionOf<"DRAW">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -22,7 +28,7 @@ export function executeDraw(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "DRAW");
-  const amount = resolveAmount(p.amount as number | { type: string }, resultRefs, state, controller, cardDb);
+  const amount = resolveAmount(p.amount, resultRefs, state, controller, cardDb);
   if (amount <= 0) return { state, events, succeeded: false };
 
   const player = state.players[controller];
@@ -53,7 +59,7 @@ export function executeDraw(
 
 export function executeSearchDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SEARCH_DECK">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -61,8 +67,8 @@ export function executeSearchDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p_ = getActionParams(action, "SEARCH_DECK");
-  const lookAt = (p_.look_at as number) ?? 5;
-  const filter = (p_.filter ?? {}) as TargetFilter;
+  const lookAt = p_.look_at ?? 5;
+  const filter = p_.filter ?? {};
   const restDest = p_.rest_destination ?? "BOTTOM";
 
   const p = state.players[controller];
@@ -86,7 +92,7 @@ export function executeSearchDeck(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
@@ -106,17 +112,17 @@ export function executeSearchDeck(
 
 export function executeSearchTrashTheRest(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SEARCH_TRASH_THE_REST">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const p_ = action.params ?? {};
-  const lookAt = (p_.look_at as number) ?? 5;
-  const filter = (p_.filter ?? {}) as TargetFilter;
-  const restDest = (p_.rest_destination as string) ?? "TRASH";
+  const p_ = getActionParams(action, "SEARCH_TRASH_THE_REST");
+  const lookAt = p_.look_at ?? 5;
+  const filter = p_.filter ?? {};
+  const restDest = p_.rest_destination ?? "TRASH";
 
   const p = state.players[controller];
   const topCards = p.deck.slice(0, Math.min(lookAt, p.deck.length));
@@ -139,7 +145,7 @@ export function executeSearchTrashTheRest(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
@@ -160,15 +166,21 @@ export function executeSearchTrashTheRest(
 
 export function executeMill(
   state: GameState,
-  action: Action,
+  action: ActionOf<"MILL">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "MILL");
-  const amount = p.amount ?? 1;
+  const amount = resolveAmount(
+    p.amount ?? 1,
+    resultRefs,
+    state,
+    controller,
+    cardDb
+  );
   const player = state.players[controller];
   const millCount = Math.min(amount, player.deck.length);
   if (millCount === 0) return { state, events, succeeded: false };
@@ -196,7 +208,7 @@ export function executeMill(
 
 export function executeFullDeckSearch(
   state: GameState,
-  action: Action,
+  action: ActionOf<"FULL_DECK_SEARCH">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -204,7 +216,7 @@ export function executeFullDeckSearch(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const fds = getActionParams(action, "FULL_DECK_SEARCH");
-  const filter = (fds.filter ?? {}) as TargetFilter;
+  const filter = fds.filter ?? {};
   const shuffleAfter = fds.shuffle_after ?? true;
 
   const p = state.players[controller];
@@ -236,7 +248,7 @@ export function executeFullDeckSearch(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
@@ -256,7 +268,7 @@ export function executeFullDeckSearch(
 
 export function executeDeckScry(
   state: GameState,
-  action: Action,
+  action: ActionOf<"DECK_SCRY">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -280,7 +292,7 @@ export function executeDeckScry(
     controller,
     pausedAction: action,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: [],
   };
   const pendingPrompt: PendingPromptState = {

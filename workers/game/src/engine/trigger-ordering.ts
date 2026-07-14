@@ -6,7 +6,6 @@
 
 import type { CardData, GameState, PendingPromptState, PendingEvent } from "../types.js";
 import type { QueuedTrigger, EffectStackFrame } from "../types.js";
-import type { EffectBlock } from "./effect-types.js";
 import {
   matchTriggersForEvent,
   orderMatchedTriggers,
@@ -108,14 +107,14 @@ export function buildTriggerSelectionPrompt(
     const cardData = card ? cardDb.get(card.cardId) : null;
     const cardName = cardData?.name ?? "Unknown Card";
     const effectDesc = cardData
-      ? extractEffectDescription(cardData.effectText, t.effectBlock as EffectBlock)
+      ? extractEffectDescription(cardData.effectText, t.effectBlock)
       : "Activate effect";
     return { id: String(i), label: `${cardName}: ${effectDesc}` };
   });
 
   // Add "Done" option if all remaining triggers are optional
   const allOptional = triggers.every(
-    t => (t.effectBlock as EffectBlock).flags?.optional === true,
+    (t) => t.effectBlock.flags?.optional === true
   );
   if (allOptional) {
     choices.push({ id: "done", label: "Done — skip remaining triggers" });
@@ -126,7 +125,7 @@ export function buildTriggerSelectionPrompt(
     id: frameId.id,
     sourceCardInstanceId: triggers[0].sourceCardInstanceId,
     controller,
-    effectBlock: triggers[0].effectBlock as EffectBlock,
+    effectBlock: triggers[0].effectBlock,
     phase: "AWAITING_TRIGGER_ORDER_SELECTION",
     pausedAction: null,
     remainingActions: [],

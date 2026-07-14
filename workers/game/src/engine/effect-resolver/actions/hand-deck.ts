@@ -3,7 +3,7 @@
  * SHUFFLE_DECK, REVEAL, REVEAL_HAND, SEARCH_AND_PLAY
  */
 
-import type { Action, EffectResult } from "../../effect-types.js";
+import type { ActionOf, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
@@ -15,7 +15,7 @@ import { shuffleWithEngineContext } from "../../execution-context.js";
 
 export function executePlaceHandToDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"PLACE_HAND_TO_DECK">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -24,8 +24,8 @@ export function executePlaceHandToDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
+  const amount = params.amount ?? 1;
+  const position = params.position === "TOP" ? "TOP" : "BOTTOM";
 
   const p = state.players[controller];
   if (p.hand.length === 0) return { state, events, succeeded: false };
@@ -74,7 +74,7 @@ export function executePlaceHandToDeck(
 
 export function executeReturnHandToDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"RETURN_HAND_TO_DECK">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -82,7 +82,7 @@ export function executeReturnHandToDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const position = (params.position as "TOP" | "BOTTOM") ?? "BOTTOM";
+  const position = params.position ?? "BOTTOM";
   const p = state.players[controller];
   if (p.hand.length === 0) return { state, events, succeeded: false };
 
@@ -103,7 +103,7 @@ export function executeReturnHandToDeck(
 
 export function executeHandWheel(
   state: GameState,
-  action: Action,
+  action: ActionOf<"HAND_WHEEL">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -111,8 +111,20 @@ export function executeHandWheel(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const trashCount = resolveAmount(params.trash_count as number | { type: string }, resultRefs, state, controller, cardDb) || (params.amount as number) || 0;
-  const drawCount = resolveAmount(params.draw_count as number | { type: string }, resultRefs, state, controller, cardDb) || (params.amount as number) || 0;
+  const trashCount = resolveAmount(
+    params.trash_count ?? params.amount ?? 0,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
+  const drawCount = resolveAmount(
+    params.draw_count ?? params.amount ?? 0,
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+  );
 
   const p = state.players[controller];
 
@@ -157,16 +169,19 @@ export function executeHandWheel(
 
 export function executeShuffleDeck(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SHUFFLE_DECK">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const targetController = (action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
   const p = state.players[targetController];
   const shuffled = shuffleWithEngineContext(state, p.deck);
   const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
@@ -181,7 +196,7 @@ export function executeShuffleDeck(
 
 export function executeReveal(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REVEAL">,
   _sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -189,15 +204,18 @@ export function executeReveal(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const source = (params.source as string) ?? "DECK";
+  const amount = params.amount ?? 1;
+  const source = params.source ?? "DECK";
   // "BOTH" = reveal (both players see), "CONTROLLER_ONLY" = look at (private peek)
   const visibility = params.visibility === "CONTROLLER_ONLY" ? "CONTROLLER_ONLY" : "BOTH";
 
   // Resolve which player's zone to reveal from
-  const targetController = (action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
 
   if (source === "DECK" || source === "DECK_TOP") {
     const p = state.players[targetController];
@@ -271,7 +289,7 @@ export function executeReveal(
 
 export function executeRevealHand(
   state: GameState,
-  action: Action,
+  action: ActionOf<"REVEAL_HAND">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
@@ -279,10 +297,13 @@ export function executeRevealHand(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = (params.amount as number) ?? 1;
-  const targetController = (action.target?.controller === "OPPONENT")
-    ? (controller === 0 ? 1 : 0) as 0 | 1
-    : controller;
+  const amount = params.amount ?? 1;
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
   const p = state.players[targetController];
 
   if (p.hand.length === 0) return { state, events, succeeded: false };
@@ -297,7 +318,7 @@ export function executeRevealHand(
       controller,
       pausedAction: action,
       remainingActions: [],
-      resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+      resultRefs: [...resultRefs.entries()],
       validTargets,
     };
 
@@ -340,7 +361,7 @@ export function executeRevealHand(
 
 export function executeSearchAndPlay(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SEARCH_AND_PLAY">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -348,7 +369,7 @@ export function executeSearchAndPlay(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const sap = getActionParams(action, "SEARCH_AND_PLAY");
-  const lookAt = (sap.look_at as number) ?? 5;
+  const lookAt = sap.look_at ?? 5;
   const filter = sap.filter ?? {};
   const restDest = sap.rest_destination ?? "BOTTOM";
   const searchFullDeck = sap.search_full_deck ?? false;
@@ -400,7 +421,7 @@ export function executeSearchAndPlay(
     controller,
     pausedAction: taggedAction,
     remainingActions: [],
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets,
   };
   const pendingPrompt: PendingPromptState = {
@@ -410,7 +431,12 @@ export function executeSearchAndPlay(
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
       validTargets,
-      maxKeep: sap.pick?.up_to ?? 1,
+      maxKeep:
+        sap.pick && "up_to" in sap.pick
+          ? sap.pick.up_to
+          : sap.pick && "exact" in sap.pick
+            ? sap.pick.exact
+            : validTargets.length,
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,

@@ -7,6 +7,7 @@ import type { CardData, CardInstance, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
 import { findCardInstance } from "../state.js";
 import type { ExpiryTiming } from "../effect-types.js";
+import { isPresent } from "../type-guards.js";
 
 export { getActionParams } from "../effect-types.js";
 
@@ -68,7 +69,7 @@ export function markOncePerTurnUsed(state: GameState, effectBlockId: string, ins
 // ─── resolveAmount ────────────────────────────────────────────────────────────
 
 export function resolveAmount(
-  amount: number | { type: string; [key: string]: unknown } | undefined,
+  amount: number | DynamicValue | undefined,
   resultRefs: Map<string, EffectResult>,
   state?: GameState,
   controller?: 0 | 1,
@@ -76,13 +77,12 @@ export function resolveAmount(
 ): number {
   if (typeof amount === "number") return amount;
   if (!amount) return 0;
-  // Cast to DynamicValue for type-safe property access after discriminant check
-  const dv = amount as DynamicValue;
+  const dv = amount;
 
   if (dv.type === "FIXED") return dv.value ?? 0;
 
   if (dv.type === "PER_COUNT" && state != null && controller != null) {
-    const source = dv.source as string;
+    const source = dv.source;
     const costRefKey = THIS_WAY_TO_COST_REF[source];
     if (costRefKey) {
       const costRef = resultRefs.get(costRefKey);
@@ -90,8 +90,8 @@ export function resolveAmount(
         return Math.floor(costRef.count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
       }
     }
-    if (source === "REVEALED_CARD_COST" && (dv as any).ref && cardDb) {
-      const refResult = resultRefs.get((dv as any).ref as string);
+    if (source === "REVEALED_CARD_COST" && dv.ref && cardDb) {
+      const refResult = resultRefs.get(dv.ref);
       if (refResult?.targetInstanceIds?.length) {
         const targetCard = findCardInstanceForDV(state, refResult.targetInstanceIds[0]);
         if (targetCard) {
@@ -100,8 +100,8 @@ export function resolveAmount(
         }
       }
     }
-    if (source === "DON_GIVEN_TO_TARGET" && (dv as any).ref) {
-      const refResult = resultRefs.get((dv as any).ref as string);
+    if (source === "DON_GIVEN_TO_TARGET" && dv.ref) {
+      const refResult = resultRefs.get(dv.ref);
       if (refResult?.targetInstanceIds?.length) {
         const targetCard = findCardInstanceForDV(state, refResult.targetInstanceIds[0]);
         if (targetCard) {
@@ -117,9 +117,9 @@ export function resolveAmount(
   }
 
   if (dv.type === "GAME_STATE" && state != null && controller != null) {
-    const ctrl = (dv.controller as string) ?? "SELF";
+    const ctrl = dv.controller ?? "SELF";
     const pi = ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
-    return resolveGameStateSource(state, pi as 0 | 1, dv.source as string, cardDb);
+    return resolveGameStateSource(state, pi, dv.source, cardDb);
   }
 
   if (dv.type === "ACTION_RESULT") {
@@ -130,6 +130,10 @@ export function resolveAmount(
   if (dv.type === "CHOSEN_VALUE") {
     const chosen = resultRefs.get(dv.ref)?.value;
     return typeof chosen === "number" && Number.isInteger(chosen) ? chosen : 0;
+  }
+
+  if (dv.type === "DRAW_TO" && state != null && controller != null) {
+    return Math.max(0, dv.target_count - state.players[controller].hand.length);
   }
 
   // Fallback for PER_COUNT without state (legacy calls)
@@ -143,7 +147,7 @@ export function resolveAmount(
 function resolvePerCountSource(
   state: GameState,
   controller: 0 | 1,
-  source: string,
+  source: import("../effect-types.js").DynamicSource,
   cardDb?: Map<string, CardData>,
   filter?: TargetFilter,
 ): number {
@@ -164,7 +168,7 @@ function resolvePerCountSource(
     }
     case "CHARACTERS_ON_FIELD":
     case "MATCHING_CHARACTERS_ON_FIELD": {
-      let chars = p.characters.filter(Boolean) as CardInstance[];
+      let chars = p.characters.filter(isPresent);
       if (filter && cardDb) {
         chars = chars.filter((c) => matchesFilter(c, filter, cardDb, state));
       }
@@ -195,8 +199,8 @@ function resolvePerCountSource(
 function resolveGameStateSource(
   state: GameState,
   playerIndex: 0 | 1,
-  source: string,
-  cardDb?: Map<string, CardData>,
+  source: import("../effect-types.js").GameStateSource,
+  cardDb?: Map<string, CardData>
 ): number {
   const p = state.players[playerIndex];
   const opp = state.players[playerIndex === 0 ? 1 : 0];

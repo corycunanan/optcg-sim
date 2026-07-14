@@ -532,10 +532,18 @@ export type NumericRange =
 
 export type DynamicValue =
   | { type: "FIXED"; value: number }
-  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number; filter?: TargetFilter }
+  | {
+      type: "PER_COUNT";
+      source: DynamicSource;
+      multiplier: number;
+      divisor?: number;
+      filter?: TargetFilter;
+      ref?: string;
+    }
   | { type: "GAME_STATE"; source: GameStateSource; controller?: Controller }
   | { type: "ACTION_RESULT"; ref: string }
-  | { type: "CHOSEN_VALUE"; ref: string };
+  | { type: "CHOSEN_VALUE"; ref: string }
+  | { type: "DRAW_TO"; target_count: number };
 
 export type DynamicSource =
   | "CARDS_TRASHED_THIS_WAY"
@@ -547,7 +555,11 @@ export type DynamicSource =
   | "CARDS_IN_TRASH"
   | "REVEALED_CARD_COST"
   | "DON_GIVEN_TO_TARGET"
-  | "MATCHING_CHARACTERS_ON_FIELD";
+  | "MATCHING_CHARACTERS_ON_FIELD"
+  | "HAND_COUNT"
+  | "CHARACTERS_ON_FIELD"
+  | "OPPONENT_CHARACTERS_ON_FIELD"
+  | "DON_FIELD_COUNT";
 
 export type GameStateSource =
   | "LIFE_COUNT"
@@ -563,16 +575,24 @@ export type GameStateSource =
 
 // ─── Actions (04-ACTIONS) ────────────────────────────────────────────────────
 
-export interface Action {
-  type: ActionType;
+export interface ActionBase {
   target?: Target;
-  params?: Record<string, unknown>;
   duration?: Duration;
   chain?: ChainConnector;
   target_ref?: string;
   result_ref?: string;
   conditions?: Condition;
 }
+
+/** Exhaustive action union keyed by type with its exact parameter contract. */
+export type Action = {
+  [K in ActionType]: ActionBase & {
+    type: K;
+    params?: ActionParamsMap[K];
+  };
+}[ActionType];
+
+export type ActionOf<K extends ActionType> = Extract<Action, { type: K }>;
 
 export type ActionType =
   // Card Movement
@@ -723,136 +743,233 @@ void _allActionTypesCovers;
 
 // ─── Action Params Map ──────────────────────────────────────────────────────
 // Maps each ActionType to its typed params shape. Used by getActionParams()
-// to provide type-safe access in action handlers without per-site `as any` casts.
+// to provide type-safe access in action handlers without per-site untyped assertions.
 
 export interface ActionParamsMap {
-  // No params (target-only)
+  DRAW: { amount: number | DynamicValue };
+  SEARCH_DECK: {
+    look_at?: number;
+    pick?: CountMode;
+    filter?: TargetFilter;
+    rest_destination?: string;
+    pick_destination?: string;
+    face?: "UP" | "DOWN";
+  };
+  TRASH_CARD: Record<string, never>;
   KO: Record<string, never>;
   RETURN_TO_HAND: Record<string, never>;
-  SET_ACTIVE: Record<string, never>;
-  SET_REST: Record<string, never>;
-  NEGATE_EFFECTS: Record<string, never>;
-  TRASH_FACE_UP_LIFE: Record<string, never>;
-  TURN_ALL_LIFE_FACE_DOWN: Record<string, never>;
-  REORDER_ALL_LIFE: Record<string, never>;
-  SHUFFLE_DECK: Record<string, never>;
-  PLAY_SELF: Record<string, never>;
-  TRASH_CARD: Record<string, never>;
-
-  // Simple amount
-  DRAW: { amount: number | DynamicValue };
-  MILL: { amount?: number };
-  GIVE_DON: { amount?: number; don_state?: "ACTIVE" | "RESTED" };
-  ADD_DON_FROM_DECK: { amount?: number; target_state?: "ACTIVE" | "RESTED" };
-  FORCE_OPPONENT_DON_RETURN: { amount?: number };
-  SET_DON_ACTIVE: { amount?: number };
-  REST_OPPONENT_DON: { amount?: number };
-  RETURN_DON_TO_DECK: { amount?: number };
-  TRASH_FROM_HAND: { amount?: number | DynamicValue; optional?: boolean };
-  REVEAL: { amount?: number; source?: string };
-  REVEAL_HAND: { amount?: number };
-
-  // Amount + position
-  PLACE_HAND_TO_DECK: { amount?: number; position?: "TOP" | "BOTTOM" };
-  RETURN_HAND_TO_DECK: { position?: "TOP" | "BOTTOM" };
-  LIFE_CARD_TO_DECK: { amount?: number; position?: "TOP" | "BOTTOM" };
-  TURN_LIFE_FACE_DOWN: { amount?: number };
-
-  // Power/cost modification
-  MODIFY_POWER: { amount: number | DynamicValue };
-  MODIFY_COST: { amount: number | DynamicValue };
-  GRANT_KEYWORD: { keyword: string };
-  GRANT_ATTRIBUTE: { attribute: string };
-
-  // Search
-  SEARCH_DECK: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string; face?: "UP" | "DOWN" };
-  FULL_DECK_SEARCH: { filter?: TargetFilter; shuffle_after?: boolean };
-  DECK_SCRY: { look_at?: number };
-  SEARCH_AND_PLAY: { look_at?: number; filter?: TargetFilter; rest_destination?: string; search_full_deck?: boolean; shuffle_after?: boolean; entry_state?: "ACTIVE" | "RESTED"; pick?: { up_to?: number } };
-
-  // Play/move
+  RETURN_TO_DECK: { position?: "TOP" | "BOTTOM" };
   PLAY_CARD: {
     source_zone?: string;
     cost_override?: string;
-    entry_state?: "ACTIVE" | "RESTED" | "PLAYER_CHOICE";
-    // OPT-114: when entry_state is "PLAYER_CHOICE", state_distribution bounds how
-    // many plays in this multi-target PLAY_CARD may enter in each state. The
-    // controller is prompted per frame until one slot exhausts, then remaining
-    // frames auto-resolve into the other state.
+    entry_state?: CardState | "PLAYER_CHOICE";
     state_distribution?: { ACTIVE?: number; RESTED?: number };
   };
-  RETURN_TO_DECK: { position?: "TOP" | "BOTTOM" };
+  ADD_TO_LIFE: { face?: "UP" | "DOWN"; position?: "TOP" | "BOTTOM" };
+  MILL: { amount?: number | DynamicValue };
+  REVEAL: {
+    amount?: number;
+    source?: string;
+    visibility?: "BOTH" | "CONTROLLER_ONLY";
+  };
+  FULL_DECK_SEARCH: {
+    filter?: TargetFilter;
+    pick?: CountMode;
+    shuffle_after?: boolean;
+  };
+  DECK_SCRY: { look_at?: number; count?: number };
+  SEARCH_TRASH_THE_REST: {
+    look_at?: number;
+    pick?: CountMode;
+    filter?: TargetFilter;
+    rest_destination?: string;
+    pick_destination?: string;
+  };
+  SEARCH_AND_PLAY: {
+    look_at?: number;
+    filter?: TargetFilter;
+    rest_destination?: string;
+    search_full_deck?: boolean;
+    shuffle_after?: boolean;
+    entry_state?: CardState;
+    pick?: CountMode;
+    cost_override?: string;
+    destination?: string;
+  };
+  PLACE_HAND_TO_DECK: {
+    amount?: number;
+    position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+  };
+  HAND_WHEEL: {
+    trash_count?: number | DynamicValue;
+    draw_count?: number | DynamicValue;
+    amount?: number;
+  };
+  REVEAL_HAND: { amount?: number };
+  SHUFFLE_DECK: Record<string, never>;
 
-  // Life
-  ADD_TO_LIFE_FROM_DECK: { amount?: number; face?: "UP" | "DOWN"; position?: "TOP" | "BOTTOM" };
-  ADD_TO_LIFE_FROM_HAND: { amount?: number; face?: "UP" | "DOWN"; position?: "TOP" | "BOTTOM" };
-  ADD_TO_LIFE_FROM_FIELD: { face?: "UP" | "DOWN" };
-  TRASH_FROM_LIFE: { amount?: number; position?: "TOP" | "BOTTOM"; controller?: string };
-  LIFE_TO_HAND: { amount?: number; position?: "TOP" | "BOTTOM" };
-  PLAY_FROM_LIFE: { position?: "TOP" | "BOTTOM"; entry_state?: "ACTIVE" | "RESTED" };
-  TURN_LIFE_FACE_UP: { amount?: number; position?: "TOP" | "BOTTOM" | "ALL" };
-  LIFE_SCRY: { look_at?: number };
-  DRAIN_LIFE_TO_THRESHOLD: { threshold?: number };
+  MODIFY_POWER: { amount: number | DynamicValue };
+  SET_BASE_POWER: { value: number | DynamicValue };
+  MODIFY_COST: { amount: number | DynamicValue };
+  SET_POWER_TO_ZERO: Record<string, never>;
+  SWAP_BASE_POWER: Record<string, never>;
+  COPY_POWER: {
+    source?:
+      | "OPPONENT_LEADER"
+      | "ATTACKING_CARD"
+      | "SELECTED_CHARACTER"
+      | Target;
+    source_target?: Target;
+    source_power?: "BASE" | "EFFECTIVE";
+  };
+  SET_COST: { value: number | DynamicValue };
 
-  // Hand/deck
-  HAND_WHEEL: { trash_count?: number | DynamicValue; draw_count?: number | DynamicValue; amount?: number };
+  GRANT_KEYWORD: { keyword: Keyword };
+  NEGATE_EFFECTS: Record<string, never>;
 
-  // Choice/meta
-  PLAYER_CHOICE: { options: Action[][]; labels?: string[] };
-  OPPONENT_CHOICE: { options: Action[][]; labels?: string[] };
+  GIVE_DON: { amount?: number; don_state?: CardState };
+  RETURN_DON_TO_DECK: { amount?: number | DynamicValue };
+  ADD_DON_FROM_DECK: { amount?: number; target_state?: CardState };
+  SET_DON_ACTIVE: { amount?: number };
+  REST_DON: { amount?: number };
+  REDISTRIBUTE_DON: { amount?: number };
+  FORCE_OPPONENT_DON_RETURN: { amount?: number };
+  REST_OPPONENT_DON: { amount?: number };
+  GIVE_OPPONENT_DON_TO_OPPONENT: {
+    amount?: number;
+    source?: "COST_AREA";
+    source_filter?: TargetFilter;
+  };
+  DISTRIBUTE_DON: {
+    amount?: number;
+    amount_per_target?: number;
+    don_state?: CardState;
+  };
+  RETURN_ATTACHED_DON_TO_COST: Record<string, never>;
+
+  SET_ACTIVE: Record<string, never>;
+  SET_REST: Record<string, never>;
+  APPLY_PROHIBITION: {
+    prohibition_type: ProhibitionType;
+    scope?: ProhibitionScope;
+    conditional_override?: ConditionalOverride;
+  };
+  REMOVE_PROHIBITION: Record<string, never>;
+
+  PLAYER_CHOICE: {
+    options: Action[][];
+    labels?: string[];
+    mandatory?: boolean;
+  };
+  OPPONENT_CHOICE: {
+    options: Action[][];
+    labels?: string[];
+    mandatory?: boolean;
+  };
   CHOOSE_VALUE: {
     domain: "COST" | "POWER" | "NUMBER";
     constraints?: NumericRange;
     step?: number;
   };
-  OPPONENT_ACTION: { action: Action };
+  WIN_GAME: Record<string, never>;
+  OPPONENT_ACTION: { action: Action; mandatory?: boolean };
+  EXTRA_TURN: Record<string, never>;
+  SCHEDULE_ACTION: {
+    timing?: ScheduleTiming;
+    action: Action;
+    bound_to?: string | null;
+  };
 
-  // Effects/scheduling
-  SCHEDULE_ACTION: { timing?: ScheduleTiming; action: Action; bound_to?: string | null };
-  APPLY_PROHIBITION: { prohibition_type: string; scope?: Record<string, unknown>; conditional_override?: Record<string, unknown> };
-  APPLY_ONE_TIME_MODIFIER: { modification: Modifier; applies_to: Record<string, unknown> };
+  TURN_LIFE_FACE_UP: { amount?: number; position?: "TOP" | "BOTTOM" | "ALL" };
+  TURN_LIFE_FACE_DOWN: { amount?: number };
+  TURN_ALL_LIFE_FACE_DOWN: Record<string, never>;
+  LIFE_SCRY: { look_at?: number };
+  REORDER_ALL_LIFE: Record<string, never>;
+  ADD_TO_LIFE_FROM_DECK: {
+    amount?: number;
+    face?: "UP" | "DOWN";
+    position?: "TOP" | "BOTTOM";
+  };
+  ADD_TO_LIFE_FROM_HAND: {
+    amount?: number;
+    face?: "UP" | "DOWN";
+    position?: "TOP" | "BOTTOM";
+  };
+  ADD_TO_LIFE_FROM_FIELD: {
+    amount?: number;
+    face?: "UP" | "DOWN";
+    position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+    life_controller?: Controller;
+  };
+  PLAY_FROM_LIFE: { position?: "TOP" | "BOTTOM"; entry_state?: CardState };
+  LIFE_TO_HAND: {
+    amount?: number;
+    position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+  };
+  TRASH_FROM_LIFE: {
+    amount?: number;
+    position?: "TOP" | "BOTTOM";
+    controller?: Controller;
+  };
+  DRAIN_LIFE_TO_THRESHOLD: { threshold?: number };
+  LIFE_CARD_TO_DECK: { amount?: number; position?: "TOP" | "BOTTOM" };
+  TRASH_FACE_UP_LIFE: Record<string, never>;
+
+  REDIRECT_ATTACK: Record<string, never>;
+  DEAL_DAMAGE: { amount?: number | DynamicValue };
+  SELF_TAKE_DAMAGE: { amount?: number | DynamicValue };
+
+  ACTIVATE_EVENT_FROM_HAND: Record<string, never>;
+  ACTIVATE_EVENT_FROM_TRASH: Record<string, never>;
   REUSE_EFFECT: { target_effect: string };
+  NEGATE_TRIGGER_TYPE: {
+    trigger_type: KeywordTriggerType;
+    affected_controller?: "SELF" | "OPPONENT";
+  };
+  GRANT_ATTRIBUTE: { attribute: Attribute };
+  TRASH_FROM_HAND: {
+    amount?: number | DynamicValue;
+    optional?: boolean;
+    until_count?: number;
+    filter?: TargetFilter;
+    _comment?: string;
+  };
+  RETURN_HAND_TO_DECK: { position?: "TOP" | "BOTTOM" };
+  GRANT_COUNTER: Record<string, never>;
 
-  // OPT-363: dispatches by `target.type`; only `CARD_IN_TRASH` is currently
-  // handled (OP14-104 Gecko Moria). Params mirror the other ADD_TO_LIFE_FROM_*
-  // variants for forward compatibility.
-  ADD_TO_LIFE: { face?: "UP" | "DOWN"; position?: "TOP" | "BOTTOM" };
-
-  // Unimplemented — forward-compatible
-
-  SEARCH_TRASH_THE_REST: { look_at?: number; pick?: CountMode; filter?: TargetFilter; rest_destination?: string; pick_destination?: string };
-  SET_BASE_POWER: Record<string, unknown>;
-  SET_POWER_TO_ZERO: Record<string, unknown>;
-  SWAP_BASE_POWER: Record<string, unknown>;
-  COPY_POWER: Record<string, unknown>;
-  SET_COST: Record<string, unknown>;
-  REMOVE_KEYWORD: Record<string, unknown>;
-  GRANT_COUNTER: Record<string, unknown>;
-  REST_DON: Record<string, unknown>;
-  REDISTRIBUTE_DON: Record<string, unknown>;
-  GIVE_OPPONENT_DON_TO_OPPONENT: Record<string, unknown>;
-  DISTRIBUTE_DON: Record<string, unknown>;
-  RETURN_ATTACHED_DON_TO_COST: Record<string, unknown>;
-  REMOVE_PROHIBITION: Record<string, unknown>;
-  WIN_GAME: Record<string, unknown>;
-  EXTRA_TURN: Record<string, unknown>;
-  REDIRECT_ATTACK: Record<string, unknown>;
-  DEAL_DAMAGE: Record<string, unknown>;
-  SELF_TAKE_DAMAGE: Record<string, unknown>;
-  ACTIVATE_EVENT_FROM_HAND: Record<string, unknown>;
-  ACTIVATE_EVENT_FROM_TRASH: Record<string, unknown>;
-  NEGATE_TRIGGER_TYPE: Record<string, unknown>;
+  APPLY_ONE_TIME_MODIFIER: {
+    modification: Modifier;
+    applies_to: RuntimeOneTimeModifier["appliesTo"];
+  };
+  PLAY_SELF: Record<string, never>;
 }
 
 /**
  * Type-safe params accessor for action handlers.
- * Replaces scattered `as any` casts with a single auditable assertion.
+ * Replaces scattered untyped assertions with a single auditable assertion.
  */
-export function getActionParams<T extends keyof ActionParamsMap>(
-  action: Action,
-  _type: T,
+export function getActionParams<T extends ActionType>(
+  action: ActionOf<T>,
+  type: T
 ): ActionParamsMap[T] {
+  if (action.type !== type) {
+    throw new Error(`Expected ${type} action params, received ${action.type}`);
+  }
   return (action.params ?? {}) as ActionParamsMap[T];
+}
+
+/** Nested action branches carried by the action variants that support them. */
+export function getNestedActions(action: Action): Action[] {
+  switch (action.type) {
+    case "PLAYER_CHOICE":
+    case "OPPONENT_CHOICE":
+      return action.params?.options.flat() ?? [];
+    case "OPPONENT_ACTION":
+    case "SCHEDULE_ACTION":
+      return action.params?.action ? [action.params.action] : [];
+    default:
+      return [];
+  }
 }
 
 // ─── Targeting (05-TARGETING) ────────────────────────────────────────────────
@@ -1012,7 +1129,7 @@ export interface TargetFilter {
   has_counter?: boolean;
 
   // Card type filter
-  card_type?: "CHARACTER" | "EVENT" | "STAGE" | "LEADER" | string[];
+  card_type?: "CHARACTER" | "EVENT" | "STAGE" | "LEADER" | "DON" | string[];
 
   // State filters
   is_rested?: boolean;
@@ -1220,7 +1337,7 @@ export type ProhibitionType =
   | "CANNOT_BE_RETURNED_TO_DECK";
 
 export interface ProhibitionScope {
-  cause?: KOCause | "BY_OPPONENT_EFFECT" | "ANY";
+  cause?: KOCause | EventCause;
   controller?: Controller;
   filter?: TargetFilter;
   source_filter?: TargetFilter;
@@ -1233,7 +1350,7 @@ export interface ProhibitionScope {
   triggerType?: KeywordTriggerType;
 }
 
-export type ConditionalOverride = Condition;
+export type ConditionalOverride = Condition | { action: Action };
 
 // ─── Replacement Effects (06-PROHIBITIONS-AND-REPLACEMENTS) ──────────────────
 
@@ -1412,7 +1529,7 @@ export interface RuntimeProhibition {
    */
   conditions?: Condition;
   usesRemaining: number | null;
-  conditionalOverride?: ConditionalOverride;
+  conditionalOverride?: ConditionalOverride | null;
 }
 
 export interface RuntimeScheduledAction {
@@ -1426,7 +1543,12 @@ export interface RuntimeScheduledAction {
 
 export interface RuntimeOneTimeModifier {
   id: string;
-  appliesTo: { action: ModifierType; filter?: TargetFilter };
+  appliesTo: {
+    action?: ModifierType;
+    filter?: TargetFilter;
+    controller?: Controller;
+    card_type?: "CHARACTER" | "EVENT" | "STAGE" | "LEADER";
+  };
   modification: Modifier;
   expires: Duration;
   consumed: boolean;

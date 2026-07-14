@@ -1,7 +1,6 @@
 import type {
-  BattleContext,
   CardData,
-  DonInstance,
+  CardInstance,
   GameAction,
   GameState,
   LifeCard,
@@ -33,6 +32,10 @@ const EXPECTED_RESPONSE_TYPES: Record<
   OPTIONAL_EFFECT: ["PLAYER_CHOICE", "PASS"],
   REVEAL_TRIGGER: ["REVEAL_TRIGGER"],
 };
+
+function isDurablePromptType(value: PromptType): value is DurablePromptType {
+  return value in EXPECTED_RESPONSE_TYPES;
+}
 
 export type PromptRoute =
   | { kind: "pipeline"; state: GameState }
@@ -116,10 +119,9 @@ export class SessionCoordinator {
     if (action.type === "CONCEDE") return { kind: "pipeline", state };
     const prompt = state.pendingPrompt;
     const promptType = prompt.options.promptType;
-    const expected =
-      promptType in EXPECTED_RESPONSE_TYPES
-        ? EXPECTED_RESPONSE_TYPES[promptType as DurablePromptType]
-        : null;
+    const expected = isDurablePromptType(promptType)
+      ? EXPECTED_RESPONSE_TYPES[promptType]
+      : null;
     if (!expected) {
       return {
         kind: "reject",
@@ -315,9 +317,7 @@ export class SessionCoordinator {
     let respondingPlayer: 0 | 1 | undefined;
 
     if (battleSubPhase === "DAMAGE_STEP" && battle) {
-      lifeCard = (
-        battle as BattleContext & { pendingTriggerLifeCard?: LifeCard }
-      ).pendingTriggerLifeCard;
+      lifeCard = battle.pendingTriggerLifeCard;
       if (lifeCard)
         respondingPlayer = state.turn.activePlayerIndex === 0 ? 1 : 0;
     } else if (pendingTriggerFromEffect) {
@@ -327,23 +327,22 @@ export class SessionCoordinator {
     if (!lifeCard || respondingPlayer === undefined) return state;
 
     const cardData = cardDb.get(lifeCard.cardId);
+    const promptCard: CardInstance = {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      zone: "LIFE",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: respondingPlayer,
+      owner: respondingPlayer,
+    };
     return {
       ...state,
       pendingPrompt: {
         options: {
           promptType: "REVEAL_TRIGGER",
-          cards: [
-            {
-              instanceId: lifeCard.instanceId,
-              cardId: lifeCard.cardId,
-              zone: "LIFE",
-              state: "ACTIVE",
-              attachedDon: [] as DonInstance[],
-              turnPlayed: null,
-              controller: respondingPlayer,
-              owner: respondingPlayer,
-            },
-          ],
+          cards: [promptCard],
           effectDescription:
             cardData?.triggerText ??
             cardData?.effectText ??
@@ -363,7 +362,10 @@ export class SessionCoordinator {
     update: PresenceUpdate
   ): GameState {
     const connected = setPlayerConnected(state, playerIndex, update.connected);
-    const players = [...connected.players] as GameState["players"];
+    const players: GameState["players"] = [
+      connected.players[0],
+      connected.players[1],
+    ];
     players[playerIndex] = { ...players[playerIndex], ...update };
     return { ...connected, players };
   }

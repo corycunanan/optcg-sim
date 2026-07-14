@@ -12,7 +12,7 @@
  *                      using the shared events accumulator
  */
 
-import type { EffectBlock, EffectResult } from "../../effect-types.js";
+import type { EffectResult } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
@@ -31,6 +31,7 @@ import { pushBatchResumeFrame } from "./batch.js";
 import { processRemainingTriggers } from "./triggers.js";
 import { isEngineTerminated } from "../../engine-limits.js";
 import { replacePendingEventReferences } from "../../events.js";
+import { CONTINUATION_EFFECT_BLOCK } from "../../effect-stack.js";
 
 export interface TargetFallthrough {
   kind: "fallthrough";
@@ -89,8 +90,8 @@ export function handleRedistributeDon(
     const actionResult = applyRedistributeDonTransfers(nextState, transfers, controller);
     nextState = actionResult.state;
     events.push(...actionResult.events);
-    if (actionResult.result && (pausedAction as any).result_ref) {
-      resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+    if (actionResult.result && pausedAction.result_ref) {
+      resultRefs.set(pausedAction.result_ref, actionResult.result);
     }
   }
 
@@ -115,8 +116,20 @@ export function handleSelectTargetRuleTrashForPlay(
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
 ): TargetBranchResult {
-  const { pausedAction, controller, validTargets, remainingActions, ruleTrashForPlay, effectSourceInstanceId } = resumeCtx;
-  if (action.type !== "SELECT_TARGET" || !pausedAction || !ruleTrashForPlay) {
+  const {
+    pausedAction,
+    controller,
+    validTargets,
+    remainingActions,
+    ruleTrashForPlay,
+    effectSourceInstanceId,
+  } = resumeCtx;
+  if (
+    action.type !== "SELECT_TARGET" ||
+    !pausedAction ||
+    pausedAction.type !== "PLAY_CARD" ||
+    !ruleTrashForPlay
+  ) {
     return null;
   }
 
@@ -173,8 +186,8 @@ export function handleSelectTargetRuleTrashForPlay(
   if (actionResult.pendingPrompt) {
     return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt } };
   }
-  if (actionResult.result && (pausedAction as any).result_ref) {
-    resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+  if (actionResult.result && pausedAction.result_ref) {
+    resultRefs.set(pausedAction.result_ref, actionResult.result);
   }
 
   // Scan for triggers produced by the re-entered play (e.g., ON_PLAY)
@@ -266,7 +279,7 @@ export function handleSelectTarget(
       nextState,
       effectSourceInstanceId,
       controller,
-      {} as EffectBlock,
+      CONTINUATION_EFFECT_BLOCK,
       marker,
       triggers,
       remainingActions,
@@ -278,8 +291,8 @@ export function handleSelectTarget(
     const drain = processRemainingTriggers(nextState, triggers, cardDb, events);
     return { kind: "terminal", result: { state: drain.state, events: drain.events, resolved: drain.resolved, pendingPrompt: drain.pendingPrompt } };
   }
-  if (actionResult.result && (pausedAction as any).result_ref) {
-    resultRefs.set((pausedAction as any).result_ref as string, actionResult.result);
+  if (actionResult.result && pausedAction.result_ref) {
+    resultRefs.set(pausedAction.result_ref, actionResult.result);
   }
 
   return { kind: "fallthrough", state: nextState, succeeded: actionResult.succeeded };

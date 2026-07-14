@@ -7,8 +7,18 @@
 
 import type { GameState } from "../types.js";
 import type { EffectStackFrame } from "../types.js";
-import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
+import type { EffectBlock } from "./effect-types.js";
+import {
+  MAX_EFFECT_STACK_DEPTH,
+  terminateForEngineLimit,
+} from "./engine-limits.js";
 import { allocateEngineId } from "./execution-context.js";
+
+/** Typed placeholder for continuation frames that do not own a schema block. */
+export const CONTINUATION_EFFECT_BLOCK: EffectBlock = {
+  id: "__engine_continuation__",
+  category: "auto",
+};
 
 // ─── Stack Operations ────────────────────────────────────────────────────────
 
@@ -24,7 +34,7 @@ export function pushFrame(state: GameState, frame: EffectStackFrame): GameState 
   }
   return {
     ...state,
-    effectStack: [...state.effectStack, frame] as GameState["effectStack"],
+    effectStack: [...state.effectStack, frame],
   };
 }
 
@@ -33,14 +43,14 @@ export function popFrame(state: GameState): GameState {
   if (stack.length === 0) return state;
   return {
     ...state,
-    effectStack: stack.slice(0, -1) as GameState["effectStack"],
+    effectStack: stack.slice(0, -1),
   };
 }
 
 export function peekFrame(state: GameState): EffectStackFrame | null {
   const stack = state.effectStack;
   if (stack.length === 0) return null;
-  return stack[stack.length - 1] as unknown as EffectStackFrame;
+  return stack[stack.length - 1];
 }
 
 export function updateTopFrame(
@@ -53,7 +63,7 @@ export function updateTopFrame(
   const updated = { ...top, ...partial };
   return {
     ...state,
-    effectStack: [...stack.slice(0, -1), updated] as GameState["effectStack"],
+    effectStack: [...stack.slice(0, -1), updated],
   };
 }
 

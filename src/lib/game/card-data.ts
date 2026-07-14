@@ -4,9 +4,11 @@
 
 import type { Card } from "@prisma/client";
 import { extractKeywords } from "@/lib/game/keywords";
+import type { CardData } from "@engine/types";
+import { parseCardData } from "@engine/util/validate";
 
-export function toCardData(card: Card) {
-  return {
+export function toCardData(card: Card): CardData {
+  return parseCardData({
     id: card.id,
     name: card.name,
     type: card.type as "Leader" | "Character" | "Event" | "Stage",
@@ -22,5 +24,5 @@ export function toCardData(card: Card) {
     keywords: extractKeywords(card.effectText, card.triggerText ?? null),
     effectSchema: card.effectSchema ?? null,
     imageUrl: card.imageUrl,
-  };
+  });
 }

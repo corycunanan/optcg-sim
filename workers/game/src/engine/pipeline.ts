@@ -210,7 +210,7 @@ function fireEventsAndTriggers(
       const controller = (pendingEvent.playerIndex ?? pi) as 0 | 1;
       const counterCardData = cardDb.get(cardId);
       if (counterCardData?.effectSchema) {
-        const schema = counterCardData.effectSchema as import("./effect-types.js").EffectSchema;
+        const schema = counterCardData.effectSchema;
         for (const block of schema.effects) {
           if (block.category === "auto" && block.trigger && "keyword" in block.trigger && block.trigger.keyword === "COUNTER_EVENT") {
             triggerQueue.push({

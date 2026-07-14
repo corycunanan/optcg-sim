@@ -23,14 +23,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
-  CardData,
   CardDb,
   GameAction,
   GameEvent,
-  GameState,
   PlayerState,
   PromptOptions,
 } from "@shared/game-types";
+import type { CardData, GameState } from "@engine/types";
 import type {
   PartialGameState,
   PartialPlayerState,

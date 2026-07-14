@@ -57,6 +57,7 @@ export const GAME_EVENT_VISIBILITY = {
   EFFECTS_NEGATED: PUBLIC,
   LIFE_CARD_TO_DECK: PUBLIC,
   LIFE_SCRIED: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITIES" },
+  LIFE_REORDERED: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITIES" },
   ATTACK_REDIRECTED: PUBLIC,
   CARD_REMOVED_FROM_LIFE: { audience: "OWNER_ONLY", redactor: "CARD_IDENTITY" },
   EXTRA_TURN_GRANTED: PUBLIC,
@@ -113,6 +114,11 @@ function redactEventIdentities(event: GameEvent): GameEvent {
       cardId: HIDDEN_IDENTITY,
       instanceId: HIDDEN_IDENTITY,
     }));
+  }
+  if (Array.isArray(payload.orderedInstanceIds)) {
+    redactedPayload.orderedInstanceIds = payload.orderedInstanceIds.map(
+      () => HIDDEN_IDENTITY,
+    );
   }
 
   return { ...event, payload: redactedPayload } as GameEvent;

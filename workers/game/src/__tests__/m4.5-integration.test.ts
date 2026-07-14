@@ -6,12 +6,43 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { CardData, CardInstance, DonInstance, GameAction, GameState, PlayerState } from "../types.js";
-import type { Action, Cost } from "../engine/effect-types.js";
-import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./factories.js";
-import { getEffectiveCost, getEffectivePower, consumeOneTimeModifiers } from "../engine/modifiers.js";
-import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
-import { resolveEffect, executeActionChain, executeEffectAction } from "../engine/effect-resolver/resolver.js";
+import type {
+  CardData,
+  CardInstance,
+  DonInstance,
+  GameAction,
+  GameState,
+  PlayerState,
+  ResumeContext,
+} from "../types.js";
+import type {
+  Action,
+  ActionOf,
+  Cost,
+  DynamicValue,
+} from "../engine/effect-types.js";
+import {
+  setupGame,
+  createTestCardDb,
+  createBattleReadyState,
+  CARDS,
+  padChars,
+} from "./factories.js";
+import {
+  getEffectiveCost,
+  getEffectivePower,
+  consumeOneTimeModifiers,
+} from "../engine/modifiers.js";
+import {
+  evaluateCondition,
+  matchesFilter,
+  type ConditionContext,
+} from "../engine/conditions.js";
+import {
+  resolveEffect,
+  executeActionChain,
+  executeEffectAction,
+} from "../engine/effect-resolver/resolver.js";
 import { executeApplyOneTimeModifier } from "../engine/effect-resolver/actions/effects.js";
 import { executeReveal } from "../engine/effect-resolver/actions/hand-deck.js";
 import { executeTurnLifeFaceUp, executeTurnLifeFaceDown } from "../engine/effect-resolver/actions/life.js";
@@ -198,20 +229,24 @@ describe("1. Hand-Zone Cost Modifiers", () => {
       cost: 3,
       power: 5000,
       effectSchema: {
-        effects: [{
-          id: "croc-1",
-          category: "permanent",
-          // Default zone is FIELD (not "HAND")
-          modifiers: [{
-            type: "MODIFY_COST",
-            params: { amount: -1 },
-            target: {
-              type: "CARD_IN_HAND",
-              controller: "SELF",
-              filter: { color: "Blue", card_type: "EVENT" },
-            },
-          }],
-        }],
+        effects: [
+          {
+            id: "croc-1",
+            category: "permanent",
+            // Default zone is FIELD (not "HAND")
+            modifiers: [
+              {
+                type: "MODIFY_COST",
+                params: { amount: -1 },
+                target: {
+                  type: "CARD_IN_HAND",
+                  controller: "SELF",
+                  filter: { color: "BLUE", card_type: "EVENT" },
+                },
+              },
+            ],
+          },
+        ],
       },
     });
 
@@ -466,7 +501,7 @@ describe("3. SEARCH_TRASH_THE_REST Resume", () => {
     // Put target card as 2nd in deck, vanilla as 1st
     state.players[0].deck[1] = makeInstance(targetCard.id, "DECK", 0, { instanceId: "search-hit" });
 
-    const action = {
+    const action: ActionOf<"SEARCH_TRASH_THE_REST"> = {
       type: "SEARCH_TRASH_THE_REST" as const,
       params: {
         look_at: 5,
@@ -497,7 +532,7 @@ describe("3. SEARCH_TRASH_THE_REST Resume", () => {
     const state = buildMinimalState();
     state.players[0].deck[0] = makeInstance(targetCard.id, "DECK", 0, { instanceId: "search-bot" });
 
-    const action = {
+    const action: ActionOf<"SEARCH_TRASH_THE_REST"> = {
       type: "SEARCH_TRASH_THE_REST" as const,
       params: {
         look_at: 5,
@@ -527,7 +562,7 @@ describe("4. One-Time Modifiers / NEXT_EVENT_COST_REDUCTION", () => {
     const cardDb = createTestCardDb();
     const state = buildMinimalState();
 
-    const action = {
+    const action: ActionOf<"APPLY_ONE_TIME_MODIFIER"> = {
       type: "APPLY_ONE_TIME_MODIFIER" as const,
       params: {
         modification: { type: "MODIFY_COST", params: { amount: -3 } },
@@ -734,7 +769,11 @@ describe("6. Dynamic Values", () => {
     const state = buildMinimalState();
 
     // Leader has 5000 power (from CARDS.LEADER)
-    const dynamicValue = { type: "GAME_STATE", source: "LEADER_BASE_POWER", controller: "SELF" };
+    const dynamicValue: DynamicValue = {
+      type: "GAME_STATE",
+      source: "LEADER_BASE_POWER",
+      controller: "SELF",
+    };
     const resolved = resolveAmount(dynamicValue, new Map(), state, 0, cardDb);
     expect(resolved).toBe(5000);
   });
@@ -748,7 +787,7 @@ describe("6. Dynamic Values", () => {
     state.players[0].characters = padChars([char]);
 
     // SET_BASE_POWER with dynamic value = LEADER_BASE_POWER (5000)
-    const action: Action = {
+    const action: ActionOf<"SET_BASE_POWER"> = {
       type: "SET_BASE_POWER" as const,
       params: { value: { type: "GAME_STATE", source: "LEADER_BASE_POWER", controller: "SELF" } },
       target: { type: "ALL_YOUR_CHARACTERS", controller: "SELF", count: { all: true } },
@@ -786,7 +825,7 @@ describe("7. Stage Support in SEARCH_AND_PLAY", () => {
     state.players[0].deck[0] = makeInstance(stageCard.id, "DECK", 0, { instanceId: "stage-found" });
 
     // Simulate SEARCH_AND_PLAY paused action
-    const pausedAction = {
+    const pausedAction: ActionOf<"SEARCH_AND_PLAY"> = {
       type: "SEARCH_AND_PLAY" as const,
       params: {
         look_at: 5,
@@ -796,7 +835,7 @@ describe("7. Stage Support in SEARCH_AND_PLAY", () => {
       },
     };
 
-    const resumeCtx = {
+    const resumeCtx: ResumeContext = {
       effectSourceInstanceId: "leader-0",
       controller: 0 as const,
       pausedAction,

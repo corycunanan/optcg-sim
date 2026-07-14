@@ -1,6 +1,12 @@
 /** Prompt and display construction for cost selection. */
 import type { Cost, EffectBlock, SimpleCost } from "../../effect-types.js";
-import type { CardInstance, EffectStackFrame, GameState, PendingPromptState } from "../../../types.js";
+import type {
+  CardInstance,
+  EffectStackFrame,
+  GameState,
+  PendingPromptState,
+} from "../../../types.js";
+import { isPresent } from "../../type-guards.js";
 
 /**
  * True when the effect block shuffles the deck after its costs resolve —
@@ -27,7 +33,7 @@ export function buildTrashToDeckArrangePrompt(
   const byId = new Map([
     ...p.trash.map((c) => [c.instanceId, c] as const),
     ...p.hand.map((c) => [c.instanceId, c] as const),
-    ...(p.characters.filter(Boolean) as CardInstance[]).map((c) => [c.instanceId, c] as const),
+    ...p.characters.filter(isPresent).map((c) => [c.instanceId, c] as const),
     ...(p.stage ? [[p.stage.instanceId, p.stage] as const] : []),
   ]);
   const cards = cardIds

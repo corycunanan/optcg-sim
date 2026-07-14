@@ -20,8 +20,18 @@ import type {
   PlayerState,
   Zone,
 } from "../types.js";
-import type { EffectSchema, EffectBlock } from "../engine/effect-types.js";
-import { setupGame, createTestCardDb, createBattleReadyState, CARDS, padChars } from "./factories.js";
+import type {
+  ActionOf,
+  EffectSchema,
+  EffectBlock,
+} from "../engine/effect-types.js";
+import {
+  setupGame,
+  createTestCardDb,
+  createBattleReadyState,
+  CARDS,
+  padChars,
+} from "./factories.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { evaluateCondition, matchesFilter, type ConditionContext } from "../engine/conditions.js";
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
@@ -608,16 +618,25 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const playFromTrashCard = makeCard("PLAY-FROM-TRASH", {
         cost: 1,
         effectSchema: {
-          effects: [{
-            id: "pft-1",
-            category: "auto",
-            trigger: { keyword: "ON_PLAY" },
-            actions: [{
-              type: "PLAY_FROM_ZONE",
-              target: { type: "TRASH", controller: "SELF", count: { exact: 1 }, filter: { card_type: "CHARACTER" } },
-              params: { zone: "TRASH" },
-            }],
-          }],
+          effects: [
+            {
+              id: "pft-1",
+              category: "auto",
+              trigger: { keyword: "ON_PLAY" },
+              actions: [
+                {
+                  type: "PLAY_CARD",
+                  target: {
+                    type: "CARD_IN_TRASH",
+                    controller: "SELF",
+                    count: { exact: 1 },
+                    filter: { card_type: "CHARACTER" },
+                  },
+                  params: { source_zone: "TRASH" },
+                },
+              ],
+            },
+          ],
         },
       });
       cardDb.set(playFromTrashCard.id, playFromTrashCard);
@@ -1792,7 +1811,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
 
     it("buildSelectTargetPrompt includes dualTargets metadata with per-slot validIds", () => {
       const { state, cardDb } = buildDualTargetState();
-      const action = {
+      const action: ActionOf<"RETURN_TO_DECK"> = {
         type: "RETURN_TO_DECK" as const,
         target: {
           type: "CHARACTER" as const,

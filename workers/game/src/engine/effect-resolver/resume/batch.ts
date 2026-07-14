@@ -41,8 +41,12 @@ export function reenterBatchResume(
   const events = [...priorEvents];
 
   while (true) {
-    const top = peekFrame(nextState) as EffectStackFrame | null;
-    if (!top || top.phase !== "AWAITING_BATCH_RESUME" || !top.batchResumeMarker) {
+    const top = peekFrame(nextState);
+    if (
+      !top ||
+      top.phase !== "AWAITING_BATCH_RESUME" ||
+      !top.batchResumeMarker
+    ) {
       return { state: nextState, events, resolved: true };
     }
     // Triggers were drained by processRemainingTriggers (the only caller). The
@@ -51,9 +55,7 @@ export function reenterBatchResume(
 
     nextState = popFrame(nextState);
     const marker = top.batchResumeMarker;
-    const resultRefs = new Map<string, EffectResult>(
-      top.resultRefs.map(([k, v]) => [k, v as EffectResult]),
-    );
+    const resultRefs = new Map<string, EffectResult>(top.resultRefs);
 
     const actionResult = dispatchBatchResume(
       nextState,
@@ -79,11 +81,11 @@ export function reenterBatchResume(
         nextState,
         top.sourceCardInstanceId,
         top.controller,
-        top.effectBlock as EffectBlock,
+        top.effectBlock,
         nextMarker,
         triggers,
-        top.remainingActions as Action[],
-        resultRefs,
+        top.remainingActions,
+        resultRefs
       );
       return processRemainingTriggers(nextState, triggers, cardDb, events);
     }
@@ -105,7 +107,7 @@ export function reenterBatchResume(
     if (top.remainingActions.length > 0) {
       const chainResult = executeActionChain(
         nextState,
-        top.remainingActions as Action[],
+        top.remainingActions,
         top.sourceCardInstanceId,
         top.controller,
         cardDb,
@@ -198,7 +200,7 @@ export function pushBatchResumeFrame(
     phase: "AWAITING_BATCH_RESUME",
     pausedAction: marker.pausedAction,
     remainingActions,
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: [],
     costs: [],
     currentCostIndex: 0,

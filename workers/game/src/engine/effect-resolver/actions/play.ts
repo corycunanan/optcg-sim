@@ -3,8 +3,20 @@
  * ACTIVATE_EVENT_FROM_HAND, ACTIVATE_EVENT_FROM_TRASH
  */
 
-import type { Action, EffectBlock, EffectResult, EffectSchema } from "../../effect-types.js";
-import type { BatchResumeMarker, CardData, CardInstance, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
+import type {
+  ActionOf,
+  EffectBlock,
+  EffectResult,
+} from "../../effect-types.js";
+import type {
+  BatchResumeMarker,
+  CardData,
+  CardInstance,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+  ResumeContext,
+} from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
@@ -17,7 +29,7 @@ import { transitionCard } from "../../zone-transition.js";
 import type { EffectResolverServices } from "../services.js";
 
 function findMainEventBlock(cardData: CardData): EffectBlock | undefined {
-  const schema = cardData.effectSchema as EffectSchema | null;
+  const schema = cardData.effectSchema;
   if (!schema) return undefined;
   return schema.effects.find(
     (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
@@ -44,7 +56,7 @@ type FrameResult = {
 
 function playOneCharacter(
   state: GameState,
-  action: Action,
+  action: ActionOf<"PLAY_CARD">,
   card: CardInstance,
   sourceCardInstanceId: string,
   controller: 0 | 1,
@@ -78,7 +90,7 @@ function playOneCharacter(
       controller,
       pausedAction: action,
       remainingActions: [],
-      resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+      resultRefs: [...resultRefs.entries()],
       validTargets: ownCharIds,
       ruleTrashForPlay: {
         playTargetId: card.instanceId,
@@ -171,7 +183,7 @@ export type PlayCardResumeFrame = {
 
 export function executePlayCard(
   state: GameState,
-  action: Action,
+  action: ActionOf<"PLAY_CARD">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -210,12 +222,14 @@ export function executePlayCard(
     return { state, events, succeeded: false };
   }
 
-  const entryStateMode = (params.entry_state as "ACTIVE" | "RESTED" | "PLAYER_CHOICE" | undefined) ?? "ACTIVE";
+  const entryStateMode = params.entry_state ?? "ACTIVE";
   const isDistributed = entryStateMode === "PLAYER_CHOICE";
-  let remaining = resumeFrame?.remaining ?? (() => {
-    const sd = (params.state_distribution as { ACTIVE?: number; RESTED?: number } | undefined) ?? {};
-    return { ACTIVE: sd.ACTIVE ?? 0, RESTED: sd.RESTED ?? 0 };
-  })();
+  let remaining =
+    resumeFrame?.remaining ??
+    (() => {
+      const sd = params.state_distribution ?? {};
+      return { ACTIVE: sd.ACTIVE ?? 0, RESTED: sd.RESTED ?? 0 };
+    })();
 
   let nextState = state;
   const playedIds: string[] = [...(resumeFrame?.playedSoFar ?? [])];
@@ -255,7 +269,7 @@ export function executePlayCard(
                 controller,
                 pausedAction: action,
                 remainingActions: [],
-                resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+                resultRefs: [...resultRefs.entries()],
                 validTargets: [],
                 stateDistributionForPlay: {
                   pendingTargetId: id,
@@ -345,7 +359,7 @@ export function executePlayCard(
 
 export function executePlaySelf(
   state: GameState,
-  _action: Action,
+  _action: ActionOf<"PLAY_SELF">,
   sourceCardInstanceId: string,
   _controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -380,7 +394,7 @@ export function executePlaySelf(
 
 export function executeSetActive(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SET_ACTIVE">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -406,7 +420,7 @@ export function executeSetActive(
 
 export function executeSetRest(
   state: GameState,
-  action: Action,
+  action: ActionOf<"SET_REST">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -502,7 +516,7 @@ export function executeSetRest(
 
 export function executeActivateEventFromHand(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ACTIVATE_EVENT_FROM_HAND">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -544,7 +558,7 @@ export function executeActivateEventFromHand(
 
 export function executeActivateEventFromTrash(
   state: GameState,
-  action: Action,
+  action: ActionOf<"ACTIVATE_EVENT_FROM_TRASH">,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,

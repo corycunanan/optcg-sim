@@ -23,7 +23,7 @@ import {
   executeRevealTrigger,
 } from "./battle.js";
 import { resolveEffect } from "./effect-resolver/index.js";
-import { isOncePerTurnBlock, type EffectSchema } from "./effect-types.js";
+import { isOncePerTurnBlock } from "./effect-types.js";
 import { transitionCard } from "./zone-transition.js";
 
 export function execute(
@@ -130,7 +130,7 @@ function executePlayCard(
     events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstanceId, costReducedAmount } });
 
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
-    const schema = cardData.effectSchema as EffectSchema | null;
+    const schema = cardData.effectSchema;
     if (schema?.effects) {
       const mainBlock = schema.effects.find(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
@@ -238,7 +238,7 @@ function executeActivateEffect(
   if (!cardData) return { state, events };
 
   // Get the effect schema
-  const schema = cardData.effectSchema as EffectSchema | null;
+  const schema = cardData.effectSchema;
   if (!schema) return { state, events };
 
   // Find the specific effect block

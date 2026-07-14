@@ -4,6 +4,7 @@
 
 import type {
   Action,
+  ActionOf,
   CostResult,
   EffectBlock,
   EffectResult,
@@ -17,10 +18,23 @@ import type {
   EffectStackFrame,
 } from "../../types.js";
 import { evaluateCondition, type ConditionContext } from "../conditions.js";
-import { popFrame, pushFrame, generateFrameId } from "../effect-stack.js";
+import {
+  CONTINUATION_EFFECT_BLOCK,
+  popFrame,
+  pushFrame,
+  generateFrameId,
+} from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
-import type { EffectResolverResult, ActionResult, ActionHandler } from "./types.js";
-import { markOncePerTurnUsed, extractEffectDescription } from "./action-utils.js";
+import type {
+  EffectResolverResult,
+  ActionResult,
+  ActionHandler,
+  ActionHandlerMap,
+} from "./types.js";
+import {
+  markOncePerTurnUsed,
+  extractEffectDescription,
+} from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import { pushBatchResumeFrame, processRemainingTriggers } from "./resume.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
@@ -57,7 +71,7 @@ import {
 
 // ─── Action dispatcher map ───────────────────────────────────────────────────
 
-const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
+const ACTION_HANDLERS: Partial<ActionHandlerMap> = {
   // Draw / search
   DRAW: drawSearch.executeDraw,
   SEARCH_DECK: drawSearch.executeSearchDeck,
@@ -160,6 +174,14 @@ const ACTION_HANDLERS: Partial<Record<ActionType, ActionHandler>> = {
   OPPONENT_ACTION: executeOpponentAction,
   REUSE_EFFECT: executeReuseEffect,
 };
+
+function getActionHandler<K extends ActionType>(
+  action: ActionOf<K>
+): ActionHandler<K> | undefined {
+  // TypeScript cannot retain the correlation between a computed union key and
+  // its mapped value. Keep that one assertion at the dispatcher boundary.
+  return ACTION_HANDLERS[action.type] as ActionHandler<K> | undefined;
+}
 
 /** Runtime handler inventory consumed by the authored-action CI contract. */
 export function listRegisteredActionTypes(): ActionType[] {
@@ -417,9 +439,7 @@ function promptForSimultaneousSelection(
   cardDb: Map<string, CardData>,
 ): ChainResult {
   const action = plan.actions[actionIndex];
-  const resultRefs = new Map<string, EffectResult>(
-    plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
-  );
+  const resultRefs = new Map<string, EffectResult>(plan.resultRefs);
   const promptResult = buildSelectTargetPrompt(
     state,
     action,
@@ -436,7 +456,7 @@ function promptForSimultaneousSelection(
     id: frameId.id,
     sourceCardInstanceId,
     controller,
-    effectBlock: {} as EffectBlock,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
     phase: "AWAITING_TARGET_SELECTION",
     pausedAction: action,
     remainingActions: plan.followingActions,
@@ -510,9 +530,7 @@ export function continueSimultaneousGroup(
     );
   }
 
-  const resultRefs = new Map<string, EffectResult>(
-    planning.plan.resultRefs.map(([key, value]) => [key, value as EffectResult]),
-  );
+  const resultRefs = new Map<string, EffectResult>(planning.plan.resultRefs);
   const events: PendingEvent[] = [];
   const succeeded = planning.plan.actions.map(() => false);
   let nextState = state;
@@ -603,7 +621,7 @@ export function executeActionChain(
         locks: [],
         nextActionIndex: 0,
         followingActions: actions.slice(end + 1),
-        resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+        resultRefs: [...resultRefs.entries()],
         effectDescription,
       };
       const groupResult = continueSimultaneousGroup(
@@ -661,7 +679,7 @@ export function executeActionChain(
 
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
-      const nestedPromptFrame = result.state.effectStack.at(-1) as unknown as EffectStackFrame | undefined;
+      const nestedPromptFrame = result.state.effectStack.at(-1);
       if (nestedPromptFrame?.replacementBatchContinuation) {
         // A non-optional replacement substitute opened its own prompt and
         // already pushed that prompt's frame. Insert this action chain's
@@ -672,11 +690,11 @@ export function executeActionChain(
           id: frameId.id,
           sourceCardInstanceId,
           controller,
-          effectBlock: {} as EffectBlock,
+          effectBlock: CONTINUATION_EFFECT_BLOCK,
           phase: "INTERRUPTED_BY_TRIGGERS",
           pausedAction: action,
           remainingActions: actions.slice(i + 1),
-          resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+          resultRefs: [...resultRefs.entries()],
           validTargets: [],
           priorActionSucceeded: false,
           costs: [],
@@ -705,11 +723,11 @@ export function executeActionChain(
           id: frameId.id,
           sourceCardInstanceId,
           controller,
-          effectBlock: {} as EffectBlock,
+          effectBlock: CONTINUATION_EFFECT_BLOCK,
           phase: "INTERRUPTED_BY_TRIGGERS",
           pausedAction: action,
           remainingActions: actions.slice(i + 1),
-          resultRefs: [...resultRefs.entries()].map(([key, value]) => [key, value as unknown]),
+          resultRefs: [...resultRefs.entries()],
           validTargets: [],
           priorActionSucceeded: false,
           costs: [],
@@ -739,11 +757,11 @@ export function executeActionChain(
         sourceCardInstanceId,
         controller: resumeController,
         remainingActionsController: controller,
-        effectBlock: {} as EffectBlock, // not needed for mid-chain resumes
+        effectBlock: CONTINUATION_EFFECT_BLOCK,
         phase: phaseForPrompt,
         pausedAction: ctx.pausedAction,
         remainingActions: actions.slice(i + 1),
-        resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+        resultRefs: [...resultRefs.entries()],
         validTargets: ctx.validTargets,
         costs: [],
         currentCostIndex: 0,
@@ -778,7 +796,7 @@ export function executeActionChain(
         result.state,
         sourceCardInstanceId,
         controller,
-        {} as EffectBlock,
+        CONTINUATION_EFFECT_BLOCK,
         marker,
         triggers,
         actions.slice(i + 1),
@@ -825,9 +843,9 @@ function costResultToRefs(
 
 // ─── Single Action Dispatcher ─────────────────────────────────────────────────
 
-export function executeEffectAction(
+export function executeEffectAction<K extends ActionType>(
   state: GameState,
-  action: Action,
+  action: ActionOf<K>,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -838,7 +856,7 @@ export function executeEffectAction(
   if (isEngineTerminated(state)) {
     return { state, events: [], succeeded: false };
   }
-  const handler = ACTION_HANDLERS[action.type];
+  const handler = getActionHandler(action);
   if (handler) {
     return handler(
       state,

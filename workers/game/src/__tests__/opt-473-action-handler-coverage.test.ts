@@ -280,7 +280,7 @@ describe("OPT-473 effects action handlers", () => {
 
     const rejected = executeEffectAction(
       state,
-      { type: "APPLY_ONE_TIME_MODIFIER", params: {} },
+      { type: "APPLY_ONE_TIME_MODIFIER", params: {} } as unknown as Action,
       sourceId,
       0,
       cardDb,

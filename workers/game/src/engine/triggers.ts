@@ -18,7 +18,6 @@ import type {
   CustomEventType,
   EventFilter,
   EffectBlock,
-  EffectSchema,
   EffectZone,
   RuntimeActiveEffect,
   RuntimeRegisteredTrigger,
@@ -47,7 +46,7 @@ export function registerTriggersForCard(
   cardInstance: CardInstance,
   cardData: CardData,
 ): GameState {
-  const schema = cardData.effectSchema as EffectSchema | null;
+  const schema = cardData.effectSchema;
   if (!schema?.effects) return state;
 
   const newTriggers: RuntimeRegisteredTrigger[] = [];
@@ -80,7 +79,7 @@ export function registerTriggersForCard(
 
   return {
     ...nextState,
-    triggerRegistry: [...state.triggerRegistry, ...newTriggers] as any,
+    triggerRegistry: [...state.triggerRegistry, ...newTriggers],
   };
 }
 
@@ -92,7 +91,7 @@ export function deregisterTriggersForCard(
   cardInstanceId: string,
 ): GameState {
   const filtered = state.triggerRegistry.filter(
-    (t) => (t as RuntimeRegisteredTrigger).sourceCardInstanceId !== cardInstanceId,
+    (trigger) => trigger.sourceCardInstanceId !== cardInstanceId
   );
   if (filtered.length === state.triggerRegistry.length) return state;
   return { ...state, triggerRegistry: filtered };
@@ -111,7 +110,7 @@ export function registerPermanentEffectsForCard(
   cardInstance: CardInstance,
   cardData: CardData,
 ): GameState {
-  const schema = cardData.effectSchema as EffectSchema | null;
+  const schema = cardData.effectSchema;
   if (!schema?.effects) return state;
 
   const newEffects: RuntimeActiveEffect[] = [];
@@ -217,12 +216,14 @@ export function registerPermanentEffectsForCard(
 
   return {
     ...nextState,
-    activeEffects: newEffects.length > 0
-      ? [...state.activeEffects, ...newEffects as any]
-      : state.activeEffects,
-    prohibitions: newProhibitions.length > 0
-      ? [...state.prohibitions, ...newProhibitions as any]
-      : state.prohibitions,
+    activeEffects:
+      newEffects.length > 0
+        ? [...state.activeEffects, ...newEffects]
+        : state.activeEffects,
+    prohibitions:
+      newProhibitions.length > 0
+        ? [...state.prohibitions, ...newProhibitions]
+        : state.prohibitions,
   };
 }
 
@@ -238,7 +239,7 @@ export function registerReplacementsForCard(
   cardInstance: CardInstance,
   cardData: CardData,
 ): GameState {
-  const schema = cardData.effectSchema as EffectSchema | null;
+  const schema = cardData.effectSchema;
   if (!schema?.effects) return state;
 
   const newEffects: RuntimeActiveEffect[] = [];
@@ -286,7 +287,7 @@ export function registerReplacementsForCard(
 
   return {
     ...nextState,
-    activeEffects: [...state.activeEffects, ...newEffects as any],
+    activeEffects: [...state.activeEffects, ...newEffects],
   };
 }
 
@@ -323,7 +324,7 @@ export function isTriggerTypeNegated(
   cardDb: Map<string, CardData>,
 ): boolean {
   // (1) Active prohibitions (NEGATE_TRIGGER_TYPE action).
-  const prohibitions = state.prohibitions as RuntimeProhibition[];
+  const prohibitions = state.prohibitions;
   for (const p of prohibitions) {
     if (p.scope?.triggerType !== triggerType) continue;
     if (p.controller !== sourceCard.controller) continue;
@@ -333,12 +334,12 @@ export function isTriggerTypeNegated(
   // (2) Leader rule_modification (passive while card is the Leader).
   for (const player of state.players) {
     const leaderData = cardDb.get(player.leader.cardId);
-    const schema = leaderData?.effectSchema as EffectSchema | null;
+    const schema = leaderData?.effectSchema;
     if (!schema?.effects) continue;
     const leaderController = player.leader.controller;
     for (const block of schema.effects) {
       if (block.category !== "rule_modification") continue;
-      const rule = (block as { rule?: { rule_type?: string; trigger_type?: string; affected_controller?: string } }).rule;
+      const rule = block.rule;
       if (!rule || rule.rule_type !== "TRIGGER_TYPE_NEGATION") continue;
       if (rule.trigger_type !== triggerType) continue;
       const affected = rule.affected_controller === "OPPONENT"
@@ -360,7 +361,7 @@ export function matchTriggersForEvent(
   cardDb: Map<string, CardData>,
 ): MatchedTrigger[] {
   const matched: MatchedTrigger[] = [];
-  const registry = state.triggerRegistry as RuntimeRegisteredTrigger[];
+  const registry = state.triggerRegistry;
 
   for (const reg of registry) {
     if (!reg.trigger || !reg.effectBlock) continue;
@@ -852,14 +853,26 @@ function matchesEventFilter(
 }
 
 function getCardFromEvent(event: GameEvent): string | null {
-  const p = event.payload as Record<string, unknown> | undefined;
-  if (!p) return null;
-  return (
-    (p.cardInstanceId as string) ??
-    (p.attackerInstanceId as string) ??
-    (p.blockerInstanceId as string) ??
-    null
-  );
+  const payload = event.payload;
+  if (
+    "cardInstanceId" in payload &&
+    typeof payload.cardInstanceId === "string"
+  ) {
+    return payload.cardInstanceId;
+  }
+  if (
+    "attackerInstanceId" in payload &&
+    typeof payload.attackerInstanceId === "string"
+  ) {
+    return payload.attackerInstanceId;
+  }
+  if (
+    "blockerInstanceId" in payload &&
+    typeof payload.blockerInstanceId === "string"
+  ) {
+    return payload.blockerInstanceId;
+  }
+  return null;
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────

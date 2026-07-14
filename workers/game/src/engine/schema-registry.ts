@@ -15,6 +15,7 @@ import {
   ALL_ACTION_TYPES,
   ALL_COST_TYPES,
   ALL_TARGET_TYPES,
+  getNestedActions,
   type EffectSchema,
   type EffectBlock,
   type Action,
@@ -631,23 +632,7 @@ function walkActions(actions: Action[]): Action[] {
     for (const action of list) {
       if (!action || typeof action !== "object") continue;
       walked.push(action);
-      const params = action.params;
-      if (!params) continue;
-      if (Array.isArray(params.options)) {
-        for (const option of params.options) {
-          if (Array.isArray(option)) visit(option as Action[]);
-          else if (
-            option &&
-            typeof option === "object" &&
-            Array.isArray((option as { actions?: unknown }).actions)
-          ) {
-            visit((option as { actions: Action[] }).actions);
-          }
-        }
-      }
-      if (params.action && typeof params.action === "object") {
-        visit([params.action as Action]);
-      }
+      visit(getNestedActions(action));
     }
   };
   visit(actions);

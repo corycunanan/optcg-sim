@@ -21,6 +21,7 @@ import type {
   Target,
   TargetFilter,
 } from "./effect-types.js";
+import { ALL_ACTION_TYPES } from "./effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -66,11 +67,78 @@ export interface ReplacementCheckResult {
 
 interface ReplacementParams {
   trigger: string;
-  cause_filter: CauseFilter | null;
-  target_filter: TargetFilter | null;
+  cause_filter?: CauseFilter | null;
+  target_filter?: TargetFilter | null;
   replacement_actions: Action[];
   optional: boolean;
   once_per_turn: boolean;
+  usedOnTurn?: number;
+}
+
+const REPLACEMENT_EVENTS = new Set<string>([
+  "WOULD_BE_KO",
+  "WOULD_BE_REMOVED_FROM_FIELD",
+  "WOULD_LEAVE_FIELD",
+  "WOULD_BE_RESTED",
+  "WOULD_LOSE_GAME",
+  "LIFE_ADDED_TO_HAND",
+]);
+const REPLACEMENT_ACTION_TYPES = new Set<string>(ALL_ACTION_TYPES);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isReplacementAction(value: unknown): value is Action {
+  if (
+    !isRecord(value) ||
+    typeof value.type !== "string" ||
+    !REPLACEMENT_ACTION_TYPES.has(value.type)
+  )
+    return false;
+  if (!isRecord(value.params)) return value.params === undefined;
+  if (value.type === "PLAYER_CHOICE" || value.type === "OPPONENT_CHOICE") {
+    return (
+      Array.isArray(value.params.options) &&
+      value.params.options.every(
+        (branch) => Array.isArray(branch) && branch.every(isReplacementAction)
+      )
+    );
+  }
+  if (value.type === "OPPONENT_ACTION" || value.type === "SCHEDULE_ACTION") {
+    return isReplacementAction(value.params.action);
+  }
+  return true;
+}
+
+function isCauseFilter(value: unknown): value is CauseFilter {
+  return (
+    isRecord(value) &&
+    (value.by === "OPPONENT_EFFECT" ||
+      value.by === "ANY_EFFECT" ||
+      value.by === "ANY")
+  );
+}
+
+function isTargetFilter(value: unknown): value is TargetFilter {
+  return isRecord(value);
+}
+
+function isReplacementParams(value: unknown): value is ReplacementParams {
+  if (
+    !isRecord(value) ||
+    typeof value.trigger !== "string" ||
+    !REPLACEMENT_EVENTS.has(value.trigger) ||
+    typeof value.optional !== "boolean" ||
+    typeof value.once_per_turn !== "boolean" ||
+    !Array.isArray(value.replacement_actions) ||
+    !value.replacement_actions.every(isReplacementAction)
+  )
+    return false;
+  return (
+    (value.cause_filter == null || isCauseFilter(value.cause_filter)) &&
+    (value.target_filter == null || isTargetFilter(value.target_filter))
+  );
 }
 
 // ─── Pipeline Step 3: Action-Level Replacement ───────────────────────────────
@@ -212,14 +280,14 @@ function checkReplacementForEvent(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
 
   for (const effect of effects) {
     const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
     if (!mod) continue;
 
-    const params = mod.params as unknown as ReplacementParams;
-    if (!params) continue;
+    const params = mod.params;
+    if (!isReplacementParams(params)) continue;
 
     if (!replacementMatchesTarget(state, effect, params, targetInstanceId, event, cause, causingController, cardDb)) {
       continue;
@@ -285,14 +353,14 @@ export function scanReplacementsForBatch(
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
 ): ReplacementBatchMatch[] {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const matches: ReplacementBatchMatch[] = [];
 
   for (const effect of effects) {
     const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
     if (!mod) continue;
-    const params = mod.params as unknown as ReplacementParams;
-    if (!params) continue;
+    const params = mod.params;
+    if (!isReplacementParams(params)) continue;
     if (params.trigger !== event) continue;
     if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
     if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) continue;
@@ -325,12 +393,13 @@ export function applyBatchReplacement(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const effect = effects.find((e) => e.id === effectId);
   if (!effect) return { replaced: false, state, events: [] };
   const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
-  const params = mod?.params as unknown as ReplacementParams;
-  if (!params) return { replaced: false, state, events: [] };
+  const params = mod?.params;
+  if (!isReplacementParams(params))
+    return { replaced: false, state, events: [] };
   return applyReplacement(state, effect, params, "", cardDb, services);
 }
 
@@ -346,7 +415,7 @@ export function buildBatchReplacementPrompt(
   resumeContext: ReplacementBatchResumeContext,
   cardDb: Map<string, CardData>,
 ): PendingPromptState {
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const effect = effects.find((e) => e.id === effectId);
   const sourceCard = effect ? findCardInstance(state, effect.sourceCardInstanceId) : undefined;
   const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
@@ -355,7 +424,7 @@ export function buildBatchReplacementPrompt(
   return {
     options: { promptType: "OPTIONAL_EFFECT", effectDescription, cards },
     respondingPlayer: effect?.controller ?? 0,
-    resumeContext: resumeContext as unknown,
+    resumeContext,
   };
 }
 
@@ -381,8 +450,8 @@ function hasUsedThisTurn(state: GameState, effect: RuntimeActiveEffect): boolean
   // Check if this effect has been marked as used this turn
   // We track this via a convention: the effect's params will have usedOnTurn set
   const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
-  const params = mod?.params as Record<string, unknown> | undefined;
-  return params?.usedOnTurn === state.turn.number;
+  const params = mod?.params;
+  return isReplacementParams(params) && params.usedOnTurn === state.turn.number;
 }
 
 // ─── Cost Validation ─────────────────────────────────────────────────────────
@@ -397,8 +466,9 @@ function canPayReplacementCost(
 
   for (const action of actions) {
     if (action.type === "TRASH_FROM_HAND") {
-      const amount = (action.params?.amount as number) ?? 1;
-      const filter = (action.target?.filter ?? action.params?.filter) as TargetFilter | undefined;
+      const amount =
+        typeof action.params?.amount === "number" ? action.params.amount : 1;
+      const filter = action.target?.filter ?? action.params?.filter;
 
       if (filter) {
         const matching = player.hand.filter((c) =>
@@ -441,14 +511,16 @@ function canExecuteReplacementSubstitute(
       // the replacement is infeasible — the removal proceeds as written.
       if (!canTurnLifeFaceUpSucceed(state, effect)) return false;
     } else if (action.type === "REST_DON") {
-      const amount = (action.params?.amount as number) ?? 1;
-      const activeDon = state.players[effect.controller].donCostArea.filter((d) => d.state === "ACTIVE").length;
+      const amount = action.params?.amount ?? 1;
+      const activeDon = state.players[effect.controller].donCostArea.filter(
+        (d) => d.state === "ACTIVE"
+      ).length;
       if (activeDon < amount) return false;
     } else if (action.type === "PLAYER_CHOICE") {
       // Choice-of-payments substitute (e.g. OP16-033 Morley "rest 2 of your
       // cards" = field cards and/or DON). Feasible if at least one non-empty
       // branch is fully feasible.
-      const options = (action.params?.options as Action[][]) ?? [];
+      const options = action.params?.options ?? [];
       const anyFeasible = options.some(
         (branch) => branch.length > 0 && canExecuteReplacementSubstitute(state, effect, branch, cardDb),
       );
@@ -463,7 +535,7 @@ function canExecuteReplacementSubstitute(
 
 function canSetRestSucceed(
   state: GameState,
-  action: Action,
+  action: import("./effect-types.js").ActionOf<"SET_REST">,
   effect: RuntimeActiveEffect,
   cardDb: Map<string, CardData>,
 ): boolean {
@@ -508,7 +580,10 @@ function collectSubstituteCandidates(
 ): CardInstance[] {
   const scope = target.controller ?? "SELF";
   const opp = replacementController === 0 ? 1 : 0;
-  const pickChars = (pi: 0 | 1) => state.players[pi].characters.filter(Boolean) as CardInstance[];
+  const pickChars = (pi: 0 | 1) =>
+    state.players[pi].characters.filter(
+      (card): card is CardInstance => card !== null
+    );
   const pickLeader = (pi: 0 | 1) => state.players[pi].leader;
   const includeLeader = target.type === "LEADER_OR_CHARACTER" || target.type === "FIELD_CARD";
 
@@ -516,7 +591,7 @@ function collectSubstituteCandidates(
     const chars = pickChars(pi);
     const base = includeLeader ? [pickLeader(pi), ...chars] : chars;
     return target.type === "FIELD_CARD" && state.players[pi].stage
-      ? [...base, state.players[pi].stage as CardInstance]
+      ? [...base, state.players[pi].stage]
       : base;
   };
 
@@ -564,8 +639,12 @@ function applyReplacement(
   return { replaced: true, state: nextState, events };
 }
 
-function markReplacementUsed(state: GameState, effect: RuntimeActiveEffect, turn: number): GameState {
-  const effects = (state.activeEffects as RuntimeActiveEffect[]).map((e) => {
+function markReplacementUsed(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+  turn: number
+): GameState {
+  const effects = state.activeEffects.map((e) => {
     if (e.id !== effect.id) return e;
     return {
       ...e,
@@ -575,7 +654,7 @@ function markReplacementUsed(state: GameState, effect: RuntimeActiveEffect, turn
       }),
     };
   });
-  return { ...state, activeEffects: effects as any };
+  return { ...state, activeEffects: effects };
 }
 
 // ─── Prompt for Optional Replacement ─────────────────────────────────────────
@@ -653,15 +732,15 @@ export function resumeReplacement(
     return { replaced: false, state, events: [] };
   }
 
-  const effects = state.activeEffects as RuntimeActiveEffect[];
+  const effects = state.activeEffects;
   const effect = effects.find((e) => e.id === ctx.effectId);
   if (!effect) {
     return { replaced: false, state, events: [] };
   }
 
   const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
-  const params = mod?.params as unknown as ReplacementParams;
-  if (!params) {
+  const params = mod?.params;
+  if (!isReplacementParams(params)) {
     return { replaced: false, state, events: [] };
   }
 

@@ -9,21 +9,87 @@ export type {
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
   EngineLimitDiagnostic, EngineTerminalOutcome,
   EngineExecutionContext,
-  GameEventType, GameEvent, GameEventPayloadMap, PendingGameEvent,
-  GameState,
-  CardData, KeywordSet,
+  GameEventType,
+  GameEvent,
+  GameEventPayloadMap,
+  PendingGameEvent,
+  KeywordSet,
   GameAction,
-  ServerMessage, ClientMessage,
-  PromptType, PromptOptions,
-  PendingPromptState,
+  ServerMessage,
+  ClientMessage,
+  PromptType,
+  PromptOptions,
   EffectStackPhase,
   EffectStackFrame as SharedEffectStackFrame,
   QueuedTrigger as SharedQueuedTrigger,
 } from "../../../shared/game-types.js";
 
-import type { CardData, GameAction, GameState, PendingPromptState, PendingGameEvent } from "../../../shared/game-types.js";
+import type {
+  CardData as SharedCardData,
+  GameAction,
+  GameState as SharedGameState,
+  PendingGameEvent,
+  PendingPromptState as SharedPendingPromptState,
+} from "../../../shared/game-types.js";
+import type {
+  EffectSchema,
+  RuntimeActiveEffect,
+  RuntimeOneTimeModifier,
+  RuntimeProhibition,
+  RuntimeRegisteredTrigger,
+  RuntimeScheduledAction,
+} from "./engine/effect-types.js";
 
 // ─── Engine-internal types ────────────────────────────────────────────────────
+
+/** Card data after the game-init/schema boundary has validated effect schemas. */
+export interface CardData extends Omit<SharedCardData, "effectSchema"> {
+  effectSchema: EffectSchema | null;
+}
+
+/** Prompt state persisted and executed inside the worker after validation. */
+export interface PendingPromptState extends Omit<
+  SharedPendingPromptState,
+  "resumeContext"
+> {
+  resumeContext: PromptResumeContext;
+}
+
+export type PregamePromptResumeContext = {
+  type: "PREGAME_PRIORITY_CHOICE" | "PREGAME_MULLIGAN";
+};
+
+/** Exhaustive persisted prompt continuation shapes used by the worker. */
+export type PromptResumeContext =
+  | ResumeContext
+  | import("./engine/replacements.js").ReplacementBatchResumeContext
+  | import("./engine/replacements.js").ReplacementResumeContext
+  | PregamePromptResumeContext
+  | string
+  | null;
+
+/**
+ * Worker-owned state replaces shared transport stubs with executable runtime
+ * contracts. It remains structurally assignable to the shared public state.
+ */
+export interface GameState extends Omit<
+  SharedGameState,
+  | "activeEffects"
+  | "prohibitions"
+  | "scheduledActions"
+  | "oneTimeModifiers"
+  | "triggerRegistry"
+  | "pendingPrompt"
+  | "effectStack"
+> {
+  activeEffects: RuntimeActiveEffect[];
+  prohibitions: RuntimeProhibition[];
+  scheduledActions: RuntimeScheduledAction[];
+  oneTimeModifiers: RuntimeOneTimeModifier[];
+  triggerRegistry: RuntimeRegisteredTrigger[];
+  pendingPrompt: PendingPromptState | null;
+  effectStack: EffectStackFrame[];
+}
 
 /** Alias for the shared PendingGameEvent — used throughout the engine. */
 export type PendingEvent = PendingGameEvent;
@@ -42,7 +108,7 @@ export interface ResumeContext {
   remainingActionsController?: 0 | 1;
   pausedAction: import("./engine/effect-types.js").Action | null;
   remainingActions: import("./engine/effect-types.js").Action[];
-  resultRefs: [string, unknown][];
+  resultRefs: [string, import("./engine/effect-types.js").EffectResult][];
   validTargets: string[];
   // Rule 3-7-6-1: when an effect-driven play hits a full board, the prompt asks
   // the controller to pick one of their own Characters to trash before the play
@@ -97,7 +163,7 @@ export interface ResumeContext {
 export type BatchResumeMarker =
   | {
       kind: "PLAY_CARD";
-      pausedAction: import("./engine/effect-types.js").Action;
+      pausedAction: import("./engine/effect-types.js").ActionOf<"PLAY_CARD">;
       resumeFrame: {
         remainingTargetIds: string[];
         remaining: { ACTIVE: number; RESTED: number };
@@ -107,13 +173,13 @@ export type BatchResumeMarker =
     }
   | {
       kind: "KO";
-      pausedAction: import("./engine/effect-types.js").Action;
+      pausedAction: import("./engine/effect-types.js").ActionOf<"KO">;
       remainingTargetIds: string[];
       koedSoFar: string[];
     }
   | {
       kind: "SET_REST";
-      pausedAction: import("./engine/effect-types.js").Action;
+      pausedAction: import("./engine/effect-types.js").ActionOf<"SET_REST">;
       remainingTargetIds: string[];
       restedSoFar: string[];
     };
@@ -132,7 +198,7 @@ export interface EffectStackFrame {
   // Action chain state
   pausedAction: import("./engine/effect-types.js").Action | null;
   remainingActions: import("./engine/effect-types.js").Action[];
-  resultRefs: [string, unknown][];
+  resultRefs: [string, import("./engine/effect-types.js").EffectResult][];
   validTargets: string[];
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;

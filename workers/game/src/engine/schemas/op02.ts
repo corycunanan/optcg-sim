@@ -2026,7 +2026,11 @@ export const OP02_025_KINEMON: EffectSchema = {
             },
             applies_to: {
               action: "MODIFY_COST",
-              filter: { traits: ["Land of Wano"], card_type: "CHARACTER", costMin: 3 },
+              filter: {
+                traits: ["Land of Wano"],
+                card_type: "CHARACTER",
+                cost_min: 3,
+              },
             },
           },
           duration: { type: "THIS_TURN" },

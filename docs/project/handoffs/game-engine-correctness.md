@@ -57,8 +57,8 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 39 | OPT-477 | Introduce an explicit deterministic EngineExecutionContext for RNG, IDs, and time | — | OPT-467, OPT-468, OPT-472, OPT-474 | Done | [#297](https://github.com/corycunanan/optcg-sim/pull/297) | Persisted RNG/time/ID/budget/trace context with exact replay and restart coverage. |
 | 40 | OPT-478 | Replace resolver module-global dispatch and decompose the 1,831-line cost handler | — | OPT-471, OPT-477 | Done | [#298](https://github.com/corycunanan/optcg-sim/pull/298) | Immutable runtime resolver services; cost façade split into six acyclic modules with architecture guards. |
 | 41 | OPT-479 | Decompose GameSession transport, authorization, orchestration, visibility, and persistence | — | OPT-477 | Done | [#303](https://github.com/corycunanan/optcg-sim/pull/303) | 919-line Durable Object composition root over typed session collaborators; contract coverage locks serialization, reconnects, authorization, visibility, and persistence. |
-| 42 | OPT-487 | RETURN_TO_DECK silently ignores non-Character source zones | — | OPT-474, OPT-475 | In Review | [#305](https://github.com/corycunanan/optcg-sim/pull/305) | Canonical returns, Life-removal events, and owner-authoritative ordering for every legal source; field replacements remain field-only. |
-| 43 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | Backlog | — | Exhaustive runtime unions and dead resolver removal. |
+| 42 | OPT-487 | RETURN_TO_DECK silently ignores non-Character source zones | — | OPT-474, OPT-475 | Done | [#305](https://github.com/corycunanan/optcg-sim/pull/305) | Canonical returns, Life-removal events, and owner-authoritative ordering for every legal source; field replacements remain field-only. |
+| 43 | OPT-480 | Tighten engine runtime types and remove the duplicate unused target resolver | — | OPT-478, OPT-479 | In Review | [#307](https://github.com/corycunanan/optcg-sim/pull/307) | Exhaustive action/event/runtime unions, validated unknown-data boundaries, and dead resolver removal. |
 | 44 | OPT-481 | Bound event-log, undo-history, and Durable Object persistence growth | — | OPT-479 | Backlog | — | Tested persistence and history bounds. |
 | 45 | OPT-482 | Reconcile rules, schema, and architecture docs to executable engine behavior | — | OPT-471–OPT-481 | Backlog | — | Final documentation and closure evidence. |
 | 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Backlog | — | Seventeen newly exposed findings; overlaps OPT-475 where conditional reveals are involved. |
@@ -68,7 +68,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #305. OPT-480 and OPT-481 are ready after the current review queue; OPT-484 and OPT-485 remain independently ready.
+**Next up:** Review PR #307, then implement OPT-481. OPT-484 and OPT-485 remain independently ready; OPT-482 closes the project after implementation tickets land.
 
 ---
 
@@ -397,3 +397,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Same-deck result-reference placement remains an identity-preserving reorder in `actions/removal.ts`. For nested `OPPONENT_ACTION` schemas, `SELF` is responder-relative; the responder owns both Trash selection and order under rule 3-1-7. Schema destination is authoritative over a client's arrangement payload. A non-optional replacement substitute that prompts carries `replacementBatchContinuation` on its prompt frame, with the original action-chain continuation immediately below it. Keep old/new destination identities owner-only in movement events, and retain Character/Stage prohibition and replacement behavior while tightening types.
 - **Unresolved:** The action reference still describes field-only returns; documentation reconciliation remains tracked by OPT-482. No OPT-487 runtime behavior is deferred.
 - **Pointer:** PR #305; inspect `6dfef20` for the final source-zone matrix, owner-selected ordering, replacement-stack continuation, zero-target-safe `any_number` handling, visibility checks, and field-replacement boundary. Earlier review fixes are captured in `8c50406`, `401cbae`, `ccdab6a`, and `da3ecf0`.
+
+### OPT-480 → OPT-481
+**From:** session on 2026-07-13 · **Commit:** `4af967c` · **PR:** [#307](https://github.com/corycunanan/optcg-sim/pull/307)
+
+- **Primer:** Engine actions and events are exhaustive mapped discriminated unions, resolver handlers receive exact action variants, and runtime card/state/prompt/stack shapes no longer fall back to broad records. Card payloads, WebSocket messages, game initialization, and restored Durable Object snapshots validate at their unknown-data boundaries. The duplicate unused target resolver and export are gone.
+- **Read first:** `workers/game/src/types.ts`, `workers/game/src/engine/effect-types.ts`, `workers/game/src/util/validate.ts`, `workers/game/src/session/persistence.ts`, and `workers/game/src/__tests__/opt-480-runtime-types.test.ts`; then begin OPT-481 at the event-log and undo-history ownership in `session/coordinator.ts` and snapshot writes in `session/persistence.ts`.
+- **Gotchas / do NOT touch:** Keep the two intentional double assertions confined to Cloudflare storage and the final validated persistence boundary; the static regression enforces that allowance. Preserve `ActionParamsMap`/handler exhaustiveness when adding action types. OPT-481 must bound histories without weakening snapshot validation or discarding state required to resume a pending prompt/effect stack.
+- **Unresolved:** OPT-481 owns event-log, undo-history, and persisted-snapshot growth policy. OPT-484 and OPT-485 remain independent schema/source work; OPT-482 remains the final documentation reconciliation.
+- **Pointer:** PR #307; `pnpm verify` passes with 613 app tests, 1,591 worker tests, 2,319 validated card schemas, 3,574 authored action uses, 73/73 handler coverage, and a production build.

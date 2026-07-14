@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { Action, EffectBlock, EffectSchema } from "../engine/effect-types.js";
-import type { CardData, CardInstance, GameState, LifeCard, PlayerState } from "../types.js";
+import {
+  getNestedActions,
+  type Action,
+  type EffectBlock,
+  type EffectSchema,
+} from "../engine/effect-types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameState,
+  LifeCard,
+  PlayerState,
+} from "../types.js";
 import {
   CHOSEN_COST_REVEAL_CARD_IDS,
   CONDITIONAL_REVEAL_CARD_IDS,
@@ -17,14 +28,7 @@ function walkActions(actions: Action[] | undefined): Action[] {
   const visit = (list: Action[] | undefined): void => {
     for (const action of list ?? []) {
       found.push(action);
-      const options = action.params?.options;
-      if (Array.isArray(options)) {
-        for (const option of options) {
-          if (Array.isArray(option)) visit(option as Action[]);
-        }
-      }
-      const nested = action.params?.action;
-      if (nested && typeof nested === "object") visit([nested as Action]);
+      visit(getNestedActions(action));
     }
   };
   visit(actions);

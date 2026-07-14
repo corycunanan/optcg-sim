@@ -27,13 +27,14 @@ import { matchesFilter as matchesFilterImpl } from "../conditions.js";
 import { getEffectivePower, getEffectiveCostForRead } from "../modifiers.js";
 import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
+import { isPresent } from "../type-guards.js";
 
 // ─── Source zone helpers ─────────────────────────────────────────────────────
 
 function getCandidatesFromSourceZones(
   sourceZone: SourceZone | SourceZone[] | undefined,
   player: PlayerState,
-  state?: GameState,
+  state: GameState
 ): CardInstance[] {
   if (!sourceZone) return player.hand;
   const zones = Array.isArray(sourceZone) ? sourceZone : [sourceZone];
@@ -42,18 +43,44 @@ function getCandidatesFromSourceZones(
   // window. The Bandai ruling for the OP14 Thriller Bark Trigger pattern
   // ("Play X from trash") is that the just-revealed Life card cannot be
   // chosen as its own target.
-  const stagingIds = new Set(state?.turn.triggerStagingInstanceIds ?? []);
+  const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
+  const playerIndex: 0 | 1 = state.players[0] === player ? 0 : 1;
   const candidates: CardInstance[] = [];
   const seen = new Set<string>();
   for (const zone of zones) {
     let cards: CardInstance[];
     switch (zone) {
-      case "TRASH": cards = player.trash.filter((c) => !stagingIds.has(c.instanceId)); break;
-      case "DECK": cards = player.deck; break;
-      case "DECK_TOP": cards = player.deck.slice(0, 1); break;
-      case "FIELD": cards = [player.leader, ...(player.characters.filter(Boolean) as CardInstance[]), ...(player.stage ? [player.stage] : [])]; break;
-      case "LIFE": cards = player.life.map((l) => ({ instanceId: l.instanceId, cardId: l.cardId, zone: "LIFE" as any, state: "ACTIVE" as any, attachedDon: [], turnPlayed: null, controller: 0 as 0 | 1, owner: 0 as 0 | 1 })); break;
-      default: cards = player.hand; break;
+      case "TRASH":
+        cards = player.trash.filter((c) => !stagingIds.has(c.instanceId));
+        break;
+      case "DECK":
+        cards = player.deck;
+        break;
+      case "DECK_TOP":
+        cards = player.deck.slice(0, 1);
+        break;
+      case "FIELD":
+        cards = [
+          player.leader,
+          ...player.characters.filter(isPresent),
+          ...(player.stage ? [player.stage] : []),
+        ];
+        break;
+      case "LIFE":
+        cards = player.life.map((l) => ({
+          instanceId: l.instanceId,
+          cardId: l.cardId,
+          zone: "LIFE",
+          state: "ACTIVE",
+          attachedDon: [],
+          turnPlayed: null,
+          controller: playerIndex,
+          owner: playerIndex,
+        }));
+        break;
+      default:
+        cards = player.hand;
+        break;
     }
     for (const c of cards) {
       if (!seen.has(c.instanceId)) {
@@ -322,16 +349,30 @@ export function computeAllValidTargets(
       const includeLeader = targetType === "LEADER_OR_CHARACTER" || targetType === "FIELD_CARD";
       let candidates: CardInstance[] = [];
       if (pi === -1) {
-        candidates = [...state.players[0].characters.filter(Boolean) as CardInstance[], ...state.players[1].characters.filter(Boolean) as CardInstance[]];
-        if (includeLeader) candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
+        candidates = [
+          ...state.players[0].characters.filter(isPresent),
+          ...state.players[1].characters.filter(isPresent),
+        ];
+        if (includeLeader)
+          candidates = [
+            state.players[0].leader,
+            ...candidates,
+            state.players[1].leader,
+          ];
         if (targetType === "FIELD_CARD") {
-          candidates = [...candidates, ...[state.players[0].stage, state.players[1].stage].filter(Boolean) as CardInstance[]];
+          candidates = [
+            ...candidates,
+            ...[state.players[0].stage, state.players[1].stage].filter(
+              isPresent
+            ),
+          ];
         }
       } else {
-        candidates = state.players[pi].characters.filter(Boolean) as CardInstance[];
-        if (includeLeader) candidates = [state.players[pi].leader, ...candidates];
+        candidates = state.players[pi].characters.filter(isPresent);
+        if (includeLeader)
+          candidates = [state.players[pi].leader, ...candidates];
         if (targetType === "FIELD_CARD" && state.players[pi].stage) {
-          candidates = [...candidates, state.players[pi].stage as CardInstance];
+          candidates = [...candidates, state.players[pi].stage];
         }
       }
       if (target.filter) {
@@ -394,8 +435,8 @@ export function computeAllValidTargets(
       let candidates = state.players[pi].donCostArea;
       if (target.filter) {
         candidates = candidates.filter((d) => {
-          if ((target.filter as any).is_active && d.state !== "ACTIVE") return false;
-          if ((target.filter as any).is_rested && d.state !== "RESTED") return false;
+          if (target.filter!.is_active && d.state !== "ACTIVE") return false;
+          if (target.filter!.is_rested && d.state !== "RESTED") return false;
           return true;
         });
       }
@@ -431,7 +472,7 @@ export function computeAllValidTargets(
     }
     case "SELECTED_CARDS": {
       // Reference to previously selected targets — resolved via result_refs
-      const ref = (target as any).ref as string;
+      const ref = target.ref;
       if (ref && _resultRefs.has(ref)) {
         return _resultRefs.get(ref)!.targetInstanceIds ?? [];
       }
@@ -570,7 +611,7 @@ export function buildSelectTargetPrompt(
     controller,
     pausedAction: action,
     remainingActions: [], // filled in by executeActionChain
-    resultRefs: [...resultRefs.entries()].map(([k, v]) => [k, v as unknown]),
+    resultRefs: [...resultRefs.entries()],
     validTargets: allValidIds,
   };
 
@@ -590,223 +631,4 @@ export function buildSelectTargetPrompt(
   };
 
   return { state, events: [], succeeded: false, pendingPrompt };
-}
-
-// ─── resolveTargetInstances ──────────────────────────────────────────────────
-
-export function resolveTargetInstances(
-  state: GameState,
-  target: Target | undefined,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  sourceCardInstanceId: string,
-  _resultRefs: Map<string, EffectResult>,
-): string[] {
-  if (!target) return [];
-
-  const targetType = target.type;
-  if (!targetType) return [];
-
-  switch (targetType) {
-    case "SELF":
-      return [sourceCardInstanceId];
-
-    case "YOUR_LEADER":
-      return [state.players[controller].leader.instanceId];
-
-    case "OPPONENT_LEADER": {
-      const opp = controller === 0 ? 1 : 0;
-      return [state.players[opp].leader.instanceId];
-    }
-
-    case "ALL_YOUR_CHARACTERS":
-      return state.players[controller].characters.filter(Boolean).map((c) => c!.instanceId);
-
-    case "ALL_OPPONENT_CHARACTERS": {
-      const opp = controller === 0 ? 1 : 0;
-      return state.players[opp].characters.filter(Boolean).map((c) => c!.instanceId);
-    }
-
-    case "CHARACTER":
-    case "LEADER_OR_CHARACTER":
-    case "FIELD_CARD": {
-      // FIELD_CARD = leader + characters + stage ("your cards" on the field).
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : -1;
-      const includeLeader = targetType === "LEADER_OR_CHARACTER" || targetType === "FIELD_CARD";
-
-      let candidates: CardInstance[] = [];
-      if (pi === -1) {
-        // EITHER — both players
-        candidates = [
-          ...state.players[0].characters.filter(Boolean) as CardInstance[],
-          ...state.players[1].characters.filter(Boolean) as CardInstance[],
-        ];
-        if (includeLeader) {
-          candidates = [state.players[0].leader, ...candidates, state.players[1].leader];
-        }
-        if (targetType === "FIELD_CARD") {
-          candidates = [...candidates, ...[state.players[0].stage, state.players[1].stage].filter(Boolean) as CardInstance[]];
-        }
-      } else {
-        candidates = state.players[pi].characters.filter(Boolean) as CardInstance[];
-        if (includeLeader) {
-          candidates = [state.players[pi].leader, ...candidates];
-        }
-        if (targetType === "FIELD_CARD" && state.players[pi].stage) {
-          candidates = [...candidates, state.players[pi].stage as CardInstance];
-        }
-      }
-
-      // Apply filter
-      if (target.filter) {
-        candidates = candidates.filter((c) => {
-          if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
-          return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
-        });
-      }
-
-      // Apply self_ref
-      if (target.self_ref) {
-        return candidates.filter((c) => c.instanceId === sourceCardInstanceId).map((c) => c.instanceId);
-      }
-
-      // Apply count
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
-      if ("all" in count) return candidates.map((c) => c.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
-      if ("any_number" in count) return candidates.map((c) => c.instanceId);
-
-      return candidates.slice(0, 1).map((c) => c.instanceId);
-    }
-
-    case "CARD_IN_HAND":
-    case "CHARACTER_CARD":
-    case "EVENT_CARD":
-    case "STAGE_CARD": {
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      let candidates: CardInstance[];
-      candidates = getCandidatesFromSourceZones(target.source_zone, state.players[pi], state);
-      if (targetType === "CHARACTER_CARD") {
-        candidates = candidates.filter((c) => { const d = cardDb.get(c.cardId); return d && d.type?.toUpperCase() === "CHARACTER"; });
-      } else if (targetType === "EVENT_CARD") {
-        candidates = candidates.filter((c) => { const d = cardDb.get(c.cardId); return d && d.type?.toUpperCase() === "EVENT"; });
-      } else if (targetType === "STAGE_CARD") {
-        candidates = candidates.filter((c) => { const d = cardDb.get(c.cardId); return d && d.type?.toUpperCase() === "STAGE"; });
-      }
-      if (target.filter) {
-        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
-      }
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
-      return candidates.slice(0, 1).map((c) => c.instanceId);
-    }
-
-    case "CARD_IN_TRASH": {
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      // OPT-257 (F4): exclude trigger-staging instances from trash queries.
-      const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
-      let candidates = state.players[pi].trash.filter((c) => !stagingIds.has(c.instanceId));
-      if (target.filter) {
-        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
-      }
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
-      if ("all" in count) return candidates.map((c) => c.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
-      return candidates.slice(0, 1).map((c) => c.instanceId);
-    }
-
-    case "CARD_IN_DECK": {
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      let candidates = state.players[pi].deck;
-      if (target.filter) {
-        candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
-      }
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
-      return candidates.slice(0, 1).map((c) => c.instanceId);
-    }
-
-    case "DON_IN_COST_AREA": {
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      let candidates = state.players[pi].donCostArea;
-      if (target.filter) {
-        candidates = candidates.filter((d) => {
-          if ((target.filter as any).is_active && d.state !== "ACTIVE") return false;
-          if ((target.filter as any).is_rested && d.state !== "RESTED") return false;
-          return true;
-        });
-      }
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((d) => d.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((d) => d.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((d) => d.instanceId);
-      return candidates.slice(0, 1).map((d) => d.instanceId);
-    }
-
-    case "STAGE": {
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      const stage = state.players[pi].stage;
-      if (!stage) return [];
-      if (target.filter && !matchesFilterForTarget(stage, target.filter, cardDb, state, _resultRefs)) return [];
-      return [stage.instanceId];
-    }
-
-    case "OPPONENT_LIFE": {
-      const opp = controller === 0 ? 1 : 0;
-      const candidates = state.players[opp].life;
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
-      return candidates.slice(0, 1).map((c) => c.instanceId);
-    }
-
-    case "LIFE_CARD": {
-      const candidates = state.players[controller].life;
-      const count = target.count;
-      if (!count) return candidates.slice(0, 1).map((c) => c.instanceId);
-      if ("up_to" in count) return candidates.slice(0, count.up_to).map((c) => c.instanceId);
-      if ("exact" in count) return candidates.slice(0, count.exact).map((c) => c.instanceId);
-      return candidates.slice(0, 1).map((c) => c.instanceId);
-    }
-
-    case "PLAYER": {
-      const ctrl = target.controller ?? "OPPONENT";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      return [`player-${pi}`];
-    }
-
-    case "CARD_ON_TOP_OF_DECK": {
-      const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      const deck = state.players[pi].deck;
-      if (deck.length === 0) return [];
-      return [deck[0].instanceId];
-    }
-
-    case "SELECTED_CARDS": {
-      const ref = (target as any).ref as string;
-      if (ref && _resultRefs.has(ref)) {
-        return _resultRefs.get(ref)!.targetInstanceIds ?? [];
-      }
-      return [];
-    }
-
-    default:
-      return [];
-  }
 }

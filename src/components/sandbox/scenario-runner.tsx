@@ -16,7 +16,7 @@
 // shell contract.
 
 import { useMemo, useCallback } from "react";
-import type { CardData } from "@shared/game-types";
+import type { CardData } from "@engine/types";
 import { SANDBOX_CARD_DB } from "@/lib/sandbox/sandbox-card-data";
 import { scenarios } from "@/lib/sandbox/scenarios";
 import type { Scenario } from "@/lib/sandbox/scenarios";

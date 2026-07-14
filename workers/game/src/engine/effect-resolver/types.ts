@@ -9,10 +9,7 @@ import type {
   PendingPromptState,
   QueuedTrigger,
 } from "../../types.js";
-import type {
-  Action,
-  EffectResult,
-} from "../effect-types.js";
+import type { ActionOf, ActionType, EffectResult } from "../effect-types.js";
 import type { CardData } from "../../types.js";
 import type { EffectResolverServices } from "./services.js";
 
@@ -43,9 +40,9 @@ export interface ActionResult {
   };
 }
 
-export type ActionHandler = (
+export type ActionHandler<K extends ActionType = ActionType> = (
   state: GameState,
-  action: Action,
+  action: ActionOf<K>,
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
@@ -53,6 +50,10 @@ export type ActionHandler = (
   preselectedTargets: string[] | undefined,
   services: EffectResolverServices,
 ) => ActionResult;
+
+export type ActionHandlerMap = {
+  [K in ActionType]: ActionHandler<K>;
+};
 
 export interface CostPaymentResult {
   state: GameState;

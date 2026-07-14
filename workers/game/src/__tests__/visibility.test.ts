@@ -224,7 +224,7 @@ describe("filterStateForPlayer", () => {
           cards: state.players[1].hand.slice(0, 2), // opponent hand cards with real cardIds
         },
         respondingPlayer: 1 as const,
-        resumeContext: {},
+        resumeContext: "test-frame",
       },
     };
 

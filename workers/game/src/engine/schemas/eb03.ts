@@ -475,7 +475,7 @@ export const EB03_012_OTAMA: EffectSchema = {
             count: { up_to: 1 },
             filter: {
               any_of: [
-                { card_type: "DON" as any },
+                { card_type: "DON" },
                 { traits_any_of: ["Animal", "SMILE"], cost_max: 3 },
               ],
             },
@@ -838,10 +838,7 @@ export const EB03_061_UTA: EffectSchema = {
             controller: "OPPONENT",
             count: { up_to: 1 },
             filter: {
-              any_of: [
-                { card_type: "DON" as any },
-                { cost_max: 4 },
-              ],
+              any_of: [{ card_type: "DON" }, { cost_max: 4 }],
             },
           },
           chain: "THEN",

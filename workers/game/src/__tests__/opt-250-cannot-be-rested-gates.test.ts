@@ -21,9 +21,19 @@ import { describe, it, expect } from "vitest";
 import { checkProhibitions } from "../engine/prohibitions.js";
 import { computeCostTargets, isCostPayable } from "../engine/effect-resolver/cost-handler.js";
 import { executeSetRest } from "../engine/effect-resolver/actions/play.js";
-import type { Action, Cost, EffectResult } from "../engine/effect-types.js";
-import type { CardInstance, GameAction, GameState, PlayerState } from "../types.js";
-import { createBattleReadyState, createTestCardDb, padChars, CARDS } from "./helpers.js";
+import type { ActionOf, Cost, EffectResult } from "../engine/effect-types.js";
+import type {
+  CardInstance,
+  GameAction,
+  GameState,
+  PlayerState,
+} from "../types.js";
+import {
+  createBattleReadyState,
+  createTestCardDb,
+  padChars,
+  CARDS,
+} from "./helpers.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -199,10 +209,14 @@ describe("OPT-250 — SET_REST action strips prohibited targets from candidates"
     const protectedId = base.players[0].characters[0]!.instanceId;
     const state = withProhibitionOn(base, protectedId);
 
-    const action: Action = {
+    const action: ActionOf<"SET_REST"> = {
       type: "SET_REST",
-      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
-    } as unknown as Action;
+      target: {
+        type: "CHARACTER",
+        controller: "OPPONENT",
+        count: { exact: 1 },
+      },
+    };
 
     const result = executeSetRest(
       state,
@@ -229,10 +243,14 @@ describe("OPT-250 — SET_REST action strips prohibited targets from candidates"
     const freeId = base.players[0].characters[1]!.instanceId;
     const state = withProhibitionOn(base, protectedId);
 
-    const action: Action = {
+    const action: ActionOf<"SET_REST"> = {
       type: "SET_REST",
-      target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 2 } },
-    } as unknown as Action;
+      target: {
+        type: "CHARACTER",
+        controller: "OPPONENT",
+        count: { up_to: 2 },
+      },
+    };
 
     const result = executeSetRest(
       state,
@@ -280,10 +298,14 @@ describe("OPT-250 — an already-RESTED card under the prohibition stays RESTED"
       targetId,
     );
 
-    const action: Action = {
+    const action: ActionOf<"SET_REST"> = {
       type: "SET_REST",
-      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
-    } as unknown as Action;
+      target: {
+        type: "CHARACTER",
+        controller: "OPPONENT",
+        count: { exact: 1 },
+      },
+    };
     const result = executeSetRest(
       state,
       action,
