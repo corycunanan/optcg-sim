@@ -65,13 +65,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Done | [#310](https://github.com/corycunanan/optcg-sim/pull/310) | Official text and the source-parity gate merged 2026-07-14 in `5cac50c`. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
 | 49 | OPT-496 | Redact turn-scoped pending Trigger Life cards | — | — | In Review | [#313](https://github.com/corycunanan/optcg-sim/pull/313) | Owner-only turn continuations now match the Trigger event visibility policy; opponent deck previews remain intentionally public. |
-| 50 | OPT-497 | Filter raw client actions in game:update broadcasts | — | — | Backlog | — | Independent high-priority hidden-information leak. |
-| 51 | OPT-498 | Terminate remaining warn-and-continue engine paths | — | — | Backlog | — | Independent medium-priority typed-outcome hardening. |
+| 50 | OPT-497 | Filter raw client actions in game:update broadcasts | — | — | In Review | [#314](https://github.com/corycunanan/optcg-sim/pull/314) | Opponent updates no longer echo action payloads, preventing hidden prompt-response IDs and ordering from crossing the socket boundary. |
+| 51 | OPT-498 | Terminate remaining warn-and-continue engine paths | — | — | In Review | [#315](https://github.com/corycunanan/optcg-sim/pull/315) | Runtime action drift and malformed deterministic setup data now fail closed; ambiguous AND-to-IF_DO semantics are rejected before commit. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** OPT-497 is ready now. OPT-498 can proceed in parallel. Review PRs #312 and #313 independently.
+**Next up:** Review PRs #314 and #315 independently. The project closes after both merge.
 
 ---
 
@@ -454,3 +454,21 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep the controller's private reveal state intact; only cross-player state views are redacted. `deckList` is intentionally public because `board-modals.tsx` supports opponent deck previews.
 - **Unresolved:** None for OPT-496. OPT-497 independently owns raw-action visibility; do not infer action safety from the filtered state snapshot.
 - **Pointer:** Inspect `ac8dd6a` or PR #313; `pnpm verify` passed with 615 app and 1,615 worker tests plus a production build.
+
+### OPT-497 → OPT-498
+**From:** session on 2026-07-14 · **Commit:** `4fff01a` · **PR:** [#314](https://github.com/corycunanan/optcg-sim/pull/314)
+
+- **Primer:** `game:update` now includes the raw action only for the player who submitted it. The opponent receives the same individually filtered state with no action field, closing hidden-zone identity and ordering leaks for every prompt response.
+- **Read first:** `workers/game/src/GameSession.ts` (`broadcastGameUpdate`), `workers/game/src/session/transport.ts`, `shared/game-types.ts`, and `workers/game/src/__tests__/opt-337-authoritative-socket.test.ts`.
+- **Gotchas / do NOT touch:** Keep state-bearing updates on `broadcastFilteredState`; future recipient-specific metadata must use its player-index callback rather than a shared closure. `game:update.action` is optional on the client protocol because an opponent update intentionally omits it.
+- **Unresolved:** None. Review the full socket payload rather than only the visible state whenever adding a new broadcast field.
+- **Pointer:** `4fff01a`; `pnpm verify` passes with 615 app tests, 1,613 worker tests with coverage, schema checks, and a production build.
+
+### OPT-498 → Project closure
+**From:** session on 2026-07-14 · **Commit:** `fd75672` · **PR:** [#315](https://github.com/corycunanan/optcg-sim/pull/315)
+
+- **Primer:** Residual runtime action drift and malformed deterministic setup orders now fail closed. Future authored `AND` groups cannot use an ambiguous following `IF_DO`, and runtime drift terminates before group commit.
+- **Read first:** `workers/game/src/util/test-order.ts`, `workers/game/src/engine/effect-resolver/actions/life.ts`, `workers/game/src/engine/effect-resolver/resolver.ts`, and `docs/game-engine/AND-CHAIN-AUDIT.md`.
+- **Gotchas / do NOT touch:** Keep deterministic-order validation at both the untrusted payload boundary and the typed setup entry point. `AND` atomicity remains preflight- and allowlist-contingent rather than a general rollback transaction. OPT-498 intentionally does not touch OPT-497's socket files.
+- **Unresolved:** None. PRs #314 and #315 are independent and both must merge for project closure.
+- **Pointer:** `fd75672`; verification passed with 615 app tests, 1,620 worker tests at 79.11% statement / 69.28% branch coverage, schema/doc gates, and a production build.
