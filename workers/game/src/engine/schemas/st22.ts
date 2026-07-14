@@ -292,7 +292,11 @@ export const ST22_011_WHITEY_BAY: EffectSchema = {
       actions: [
         {
           type: "MODIFY_POWER",
-          target: { type: "YOUR_LEADER" },
+          target: {
+            type: "YOUR_LEADER",
+            count: { up_to: 1 },
+            filter: { traits_contains: ["Whitebeard Pirates"] },
+          },
           params: { amount: 2000 },
           duration: { type: "THIS_TURN" },
         },

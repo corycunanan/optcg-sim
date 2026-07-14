@@ -453,7 +453,7 @@ export const ST12_017_PLASTIC_SURGERY_SHOT: EffectSchema = {
           params: {
             look_at: 1,
             filter: { card_type: "CHARACTER", cost_exact: 2 },
-            rest_destination: "BOTTOM",
+            rest_destination: "TOP_OR_BOTTOM",
           },
           chain: "THEN",
         },

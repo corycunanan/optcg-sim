@@ -429,7 +429,8 @@ export function executeSearchAndPlay(
       promptType: "ARRANGE_TOP_CARDS",
       cards: searchFullDeck ? matching : searchPool,
       effectDescription,
-      canSendToBottom: restDest.toUpperCase() === "BOTTOM",
+      canSendToBottom: restDest.toUpperCase() !== "TOP",
+      restDestination: restDest,
       validTargets,
       maxKeep:
         sap.pick && "up_to" in sap.pick
