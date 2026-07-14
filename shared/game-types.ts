@@ -178,6 +178,8 @@ export interface PlayerState {
   donDeck: DonInstance[];
   life: LifeCard[];              // ordered; index 0 = top (first removed on damage)
   removedFromGame: CardInstance[];
+  // Public by design: the game board's opponent deck-preview feature displays
+  // the original composition before and during play.
   deckList: DeckListEntry[];     // original deck composition (static, never changes)
   connected: boolean;
   awayReason: "LEFT" | "DISCONNECTED" | null;
