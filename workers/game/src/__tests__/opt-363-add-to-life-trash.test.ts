@@ -11,13 +11,13 @@
  *      requested face/position.
  *   2. With multiple valid trash candidates and `up_to: 1`, the handler emits
  *      a SELECT_TARGET prompt rather than auto-resolving.
- *   3. Unsupported `target.type` values fail loudly (no crash, no silent
- *      no-op) so future authoring lands here visibly.
+ *   3. Unsupported `target.type` values fail closed through the typed engine
+ *      contract outcome so future runtime drift cannot continue the chain.
  *   4. End-to-end via the OP14-104 schema: PLAYER_CHOICE → SELECT_TARGET →
  *      trash card lands face-up on top of Life.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 import { createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
@@ -239,10 +239,9 @@ describe("OPT-363 — executeAddToLife (CARD_IN_TRASH)", () => {
     expect(result.pendingPrompt).toBeUndefined();
   });
 
-  it("warns and fails on unsupported target.type instead of silently no-op'ing", () => {
+  it("terminates with a typed contract outcome on unsupported target.type", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const result = executeAddToLife(
       state,
@@ -258,10 +257,20 @@ describe("OPT-363 — executeAddToLife (CARD_IN_TRASH)", () => {
     );
 
     expect(result.succeeded).toBe(false);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("ADD_TO_LIFE with unsupported target.type"),
-    );
-    warnSpy.mockRestore();
+    expect(result.state).toMatchObject({
+      status: "FINISHED",
+      winner: null,
+      engineOutcome: {
+        type: "ENGINE_ERROR_DRAW",
+        diagnostic: {
+          kind: "ENGINE_CONTRACT",
+          contract: "ACTION_HANDLER",
+          actionType: "ADD_TO_LIFE",
+          sourceCardInstanceId: "char-0-v1",
+        },
+      },
+    });
+    expect(result.state.eventLog.at(-1)).toMatchObject({ type: "GAME_OVER" });
   });
 });
 

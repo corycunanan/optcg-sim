@@ -31,6 +31,7 @@ import {
   ensureExecutionContext,
   shuffleWithContext,
 } from "./execution-context.js";
+import { assertValidTestOrder } from "../util/test-order.js";
 
 const DEFAULT_DON_DECK_SIZE = 10;
 const OPENING_HAND_SIZE = 5;
@@ -73,6 +74,7 @@ export function prepareDecksAndLeaders(
   const cardDb = new Map<string, CardData>();
 
   for (const player of [payload.player1, payload.player2]) {
+    assertValidTestOrder(player);
     cardDb.set(player.leader.cardData.id, player.leader.cardData);
     for (const entry of player.deck) {
       cardDb.set(entry.cardData.id, entry.cardData);
@@ -89,12 +91,10 @@ export function prepareDecksAndLeaders(
 
   const leader0Data = cardDb.get(payload.player1.leader.cardId);
   const leader1Data = cardDb.get(payload.player2.leader.cardId);
-  const leaderLife0 = leader0Data?.life ?? leader0Data?.cost ?? 5;
-  const leaderLife1 = leader1Data?.life ?? leader1Data?.cost ?? 5;
 
-  const arranged0 = arrangeDeck(p0Built.deck, leaderLife0, payload.player1.testOrder, executionContext);
+  const arranged0 = arrangeDeck(p0Built.deck, payload.player1.testOrder, executionContext);
   executionContext = arranged0.executionContext;
-  const arranged1 = arrangeDeck(p1Built.deck, leaderLife1, payload.player2.testOrder, executionContext);
+  const arranged1 = arrangeDeck(p1Built.deck, payload.player2.testOrder, executionContext);
   executionContext = arranged1.executionContext;
 
   const don0 = buildDonDeck(executionContext, resolveDonDeckSize(leader0Data));
@@ -355,22 +355,14 @@ function buildDonDeck(
  *   [hand[0..4], life[0..N-1], shuffled-rest]
  *
  * `placeLifeCards` reverses the sliced life portion (legacy semantics — top of
- * life is the last consumed). Falls back to a normal shuffle if testOrder is
- * malformed (e.g. wrong sizes or names not present in the deck).
+ * life is the last consumed). Callers validate testOrder before setup begins.
  */
 function arrangeDeck(
   expandedDeck: CardInstance[],
-  leaderLife: number,
   testOrder?: { life: string[]; hand: string[] } | null,
   initialExecutionContext: EngineExecutionContext = createDeterministicExecutionContext("setup"),
 ): { deck: CardInstance[]; executionContext: EngineExecutionContext } {
   if (!testOrder) {
-    const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
-    return { deck: shuffled.values, executionContext: shuffled.context };
-  }
-
-  if (testOrder.life.length !== leaderLife || testOrder.hand.length !== OPENING_HAND_SIZE) {
-    console.warn("Invalid testOrder size, falling back to shuffle");
     const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
     return { deck: shuffled.values, executionContext: shuffled.context };
   }
@@ -392,9 +384,9 @@ function arrangeDeck(
   for (const cardId of testOrder.hand) {
     const instance = consume(cardId);
     if (!instance) {
-      console.warn("Invalid testOrder.hand card, falling back to shuffle");
-      const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
-      return { deck: shuffled.values, executionContext: shuffled.context };
+      throw new Error(
+        `PlayerInitData.testOrder.hand references unavailable card '${cardId}'`,
+      );
     }
     handInstances.push(instance);
   }
@@ -403,9 +395,9 @@ function arrangeDeck(
   for (const cardId of testOrder.life) {
     const instance = consume(cardId);
     if (!instance) {
-      console.warn("Invalid testOrder.life card, falling back to shuffle");
-      const shuffled = shuffleWithContext(initialExecutionContext, expandedDeck);
-      return { deck: shuffled.values, executionContext: shuffled.context };
+      throw new Error(
+        `PlayerInitData.testOrder.life references unavailable card '${cardId}'`,
+      );
     }
     lifeInstances.push(instance);
   }

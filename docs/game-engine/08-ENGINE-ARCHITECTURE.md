@@ -545,7 +545,7 @@ sequenceDiagram
 4. **Action chain execution.** Execute the `actions` array sequentially, respecting chain connectors:
    - `THEN`: execute the next action regardless of prior success.
    - `IF_DO`: execute only if the prior action successfully resolved (produced a result).
-   - `AND`: execute simultaneously with the prior action (atomic).
+   - `AND`: execute simultaneously with the prior action through the preflighted, allowlisted commit contract (no general rollback; a following `IF_DO` is rejected).
 5. **Inline conditions.** Individual actions with their own `conditions` field are gated by those conditions independently.
 6. **Back-references.** Actions using `target_ref` resolve their target from the `result_ref` stored by a prior action in the chain.
 7. **Re-triggering.** Each action in the chain enters the pipeline at step 1, which may emit events and trigger additional effects. These nested triggers are queued per the ordering rules above.

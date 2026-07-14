@@ -319,7 +319,7 @@ function processTriggerQueuePipeline(
 
     const result = resolveEffect(
       nextState,
-      next.effectBlock as import("./effect-types.js").EffectBlock,
+      next.effectBlock,
       next.sourceCardInstanceId,
       next.controller,
       cardDb,

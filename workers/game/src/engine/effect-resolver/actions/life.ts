@@ -14,6 +14,7 @@ import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, 
 import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
+import { terminateForEngineContract } from "../../engine-limits.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -253,9 +254,9 @@ export function executeLifeToHand(
 // OP14-104 Gecko Moria's CHOICE branch ("add a Character from your trash to the
 // top of your Life cards face-up"), targeted by `CARD_IN_TRASH`. The existing
 // `_FROM_DECK` / `_FROM_HAND` / `_FROM_FIELD` variants stay because they're
-// referenced directly by a number of card schemas. If a future schema dispatches
-// ADD_TO_LIFE with a different target, the warning surfaces it instead of a
-// silent no-op.
+// referenced directly by a number of card schemas. A different target indicates
+// schema/runtime drift, so it terminates through the same typed contract outcome
+// as a missing action handler.
 export function executeAddToLife(
   state: GameState,
   action: ActionOf<"ADD_TO_LIFE">,
@@ -269,8 +270,14 @@ export function executeAddToLife(
   if (targetType === "CARD_IN_TRASH") {
     return executeAddToLifeFromTrash(state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets);
   }
-  console.warn(`[life] ADD_TO_LIFE with unsupported target.type: ${targetType ?? "(missing)"}`);
-  return { state, events: [], succeeded: false };
+  const terminated = terminateForEngineContract(state, {
+    kind: "ENGINE_CONTRACT",
+    contract: "ACTION_HANDLER",
+    actionType: action.type,
+    sourceCardInstanceId,
+    message: `ADD_TO_LIFE does not support target type '${targetType ?? "(missing)"}'`,
+  });
+  return { state: terminated, events: [], succeeded: false };
 }
 
 function executeAddToLifeFromTrash(

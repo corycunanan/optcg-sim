@@ -16,6 +16,7 @@ import type {
 import type { ClientMessage } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { validateEffectSchema } from "../engine/schema-registry.js";
+import { assertValidTestOrder } from "./test-order.js";
 
 export type NotifyEndPayload = {
   winnerIndex: 0 | 1;
@@ -192,7 +193,7 @@ function parsePlayerInitData(raw: unknown): PlayerInitData {
     }
     testOrder = { life: order.life, hand: order.hand };
   }
-  return {
+  const parsed: PlayerInitData = {
     userId: player.userId,
     deck: player.deck.map(parseDeckCardData),
     leader: parseDeckCardData(player.leader),
@@ -200,6 +201,8 @@ function parsePlayerInitData(raw: unknown): PlayerInitData {
     donArtUrl: player.donArtUrl,
     testOrder: testOrder ?? null,
   };
+  assertValidTestOrder(parsed);
+  return parsed;
 }
 
 export function validateGameInitPayload(raw: unknown): GameInitPayload {
