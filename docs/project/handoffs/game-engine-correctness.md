@@ -64,11 +64,14 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 46 | OPT-484 | Triage low-confidence schema findings missing from the disposition ledger | — | — | Done | [#309](https://github.com/corycunanan/optcg-sim/pull/309) | Fifteen implemented detector false positives plus ST12-017/ST22-011 corrections merged 2026-07-14 in `22ae230`. |
 | 47 | OPT-485 | Restore missing OP12-112 canonical card-source entry | — | — | Done | [#310](https://github.com/corycunanan/optcg-sim/pull/310) | Official text and the source-parity gate merged 2026-07-14 in `5cac50c`. |
 | 48 | OPT-486 | Align Vitest and coverage provider versions | — | — | Done | [#301](https://github.com/corycunanan/optcg-sim/pull/301) | Root and worker Vitest plus coverage-v8 pinned to 4.1.4; mixed-version warning removed. |
+| 49 | OPT-496 | Redact turn-scoped pending Trigger Life cards | — | — | In Review | [#313](https://github.com/corycunanan/optcg-sim/pull/313) | Owner-only turn continuations now match the Trigger event visibility policy; opponent deck previews remain intentionally public. |
+| 50 | OPT-497 | Filter raw client actions in game:update broadcasts | — | — | Backlog | — | Independent high-priority hidden-information leak. |
+| 51 | OPT-498 | Terminate remaining warn-and-continue engine paths | — | — | Backlog | — | Independent medium-priority typed-outcome hardening. |
 | — | OPT-428 | Prompt responses carry no identity | — | — | Duplicate | [#252](https://github.com/corycunanan/optcg-sim/pull/252) | Superseded by OPT-438, which shipped server-issued prompt identities end to end. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`, `Duplicate`).
 
-**Next up:** Review PR #312. After merge, the Game Engine Correctness project is complete — no follow-up tickets remain in the Action Plan.
+**Next up:** OPT-497 is ready now. OPT-498 can proceed in parallel. Review PRs #312 and #313 independently.
 
 ---
 
@@ -442,3 +445,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep the documentation gate fail closed when adding action or target types, changing deferred-card dispositions, or moving executable tests. Do not broaden snapshot immutability into a recursive-freeze claim or deterministic replay beyond the same recorded `EngineExecutionContext`.
 - **Unresolved:** No Backlog or Todo ticket remains in the Action Plan. The audit intentionally preserves residual platform risks for player-stoppable loops, generic secret-to-secret reveal/order rules, scoped snapshot immutability, and the one-checkpoint undo/history policy; these are documented risks, not hidden project deferrals.
 - **Pointer:** Full `pnpm verify` passes with 615 app tests, 1,612 worker tests at 79.05% statement / 69.15% branch coverage, 2,319 validated schemas, 3,574 authored action uses with 73/73 handled and executed, and a production build.
+
+### OPT-496 → OPT-497
+**From:** session on 2026-07-14 · **Commit:** `ac8dd6a` · **PR:** [#313](https://github.com/corycunanan/optcg-sim/pull/313)
+
+- **Primer:** Player-filtered game state now suppresses unrevealed Life-card identities held in battle, effect-damage, and delayed-damage turn continuations for the non-owning player.
+- **Read first:** `workers/game/src/session/transport.ts`, `workers/game/src/session/visibility.ts`, and the `game:update` broadcast construction before changing action serialization.
+- **Gotchas / do NOT touch:** Keep the controller's private reveal state intact; only cross-player state views are redacted. `deckList` is intentionally public because `board-modals.tsx` supports opponent deck previews.
+- **Unresolved:** None for OPT-496. OPT-497 independently owns raw-action visibility; do not infer action safety from the filtered state snapshot.
+- **Pointer:** Inspect `ac8dd6a` or PR #313; `pnpm verify` passed with 615 app and 1,615 worker tests plus a production build.

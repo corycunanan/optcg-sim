@@ -485,6 +485,24 @@ export function filterStateForPlayer(
   const filteredEventLog = state.eventLog.map((event) =>
     filterEventForPlayer(event, receivingPlayer));
   const filteredPrompt = filterPromptForPlayer(state.pendingPrompt, receivingPlayer);
+  const battleTriggerOwner = state.turn.activePlayerIndex === 0 ? 1 : 0;
+  const filteredTurn = {
+    ...state.turn,
+    battle:
+      state.turn.battle?.pendingTriggerLifeCard && receivingPlayer !== battleTriggerOwner
+        ? { ...state.turn.battle, pendingTriggerLifeCard: undefined }
+        : state.turn.battle,
+    pendingTriggerFromEffect:
+      state.turn.pendingTriggerFromEffect &&
+      receivingPlayer !== state.turn.pendingTriggerFromEffect.damagedPlayerIndex
+        ? null
+        : state.turn.pendingTriggerFromEffect,
+    pendingBattleDamageContinuation:
+      state.turn.pendingBattleDamageContinuation &&
+      receivingPlayer !== state.turn.pendingBattleDamageContinuation.damagedPlayerIndex
+        ? null
+        : state.turn.pendingBattleDamageContinuation,
+  };
 
   return {
     ...state,
@@ -503,6 +521,7 @@ export function filterStateForPlayer(
     pendingPrompt: filteredPrompt,
     promptRespondingPlayer: state.pendingPrompt?.respondingPlayer ?? null,
     effectStack: [],
+    turn: filteredTurn,
   };
 }
 

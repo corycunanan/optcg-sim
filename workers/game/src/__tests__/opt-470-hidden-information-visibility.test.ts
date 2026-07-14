@@ -309,6 +309,81 @@ describe("OPT-470 hidden-information visibility contract", () => {
     expect(filterStateForPlayer(withInternalFrame, 1).effectStack).toEqual([]);
   });
 
+  it("redacts an opponent's in-flight battle Trigger Life card from turn state", () => {
+    const { state } = setupGame();
+    const lifeCard = state.players[1].life[0]!;
+    const withPendingTrigger: GameState = {
+      ...state,
+      turn: {
+        ...state.turn,
+        activePlayerIndex: 0,
+        battleSubPhase: "DAMAGE_STEP",
+        battle: {
+          battleId: "pending-trigger-battle",
+          attackerInstanceId: state.players[0].leader.instanceId,
+          targetInstanceId: state.players[1].leader.instanceId,
+          attackerPower: 5000,
+          defenderPower: 5000,
+          counterPowerAdded: 0,
+          blockerActivated: false,
+          pendingTriggerLifeCard: lifeCard,
+        },
+      },
+    };
+
+    const ownerView = filterStateForPlayer(withPendingTrigger, 1);
+    const opponentView = filterStateForPlayer(withPendingTrigger, 0);
+
+    expect(ownerView.turn.battle?.pendingTriggerLifeCard).toEqual(lifeCard);
+    expect(opponentView.turn.battle?.pendingTriggerLifeCard).toBeUndefined();
+    expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.cardId);
+    expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.instanceId);
+  });
+
+  it("redacts an opponent's effect-damage Trigger Life card and continuation", () => {
+    const { state } = setupGame();
+    const lifeCard = state.players[1].life[0]!;
+    const withPendingTrigger: GameState = {
+      ...state,
+      turn: {
+        ...state.turn,
+        pendingTriggerFromEffect: {
+          lifeCard,
+          damagedPlayerIndex: 1,
+          remainingDamages: 1,
+          sourceCardInstanceId: state.players[0].leader.instanceId,
+          controllerIndex: 0,
+        },
+        pendingBattleDamageContinuation: {
+          battleId: "battle-continuation",
+          lifeCardInstanceId: lifeCard.instanceId,
+          damagedPlayerIndex: 1,
+          stage: "LIFE_REMOVAL",
+        },
+      },
+    };
+
+    const ownerView = filterStateForPlayer(withPendingTrigger, 1);
+    const opponentView = filterStateForPlayer(withPendingTrigger, 0);
+
+    expect(ownerView.turn.pendingTriggerFromEffect?.lifeCard).toEqual(lifeCard);
+    expect(ownerView.turn.pendingBattleDamageContinuation?.lifeCardInstanceId)
+      .toBe(lifeCard.instanceId);
+    expect(opponentView.turn.pendingTriggerFromEffect).toBeNull();
+    expect(opponentView.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.cardId);
+    expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.instanceId);
+  });
+
+  it("keeps deckList public for the opponent deck-preview feature", () => {
+    const { state } = setupGame();
+    const deckList = [{ cardId: "PUBLIC-DECK-PREVIEW-CARD", count: 4 }];
+    const players = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+    players[1] = { ...players[1], deckList };
+
+    expect(filterStateForPlayer({ ...state, players }, 0).players[1].deckList).toEqual(deckList);
+  });
+
   it("replaces hidden-zone instance IDs with zone-local placeholders", () => {
     const { state, cardDb } = setupGame();
     const main = advanceToPhase(state, "MAIN", cardDb);
