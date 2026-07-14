@@ -2,7 +2,15 @@
  * Pure utility functions for action handlers.
  */
 
-import type { Action, Duration, DynamicValue, EffectResult, EffectBlock, TargetFilter } from "../effect-types.js";
+import type {
+  Action,
+  ActionParamsMap,
+  Duration,
+  DynamicValue,
+  EffectResult,
+  EffectBlock,
+  TargetFilter,
+} from "../effect-types.js";
 import type { CardData, CardInstance, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
 import { findCardInstance } from "../state.js";
@@ -10,6 +18,17 @@ import type { ExpiryTiming } from "../effect-types.js";
 import { isPresent } from "../type-guards.js";
 
 export { getActionParams } from "../effect-types.js";
+
+export function getSearchAndPlayPickLimit(
+  params: ActionParamsMap["SEARCH_AND_PLAY"],
+  validTargetCount: number,
+): number {
+  const pick = params.pick;
+  if (!pick) return 1;
+  if ("up_to" in pick) return pick.up_to;
+  if ("exact" in pick) return pick.exact;
+  return validTargetCount;
+}
 
 function findCardInstanceForDV(state: GameState, instanceId: string): CardInstance | null {
   return findCardInstance(state, instanceId);
