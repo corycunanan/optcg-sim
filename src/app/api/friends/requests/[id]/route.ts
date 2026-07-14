@@ -50,9 +50,17 @@ export async function PUT(
       // Create friendship with userA < userB lexicographically
       const [userAId, userBId] = [req.fromUserId, userId].sort();
 
-      let friendship;
+      let result;
       try {
-        friendship = await prisma.$transaction(async (tx) => {
+        result = await prisma.$transaction(async (tx) => {
+          // A decline can win after the read above. Remove this exact pending
+          // request first so a stale accept cannot create a friendship after
+          // the request is gone.
+          const removedRequest = await tx.friendRequest.deleteMany({
+            where: { id, toUserId: userId, status: "PENDING" },
+          });
+          if (removedRequest.count !== 1) return { kind: "missing" as const };
+
           const createdFriendship = await tx.friendship.create({
             data: { userAId, userBId },
           });
@@ -70,7 +78,7 @@ export async function PUT(
             },
           });
 
-          return createdFriendship;
+          return { kind: "accepted" as const, friendship: createdFriendship };
         });
       } catch (error) {
         if (
@@ -93,6 +101,11 @@ export async function PUT(
         }
         throw error;
       }
+
+      if (result.kind === "missing") {
+        return apiError("Request not found", 404);
+      }
+      const { friendship } = result;
 
       // The accepter's user info, sent to the original sender so their
       // sidebar can append the new friend without a refetch.

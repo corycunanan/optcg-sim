@@ -160,6 +160,17 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
     expect(notifyUserMock).not.toHaveBeenCalled();
   });
 
+  it("does not create a friendship when a concurrent decline removed the request", async () => {
+    friendRequestDeleteManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest({ action: "accept" });
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(404);
+    expect(friendshipCreateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
   it("is idempotent when a concurrent acceptance already created the friendship", async () => {
     friendshipCreateMock.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
@@ -172,8 +183,15 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(200);
-    expect(friendRequestDeleteManyMock).toHaveBeenCalledTimes(1);
-    expect(friendRequestDeleteManyMock).toHaveBeenCalledWith({
+    expect(friendRequestDeleteManyMock).toHaveBeenCalledTimes(2);
+    expect(friendRequestDeleteManyMock).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: "req-1",
+        toUserId: "user-accepter",
+        status: "PENDING",
+      },
+    });
+    expect(friendRequestDeleteManyMock).toHaveBeenNthCalledWith(2, {
       where: {
         status: "PENDING",
         OR: [
