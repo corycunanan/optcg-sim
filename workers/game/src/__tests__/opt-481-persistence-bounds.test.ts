@@ -202,7 +202,16 @@ describe("OPT-481 bounded session persistence", () => {
   it("compacts legacy history and undo snapshots before returning a restore", async () => {
     const storage = new AtomicMemoryStorage();
     const { state, cardDb } = setupGame();
-    const legacyState = { ...state, eventLog: turnEvents(1_000) };
+    const legacyState = {
+      ...state,
+      eventLog: turnEvents(1_000),
+      effectStack: [
+        {
+          sourceCardInstanceId: state.players[0].leader.instanceId,
+          pausedAction: null,
+        } as GameState["effectStack"][number],
+      ],
+    };
     storage.data.set(SESSION_STORAGE_KEY, {
       state: legacyState,
       cardDb: Object.fromEntries(cardDb),

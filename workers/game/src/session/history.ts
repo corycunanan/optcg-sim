@@ -176,8 +176,8 @@ function collectEventAnchorIds(state: GameState): Set<string> {
   for (const frame of state.effectStack) {
     ids.add(frame.sourceCardInstanceId);
     for (const trigger of [
-      ...frame.pendingTriggers,
-      ...frame.simultaneousTriggers,
+      ...(frame.pendingTriggers ?? []),
+      ...(frame.simultaneousTriggers ?? []),
     ]) {
       ids.add(trigger.sourceCardInstanceId);
     }
