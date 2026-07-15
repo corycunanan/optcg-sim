@@ -95,6 +95,32 @@ const SAMPLE_PROMPT: PromptOptions = {
   ctaLabel: "Confirm",
 };
 
+const DON_RETURN_PROMPT: PromptOptions = {
+  promptType: "PLAYER_CHOICE",
+  effectDescription: "Return 1 DON!! card.",
+  choices: [
+    { id: "don-return:1:1", label: "Return active DON!!" },
+    { id: "don-return:0:1:leader=1", label: "Return attached DON!!" },
+  ],
+  donReturn: {
+    count: 1,
+    sources: [
+      {
+        id: "cost-active",
+        label: "Active DON!!",
+        max: 1,
+        kind: "COST_ACTIVE",
+      },
+      {
+        id: "leader",
+        label: "Leader",
+        max: 1,
+        kind: "ATTACHED",
+      },
+    ],
+  },
+};
+
 function makeScenario(
   script: ScenarioStep[],
   overrides: Partial<Scenario> = {},
@@ -296,6 +322,32 @@ describe("createScenarioRunner — stepForward", () => {
 });
 
 describe("createScenarioRunner — prompt + resolvePrompt", () => {
+  it("assigns different stable IDs to consecutive identical DON-return prompts", () => {
+    const scenario = makeScenario(
+      [
+        { type: "prompt", prompt: DON_RETURN_PROMPT },
+        { type: "prompt", prompt: DON_RETURN_PROMPT },
+      ],
+      { inputMode: "interactive" },
+    );
+    const runner = createScenarioRunner(scenario);
+
+    runner.play();
+    const first = runner.getState();
+    expect(first.activePrompt).toBe(DON_RETURN_PROMPT);
+    expect(first.activePromptId).toBe("sandbox-script-prompt-0");
+    expect(runner.getState().activePromptId).toBe(first.activePromptId);
+
+    runner.resolvePrompt({
+      type: "PLAYER_CHOICE",
+      choiceId: "don-return:1:1",
+    });
+    const second = runner.getState();
+    expect(second.activePrompt).toBe(DON_RETURN_PROMPT);
+    expect(second.activePromptId).toBe("sandbox-script-prompt-1");
+    expect(second.activePromptId).not.toBe(first.activePromptId);
+  });
+
   it("transitions to \"awaiting-response\" when play reaches a prompt step", () => {
     const scenario = makeScenario(
       [eventStep(1), { type: "prompt", prompt: SAMPLE_PROMPT }, eventStep(2)],

@@ -39,6 +39,7 @@ export interface SandboxSessionInput {
   events: GameEvent[];
   cardDb: CardDb;
   activePrompt?: PromptOptions | null;
+  activePromptId?: string | null;
   onAction?: (action: GameAction) => void;
   onBackToLobbies?: () => Promise<void> | void;
 }
@@ -57,6 +58,7 @@ export interface SandboxGameSessionGame {
   connectionStatus: "connected";
   lastError: string | null;
   activePrompt: PromptOptions | null;
+  activePromptId: string | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   sendAction: (action: GameAction) => void;
   myIndex: 0 | 1;
@@ -113,6 +115,7 @@ export function buildSandboxSession(
     events,
     cardDb,
     activePrompt = null,
+    activePromptId = null,
     onAction,
     onBackToLobbies,
   } = input;
@@ -168,6 +171,7 @@ export function buildSandboxSession(
       connectionStatus: "connected",
       lastError: null,
       activePrompt,
+      activePromptId,
       gameOver: null,
       sendAction,
       myIndex,

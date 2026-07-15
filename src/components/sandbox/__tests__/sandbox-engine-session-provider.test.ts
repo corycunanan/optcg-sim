@@ -26,6 +26,7 @@ import type { PartialGameState } from "@/lib/sandbox/scenarios/types";
 import {
   buildEngineSessionGame,
   hydrateToGameState,
+  withSandboxPromptIdentity,
 } from "../sandbox-engine-session-provider";
 
 // ─── Fixtures ──────────────────────────────────────────────────────────
@@ -209,6 +210,52 @@ describe("reset semantics", () => {
 });
 
 describe("buildEngineSessionGame", () => {
+  it("allocates prompt identity once and exposes it through the board session model", () => {
+    const state = hydrateToGameState(fixtureState());
+    state.pendingPrompt = {
+      respondingPlayer: 0,
+      resumeContext: null,
+      options: {
+        promptType: "PLAYER_CHOICE",
+        effectDescription: "Return 1 DON!! card.",
+        choices: [
+          { id: "don-return:1:1", label: "Return active DON!!" },
+          { id: "don-return:0:1:leader=1", label: "Return attached DON!!" },
+        ],
+      },
+    };
+
+    const first = withSandboxPromptIdentity(state, 0);
+    expect(first.gameState.pendingPrompt?.promptId).toBe(
+      "sandbox-engine-prompt-1",
+    );
+
+    const samePromptUpdate = withSandboxPromptIdentity(
+      { ...first.gameState, eventLog: [...first.gameState.eventLog] },
+      first.promptSequence,
+    );
+    expect(samePromptUpdate.gameState.pendingPrompt?.promptId).toBe(
+      "sandbox-engine-prompt-1",
+    );
+
+    const nextPrompt = withSandboxPromptIdentity(
+      {
+        ...samePromptUpdate.gameState,
+        pendingPrompt: {
+          ...state.pendingPrompt,
+          promptId: undefined,
+        },
+      },
+      samePromptUpdate.promptSequence,
+    );
+    expect(nextPrompt.gameState.pendingPrompt?.promptId).toBe(
+      "sandbox-engine-prompt-2",
+    );
+
+    const game = buildEngineSessionGame(nextPrompt.gameState, {}, 0, () => {});
+    expect(game.activePromptId).toBe("sandbox-engine-prompt-2");
+  });
+
   it("populates every BoardLayoutProps field with no runtime undefineds", () => {
     const state = hydrateToGameState(fixtureState());
     const cardDbRecord = {
@@ -233,6 +280,7 @@ describe("buildEngineSessionGame", () => {
       eventLog: game.eventLog,
       activeEffects: game.gameState.activeEffects,
       activePrompt: game.activePrompt,
+      activePromptId: game.activePromptId,
       onAction: game.sendAction,
       onLeave: () => {},
       matchClosed: game.matchClosed,

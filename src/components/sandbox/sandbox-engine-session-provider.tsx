@@ -57,6 +57,11 @@ export interface SandboxEngineSession {
   eventLog: GameEvent[];
 }
 
+export interface SandboxEngineState {
+  gameState: GameState;
+  promptSequence: number;
+}
+
 // ─── Pure builders ─────────────────────────────────────────────────────
 
 export function hydrateToGameState(partial: PartialGameState): GameState {
@@ -83,6 +88,27 @@ export function hydrateToGameState(partial: PartialGameState): GameState {
   };
 }
 
+export function withSandboxPromptIdentity(
+  gameState: GameState,
+  promptSequence: number
+): SandboxEngineState {
+  if (!gameState.pendingPrompt || gameState.pendingPrompt.promptId) {
+    return { gameState, promptSequence };
+  }
+
+  const nextPromptSequence = promptSequence + 1;
+  return {
+    gameState: {
+      ...gameState,
+      pendingPrompt: {
+        ...gameState.pendingPrompt,
+        promptId: `sandbox-engine-prompt-${nextPromptSequence}`,
+      },
+    },
+    promptSequence: nextPromptSequence,
+  };
+}
+
 export function buildEngineSessionGame(
   state: GameState,
   cardDb: CardDb,
@@ -95,6 +121,7 @@ export function buildEngineSessionGame(
   const turn = state.turn;
   const activePrompt: PromptOptions | null =
     state.pendingPrompt?.options ?? null;
+  const activePromptId = state.pendingPrompt?.promptId ?? null;
   const gameOver =
     state.status === "FINISHED" || state.status === "ABANDONED"
       ? { winner: state.winner, reason: state.winReason ?? "" }
@@ -107,6 +134,7 @@ export function buildEngineSessionGame(
     connectionStatus: "connected",
     lastError: null,
     activePrompt,
+    activePromptId,
     gameOver,
     sendAction,
     myIndex,
@@ -133,9 +161,11 @@ export function useSandboxEngineSession(
   const { initialState, cardDb } = input;
   const myIndex = initialState.myIndex;
 
-  const [state, setState] = useState<GameState>(() =>
-    hydrateToGameState(initialState)
-  );
+  const [engineState, setEngineState] = useState<SandboxEngineState>(() => ({
+    gameState: hydrateToGameState(initialState),
+    promptSequence: 0,
+  }));
+  const state = engineState.gameState;
 
   const router = useRouter();
   const handleBackToLobbies = useCallback(() => {
@@ -144,13 +174,24 @@ export function useSandboxEngineSession(
 
   const dispatch = useCallback(
     (action: GameAction) => {
-      setState((prev) => runPipeline(prev, action, cardDb, myIndex).state);
+      setEngineState((previous) => {
+        const next = runPipeline(
+          previous.gameState,
+          action,
+          cardDb,
+          myIndex
+        ).state;
+        return withSandboxPromptIdentity(next, previous.promptSequence);
+      });
     },
     [cardDb, myIndex]
   );
 
   const reset = useCallback(() => {
-    setState(hydrateToGameState(initialState));
+    setEngineState({
+      gameState: hydrateToGameState(initialState),
+      promptSequence: 0,
+    });
   }, [initialState]);
 
   // Engine consumes a Map; BoardLayout consumes a Record. Project once.

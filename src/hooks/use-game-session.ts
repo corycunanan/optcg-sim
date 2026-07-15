@@ -28,6 +28,7 @@ export interface GameSessionGame {
   actionRejection: ActionRejection | null;
   acceptedUpdate: AcceptedGameUpdate | null;
   activePrompt: PromptOptions | null;
+  activePromptId: string | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   sendAction: (action: GameAction) => void;
   myIndex: 0 | 1 | null;
@@ -130,6 +131,7 @@ export function useGameSession(
     actionRejection,
     acceptedUpdate,
     activePrompt,
+    activePromptId,
     gameOver,
     canUndo,
     sendAction: rawSendAction,
@@ -317,6 +319,7 @@ export function useGameSession(
       actionRejection,
       acceptedUpdate,
       activePrompt,
+      activePromptId,
       gameOver,
       sendAction,
       myIndex,

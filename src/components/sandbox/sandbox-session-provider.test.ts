@@ -194,6 +194,7 @@ describe("buildSandboxSession", () => {
       eventLog: session.game.eventLog,
       activeEffects: session.game.gameState.activeEffects,
       activePrompt: session.game.activePrompt,
+      activePromptId: session.game.activePromptId,
       onAction: session.game.sendAction,
       onLeave: () => session.navigation.handleBackToLobbies(),
       matchClosed: session.game.matchClosed,

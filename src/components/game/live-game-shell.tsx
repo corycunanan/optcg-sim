@@ -127,6 +127,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
   const manualFlipPendingRef = useRef(false);
   const fadeTimersRef = useRef<number[]>([]);
   const activePrompt = devPrompt ?? game.activePrompt;
+  const activePromptId = devPrompt ? null : game.activePromptId;
 
   const clearFadeTimers = useCallback(() => {
     fadeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -328,6 +329,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     eventLog: game.gameState.eventLog,
     activeEffects: game.gameState.activeEffects,
     activePrompt,
+    activePromptId,
     matchClosed: game.matchClosed,
     canUndo: game.canUndo,
     actionRejection: game.actionRejection,
