@@ -3,13 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Gamepad2, Loader2, Plus } from "lucide-react";
-import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { apiGet } from "@/lib/api-client";
+import { useLobbiesOperations } from "@/hooks/use-lobbies-operations";
 import { Button } from "@/components/ui/button";
 import { ActiveGameResponseSchema } from "@/lib/validators/game";
-import {
-  CreateLobbyResponseSchema,
-  JoinLobbyResponseSchema,
-} from "@/lib/validators/lobbies";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,13 +42,22 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [activeGameLoading, setActiveGameLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [joining, setJoining] = useState(false);
   const [joinCode, setJoinCode] = useState("");
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [conceding, setConceding] = useState(false);
-  const [concedeError, setConcedeError] = useState<string | null>(null);
+  const {
+    creating,
+    createError,
+    createLobby,
+    joining,
+    joinError,
+    joinLobby,
+    conceding,
+    concedeError,
+    concedeGame,
+  } = useLobbiesOperations({
+    onCreated: (lobbyId) => router.push(`/lobbies/${lobbyId}`),
+    onJoined: (lobbyId) => router.push(`/lobbies/${lobbyId}`),
+    onConceded: () => setActiveGameId(null),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -73,57 +79,14 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
     if (code) setJoinCode(code.toUpperCase());
   }, []);
 
-  const createLobby = async () => {
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const json = await apiPost(
-        "/api/lobbies",
-        { format: "Standard" },
-        CreateLobbyResponseSchema
-      );
-      router.push(`/lobbies/${json.data.lobbyId}`);
-    } catch (err) {
-      setCreateError(
-        err instanceof ApiError ? err.message : "Could not create lobby"
-      );
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const joinLobby = async () => {
+  const handleJoinLobby = async () => {
     if (joinCode.length < 4) return;
-    setJoining(true);
-    setJoinError(null);
-    try {
-      const json = await apiPost(
-        "/api/lobbies/join",
-        { code: joinCode },
-        JoinLobbyResponseSchema
-      );
-      router.push(`/lobbies/${json.data.lobbyId}`);
-    } catch (err) {
-      setJoinError(
-        err instanceof ApiError ? err.message : "Could not join lobby"
-      );
-    } finally {
-      setJoining(false);
-    }
+    await joinLobby(joinCode);
   };
 
-  const concedeGame = async () => {
+  const handleConcedeGame = async () => {
     if (!activeGameId) return;
-    setConceding(true);
-    setConcedeError(null);
-    try {
-      await apiPost(`/api/game/${activeGameId}`, { action: "CONCEDE" });
-      setActiveGameId(null);
-    } catch (err) {
-      setConcedeError(err instanceof ApiError ? err.message : "Network error");
-    } finally {
-      setConceding(false);
-    }
+    await concedeGame(activeGameId);
   };
 
   if (activeGameLoading) {
@@ -193,7 +156,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                     </AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
-                      onClick={concedeGame}
+                      onClick={handleConcedeGame}
                       disabled={conceding}
                     >
                       {conceding ? "Conceding..." : "Yes, Concede"}
@@ -257,7 +220,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
                 </InputOTP>
                 {joinError && <p className="text-error text-sm">{joinError}</p>}
                 <Button
-                  onClick={joinLobby}
+                  onClick={handleJoinLobby}
                   disabled={joining || joinCode.length < 4}
                 >
                   {joining ? (

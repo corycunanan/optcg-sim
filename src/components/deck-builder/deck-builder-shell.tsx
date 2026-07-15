@@ -31,7 +31,7 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { ApiError, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import {
   DeckDetailResponseSchema,
   SaveDeckResponseSchema,
@@ -152,7 +152,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     try {
       const { data } = state.id
-        ? await apiPut(
+        ? await apiPatch(
             `/api/decks/${state.id}`,
             payload,
             SaveDeckResponseSchema

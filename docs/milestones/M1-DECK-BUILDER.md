@@ -37,14 +37,14 @@ M1 delivers a fully functional deck builder — the first real user-facing featu
 │  └────────┬───────┘  └──────────────┬────────────────┘  │
 │           │                         │                    │
 └───────────┼─────────────────────────┼────────────────────┘
-            │ GET /api/cards          │ POST/PUT/GET /api/decks
+            │ GET /api/cards          │ POST/PATCH/GET /api/decks
             │                         │
 ┌───────────▼─────────────────────────▼────────────────────┐
 │   API Routes                                              │
 │   • GET  /api/cards?q=&color=&type=&cost=&...            │
 │   • GET  /api/decks                                       │
 │   • POST /api/decks                                       │
-│   • PUT  /api/decks/:id                                   │
+│   • PATCH /api/decks/:id                                  │
 │   • DEL  /api/decks/:id                                   │
 │   • POST /api/decks/import                                │
 │   • GET  /api/decks/:id/export                            │
@@ -219,7 +219,7 @@ M1 delivers a fully functional deck builder — the first real user-facing featu
 | `GET` | `/api/decks` | List user's decks (name, leader, card count, updated date) |
 | `POST` | `/api/decks` | Create new deck |
 | `GET` | `/api/decks/:id` | Get deck with full card list |
-| `PUT` | `/api/decks/:id` | Update deck (name, leader, cards) |
+| `PATCH` | `/api/decks/:id` | Partially update deck (name, leader, cards) |
 | `DELETE` | `/api/decks/:id` | Delete deck |
 
 **Authorization:** All deck endpoints require authentication. Users can only access their own decks (enforced via query filter on `userId`).

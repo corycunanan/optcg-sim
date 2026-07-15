@@ -52,13 +52,13 @@ The game result endpoint uses Bearer token auth (`GAME_WORKER_SECRET`) for worke
 | GET    | `/api/decks`        | Session         | List user's decks (summary with colors, card count)      |
 | POST   | `/api/decks`        | Session         | Create deck with leader + optional cards                 |
 | GET    | `/api/decks/[id]`   | Session (owner) | Get full deck with cards ordered by cost                 |
-| PUT    | `/api/decks/[id]`   | Session (owner) | Update deck (replaces all cards if cards array provided) |
+| PATCH  | `/api/decks/[id]`   | Session (owner) | Partially update deck fields                              |
 | DELETE | `/api/decks/[id]`   | Session (owner) | Delete deck                                              |
 | POST   | `/api/decks/import` | Session         | Parse deck list text into structured card data           |
 
 **POST /api/decks** — Validates leader is type "Leader". Request: `{ name, leaderId, leaderArtUrl?, format?, cards?: [{ cardId, quantity }] }`.
 
-**PUT /api/decks/[id]** — If `cards` array is provided, deletes ALL existing deck cards and recreates them (full replacement, not merge).
+**PATCH /api/decks/[id]** — Updates only the supplied deck fields. If `cards` is supplied, that field is replaced atomically by deleting all existing deck cards and recreating them; omitted fields are preserved.
 
 **POST /api/decks/import** — Parses multiple deck list formats: `N CARDID`, `Nx CARDID`, `N Card Name (CARDID)`, `Leader: CARDID`. Skips comments (`#`, `//`) and section headers. Returns `{ leader, cards, errors, totalLines }`.
 
@@ -69,7 +69,9 @@ The game result endpoint uses Bearer token auth (`GAME_WORKER_SECRET`) for worke
 | POST   | `/api/lobbies`      | Session        | Create lobby (generates join code, closes previous WAITING lobbies) |
 | POST   | `/api/lobbies/join` | Session        | Join by code and enter the lobby room                               |
 | GET    | `/api/lobbies/[id]` | Session        | Poll lobby status (guest info, gameId)                              |
+| PATCH  | `/api/lobbies/[id]` | Session (member) | Partially update pre-game mode, deck, or ready state              |
 | DELETE | `/api/lobbies/[id]` | Session (host) | Cancel WAITING lobby                                                |
+| POST   | `/api/lobbies/[id]/start` | Session (host) | Start a ready lobby                                           |
 
 **POST /api/lobbies** — Request: `{ deckId?, format? }`. Returns `{ lobbyId, joinCode }`. Closes any existing WAITING lobbies for the host.
 
@@ -130,6 +132,12 @@ The game result endpoint uses Bearer token auth (`GAME_WORKER_SECRET`) for worke
 **PUT /api/friends/requests/[id]** — Accept creates Friendship with lexicographically sorted user IDs (consistent ordering). Decline deletes the request.
 
 ## Adding a New Endpoint
+
+### HTTP method convention
+
+- Use `PATCH` for partial resource updates where omitted fields remain unchanged.
+- Use `PUT` only when the request replaces the complete resource representation.
+- Replacing one supplied collection field (for example, a deck's `cards`) is still a partial resource update when the endpoint preserves omitted resource fields.
 
 1. Create `src/app/api/<domain>/route.ts` (or `src/app/api/<domain>/[param]/route.ts` for dynamic routes)
 2. Export named functions matching HTTP methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`

@@ -1,6 +1,6 @@
 /**
  * GET    /api/decks/[id] — Get a deck with full card list
- * PUT    /api/decks/[id] — Update a deck (name, leader, cards)
+ * PATCH  /api/decks/[id] — Partially update a deck (name, leader, cards)
  * DELETE /api/decks/[id] — Delete a deck
  */
 
@@ -59,7 +59,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -160,6 +160,18 @@ export async function PUT(
     console.error("[decks:update] failed", error);
     return apiError("Failed to update deck", 500);
   }
+}
+
+/**
+ * Deprecated 2026-07-15: PUT accepted for pre-deploy clients; remove after
+ * next release.
+ */
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  console.warn("[decks:update] PUT is deprecated; use PATCH");
+  return PATCH(request, context);
 }
 
 export async function DELETE(
