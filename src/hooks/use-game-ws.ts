@@ -8,7 +8,6 @@ import type {
   ServerMessage,
 } from "@shared/game-types";
 import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
-import type { ConnectionStatus } from "@/types/realtime";
 
 export interface ActionRejection {
   action: GameAction;
