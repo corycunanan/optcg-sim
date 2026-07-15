@@ -55,4 +55,15 @@ export const RemoteGameStatusResponseSchema = z.object({
   data: RemoteGameStatusSchema,
 });
 
+export const ConcedeGameResponseSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    status: z.enum(["IN_PROGRESS", "FINISHED", "ABANDONED"]),
+    winnerId: z.string().nullable(),
+    winReason: z.string().nullable(),
+    winnerPerspective: z.enum(["SELF", "OPPONENT", "NONE"]),
+    canFallbackConcede: z.boolean(),
+  }),
+});
+
 export type RemoteGameStatus = z.infer<typeof RemoteGameStatusSchema>;

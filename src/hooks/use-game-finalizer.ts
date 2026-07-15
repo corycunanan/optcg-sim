@@ -5,7 +5,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { GameState } from "@shared/game-types";
 import type { RemoteGameStatus } from "./use-remote-game-status";
 import { apiPost } from "@/lib/api-client";
-import { RemoteGameStatusResponseSchema } from "@/lib/validators/game";
+import { ConcedeGameResponseSchema } from "@/lib/validators/game";
 
 export interface UseGameFinalizerArgs {
   gameId: string;
@@ -88,10 +88,12 @@ export function useGameFinalizer({
       const json = await apiPost(
         `/api/game/${gameId}`,
         { action: "CONCEDE" },
-        RemoteGameStatusResponseSchema
+        ConcedeGameResponseSchema
       );
 
-      setRemoteGameStatus(json.data);
+      setRemoteGameStatus((current) =>
+        current ? { ...current, ...json.data } : current
+      );
       window.location.href = "/lobbies";
     } catch (error) {
       setFallbackError(
