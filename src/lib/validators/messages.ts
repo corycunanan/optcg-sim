@@ -16,6 +16,25 @@ export const SendMessageSchema = z.object({
     .pipe(z.string().min(1, "Message body is required")),
 });
 
+const MessageCursorTimestampSchema = z.iso.datetime({ offset: true });
+
+/**
+ * OPT-489 — query parameters for message polling and history pagination.
+ * `afterId` is the tie-breaker for an `after` timestamp, so it is invalid on
+ * its own. An `after` timestamp without an id remains supported for clients
+ * starting a fresh polling window.
+ */
+export const MessageHistoryQuerySchema = z
+  .object({
+    cursor: MessageCursorTimestampSchema.optional(),
+    after: MessageCursorTimestampSchema.optional(),
+    afterId: z.string().min(1).optional(),
+  })
+  .refine(({ after, afterId }) => !afterId || Boolean(after), {
+    message: "afterId requires after",
+    path: ["afterId"],
+  });
+
 /**
  * OPT-359 — body for `POST /api/messages/[userId]/read`. The cutoff is the
  * `createdAt` of the latest message the recipient has visible; the route

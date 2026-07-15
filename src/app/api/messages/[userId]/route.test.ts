@@ -104,6 +104,21 @@ beforeEach(() => {
 });
 
 describe("GET /api/messages/[userId] polling branch (?after)", () => {
+  it.each([
+    ["after", "?after=not-a-timestamp"],
+    ["calendar date", "?after=2026-02-30T00:00:00.000Z"],
+    ["cursor", "?cursor=not-a-timestamp"],
+    ["afterId without after", "?afterId=msg-5"],
+    ["empty afterId", "?after=2026-01-01T00:00:05.000Z&afterId="],
+  ])("rejects an invalid %s before querying Prisma", async (_label, query) => {
+    const { request, params } = buildGetRequest("user-recipient", query);
+
+    const res = await GET(request, { params });
+
+    expect(res.status).toBe(400);
+    expect(messageFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("caps the polling query with a take bound", async () => {
     messageFindManyMock.mockResolvedValue([fakeMessage(1), fakeMessage(2)]);
     const { request, params } = buildGetRequest(
@@ -168,6 +183,35 @@ describe("GET /api/messages/[userId] polling branch (?after)", () => {
     expect(body.data).toHaveLength(200);
     expect(body.data[199].id).toBe("msg-199");
     expect(body.more).toBe(true);
+  });
+});
+
+describe("GET /api/messages/[userId] history branch (?cursor)", () => {
+  it("preserves descending history pagination for a valid ISO cursor", async () => {
+    messageFindManyMock.mockResolvedValue([fakeMessage(2), fakeMessage(1)]);
+    const boundary = "2026-01-01T00:00:05.000Z";
+    const { request, params } = buildGetRequest(
+      "user-recipient",
+      `?cursor=${boundary}`,
+    );
+
+    const res = await GET(request, { params });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(messageFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdAt: { lt: new Date(boundary) },
+        }),
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    );
+    expect(body.data.map((message: { id: string }) => message.id)).toEqual([
+      "msg-1",
+      "msg-2",
+    ]);
   });
 });
 
