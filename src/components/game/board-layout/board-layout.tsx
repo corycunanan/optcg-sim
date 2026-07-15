@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type {
   ActiveEffect,
   CardDb,
@@ -10,12 +10,10 @@ import type {
   PromptOptions,
   TurnState,
 } from "@shared/game-types";
-import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
-import { motion, useReducedMotion } from "motion/react";
-import { useDragTilt } from "@/hooks/use-drag-tilt";
+import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
+import { useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui";
-import { Card } from "../card";
 import {
   NAVBAR_H,
   HAND_CARD_H,
@@ -23,13 +21,11 @@ import {
   BOARD_CONTENT_H,
 } from "./constants";
 import { midTop, computeBoardScaling } from "./board-geometry";
-import { useBoardDnd } from "./use-board-dnd";
 import { boardCollisionDetection } from "./board-collision";
 import { useHandOrder, useHiddenHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
-import { DonCard } from "./don-zone";
 import { MidZone } from "./mid-zone";
 import { CardAnimationLayer } from "./card-animation-layer";
 import { NavMenu } from "./nav-menu";
@@ -44,15 +40,17 @@ import {
 import { useCardTransitions } from "@/hooks/use-card-transitions";
 import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
-import type { RedistributeTransfer } from "../redistribute-don-overlay";
 import type {
   AcceptedGameUpdate,
   ActionRejection,
 } from "@/hooks/use-game-ws";
 import { ActionFeedbackProvider } from "./action-feedback";
-import { useInPlaceTargetSelection } from "./use-in-place-target-selection";
 import { useCardSpotlight } from "@/hooks/use-card-spotlight";
 import { SpotlightOverlay } from "../spotlight-overlay";
+import { useBoardDragState } from "./use-board-drag-state";
+import { BoardDragOverlay } from "./board-drag-overlay";
+import { useBoardModalRouting } from "./use-board-modal-routing";
+import { useRedistributionState } from "./use-redistribution-state";
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -142,119 +140,21 @@ function BoardLayoutInner({
     },
     [onAction, spotlight.isBlockingPrompt]
   );
-  const boardPrompt = spotlight.isBlockingPrompt ? null : activePrompt;
-  const promptType = boardPrompt?.promptType ?? null;
-  const [hiddenPromptType, setHiddenPromptType] = useState<string | null>(null);
-  const isPromptHidden = hiddenPromptType === promptType;
-  const [zonePreview, setZonePreview] = useState<
-    | { type: "deck"; owner: "me" | "opp" }
-    | { type: "trash"; owner: "me" | "opp" }
-    | null
-  >(null);
-
-  /* ── Redistribute DON prompt state ───────────────────────────── */
-
-  const redistributePrompt = boardPrompt?.promptType === "REDISTRIBUTE_DON" ? boardPrompt : null;
-  const redistributePromptKey = redistributePrompt
-    ? [
-        redistributePrompt.validSourceCardIds.join(","),
-        redistributePrompt.validTargetCardIds.join(","),
-        redistributePrompt.maxTransfers,
-      ].join("|")
-    : null;
-  const [redistributeTransferState, setRedistributeTransferState] = useState<{
-    key: string | null;
-    transfers: RedistributeTransfer[];
-  }>({ key: null, transfers: [] });
-  const redistributeTransfers = useMemo(
-    () =>
-      redistributeTransferState.key === redistributePromptKey
-        ? redistributeTransferState.transfers
-        : [],
-    [redistributeTransferState, redistributePromptKey],
-  );
-  const updateRedistributeTransfers = useCallback(
-    (
-      updater: (prev: RedistributeTransfer[]) => RedistributeTransfer[],
-    ) => {
-      setRedistributeTransferState((prev) => ({
-        key: redistributePromptKey,
-        transfers: updater(
-          prev.key === redistributePromptKey ? prev.transfers : [],
-        ),
-      }));
-    },
-    [redistributePromptKey],
-  );
-
-  const handleRedistributeDrop = useCallback(
-    (fromCardId: string, donId: string, toCardId: string) => {
-      if (!redistributePrompt) return;
-      if (fromCardId === toCardId) return;
-      if (!redistributePrompt.validSourceCardIds.includes(fromCardId)) return;
-      if (!redistributePrompt.validTargetCardIds.includes(toCardId)) return;
-      updateRedistributeTransfers((prev) => {
-        if (prev.length >= redistributePrompt.maxTransfers) return prev;
-        // Each DON can only be moved once in one submission
-        if (prev.some((t) => t.donInstanceId === donId)) return prev;
-        return [...prev, { fromCardInstanceId: fromCardId, donInstanceId: donId, toCardInstanceId: toCardId }];
-      });
-    },
-    [redistributePrompt, updateRedistributeTransfers],
-  );
-
-  const redistributeSourceIds = useMemo(() => {
-    if (!redistributePrompt) return undefined;
-    return new Set(redistributePrompt.validSourceCardIds);
-  }, [redistributePrompt]);
-
-  const pendingTransferDonIdsByCard = useMemo(() => {
-    if (!redistributePrompt || redistributeTransfers.length === 0) return undefined;
-    const map = new Map<string, Set<string>>();
-    for (const t of redistributeTransfers) {
-      let set = map.get(t.fromCardInstanceId);
-      if (!set) {
-        set = new Set<string>();
-        map.set(t.fromCardInstanceId, set);
-      }
-      set.add(t.donInstanceId);
-    }
-    return map;
-  }, [redistributePrompt, redistributeTransfers]);
-
-  const donCountAdjustments = useMemo(() => {
-    if (!redistributePrompt || redistributeTransfers.length === 0) return undefined;
-    const map = new Map<string, number>();
-    for (const t of redistributeTransfers) {
-      map.set(t.fromCardInstanceId, (map.get(t.fromCardInstanceId) ?? 0) - 1);
-      map.set(t.toCardInstanceId, (map.get(t.toCardInstanceId) ?? 0) + 1);
-    }
-    return map;
-  }, [redistributePrompt, redistributeTransfers]);
-
-  /* ── In-place SELECT_TARGET prompt state ────────────────────── */
-
-  const selectTargetPrompt =
-    boardPrompt?.promptType === "SELECT_TARGET" ? boardPrompt : null;
-  const inPlaceTargetSelection = useInPlaceTargetSelection({
-    prompt: selectTargetPrompt,
+  const modalRouting = useBoardModalRouting({
+    activePrompt,
+    promptBlocked: spotlight.isBlockingPrompt,
     me,
     opp,
     cardDb,
     onAction: dispatchBoardAction,
   });
-  const targetSelectionActive = !!inPlaceTargetSelection.prompt;
+  const boardPrompt = modalRouting.prompt;
+
+  const redistribution = useRedistributionState(boardPrompt);
 
   /* ── Derived state from extracted hooks ───────────────────────────── */
 
   const { boardScale, boardTop, playerHandTop } = computeBoardScaling(viewport);
-
-  // The dnd-kit DragOverlay portals to `document.body`, which sits outside
-  // the ancestor `<ScaledBoard>` transform. To render dragged cards at the
-  // same on-screen size as cards already on the board, the overlay must
-  // recreate the user's perceived scale: BoardLayout's own design-canvas-fit
-  // `boardScale` times `<ScaledBoard>`'s viewport-fit `outerScale`.
-  const dragOverlayScale = outerScale * boardScale;
 
   const bs = useBattleState(me, opp, myIndex, turn, cardDb, isMyTurn, battlePhase, matchClosed);
 
@@ -263,25 +163,21 @@ function BoardLayoutInner({
   );
   const opponentOrderedHand = useHiddenHandOrder(opp?.hand ?? []);
 
-  const {
-    activeDrag,
-    activeDragType,
-    sensors,
-    accessibility,
-    handleDragStart,
-    handleDragEnd,
-    handleDragCancel,
-  } = useBoardDnd(
+  const drag = useBoardDragState({
     cardDb,
-    bs.battle,
-    dispatchBoardAction,
-    handleRedistributeDrop,
-    reorderPlayerHand,
-    dndDisabled || targetSelectionActive || spotlight.isBlockingPrompt,
-  );
+    battle: bs.battle,
+    onAction: dispatchBoardAction,
+    onRedistributeDrop: redistribution.handleDrop,
+    onHandReorder: reorderPlayerHand,
+    disabled:
+      dndDisabled ||
+      modalRouting.targetSelectionActive ||
+      spotlight.isBlockingPrompt,
+    boardScale,
+    outerScale,
+  });
 
   const reducedMotion = useReducedMotion();
-  const dragTilt = useDragTilt({ disabled: !!reducedMotion });
 
   /* ── Status indicator ──────────────────────────────────────────── */
 
@@ -297,7 +193,7 @@ function BoardLayoutInner({
   const { transitions: cardAnimations, removeTransition } = useCardTransitions(
     eventLog,
     myIndex,
-    activeDrag !== null,
+    drag.activeDrag !== null,
     zoneRegistry,
     spotlight.presentation,
   );
@@ -336,10 +232,10 @@ function BoardLayoutInner({
   }, [cardAnimations]);
 
   const mergedDonCountAdjustments = useMemo(() => {
-    if (!inFlightDonAdjustByCard && !donCountAdjustments) return undefined;
+    if (!inFlightDonAdjustByCard && !redistribution.donCountAdjustments) return undefined;
     const out = new Map<string, number>();
-    if (donCountAdjustments) {
-      for (const [k, v] of donCountAdjustments) out.set(k, v);
+    if (redistribution.donCountAdjustments) {
+      for (const [k, v] of redistribution.donCountAdjustments) out.set(k, v);
     }
     if (inFlightDonAdjustByCard) {
       for (const [k, v] of inFlightDonAdjustByCard) {
@@ -347,7 +243,7 @@ function BoardLayoutInner({
       }
     }
     return out.size > 0 ? out : undefined;
-  }, [donCountAdjustments, inFlightDonAdjustByCard]);
+  }, [redistribution.donCountAdjustments, inFlightDonAdjustByCard]);
 
   const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
   const oppHandAnim = useHandAnimationState(cardAnimations, opponentOrderedHand, "o-hand");
@@ -381,17 +277,14 @@ function BoardLayoutInner({
   return (
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
-      sensors={sensors}
-      accessibility={accessibility}
+      sensors={drag.sensors}
+      accessibility={drag.accessibility}
       collisionDetection={boardCollisionDetection}
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-      onDragStart={(e) => { handleDragStart(e); dragTilt.handleDragStart(e); }}
-      onDragMove={dragTilt.handleDragMove}
-      onDragEnd={(e) => { handleDragEnd(e); dragTilt.handleDragEnd(e); }}
-      onDragCancel={(e) => {
-        handleDragCancel();
-        dragTilt.handleDragEnd(e);
-      }}
+      onDragStart={drag.handleDragStart}
+      onDragMove={drag.handleDragMove}
+      onDragEnd={drag.handleDragEnd}
+      onDragCancel={drag.handleDragCancel}
     >
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
@@ -500,16 +393,16 @@ function BoardLayoutInner({
           <OpponentField
             opp={opp}
             cardDb={cardDb}
-            activeDragType={activeDragType}
+            activeDragType={drag.activeDragType}
             refreshWave={refreshWave}
-            onPreviewZone={setZonePreview}
+            onPreviewZone={modalRouting.openZonePreview}
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
             pileArrivingCounts={pileArrivingCounts}
-            targetSelectionById={inPlaceTargetSelection.model?.byId}
-            onTargetToggle={inPlaceTargetSelection.toggle}
+            targetSelectionById={modalRouting.targetSelection.model?.byId}
+            onTargetToggle={modalRouting.targetSelection.toggle}
           />
 
           <MidZone
@@ -534,22 +427,22 @@ function BoardLayoutInner({
               },
             } : undefined}
             targetSelectionMode={
-              inPlaceTargetSelection.prompt && inPlaceTargetSelection.model
+              modalRouting.targetSelection.prompt && modalRouting.targetSelection.model
                 ? {
-                    effectDescription: inPlaceTargetSelection.prompt.effectDescription,
-                    countLabel: inPlaceTargetSelection.model.countLabel,
-                    selectedCount: inPlaceTargetSelection.model.selectedCount,
-                    aggregateLabel: inPlaceTargetSelection.model.aggregateLabel,
-                    ctaLabel: inPlaceTargetSelection.prompt.ctaLabel,
-                    canConfirm: inPlaceTargetSelection.model.canConfirm,
-                    canSkip: inPlaceTargetSelection.prompt.countMin === 0,
-                    onConfirm: inPlaceTargetSelection.confirm,
-                    onSkip: inPlaceTargetSelection.skip,
+                    effectDescription: modalRouting.targetSelection.prompt.effectDescription,
+                    countLabel: modalRouting.targetSelection.model.countLabel,
+                    selectedCount: modalRouting.targetSelection.model.selectedCount,
+                    aggregateLabel: modalRouting.targetSelection.model.aggregateLabel,
+                    ctaLabel: modalRouting.targetSelection.prompt.ctaLabel,
+                    canConfirm: modalRouting.targetSelection.model.canConfirm,
+                    canSkip: modalRouting.targetSelection.prompt.countMin === 0,
+                    onConfirm: modalRouting.targetSelection.confirm,
+                    onSkip: modalRouting.targetSelection.skip,
                   }
                 : undefined
             }
-            isPromptHidden={isPromptHidden}
-            onShowPrompt={() => setHiddenPromptType(null)}
+            isPromptHidden={modalRouting.isPromptHidden}
+            onShowPrompt={modalRouting.showPrompt}
             canUndo={canUndo && !spotlight.isBlockingPrompt}
             onAction={dispatchBoardAction}
           />
@@ -557,12 +450,12 @@ function BoardLayoutInner({
           <PlayerField
             me={me}
             cardDb={cardDb}
-            activeDragType={activeDragType}
-            activeDrag={activeDrag}
+            activeDragType={drag.activeDragType}
+            activeDrag={drag.activeDrag}
             refreshWave={refreshWave}
             canInteract={
               bs.canInteract &&
-              !targetSelectionActive &&
+              !modalRouting.targetSelectionActive &&
               !spotlight.isBlockingPrompt
             }
             canActivateMain={
@@ -573,23 +466,23 @@ function BoardLayoutInner({
             oncePerTurnUsed={turn?.oncePerTurnUsed}
             canDragCounter={
               bs.canDragCounter &&
-              !targetSelectionActive &&
+              !modalRouting.targetSelectionActive &&
               !spotlight.isBlockingPrompt
             }
             inBlockStep={bs.inBlockStep && !spotlight.isBlockingPrompt}
             selectedBlockerId={bs.selectedBlockerId}
             setSelectedBlockerId={bs.setSelectedBlockerId}
             onAction={dispatchBoardAction}
-            onPreviewZone={setZonePreview}
-            redistributeSourceIds={redistributeSourceIds}
-            pendingTransferDonIdsByCard={pendingTransferDonIdsByCard}
+            onPreviewZone={modalRouting.openZonePreview}
+            redistributeSourceIds={redistribution.sourceIds}
+            pendingTransferDonIdsByCard={redistribution.pendingDonIdsByCard}
             donCountAdjustments={mergedDonCountAdjustments}
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             pileArrivingCounts={pileArrivingCounts}
-            targetSelectionById={inPlaceTargetSelection.model?.byId}
-            onTargetToggle={inPlaceTargetSelection.toggle}
+            targetSelectionById={modalRouting.targetSelection.model?.byId}
+            onTargetToggle={modalRouting.targetSelection.toggle}
           />
         </div>
       </div>
@@ -613,13 +506,13 @@ function BoardLayoutInner({
             enableDrag={
               !dndDisabled &&
               !spotlight.isBlockingPrompt &&
-              !targetSelectionActive &&
+              !modalRouting.targetSelectionActive &&
               (bs.canInteract || bs.canDragCounter)
             }
             counterMode={
               !dndDisabled &&
               !spotlight.isBlockingPrompt &&
-              !targetSelectionActive &&
+              !modalRouting.targetSelectionActive &&
               bs.canDragCounter
             }
             availableDon={
@@ -646,85 +539,28 @@ function BoardLayoutInner({
 
       <BoardModals
         activePrompt={boardPrompt}
-        isPromptHidden={isPromptHidden}
-        onHide={() => setHiddenPromptType(promptType)}
+        isPromptHidden={modalRouting.isPromptHidden}
+        onHide={modalRouting.hidePrompt}
         cardDb={cardDb}
         onAction={dispatchBoardAction}
-        zonePreview={zonePreview}
-        onCloseZonePreview={() => setZonePreview(null)}
+        zonePreview={modalRouting.zonePreview}
+        onCloseZonePreview={modalRouting.closeZonePreview}
         me={me}
         opp={opp}
-        redistributeTransfers={redistributeTransfers}
-        onRedistributeUndo={() => updateRedistributeTransfers((prev) => prev.slice(0, -1))}
-        selectTargetInPlace={targetSelectionActive}
+        redistributeTransfers={redistribution.transfers}
+        onRedistributeUndo={redistribution.undo}
+        selectTargetInPlace={modalRouting.targetSelectionActive}
       />
     </div>
 
-    <DragOverlay dropAnimation={null}>
-      {activeDrag && (
-        <motion.div
-          style={{
-            // Parent perspective so the rotateX/rotateY reads as depth rather
-            // than orthographic skew. The inner <Card> owns its own
-            // perspective stack; this one lives on the DragOverlay wrapper
-            // specifically to give the drag tilt physical volume.
-            transformPerspective: 1000,
-            rotateX: dragTilt.tiltX,
-            rotateY: dragTilt.tiltY,
-          }}
-        >
-          {activeDrag.type === "hand-card" && (
-            <div
-              style={{
-                transform: `scale(${dragOverlayScale})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <Card
-                variant="hand"
-                data={{ cardDb, card: activeDrag.card }}
-                interaction={{ tooltipDisabled: true }}
-              />
-            </div>
-          )}
-          {activeDrag.type === "active-don" && (
-            <div
-              style={{
-                transform: `scale(${dragOverlayScale})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <DonCard donArtUrl={me?.donArtUrl} />
-            </div>
-          )}
-          {activeDrag.type === "redistribute-don" && (
-            <div
-              style={{
-                transform: `scale(${dragOverlayScale})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <DonCard donArtUrl={me?.donArtUrl} />
-            </div>
-          )}
-          {activeDrag.type === "attacker" && (
-            <div
-              style={{
-                transform: `scale(${dragOverlayScale})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <Card
-                variant="field"
-                data={{ cardDb, card: activeDrag.card }}
-                overlays={{ donCount: activeDrag.card.attachedDon.length }}
-                interaction={{ tooltipDisabled: true }}
-              />
-            </div>
-          )}
-        </motion.div>
-      )}
-    </DragOverlay>
+    <BoardDragOverlay
+      activeDrag={drag.activeDrag}
+      cardDb={cardDb}
+      donArtUrl={me?.donArtUrl}
+      overlayScale={drag.overlayScale}
+      tiltX={drag.tiltX}
+      tiltY={drag.tiltY}
+    />
 
     <CardAnimationLayer
       transitions={cardAnimations}
