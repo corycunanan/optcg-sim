@@ -31,6 +31,11 @@ import {
 } from "./effective-keyword.js";
 import { findCardInstance } from "./state.js";
 import { isPresent } from "./type-guards.js";
+import {
+  matchesTargetFilter,
+  type SharedTargetFilter,
+  type SharedTargetFilterCard,
+} from "../../../../shared/target-filter.js";
 
 type ConditionContext = Omit<QueryConditionContext, "queries">;
 
@@ -707,33 +712,36 @@ function matchesHandCardFilter(
   filter: TargetFilter,
   cardData: CardData
 ): boolean {
-  const cardColors = cardData.color.map((color) => color.toUpperCase());
-  if (filter.color) {
-    if (!cardColors.includes(filter.color)) return false;
-  }
-  if (filter.color_includes) {
-    if (!filter.color_includes.some((c) => cardColors.includes(c)))
-      return false;
-  }
-  if (filter.card_type) {
-    const types = Array.isArray(filter.card_type)
-      ? filter.card_type
-      : [filter.card_type];
-    if (!types.includes(cardData.type?.toUpperCase() ?? "")) return false;
-  }
-  if (filter.traits) {
-    const cardTraits = cardData.types ?? [];
-    if (!filter.traits.every((t: string) => cardTraits.includes(t)))
-      return false;
-  }
-  if (filter.cost_max !== undefined) {
-    if (
-      typeof filter.cost_max === "number" &&
-      (cardData.cost ?? 0) > filter.cost_max
-    )
-      return false;
-  }
-  return true;
+  const sharedCard: SharedTargetFilterCard = {
+    cost: cardData.cost ?? 0,
+    baseCost: cardData.cost ?? 0,
+    power: cardData.power ?? 0,
+    basePower: cardData.power ?? 0,
+    colors: cardData.color,
+    traits: cardData.types ?? [],
+    name: cardData.name,
+    attributes: cardData.attribute ?? [],
+    cardType: cardData.type,
+    attachedDonCount: 0,
+    hasTrigger: cardData.keywords.trigger,
+    hasEffect: Boolean(cardData.effectText.trim()),
+    hasBaseEffect: Boolean(cardData.effectText.trim()),
+    hasCounter: cardData.counter !== null && cardData.counter !== undefined,
+    treatsAsAllNames: false,
+    treatsAsAllTraits: false,
+    treatsAsAllAttributes: false,
+  };
+  const legacyHandFilter: SharedTargetFilter = {
+    color: filter.color,
+    color_includes: filter.color_includes,
+    card_type: filter.card_type,
+    traits: filter.traits,
+    cost_max: filter.cost_max,
+  };
+
+  return matchesTargetFilter(sharedCard, legacyHandFilter, {
+    getEffectiveCost: ({ cost }) => cost,
+  });
 }
 
 /**

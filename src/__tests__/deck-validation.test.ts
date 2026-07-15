@@ -233,4 +233,120 @@ describe("validateDeck leader deck restrictions", () => {
     expect(result.passed).toBe(false);
     expect(result.cardIds).toEqual(["P-119"]);
   });
+
+  it("applies previously-unknown keys to ONLY_INCLUDE restrictions", () => {
+    const expandedLeader: DeckLeader = {
+      ...leader,
+      effectSchema: {
+        rule_modifications: [
+          {
+            rule_type: "DECK_RESTRICTION",
+            restriction: "ONLY_INCLUDE",
+            filter: {
+              color: "BLUE",
+              name_includes: "Monkey",
+              traits_any_of: ["Straw Hat Crew", "Navy"],
+              traits_contains: ["Hat"],
+              cost_max: { type: "FIXED", value: 3 },
+              power_min: 5000,
+            },
+          },
+        ],
+      },
+    };
+    const result = validateDeck(expandedLeader, [
+      makeCard("OPT-412-OK", "Monkey.D.Luffy", 4, null, {
+        color: ["Blue"],
+        cost: 3,
+        power: 5000,
+        traits: ["Straw Hat Crew"],
+      }),
+      makeCard("OPT-412-NAME", "Roronoa Zoro", 4, null, {
+        color: ["Blue"],
+        cost: 3,
+        power: 5000,
+        traits: ["Straw Hat Crew"],
+      }),
+      makeCard("OPT-412-COLOR", "Monkey.D.Garp", 4, null, {
+        color: ["Red"],
+        cost: 3,
+        power: 5000,
+        traits: ["Navy"],
+      }),
+      makeCard("OPT-412-COST", "Monkey.D.Dragon", 4, null, {
+        color: ["Blue"],
+        cost: 4,
+        power: 5000,
+        traits: ["Straw Hat Crew"],
+      }),
+    ]).results.find((r) => r.id === "leader-deck-restriction")!;
+
+    expect(result.passed).toBe(false);
+    expect(result.cardIds).toEqual([
+      "OPT-412-NAME",
+      "OPT-412-COLOR",
+      "OPT-412-COST",
+    ]);
+  });
+
+  it("applies previously-unknown keys to CANNOT_INCLUDE restrictions", () => {
+    const restrictedLeader: DeckLeader = {
+      ...leader,
+      effectSchema: {
+        rule_modifications: [
+          {
+            rule_type: "DECK_RESTRICTION",
+            restriction: "CANNOT_INCLUDE",
+            filter: {
+              color_includes: ["RED", "GREEN"],
+              name_any_of: ["Forbidden Event", "Forbidden Character"],
+              cost_range: { min: 2, max: 4 },
+            },
+          },
+        ],
+      },
+    };
+    const result = validateDeck(restrictedLeader, [
+      makeCard("OPT-412-BANNED", "Forbidden Event", 4, null, {
+        color: ["Red"],
+        type: "Event",
+        cost: 2,
+      }),
+      makeCard("OPT-412-WRONG-NAME", "Allowed Event", 4, null, {
+        color: ["Red"],
+        type: "Event",
+        cost: 2,
+      }),
+      makeCard("OPT-412-WRONG-COLOR", "Forbidden Event", 4, null, {
+        color: ["Blue"],
+        type: "Event",
+        cost: 2,
+      }),
+    ]).results.find((r) => r.id === "leader-deck-restriction")!;
+
+    expect(result.passed).toBe(false);
+    expect(result.cardIds).toEqual(["OPT-412-BANNED"]);
+  });
+
+  it("fails closed for filter keys outside the shared vocabulary", () => {
+    const card = {
+      name: "Any Card",
+      type: "Character",
+      cost: 1,
+      traits: [],
+    };
+
+    expect(
+      isCardAllowedByDeckRestrictionRules(
+        [{ restriction: "ONLY_INCLUDE", filter: { future_key: true } }],
+        card
+      )
+    ).toBe(false);
+    expect(
+      isCardAllowedByDeckRestrictionRules(
+        [{ restriction: "CANNOT_INCLUDE", filter: { future_key: true } }],
+        card
+      )
+    ).toBe(true);
+  });
 });
