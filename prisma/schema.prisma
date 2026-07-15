@@ -62,6 +62,7 @@ model User {
   gamesAsPlayer1    GameSession[]   @relation("GamesAsPlayer1")
   gamesAsPlayer2    GameSession[]   @relation("GamesAsPlayer2")
 
+  @@index([username(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_username_trgm_idx")
   @@map("users")
 }
 
@@ -140,6 +141,7 @@ model Card {
   @@index([originSet])
   @@index([banStatus])
   @@index([blockNumber])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "cards_name_trgm_idx")
   @@map("cards")
 }
 
