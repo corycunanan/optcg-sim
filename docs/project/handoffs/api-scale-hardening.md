@@ -19,13 +19,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-378 | Enforce reciprocal friend-request uniqueness and idempotent accept | — | — | Done | [#317](https://github.com/corycunanan/optcg-sim/pull/317) | Establishes the partial-index and P2002-handling pattern. |
 | 2 | OPT-381 | Index active-lobby lookup and enforce one WAITING lobby per host | — | OPT-378 | Done | [#318](https://github.com/corycunanan/optcg-sim/pull/318) | Reuses the same partial-index and dedup-migration pattern. |
 | 3 | OPT-380 | Add pg_trgm indexes and measurable search-query acceptance criteria | — | — | Done | [#319](https://github.com/corycunanan/optcg-sim/pull/319) | Final raw-SQL migration ticket. |
-| 4 | OPT-489 | Validate message-history cursor timestamps before Prisma queries | — | OPT-375 | In Review | [#320](https://github.com/corycunanan/optcg-sim/pull/320) | Closes the remaining malformed-date 500 path. |
-| 5 | OPT-382 | Trim /api/cards search payload without weakening deck legality | — | OPT-374 | Backlog | — | Separate list/detail contract while preserving legality data. |
+| 4 | OPT-489 | Validate message-history cursor timestamps before Prisma queries | — | OPT-375 | Done | [#320](https://github.com/corycunanan/optcg-sim/pull/320) | Closes the remaining malformed-date 500 path. |
+| 5 | OPT-382 | Trim /api/cards search payload without weakening deck legality | — | OPT-374 | In Review | [#321](https://github.com/corycunanan/optcg-sim/pull/321) | Separate list/detail contract while preserving legality data. |
 | 6 | OPT-488 | Define and automate retention for CLOSED lobbies without game sessions | — | OPT-381 | Backlog | — | Requires an explicit retention policy and scheduler. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-382; its OPT-374 dependency is complete. OPT-488 is ready in parallel.
+**Next up:** OPT-488; its OPT-381 dependency is complete.
 
 ---
 
@@ -66,3 +66,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** OPT-382 must preserve deck-legality inputs when splitting list/detail payloads; keep leader restriction behavior from OPT-374 intact.
 - **Unresolved:** none for OPT-489; malformed timestamps and composite cursor boundaries are covered without changing OPT-375's cap, `more` flag, or ordering.
 - **Pointer:** commit `6ef5b40` / PR #320; run `git show 6ef5b40` for the implementation diff.
+
+### OPT-382 → OPT-488
+**From:** session on 2026-07-15 · **Commit:** `0cece0f` · **PR:** [#321](https://github.com/corycunanan/optcg-sim/pull/321)
+
+- **Primer:** Card search now returns only the seven grid/restriction fields; inspect and add load the full detail record so `effectSchema`, art variants, set membership, and copy-limit/deck-restriction legality remain authoritative. The measured 100-card JSON envelope is 80.0% smaller.
+- **Read first:** `prisma/schema.prisma` (`Lobby`, `LobbyGuest`, `LobbyInvite`, and `GameSession`), `src/app/api/lobbies/route.ts`, and the deployment configuration before choosing a scheduled execution path.
+- **Gotchas / do NOT touch:** Preserve OPT-381's WAITING-lobby partial unique index. Retention may delete only old `CLOSED` lobbies with no `GameSession`; guest and invite cascades are safe only after the parent meets every eligibility condition.
+- **Unresolved:** OPT-488 must document the retention window (the ticket proposes 30 days), scheduler/authentication mechanism, bounded batch behavior, operational metrics, and a production dry-run procedure.
+- **Pointer:** commit `0cece0f` / PR #321; run `git show 0cece0f` for the implementation diff.
