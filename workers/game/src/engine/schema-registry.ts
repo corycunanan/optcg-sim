@@ -6,8 +6,9 @@
  * This module provides a runtime registry for the engine worker,
  * populated from the DB on game init.
  *
- * During development and testing, we also provide pre-authored schemas
- * from the schemas/ directory.
+ * Authored TypeScript schemas are compacted into a generated production
+ * artifact. Validation tooling still loads every source module and enforces
+ * exact source parity before this synchronous registry can ship.
  */
 
 import {
@@ -24,116 +25,7 @@ import {
 } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
-import { OP01_SCHEMAS } from "./schemas/op01.js";
-import { OP02_SCHEMAS } from "./schemas/op02.js";
-import { OP03_SCHEMAS } from "./schemas/op03.js";
-import { OP04_SCHEMAS } from "./schemas/op04.js";
-import { OP05_SCHEMAS } from "./schemas/op05.js";
-import { OP06_SCHEMAS } from "./schemas/op06.js";
-import { OP07_SCHEMAS } from "./schemas/op07.js";
-import { OP08_SCHEMAS } from "./schemas/op08.js";
-import { OP09_SCHEMAS } from "./schemas/op09.js";
-import { OP10_SCHEMAS } from "./schemas/op10.js";
-import { OP11_SCHEMAS } from "./schemas/op11.js";
-import { OP12_SCHEMAS } from "./schemas/op12.js";
-import { OP13_SCHEMAS } from "./schemas/op13.js";
-import { OP14_SCHEMAS } from "./schemas/op14.js";
-import { OP15_SCHEMAS } from "./schemas/op15.js";
-import { OP16_SCHEMAS } from "./schemas/op16.js";
-import { EB01_SCHEMAS } from "./schemas/eb01.js";
-import { EB02_SCHEMAS } from "./schemas/eb02.js";
-import { EB03_SCHEMAS } from "./schemas/eb03.js";
-import { EB04_SCHEMAS } from "./schemas/eb04.js";
-import { PRB01_SCHEMAS } from "./schemas/prb01.js";
-import { PRB02_SCHEMAS } from "./schemas/prb02.js";
-import { ST01_SCHEMAS } from "./schemas/st01.js";
-import { ST02_SCHEMAS } from "./schemas/st02.js";
-import { ST03_SCHEMAS } from "./schemas/st03.js";
-import { ST04_SCHEMAS } from "./schemas/st04.js";
-import { ST05_SCHEMAS } from "./schemas/st05.js";
-import { ST06_SCHEMAS } from "./schemas/st06.js";
-import { ST07_SCHEMAS } from "./schemas/st07.js";
-import { ST08_SCHEMAS } from "./schemas/st08.js";
-import { ST09_SCHEMAS } from "./schemas/st09.js";
-import { ST10_SCHEMAS } from "./schemas/st10.js";
-import { ST11_SCHEMAS } from "./schemas/st11.js";
-import { ST12_SCHEMAS } from "./schemas/st12.js";
-import { ST13_SCHEMAS } from "./schemas/st13.js";
-import { ST14_SCHEMAS } from "./schemas/st14.js";
-import { ST15_SCHEMAS } from "./schemas/st15.js";
-import { ST16_SCHEMAS } from "./schemas/st16.js";
-import { ST17_SCHEMAS } from "./schemas/st17.js";
-import { ST18_SCHEMAS } from "./schemas/st18.js";
-import { ST19_SCHEMAS } from "./schemas/st19.js";
-import { ST20_SCHEMAS } from "./schemas/st20.js";
-import { ST21_SCHEMAS } from "./schemas/st21.js";
-import { ST22_SCHEMAS } from "./schemas/st22.js";
-import { ST23_SCHEMAS } from "./schemas/st23.js";
-import { ST24_SCHEMAS } from "./schemas/st24.js";
-import { ST25_SCHEMAS } from "./schemas/st25.js";
-import { ST26_SCHEMAS } from "./schemas/st26.js";
-import { ST27_SCHEMAS } from "./schemas/st27.js";
-import { ST28_SCHEMAS } from "./schemas/st28.js";
-import { ST29_SCHEMAS } from "./schemas/st29.js";
-import { ST30_SCHEMAS } from "./schemas/st30.js";
-import { P_SCHEMAS } from "./schemas/p.js";
-
-/** All pre-authored schemas, keyed by card ID */
-const AUTHORED_SCHEMAS: Record<string, EffectSchema> = {
-  ...OP01_SCHEMAS,
-  ...OP02_SCHEMAS,
-  ...OP03_SCHEMAS,
-  ...OP04_SCHEMAS,
-  ...OP05_SCHEMAS,
-  ...OP06_SCHEMAS,
-  ...OP07_SCHEMAS,
-  ...OP08_SCHEMAS,
-  ...OP09_SCHEMAS,
-  ...OP10_SCHEMAS,
-  ...OP11_SCHEMAS,
-  ...OP12_SCHEMAS,
-  ...OP13_SCHEMAS,
-  ...OP14_SCHEMAS,
-  ...OP15_SCHEMAS,
-  ...OP16_SCHEMAS,
-  ...EB01_SCHEMAS,
-  ...EB02_SCHEMAS,
-  ...EB03_SCHEMAS,
-  ...EB04_SCHEMAS,
-  ...PRB01_SCHEMAS,
-  ...PRB02_SCHEMAS,
-  ...ST01_SCHEMAS,
-  ...ST02_SCHEMAS,
-  ...ST03_SCHEMAS,
-  ...ST04_SCHEMAS,
-  ...ST05_SCHEMAS,
-  ...ST06_SCHEMAS,
-  ...ST07_SCHEMAS,
-  ...ST08_SCHEMAS,
-  ...ST09_SCHEMAS,
-  ...ST10_SCHEMAS,
-  ...ST11_SCHEMAS,
-  ...ST12_SCHEMAS,
-  ...ST13_SCHEMAS,
-  ...ST14_SCHEMAS,
-  ...ST15_SCHEMAS,
-  ...ST16_SCHEMAS,
-  ...ST17_SCHEMAS,
-  ...ST18_SCHEMAS,
-  ...ST19_SCHEMAS,
-  ...ST20_SCHEMAS,
-  ...ST21_SCHEMAS,
-  ...ST22_SCHEMAS,
-  ...ST23_SCHEMAS,
-  ...ST24_SCHEMAS,
-  ...ST25_SCHEMAS,
-  ...ST26_SCHEMAS,
-  ...ST27_SCHEMAS,
-  ...ST28_SCHEMAS,
-  ...ST29_SCHEMAS,
-  ...ST30_SCHEMAS,
-  ...P_SCHEMAS,
-};
+import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 
 /**
  * Get the effect schema for a card by ID.
@@ -147,7 +39,6 @@ export function getEffectSchema(cardId: string): EffectSchema | null {
   }
   return schema;
 }
-
 /**
  * Merge authored schemas into a CardDb's effectSchema fields.
  * Called at game init to inject schemas into the runtime card database.

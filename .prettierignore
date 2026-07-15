@@ -5,3 +5,4 @@ build
 data
 vegapull
 pnpm-lock.yaml
+workers/game/src/engine/authored-schemas.generated.ts

@@ -22,14 +22,13 @@ op03/
   yellow.ts   — Yellow card schemas + OP03_YELLOW_SCHEMAS array
   index.ts    — Barrel: imports color arrays, exports OP03_SCHEMAS record + re-exports all constants
 ```
-
 Each color file starts with `import type { EffectSchema } from "../../effect-types.js";` and exports its card constants plus a color array. The barrel `index.ts` builds the `Record<string, EffectSchema>` from all color arrays and re-exports individual constants for backwards compatibility. The registry imports from `./schemas/op03/index.js`.
 
 For smaller sets or test decks, a single `{set-id}.ts` or `{deck-name}-deck.ts` file is still acceptable.
 
 ## Registration
 
-All schemas must be registered in `schema-registry.ts` so the engine can look them up by `card_id`. Add your schemas to the registry's import list and include them in the lookup map.
+All schemas are collected into `authored-schemas.generated.ts` so the engine can look them up synchronously by `card_id` without bundling every authored source module. Run `pnpm schema:generate` after adding or changing a schema file; `pnpm schema:check` rejects stale generated output or source/registry payload drift.
 
 ## Top-Level Schema Structure
 
@@ -807,7 +806,7 @@ Before committing a schema, verify:
 - [ ] Duration matches card text (THIS_TURN, THIS_BATTLE, PERMANENT, etc.)
 - [ ] `zone: "HAND"` set on effects that work from hand
 - [ ] Filters use `base_*` variants when card text says "base"
-- [ ] Schema is registered in `schema-registry.ts`
+- [ ] `pnpm schema:generate` has refreshed the generated registry artifact
 
 ---
 

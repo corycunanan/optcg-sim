@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy",
+    "bundle:check": "node scripts/check-bundle-capacity.mjs",
     "type-check": "tsc --noEmit",
-    "schema:check": "node src/engine/schemas/lint-schemas.sh && node src/engine/schemas/check-doc-drift.sh && node --import tsx src/engine/action-inventory-cli.ts && vitest run src/__tests__/opt-471-authored-schema-gate.test.ts",
+    "schema:generate": "node --import tsx scripts/generate-schema-registry.ts",
+    "schema:check": "node --import tsx scripts/generate-schema-registry.ts --check && node src/engine/schemas/lint-schemas.sh && node src/engine/schemas/check-doc-drift.sh && node --import tsx src/engine/action-inventory-cli.ts && vitest run src/__tests__/opt-471-authored-schema-gate.test.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
