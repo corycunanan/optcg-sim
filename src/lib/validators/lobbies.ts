@@ -54,6 +54,9 @@ export const CreateLobbyResponseSchema = z.object({
 export const JoinLobbyResponseSchema = z.object({
   data: z.object({ lobbyId: z.string() }),
 });
+export const LobbyActionResponseSchema = z.object({
+  success: z.literal(true),
+});
 
 export const CreateLobbySchema = z.object({
   deckId: z.string().min(1, "deckId is required").optional(),

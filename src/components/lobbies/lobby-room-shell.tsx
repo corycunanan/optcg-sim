@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { DeckPreviewModal } from "./deck-preview-modal";
+import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 import { InviteFriendPopover } from "./invite-friend-popover";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
 
@@ -55,8 +56,17 @@ export function LobbyRoomShell({
   currentUserId,
 }: LobbyRoomShellProps) {
   const router = useRouter();
-  const { lobby, loading, error, mutating, starting, patchLobby, startLobby } =
-    useLobbyRoom(lobbyId);
+  const {
+    lobby,
+    loading,
+    error,
+    mutating,
+    starting,
+    leaving,
+    patchLobby,
+    startLobby,
+    leaveLobby,
+  } = useLobbyRoom(lobbyId);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
   const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
@@ -159,6 +169,18 @@ export function LobbyRoomShell({
     }
   };
 
+  const handleLeave = async () => {
+    await runGuestLeave({
+      leave: leaveLobby,
+      onSuccess: () => toast.success("You left the lobby"),
+      onError: (err) =>
+        toast.error(
+          err instanceof ApiError ? err.message : "Could not leave lobby"
+        ),
+      returnToBrowser: () => router.push("/lobbies"),
+    });
+  };
+
   if (loading && !lobby) {
     return (
       <div className="bg-surface-base flex-1 overflow-y-auto">
@@ -199,6 +221,12 @@ export function LobbyRoomShell({
           </PageHeaderContent>
           <PageHeaderActions>
             <Badge variant="secondary">{lobby.format}</Badge>
+            <GuestLeaveAction
+              isGuest={Boolean(isGuest)}
+              leaving={leaving}
+              disabled={mutating}
+              onLeave={() => void handleLeave()}
+            />
             {isHost && (
               <Button onClick={handleStart} disabled={!canStart || starting}>
                 {starting ? (
