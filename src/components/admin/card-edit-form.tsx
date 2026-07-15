@@ -196,20 +196,13 @@ export function CardEditForm({ card }: { card: Card }) {
               <button
                 key={c}
                 type="button"
+                aria-pressed={active}
+                data-color={c.toLowerCase()}
                 onClick={() => toggleColor(c)}
                 className={cn(
-                  "rounded-md border px-3 py-1 text-xs font-medium transition-all",
+                  "admin-card-color-button rounded-md border px-3 py-1 text-xs font-medium transition-all",
                   !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
                 )}
-                style={
-                  active
-                    ? {
-                        background: `var(--card-${c.toLowerCase()})`,
-                        color: c === "Yellow" ? "var(--text-primary)" : "var(--text-inverse)",
-                        borderColor: `var(--card-${c.toLowerCase()})`,
-                      }
-                    : undefined
-                }
               >
                 {c}
               </button>
