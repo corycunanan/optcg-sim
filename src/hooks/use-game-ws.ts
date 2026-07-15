@@ -57,6 +57,7 @@ export function useGameWs(
   const acceptedUpdateSequenceRef = useRef(0);
   const [acceptedUpdate, setAcceptedUpdate] =
     useState<AcceptedGameUpdate | null>(null);
+  const [activePromptId, setActivePromptId] = useState<string | null>(null);
 
   const url = useMemo(
     () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
@@ -77,8 +78,11 @@ export function useGameWs(
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
-          activePromptIdRef.current = msg.state.pendingPrompt.promptId ?? null;
+          const promptId = msg.state.pendingPrompt.promptId ?? null;
+          setActivePromptId(promptId);
+          activePromptIdRef.current = promptId;
         } else {
+          setActivePromptId(null);
           activePromptIdRef.current = null;
         }
         if (msg.state.status !== "IN_PROGRESS") {
@@ -99,9 +103,12 @@ export function useGameWs(
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
-          activePromptIdRef.current = msg.state.pendingPrompt.promptId ?? null;
+          const promptId = msg.state.pendingPrompt.promptId ?? null;
+          setActivePromptId(promptId);
+          activePromptIdRef.current = promptId;
         } else {
           setActivePrompt(null);
+          setActivePromptId(null);
           activePromptIdRef.current = null;
         }
         if (msg.state.status !== "IN_PROGRESS") {
@@ -116,6 +123,7 @@ export function useGameWs(
         break;
       case "game:prompt":
         setActivePrompt(msg.options);
+        setActivePromptId(msg.promptId ?? null);
         activePromptIdRef.current = msg.promptId ?? null;
         break;
       case "game:error":
@@ -188,6 +196,7 @@ export function useGameWs(
     actionRejection,
     acceptedUpdate,
     activePrompt,
+    activePromptId,
     gameOver,
     canUndo,
     sendAction,

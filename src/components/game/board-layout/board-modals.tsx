@@ -18,6 +18,7 @@ import { selectTargetPromptKey } from "@/lib/game/target-selection";
 
 interface BoardModalsProps {
   activePrompt: PromptOptions | null;
+  activePromptId: string | null;
   isPromptHidden: boolean;
   onHide: () => void;
   cardDb: CardDb;
@@ -36,6 +37,7 @@ interface BoardModalsProps {
 
 export function BoardModals({
   activePrompt,
+  activePromptId,
   isPromptHidden,
   onHide,
   cardDb,
@@ -96,7 +98,7 @@ export function BoardModals({
         activePrompt.choices.length > 0 &&
         activePrompt.source !== "PREGAME" && (
           <PlayerChoiceModal
-            key={activePrompt.choices.map((choice) => choice.id).join(",")}
+            key={activePromptId ?? "player-choice"}
             effectDescription={activePrompt.effectDescription}
             choices={activePrompt.choices}
             donReturn={activePrompt.donReturn}

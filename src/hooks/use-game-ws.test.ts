@@ -80,6 +80,7 @@ describe("useGameWs prompt identity", () => {
       "https://worker.test",
       async () => "token"
     );
+    const activePromptIdSetter = mocks.stateSetters[7];
     mocks.onMessage?.({
       type: "game:prompt",
       promptId: "prompt-2",
@@ -89,6 +90,8 @@ describe("useGameWs prompt identity", () => {
         choices: [{ id: "yes", label: "Yes" }],
       },
     });
+
+    expect(activePromptIdSetter).toHaveBeenCalledWith("prompt-2");
 
     game.sendAction({ type: "PLAYER_CHOICE", choiceId: "yes" });
 
