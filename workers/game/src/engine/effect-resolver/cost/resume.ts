@@ -1,5 +1,5 @@
 /** Mutations applied after a player answers a cost-selection prompt. */
-import type { Cost, SimpleCost } from "../../effect-types.js";
+import type { Cost } from "../../effect-types.js";
 import type { CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
 
@@ -116,8 +116,8 @@ export function applyCostSelection(
       // DON returns rested, and the old field instance's registrations are
       // cleaned up inline.
       const toMove = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-      const face = (cost as SimpleCost).face ?? "UP";
-      const position = (cost as SimpleCost).position ?? "TOP";
+      const face = cost.face ?? "UP";
+      const position = cost.position ?? "TOP";
       const moved = transitionCards(state, toMove.map((c) => c.instanceId), "LIFE", {
         position: position === "BOTTOM" ? "BOTTOM" : "TOP",
         lifeFace: face,

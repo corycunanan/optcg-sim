@@ -19,6 +19,7 @@ import type {
   CardData,
   CardInstance,
   GameState,
+  LifeCard,
   PlayerState,
   PendingPromptState,
   ResumeContext,
@@ -28,6 +29,33 @@ import { getEffectivePower, getEffectiveCostForRead } from "../modifiers.js";
 import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
 import { isPresent } from "../type-guards.js";
+
+export interface LifeCardTargetContext {
+  owner: 0 | 1;
+  /** Hidden identity is available only to trusted engine target evaluation. */
+  visibility: "ENGINE_INTERNAL";
+}
+
+/**
+ * Present a Life card to trusted target/filter code as a read-only card
+ * candidate. This adapter must never be used for client serialization: its
+ * engine-internal visibility contract intentionally retains hidden cardId.
+ */
+export function lifeCardToTargetCandidate(
+  lifeCard: LifeCard,
+  context: LifeCardTargetContext,
+): CardInstance {
+  return {
+    instanceId: lifeCard.instanceId,
+    cardId: lifeCard.cardId,
+    zone: "LIFE",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: null,
+    controller: context.owner,
+    owner: context.owner,
+  };
+}
 
 // ─── Source zone helpers ─────────────────────────────────────────────────────
 
@@ -67,16 +95,12 @@ function getCandidatesFromSourceZones(
         ];
         break;
       case "LIFE":
-        cards = player.life.map((l) => ({
-          instanceId: l.instanceId,
-          cardId: l.cardId,
-          zone: "LIFE",
-          state: "ACTIVE",
-          attachedDon: [],
-          turnPlayed: null,
-          controller: playerIndex,
-          owner: playerIndex,
-        }));
+        cards = player.life.map((lifeCard) =>
+          lifeCardToTargetCandidate(lifeCard, {
+            owner: playerIndex,
+            visibility: "ENGINE_INTERNAL",
+          })
+        );
         break;
       default:
         cards = player.hand;

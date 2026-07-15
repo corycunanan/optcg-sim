@@ -1,34 +1,53 @@
 /** Pure cost payability predicates. */
-import type { ChoiceCost, Cost, SimpleCost } from "../../effect-types.js";
+import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { computeCostTargets, resolveAmount } from "./targets.js";
 
-const SELECTION_COST_TYPES: Set<string> = new Set([
-  "TRASH_FROM_HAND",
-  "KO_OWN_CHARACTER",
-  "RETURN_OWN_CHARACTER_TO_HAND",
-  "PLACE_OWN_CHARACTER_TO_DECK",
-  "PLACE_HAND_TO_DECK",
-  "REST_CARDS",
-  "REST_NAMED_CARD",
-  "TRASH_OWN_CHARACTER",
-  "REVEAL_FROM_HAND",
-  "CHOOSE_ONE_COST",
-  "PLACE_FROM_TRASH_TO_DECK",
-  "PLACE_SELF_AND_TRASH_TO_DECK",
-  "PLACE_SELF_AND_HAND_TO_DECK",
-  "ADD_OWN_CHARACTER_TO_LIFE",
-]);
-
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
-  if (cost.type === "LIFE_TO_HAND" && (cost as SimpleCost).position === "TOP_OR_BOTTOM") return true;
-  // Life is an ordered hidden zone — the only choice a life cost can offer is
-  // top-vs-bottom (OP03-109). Fixed positions auto-pay in payCosts.
-  if (cost.type === "TRASH_FROM_LIFE") return (cost as SimpleCost).position === "TOP_OR_BOTTOM";
-  return SELECTION_COST_TYPES.has(cost.type);
+  switch (cost.type) {
+    // Life is an ordered hidden zone — the only choice a life cost can offer
+    // is top-vs-bottom (OP03-109). Fixed positions auto-pay in payCosts.
+    case "LIFE_TO_HAND":
+    case "TRASH_FROM_LIFE":
+      return cost.position === "TOP_OR_BOTTOM";
+    case "TRASH_FROM_HAND":
+    case "KO_OWN_CHARACTER":
+    case "RETURN_OWN_CHARACTER_TO_HAND":
+    case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "PLACE_HAND_TO_DECK":
+    case "REST_CARDS":
+    case "REST_NAMED_CARD":
+    case "TRASH_OWN_CHARACTER":
+    case "REVEAL_FROM_HAND":
+    case "CHOOSE_ONE_COST":
+    case "PLACE_FROM_TRASH_TO_DECK":
+    case "PLACE_SELF_AND_TRASH_TO_DECK":
+    case "PLACE_SELF_AND_HAND_TO_DECK":
+    case "ADD_OWN_CHARACTER_TO_LIFE":
+      return true;
+    case "DON_MINUS":
+    case "DON_REST":
+    case "VARIABLE_DON_RETURN":
+    case "REST_SELF":
+    case "TRASH_SELF":
+    case "PLAY_NAMED_CARD_FROM_HAND":
+    case "PLACE_SELF_TO_DECK":
+    case "PLACE_STAGE_TO_DECK":
+    case "TRASH_OWN_STAGE":
+    case "LEADER_POWER_REDUCTION":
+    case "GIVE_OPPONENT_DON":
+    case "RETURN_ATTACHED_DON_TO_COST":
+    case "REST_DON":
+    case "TURN_LIFE_FACE_UP":
+    case "TURN_LIFE_FACE_DOWN":
+    case "CHOICE":
+      return false;
+    default:
+      return assertNever(cost);
+  }
 }
 
 /**
@@ -43,13 +62,13 @@ export function isCostPayable(
   sourceCardInstanceId?: string,
 ): boolean {
   if (cost.type === "CHOICE") {
-    return (cost as ChoiceCost).options.some((branch) =>
+    return cost.options.some((branch) =>
       branch.every((c) => isCostPayable(state, c, controller, cardDb, sourceCardInstanceId)),
     );
   }
 
   if (cost.type === "CHOOSE_ONE_COST") {
-    const opts = (cost as SimpleCost).options ?? [];
+    const opts = cost.options ?? [];
     return opts.some((o) => isCostPayable(state, o, controller, cardDb, sourceCardInstanceId));
   }
 
@@ -62,7 +81,7 @@ export function isCostPayable(
       .some((c) => c?.instanceId === sourceCardInstanceId);
     if (!onField) return false;
     const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
-    return targets.length >= resolveAmount(cost as SimpleCost);
+    return targets.length >= resolveAmount(cost);
   }
 
   if (cost.type === "PLACE_SELF_AND_HAND_TO_DECK") {
@@ -72,23 +91,21 @@ export function isCostPayable(
 
   if (costNeedsPlayerSelection(cost)) {
     if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
-        (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
-      return state.players[controller].life.length >= resolveAmount(cost as SimpleCost);
+        cost.position === "TOP_OR_BOTTOM") {
+      return state.players[controller].life.length >= resolveAmount(cost);
     }
     const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
-    const amt = cost.type === "REST_CARDS" && (cost as SimpleCost).amount === "ANY_NUMBER"
+    const amt = cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER"
       ? 1
-      : resolveAmount(cost as SimpleCost);
+      : resolveAmount(cost);
     return targets.length >= amt;
   }
 
   const player = state.players[controller];
-  const simple = cost as SimpleCost;
-
   switch (cost.type) {
     case "DON_MINUS": {
-      const amt = resolveAmount(simple, 0);
-      if (simple.filter?.is_active === true || simple.filter?.state === "ACTIVE") {
+      const amt = resolveAmount(cost, 0);
+      if (cost.filter?.is_active === true || cost.filter?.state === "ACTIVE") {
         return player.donCostArea.filter((d) => d.state === "ACTIVE").length >= amt;
       }
       const allFieldDon = [
@@ -101,14 +118,14 @@ export function isCostPayable(
 
     case "DON_REST":
     case "REST_DON": {
-      if (simple.amount === "ANY_NUMBER") return true;
-      const amt = resolveAmount(simple);
+      if (cost.amount === "ANY_NUMBER") return true;
+      const amt = resolveAmount(cost);
       if (amt === 0) return false;
       return player.donCostArea.filter((d) => d.state === "ACTIVE").length >= amt;
     }
 
     case "VARIABLE_DON_RETURN": {
-      const amt = resolveAmount(simple, 0);
+      const amt = resolveAmount(cost, 0);
       if (amt === 0) return true;
       return player.donCostArea.filter((d) => !d.attachedTo).length >= amt;
     }
@@ -117,7 +134,7 @@ export function isCostPayable(
       // A target-bearing REST_SELF rests the targeted card, not the source —
       // the schema convention for "rest your Leader" costs (OP04-081/094 etc.).
       // Payable iff that card is active and not prohibited from resting.
-      if (simple.target?.type === "YOUR_LEADER") {
+      if (cost.target?.type === "YOUR_LEADER") {
         const leader = player.leader;
         if (leader.state !== "ACTIVE") return false;
         return !isProhibitedForCard(state, leader.instanceId, "CANNOT_BE_RESTED", cardDb);
@@ -152,17 +169,17 @@ export function isCostPayable(
 
     case "LIFE_TO_HAND":
     case "TRASH_FROM_LIFE": {
-      const amt = resolveAmount(simple);
+      const amt = resolveAmount(cost);
       return player.life.length >= amt;
     }
 
     case "TURN_LIFE_FACE_UP": {
-      const amt = resolveAmount(simple);
+      const amt = resolveAmount(cost);
       return player.life.filter((l) => l.face === "DOWN").length >= amt;
     }
 
     case "TURN_LIFE_FACE_DOWN": {
-      const amt = resolveAmount(simple);
+      const amt = resolveAmount(cost);
       return player.life.filter((l) => l.face === "UP").length >= amt;
     }
 
@@ -170,25 +187,25 @@ export function isCostPayable(
       return !!player.leader;
 
     case "GIVE_OPPONENT_DON": {
-      const amt = resolveAmount(simple);
+      const amt = resolveAmount(cost);
       return player.donCostArea.filter((d) => !d.attachedTo).length >= amt;
     }
 
     case "PLACE_STAGE_TO_DECK": {
       if (!player.stage) return false;
-      if (!simple.filter) return true;
-      return matchesFilter(player.stage, simple.filter, cardDb, state, undefined, undefined, controller);
+      if (!cost.filter) return true;
+      return matchesFilter(player.stage, cost.filter, cardDb, state, undefined, undefined, controller);
     }
 
     case "TRASH_OWN_STAGE": {
       if (!player.stage) return false;
-      if (!simple.filter) return true;
-      return matchesFilter(player.stage, simple.filter, cardDb, state, undefined, undefined, controller);
+      if (!cost.filter) return true;
+      return matchesFilter(player.stage, cost.filter, cardDb, state, undefined, undefined, controller);
     }
 
     case "RETURN_ATTACHED_DON_TO_COST": {
       if (!sourceCardInstanceId) return false;
-      const amt = resolveAmount(simple);
+      const amt = resolveAmount(cost);
       for (let pIdx = 0; pIdx < 2; pIdx++) {
         const p = state.players[pIdx as 0 | 1];
         const charIdx = p.characters.findIndex((c) => c?.instanceId === sourceCardInstanceId);
@@ -199,7 +216,7 @@ export function isCostPayable(
     }
 
     case "PLAY_NAMED_CARD_FROM_HAND": {
-      const cardName = simple.card_name;
+      const cardName = cost.card_name;
       if (!cardName) return false;
       return player.hand.some((c) => {
         const data = cardDb.get(c.cardId);
@@ -207,7 +224,23 @@ export function isCostPayable(
       });
     }
 
-    default:
+    case "TRASH_FROM_HAND":
+    case "PLACE_HAND_TO_DECK":
+    case "REVEAL_FROM_HAND":
+    case "REST_CARDS":
+    case "REST_NAMED_CARD":
+    case "KO_OWN_CHARACTER":
+    case "TRASH_OWN_CHARACTER":
+    case "RETURN_OWN_CHARACTER_TO_HAND":
+    case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "ADD_OWN_CHARACTER_TO_LIFE":
+    case "PLACE_FROM_TRASH_TO_DECK":
       return true;
+    default:
+      return assertNever(cost);
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled cost type: ${JSON.stringify(value)}`);
 }

@@ -445,7 +445,7 @@ export function payCosts(
         if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
         const applied = applyCostSelection(
           nextState,
-          { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: cost.position ?? "BOTTOM" } as Cost,
+          { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: cost.position ?? "BOTTOM" },
           [sourceCardInstanceId],
           controller,
         );
@@ -465,7 +465,7 @@ export function payCosts(
         if (!p.characters.some((c) => c?.instanceId === sourceCardInstanceId)) return null;
         const applied = applyCostSelection(
           nextState,
-          { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: "BOTTOM" } as Cost,
+          { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: "BOTTOM" },
           [sourceCardInstanceId],
           controller,
         );
