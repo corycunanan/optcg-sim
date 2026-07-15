@@ -36,6 +36,33 @@ export interface SessionStorage extends TokenJtiStorage {
   deleteAlarm(): Promise<void>;
 }
 
+/** Adapt Cloudflare storage to the narrower engine-owned session port. */
+export class DurableObjectSessionStorage implements SessionStorage {
+  constructor(private readonly storage: DurableObjectStorage) {}
+
+  get<T>(key: string): Promise<T | undefined> {
+    return this.storage.get<T>(key);
+  }
+
+  async put(key: string, value: unknown): Promise<void>;
+  async put(entries: Record<string, unknown>): Promise<void>;
+  async put(keyOrEntries: string | Record<string, unknown>, value?: unknown): Promise<void> {
+    if (typeof keyOrEntries === "string") {
+      await this.storage.put(keyOrEntries, value);
+      return;
+    }
+    await this.storage.put(keyOrEntries);
+  }
+
+  setAlarm(timestamp: number): Promise<void> {
+    return this.storage.setAlarm(timestamp);
+  }
+
+  deleteAlarm(): Promise<void> {
+    return this.storage.deleteAlarm();
+  }
+}
+
 export interface SessionSnapshot {
   state: GameState;
   cardDb: Map<string, CardData>;

@@ -24,7 +24,7 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import { popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
-import { emitEvent, replacePendingEventReferences } from "../../events.js";
+import { emitEvent, getEventCardInstanceId, replacePendingEventReferences } from "../../events.js";
 import {
   scanEventsForTriggers,
   buildTriggerSelectionPrompt,
@@ -425,7 +425,7 @@ export function handleAwaitingOptionalResponse(
     const scannable = events.filter(
       (e) =>
       e.type !== "CARD_TRASHED" ||
-        !!(e.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId
+        Boolean(getEventCardInstanceId(e))
     );
     if (scannable.length > 0) {
       const costScan = scanEventsForTriggers(

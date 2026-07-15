@@ -39,7 +39,7 @@ import {
   checkReplacementForKO,
   checkReplacementForRemoval,
 } from "../../replacements.js";
-import { replacePendingEventReferences } from "../../events.js";
+import { getEventCardInstanceId, replacePendingEventReferences } from "../../events.js";
 import { transitionCards } from "../../zone-transition.js";
 
 export function abortReplacedCost(
@@ -138,8 +138,7 @@ function finishCostsAndRunActions(
   // would false-fire on hand trashes. Instance-bearing trash events scan.
   const scannable = events.filter(
     (e) =>
-    e.type !== "CARD_TRASHED" ||
-      !!(e.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId
+    e.type !== "CARD_TRASHED" || Boolean(getEventCardInstanceId(e))
   );
   let pendingTriggers = topFrame.pendingTriggers;
   if (scannable.length > 0) {

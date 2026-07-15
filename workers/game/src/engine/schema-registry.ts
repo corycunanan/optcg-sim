@@ -120,6 +120,24 @@ const IMPLICIT_COST_RESULT_REFS = new Set([
   "__cost_cards_placed_to_deck",
   "__cost_characters_ko",
 ]);
+const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
+  "type", "params", "target", "duration", "chain", "target_ref",
+  "result_ref", "conditions",
+]);
+const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set([
+  "controller",
+  "cost_exact", "cost_min", "cost_max", "cost_range",
+  "base_cost_exact", "base_cost_min", "base_cost_max",
+  "power_exact", "power_min", "power_max", "power_range",
+  "base_power_exact", "base_power_min", "base_power_max",
+  "color", "color_includes", "color_not_matching_ref",
+  "traits", "traits_any_of", "traits_contains", "traits_exclude",
+  "name", "name_any_of", "name_includes", "exclude_name", "exclude_self",
+  "name_matching_ref", "keywords", "has_trigger", "attribute",
+  "attribute_not", "has_effect", "no_base_effect", "lacks_effect_type",
+  "has_counter", "card_type", "is_rested", "is_active", "state",
+  "don_given_count", "exclude_ref", "unique_names", "any_of",
+]);
 
 /**
  * Validate an effect schema and return a list of error messages.
@@ -333,6 +351,11 @@ function validateTargetFilterController(
   const errors: string[] = [];
   const visit = (f: TargetFilter | undefined): void => {
     if (!f) return;
+    for (const key of Object.keys(f)) {
+      if (!VALID_TARGET_FILTER_FIELDS.has(key)) {
+        errors.push(`${prefix}: Unknown target filter field '${key}'`);
+      }
+    }
     if (f.controller !== undefined) {
       errors.push(
         `${prefix}: [C5] 'controller' inside target.filter is ignored on targeting paths — use target.controller`,
@@ -367,6 +390,12 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
 
   if (!action || typeof action !== "object" || Array.isArray(action)) {
     return [`${prefix}: Action must be an object`];
+  }
+
+  for (const key of Object.keys(action)) {
+    if (!VALID_ACTION_FIELDS.has(key)) {
+      errors.push(`${prefix}: Unknown action field '${key}'`);
+    }
   }
 
   if (!action.type) {
