@@ -16,16 +16,16 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | OPT-378 | Enforce reciprocal friend-request uniqueness and idempotent accept | — | — | In Review | [#317](https://github.com/corycunanan/optcg-sim/pull/317) | Establishes the partial-index and P2002-handling pattern. |
-| 2 | OPT-381 | Index active-lobby lookup and enforce one WAITING lobby per host | — | OPT-378 | In Review | [#318](https://github.com/corycunanan/optcg-sim/pull/318) | Reuses the same partial-index and dedup-migration pattern. |
-| 3 | OPT-380 | Add pg_trgm indexes and measurable search-query acceptance criteria | — | — | Backlog | — | Final raw-SQL migration ticket. |
+| 1 | OPT-378 | Enforce reciprocal friend-request uniqueness and idempotent accept | — | — | Done | [#317](https://github.com/corycunanan/optcg-sim/pull/317) | Establishes the partial-index and P2002-handling pattern. |
+| 2 | OPT-381 | Index active-lobby lookup and enforce one WAITING lobby per host | — | OPT-378 | Done | [#318](https://github.com/corycunanan/optcg-sim/pull/318) | Reuses the same partial-index and dedup-migration pattern. |
+| 3 | OPT-380 | Add pg_trgm indexes and measurable search-query acceptance criteria | — | — | In Review | [#319](https://github.com/corycunanan/optcg-sim/pull/319) | Final raw-SQL migration ticket. |
 | 4 | OPT-489 | Validate message-history cursor timestamps before Prisma queries | — | OPT-375 | Backlog | — | Closes the remaining malformed-date 500 path. |
 | 5 | OPT-382 | Trim /api/cards search payload without weakening deck legality | — | OPT-374 | Backlog | — | Separate list/detail contract while preserving legality data. |
 | 6 | OPT-488 | Define and automate retention for CLOSED lobbies without game sessions | — | OPT-381 | Backlog | — | Requires an explicit retention policy and scheduler. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-381 after OPT-378 merges.
+**Next up:** OPT-489; its OPT-375 dependency is complete.
 
 ---
 
@@ -48,3 +48,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep partial indexes in raw migrations—Prisma schema declarations cannot express their predicates. The database-backed concurrency script needs a disposable migrated database and was not run in this session.
 - **Unresolved:** none for OPT-381; OPT-380 still needs a product decision and benchmark evidence for 1–2 character substring searches.
 - **Pointer:** commit `3862ece` / PR #318; run `git show 3862ece` for the implementation diff.
+
+### OPT-380 → OPT-489
+**From:** session on 2026-07-15 · **Commit:** `431641b` · **PR:** [#319](https://github.com/corycunanan/optcg-sim/pull/319)
+
+- **Primer:** Username and card-name substring search now share a three-character floor, backed by GIN trigram indexes; benchmark evidence records index selection and 38–105× lower execution time at synthetic scale.
+- **Read first:** `src/app/api/messages/[userId]/route.ts`, `src/app/api/messages/[userId]/route.test.ts`, `src/lib/validators/messages.ts`.
+- **Gotchas / do NOT touch:** Preserve OPT-375's 200-row polling cap, `more` flag, and composite `createdAt + id` ordering while adding timestamp validation.
+- **Unresolved:** none for OPT-380; OPT-489 must define whether `afterId` without `after` is rejected or ignored, then encode that decision in the shared query schema.
+- **Pointer:** commit `431641b` / PR #319; run `git show 431641b` for the implementation diff.
