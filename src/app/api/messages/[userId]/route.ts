@@ -6,7 +6,10 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
-import { SendMessageSchema } from "@/lib/validators/messages";
+import {
+  MessageHistoryQuerySchema,
+  SendMessageSchema,
+} from "@/lib/validators/messages";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
 import { notifyUser } from "@/lib/realtime/fan-out";
@@ -21,8 +24,14 @@ export async function GET(
   const { userId: myId } = authResult;
 
   const { userId: otherId } = await params;
-  const cursor = request.nextUrl.searchParams.get("cursor");
-  const after = request.nextUrl.searchParams.get("after");
+  const parsedQuery = MessageHistoryQuerySchema.safeParse(
+    Object.fromEntries(request.nextUrl.searchParams.entries()),
+  );
+  if (!parsedQuery.success) {
+    return apiError("Invalid message history parameters", 400);
+  }
+
+  const { cursor, after: afterTimestamp, afterId } = parsedQuery.data;
   const limit = 50;
 
   try {
@@ -30,15 +39,14 @@ export async function GET(
     // OPT-359: the implicit "GET marks read" side-effect that used to fire
     // here (and below) was removed; clients now call POST
     // /api/messages/[userId]/read explicitly.
-    if (after) {
+    if (afterTimestamp) {
       // OPT-375: bound the client-supplied `after` window — a stale tab or a
       // deliberate after=1970 must not pull the whole conversation. Fetch one
       // extra row to detect overflow; `more: true` tells the client to poll
       // again from the last returned message. `afterId` makes the cursor a
       // composite (createdAt, id) so ties in createdAt at the page boundary
       // are neither skipped nor re-served forever; ordering must match it.
-      const afterId = request.nextUrl.searchParams.get("afterId");
-      const afterDate = new Date(after);
+      const afterDate = new Date(afterTimestamp);
       const pollLimit = 200;
       const newMessages = await prisma.message.findMany({
         where: {
