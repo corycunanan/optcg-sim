@@ -142,7 +142,7 @@ describe("POST /api/lobbies/[id]/leave", () => {
 
     const response = await POST(request, params);
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
       error: "Guest seat was already released",
     });

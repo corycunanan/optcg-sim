@@ -2,6 +2,7 @@
 
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApiError } from "@/lib/api-client";
 
 interface GuestLeaveActionProps {
   isGuest: boolean;
@@ -26,10 +27,16 @@ export async function runGuestLeave({
   try {
     await leave();
     onSuccess();
-  } catch (error) {
-    onError(error);
-  } finally {
     returnToBrowser();
+  } catch (error) {
+    // A missing lobby/seat is already the desired terminal state, so it is
+    // safe to leave the room. Retryable failures keep the guest in place.
+    if (error instanceof ApiError && error.status === 404) {
+      onSuccess();
+      returnToBrowser();
+      return;
+    }
+    onError(error);
   }
 }
 

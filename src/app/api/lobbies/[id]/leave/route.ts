@@ -109,7 +109,7 @@ function leaveFailureResponse(failure: LeaveFailure) {
     case "FORBIDDEN":
       return apiError("Forbidden", 403);
     case "ALREADY_LEFT":
-      return apiError("Guest seat was already released", 409);
+      return apiError("Guest seat was already released", 404);
     case "ALREADY_STARTED":
       return apiError("Lobby already started", 409, {
         code: "ALREADY_STARTED",
