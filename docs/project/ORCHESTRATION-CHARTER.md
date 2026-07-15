@@ -2,6 +2,8 @@
 
 Standing agreement for projects run by the orchestrator (Claude) with Codex as implementer. Ratified by Cory 2026-07-15 after the Tech Debt project retro. Reconfirm the **per-project decisions** (§7) at each project kickoff; everything else is standing policy.
 
+Kickoff driver: the `/orchestrate` skill (`.claude/skills/orchestrate/SKILL.md`) accepts a Linear project, an issue list, or a single issue.
+
 ## 1. Roles
 
 - **Claude (orchestrator/PM):** sequencing, dispatch, Linear state, code review, merge execution, close-out. Never authors implementation code.
