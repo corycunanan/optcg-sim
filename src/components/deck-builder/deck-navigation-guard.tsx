@@ -31,13 +31,14 @@ interface DirtyDeckEditor {
 
 interface DeckNavigationGuardContextValue {
   requestNavigation: (href: string) => boolean;
+  requestLeave: (proceed: () => void) => boolean;
   setEditorState: (editor: DirtyDeckEditor | null) => void;
 }
 
 const DeckNavigationGuardContext =
   createContext<DeckNavigationGuardContextValue | null>(null);
 
-function useDeckNavigationGuard() {
+export function useDeckNavigationGuard() {
   const context = useContext(DeckNavigationGuardContext);
   if (!context) {
     throw new Error(
@@ -54,36 +55,43 @@ export function DeckNavigationGuardProvider({
 }) {
   const router = useRouter();
   const [editor, setEditorState] = useState<DirtyDeckEditor | null>(null);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
 
-  const requestNavigation = useCallback(
-    (href: string) => {
+  const requestLeave = useCallback(
+    (proceed: () => void) => {
       if (!editor?.isDirty) return false;
-      setPendingHref(href);
+      setPendingLeave(() => proceed);
       return true;
     },
     [editor]
   );
 
-  const context = useMemo(
-    () => ({ requestNavigation, setEditorState }),
-    [requestNavigation]
+  const requestNavigation = useCallback(
+    (href: string) => {
+      return requestLeave(() => router.push(href));
+    },
+    [requestLeave, router]
   );
 
-  const confirmNavigation = () => {
-    if (!pendingHref) return;
-    const destination = pendingHref;
-    setPendingHref(null);
-    router.push(destination);
+  const context = useMemo(
+    () => ({ requestLeave, requestNavigation, setEditorState }),
+    [requestLeave, requestNavigation]
+  );
+
+  const confirmLeave = () => {
+    if (!pendingLeave) return;
+    const proceed = pendingLeave;
+    setPendingLeave(null);
+    proceed();
   };
 
   return (
     <DeckNavigationGuardContext.Provider value={context}>
       {children}
       <AlertDialog
-        open={pendingHref !== null}
+        open={pendingLeave !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingHref(null);
+          if (!open) setPendingLeave(null);
         }}
       >
         <AlertDialogContent>
@@ -96,10 +104,7 @@ export function DeckNavigationGuardProvider({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Stay</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={confirmNavigation}
-            >
+            <AlertDialogAction variant="destructive" onClick={confirmLeave}>
               Discard &amp; Leave
             </AlertDialogAction>
           </AlertDialogFooter>
