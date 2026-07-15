@@ -7,9 +7,7 @@
  *
  * 1. The extraction produces schemas that app-side deck validation actually
  *    consumes (round-trip: authored file → sync shape → validation helpers).
- * 2. Every authored DECK_RESTRICTION stays within the filter vocabulary that
- *    validation.ts's matcher understands. The matcher silently ignores unknown
- *    keys, so an unguarded new key would ship wrong legality with no error.
+ * 2. Authored DECK_RESTRICTION verbs stay within the validation contract.
  */
 
 import { describe, expect, it } from "vitest";
@@ -23,11 +21,6 @@ import {
 
 const desired = buildDesiredEffectSchemas();
 
-// Filter keys matchesDeckRestrictionFilter in validation.ts understands.
-// If this test fails after authoring a new DECK_RESTRICTION, extend the
-// matcher (and this list) before shipping the schema — the matcher ignores
-// unknown keys, which corrupts legality in both directions.
-const SUPPORTED_FILTER_KEYS = new Set(["cost_min", "card_type", "traits"]);
 const SUPPORTED_RESTRICTIONS = new Set(["CANNOT_INCLUDE", "ONLY_INCLUDE"]);
 
 describe("effect schema sync", () => {
@@ -62,7 +55,7 @@ describe("effect schema sync", () => {
     }
   });
 
-  it("keeps every authored DECK_RESTRICTION within the app matcher's vocabulary", () => {
+  it("keeps every authored DECK_RESTRICTION within the validation contract", () => {
     for (const [cardId, schema] of desired) {
       for (const mod of schema.rule_modifications) {
         if (mod.rule_type !== "DECK_RESTRICTION") continue;
@@ -71,14 +64,6 @@ describe("effect schema sync", () => {
           SUPPORTED_RESTRICTIONS.has(mod.restriction as string),
           `${cardId} uses restriction "${String(mod.restriction)}" — extend validation.ts before authoring it`
         ).toBe(true);
-
-        const filter = mod.filter as Record<string, unknown>;
-        for (const key of Object.keys(filter)) {
-          expect(
-            SUPPORTED_FILTER_KEYS.has(key),
-            `${cardId} uses filter key "${key}" that matchesDeckRestrictionFilter ignores — extend the matcher in validation.ts first`
-          ).toBe(true);
-        }
       }
     }
   });

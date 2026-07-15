@@ -18,3 +18,7 @@ such as the Next.js app, game worker, and card-data pipeline.
 `game-init.ts` is the canonical Next.js-to-game-worker initialization wire
 contract. Its generic card-data parameter lets the worker narrow validated card
 schemas without changing the serialized payload shape.
+
+`target-filter.ts` is the canonical runtime-neutral TargetFilter predicate
+core. App and worker adapters supply their own effective-stat, keyword, and
+result-reference reads while sharing the same per-key boolean semantics.
