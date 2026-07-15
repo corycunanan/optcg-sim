@@ -7,6 +7,10 @@ import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { generateLobbyCode } from "@/lib/lobbies";
+import {
+  isActiveLobbyConflict,
+  isJoinCodeCollision,
+} from "@/lib/lobbies/unique-constraints";
 import { CreateLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -55,12 +59,13 @@ export async function POST(request: NextRequest) {
           },
         });
       } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          (error as { code: string }).code === "P2002"
-        ) {
+        if (isJoinCodeCollision(error)) {
           continue;
+        }
+        if (isActiveLobbyConflict(error)) {
+          return apiError("An active lobby already exists", 409, {
+            code: "ACTIVE_LOBBY_EXISTS",
+          });
         }
         throw error;
       }

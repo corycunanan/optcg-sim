@@ -18,6 +18,7 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { viewerIsEvicted } from "@/lib/lobbies/state";
+import { isActiveLobbyConflict } from "@/lib/lobbies/unique-constraints";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
@@ -246,7 +247,16 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   if (operations.length > 0) {
-    await prisma.$transaction(operations);
+    try {
+      await prisma.$transaction(operations);
+    } catch (error) {
+      if (isActiveLobbyConflict(error)) {
+        return apiError("An active lobby already exists", 409, {
+          code: "ACTIVE_LOBBY_EXISTS",
+        });
+      }
+      throw error;
+    }
   }
 
   // Capture the ejected guest (if any) so the post-transaction fanout can

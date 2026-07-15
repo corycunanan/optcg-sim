@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
@@ -230,6 +231,37 @@ describe("PATCH /api/lobbies/[id]", () => {
       where: { id: "lobby-1" },
       data: { mode: "PVP", hostReady: false, status: "WAITING" },
     });
+  });
+
+  it("returns a stable conflict when switching Solitaire back to PVP would create a second WAITING lobby", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        guest: {
+          userId: "host-user",
+          deckId: "side-b-deck",
+          guestReady: false,
+          user: { id: "host-user", username: "hosty", name: "Host Player" },
+        },
+      })
+    );
+    transactionMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: "lobbies_waiting_host_unique" },
+      })
+    );
+
+    const res = await PATCH(buildRequest({ mode: "PVP" }), params);
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "An active lobby already exists",
+      code: "ACTIVE_LOBBY_EXISTS",
+    });
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 
   it("lets the PVP guest change only their deck and clears guestReady", async () => {
