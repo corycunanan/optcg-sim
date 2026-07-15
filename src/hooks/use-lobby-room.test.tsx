@@ -5,6 +5,7 @@ type LobbyEvent = { type: "lobby:state_changed"; lobby: LobbyRoomState };
 
 const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
+  apiDelete: vi.fn(),
   apiPatch: vi.fn(),
   apiPost: vi.fn(),
   addEventListener: vi.fn(),
@@ -18,7 +19,8 @@ const mocks = vi.hoisted(() => ({
 
 // Mock React's hooks to run synchronously and capture per-`useState` setter
 // calls in declaration order. The hook declares state in this order:
-//   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting, 5: leaving
+//   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting, 5: leaving,
+//   6: closing
 // Tests assert on the lobby setter (index 0) and the error setter (index 2).
 vi.mock("react", async (importActual) => {
   const actual = await importActual<typeof import("react")>();
@@ -46,6 +48,7 @@ vi.mock("react", async (importActual) => {
 });
 
 vi.mock("@/lib/api-client", () => ({
+  apiDelete: (...args: unknown[]) => mocks.apiDelete(...args),
   apiGet: (...args: unknown[]) => mocks.apiGet(...args),
   apiPatch: (...args: unknown[]) => mocks.apiPatch(...args),
   apiPost: (...args: unknown[]) => mocks.apiPost(...args),
@@ -87,6 +90,7 @@ function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
 
 beforeEach(() => {
   mocks.apiGet.mockReset();
+  mocks.apiDelete.mockReset();
   mocks.apiPatch.mockReset();
   mocks.apiPost.mockReset();
   mocks.addEventListener.mockReset();
@@ -200,6 +204,20 @@ describe("useLobbyRoom leave behavior", () => {
     expect(mocks.apiPost).toHaveBeenCalledWith(
       "/api/lobbies/lobby-1/leave",
       undefined,
+      expect.anything()
+    );
+  });
+});
+
+describe("useLobbyRoom close behavior", () => {
+  it("deletes through the host close endpoint", async () => {
+    mocks.apiDelete.mockResolvedValueOnce({ success: true });
+    const room = useLobbyRoom("lobby-1", lobbyState());
+
+    await room.closeLobby();
+
+    expect(mocks.apiDelete).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1",
       expect.anything()
     );
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import {
   LobbyActionResponseSchema,
@@ -27,6 +27,7 @@ export function useLobbyRoom(
   const [mutating, setMutating] = useState(false);
   const [starting, setStarting] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [closing, setClosing] = useState(false);
   const cancelledRef = useRef(false);
   const refreshInFlightRef = useRef(false);
   const { subscribe } = useUserChannelEvents();
@@ -125,6 +126,15 @@ export function useLobbyRoom(
     }
   }, [lobbyId]);
 
+  const closeLobby = useCallback(async () => {
+    setClosing(true);
+    try {
+      await apiDelete(`/api/lobbies/${lobbyId}`, LobbyActionResponseSchema);
+    } finally {
+      setClosing(false);
+    }
+  }, [lobbyId]);
+
   return {
     lobby,
     loading,
@@ -132,9 +142,11 @@ export function useLobbyRoom(
     mutating,
     starting,
     leaving,
+    closing,
     refresh,
     patchLobby,
     startLobby,
     leaveLobby,
+    closeLobby,
   };
 }

@@ -36,58 +36,69 @@ export async function POST(request: NextRequest) {
       return apiError("Invalid lobby code", 400);
     }
 
-    // Find the lobby by join code
-    const lobby = await prisma.lobby.findFirst({
-      where: { joinCode: normalizedCode, status: "WAITING" },
-      include: {
-        guest: true,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const lobby = await tx.lobby.findFirst({
+        where: { joinCode: normalizedCode },
+        include: { guest: true },
+      });
+
+      if (!lobby || lobby.status !== "WAITING") {
+        return { kind: "not_found" as const };
+      }
+      if (lobby.hostUserId === userId) return { kind: "self" as const };
+      if (lobby.guest) return { kind: "occupied" as const };
+      if (lobby.mode === "SOLITAIRE") return { kind: "solitaire" as const };
+      if (lobby.mode === "PVCOMPUTER") return { kind: "computer" as const };
+
+      // READY is acquired conditionally in the same transaction as the seat.
+      // If close commits CLOSED after the read above, this re-check returns 0
+      // and no guest row can be created or lobby state resurrected.
+      const acquired = await tx.lobby.updateMany({
+        where: {
+          id: lobby.id,
+          status: "WAITING",
+          mode: "PVP",
+          guest: { is: null },
+        },
+        data: { status: "READY" },
+      });
+      if (acquired.count !== 1) return { kind: "not_found" as const };
+
+      // Enter the room only. Deck slots are mutable in the lobby room; deck
+      // legality belongs to POST /api/lobbies/[id]/start.
+      await tx.lobbyGuest.create({
+        data: { lobbyId: lobby.id, userId, deckId },
+      });
+      return { kind: "joined" as const, lobbyId: lobby.id };
     });
 
-    if (!lobby) {
-      return apiError("Lobby not found or already started", 404);
+    switch (result.kind) {
+      case "not_found":
+        return apiError("Lobby not found or already started", 404);
+      case "self":
+        return apiError("You cannot join your own lobby", 409);
+      case "occupied":
+        return apiError("Lobby already has a guest", 409);
+      case "solitaire":
+        return apiError("This lobby is in solo mode and cannot be joined", 409);
+      case "computer":
+        return apiError(
+          "This lobby is in computer mode and cannot be joined",
+          409
+        );
     }
 
-    if (lobby.hostUserId === userId) {
-      return apiError("You cannot join your own lobby", 409);
-    }
-
-    if (lobby.guest) {
-      return apiError("Lobby already has a guest", 409);
-    }
-
-    if (lobby.mode === "SOLITAIRE") {
-      return apiError("This lobby is in solo mode and cannot be joined", 409);
-    }
-
-    if (lobby.mode === "PVCOMPUTER") {
-      return apiError(
-        "This lobby is in computer mode and cannot be joined",
-        409
-      );
-    }
-
-    // Enter the room only. Deck slots are mutable in the lobby room; deck
-    // legality belongs to POST /api/lobbies/[id]/start.
-    await prisma.$transaction([
-      prisma.lobbyGuest.create({
-        data: { lobbyId: lobby.id, userId, deckId },
-      }),
-      prisma.lobby.update({
-        where: { id: lobby.id },
-        data: { status: "READY" },
-      }),
-    ]);
+    const joinedLobbyId = result.lobbyId;
 
     after(async () => {
-      const state = await buildLobbyRoomState(lobby.id);
+      const state = await buildLobbyRoomState(joinedLobbyId);
       if (!state) return;
       // Actor (the new guest) sees the join via the route response; only the
       // host needs the push.
       await notifyLobby(state, { actorUserId: userId });
     });
 
-    return apiSuccess({ lobbyId: lobby.id });
+    return apiSuccess({ lobbyId: joinedLobbyId });
   } catch (error) {
     console.error("[lobbies:join] failed", error);
     return apiError("Failed to join lobby", 500);

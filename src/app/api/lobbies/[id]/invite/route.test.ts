@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindUniqueMock = vi.fn();
+const lobbyUpdateManyMock = vi.fn();
 const friendshipFindFirstMock = vi.fn();
 const inviteCreateMock = vi.fn();
 const inviteUpdateManyMock = vi.fn();
@@ -24,7 +25,10 @@ vi.mock("next/server", async (importActual) => {
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {
-    lobby: { findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args) },
+    lobby: {
+      findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args),
+      updateMany: (...args: unknown[]) => lobbyUpdateManyMock(...args),
+    },
     friendship: {
       findFirst: (...args: unknown[]) => friendshipFindFirstMock(...args),
     },
@@ -56,7 +60,7 @@ function buildRequest(body: unknown = { toUserId: FRIEND_ID }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-      },
+      }
     ),
     params: Promise.resolve({ id: LOBBY_ID }),
   };
@@ -99,6 +103,7 @@ beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   lobbyFindUniqueMock.mockReset();
+  lobbyUpdateManyMock.mockReset();
   friendshipFindFirstMock.mockReset();
   inviteCreateMock.mockReset();
   inviteUpdateManyMock.mockReset();
@@ -108,6 +113,7 @@ beforeEach(() => {
   authMock.mockResolvedValue({ user: { id: HOST_ID } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   lobbyFindUniqueMock.mockResolvedValue(lobbyOpen);
+  lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   friendshipFindFirstMock.mockResolvedValue({ id: "friendship-1" });
   inviteCreateMock.mockResolvedValue(inviteRow);
   inviteUpdateManyMock.mockResolvedValue({ count: 0 });
@@ -119,6 +125,7 @@ beforeEach(() => {
   transactionMock.mockImplementation(async (fn: unknown) => {
     if (typeof fn !== "function") return fn;
     return (fn as (tx: unknown) => Promise<unknown>)({
+      lobby: { updateMany: lobbyUpdateManyMock },
       lobbyInvite: {
         updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
         create: (...args: unknown[]) => inviteCreateMock(...args),
@@ -139,6 +146,16 @@ describe("POST /api/lobbies/[id]/invite", () => {
     expect(res.status).toBe(201);
 
     expect(inviteCreateMock).toHaveBeenCalledTimes(1);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: LOBBY_ID,
+        hostUserId: HOST_ID,
+        status: "WAITING",
+        mode: "PVP",
+        guest: { is: null },
+      },
+      data: { status: "WAITING" },
+    });
     const createCall = inviteCreateMock.mock.calls[0]?.[0];
     expect(createCall?.data).toMatchObject({
       lobbyId: LOBBY_ID,
@@ -184,7 +201,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
     transactionMock.mockImplementationOnce(async () => {
       throw new Prisma.PrismaClientKnownRequestError(
         "Unique constraint failed",
-        { code: "P2002", clientVersion: "test" },
+        { code: "P2002", clientVersion: "test" }
       );
     });
     const { request, params } = buildRequest();
@@ -220,6 +237,19 @@ describe("POST /api/lobbies/[id]/invite", () => {
     const res = await POST(request, { params });
     expect(res.status).toBe(400);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not create or fan out an invite when close wins after preflight", async () => {
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(400);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
+    expect(inviteCreateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
   });
 
   it("rejects non-PVP lobbies (400)", async () => {

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindFirstMock = vi.fn();
-const lobbyUpdateMock = vi.fn();
+const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
@@ -38,7 +38,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     lobby: {
       findFirst: (...args: unknown[]) => lobbyFindFirstMock(...args),
-      update: (...args: unknown[]) => lobbyUpdateMock(...args),
+      updateMany: (...args: unknown[]) => lobbyUpdateManyMock(...args),
     },
     lobbyGuest: {
       create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
@@ -70,7 +70,7 @@ beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   lobbyFindFirstMock.mockReset();
-  lobbyUpdateMock.mockReset();
+  lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
@@ -89,8 +89,17 @@ beforeEach(() => {
     guest: null,
   });
   lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
-  lobbyUpdateMock.mockReturnValue({ query: "update-lobby" });
-  transactionMock.mockResolvedValue([]);
+  lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
+  transactionMock.mockImplementation(async (operation) => {
+    if (typeof operation !== "function") return operation;
+    return operation({
+      lobby: {
+        findFirst: lobbyFindFirstMock,
+        updateMany: lobbyUpdateManyMock,
+      },
+      lobbyGuest: { create: lobbyGuestCreateMock },
+    });
+  });
   buildLobbyRoomStateMock.mockResolvedValue({
     id: "lobby-1",
     status: "READY",
@@ -110,14 +119,16 @@ describe("POST /api/lobbies/join", () => {
     expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
       data: { lobbyId: "lobby-1", userId: "guest-user", deckId: undefined },
     });
-    expect(lobbyUpdateMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1" },
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: "lobby-1",
+        status: "WAITING",
+        mode: "PVP",
+        guest: { is: null },
+      },
       data: { status: "READY" },
     });
-    expect(transactionMock).toHaveBeenCalledWith([
-      { query: "create-guest" },
-      { query: "update-lobby" },
-    ]);
+    expect(transactionMock).toHaveBeenCalledOnce();
   });
 
   it("keeps a provided guest deck as mutable room state", async () => {
@@ -166,7 +177,8 @@ describe("POST /api/lobbies/join", () => {
     expect(body).toEqual({
       error: "This lobby is in solo mode and cannot be joined",
     });
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledOnce();
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("rejects joins when a lobby already has a guest", async () => {
@@ -184,7 +196,8 @@ describe("POST /api/lobbies/join", () => {
     const res = await POST(buildRequest());
 
     expect(res.status).toBe(409);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledOnce();
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("fans out lobby:state_changed to the host (skipping the joining guest)", async () => {
@@ -196,7 +209,7 @@ describe("POST /api/lobbies/join", () => {
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     expect(notifyLobbyMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lobby-1" }),
-      { actorUserId: "guest-user" },
+      { actorUserId: "guest-user" }
     );
   });
 
@@ -207,6 +220,18 @@ describe("POST /api/lobbies/join", () => {
     await flushAfter();
 
     expect(res.status).toBe(404);
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not create a seat when close wins after the WAITING read", async () => {
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const res = await POST(buildRequest());
+    await flushAfter();
+
+    expect(res.status).toBe(404);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
     expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 });
