@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { X, Minus, ChevronUp, Check, CheckCheck } from "lucide-react";
+import { toast } from "sonner";
 import { UserAvatar } from "./user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import {
@@ -56,11 +57,14 @@ export function ChatWidget({
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [typingUntil, setTypingUntil] = useState<number | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
+  const activeSendRef = useRef<symbol | null>(null);
+  const historyRequestRef = useRef<symbol | null>(null);
   const lastTypingEmitRef = useRef<number>(NEVER_EMITTED);
   const lastReadCutoffRef = useRef<string>("");
   const minimizedRef = useRef<boolean>(minimized);
@@ -75,15 +79,46 @@ export function ChatWidget({
   }, [minimized]);
 
   useEffect(() => {
+    setMessages([]);
+    messagesRef.current = [];
+    setBody("");
+    setSending(false);
+    activeSendRef.current = null;
+    historyRequestRef.current = null;
+    setTypingUntil(null);
+    lastTypingEmitRef.current = NEVER_EMITTED;
+    lastReadCutoffRef.current = "";
+    return () => {
+      activeSendRef.current = null;
+      historyRequestRef.current = null;
+    };
+  }, [user.id]);
+
+  const loadHistory = useCallback(() => {
+    const request = Symbol("history-request");
+    historyRequestRef.current = request;
     setLoading(true);
-    apiGet(`/api/messages/${user.id}`, MessageHistoryResponseSchema)
+    setHistoryLoadFailed(false);
+    void apiGet(`/api/messages/${user.id}`, MessageHistoryResponseSchema)
       .then((json) => {
+        if (historyRequestRef.current !== request) return;
         const history = json.data || [];
         setMessages((prev) => mergeInitialHistory(history, prev));
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (historyRequestRef.current !== request) return;
+        setHistoryLoadFailed(true);
+      })
+      .finally(() => {
+        if (historyRequestRef.current === request) {
+          setLoading(false);
+        }
+      });
   }, [user.id]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   useEffect(() => {
     return subscribe("message:new", (event) => {
@@ -224,21 +259,31 @@ export function ChatWidget({
   const send_ = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!body.trim() || sending) return;
+      const messageBody = body.trim();
+      if (!messageBody || activeSendRef.current !== null) return;
+      const request = Symbol("send-request");
+      activeSendRef.current = request;
       setSending(true);
       try {
         const json = await apiPost(
           `/api/messages/${user.id}`,
-          { body: body.trim() },
+          { body: messageBody },
           SendMessageResponseSchema
         );
+        if (activeSendRef.current !== request) return;
         setMessages((prev) => [...prev, json.data]);
         setBody("");
+      } catch {
+        if (activeSendRef.current !== request) return;
+        toast.error("Message couldn't be sent. Try again.");
       } finally {
-        setSending(false);
+        if (activeSendRef.current === request) {
+          activeSendRef.current = null;
+          setSending(false);
+        }
       }
     },
-    [body, user.id, sending]
+    [body, user.id]
   );
 
   const handleBodyChange = useCallback(
@@ -311,12 +356,31 @@ export function ChatWidget({
           {/* Messages */}
           <div className="bg-surface-1 h-80 space-y-2 overflow-y-auto px-3 py-3">
             {loading && (
-              <p className="text-content-tertiary py-6 text-center text-xs">
-                Loading...
+              <p
+                className="text-content-tertiary py-6 text-center text-xs"
+                role="status"
+              >
+                Loading messages…
               </p>
             )}
-            {!loading && messages.length === 0 && (
-              <p className="text-content-tertiary py-6 text-center text-xs">
+            {!loading && historyLoadFailed && (
+              <div
+                className="flex flex-col items-center gap-3 py-6 text-center"
+                role="alert"
+              >
+                <p className="text-content-tertiary text-xs">
+                  Couldn&apos;t load messages.
+                </p>
+                <Button type="button" size="sm" onClick={loadHistory}>
+                  Try again
+                </Button>
+              </div>
+            )}
+            {!loading && !historyLoadFailed && messages.length === 0 && (
+              <p
+                className="text-content-tertiary py-6 text-center text-xs"
+                role="status"
+              >
                 No messages yet. Say something!
               </p>
             )}
@@ -373,6 +437,7 @@ export function ChatWidget({
               type="text"
               value={body}
               onChange={handleBodyChange}
+              disabled={sending}
               placeholder={`Message ${displayName}...`}
               className="bg-surface-2 h-8 flex-1 text-xs"
             />
