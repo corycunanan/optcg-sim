@@ -10,3 +10,27 @@ export const FriendRequestActionSchema = z.object({
   }),
 });
 
+export const SidebarUserSchema = z.object({
+  id: z.string(),
+  username: z.string().nullable(),
+  name: z.string().nullable(),
+  image: z.string().nullable(),
+});
+
+export const FriendsResponseSchema = z.object({
+  data: z.array(
+    z.object({ friendshipId: z.string(), user: SidebarUserSchema })
+  ),
+});
+
+export const FriendRequestsResponseSchema = z.object({
+  data: z.object({
+    incoming: z.array(
+      z.object({ id: z.string(), fromUser: SidebarUserSchema.optional() })
+    ),
+  }),
+});
+
+export const UserSearchResponseSchema = z.object({
+  data: z.array(SidebarUserSchema),
+});

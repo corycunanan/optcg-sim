@@ -7,7 +7,7 @@ import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/social/user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
-import type { SerializedLobbyInvite } from "@/types/realtime";
+import { PendingLobbyInvitesResponseSchema } from "@/lib/validators/realtime";
 import {
   EMPTY_INVITES,
   addInvite,
@@ -20,10 +20,6 @@ import {
 const TICK_MS = 1000;
 const TOAST_DURATION_MS = 5 * 60 * 1000;
 
-type PendingResponse = {
-  data: SerializedLobbyInvite[];
-};
-
 export function LobbyInviteToasts() {
   const router = useRouter();
   const { subscribe } = useUserChannelEvents();
@@ -35,7 +31,7 @@ export function LobbyInviteToasts() {
   // was offline / a tab wasn't open.
   useEffect(() => {
     let cancelled = false;
-    apiGet<PendingResponse>("/api/lobby-invites/pending")
+    apiGet("/api/lobby-invites/pending", PendingLobbyInvitesResponseSchema)
       .then((res) => {
         if (cancelled) return;
         setInvites((prev) => seedInvites(prev, res.data ?? []));
@@ -80,9 +76,7 @@ export function LobbyInviteToasts() {
     async (invite: InviteToastEntry) => {
       setBusyId(invite.id);
       try {
-        await apiPost<{ data: { lobbyId: string } }>(
-          `/api/lobby-invites/${invite.id}/accept`,
-        );
+        await apiPost(`/api/lobby-invites/${invite.id}/accept`);
         setInvites((prev) => removeInvite(prev, invite.id));
         router.push(`/lobbies/${invite.lobbyId}`);
       } catch (err) {
@@ -93,13 +87,13 @@ export function LobbyInviteToasts() {
           return;
         }
         toast.error(
-          err instanceof ApiError ? err.message : "Could not join lobby",
+          err instanceof ApiError ? err.message : "Could not join lobby"
         );
       } finally {
         setBusyId(null);
       }
     },
-    [router],
+    [router]
   );
 
   const onDecline = useCallback(async (invite: InviteToastEntry) => {
@@ -113,13 +107,16 @@ export function LobbyInviteToasts() {
     } catch (err) {
       // 404 / 410 = already canceled / no longer active. Drop the row
       // silently — the user clicked a stale toast, not a broken one.
-      if (err instanceof ApiError && (err.status === 404 || err.status === 410)) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 404 || err.status === 410)
+      ) {
         setInvites((prev) => removeInvite(prev, invite.id));
         return;
       }
       // Transient failure — keep the toast in place so the user can retry.
       toast.error(
-        err instanceof ApiError ? err.message : "Could not decline invite",
+        err instanceof ApiError ? err.message : "Could not decline invite"
       );
     } finally {
       setBusyId(null);
@@ -171,7 +168,8 @@ function InviteCard({
   const remaining = Math.max(0, invite.expiresAtMs - now);
   const remainingSec = Math.ceil(remaining / 1000);
   const progress = Math.max(0, Math.min(1, remaining / TOAST_DURATION_MS));
-  const inviterName = invite.fromUser.username ?? invite.fromUser.name ?? "A friend";
+  const inviterName =
+    invite.fromUser.username ?? invite.fromUser.name ?? "A friend";
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
@@ -203,7 +201,12 @@ function InviteCard({
         </div>
       </div>
       <div className="mt-3 flex gap-2">
-        <Button variant="gold" onClick={onJoin} disabled={busy} className="flex-1">
+        <Button
+          variant="gold"
+          onClick={onJoin}
+          disabled={busy}
+          className="flex-1"
+        >
           {busy ? "Joining..." : "Join"}
         </Button>
         <Button

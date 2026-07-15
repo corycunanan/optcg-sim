@@ -8,6 +8,7 @@ import type {
   ServerMessage,
 } from "@shared/game-types";
 import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
+import { GameServerMessageSchema } from "@/lib/validators/realtime";
 
 export interface ActionRejection {
   action: GameAction;
@@ -39,7 +40,7 @@ const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
 export function useGameWs(
   gameId: string,
   workerUrl: string,
-  getToken: () => Promise<string>,
+  getToken: () => Promise<string>
 ) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [activePrompt, setActivePrompt] = useState<PromptOptions | null>(null);
@@ -59,10 +60,16 @@ export function useGameWs(
 
   const url = useMemo(
     () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
-    [gameId, workerUrl],
+    [gameId, workerUrl]
   );
 
-  const onMessage = useCallback((msg: ServerMessage) => {
+  const onMessage = useCallback((raw: unknown) => {
+    const parsed = GameServerMessageSchema.safeParse(raw);
+    if (!parsed.success) {
+      setGameError("Game server sent an invalid message");
+      return;
+    }
+    const msg: ServerMessage = parsed.data;
     switch (msg.type) {
       case "game:state":
         setActionRejection(null);
@@ -155,7 +162,7 @@ export function useGameWs(
       // Keep the last rejection visible while this attempt is pending. The
       // next accepted state update clears it; another rejection supersedes it.
     },
-    [send],
+    [send]
   );
 
   const leaveGame = useCallback(async () => {

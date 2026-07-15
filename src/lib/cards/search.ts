@@ -5,7 +5,7 @@
  * from URL search params. Used by GET /api/cards.
  */
 
-import { type Prisma } from "@prisma/client";
+import { BanStatus, CardType, type Prisma } from "@prisma/client";
 import {
   MIN_SUBSTRING_SEARCH_LENGTH,
   isSubstringSearchQueryTooShort,
@@ -41,13 +41,32 @@ const VALID_SORT_FIELDS = [
   "rarity",
   "blockNumber",
 ] as const;
+const VALID_SORT_FIELD_SET = new Set<string>(VALID_SORT_FIELDS);
+const CARD_TYPES = new Set<string>(Object.values(CardType));
+const BAN_STATUSES = new Set<string>(Object.values(BanStatus));
 
-export function buildCardWhereClause(params: CardSearchParams): Prisma.CardWhereInput {
+function isCardType(value: string): value is CardType {
+  return CARD_TYPES.has(value);
+}
+
+function isBanStatus(value: string): value is BanStatus {
+  return BAN_STATUSES.has(value);
+}
+
+function isSortField(
+  value: string
+): value is (typeof VALID_SORT_FIELDS)[number] {
+  return VALID_SORT_FIELD_SET.has(value);
+}
+
+export function buildCardWhereClause(
+  params: CardSearchParams
+): Prisma.CardWhereInput {
   const where: Prisma.CardWhereInput = {};
 
   if (isSubstringSearchQueryTooShort(params.q)) {
     throw new RangeError(
-      `Card search queries must be at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`,
+      `Card search queries must be at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`
     );
   }
 
@@ -61,7 +80,8 @@ export function buildCardWhereClause(params: CardSearchParams): Prisma.CardWhere
   }
 
   if (params.type) {
-    where.type = { in: params.type.split(",") as Prisma.EnumCardTypeFilter["in"] };
+    const types = params.type.split(",").filter(isCardType);
+    if (types.length > 0) where.type = { in: types };
   }
 
   if (params.costMin || params.costMax) {
@@ -93,9 +113,8 @@ export function buildCardWhereClause(params: CardSearchParams): Prisma.CardWhere
   }
 
   if (params.ban) {
-    where.banStatus = {
-      in: params.ban.split(",") as Prisma.EnumBanStatusFilter["in"],
-    };
+    const statuses = params.ban.split(",").filter(isBanStatus);
+    if (statuses.length > 0) where.banStatus = { in: statuses };
   }
 
   if (params.traits) {
@@ -111,11 +130,9 @@ export function buildCardWhereClause(params: CardSearchParams): Prisma.CardWhere
 
 export function buildCardOrderBy(
   sort?: string,
-  order?: string,
+  order?: string
 ): Prisma.CardOrderByWithRelationInput {
-  const sortField = sort && (VALID_SORT_FIELDS as readonly string[]).includes(sort)
-    ? sort
-    : "id";
+  const sortField = sort && isSortField(sort) ? sort : "id";
   return { [sortField]: order === "desc" ? "desc" : "asc" };
 }
 

@@ -1,6 +1,59 @@
 import { z } from "zod";
 
-const LobbyModeSchema = z.enum(["PVP", "SOLITAIRE", "PVCOMPUTER"]);
+export const LobbyModeSchema = z.enum(["PVP", "SOLITAIRE", "PVCOMPUTER"]);
+export const LobbyStatusSchema = z.enum([
+  "WAITING",
+  "READY",
+  "IN_GAME",
+  "CLOSED",
+  "EVICTED",
+]);
+
+const LobbyUserSchema = z.object({
+  id: z.string(),
+  username: z.string().nullable(),
+  name: z.string().nullable(),
+  image: z.string().nullable(),
+});
+
+const LobbyDeckSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  leaderId: z.string(),
+  leaderName: z.string().nullable(),
+  leaderImageUrl: z.string().nullable(),
+});
+
+export const LobbyRoomStateSchema = z.object({
+  id: z.string(),
+  status: LobbyStatusSchema,
+  joinCode: z.string(),
+  format: z.string(),
+  mode: LobbyModeSchema,
+  hostReady: z.boolean(),
+  hostUserId: z.string(),
+  host: LobbyUserSchema.omit({ id: true }).nullable(),
+  hostDeck: LobbyDeckSchema.nullable(),
+  guest: z
+    .object({
+      guestReady: z.boolean(),
+      user: LobbyUserSchema,
+      deck: LobbyDeckSchema.nullable(),
+    })
+    .nullable(),
+  gameId: z.string().nullable(),
+});
+
+export const LobbyRoomResponseSchema = z.object({ data: LobbyRoomStateSchema });
+export const StartLobbyResponseSchema = z.object({
+  data: z.object({ gameId: z.string() }),
+});
+export const CreateLobbyResponseSchema = z.object({
+  data: z.object({ lobbyId: z.string(), joinCode: z.string() }),
+});
+export const JoinLobbyResponseSchema = z.object({
+  data: z.object({ lobbyId: z.string() }),
+});
 
 export const CreateLobbySchema = z.object({
   deckId: z.string().min(1, "deckId is required").optional(),

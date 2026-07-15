@@ -54,7 +54,11 @@ export async function POST(request: NextRequest) {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      const target = error.meta?.target as string[] | undefined;
+      const target = Array.isArray(error.meta?.target)
+        ? error.meta.target.filter(
+            (field): field is string => typeof field === "string"
+          )
+        : [];
       if (target?.includes("email")) {
         return apiError("An account with this email already exists", 409);
       }

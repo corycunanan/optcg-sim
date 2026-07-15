@@ -37,9 +37,9 @@ export interface NotifyGameOptions {
 export async function notifyGame(
   gameId: string,
   details: NotifyGameDetails,
-  options: NotifyGameOptions = {},
+  options: NotifyGameOptions = {}
 ): Promise<void> {
-  const db = options.prisma ?? (defaultPrisma as unknown as PrismaGameLookup);
+  const db: PrismaGameLookup = options.prisma ?? defaultPrisma;
   const game = await db.gameSession.findUnique({
     where: { id: gameId },
     select: { player1Id: true, player2Id: true },
@@ -63,6 +63,6 @@ export async function notifyGame(
   // future behavior changes from accidentally turning the fanout into all-or-
   // nothing.
   await Promise.allSettled(
-    targets.map((userId) => notifyUser(userId, event, options.deps)),
+    targets.map((userId) => notifyUser(userId, event, options.deps))
   );
 }

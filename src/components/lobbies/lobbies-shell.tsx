@@ -6,6 +6,7 @@ import { ArrowRight, Gamepad2, Loader2, Plus } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 import { useLobbiesOperations } from "@/hooks/use-lobbies-operations";
 import { Button } from "@/components/ui/button";
+import { ActiveGameResponseSchema } from "@/lib/validators/game";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,10 +38,6 @@ interface LobbiesShellProps {
   };
 }
 
-type ActiveGameResponse = {
-  data: { id: string } | null;
-};
-
 export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
@@ -64,7 +61,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet<ActiveGameResponse>("/api/game/active")
+    apiGet("/api/game/active", ActiveGameResponseSchema)
       .then((json) => {
         if (!cancelled) setActiveGameId(json.data?.id ?? null);
       })

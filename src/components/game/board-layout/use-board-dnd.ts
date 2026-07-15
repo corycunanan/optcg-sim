@@ -22,7 +22,33 @@ type BoardDropData = {
   type?: unknown;
   slotIndex?: unknown;
   targetInstanceId?: unknown;
+  card?: unknown;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isBoardDropData(value: unknown): value is BoardDropData {
+  return isRecord(value);
+}
+
+function isDragPayload(value: unknown): value is DragPayload {
+  if (!isRecord(value) || typeof value.type !== "string") return false;
+  switch (value.type) {
+    case "hand-card":
+    case "attacker":
+      return isRecord(value.card);
+    case "active-don":
+      return isRecord(value.don);
+    case "redistribute-don":
+      return (
+        isRecord(value.don) && typeof value.fromCardInstanceId === "string"
+      );
+    default:
+      return false;
+  }
+}
 
 const OWN_FIELD_DROP_TYPES = new Set([
   "own-field",
@@ -36,7 +62,10 @@ const boardScreenReaderInstructions: ScreenReaderInstructions = {
     "To pick up a card, press Enter or Space. While dragging, use the arrow keys to move between legal targets. Press Enter or Space again to drop, or Escape to cancel.",
 };
 
-export function describeBoardDrag(dragData: DragPayload, cardDb: CardDb): string {
+export function describeBoardDrag(
+  dragData: DragPayload,
+  cardDb: CardDb
+): string {
   switch (dragData.type) {
     case "hand-card":
     case "attacker":
@@ -76,7 +105,7 @@ export function resolveHandCardDropAction(
   dragData: Extract<DragPayload, { type: "hand-card" }>,
   dropData: BoardDropData,
   cardDb: CardDb,
-  battle: TurnState["battle"] | null,
+  battle: TurnState["battle"] | null
 ): GameAction | null {
   const cardData = cardDb[dragData.card.cardId];
   if (!cardData || typeof dropData.type !== "string") return null;
@@ -137,51 +166,60 @@ export function useBoardDnd(
   cardDb: CardDb,
   battle: TurnState["battle"] | null,
   onAction: (action: GameAction) => void,
-  onRedistributeDrop?: (fromCardId: string, donId: string, toCardId: string) => void,
+  onRedistributeDrop?: (
+    fromCardId: string,
+    donId: string,
+    toCardId: string
+  ) => void,
   onHandReorder?: (activeInstanceId: string, overInstanceId: string) => void,
   /** When true, drop handlers are no-ops. Sandbox spectator/responseOnly
    *  modes (OPT-290) pass this so that a stray drag can't fire an action.
    *  The drag start still tracks `activeDrag` so DragOverlay rendering stays
    *  consistent — only the resolution is suppressed. */
-  disabled = false,
+  disabled = false
 ) {
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: boardKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: boardKeyboardCoordinates })
   );
 
   const announcements = useMemo<Announcements>(
     () => ({
       onDragStart({ active }) {
-        const dragData = active.data.current as DragPayload;
+        const dragData = active.data.current;
+        if (!isDragPayload(dragData)) return "Unknown item picked up.";
         return `${describeBoardDrag(dragData, cardDb)} picked up.`;
       },
       onDragOver({ active, over }) {
         if (!over) return "No legal drop target.";
-        const dragData = active.data.current as DragPayload;
+        const dragData = active.data.current;
+        if (!isDragPayload(dragData)) return "Unknown item is being dragged.";
         if (over.id === active.id) {
           return `${describeBoardDrag(dragData, cardDb)} remains at its current position.`;
         }
         return `${describeBoardDrag(dragData, cardDb)} is over ${describeBoardDrop(over.data.current)}.`;
       },
       onDragEnd({ active, over }) {
-        const dragData = active.data.current as DragPayload;
+        const dragData = active.data.current;
+        if (!isDragPayload(dragData)) return "Unknown item was not moved.";
         return over && over.id !== active.id
           ? `${describeBoardDrag(dragData, cardDb)} dropped on ${describeBoardDrop(over.data.current)}.`
           : `${describeBoardDrag(dragData, cardDb)} was not moved.`;
       },
       onDragCancel({ active }) {
-        const dragData = active.data.current as DragPayload;
+        const dragData = active.data.current;
+        if (!isDragPayload(dragData)) return "Unknown item drag canceled.";
         return `${describeBoardDrag(dragData, cardDb)} drag canceled.`;
       },
     }),
-    [cardDb],
+    [cardDb]
   );
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveDrag(event.active.data.current as DragPayload);
+    const dragData = event.active.data.current;
+    setActiveDrag(isDragPayload(dragData) ? dragData : null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -190,55 +228,67 @@ export function useBoardDnd(
     if (disabled) return;
     if (!over) return;
 
-    const dragData = active.data.current as DragPayload;
-    const dropData = over.data.current as BoardDropData | undefined;
+    const dragData = active.data.current;
+    const dropData = isBoardDropData(over.data.current)
+      ? over.data.current
+      : undefined;
+    if (!isDragPayload(dragData)) return;
 
     // Hand-card reorder: sortable reports the target hand card via over.data.
     // Only fires when active.id !== over.id (dropping on self is a no-op).
     if (
       dragData.type === "hand-card" &&
       dropData?.type === "hand-card" &&
-      active.id !== over.id
+      active.id !== over.id &&
+      isRecord(dropData.card) &&
+      typeof dropData.card.instanceId === "string"
     ) {
-      const overCard = (dropData as unknown as { card: { instanceId: string } }).card;
-      onHandReorder?.(dragData.card.instanceId, overCard.instanceId);
+      onHandReorder?.(dragData.card.instanceId, dropData.card.instanceId);
       return;
     }
 
     if (!dropData) return;
 
     if (dragData.type === "hand-card") {
-      const action = resolveHandCardDropAction(dragData, dropData, cardDb, battle);
+      const action = resolveHandCardDropAction(
+        dragData,
+        dropData,
+        cardDb,
+        battle
+      );
       if (action) onAction(action);
       return;
     }
 
     if (
       dragData.type === "active-don" &&
-      dropData.type === "don-target"
+      dropData.type === "don-target" &&
+      typeof dropData.targetInstanceId === "string"
     ) {
       onAction({
         type: "ATTACH_DON",
-        targetInstanceId: dropData.targetInstanceId as string,
+        targetInstanceId: dropData.targetInstanceId,
         count: 1,
       });
     } else if (
       dragData.type === "redistribute-don" &&
-      dropData.type === "don-target"
+      dropData.type === "don-target" &&
+      typeof dropData.targetInstanceId === "string"
     ) {
       onRedistributeDrop?.(
         dragData.fromCardInstanceId,
         dragData.don.instanceId,
-        dropData.targetInstanceId as string,
+        dropData.targetInstanceId
       );
     } else if (
       dragData.type === "attacker" &&
-      dropData.type === "attack-target"
+      dropData.type === "attack-target" &&
+      typeof dropData.targetInstanceId === "string"
     ) {
       onAction({
         type: "DECLARE_ATTACK",
         attackerInstanceId: dragData.card.instanceId,
-        targetInstanceId: dropData.targetInstanceId as string,
+        targetInstanceId: dropData.targetInstanceId,
       });
     }
   }

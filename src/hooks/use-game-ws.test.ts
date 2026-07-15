@@ -128,7 +128,8 @@ describe("useGameWs prompt identity", () => {
     const state = {
       status: "IN_PROGRESS",
       pendingPrompt: null,
-    } as GameState;
+      players: [],
+    } as unknown as GameState;
 
     mocks.onMessage?.({
       type: "game:update",

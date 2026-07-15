@@ -11,7 +11,10 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   retry: vi.fn(),
   connectionStatus: "connecting" as ConnectionStatus,
-  session: { data: null as { user: { id: string } } | null, status: "loading" as string },
+  session: {
+    data: null as { user: { id: string } } | null,
+    status: "loading" as string,
+  },
   fetch: vi.fn(),
 }));
 
@@ -38,7 +41,8 @@ vi.mock("next-auth/react", () => ({
 }));
 
 vi.mock("@/hooks/use-authed-websocket", async (importActual) => {
-  const actual = await importActual<typeof import("@/hooks/use-authed-websocket")>();
+  const actual =
+    await importActual<typeof import("@/hooks/use-authed-websocket")>();
   return {
     ...actual,
     useAuthedWebSocket: (opts: {
@@ -101,22 +105,33 @@ describe("useUserChannel", () => {
 
   it("builds the user-channel URL once authenticated", async () => {
     process.env.NEXT_PUBLIC_GAME_WORKER_URL = "https://worker.example";
-    mocks.session = { data: { user: { id: "user-7" } }, status: "authenticated" };
+    mocks.session = {
+      data: { user: { id: "user-7" } },
+      status: "authenticated",
+    };
 
     const useUserChannel = await importHook();
     useUserChannel();
 
-    expect(mocks.authedCalls[0].url).toBe("https://worker.example/user/user-7/ws");
+    expect(mocks.authedCalls[0].url).toBe(
+      "https://worker.example/user/user-7/ws"
+    );
   });
 
   it("getToken POSTs /api/realtime/token and returns the token string", async () => {
     process.env.NEXT_PUBLIC_GAME_WORKER_URL = "https://worker.example";
-    mocks.session = { data: { user: { id: "user-7" } }, status: "authenticated" };
+    mocks.session = {
+      data: { user: { id: "user-7" } },
+      status: "authenticated",
+    };
     mocks.fetch.mockResolvedValue(
-      new Response(JSON.stringify({ data: { token: "tok-abc", expiresAt: 0 } }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+      new Response(
+        JSON.stringify({ data: { token: "tok-abc", expiresAt: 0 } }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
     );
 
     const useUserChannel = await importHook();
@@ -125,14 +140,17 @@ describe("useUserChannel", () => {
     const token = await mocks.authedCalls[0].getToken();
     expect(mocks.fetch).toHaveBeenCalledWith(
       "/api/realtime/token",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({ method: "POST" })
     );
     expect(token).toBe("tok-abc");
   });
 
   it("getToken throws when the mint endpoint returns an error", async () => {
     process.env.NEXT_PUBLIC_GAME_WORKER_URL = "https://worker.example";
-    mocks.session = { data: { user: { id: "user-7" } }, status: "authenticated" };
+    mocks.session = {
+      data: { user: { id: "user-7" } },
+      status: "authenticated",
+    };
     mocks.fetch.mockResolvedValue(new Response("nope", { status: 500 }));
 
     const useUserChannel = await importHook();
@@ -143,32 +161,45 @@ describe("useUserChannel", () => {
 
   it("subscribers receive only events of their type and unsubscribe cleans up", async () => {
     process.env.NEXT_PUBLIC_GAME_WORKER_URL = "https://worker.example";
-    mocks.session = { data: { user: { id: "user-7" } }, status: "authenticated" };
+    mocks.session = {
+      data: { user: { id: "user-7" } },
+      status: "authenticated",
+    };
 
     const useUserChannel = await importHook();
     const { subscribe } = useUserChannel();
 
     const onA = vi.fn();
     const onB = vi.fn();
-    const offA = subscribe("feature:a" as never, onA as never);
-    subscribe("feature:b" as never, onB as never);
+    const offA = subscribe("presence:friend_online", onA);
+    subscribe("presence:friend_offline", onB);
 
     const dispatch = mocks.authedCalls[0].onMessage;
-    dispatch({ type: "feature:a", value: 1 });
-    dispatch({ type: "feature:b", value: 2 });
+    dispatch({ type: "presence:friend_online", userId: "user-a" });
+    dispatch({
+      type: "presence:friend_offline",
+      userId: "user-b",
+      lastSeen: "2026-07-15T00:00:00.000Z",
+    });
 
     expect(onA).toHaveBeenCalledTimes(1);
-    expect(onA).toHaveBeenCalledWith({ type: "feature:a", value: 1 });
+    expect(onA).toHaveBeenCalledWith({
+      type: "presence:friend_online",
+      userId: "user-a",
+    });
     expect(onB).toHaveBeenCalledTimes(1);
 
     offA();
-    dispatch({ type: "feature:a", value: 3 });
+    dispatch({ type: "presence:friend_online", userId: "user-c" });
     expect(onA).toHaveBeenCalledTimes(1);
   });
 
   it("ignores malformed inbound messages without throwing", async () => {
     process.env.NEXT_PUBLIC_GAME_WORKER_URL = "https://worker.example";
-    mocks.session = { data: { user: { id: "user-7" } }, status: "authenticated" };
+    mocks.session = {
+      data: { user: { id: "user-7" } },
+      status: "authenticated",
+    };
 
     const useUserChannel = await importHook();
     useUserChannel();

@@ -66,4 +66,8 @@ export const ConcedeGameResponseSchema = z.object({
   }),
 });
 
+export const ActiveGameResponseSchema = z.object({
+  data: z.object({ id: z.string() }).nullable(),
+});
+
 export type RemoteGameStatus = z.infer<typeof RemoteGameStatusSchema>;

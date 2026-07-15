@@ -39,6 +39,8 @@ export interface EventDispatcher {
 }
 
 export function createEventDispatcher(): EventDispatcher {
+  // A heterogeneous handler map erases the correlation between each key and
+  // its event subtype; assertions stay inside this private, typed API boundary.
   const handlers = new Map<string, Set<Handler<EventType>>>();
 
   return {
@@ -66,7 +68,10 @@ export function createEventDispatcher(): EventDispatcher {
         try {
           handler(event as EventOf<EventType>);
         } catch (err) {
-          console.warn("[useUserChannel] subscriber threw", { type: event.type, err });
+          console.warn("[useUserChannel] subscriber threw", {
+            type: event.type,
+            err,
+          });
         }
       }
     },

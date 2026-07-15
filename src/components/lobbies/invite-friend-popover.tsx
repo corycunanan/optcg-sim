@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { UserAvatar } from "@/components/social/user-avatar";
+import { FriendsResponseSchema } from "@/lib/validators/friends";
 
 interface FriendUser {
   id: string;
@@ -24,10 +25,6 @@ interface FriendEntry {
   friendshipId: string;
   user: FriendUser;
 }
-
-type FriendsResponse = {
-  data: FriendEntry[];
-};
 
 interface Props {
   lobbyId: string;
@@ -47,7 +44,7 @@ export function InviteFriendPopover({ lobbyId }: Props) {
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    apiGet<FriendsResponse>("/api/friends")
+    apiGet("/api/friends", FriendsResponseSchema)
       .then((res) => {
         if (cancelled) return;
         setFriends(res.data ?? []);

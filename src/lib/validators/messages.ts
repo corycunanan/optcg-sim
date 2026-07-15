@@ -47,6 +47,21 @@ export const MarkMessagesReadSchema = z.object({
     .min(1, "throughCreatedAt is required")
     .refine(
       (s) => !Number.isNaN(new Date(s).getTime()),
-      "throughCreatedAt must be a valid ISO date",
+      "throughCreatedAt must be a valid ISO date"
     ),
 });
+
+export const ChatMessageSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+  fromUserId: z.string(),
+  readAt: z.string().nullable(),
+});
+
+export const MessageHistoryResponseSchema = z.object({
+  data: z.array(ChatMessageSchema),
+  more: z.boolean().optional(),
+});
+
+export const SendMessageResponseSchema = z.object({ data: ChatMessageSchema });

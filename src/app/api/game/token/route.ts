@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     if (playerIndexParam !== "0" && playerIndexParam !== "1") {
       return apiError("playerIndex must be 0 or 1", 400);
     }
-    requestedPlayerIndex = Number(playerIndexParam) as 0 | 1;
+    requestedPlayerIndex = playerIndexParam === "0" ? 0 : 1;
   }
 
   if (!GAME_WORKER_SECRET) {

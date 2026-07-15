@@ -29,7 +29,9 @@ export default async function GamePage({
     : resolvedSearchParams?.playerIndex;
   const playerIndex =
     rawPlayerIndex === "0" || rawPlayerIndex === "1"
-      ? (Number(rawPlayerIndex) as 0 | 1)
+      ? rawPlayerIndex === "0"
+        ? 0
+        : 1
       : undefined;
   const game = await prisma.gameSession.findFirst({
     where: {

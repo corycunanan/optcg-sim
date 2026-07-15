@@ -23,6 +23,7 @@ import {
   type PresenceEntry,
   type PresenceMap,
 } from "./presence-state";
+import { z } from "zod";
 
 export type { PresenceEntry, PresenceMap } from "./presence-state";
 
@@ -74,7 +75,9 @@ export function UserChannelProvider({ children }: { children: ReactNode }) {
       setPresence((prev) => applyOnlineEvent(prev, event.userId));
     });
     const unsubOffline = subscribe("presence:friend_offline", (event) => {
-      setPresence((prev) => applyOfflineEvent(prev, event.userId, event.lastSeen));
+      setPresence((prev) =>
+        applyOfflineEvent(prev, event.userId, event.lastSeen)
+      );
     });
     return () => {
       unsubOnline();
@@ -84,7 +87,7 @@ export function UserChannelProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<UserChannelContextValue>(
     () => ({ subscribe, send, connectionStatus, presence, trackPresence }),
-    [subscribe, send, connectionStatus, presence, trackPresence],
+    [subscribe, send, connectionStatus, presence, trackPresence]
   );
 
   return (
@@ -103,20 +106,26 @@ export function useUserChannelEvents(): UserChannelContextValue {
   const ctx = useContext(UserChannelContext);
   if (!ctx) {
     throw new Error(
-      "useUserChannelEvents must be used inside <UserChannelProvider>",
+      "useUserChannelEvents must be used inside <UserChannelProvider>"
     );
   }
   return ctx;
 }
 
 async function seedPresence(
-  ids: string[],
+  ids: string[]
 ): Promise<Record<string, PresenceEntry> | null> {
   if (ids.length === 0) return null;
   try {
     const qs = `?ids=${encodeURIComponent(ids.join(","))}`;
-    const res = await apiGet<{ data: Record<string, PresenceEntry> }>(
+    const res = await apiGet(
       `/api/users/presence${qs}`,
+      z.object({
+        data: z.record(
+          z.string(),
+          z.object({ online: z.boolean(), lastSeen: z.string().nullable() })
+        ),
+      })
     );
     return res.data ?? {};
   } catch (err) {

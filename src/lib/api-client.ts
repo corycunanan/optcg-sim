@@ -4,9 +4,8 @@
  * Standardizes headers, JSON parsing, and error handling for all client-side
  * API calls. Replaces 18+ scattered fetch() patterns with typed helpers.
  *
- * Each helper supports two call styles:
- *   1. `apiGet<T>(url, opts?)` — unchecked cast (existing callers)
- *   2. `apiGet(url, schema, opts?)` — Zod-validated at runtime
+ * Response bodies are `unknown` unless the caller supplies a Zod schema.
+ * Callers that consume response data must validate it at this boundary.
  */
 
 import type { ZodType } from "zod";
@@ -28,16 +27,38 @@ interface RequestOptions {
   credentials?: RequestCredentials;
 }
 
-async function request<T extends Record<string, unknown>>(
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSchema<T>(
+  value: ZodType<T> | RequestOptions | undefined
+): value is ZodType<T> {
+  return Boolean(value && "safeParse" in value);
+}
+
+function resolveRequestArgs<T>(
+  schemaOrOpts: ZodType<T> | RequestOptions | undefined,
+  opts: RequestOptions | undefined
+): { schema?: ZodType<T>; options?: RequestOptions } {
+  if (isSchema(schemaOrOpts)) {
+    return { schema: schemaOrOpts, options: opts };
+  }
+  return { options: schemaOrOpts };
+}
+
+async function request<T>(
   url: string,
   init: RequestInit & { signal?: AbortSignal },
   schema?: ZodType<T>
-): Promise<T> {
+): Promise<T | unknown> {
   const res = await fetch(url, init);
-  const json = await res.json().catch(() => null);
+  const json: unknown = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const message = json?.error ?? `Request failed (${res.status})`;
+    const error = isRecord(json) ? json.error : undefined;
+    const message =
+      typeof error === "string" ? error : `Request failed (${res.status})`;
     throw new ApiError(message, res.status);
   }
 
@@ -45,32 +66,25 @@ async function request<T extends Record<string, unknown>>(
     return schema.parse(json);
   }
 
-  return json as T;
+  return json;
 }
 
 // ─── GET ────────────────────────────────────────────────────
 
 /** GET request with Zod validation. */
-export function apiGet<T extends Record<string, unknown>>(
+export function apiGet<T>(
   url: string,
   schema: ZodType<T>,
   opts?: RequestOptions
 ): Promise<T>;
-/** GET request — unchecked cast. */
-export function apiGet<T extends Record<string, unknown>>(
-  url: string,
-  opts?: RequestOptions
-): Promise<T>;
-export function apiGet<T extends Record<string, unknown>>(
+/** GET request when the response body is intentionally ignored or inspected manually. */
+export function apiGet(url: string, opts?: RequestOptions): Promise<unknown>;
+export function apiGet<T>(
   url: string,
   schemaOrOpts?: ZodType<T> | RequestOptions,
   opts?: RequestOptions
-): Promise<T> {
-  const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
-  const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema
-    ? opts
-    : (schemaOrOpts as RequestOptions | undefined);
+): Promise<T | unknown> {
+  const { schema, options } = resolveRequestArgs(schemaOrOpts, opts);
 
   return request<T>(
     url,
@@ -88,29 +102,25 @@ export function apiGet<T extends Record<string, unknown>>(
 // ─── POST ───────────────────────────────────────────────────
 
 /** POST request with Zod validation. */
-export function apiPost<T extends Record<string, unknown>>(
+export function apiPost<T>(
   url: string,
   body: unknown,
   schema: ZodType<T>,
   opts?: RequestOptions
 ): Promise<T>;
-/** POST request — unchecked cast. */
-export function apiPost<T extends Record<string, unknown>>(
+/** POST request when the response body is intentionally ignored or inspected manually. */
+export function apiPost(
   url: string,
   body?: unknown,
   opts?: RequestOptions
-): Promise<T>;
-export function apiPost<T extends Record<string, unknown>>(
+): Promise<unknown>;
+export function apiPost<T>(
   url: string,
   body?: unknown,
   schemaOrOpts?: ZodType<T> | RequestOptions,
   opts?: RequestOptions
-): Promise<T> {
-  const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
-  const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema
-    ? opts
-    : (schemaOrOpts as RequestOptions | undefined);
+): Promise<T | unknown> {
+  const { schema, options } = resolveRequestArgs(schemaOrOpts, opts);
 
   return request<T>(
     url,
@@ -129,29 +139,25 @@ export function apiPost<T extends Record<string, unknown>>(
 // ─── PUT ────────────────────────────────────────────────────
 
 /** PUT request with Zod validation. */
-export function apiPut<T extends Record<string, unknown>>(
+export function apiPut<T>(
   url: string,
   body: unknown,
   schema: ZodType<T>,
   opts?: RequestOptions
 ): Promise<T>;
-/** PUT request — unchecked cast. */
-export function apiPut<T extends Record<string, unknown>>(
+/** PUT request when the response body is intentionally ignored or inspected manually. */
+export function apiPut(
   url: string,
   body?: unknown,
   opts?: RequestOptions
-): Promise<T>;
-export function apiPut<T extends Record<string, unknown>>(
+): Promise<unknown>;
+export function apiPut<T>(
   url: string,
   body?: unknown,
   schemaOrOpts?: ZodType<T> | RequestOptions,
   opts?: RequestOptions
-): Promise<T> {
-  const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
-  const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema
-    ? opts
-    : (schemaOrOpts as RequestOptions | undefined);
+): Promise<T | unknown> {
+  const { schema, options } = resolveRequestArgs(schemaOrOpts, opts);
 
   return request<T>(
     url,
@@ -170,29 +176,25 @@ export function apiPut<T extends Record<string, unknown>>(
 // ─── PATCH ──────────────────────────────────────────────────
 
 /** PATCH request with Zod validation. */
-export function apiPatch<T extends Record<string, unknown>>(
+export function apiPatch<T>(
   url: string,
   body: unknown,
   schema: ZodType<T>,
   opts?: RequestOptions
 ): Promise<T>;
-/** PATCH request — unchecked cast. */
-export function apiPatch<T extends Record<string, unknown>>(
+/** PATCH request when the response body is intentionally ignored or inspected manually. */
+export function apiPatch(
   url: string,
   body?: unknown,
   opts?: RequestOptions
-): Promise<T>;
-export function apiPatch<T extends Record<string, unknown>>(
+): Promise<unknown>;
+export function apiPatch<T>(
   url: string,
   body?: unknown,
   schemaOrOpts?: ZodType<T> | RequestOptions,
   opts?: RequestOptions
-): Promise<T> {
-  const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
-  const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema
-    ? opts
-    : (schemaOrOpts as RequestOptions | undefined);
+): Promise<T | unknown> {
+  const { schema, options } = resolveRequestArgs(schemaOrOpts, opts);
 
   return request<T>(
     url,
@@ -211,26 +213,19 @@ export function apiPatch<T extends Record<string, unknown>>(
 // ─── DELETE ─────────────────────────────────────────────────
 
 /** DELETE request with Zod validation. */
-export function apiDelete<T extends Record<string, unknown>>(
+export function apiDelete<T>(
   url: string,
   schema: ZodType<T>,
   opts?: RequestOptions
 ): Promise<T>;
-/** DELETE request — unchecked cast. */
-export function apiDelete<T extends Record<string, unknown>>(
-  url: string,
-  opts?: RequestOptions
-): Promise<T>;
-export function apiDelete<T extends Record<string, unknown>>(
+/** DELETE request when the response body is intentionally ignored or inspected manually. */
+export function apiDelete(url: string, opts?: RequestOptions): Promise<unknown>;
+export function apiDelete<T>(
   url: string,
   schemaOrOpts?: ZodType<T> | RequestOptions,
   opts?: RequestOptions
-): Promise<T> {
-  const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
-  const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema
-    ? opts
-    : (schemaOrOpts as RequestOptions | undefined);
+): Promise<T | unknown> {
+  const { schema, options } = resolveRequestArgs(schemaOrOpts, opts);
 
   return request<T>(
     url,

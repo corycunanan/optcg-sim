@@ -87,13 +87,14 @@ export function buildEngineSessionGame(
   state: GameState,
   cardDb: CardDb,
   myIndex: 0 | 1,
-  sendAction: (action: GameAction) => void,
+  sendAction: (action: GameAction) => void
 ): SandboxGameSessionGame {
   const oppIndex: 0 | 1 = myIndex === 0 ? 1 : 0;
   const me = state.players[myIndex];
   const opp = state.players[oppIndex];
   const turn = state.turn;
-  const activePrompt: PromptOptions | null = state.pendingPrompt?.options ?? null;
+  const activePrompt: PromptOptions | null =
+    state.pendingPrompt?.options ?? null;
   const gameOver =
     state.status === "FINISHED" || state.status === "ABANDONED"
       ? { winner: state.winner, reason: state.winReason ?? "" }
@@ -127,13 +128,13 @@ export function buildEngineSessionGame(
 // ─── React surface ─────────────────────────────────────────────────────
 
 export function useSandboxEngineSession(
-  input: SandboxEngineSessionInput,
+  input: SandboxEngineSessionInput
 ): SandboxEngineSession {
   const { initialState, cardDb } = input;
   const myIndex = initialState.myIndex;
 
   const [state, setState] = useState<GameState>(() =>
-    hydrateToGameState(initialState),
+    hydrateToGameState(initialState)
   );
 
   const router = useRouter();
@@ -145,7 +146,7 @@ export function useSandboxEngineSession(
     (action: GameAction) => {
       setState((prev) => runPipeline(prev, action, cardDb, myIndex).state);
     },
-    [cardDb, myIndex],
+    [cardDb, myIndex]
   );
 
   const reset = useCallback(() => {
@@ -153,14 +154,15 @@ export function useSandboxEngineSession(
   }, [initialState]);
 
   // Engine consumes a Map; BoardLayout consumes a Record. Project once.
-  const cardDbRecord = useMemo<CardDb>(
-    () => Object.fromEntries(cardDb) as CardDb,
-    [cardDb],
-  );
+  const cardDbRecord = useMemo<CardDb>(() => {
+    const record: CardDb = {};
+    for (const [cardId, data] of cardDb) record[cardId] = data;
+    return record;
+  }, [cardDb]);
 
   const game = useMemo(
     () => buildEngineSessionGame(state, cardDbRecord, myIndex, dispatch),
-    [state, cardDbRecord, myIndex, dispatch],
+    [state, cardDbRecord, myIndex, dispatch]
   );
 
   const navigation = useMemo<SandboxGameSessionNavigation>(
@@ -177,7 +179,7 @@ export function useSandboxEngineSession(
         handleBackToLobbies();
       },
     }),
-    [handleBackToLobbies],
+    [handleBackToLobbies]
   );
 
   return {

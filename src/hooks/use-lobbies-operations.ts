@@ -1,20 +1,11 @@
 "use client";
 
 import { ApiError, apiPost } from "@/lib/api-client";
+import {
+  CreateLobbyResponseSchema,
+  JoinLobbyResponseSchema,
+} from "@/lib/validators/lobbies";
 import { useAsyncOperation } from "./use-async-operation";
-
-type CreateLobbyResponse = {
-  data: {
-    lobbyId: string;
-    joinCode: string;
-  };
-};
-
-type JoinLobbyResponse = {
-  data: {
-    lobbyId: string;
-  };
-};
 
 interface LobbiesOperationCallbacks {
   onCreated: (lobbyId: string) => void;
@@ -28,10 +19,10 @@ export function useLobbiesOperations({
   onConceded,
 }: LobbiesOperationCallbacks) {
   const createOperation = useAsyncOperation(() =>
-    apiPost<CreateLobbyResponse>("/api/lobbies", { format: "Standard" })
+    apiPost("/api/lobbies", { format: "Standard" }, CreateLobbyResponseSchema)
   );
   const joinOperation = useAsyncOperation((code: string) =>
-    apiPost<JoinLobbyResponse>("/api/lobbies/join", { code })
+    apiPost("/api/lobbies/join", { code }, JoinLobbyResponseSchema)
   );
   const concedeOperation = useAsyncOperation((gameId: string) =>
     apiPost(`/api/game/${gameId}`, { action: "CONCEDE" })

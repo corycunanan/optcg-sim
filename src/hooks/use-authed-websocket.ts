@@ -14,10 +14,7 @@ export const RECONNECT_BASE_MS = 1000;
 export const RECONNECT_MAX_MS = 30_000;
 
 export function computeReconnectDelay(attempts: number): number {
-  return Math.min(
-    RECONNECT_BASE_MS * Math.pow(2, attempts),
-    RECONNECT_MAX_MS,
-  );
+  return Math.min(RECONNECT_BASE_MS * Math.pow(2, attempts), RECONNECT_MAX_MS);
 }
 
 /**
@@ -91,13 +88,20 @@ export interface AuthedWebSocketController {
  * reconnect causes a 401 loop. This is non-negotiable per the OPT-350 incident.
  */
 export function createAuthedWebSocketController<TServerMessage>(
-  opts: AuthedWebSocketControllerOptions<TServerMessage>,
+  opts: AuthedWebSocketControllerOptions<TServerMessage>
 ): AuthedWebSocketController {
   const setTimeoutImpl =
     opts.setTimeoutFn ?? ((fn, ms) => globalThis.setTimeout(fn, ms));
   const clearTimeoutImpl =
-    opts.clearTimeoutFn ?? ((id) => globalThis.clearTimeout(id as number));
-  const WS = (opts.WebSocketCtor ?? (globalThis.WebSocket as unknown as MinimalWebSocketCtor));
+    opts.clearTimeoutFn ??
+    ((id) => {
+      if (typeof id === "number") globalThis.clearTimeout(id);
+    });
+  // DOM WebSocket's callback `this` parameters prevent structural assignment
+  // to the minimal test seam even though the runtime constructor is compatible.
+  const WS =
+    opts.WebSocketCtor ??
+    (globalThis.WebSocket as unknown as MinimalWebSocketCtor);
 
   let ws: MinimalWebSocket | null = null;
   let reconnectTimerId: unknown = null;
@@ -148,10 +152,11 @@ export function createAuthedWebSocketController<TServerMessage>(
     if (stopped || myGen !== generation || manuallyClosed) return;
 
     const separator = opts.url.includes("?") ? "&" : "?";
-    const wsUrl = `${opts.url}${separator}token=${encodeURIComponent(token)}`.replace(
-      /^http/,
-      "ws",
-    );
+    const wsUrl =
+      `${opts.url}${separator}token=${encodeURIComponent(token)}`.replace(
+        /^http/,
+        "ws"
+      );
 
     const socket = new WS(wsUrl);
     ws = socket;
@@ -169,12 +174,12 @@ export function createAuthedWebSocketController<TServerMessage>(
     socket.onmessage = (event) => {
       let msg: TServerMessage;
       try {
-        msg = JSON.parse(event.data) as TServerMessage;
+        msg = JSON.parse(event.data);
       } catch (err) {
         console.warn(
           "[useAuthedWebSocket] failed to parse server message",
           err,
-          event.data,
+          event.data
         );
         return;
       }
@@ -187,7 +192,9 @@ export function createAuthedWebSocketController<TServerMessage>(
     };
 
     socket.onclose = () => {
-      if (!shouldHandleClose({ ws: socket, liveWs: ws, stopped, manuallyClosed })) {
+      if (
+        !shouldHandleClose({ ws: socket, liveWs: ws, stopped, manuallyClosed })
+      ) {
         return;
       }
       ws = null;
@@ -290,7 +297,7 @@ export interface UseAuthedWebSocketResult {
  * lifecycle logic can be unit-tested without React.
  */
 export function useAuthedWebSocket<TServerMessage>(
-  opts: UseAuthedWebSocketOptions<TServerMessage>,
+  opts: UseAuthedWebSocketOptions<TServerMessage>
 ): UseAuthedWebSocketResult {
   const { url, getToken, onMessage, onStatusChange } = opts;
 

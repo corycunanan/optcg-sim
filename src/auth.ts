@@ -28,18 +28,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (
+          typeof credentials?.email !== "string" ||
+          typeof credentials.password !== "string"
+        ) {
+          return null;
+        }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email: credentials.email },
         });
 
         if (!user?.password) return null;
 
-        const valid = await bcrypt.compare(
-          credentials.password as string,
-          user.password,
-        );
+        const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;
 
         return user;
@@ -53,8 +55,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         // token.sub is set to user.id automatically
-        token.username = (user as { username?: string | null }).username ?? null;
-        token.isAdmin = (user as { isAdmin?: boolean }).isAdmin ?? false;
+        token.username = user.username ?? null;
+        token.isAdmin = user.isAdmin ?? false;
         return token;
       }
       // Refresh isAdmin from DB on token rotation so admin flips take effect
@@ -70,7 +72,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       session.user.id = token.sub!;
-      session.user.username = (token.username ?? null) as string | null;
+      session.user.username =
+        typeof token.username === "string" ? token.username : null;
       session.user.isAdmin = Boolean(token.isAdmin);
       return session;
     },
@@ -81,6 +84,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 // Extend the Session and JWT types
 declare module "next-auth" {
+  interface User {
+    username?: string | null;
+    isAdmin?: boolean;
+  }
+
   interface Session {
     user: {
       id: string;
@@ -92,5 +100,3 @@ declare module "next-auth" {
     };
   }
 }
-
-

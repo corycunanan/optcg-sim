@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
+import {
+  LobbyRoomResponseSchema,
+  StartLobbyResponseSchema,
+} from "@/lib/validators/lobbies";
 import type {
   LobbyRoomDeck,
   LobbyRoomMode,
@@ -11,16 +15,6 @@ import type {
 } from "@/lib/lobbies/state";
 
 export type { LobbyRoomDeck, LobbyRoomMode, LobbyRoomState, LobbyRoomStatus };
-
-type LobbyRoomResponse = {
-  data: LobbyRoomState;
-};
-
-type StartLobbyResponse = {
-  data: {
-    gameId: string;
-  };
-};
 
 export function useLobbyRoom(
   lobbyId: string,
@@ -39,7 +33,10 @@ export function useLobbyRoom(
     if (refreshInFlightRef.current) return null;
     refreshInFlightRef.current = true;
     try {
-      const json = await apiGet<LobbyRoomResponse>(`/api/lobbies/${lobbyId}`);
+      const json = await apiGet(
+        `/api/lobbies/${lobbyId}`,
+        LobbyRoomResponseSchema
+      );
       if (cancelledRef.current) return null;
       setLobby(json.data);
       setError(null);
@@ -102,8 +99,10 @@ export function useLobbyRoom(
   const startLobby = useCallback(async () => {
     setStarting(true);
     try {
-      const json = await apiPost<StartLobbyResponse>(
-        `/api/lobbies/${lobbyId}/start`
+      const json = await apiPost(
+        `/api/lobbies/${lobbyId}/start`,
+        undefined,
+        StartLobbyResponseSchema
       );
       return json.data.gameId;
     } finally {

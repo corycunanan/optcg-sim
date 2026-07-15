@@ -21,16 +21,35 @@ const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const BAN_STATUSES = ["LEGAL", "BANNED", "RESTRICTED"];
 
+interface CardFormState {
+  id: string;
+  name: string;
+  type: string;
+  color: string[];
+  cost: string;
+  power: string;
+  counter: string;
+  life: string;
+  attribute: string;
+  traits: string;
+  rarity: string;
+  effectText: string;
+  triggerText: string;
+  imageUrl: string;
+  blockNumber: string;
+  banStatus: string;
+}
+
 export default function NewCardPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<CardFormState>({
     id: "",
     name: "",
     type: "Character",
-    color: [] as string[],
+    color: [],
     cost: "",
     power: "",
     counter: "",

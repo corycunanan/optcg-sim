@@ -20,6 +20,10 @@ import {
   isTypingActive,
   shouldEmitTyping,
 } from "./chat-typing-state";
+import {
+  MessageHistoryResponseSchema,
+  SendMessageResponseSchema,
+} from "@/lib/validators/messages";
 
 type Message = ChatMessage;
 
@@ -41,7 +45,12 @@ interface Props {
 // a re-render every frame.
 const TYPING_TICK_MS = 100;
 
-export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: Props) {
+export function ChatWidget({
+  user,
+  currentUserId,
+  sidebarCollapsed,
+  onClose,
+}: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -67,7 +76,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
 
   useEffect(() => {
     setLoading(true);
-    apiGet<{ data: Message[] }>(`/api/messages/${user.id}`)
+    apiGet(`/api/messages/${user.id}`, MessageHistoryResponseSchema)
       .then((json) => {
         const history = json.data || [];
         setMessages((prev) => mergeInitialHistory(history, prev));
@@ -88,7 +97,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     return subscribe("chat:typing_received", (event) => {
       if (event.fromUserId !== user.id) return;
       setTypingUntil((prev) =>
-        prev === null || event.until > prev ? event.until : prev,
+        prev === null || event.until > prev ? event.until : prev
       );
     });
   }, [subscribe, user.id]);
@@ -99,7 +108,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
     return subscribe("chat:read_to", (event) => {
       if (event.fromUserId !== user.id) return;
       setMessages((prev) =>
-        applyReadToEvent(prev, currentUserId, event.throughCreatedAt),
+        applyReadToEvent(prev, currentUserId, event.throughCreatedAt)
       );
     });
   }, [subscribe, user.id, currentUserId]);
@@ -127,16 +136,15 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
 
   const markAsRead = useCallback(() => {
     const hasUnreadIncoming = messagesRef.current.some(
-      (m) => m.fromUserId === user.id && m.readAt === null,
+      (m) => m.fromUserId === user.id && m.readAt === null
     );
     if (!hasUnreadIncoming) return;
     const cutoff = new Date().toISOString();
     if (cutoff <= lastReadCutoffRef.current) return;
     lastReadCutoffRef.current = cutoff;
-    void apiPost<{ data: { updated: number } }>(
-      `/api/messages/${user.id}/read`,
-      { throughCreatedAt: cutoff },
-    ).catch(() => {
+    void apiPost(`/api/messages/${user.id}/read`, {
+      throughCreatedAt: cutoff,
+    }).catch(() => {
       // Non-fatal — the next mount/restore call will retry the cutoff.
       lastReadCutoffRef.current = "";
     });
@@ -159,8 +167,9 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
         const cursor =
           `after=${encodeURIComponent(after)}` +
           (afterId ? `&afterId=${encodeURIComponent(afterId)}` : "");
-        const json = await apiGet<{ data: Message[]; more?: boolean }>(
+        const json = await apiGet(
           `/api/messages/${user.id}?${cursor}`,
+          MessageHistoryResponseSchema
         );
         if (json.data?.length > 0) {
           setMessages((prev) => {
@@ -218,14 +227,18 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       if (!body.trim() || sending) return;
       setSending(true);
       try {
-        const json = await apiPost<{ data: Message }>(`/api/messages/${user.id}`, { body: body.trim() });
+        const json = await apiPost(
+          `/api/messages/${user.id}`,
+          { body: body.trim() },
+          SendMessageResponseSchema
+        );
         setMessages((prev) => [...prev, json.data]);
         setBody("");
       } finally {
         setSending(false);
       }
     },
-    [body, user.id, sending],
+    [body, user.id, sending]
   );
 
   const handleBodyChange = useCallback(
@@ -240,7 +253,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
         until: nowMs + TYPING_HOLD_MS,
       });
     },
-    [send, user.id],
+    [send, user.id]
   );
 
   const displayName = user.username || user.name;
@@ -249,33 +262,43 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
   return (
     <div
       className={cn(
-        "fixed bottom-0 z-40 flex w-80 flex-col rounded-t-lg border border-b-0 border-border shadow-xl",
-        sidebarCollapsed ? "right-10" : "right-64",
+        "border-border fixed bottom-0 z-40 flex w-80 flex-col rounded-t-lg border border-b-0 shadow-xl",
+        sidebarCollapsed ? "right-10" : "right-64"
       )}
     >
       {/* Header */}
       <div
-        className="flex cursor-pointer items-center gap-2 rounded-t-lg bg-navy-900 px-3 py-2"
+        className="bg-navy-900 flex cursor-pointer items-center gap-2 rounded-t-lg px-3 py-2"
         onClick={() => setMinimized((v) => !v)}
       >
         <UserAvatar user={user} size="sm" variant="dark" />
-        <span className="flex-1 truncate text-sm font-semibold text-content-inverse">
+        <span className="text-content-inverse flex-1 truncate text-sm font-semibold">
           {displayName}
         </span>
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}
-          className="size-6 text-content-inverse/60 hover:text-content-inverse hover:bg-transparent"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMinimized((v) => !v);
+          }}
+          className="text-content-inverse/60 hover:text-content-inverse size-6 hover:bg-transparent"
           title={minimized ? "Expand" : "Minimize"}
         >
-          {minimized ? <ChevronUp className="size-3" /> : <Minus className="size-3" />}
+          {minimized ? (
+            <ChevronUp className="size-3" />
+          ) : (
+            <Minus className="size-3" />
+          )}
         </Button>
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="size-6 text-content-inverse/60 hover:text-content-inverse hover:bg-transparent"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="text-content-inverse/60 hover:text-content-inverse size-6 hover:bg-transparent"
           title="Close"
         >
           <X className="size-3" />
@@ -286,14 +309,14 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
       {!minimized && (
         <>
           {/* Messages */}
-          <div className="h-80 overflow-y-auto bg-surface-1 px-3 py-3 space-y-2">
+          <div className="bg-surface-1 h-80 space-y-2 overflow-y-auto px-3 py-3">
             {loading && (
-              <p className="py-6 text-center text-xs text-content-tertiary">
+              <p className="text-content-tertiary py-6 text-center text-xs">
                 Loading...
               </p>
             )}
             {!loading && messages.length === 0 && (
-              <p className="py-6 text-center text-xs text-content-tertiary">
+              <p className="text-content-tertiary py-6 text-center text-xs">
                 No messages yet. Say something!
               </p>
             )}
@@ -309,13 +332,15 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
                       "max-w-[75%] rounded-lg px-3 py-2 text-xs",
                       isMe
                         ? "bg-navy-900 text-content-inverse"
-                        : "bg-surface-2 text-content-primary",
+                        : "bg-surface-2 text-content-primary"
                     )}
                   >
-                    <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                    <p className="break-words whitespace-pre-wrap">
+                      {msg.body}
+                    </p>
                     {isMe && (
                       <div
-                        className="mt-1 flex justify-end text-content-inverse/60"
+                        className="text-content-inverse/60 mt-1 flex justify-end"
                         aria-label={msg.readAt ? "Read" : "Sent"}
                       >
                         {msg.readAt ? (
@@ -333,7 +358,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
           </div>
 
           {showTyping && (
-            <div className="px-3 py-1 text-xs italic text-content-tertiary">
+            <div className="text-content-tertiary px-3 py-1 text-xs italic">
               {displayName} is typing…
             </div>
           )}
@@ -341,7 +366,7 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
           {/* Input */}
           <form
             onSubmit={send_}
-            className="flex gap-2 border-t border-border bg-surface-1 px-3 py-2"
+            className="border-border bg-surface-1 flex gap-2 border-t px-3 py-2"
           >
             <Input
               ref={inputRef}
@@ -349,13 +374,9 @@ export function ChatWidget({ user, currentUserId, sidebarCollapsed, onClose }: P
               value={body}
               onChange={handleBodyChange}
               placeholder={`Message ${displayName}...`}
-              className="h-8 flex-1 bg-surface-2 text-xs"
+              className="bg-surface-2 h-8 flex-1 text-xs"
             />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!body.trim() || sending}
-            >
+            <Button type="submit" size="sm" disabled={!body.trim() || sending}>
               Send
             </Button>
           </form>
