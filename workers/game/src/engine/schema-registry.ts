@@ -194,6 +194,11 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
 function validateBlock(block: EffectBlock, prefix: string): string[] {
   const errors: string[] = [];
 
+  errors.push(...validateTargetFiltersInValue(block, prefix));
+  if (block.trigger !== undefined) {
+    errors.push(...validateTriggerShape(block.trigger, `${prefix}.trigger`));
+  }
+
   switch (block.category) {
     case "auto":
     case "activate":
@@ -351,11 +356,6 @@ function validateTargetFilterController(
   const errors: string[] = [];
   const visit = (f: TargetFilter | undefined): void => {
     if (!f) return;
-    for (const key of Object.keys(f)) {
-      if (!VALID_TARGET_FILTER_FIELDS.has(key)) {
-        errors.push(`${prefix}: Unknown target filter field '${key}'`);
-      }
-    }
     if (f.controller !== undefined) {
       errors.push(
         `${prefix}: [C5] 'controller' inside target.filter is ignored on targeting paths — use target.controller`,
@@ -365,6 +365,84 @@ function validateTargetFilterController(
   };
   visit(filter);
   return errors;
+}
+
+function validateTargetFilterShape(filter: unknown, prefix: string): string[] {
+  if (!filter || typeof filter !== "object" || Array.isArray(filter)) {
+    return [`${prefix}: Target filter must be an object`];
+  }
+  const errors: string[] = [];
+  for (const key of Object.keys(filter)) {
+    if (!VALID_TARGET_FILTER_FIELDS.has(key)) {
+      errors.push(`${prefix}: Unknown target filter field '${key}'`);
+    }
+  }
+  const anyOf = Reflect.get(filter, "any_of");
+  if (anyOf !== undefined) {
+    if (!Array.isArray(anyOf)) {
+      errors.push(`${prefix}.any_of: Must be an array of target filters`);
+    } else {
+      for (let i = 0; i < anyOf.length; i++) {
+        errors.push(...validateTargetFilterShape(anyOf[i], `${prefix}.any_of[${i}]`));
+      }
+    }
+  }
+  return errors;
+}
+
+function validateTargetFiltersInValue(
+  value: unknown,
+  prefix: string,
+  depth = 0,
+): string[] {
+  if (!value || typeof value !== "object" || depth > 20) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) =>
+      validateTargetFiltersInValue(entry, `${prefix}[${index}]`, depth + 1)
+    );
+  }
+  const errors: string[] = [];
+  const customTriggerFilter = typeof Reflect.get(value, "event") === "string";
+  for (const [key, nested] of Object.entries(value)) {
+    const isTargetFilter =
+      key === "target_filter" ||
+      key === "source_filter" ||
+      key === "shared_filter" ||
+      (key === "filter" && !customTriggerFilter);
+    if (isTargetFilter) {
+      errors.push(...validateTargetFilterShape(nested, `${prefix}.${key}`));
+    }
+    errors.push(
+      ...validateTargetFiltersInValue(nested, `${prefix}.${key}`, depth + 1)
+    );
+  }
+  return errors;
+}
+
+function validateTriggerShape(trigger: unknown, prefix: string): string[] {
+  if (!trigger || typeof trigger !== "object" || Array.isArray(trigger)) {
+    return [`${prefix}: Trigger must be an object`];
+  }
+  if ("any_of" in trigger) {
+    const anyOf = Reflect.get(trigger, "any_of");
+    if (!Array.isArray(anyOf) || anyOf.length === 0) {
+      return [`${prefix}.any_of: Must be a non-empty array of triggers`];
+    }
+    return anyOf.flatMap((entry, index) =>
+      validateTriggerShape(entry, `${prefix}.any_of[${index}]`)
+    );
+  }
+  if ("keyword" in trigger) {
+    return typeof Reflect.get(trigger, "keyword") === "string"
+      ? []
+      : [`${prefix}.keyword: Must be a string`];
+  }
+  if ("event" in trigger) {
+    return typeof Reflect.get(trigger, "event") === "string"
+      ? []
+      : [`${prefix}.event: Must be a string`];
+  }
+  return [`${prefix}: Trigger must define 'keyword', 'event', or 'any_of'`];
 }
 
 function validateTargetController(target: Action["target"], prefix: string): string[] {

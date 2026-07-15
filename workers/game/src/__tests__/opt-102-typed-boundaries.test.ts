@@ -121,4 +121,50 @@ describe("OPT-102 typed production boundaries", () => {
       "Unknown action field 'invented_field'"
     );
   });
+
+  it("rejects unknown action-param filter fields at GameSession init", async () => {
+    const response = await initializeWithSchema({
+      effects: [
+        {
+          id: "unknown-search-filter-field",
+          category: "auto",
+          trigger: { keyword: "ON_PLAY" },
+          actions: [
+            {
+              type: "SEARCH_DECK",
+              params: {
+                look_at: 5,
+                pick: { up_to: 1 },
+                filter: { traits: ["Navy"], invented_field: true },
+                rest_destination: "BOTTOM",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toContain(
+      "Unknown target filter field 'invented_field'"
+    );
+  });
+
+  it("rejects malformed compound trigger entries at GameSession init", async () => {
+    const response = await initializeWithSchema({
+      effects: [
+        {
+          id: "malformed-compound-trigger",
+          category: "auto",
+          trigger: { any_of: [null] },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        },
+      ],
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toContain(
+      "trigger.any_of[0]: Trigger must be an object"
+    );
+  });
 });

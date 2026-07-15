@@ -348,7 +348,12 @@ export function extractEffectDescription(
     keyword = trigger.keyword;
   } else if ("any_of" in trigger && Array.isArray(trigger.any_of)) {
     // Compound trigger — try the first keyword trigger
-    const first = trigger.any_of.find((candidate) => "keyword" in candidate);
+    const first = trigger.any_of.find(
+      (candidate) =>
+        candidate !== null &&
+        typeof candidate === "object" &&
+        "keyword" in candidate
+    );
     if (first && "keyword" in first) keyword = first.keyword;
   }
   if (!keyword) return effectText;
