@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Gamepad2, Loader2, Plus } from "lucide-react";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
+import { ActiveGameResponseSchema } from "@/lib/validators/game";
+import {
+  CreateLobbyResponseSchema,
+  JoinLobbyResponseSchema,
+} from "@/lib/validators/lobbies";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,23 +41,6 @@ interface LobbiesShellProps {
   };
 }
 
-type ActiveGameResponse = {
-  data: { id: string } | null;
-};
-
-type CreateLobbyResponse = {
-  data: {
-    lobbyId: string;
-    joinCode: string;
-  };
-};
-
-type JoinLobbyResponse = {
-  data: {
-    lobbyId: string;
-  };
-};
-
 export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
@@ -67,7 +55,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet<ActiveGameResponse>("/api/game/active")
+    apiGet("/api/game/active", ActiveGameResponseSchema)
       .then((json) => {
         if (!cancelled) setActiveGameId(json.data?.id ?? null);
       })
@@ -89,9 +77,11 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
     setCreating(true);
     setCreateError(null);
     try {
-      const json = await apiPost<CreateLobbyResponse>("/api/lobbies", {
-        format: "Standard",
-      });
+      const json = await apiPost(
+        "/api/lobbies",
+        { format: "Standard" },
+        CreateLobbyResponseSchema
+      );
       router.push(`/lobbies/${json.data.lobbyId}`);
     } catch (err) {
       setCreateError(
@@ -107,9 +97,11 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
     setJoining(true);
     setJoinError(null);
     try {
-      const json = await apiPost<JoinLobbyResponse>("/api/lobbies/join", {
-        code: joinCode,
-      });
+      const json = await apiPost(
+        "/api/lobbies/join",
+        { code: joinCode },
+        JoinLobbyResponseSchema
+      );
       router.push(`/lobbies/${json.data.lobbyId}`);
     } catch (err) {
       setJoinError(

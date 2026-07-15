@@ -5,15 +5,11 @@
  */
 
 import { prisma } from "@/lib/db";
-import type {
-  LobbyRoomDeck,
-  LobbyRoomMode,
-  LobbyRoomState,
-  LobbyRoomStatus,
-} from "./state";
+import type { LobbyRoomDeck, LobbyRoomState } from "./state";
+import { LobbyModeSchema, LobbyStatusSchema } from "@/lib/validators/lobbies";
 
 export async function buildLobbyRoomState(
-  lobbyId: string,
+  lobbyId: string
 ): Promise<LobbyRoomState | null> {
   const lobby = await prisma.lobby.findUnique({
     where: { id: lobbyId },
@@ -94,10 +90,10 @@ export async function buildLobbyRoomState(
 
   return {
     id: lobby.id,
-    status: lobby.status as LobbyRoomStatus,
+    status: LobbyStatusSchema.parse(lobby.status),
     joinCode: lobby.joinCode,
     format: lobby.format,
-    mode: lobby.mode as LobbyRoomMode,
+    mode: LobbyModeSchema.parse(lobby.mode),
     hostReady: lobby.hostReady,
     hostUserId: lobby.hostUserId,
     host: lobby.host,

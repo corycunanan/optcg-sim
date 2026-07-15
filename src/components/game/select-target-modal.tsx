@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useId, useState } from "react";
-import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
+import type {
+  CardDb,
+  CardInstance,
+  GameAction,
+  SelectTargetPrompt,
+} from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -60,12 +65,12 @@ function TargetCard({
       }}
       title={selection.disabledReason ?? undefined}
       className={cn(
-        "relative shrink-0 select-none rounded border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
-        blocked && "opacity-30 cursor-not-allowed",
+        "focus-visible:ring-gb-signal-eligible relative shrink-0 rounded border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 select-none focus-visible:ring-2 focus-visible:outline-none",
+        blocked && "cursor-not-allowed opacity-30",
         !blocked &&
           selection.selected &&
-          "ring-2 ring-gb-signal-selected ring-offset-1 ring-offset-transparent cursor-pointer",
-        !blocked && !selection.selected && "cursor-pointer",
+          "ring-gb-signal-selected cursor-pointer ring-2 ring-offset-1 ring-offset-transparent",
+        !blocked && !selection.selected && "cursor-pointer"
       )}
     >
       <Card
@@ -75,9 +80,15 @@ function TargetCard({
         interaction={{ tooltipDisabled: blocked }}
       />
       {selection.selected && (
-        <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-signal-selected flex items-center justify-center">
+        <div className="bg-gb-signal-selected absolute top-1 right-1 z-10 flex h-4 w-4 items-center justify-center rounded-full">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M2 5l2 2 4-4"
+              stroke="black"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
       )}
@@ -97,7 +108,11 @@ interface SelectTargetModalProps {
   countMin: number;
   countMax: number;
   ctaLabel: string;
-  aggregateConstraint?: { property: "power" | "cost"; operator: "<=" | ">=" | "=="; value: number };
+  aggregateConstraint?: {
+    property: "power" | "cost";
+    operator: "<=" | ">=" | "==";
+    value: number;
+  };
   uniquenessConstraint?: { field: "name" | "color" };
   namedDistribution?: { names: string[] };
   dualTargets?: {
@@ -126,8 +141,8 @@ export function SelectTargetModal({
   onAction,
 }: SelectTargetModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const prompt = {
-    promptType: "SELECT_TARGET" as const,
+  const prompt: SelectTargetPrompt = {
+    promptType: "SELECT_TARGET",
     cards,
     validTargets,
     effectDescription,
@@ -141,7 +156,7 @@ export function SelectTargetModal({
   };
   const model = buildTargetSelectionModel(prompt, selectedIds, cardDb);
   const rovingFocus = useRovingFocus<HTMLButtonElement>(
-    cards.map((card) => card.instanceId),
+    cards.map((card) => card.instanceId)
   );
 
   function toggleCard(instanceId: string) {
@@ -163,7 +178,12 @@ export function SelectTargetModal({
   }
 
   return (
-    <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
+    <Dialog
+      open={!isHidden}
+      onOpenChange={(open) => {
+        if (!open) onHide();
+      }}
+    >
       <DialogContent
         showCloseButton={false}
         onEscapeKeyDown={(event) => {
@@ -171,10 +191,10 @@ export function SelectTargetModal({
           event.preventDefault();
           setSelectedIds(new Set());
         }}
-        className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
+        className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[520px]"
       >
-        <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
-          <DialogTitle className="text-sm font-bold text-gb-text-bright">
+        <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
+          <DialogTitle className="text-gb-text-bright text-sm font-bold">
             {effectDescription}
           </DialogTitle>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
@@ -183,9 +203,12 @@ export function SelectTargetModal({
         </DialogHeader>
 
         <TooltipProvider delayDuration={0} disableHoverableContent>
-          <div className="px-4 py-4 overflow-y-auto" style={{ maxHeight: 300 }}>
+          <div className="overflow-y-auto px-4 py-4" style={{ maxHeight: 300 }}>
             <div
-              className={cn("flex flex-wrap gap-2", cards.length <= 5 ? "justify-center" : "justify-start")}
+              className={cn(
+                "flex flex-wrap gap-2",
+                cards.length <= 5 ? "justify-center" : "justify-start"
+              )}
               style={{ maxWidth: `${CARD_W * 5 + 8 * 4}px`, margin: "0 auto" }}
             >
               {cards.map((card) => (
@@ -209,8 +232,8 @@ export function SelectTargetModal({
           </div>
         </TooltipProvider>
 
-        <DialogFooter className="flex-row items-center justify-between px-4 py-3 border-t border-gb-border pt-3">
-          <span className="text-xs text-gb-text-dim">
+        <DialogFooter className="border-gb-border flex-row items-center justify-between border-t px-4 py-3 pt-3">
+          <span className="text-gb-text-dim text-xs">
             {model.countLabel}
             {model.selectedCount > 0 && (
               <span className="text-gb-text-subtle ml-1">
@@ -218,7 +241,7 @@ export function SelectTargetModal({
               </span>
             )}
             {model.aggregateLabel && (
-              <span className="ml-2 font-medium text-gb-text-bright">
+              <span className="text-gb-text-bright ml-2 font-medium">
                 \u00b7 {model.aggregateLabel}
               </span>
             )}

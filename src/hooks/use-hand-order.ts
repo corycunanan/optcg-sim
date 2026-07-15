@@ -16,7 +16,7 @@ import type { CardInstance } from "@shared/game-types";
  */
 export function mergeHandOrder(
   customOrder: readonly string[],
-  hand: readonly CardInstance[],
+  hand: readonly CardInstance[]
 ): CardInstance[] {
   const byId = new Map(hand.map((c) => [c.instanceId, c]));
   const seen = new Set<string>();
@@ -46,7 +46,7 @@ export function computeReorderedCustomOrder(
   prev: readonly string[],
   hand: readonly CardInstance[],
   activeId: string,
-  overId: string,
+  overId: string
 ): string[] | null {
   const byId = new Map(hand.map((c) => [c.instanceId, c]));
   const seen = new Set<string>();
@@ -77,7 +77,7 @@ export function useHandOrder(hand: CardInstance[]) {
 
   const orderedHand = useMemo(
     () => mergeHandOrder(customOrder, hand),
-    [hand, customOrder],
+    [hand, customOrder]
   );
 
   const reorder = useCallback(
@@ -87,7 +87,7 @@ export function useHandOrder(hand: CardInstance[]) {
         return next ?? prev;
       });
     },
-    [hand],
+    [hand]
   );
 
   return { orderedHand, reorder };
@@ -102,7 +102,7 @@ export function useHandOrder(hand: CardInstance[]) {
 export function mergeHiddenHandOrder(
   previousOrder: readonly string[],
   hand: readonly CardInstance[],
-  random: () => number = Math.random,
+  random: () => number = Math.random
 ): CardInstance[] {
   const byId = new Map(hand.map((card) => [card.instanceId, card]));
   const orderedIds = previousOrder.filter((id) => byId.has(id));
@@ -115,7 +115,9 @@ export function mergeHiddenHandOrder(
     known.add(card.instanceId);
   }
 
-  return orderedIds.map((id) => byId.get(id)).filter(Boolean) as CardInstance[];
+  return orderedIds
+    .map((id) => byId.get(id))
+    .filter((card): card is CardInstance => card !== undefined);
 }
 
 function hiddenVisualScore(instanceId: string): number {

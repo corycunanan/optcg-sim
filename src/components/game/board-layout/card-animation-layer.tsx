@@ -129,8 +129,8 @@ function FlyingCard({
       y: reducedMotion ? fromY : cardFizzle.y.map((offset) => fromY + offset),
       width: fromW,
       height: fromH,
-      scale: reducedMotion ? 1 : (cardFizzle.scale as number[]),
-      opacity: fizzle.opacity as number[],
+      scale: reducedMotion ? 1 : [...cardFizzle.scale],
+      opacity: [...fizzle.opacity],
     };
     transitionConfig = { ...fizzle.transition, delay };
   } else if (isDonAttach) {

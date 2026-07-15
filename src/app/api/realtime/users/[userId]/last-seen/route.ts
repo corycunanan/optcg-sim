@@ -13,15 +13,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { z } from "zod";
 
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
+const LastSeenBodySchema = z.object({ lastSeen: z.unknown().optional() });
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> },
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   if (!GAME_WORKER_SECRET) {
-    return NextResponse.json({ error: "Realtime channel not configured" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Realtime channel not configured" },
+      { status: 503 }
+    );
   }
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${GAME_WORKER_SECRET}`) {
@@ -33,8 +38,10 @@ export async function POST(
   // Accept an optional `lastSeen` ISO string. If absent or invalid, fall
   // back to the server clock — older worker callers without the body still
   // produce a sensible (if slightly drifted) write.
-  const body = await request.json().catch(() => ({})) as { lastSeen?: unknown };
-  const lastSeen = parseLastSeen(body.lastSeen);
+  const body = LastSeenBodySchema.safeParse(
+    await request.json().catch(() => null)
+  );
+  const lastSeen = parseLastSeen(body.success ? body.data.lastSeen : undefined);
 
   try {
     await prisma.user.update({
@@ -45,11 +52,19 @@ export async function POST(
   } catch (error) {
     // P2025 = record not found. Not an error condition for presence — a deleted
     // user shouldn't surface a 500 to the worker.
-    if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
       return new NextResponse(null, { status: 204 });
     }
     console.error("[realtime:update-last-seen] failed", error);
-    return NextResponse.json({ error: "Failed to update last seen" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update last seen" },
+      { status: 500 }
+    );
   }
 }
 

@@ -1,3 +1,4 @@
+import { CardType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CardBrowser } from "@/components/admin/card-browser";
 import {
@@ -7,20 +8,30 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const CARD_TYPES = new Set<string>(Object.values(CardType));
+
+function firstParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+function isCardType(value: string): value is CardType {
+  return CARD_TYPES.has(value);
+}
+
 export default async function AdminCardsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const rawQuery = normalizeSubstringSearchQuery(params.q as string);
+  const rawQuery = normalizeSubstringSearchQuery(firstParam(params.q));
   const q = isSubstringSearchQueryTooShort(rawQuery) ? "" : rawQuery;
-  const color = (params.color as string) || "";
-  const type = (params.type as string) || "";
-  const set = (params.set as string) || "";
-  const block = (params.block as string) || "";
-  const originOnly = (params.originOnly as string) || "";
-  const page = parseInt((params.page as string) || "1");
+  const color = firstParam(params.color);
+  const type = firstParam(params.type);
+  const set = firstParam(params.set);
+  const block = firstParam(params.block);
+  const originOnly = firstParam(params.originOnly);
+  const page = parseInt(firstParam(params.page) || "1");
   const limit = 20;
 
   // Get available sets for filter dropdown (needed early to determine default set)
@@ -35,7 +46,7 @@ export default async function AdminCardsPage({
   const effectiveSet = set || (!hasAnyFilter ? "OP15-EB04" : "");
 
   // Build where clause
-  const where: Record<string, unknown> = {};
+  const where: Prisma.CardWhereInput = {};
 
   if (q) {
     where.name = { contains: q, mode: "insensitive" };
@@ -44,17 +55,21 @@ export default async function AdminCardsPage({
     where.color = { hasSome: color.split(",") };
   }
   if (type) {
-    where.type = {
-      in: type.split(",") as ("Leader" | "Character" | "Event" | "Stage")[],
-    };
+    const cardTypes = type.split(",").filter(isCardType);
+    if (cardTypes.length > 0) where.type = { in: cardTypes };
   }
   if (effectiveSet) {
     const setLabels = effectiveSet.split(",").filter(Boolean);
     if (setLabels.length > 0) {
       if (originOnly === "true") {
-        where.originSet = setLabels.length === 1 ? setLabels[0] : { in: setLabels };
+        where.originSet =
+          setLabels.length === 1 ? setLabels[0] : { in: setLabels };
       } else {
-        where.cardSets = { some: { setLabel: setLabels.length === 1 ? setLabels[0] : { in: setLabels } } };
+        where.cardSets = {
+          some: {
+            setLabel: setLabels.length === 1 ? setLabels[0] : { in: setLabels },
+          },
+        };
       }
     }
   }
@@ -99,7 +114,14 @@ export default async function AdminCardsPage({
           page={page}
           totalPages={totalPages}
           sets={sets}
-          currentFilters={{ q, color, type, set: effectiveSet, block, originOnly }}
+          currentFilters={{
+            q,
+            color,
+            type,
+            set: effectiveSet,
+            block,
+            originOnly,
+          }}
         />
       </div>
     </div>

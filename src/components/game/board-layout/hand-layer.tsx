@@ -29,7 +29,7 @@ import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
  */
 export function computeFreshlyAdded(
   seenIds: ReadonlySet<string>,
-  currentIds: readonly string[],
+  currentIds: readonly string[]
 ): Set<string> {
   const fresh = new Set<string>();
   for (const id of currentIds) {
@@ -48,8 +48,8 @@ export function computeFreshlyAdded(
  */
 export function reconcileSeenIds(
   prev: ReadonlySet<string>,
-  currentIds: readonly string[],
-): Set<string> {
+  currentIds: readonly string[]
+): ReadonlySet<string> {
   if (prev.size === currentIds.length) {
     let allMatch = true;
     for (const id of currentIds) {
@@ -58,7 +58,7 @@ export function reconcileSeenIds(
         break;
       }
     }
-    if (allMatch) return prev as Set<string>;
+    if (allMatch) return prev;
   }
   return new Set(currentIds);
 }
@@ -127,8 +127,9 @@ function SortableHandCard({
   const opacity = isDragging ? 0.3 : dimmed ? 0.35 : 1;
   const rejectionPreset = reducedMotion ? cardRejectReduced : cardReject;
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
-  const rejectionOpacity = rejectionPreset.opacity.map((value, index, values) =>
-    index === 0 || index === values.length - 1 ? opacity : value,
+  const rejectionOpacity = rejectionPreset.opacity.map(
+    (value, index, values) =>
+      index === 0 || index === values.length - 1 ? opacity : value
   );
 
   const sortableTransform = transform
@@ -156,7 +157,9 @@ function SortableHandCard({
         aria-label={[
           cardName,
           tooltipNotice,
-          disabled && !tooltipNotice ? "not available for the current action" : null,
+          disabled && !tooltipNotice
+            ? "not available for the current action"
+            : null,
         ]
           .filter(Boolean)
           .join(". ")}
@@ -173,7 +176,7 @@ function SortableHandCard({
           visibility: hidden ? "hidden" : undefined,
           touchAction: "none",
         }}
-        className="rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
+        className="focus-visible:ring-gb-signal-eligible rounded-md focus-visible:ring-4 focus-visible:outline-none"
       >
         <motion.div
           key={rejectionSequence ?? "idle"}
@@ -249,11 +252,11 @@ export const HandLayer = React.memo(function HandLayer({
   // card is in `seenIds`, only `inFlightInstanceIds` controls its visibility.
   const cardIds = useMemo(() => cards.map((c) => c.instanceId), [cards]);
   const [seenIds, setSeenIds] = useState<ReadonlySet<string>>(
-    () => new Set(cardIds),
+    () => new Set(cardIds)
   );
   const freshlyAdded = useMemo(
     () => computeFreshlyAdded(seenIds, cardIds),
-    [seenIds, cardIds],
+    [seenIds, cardIds]
   );
   useEffect(() => {
     setSeenIds((prev) => reconcileSeenIds(prev, cardIds));
@@ -266,7 +269,7 @@ export const HandLayer = React.memo(function HandLayer({
         else zonePos.unregister(zoneKey);
       }
     },
-    [zoneKey, zonePos],
+    [zoneKey, zonePos]
   );
 
   if (count === 0) return null;
@@ -309,7 +312,7 @@ export const HandLayer = React.memo(function HandLayer({
             cardDb[card.cardId],
             card.instanceId,
             activeEffects,
-            availableDon,
+            availableDon
           );
     const unaffordable = affordability?.affordable === false;
     const disabledReason =
@@ -340,14 +343,14 @@ export const HandLayer = React.memo(function HandLayer({
   // when a card is dragged over them.
   if (faceDown) {
     return (
-      <div ref={handRef} className="flex items-center pointer-events-auto">
+      <div ref={handRef} className="pointer-events-auto flex items-center">
         {cards.map(renderCard)}
       </div>
     );
   }
 
   return (
-    <div ref={handRef} className="flex items-center pointer-events-auto">
+    <div ref={handRef} className="pointer-events-auto flex items-center">
       <SortableContext
         items={cards.map((c) => `hand-${c.instanceId}`)}
         strategy={horizontalListSortingStrategy}

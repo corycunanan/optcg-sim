@@ -21,11 +21,7 @@
 // issue before adding it.
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import type {
-  GameAction,
-  GameEvent,
-  PromptOptions,
-} from "@shared/game-types";
+import type { GameAction, GameEvent, PromptOptions } from "@shared/game-types";
 import { applyEvent } from "@/lib/sandbox/apply-event";
 import type {
   PartialGameState,
@@ -229,16 +225,14 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
     const eventLog = collectEventLog(script, currentStepIndex);
     const derivedGameState = eventLog.reduce<PartialGameState>(
       (s, e) => applyEvent(s, e),
-      scenario.initialState,
+      scenario.initialState
     );
+    const currentStep = script[currentStepIndex];
     const activePrompt =
       playbackState === "awaiting-response" &&
       currentStepIndex < totalSteps &&
-      script[currentStepIndex].type === "prompt"
-        ? (script[currentStepIndex] as Extract<
-            ScenarioStep,
-            { type: "prompt" }
-          >).prompt
+      currentStep?.type === "prompt"
+        ? currentStep.prompt
         : null;
     cachedSnapshot = {
       playbackState,
@@ -278,7 +272,7 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
 // ─── React hook ────────────────────────────────────────────────────────
 
 export function useScenarioRunner(
-  scenario: Scenario,
+  scenario: Scenario
 ): ScenarioRunnerState & ScenarioRunnerControls {
   // One controller per hook instance. Scenario reference changes are not
   // expected during a sandbox session (each scenario gets its own page);
@@ -292,7 +286,7 @@ export function useScenarioRunner(
   const state = useSyncExternalStore(
     runner.subscribe,
     runner.getState,
-    runner.getState,
+    runner.getState
   );
 
   return useMemo(
@@ -304,7 +298,7 @@ export function useScenarioRunner(
       stepForward: runner.stepForward,
       resolvePrompt: runner.resolvePrompt,
     }),
-    [state, runner],
+    [state, runner]
   );
 }
 
@@ -312,7 +306,7 @@ export function useScenarioRunner(
 
 function collectEventLog(
   script: ScenarioStep[],
-  upToIndex: number,
+  upToIndex: number
 ): GameEvent[] {
   const out: GameEvent[] = [];
   const limit = Math.min(upToIndex, script.length);

@@ -13,6 +13,7 @@ import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 
 import { parseDeckList } from "@/lib/deck-builder/parser";
+import type { ParsedLine } from "@/lib/deck-builder/parser";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
@@ -53,7 +54,9 @@ export async function POST(request: NextRequest) {
     const existingMap = new Map(existingCards.map((c) => [c.id, c]));
 
     // Annotate parsed lines with card data and mark not-found errors
-    const results = parsed.map((p) => {
+    type CardRow = (typeof existingCards)[number];
+    type ImportResult = ParsedLine & { card?: CardRow };
+    const results: ImportResult[] = parsed.map((p) => {
       if (p.error) return p;
       if (!p.cardId) return p;
 
@@ -66,25 +69,24 @@ export async function POST(request: NextRequest) {
     });
 
     // Separate leader and main deck cards
-    const validCards = results.filter((r) => !r.error && r.cardId);
-    const leader = validCards.find(
-      (r) =>
-        "card" in r && (r as { card: { type: string } }).card?.type === "Leader"
+    const validCards = results.filter(
+      (result): result is ImportResult & { cardId: string; card: CardRow } =>
+        !result.error &&
+        typeof result.cardId === "string" &&
+        Boolean(result.card)
     );
+    const leader = validCards.find((result) => result.card.type === "Leader");
     const mainDeck = validCards.filter(
-      (r) =>
-        "card" in r && (r as { card: { type: string } }).card?.type !== "Leader"
+      (result) => result.card.type !== "Leader"
     );
     const errors = results.filter((r) => r.error);
 
     return apiSuccess({
-      leader: leader
-        ? { cardId: leader.cardId, card: (leader as { card: unknown }).card }
-        : null,
+      leader: leader ? { cardId: leader.cardId, card: leader.card } : null,
       cards: mainDeck.map((r) => ({
         cardId: r.cardId,
         quantity: r.quantity,
-        card: (r as { card: unknown }).card,
+        card: r.card,
       })),
       errors: errors.map((e) => ({
         line: e.line,

@@ -18,11 +18,13 @@
 import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
+import { z } from "zod";
 
 const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
 const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 const HEALTH_TIMEOUT_MS = 1_500;
 const MAX_IDS = 200;
+const HealthResponseSchema = z.object({ connections: z.number().optional() });
 
 export interface PresenceEntry {
   online: boolean;
@@ -58,7 +60,7 @@ export async function GET(request: NextRequest) {
       select: { userAId: true, userBId: true },
     });
     const allowed = new Set(
-      friendships.map((f) => (f.userAId === userId ? f.userBId : f.userAId)),
+      friendships.map((f) => (f.userAId === userId ? f.userBId : f.userAId))
     );
 
     const visibleIds = ids.filter((id) => allowed.has(id));
@@ -109,9 +111,7 @@ async function aggregateOnline(ids: string[]): Promise<Map<string, boolean>> {
     return result;
   }
 
-  const settled = await Promise.allSettled(
-    ids.map((id) => fetchHealth(id)),
-  );
+  const settled = await Promise.allSettled(ids.map((id) => fetchHealth(id)));
   for (let i = 0; i < ids.length; i += 1) {
     const id = ids[i]!;
     const outcome = settled[i]!;
@@ -129,11 +129,11 @@ async function fetchHealth(userId: string): Promise<boolean> {
       {
         headers: { Authorization: `Bearer ${GAME_WORKER_SECRET}` },
         signal: controller.signal,
-      },
+      }
     );
     if (!res.ok) return false;
-    const body = (await res.json()) as { connections?: number };
-    return typeof body.connections === "number" && body.connections > 0;
+    const body = HealthResponseSchema.safeParse(await res.json());
+    return body.success && (body.data.connections ?? 0) > 0;
   } catch {
     return false;
   } finally {

@@ -16,9 +16,70 @@ import {
   type SharedTargetFilter,
   type SharedTargetFilterCard,
 } from "@shared/target-filter";
+import { z } from "zod";
 
 export const DEFAULT_COPY_LIMIT = 4;
 export const MAIN_DECK_SIZE = 50;
+
+const DynamicFilterValueSchema = z.object({
+  type: z.string(),
+  value: z.number().optional(),
+});
+const FilterNumberSchema = z.union([z.number(), DynamicFilterValueSchema]);
+const FilterRangeSchema = z.object({ min: z.number(), max: z.number() });
+
+const SharedTargetFilterSchema: z.ZodType<SharedTargetFilter> = z.lazy(() =>
+  z
+    .object({
+      controller: z.string().optional(),
+      cost_exact: FilterNumberSchema.optional(),
+      cost_min: FilterNumberSchema.optional(),
+      cost_max: FilterNumberSchema.optional(),
+      cost_range: FilterRangeSchema.optional(),
+      base_cost_exact: z.number().optional(),
+      base_cost_min: z.number().optional(),
+      base_cost_max: z.number().optional(),
+      power_exact: FilterNumberSchema.optional(),
+      power_min: FilterNumberSchema.optional(),
+      power_max: FilterNumberSchema.optional(),
+      power_range: FilterRangeSchema.optional(),
+      base_power_exact: z.number().optional(),
+      base_power_min: z.number().optional(),
+      base_power_max: z.number().optional(),
+      color: z.string().optional(),
+      color_includes: z.array(z.string()).optional(),
+      color_not_matching_ref: z.string().optional(),
+      traits: z.array(z.string()).optional(),
+      traits_any_of: z.array(z.string()).optional(),
+      traits_contains: z.array(z.string()).optional(),
+      traits_exclude: z.array(z.string()).optional(),
+      name: z.string().optional(),
+      name_any_of: z.array(z.string()).optional(),
+      name_includes: z.string().optional(),
+      exclude_name: z.string().optional(),
+      exclude_self: z.boolean().optional(),
+      name_matching_ref: z.string().optional(),
+      keywords: z.array(z.string()).optional(),
+      has_trigger: z.boolean().optional(),
+      attribute: z.string().optional(),
+      attribute_not: z.string().optional(),
+      has_effect: z.boolean().optional(),
+      no_base_effect: z.boolean().optional(),
+      lacks_effect_type: z.string().optional(),
+      has_counter: z.boolean().optional(),
+      card_type: z.union([z.string(), z.array(z.string())]).optional(),
+      is_rested: z.boolean().optional(),
+      is_active: z.boolean().optional(),
+      state: z.string().optional(),
+      don_given_count: z
+        .object({ operator: z.string(), value: FilterNumberSchema })
+        .optional(),
+      exclude_ref: z.string().optional(),
+      unique_names: z.boolean().optional(),
+      any_of: z.array(SharedTargetFilterSchema).optional(),
+    })
+    .strict()
+);
 
 type RuleModificationJson = Record<string, unknown>;
 type DeckRestrictionType = "CANNOT_INCLUDE" | "ONLY_INCLUDE";
@@ -216,6 +277,8 @@ export function matchesDeckRestrictionFilter(
   card: DeckRestrictionCard,
   filter: RuleModificationJson
 ): boolean {
+  const parsedFilter = SharedTargetFilterSchema.safeParse(filter);
+  if (!parsedFilter.success) return false;
   const effectText = card.effectText ?? "";
   const printedKeywords: Record<string, boolean> = {
     BLOCKER: effectText.includes("[Blocker]"),
@@ -251,7 +314,7 @@ export function matchesDeckRestrictionFilter(
     treatsAsAllAttributes: treatsAsAll("attributes"),
   };
 
-  return matchesTargetFilter(sharedCard, filter as SharedTargetFilter, {
+  return matchesTargetFilter(sharedCard, parsedFilter.data, {
     getEffectiveCost: ({ cost }) => cost,
     getEffectivePower: ({ power }) => power,
     hasKeyword: (_candidate, keyword) =>

@@ -45,11 +45,12 @@ function isPublicCardId(cardId: string | undefined): cardId is string {
 export function eventToSpotlight(
   event: GameEvent
 ): SpotlightPresentation | null {
-  const base = {
-    id: `${event.type}-${event.playerIndex}-${event.timestamp}`,
-    playerIndex: event.playerIndex,
-    timestamp: event.timestamp,
-  } as const;
+  const base: Pick<SpotlightPresentation, "id" | "playerIndex" | "timestamp"> =
+    {
+      id: `${event.type}-${event.playerIndex}-${event.timestamp}`,
+      playerIndex: event.playerIndex,
+      timestamp: event.timestamp,
+    };
 
   switch (event.type) {
     case "CARDS_REVEALED": {

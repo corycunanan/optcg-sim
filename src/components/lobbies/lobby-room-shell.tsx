@@ -37,16 +37,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DeckPreviewModal } from "./deck-preview-modal";
 import { InviteFriendPopover } from "./invite-friend-popover";
+import { DeckListResponseSchema } from "@/lib/validators/cards";
 
 interface DeckOption extends LobbyRoomDeck {
   format: string;
   totalCards: number;
   colors: string[];
 }
-
-type DecksResponse = {
-  data: DeckOption[];
-};
 
 interface LobbyRoomShellProps {
   lobbyId: string;
@@ -68,7 +65,7 @@ export function LobbyRoomShell({
 
   useEffect(() => {
     let cancelled = false;
-    apiGet<DecksResponse>("/api/decks")
+    apiGet("/api/decks", DeckListResponseSchema)
       .then((json) => {
         if (!cancelled) setDecks(json.data ?? []);
       })

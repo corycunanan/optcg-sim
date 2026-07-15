@@ -143,7 +143,12 @@ export const DeckDetailResponseSchema = z.object({
       leaderArtUrl: z.string().nullable(),
       sleeveUrl: z.string().nullable(),
       donArtUrl: z.string().nullable(),
-      testOrder: z.unknown().nullable(),
+      testOrder: z
+        .object({
+          life: z.array(z.string()),
+          hand: z.array(z.string()),
+        })
+        .nullable(),
       updatedAt: z.string(),
       cards: z.array(DeckCardResponseSchema),
       leader: CardResponseSchema.nullable(),
@@ -152,6 +157,25 @@ export const DeckDetailResponseSchema = z.object({
 });
 
 export type DeckDetailResponse = z.infer<typeof DeckDetailResponseSchema>;
+
+export const DeckListResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      leaderId: z.string(),
+      leaderName: z.string().nullable(),
+      leaderImageUrl: z.string().nullable(),
+      format: z.string(),
+      totalCards: z.number(),
+      colors: z.array(z.string()),
+    })
+  ),
+});
+
+export const SaveDeckResponseSchema = z.object({
+  data: z.object({ id: z.string() }),
+});
 
 /** Partial card shape returned by the import endpoint (fewer fields than CARD_SELECT). */
 const ImportCardSchema = z.object({

@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { ActiveEffect } from "@shared/game-types";
+import { z } from "zod";
 
 /**
  * Runtime shape of ActiveEffect as serialized from the game worker.
@@ -19,11 +20,43 @@ export interface RuntimeEffect {
   appliesTo?: string[];
 }
 
-const ActiveEffectsContext = createContext<ActiveEffect[]>([]);
+const RuntimeEffectSchema = z.object({
+  id: z.string(),
+  sourceCardInstanceId: z.string(),
+  modifiers: z
+    .array(
+      z.object({
+        type: z.string(),
+        params: z
+          .object({
+            amount: z.number().optional(),
+            value: z.number().optional(),
+          })
+          .optional(),
+      })
+    )
+    .optional(),
+  appliesTo: z.array(z.string()).optional(),
+});
 
-export const ActiveEffectsProvider = ActiveEffectsContext.Provider;
+const ActiveEffectsContext = createContext<RuntimeEffect[]>([]);
 
-export function useActiveEffects(): ActiveEffect[] {
+export function ActiveEffectsProvider({
+  value,
+  children,
+}: {
+  value: ActiveEffect[];
+  children: ReactNode;
+}) {
+  const parsed = z.array(RuntimeEffectSchema).safeParse(value);
+  return (
+    <ActiveEffectsContext.Provider value={parsed.success ? parsed.data : []}>
+      {children}
+    </ActiveEffectsContext.Provider>
+  );
+}
+
+export function useActiveEffects(): RuntimeEffect[] {
   return useContext(ActiveEffectsContext);
 }
 
@@ -32,14 +65,13 @@ export function useActiveEffects(): ActiveEffect[] {
  * Returns "up" | "down" | null.
  */
 export function getPowerModDirection(
-  effects: ActiveEffect[],
+  effects: RuntimeEffect[],
   instanceId: string,
-  basePower: number,
+  basePower: number
 ): "up" | "down" | null {
   let power = basePower;
   let hasSetPower = false;
-  for (const raw of effects) {
-    const effect = raw as unknown as RuntimeEffect;
+  for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
       if (mod.type === "SET_POWER" && mod.params?.value !== undefined) {
@@ -60,14 +92,13 @@ export function getPowerModDirection(
  * Mirrors the server-side getEffectivePower logic.
  */
 export function computeEffectivePower(
-  effects: ActiveEffect[],
+  effects: RuntimeEffect[],
   instanceId: string,
   basePower: number,
-  donCount: number,
+  donCount: number
 ): number {
   let power = basePower;
-  for (const raw of effects) {
-    const effect = raw as unknown as RuntimeEffect;
+  for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
       if (mod.type === "SET_POWER" && mod.params?.value !== undefined) {
@@ -87,13 +118,12 @@ export function computeEffectivePower(
  * Compute effective cost including effect modifications.
  */
 export function computeEffectiveCost(
-  effects: ActiveEffect[],
+  effects: RuntimeEffect[],
   instanceId: string,
-  baseCost: number,
+  baseCost: number
 ): number {
   let cost = baseCost;
-  for (const raw of effects) {
-    const effect = raw as unknown as RuntimeEffect;
+  for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
       if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
@@ -109,12 +139,11 @@ export function computeEffectiveCost(
  * Returns "up" | "down" | null.
  */
 export function getCostModDirection(
-  effects: ActiveEffect[],
-  instanceId: string,
+  effects: RuntimeEffect[],
+  instanceId: string
 ): "up" | "down" | null {
   let delta = 0;
-  for (const raw of effects) {
-    const effect = raw as unknown as RuntimeEffect;
+  for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
       if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {

@@ -32,11 +32,13 @@ type BuildGameInitPayloadInput = {
   };
 };
 
-function asTestOrder(value: unknown): { life: string[]; hand: string[] } | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  const order = value as Record<string, unknown>;
-  const life = order.life;
-  const hand = order.hand;
+function asTestOrder(
+  value: unknown
+): { life: string[]; hand: string[] } | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return undefined;
+  const life = "life" in value ? value.life : undefined;
+  const hand = "hand" in value ? value.hand : undefined;
   if (
     !Array.isArray(life) ||
     !life.every((cardId): cardId is string => typeof cardId === "string") ||
@@ -51,7 +53,7 @@ function asTestOrder(value: unknown): { life: string[]; hand: string[] } | undef
 function buildPlayerInit(
   userId: string,
   leader: Card,
-  deck: DeckForGameInit,
+  deck: DeckForGameInit
 ): GameInitPayload["player1"] {
   return {
     userId,
@@ -77,12 +79,22 @@ function buildPlayerInit(
   };
 }
 
-export function buildGameInitPayload(input: BuildGameInitPayloadInput): GameInitPayload {
+export function buildGameInitPayload(
+  input: BuildGameInitPayloadInput
+): GameInitPayload {
   return {
     gameId: input.gameId,
     format: input.format,
     mode: input.mode,
-    player1: buildPlayerInit(input.player1.userId, input.player1.leader, input.player1.deck),
-    player2: buildPlayerInit(input.player2.userId, input.player2.leader, input.player2.deck),
+    player1: buildPlayerInit(
+      input.player1.userId,
+      input.player1.leader,
+      input.player1.deck
+    ),
+    player2: buildPlayerInit(
+      input.player2.userId,
+      input.player2.leader,
+      input.player2.deck
+    ),
   };
 }

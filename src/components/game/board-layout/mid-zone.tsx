@@ -34,46 +34,46 @@ const BattleDisplay = React.memo(function BattleDisplay({
   const boosted = info.counterPowerAdded > 0;
 
   return (
-    <div className="flex items-center gap-3 shrink-0">
+    <div className="flex shrink-0 items-center gap-3">
       <span
         className={cn(
-          "text-base uppercase tracking-wider font-bold",
+          "text-base font-bold tracking-wider uppercase",
           info.battleSubPhase === "COUNTER_STEP"
             ? "text-gb-accent-red"
             : info.battleSubPhase === "BLOCK_STEP"
               ? "text-gb-accent-amber"
-              : "text-gb-text-dim",
+              : "text-gb-text-dim"
         )}
       >
         {info.battleSubPhase.replace(/_/g, " ")}
       </span>
 
       <div className="flex items-center gap-1">
-        <span className="text-base text-gb-text-subtle truncate max-w-[80px]">
+        <span className="text-gb-text-subtle max-w-[80px] truncate text-base">
           {info.attackerName}
         </span>
-        <span className="text-base font-bold text-gb-text-bright tabular-nums">
+        <span className="text-gb-text-bright text-base font-bold tabular-nums">
           {formatPower(info.attackerPower)}
         </span>
       </div>
 
-      <span className="text-base font-bold text-gb-text-dim">VS</span>
+      <span className="text-gb-text-dim text-base font-bold">VS</span>
 
       <div className="flex items-center gap-1">
         <span
           className={cn(
             "text-base font-bold tabular-nums",
-            boosted ? "text-gb-accent-green" : "text-gb-text-bright",
+            boosted ? "text-gb-accent-green" : "text-gb-text-bright"
           )}
         >
           {formatPower(info.defenderPower)}
         </span>
         {boosted && (
-          <span className="text-base font-bold text-gb-accent-green/70 tabular-nums">
+          <span className="text-gb-accent-green/70 text-base font-bold tabular-nums">
             +{formatPower(info.counterPowerAdded)}
           </span>
         )}
-        <span className="text-base text-gb-text-subtle truncate max-w-[80px]">
+        <span className="text-gb-text-subtle max-w-[80px] truncate text-base">
           {info.defenderName}
         </span>
       </div>
@@ -102,7 +102,7 @@ export function getPromptAnnouncement(
   activePrompt: PromptOptions | null,
   blockerMode?: BlockerMode,
   targetSelectionMode?: TargetSelectionMode,
-  isPromptHidden?: boolean,
+  isPromptHidden?: boolean
 ): string {
   if (targetSelectionMode) {
     return `Action required. ${targetSelectionMode.effectDescription || "Choose targets"}. ${targetSelectionMode.selectedCount} selected.`;
@@ -165,12 +165,12 @@ export const MidZone = React.memo(function MidZone({
     activePrompt,
     blockerMode,
     targetSelectionMode,
-    isPromptHidden,
+    isPromptHidden
   );
 
   return (
     <div
-      className="absolute flex items-center justify-center px-4 gap-2"
+      className="absolute flex items-center justify-center gap-2 px-4"
       style={{
         left: 0,
         top,
@@ -178,7 +178,12 @@ export const MidZone = React.memo(function MidZone({
         height: MID_ZONE_H,
       }}
     >
-      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      <p
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {promptAnnouncement}
       </p>
       {rejectionReason && (
@@ -201,69 +206,88 @@ export const MidZone = React.memo(function MidZone({
 
       {/* Hidden modal prompt indicator */}
       {activePrompt && !targetSelectionMode && isPromptHidden && (
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-base text-gb-accent-amber font-bold">
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-gb-accent-amber text-base font-bold">
             &#x26A1; ACTION REQUIRED
           </span>
-          <GameButton variant="green" size="sm" className={IN_BOARD_BTN} onClick={onShowPrompt ?? (() => {})}>
+          <GameButton
+            variant="green"
+            size="sm"
+            className={IN_BOARD_BTN}
+            onClick={onShowPrompt ?? (() => {})}
+          >
             Show Prompt
           </GameButton>
         </div>
       )}
 
       {/* Active prompt (suppressed when blockerMode or modal handles the UI) */}
-      {activePrompt && !blockerMode && !targetSelectionMode && !isPromptHidden && (
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-base text-gb-accent-amber font-bold">
-            &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
-          </span>
-          {activePrompt.promptType === "REVEAL_TRIGGER" &&
-            !activePrompt.cards?.length && (
-            <>
+      {activePrompt &&
+        !blockerMode &&
+        !targetSelectionMode &&
+        !isPromptHidden && (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-gb-accent-amber text-base font-bold">
+              &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
+            </span>
+            {activePrompt.promptType === "REVEAL_TRIGGER" &&
+              !activePrompt.cards?.length && (
+                <>
+                  <GameButton
+                    variant="secondary"
+                    size="sm"
+                    className={IN_BOARD_BTN}
+                    onClick={() =>
+                      onAction({ type: "REVEAL_TRIGGER", reveal: true })
+                    }
+                  >
+                    Reveal
+                  </GameButton>
+                  <GameButton
+                    variant="secondary"
+                    size="sm"
+                    className={IN_BOARD_BTN}
+                    onClick={() =>
+                      onAction({ type: "REVEAL_TRIGGER", reveal: false })
+                    }
+                  >
+                    Add to Hand
+                  </GameButton>
+                </>
+              )}
+            {"optional" in activePrompt && activePrompt.optional && (
               <GameButton
                 variant="secondary"
                 size="sm"
                 className={IN_BOARD_BTN}
-                onClick={() =>
-                  onAction({ type: "REVEAL_TRIGGER", reveal: true })
-                }
+                onClick={() => onAction({ type: "PASS" })}
               >
-                Reveal
+                Skip
               </GameButton>
-              <GameButton
-                variant="secondary"
-                size="sm"
-                className={IN_BOARD_BTN}
-                onClick={() =>
-                  onAction({ type: "REVEAL_TRIGGER", reveal: false })
-                }
-              >
-                Add to Hand
-              </GameButton>
-            </>
-          )}
-          {"optional" in activePrompt && (activePrompt as { optional?: boolean }).optional &&
-            (activePrompt.promptType as string) !== "OPTIONAL_EFFECT" && (
-            <GameButton variant="secondary" size="sm" className={IN_BOARD_BTN} onClick={() => onAction({ type: "PASS" })}>
-              Skip
-            </GameButton>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
       {targetSelectionMode && (
-        <div className="flex min-w-0 items-center gap-2" data-target-selection-control="">
-          <span className="shrink-0 text-base font-bold text-gb-accent-amber" aria-hidden>
+        <div
+          className="flex min-w-0 items-center gap-2"
+          data-target-selection-control=""
+        >
+          <span
+            className="text-gb-accent-amber shrink-0 text-base font-bold"
+            aria-hidden
+          >
             &#x26A1;
           </span>
-          <span className="max-w-[320px] truncate text-base text-gb-text-bright">
+          <span className="text-gb-text-bright max-w-[320px] truncate text-base">
             {targetSelectionMode.effectDescription || "Choose targets"}
           </span>
-          <span className="shrink-0 text-base text-gb-text-dim">
-            {targetSelectionMode.countLabel} &mdash; {targetSelectionMode.selectedCount} selected
+          <span className="text-gb-text-dim shrink-0 text-base">
+            {targetSelectionMode.countLabel} &mdash;{" "}
+            {targetSelectionMode.selectedCount} selected
           </span>
           {targetSelectionMode.aggregateLabel && (
-            <span className="shrink-0 text-base text-gb-text-subtle">
+            <span className="text-gb-text-subtle shrink-0 text-base">
               &middot; {targetSelectionMode.aggregateLabel}
             </span>
           )}
@@ -341,14 +365,19 @@ export const MidZone = React.memo(function MidZone({
         </>
       ) : (
         canPass && (
-          <GameButton variant="secondary" size="sm" className={IN_BOARD_BTN} onClick={() => onAction({ type: "PASS" })}>
+          <GameButton
+            variant="secondary"
+            size="sm"
+            className={IN_BOARD_BTN}
+            onClick={() => onAction({ type: "PASS" })}
+          >
             Pass
           </GameButton>
         )
       )}
 
       {!isMyTurn && !inBattle && (
-        <Spinner className="size-4 text-gb-text-dim" />
+        <Spinner className="text-gb-text-dim size-4" />
       )}
     </div>
   );

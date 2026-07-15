@@ -9,6 +9,7 @@ import {
 } from "@/lib/realtime/event-dispatcher";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { RealtimeTokenResponseSchema } from "@/lib/validators/game";
+import { RealtimeServerEventSchema } from "@/lib/validators/realtime";
 import type { ConnectionStatus, RealtimeClientEvent } from "@/types/realtime";
 
 export interface UseUserChannelResult {
@@ -78,14 +79,8 @@ export function useUserChannel(): UseUserChannelResult {
 
   const onMessage = useCallback(
     (msg: unknown) => {
-      if (
-        msg &&
-        typeof msg === "object" &&
-        "type" in msg &&
-        typeof (msg as { type: unknown }).type === "string"
-      ) {
-        dispatcher.dispatch(msg as { type: string } & Record<string, unknown>);
-      }
+      const event = RealtimeServerEventSchema.safeParse(msg);
+      if (event.success) dispatcher.dispatch(event.data);
     },
     [dispatcher]
   );

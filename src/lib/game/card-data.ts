@@ -7,11 +7,22 @@ import { extractKeywords } from "@/lib/game/keywords";
 import type { CardData } from "@engine/types";
 import { parseCardData } from "@engine/util/validate";
 
+const CARD_TYPES = new Set(["Leader", "Character", "Event", "Stage"]);
+
+function isGameCardType(
+  value: string
+): value is "Leader" | "Character" | "Event" | "Stage" {
+  return CARD_TYPES.has(value);
+}
+
 export function toCardData(card: Card): CardData {
+  if (!isGameCardType(card.type)) {
+    throw new Error(`Unsupported card type for ${card.id}: ${card.type}`);
+  }
   return parseCardData({
     id: card.id,
     name: card.name,
-    type: card.type as "Leader" | "Character" | "Event" | "Stage",
+    type: card.type,
     color: card.color,
     cost: card.cost,
     power: card.power,

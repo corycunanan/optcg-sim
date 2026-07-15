@@ -201,10 +201,15 @@ export async function requirePlayableDeck(
   return {
     deck: {
       ...deck,
-      cards: deck.cards.map((deckCard) => ({
-        ...deckCard,
-        card: cardById.get(deckCard.cardId) as Card,
-      })),
+      cards: deck.cards.map((deckCard) => {
+        const card = cardById.get(deckCard.cardId);
+        if (!card) {
+          throw new Error(
+            `Validated card missing from lookup: ${deckCard.cardId}`
+          );
+        }
+        return { ...deckCard, card };
+      }),
     },
     leader: leaderCard,
     validation: fullValidation,

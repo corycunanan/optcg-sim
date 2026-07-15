@@ -1,12 +1,33 @@
 import type { CardDb, CardInstance, TurnState } from "@shared/game-types";
+import { z } from "zod";
 
-type ActivateMainBlock = {
-  id: string;
-  category: string;
-  trigger?: { keyword?: string; once_per_turn?: boolean };
-  flags?: { once_per_turn?: boolean };
-  costs?: Array<{ type?: string; target?: { type?: string } }>;
-};
+const ActivateMainSchema = z
+  .object({
+    effects: z
+      .array(
+        z.object({
+          id: z.string(),
+          category: z.string(),
+          trigger: z
+            .object({
+              keyword: z.string().optional(),
+              once_per_turn: z.boolean().optional(),
+            })
+            .optional(),
+          flags: z.object({ once_per_turn: z.boolean().optional() }).optional(),
+          costs: z
+            .array(
+              z.object({
+                type: z.string().optional(),
+                target: z.object({ type: z.string().optional() }).optional(),
+              })
+            )
+            .optional(),
+        })
+      )
+      .optional(),
+  })
+  .nullable();
 
 export interface ActivateMainState {
   effectId: string;
@@ -18,15 +39,16 @@ export interface ActivateMainState {
 export function getActivateMainState(
   card: CardInstance,
   cardDb: CardDb,
-  oncePerTurnUsed?: TurnState["oncePerTurnUsed"],
+  oncePerTurnUsed?: TurnState["oncePerTurnUsed"]
 ): ActivateMainState | null {
-  const schema = cardDb[card.cardId]?.effectSchema as {
-    effects?: ActivateMainBlock[];
-  } | null;
+  const parsedSchema = ActivateMainSchema.safeParse(
+    cardDb[card.cardId]?.effectSchema ?? null
+  );
+  const schema = parsedSchema.success ? parsedSchema.data : null;
   const block = schema?.effects?.find(
     (effect) =>
       effect.category === "activate" &&
-      effect.trigger?.keyword === "ACTIVATE_MAIN",
+      effect.trigger?.keyword === "ACTIVATE_MAIN"
   );
   if (!block) return null;
 
@@ -39,7 +61,7 @@ export function getActivateMainState(
     requiresActiveSelf:
       block.costs?.some(
         (cost) =>
-          cost.type === "REST_SELF" && cost.target?.type !== "YOUR_LEADER",
+          cost.type === "REST_SELF" && cost.target?.type !== "YOUR_LEADER"
       ) ?? false,
     usedThisTurn:
       oncePerTurn &&

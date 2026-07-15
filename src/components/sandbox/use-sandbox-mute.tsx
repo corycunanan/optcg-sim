@@ -42,9 +42,11 @@ const SandboxMuteContext = createContext<SandboxMuteContextValue | null>(null);
 // ─── Pure helpers ──────────────────────────────────────────────────────
 
 function getStorage(): Storage | null {
-  if (typeof globalThis === "undefined") return null;
-  const candidate = (globalThis as { localStorage?: Storage }).localStorage;
-  return candidate ?? null;
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Reads the persisted preference. Returns `SANDBOX_MUTE_DEFAULT` when
@@ -106,7 +108,7 @@ export function SandboxMuteProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({ muted, setMuted, toggle }),
-    [muted, setMuted, toggle],
+    [muted, setMuted, toggle]
   );
 
   return (
@@ -120,7 +122,7 @@ export function useSandboxMute(): SandboxMuteContextValue {
   const ctx = useContext(SandboxMuteContext);
   if (!ctx) {
     throw new Error(
-      "useSandboxMute must be used inside a <SandboxMuteProvider>",
+      "useSandboxMute must be used inside a <SandboxMuteProvider>"
     );
   }
   return ctx;

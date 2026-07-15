@@ -11,6 +11,10 @@
  * - motionPresets.board.pile — stacked-zone receipt feedback
  */
 
+// Motion's public types widen literal easing names and require mutable
+// keyframe arrays. Assertions in this token-only module preserve those
+// library contracts; no external or runtime data enters here.
+
 // ─── UI Transitions ──────────────────────────────────────────────────
 
 const transitions = {

@@ -38,9 +38,9 @@ const CATEGORY_LABELS: Record<ScenarioCategory, string> = {
 };
 
 function groupByCategory(
-  list: Scenario[],
+  list: Scenario[]
 ): Record<ScenarioCategory, Scenario[]> {
-  const out = {
+  const out: Record<ScenarioCategory, Scenario[]> = {
     playground: [],
     draws: [],
     movement: [],
@@ -50,7 +50,7 @@ function groupByCategory(
     effects: [],
     prompts: [],
     phase: [],
-  } as Record<ScenarioCategory, Scenario[]>;
+  };
   for (const s of list) out[s.category].push(s);
   return out;
 }
@@ -59,7 +59,7 @@ export default function SandboxHubPage() {
   const grouped = groupByCategory(scenarios);
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderTitle>Sandbox</PageHeaderTitle>
@@ -71,19 +71,19 @@ export default function SandboxHubPage() {
 
       <div className="mx-auto w-full max-w-5xl space-y-12 px-6 py-8">
         <section>
-          <h2 className="mb-4 font-display text-xl font-bold tracking-tight text-content-primary">
+          <h2 className="font-display text-content-primary mb-4 text-xl font-bold tracking-tight">
             Layout Reference
           </h2>
           <Link
             href="/sandbox/scaffold"
-            className="group block rounded-lg border border-border bg-surface-1 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md"
+            className="group border-border bg-surface-1 hover:border-border-strong block rounded-lg border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-base font-bold text-content-primary">
+                <h3 className="text-content-primary text-base font-bold">
                   Board Scaffold
                 </h3>
-                <p className="mt-1 text-sm text-content-tertiary">
+                <p className="text-content-tertiary mt-1 text-sm">
                   Static board layout for visual checks and design QA.
                 </p>
               </div>
@@ -96,13 +96,13 @@ export default function SandboxHubPage() {
           const items = grouped[cat];
           return (
             <section key={cat}>
-              <h2 className="mb-4 font-display text-xl font-bold tracking-tight text-content-primary">
+              <h2 className="font-display text-content-primary mb-4 text-xl font-bold tracking-tight">
                 {CATEGORY_LABELS[cat]}
               </h2>
 
               {items.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-surface-1 px-6 py-10 text-center">
-                  <p className="text-sm text-content-tertiary">
+                <div className="border-border bg-surface-1 rounded-lg border border-dashed px-6 py-10 text-center">
+                  <p className="text-content-tertiary text-sm">
                     No scenarios yet
                   </p>
                 </div>
@@ -125,15 +125,15 @@ function ScenarioTile({ scenario }: { scenario: Scenario }) {
   return (
     <Link
       href={`/sandbox/${scenario.id}`}
-      className="group flex h-full flex-col gap-3 rounded-lg border border-border bg-surface-1 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md"
+      className="group border-border bg-surface-1 hover:border-border-strong flex h-full flex-col gap-3 rounded-lg border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-bold text-content-primary">
+        <h3 className="text-content-primary text-sm font-bold">
           {scenario.title}
         </h3>
         <Badge variant="secondary">{CATEGORY_LABELS[scenario.category]}</Badge>
       </div>
-      <p className="text-xs text-content-tertiary">{scenario.description}</p>
+      <p className="text-content-tertiary text-xs">{scenario.description}</p>
     </Link>
   );
 }

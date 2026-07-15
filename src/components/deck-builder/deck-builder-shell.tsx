@@ -32,8 +32,10 @@ import {
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiPost, apiPut } from "@/lib/api-client";
-import { DeckDetailResponseSchema } from "@/lib/validators/cards";
-import type { TestDeckOrder } from "@/lib/deck-builder/state";
+import {
+  DeckDetailResponseSchema,
+  SaveDeckResponseSchema,
+} from "@/lib/validators/cards";
 
 interface DeckBuilderShellProps {
   deckId: string | null;
@@ -84,7 +86,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
             cards: cardsMap,
             sleeveUrl: data.sleeveUrl ?? null,
             donArtUrl: data.donArtUrl ?? null,
-            testOrder: (data.testOrder as TestDeckOrder) ?? null,
+            testOrder: data.testOrder,
             lastSavedAt: new Date(data.updatedAt),
           },
         });
@@ -150,11 +152,12 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
 
     try {
       const { data } = state.id
-        ? await apiPut<{ data: { id: string } }>(
+        ? await apiPut(
             `/api/decks/${state.id}`,
-            payload
+            payload,
+            SaveDeckResponseSchema
           )
-        : await apiPost<{ data: { id: string } }>("/api/decks", payload);
+        : await apiPost("/api/decks", payload, SaveDeckResponseSchema);
 
       dispatch({ type: "SAVE_SUCCESS", id: data.id });
 
@@ -166,7 +169,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
       toast.error(
         err instanceof ApiError
           ? `Save failed: ${err.message}`
-          : "Save failed. Your changes are still here — try again.",
+          : "Save failed. Your changes are still here — try again."
       );
     }
   }, [state, leaderSelectedArtUrl, router]);
