@@ -28,3 +28,31 @@ export const GameActionSchema = z.object({
   winReason: z.string().nullable().optional(),
   reasonCode: GameEndReasonCodeSchema.nullable().optional(),
 });
+
+export const GameTokenResponseSchema = z.object({
+  data: z.object({ token: z.string().min(1) }),
+});
+
+export const RealtimeTokenResponseSchema = z.object({
+  data: z.object({
+    token: z.string().min(1),
+    expiresAt: z.number(),
+  }),
+});
+
+export const RemoteGameStatusSchema = z.object({
+  id: z.string(),
+  mode: z.enum(["PVP", "SOLITAIRE", "PVCOMPUTER"]),
+  status: z.enum(["IN_PROGRESS", "FINISHED", "ABANDONED"]),
+  winnerId: z.string().nullable(),
+  winReason: z.string().nullable(),
+  winnerPerspective: z.enum(["SELF", "OPPONENT", "NONE"]),
+  canFallbackConcede: z.boolean(),
+  playerIndex: z.union([z.literal(0), z.literal(1)]).optional(),
+});
+
+export const RemoteGameStatusResponseSchema = z.object({
+  data: RemoteGameStatusSchema,
+});
+
+export type RemoteGameStatus = z.infer<typeof RemoteGameStatusSchema>;

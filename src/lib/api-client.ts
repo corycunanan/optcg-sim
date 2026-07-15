@@ -14,7 +14,7 @@ import type { ZodType } from "zod";
 export class ApiError extends Error {
   constructor(
     message: string,
-    public status: number,
+    public status: number
   ) {
     super(message);
     this.name = "ApiError";
@@ -24,12 +24,14 @@ export class ApiError extends Error {
 interface RequestOptions {
   signal?: AbortSignal;
   headers?: Record<string, string>;
+  cache?: RequestCache;
+  credentials?: RequestCredentials;
 }
 
 async function request<T extends Record<string, unknown>>(
   url: string,
   init: RequestInit & { signal?: AbortSignal },
-  schema?: ZodType<T>,
+  schema?: ZodType<T>
 ): Promise<T> {
   const res = await fetch(url, init);
   const json = await res.json().catch(() => null);
@@ -52,26 +54,34 @@ async function request<T extends Record<string, unknown>>(
 export function apiGet<T extends Record<string, unknown>>(
   url: string,
   schema: ZodType<T>,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 /** GET request — unchecked cast. */
 export function apiGet<T extends Record<string, unknown>>(
   url: string,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 export function apiGet<T extends Record<string, unknown>>(
   url: string,
   schemaOrOpts?: ZodType<T> | RequestOptions,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T> {
   const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
   const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema ? opts : (schemaOrOpts as RequestOptions | undefined);
+  const options = isSchema
+    ? opts
+    : (schemaOrOpts as RequestOptions | undefined);
 
   return request<T>(
     url,
-    { method: "GET", signal: options?.signal, headers: options?.headers },
-    schema,
+    {
+      method: "GET",
+      signal: options?.signal,
+      headers: options?.headers,
+      cache: options?.cache,
+      credentials: options?.credentials,
+    },
+    schema
   );
 }
 
@@ -82,23 +92,25 @@ export function apiPost<T extends Record<string, unknown>>(
   url: string,
   body: unknown,
   schema: ZodType<T>,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 /** POST request — unchecked cast. */
 export function apiPost<T extends Record<string, unknown>>(
   url: string,
   body?: unknown,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 export function apiPost<T extends Record<string, unknown>>(
   url: string,
   body?: unknown,
   schemaOrOpts?: ZodType<T> | RequestOptions,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T> {
   const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
   const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema ? opts : (schemaOrOpts as RequestOptions | undefined);
+  const options = isSchema
+    ? opts
+    : (schemaOrOpts as RequestOptions | undefined);
 
   return request<T>(
     url,
@@ -107,8 +119,10 @@ export function apiPost<T extends Record<string, unknown>>(
       headers: { "Content-Type": "application/json", ...options?.headers },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: options?.signal,
+      cache: options?.cache,
+      credentials: options?.credentials,
     },
-    schema,
+    schema
   );
 }
 
@@ -119,23 +133,25 @@ export function apiPut<T extends Record<string, unknown>>(
   url: string,
   body: unknown,
   schema: ZodType<T>,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 /** PUT request — unchecked cast. */
 export function apiPut<T extends Record<string, unknown>>(
   url: string,
   body?: unknown,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 export function apiPut<T extends Record<string, unknown>>(
   url: string,
   body?: unknown,
   schemaOrOpts?: ZodType<T> | RequestOptions,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T> {
   const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
   const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema ? opts : (schemaOrOpts as RequestOptions | undefined);
+  const options = isSchema
+    ? opts
+    : (schemaOrOpts as RequestOptions | undefined);
 
   return request<T>(
     url,
@@ -144,8 +160,10 @@ export function apiPut<T extends Record<string, unknown>>(
       headers: { "Content-Type": "application/json", ...options?.headers },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: options?.signal,
+      cache: options?.cache,
+      credentials: options?.credentials,
     },
-    schema,
+    schema
   );
 }
 
@@ -156,23 +174,25 @@ export function apiPatch<T extends Record<string, unknown>>(
   url: string,
   body: unknown,
   schema: ZodType<T>,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 /** PATCH request — unchecked cast. */
 export function apiPatch<T extends Record<string, unknown>>(
   url: string,
   body?: unknown,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 export function apiPatch<T extends Record<string, unknown>>(
   url: string,
   body?: unknown,
   schemaOrOpts?: ZodType<T> | RequestOptions,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T> {
   const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
   const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema ? opts : (schemaOrOpts as RequestOptions | undefined);
+  const options = isSchema
+    ? opts
+    : (schemaOrOpts as RequestOptions | undefined);
 
   return request<T>(
     url,
@@ -181,8 +201,10 @@ export function apiPatch<T extends Record<string, unknown>>(
       headers: { "Content-Type": "application/json", ...options?.headers },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: options?.signal,
+      cache: options?.cache,
+      credentials: options?.credentials,
     },
-    schema,
+    schema
   );
 }
 
@@ -192,25 +214,33 @@ export function apiPatch<T extends Record<string, unknown>>(
 export function apiDelete<T extends Record<string, unknown>>(
   url: string,
   schema: ZodType<T>,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 /** DELETE request — unchecked cast. */
 export function apiDelete<T extends Record<string, unknown>>(
   url: string,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T>;
 export function apiDelete<T extends Record<string, unknown>>(
   url: string,
   schemaOrOpts?: ZodType<T> | RequestOptions,
-  opts?: RequestOptions,
+  opts?: RequestOptions
 ): Promise<T> {
   const isSchema = schemaOrOpts && "parse" in schemaOrOpts;
   const schema = isSchema ? (schemaOrOpts as ZodType<T>) : undefined;
-  const options = isSchema ? opts : (schemaOrOpts as RequestOptions | undefined);
+  const options = isSchema
+    ? opts
+    : (schemaOrOpts as RequestOptions | undefined);
 
   return request<T>(
     url,
-    { method: "DELETE", signal: options?.signal, headers: options?.headers },
-    schema,
+    {
+      method: "DELETE",
+      signal: options?.signal,
+      headers: options?.headers,
+      cache: options?.cache,
+      credentials: options?.credentials,
+    },
+    schema
   );
 }

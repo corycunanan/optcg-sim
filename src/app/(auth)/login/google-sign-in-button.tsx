@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiGet } from "@/lib/api-client";
+import { CsrfTokenResponseSchema } from "@/lib/validators/auth";
 
 /**
  * Google sign-in button using direct form POST to the NextAuth route handler.
@@ -12,16 +14,11 @@ import { useEffect, useState } from "react";
  *
  * See: https://github.com/nextauthjs/next-auth/issues/13388
  */
-export function GoogleSignInButton({
-  callbackUrl,
-}: {
-  callbackUrl: string;
-}) {
+export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
   const [csrfToken, setCsrfToken] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/auth/csrf")
-      .then((res) => res.json())
+    apiGet("/api/auth/csrf", CsrfTokenResponseSchema)
       .then((data) => setCsrfToken(data.csrfToken))
       .catch(console.error);
   }, []);

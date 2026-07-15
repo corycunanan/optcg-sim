@@ -5,6 +5,8 @@ import { signIn } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ApiError, apiPost } from "@/lib/api-client";
+import { RegisterResponseSchema } from "@/lib/validators/auth";
 
 type Mode = "signin" | "signup";
 
@@ -64,16 +66,11 @@ export function CredentialsForm({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Registration failed.");
-        return;
-      }
+      await apiPost(
+        "/api/auth/register",
+        { email, username, password },
+        RegisterResponseSchema
+      );
       // Auto sign-in after registration
       const result = await signIn("credentials", {
         email,
@@ -84,6 +81,12 @@ export function CredentialsForm({
       if (result?.url) {
         window.location.href = result.url;
       }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(error.message || "Registration failed.");
+        return;
+      }
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -92,7 +95,7 @@ export function CredentialsForm({
   return (
     <div>
       {/* Tab switcher */}
-      <div className="mb-5 flex rounded-md border border-border bg-surface-2 p-1">
+      <div className="border-border bg-surface-2 mb-5 flex rounded-md border p-1">
         <button
           type="button"
           onClick={() => switchMode("signin")}
@@ -100,7 +103,7 @@ export function CredentialsForm({
             "flex-1 rounded py-2 text-sm font-semibold transition-colors",
             mode === "signin"
               ? "bg-surface-1 text-content-primary shadow-sm"
-              : "text-content-tertiary hover:text-content-secondary",
+              : "text-content-tertiary hover:text-content-secondary"
           )}
         >
           Sign In
@@ -112,7 +115,7 @@ export function CredentialsForm({
             "flex-1 rounded py-2 text-sm font-semibold transition-colors",
             mode === "signup"
               ? "bg-surface-1 text-content-primary shadow-sm"
-              : "text-content-tertiary hover:text-content-secondary",
+              : "text-content-tertiary hover:text-content-secondary"
           )}
         >
           Create Account
@@ -133,7 +136,7 @@ export function CredentialsForm({
       {mode === "signin" ? (
         <form onSubmit={handleSignIn} className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-content-secondary">
+            <label className="text-content-secondary mb-1 block text-xs font-semibold">
               Email
             </label>
             <Input
@@ -145,7 +148,7 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-content-secondary">
+            <label className="text-content-secondary mb-1 block text-xs font-semibold">
               Password
             </label>
             <Input
@@ -163,7 +166,7 @@ export function CredentialsForm({
       ) : (
         <form onSubmit={handleSignUp} className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-content-secondary">
+            <label className="text-content-secondary mb-1 block text-xs font-semibold">
               Email
             </label>
             <Input
@@ -175,7 +178,7 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-content-secondary">
+            <label className="text-content-secondary mb-1 block text-xs font-semibold">
               Username
             </label>
             <Input
@@ -188,7 +191,7 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-content-secondary">
+            <label className="text-content-secondary mb-1 block text-xs font-semibold">
               Password
             </label>
             <Input
@@ -201,7 +204,7 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-content-secondary">
+            <label className="text-content-secondary mb-1 block text-xs font-semibold">
               Confirm Password
             </label>
             <Input

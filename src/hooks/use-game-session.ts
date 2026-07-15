@@ -1,12 +1,11 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { ApiError, apiGet } from "@/lib/api-client";
+import { GameTokenResponseSchema } from "@/lib/validators/game";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameWs } from "@/hooks/use-game-ws";
-import type {
-  AcceptedGameUpdate,
-  ActionRejection,
-} from "@/hooks/use-game-ws";
+import type { AcceptedGameUpdate, ActionRejection } from "@/hooks/use-game-ws";
 import { useCardDatabase } from "@/hooks/use-card-database";
 import { useRemoteGameStatus } from "@/hooks/use-remote-game-status";
 import { useGameFinalizer } from "@/hooks/use-game-finalizer";
@@ -89,18 +88,15 @@ export interface GameSessionEndState {
 export function useGameSession(
   gameId: string,
   workerUrl: string,
-  requestedPlayerIndex?: 0 | 1,
+  requestedPlayerIndex?: 0 | 1
 ) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
 
   /* ── Remote game status polling ───────────────────────────────────── */
 
-  const {
-    remoteGameStatus,
-    remoteGameNotFound,
-    setRemoteGameStatus,
-  } = useRemoteGameStatus(gameId);
+  const { remoteGameStatus, remoteGameNotFound, setRemoteGameStatus } =
+    useRemoteGameStatus(gameId);
   const liveGameId = remoteGameNotFound ? "" : gameId;
 
   const getToken = useCallback(async () => {
@@ -111,11 +107,18 @@ export function useGameSession(
     if (requestedPlayerIndex !== undefined) {
       params.set("playerIndex", String(requestedPlayerIndex));
     }
-    const r = await fetch(`/api/game/token?${params.toString()}`);
-    if (!r.ok) throw new Error(`Token fetch: ${r.status}`);
-    const d = (await r.json()) as { data?: { token?: string } };
-    if (!d.data?.token) throw new Error("No token");
-    return d.data.token;
+    try {
+      const response = await apiGet(
+        `/api/game/token?${params.toString()}`,
+        GameTokenResponseSchema
+      );
+      return response.data.token;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw new Error(`Token fetch: ${error.status}`);
+      }
+      throw new Error("No token");
+    }
   }, [liveGameId, remoteGameNotFound, requestedPlayerIndex]);
 
   /* ── WebSocket ────────────────────────────────────────────────────── */
@@ -138,23 +141,26 @@ export function useGameSession(
   // clicks (or double-trigger from keyboard + click) can otherwise send the
   // same action twice before the server responds, causing desync.
   const lastSendRef = useRef<{ signature: string; at: number } | null>(null);
-  const sendAction = useCallback((action: GameAction) => {
-    const signature = JSON.stringify(action);
-    const now = Date.now();
-    const last = lastSendRef.current;
-    if (last && last.signature === signature && now - last.at < 250) {
-      return;
-    }
-    lastSendRef.current = { signature, at: now };
-    rawSendAction(action);
-  }, [rawSendAction]);
+  const sendAction = useCallback(
+    (action: GameAction) => {
+      const signature = JSON.stringify(action);
+      const now = Date.now();
+      const last = lastSendRef.current;
+      if (last && last.signature === signature && now - last.at < 250) {
+        return;
+      }
+      lastSendRef.current = { signature, at: now };
+      rawSendAction(action);
+    },
+    [rawSendAction]
+  );
 
   /* ── Card DB ──────────────────────────────────────────────────────── */
 
   const { cardDb, cardDbReady, cardDbError, retryFetchCards } = useCardDatabase(
     liveGameId,
     workerUrl,
-    getToken,
+    getToken
   );
 
   // Single retry entry point for the UI. Re-runs whichever subsystem is
@@ -168,20 +174,20 @@ export function useGameSession(
 
   const isSameUserSolitairePerspective = Boolean(
     gameState &&
-      requestedPlayerIndex !== undefined &&
-      gameState.players[0].playerId === userId &&
-      gameState.players[1].playerId === userId,
+    requestedPlayerIndex !== undefined &&
+    gameState.players[0].playerId === userId &&
+    gameState.players[1].playerId === userId
   );
   const explicitPlayerIndex = isSameUserSolitairePerspective
     ? requestedPlayerIndex
     : undefined;
   const myIndex = gameState
-    ? explicitPlayerIndex ?? ((gameState.players[0].playerId === userId ? 0 : 1) as 0 | 1)
+    ? (explicitPlayerIndex ??
+      ((gameState.players[0].playerId === userId ? 0 : 1) as 0 | 1))
     : null;
   const oppIndex: 0 | 1 | null =
     myIndex !== null ? (myIndex === 0 ? 1 : 0) : null;
-  const me =
-    myIndex !== null && gameState ? gameState.players[myIndex] : null;
+  const me = myIndex !== null && gameState ? gameState.players[myIndex] : null;
   const opp =
     oppIndex !== null && gameState ? gameState.players[oppIndex] : null;
   const turn = gameState?.turn ?? null;
@@ -212,7 +218,7 @@ export function useGameSession(
   useEffect(() => {
     if (
       !gameState?.players.some(
-        (player) => player.rejoinDeadlineAt !== null && !player.connected,
+        (player) => player.rejoinDeadlineAt !== null && !player.connected
       )
     ) {
       return;
@@ -224,14 +230,12 @@ export function useGameSession(
   /* ── Match closed ─────────────────────────────────────────────────── */
 
   const resolvedWithoutSocket = Boolean(
-    !gameOver &&
-      remoteGameStatus &&
-      remoteGameStatus.status !== "IN_PROGRESS",
+    !gameOver && remoteGameStatus && remoteGameStatus.status !== "IN_PROGRESS"
   );
   const stateFinished =
     gameState?.status === "FINISHED" || gameState?.status === "ABANDONED";
   const matchClosed = Boolean(
-    gameOver || resolvedWithoutSocket || stateFinished,
+    gameOver || resolvedWithoutSocket || stateFinished
   );
 
   const fallbackConcedeAvailable =
@@ -301,9 +305,7 @@ export function useGameSession(
         : "text-gb-accent-red";
 
   const endReason =
-    gameOver?.reason ??
-    remoteGameStatus?.winReason ??
-    "The game has ended.";
+    gameOver?.reason ?? remoteGameStatus?.winReason ?? "The game has ended.";
 
   return {
     game: {
@@ -328,8 +330,7 @@ export function useGameSession(
       matchClosed,
       canUndo,
       retryConnection: retryConnectivity,
-      connectivityFailed:
-        connectionStatus === "failed" || cardDbError !== null,
+      connectivityFailed: connectionStatus === "failed" || cardDbError !== null,
     },
     opponent: {
       opponentAway,

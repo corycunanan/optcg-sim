@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { GameState } from "@shared/game-types";
 import type { RemoteGameStatus } from "./use-remote-game-status";
+import { apiPost } from "@/lib/api-client";
+import { RemoteGameStatusResponseSchema } from "@/lib/validators/game";
 
 export interface UseGameFinalizerArgs {
   gameId: string;
@@ -47,14 +49,10 @@ export function useGameFinalizer({
         ? gameState.players[gameOver.winner].playerId
         : null;
 
-    await fetch(`/api/game/${gameId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "FINALIZE",
-        winnerId,
-        winReason: gameOver?.reason ?? "Game ended",
-      }),
+    await apiPost(`/api/game/${gameId}`, {
+      action: "FINALIZE",
+      winnerId,
+      winReason: gameOver?.reason ?? "Game ended",
     }).catch(() => {});
   }, [gameId, gameOver, gameState]);
 
@@ -87,24 +85,17 @@ export function useGameFinalizer({
     setFallbackSubmitting(true);
     setFallbackError(null);
     try {
-      const response = await fetch(`/api/game/${gameId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "CONCEDE" }),
-      });
-      const json = (await response.json().catch(() => null)) as {
-        error?: string;
-        data?: RemoteGameStatus;
-      } | null;
-      if (!response.ok || !json?.data) {
-        throw new Error(json?.error ?? "Failed to concede");
-      }
+      const json = await apiPost(
+        `/api/game/${gameId}`,
+        { action: "CONCEDE" },
+        RemoteGameStatusResponseSchema
+      );
 
       setRemoteGameStatus(json.data);
       window.location.href = "/lobbies";
     } catch (error) {
       setFallbackError(
-        error instanceof Error ? error.message : "Failed to concede",
+        error instanceof Error ? error.message : "Failed to concede"
       );
       setFallbackSubmitting(false);
     }
