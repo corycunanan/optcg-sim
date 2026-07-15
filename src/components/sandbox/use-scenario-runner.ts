@@ -44,6 +44,7 @@ export interface ScenarioRunnerState {
   totalSteps: number;
   derivedGameState: PartialGameState;
   activePrompt: PromptOptions | null;
+  activePromptId: string | null;
   eventLog: GameEvent[];
 }
 
@@ -234,12 +235,16 @@ export function createScenarioRunner(scenario: Scenario): ScenarioRunner {
       currentStep?.type === "prompt"
         ? currentStep.prompt
         : null;
+    const activePromptId = activePrompt
+      ? `sandbox-script-prompt-${currentStepIndex}`
+      : null;
     cachedSnapshot = {
       playbackState,
       currentStepIndex,
       totalSteps,
       derivedGameState,
       activePrompt,
+      activePromptId,
       eventLog,
     };
     return cachedSnapshot;

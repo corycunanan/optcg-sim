@@ -27,6 +27,7 @@ import { useSandboxEngineSession } from "./sandbox-engine-session-provider";
 import { PlaybackControlBar } from "./playback-control-bar";
 import { SandboxMuteProvider } from "./use-sandbox-mute";
 import { SandboxShell } from "./sandbox-shell";
+import { sandboxBoardPrompt } from "./sandbox-board-prompt";
 import type {
   BoardState,
   BoardDispatch,
@@ -72,12 +73,14 @@ function ScriptedScenarioBody({ scenario }: { scenario: Scenario }) {
       events: runner.eventLog,
       cardDb: SANDBOX_CARD_DB,
       activePrompt: runner.activePrompt,
+      activePromptId: runner.activePromptId,
       onAction: gate.sendAction,
     }),
     [
       scenario.initialState,
       runner.eventLog,
       runner.activePrompt,
+      runner.activePromptId,
       gate.sendAction,
     ],
   );
@@ -100,7 +103,7 @@ function ScriptedScenarioBody({ scenario }: { scenario: Scenario }) {
     connectionStatus: session.game.connectionStatus,
     eventLog: session.game.gameState.eventLog,
     activeEffects: session.game.gameState.activeEffects,
-    activePrompt: session.game.activePrompt,
+    ...sandboxBoardPrompt(session.game),
     matchClosed: session.game.matchClosed,
     canUndo: session.game.canUndo,
     actionRejection: scenario.actionRejection ?? null,
@@ -174,7 +177,7 @@ function PlaygroundScenarioBody({ scenario }: { scenario: Scenario }) {
     connectionStatus: session.game.connectionStatus,
     eventLog: session.game.gameState.eventLog,
     activeEffects: session.game.gameState.activeEffects,
-    activePrompt: session.game.activePrompt,
+    ...sandboxBoardPrompt(session.game),
     matchClosed: session.game.matchClosed,
     canUndo: session.game.canUndo,
     promptRespondingPlayer:

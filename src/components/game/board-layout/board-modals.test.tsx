@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import type { CardDb, PromptOptions } from "@shared/game-types";
+import { sandboxBoardPrompt } from "@/components/sandbox/sandbox-board-prompt";
 
 vi.mock("@/components/ui", () => {
   const Wrapper = ({ children }: PropsWithChildren) => <>{children}</>;
@@ -50,22 +51,27 @@ const prompt = {
   },
 } satisfies PromptOptions;
 
-const boardModals = (activePromptId: string) => (
-  <BoardModals
-    activePrompt={{ ...prompt, choices: [...prompt.choices] }}
-    activePromptId={activePromptId}
-    isPromptHidden={false}
-    onHide={vi.fn()}
-    cardDb={{} as CardDb}
-    onAction={vi.fn()}
-    zonePreview={null}
-    onCloseZonePreview={vi.fn()}
-    me={null}
-    opp={null}
-    redistributeTransfers={[]}
-    onRedistributeUndo={vi.fn()}
-  />
-);
+const boardModals = (activePromptId: string) => {
+  const boardPrompt = sandboxBoardPrompt({
+    activePrompt: { ...prompt, choices: [...prompt.choices] },
+    activePromptId,
+  });
+  return (
+    <BoardModals
+      {...boardPrompt}
+      isPromptHidden={false}
+      onHide={vi.fn()}
+      cardDb={{} as CardDb}
+      onAction={vi.fn()}
+      zonePreview={null}
+      onCloseZonePreview={vi.fn()}
+      me={null}
+      opp={null}
+      redistributeTransfers={[]}
+      onRedistributeUndo={vi.fn()}
+    />
+  );
+};
 
 const selectedCount = (renderer: ReactTestRenderer) =>
   renderer.root
@@ -73,7 +79,7 @@ const selectedCount = (renderer: ReactTestRenderer) =>
     .find((node) => node.props["aria-live"] === "polite")!
     .children.join("");
 
-describe("BoardModals PLAYER_CHOICE prompt identity", () => {
+describe("sandbox BoardState PLAYER_CHOICE prompt identity", () => {
   it("preserves DON selection for the same prompt ID and resets it for the next prompt ID", async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => {

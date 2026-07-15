@@ -64,7 +64,7 @@ export interface BoardLayoutProps {
   eventLog: GameEvent[];
   activeEffects: ActiveEffect[];
   activePrompt: PromptOptions | null;
-  activePromptId?: string | null;
+  activePromptId: string | null;
   onAction: (action: GameAction) => void;
   onLeave: () => void;
   matchClosed: boolean;
@@ -115,7 +115,7 @@ function BoardLayoutInner({
   connectionStatus,
   eventLog,
   activePrompt,
-  activePromptId = null,
+  activePromptId,
   actionRejection = null,
   acceptedUpdate = null,
   promptRespondingPlayer = null,

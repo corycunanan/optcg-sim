@@ -29,7 +29,7 @@ export interface BoardState {
   eventLog: GameEvent[];
   activeEffects: ActiveEffect[];
   activePrompt: PromptOptions | null;
-  activePromptId?: string | null;
+  activePromptId: string | null;
   matchClosed: boolean;
   canUndo: boolean;
   actionRejection?: ActionRejection | null;
