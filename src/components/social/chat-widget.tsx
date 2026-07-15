@@ -63,7 +63,8 @@ export function ChatWidget({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
-  const sendingRef = useRef(false);
+  const activeSendRef = useRef<symbol | null>(null);
+  const historyRequestRef = useRef<symbol | null>(null);
   const lastTypingEmitRef = useRef<number>(NEVER_EMITTED);
   const lastReadCutoffRef = useRef<string>("");
   const minimizedRef = useRef<boolean>(minimized);
@@ -77,16 +78,42 @@ export function ChatWidget({
     minimizedRef.current = minimized;
   }, [minimized]);
 
+  useEffect(() => {
+    setMessages([]);
+    messagesRef.current = [];
+    setBody("");
+    setSending(false);
+    activeSendRef.current = null;
+    historyRequestRef.current = null;
+    setTypingUntil(null);
+    lastTypingEmitRef.current = NEVER_EMITTED;
+    lastReadCutoffRef.current = "";
+    return () => {
+      activeSendRef.current = null;
+      historyRequestRef.current = null;
+    };
+  }, [user.id]);
+
   const loadHistory = useCallback(() => {
+    const request = Symbol("history-request");
+    historyRequestRef.current = request;
     setLoading(true);
     setHistoryLoadFailed(false);
     void apiGet(`/api/messages/${user.id}`, MessageHistoryResponseSchema)
       .then((json) => {
+        if (historyRequestRef.current !== request) return;
         const history = json.data || [];
         setMessages((prev) => mergeInitialHistory(history, prev));
       })
-      .catch(() => setHistoryLoadFailed(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (historyRequestRef.current !== request) return;
+        setHistoryLoadFailed(true);
+      })
+      .finally(() => {
+        if (historyRequestRef.current === request) {
+          setLoading(false);
+        }
+      });
   }, [user.id]);
 
   useEffect(() => {
@@ -233,8 +260,9 @@ export function ChatWidget({
     async (e: React.FormEvent) => {
       e.preventDefault();
       const messageBody = body.trim();
-      if (!messageBody || sendingRef.current) return;
-      sendingRef.current = true;
+      if (!messageBody || activeSendRef.current !== null) return;
+      const request = Symbol("send-request");
+      activeSendRef.current = request;
       setSending(true);
       try {
         const json = await apiPost(
@@ -242,13 +270,17 @@ export function ChatWidget({
           { body: messageBody },
           SendMessageResponseSchema
         );
+        if (activeSendRef.current !== request) return;
         setMessages((prev) => [...prev, json.data]);
         setBody("");
       } catch {
+        if (activeSendRef.current !== request) return;
         toast.error("Message couldn't be sent. Try again.");
       } finally {
-        sendingRef.current = false;
-        setSending(false);
+        if (activeSendRef.current === request) {
+          activeSendRef.current = null;
+          setSending(false);
+        }
       }
     },
     [body, user.id]
