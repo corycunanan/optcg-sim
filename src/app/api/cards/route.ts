@@ -16,6 +16,7 @@ import {
   buildCardOrderBy,
   buildCardPagination,
 } from "@/lib/cards/search";
+import { CARD_SEARCH_SELECT } from "@/lib/cards/card-select";
 
 export async function GET(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
@@ -49,10 +50,7 @@ export async function GET(request: NextRequest) {
         orderBy,
         skip,
         take: limit,
-        include: {
-          artVariants: true,
-          cardSets: { orderBy: { isOrigin: "desc" } },
-        },
+        select: CARD_SEARCH_SELECT,
       }),
       prisma.card.count({ where }),
     ]);

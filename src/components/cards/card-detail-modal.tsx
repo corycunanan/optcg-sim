@@ -14,44 +14,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardImageGallery } from "./card-image-gallery";
 import { holoEffectForRarity, HOLO_FEATURE_ENABLED } from "@/lib/cards/holo";
+import { apiGet } from "@/lib/api-client";
+import {
+  CardDetailResponseSchema,
+  type CardArtVariant,
+  type CardDetail as CardDetailContract,
+  type CardSetMembership,
+} from "@/lib/validators/cards";
 
-export interface ArtVariant {
-  id: string;
-  variantId: string;
-  label: string;
-  rarity: string;
-  imageUrl: string;
-  set: string;
-}
-
-export interface CardSet {
-  id: string;
-  setLabel: string;
-  setName: string;
-  isOrigin: boolean;
-}
-
-export interface CardDetail {
-  id: string;
-  name: string;
-  color: string[];
-  type: string;
-  rarity: string;
-  cost: number | null;
-  power: number | null;
-  counter: number | null;
-  life: number | null;
-  blockNumber: number;
-  originSet: string;
-  attribute: string[];
-  traits: string[];
-  effectText: string;
-  triggerText: string | null;
-  banStatus: string;
-  imageUrl: string;
-  artVariants: ArtVariant[];
-  cardSets: CardSet[];
-}
+export type ArtVariant = CardArtVariant;
+export type CardSet = CardSetMembership;
+export type CardDetail = CardDetailContract;
 
 const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
   Red: "card-red",
@@ -104,11 +77,10 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/cards/${cardId}`)
-      .then((r) => r.json())
-      .then((json) => {
+    apiGet(`/api/cards/${cardId}`, CardDetailResponseSchema)
+      .then(({ data }) => {
         if (!cancelled) {
-          setCardState({ cardId, card: json.data, loading: false });
+          setCardState({ cardId, card: data, loading: false });
         }
       })
       .catch(() => {

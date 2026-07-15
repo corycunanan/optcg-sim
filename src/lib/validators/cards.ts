@@ -60,14 +60,22 @@ export const CardResponseSchema = z.object({
 
 export type CardResponse = z.infer<typeof CardResponseSchema>;
 
+/** Slim card shape returned by GET /api/cards search results. */
+export const CardSearchResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.array(z.string()),
+  type: z.string(),
+  cost: z.number().nullable(),
+  traits: z.array(z.string()),
+  imageUrl: z.string(),
+});
+
+export type CardSearchResult = z.infer<typeof CardSearchResultSchema>;
+
 /** GET /api/cards response envelope. */
 export const CardSearchResponseSchema = z.object({
-  data: z.array(
-    CardResponseSchema.extend({
-      artVariants: z.array(z.unknown()).optional(),
-      cardSets: z.array(z.unknown()).optional(),
-    })
-  ),
+  data: z.array(CardSearchResultSchema),
   pagination: z.object({
     total: z.number(),
     page: z.number(),
@@ -77,6 +85,39 @@ export const CardSearchResponseSchema = z.object({
 });
 
 export type CardSearchResponse = z.infer<typeof CardSearchResponseSchema>;
+
+export const CardArtVariantSchema = z.object({
+  id: z.string(),
+  variantId: z.string(),
+  label: z.string(),
+  rarity: z.string(),
+  imageUrl: z.string(),
+  set: z.string(),
+});
+
+export type CardArtVariant = z.infer<typeof CardArtVariantSchema>;
+
+export const CardSetMembershipSchema = z.object({
+  id: z.string(),
+  setLabel: z.string(),
+  setName: z.string(),
+  isOrigin: z.boolean(),
+});
+
+export type CardSetMembership = z.infer<typeof CardSetMembershipSchema>;
+
+/** Full card shape returned by GET /api/cards/[id]. */
+export const CardDetailSchema = CardResponseSchema.extend({
+  effectSchema: z.unknown().nullable(),
+  artVariants: z.array(CardArtVariantSchema),
+  cardSets: z.array(CardSetMembershipSchema),
+});
+
+export type CardDetail = z.infer<typeof CardDetailSchema>;
+
+export const CardDetailResponseSchema = z.object({
+  data: CardDetailSchema,
+});
 
 /** GET /api/decks/[id] — card entry within a deck response. */
 export const DeckCardResponseSchema = z.object({

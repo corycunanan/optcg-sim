@@ -7,36 +7,18 @@ import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 import {
+  CardSearchResponseSchema,
+  type CardSearchResult,
+} from "@/lib/validators/cards";
+import {
   MIN_SUBSTRING_SEARCH_LENGTH,
   isSubstringSearchQueryTooShort,
   normalizeSubstringSearchQuery,
 } from "@/lib/search-query";
 import {
   collectDeckRestrictionRules,
-  getDeckCardCopyLimit,
   isCardAllowedByDeckRestrictionRules,
 } from "@/lib/deck-builder/validation";
-
-interface CardSearchResult {
-  id: string;
-  name: string;
-  color: string[];
-  type: string;
-  cost: number | null;
-  power: number | null;
-  counter: number | null;
-  life: number | null;
-  imageUrl: string;
-  banStatus: string;
-  blockNumber: number;
-  traits: string[];
-  attribute: string[];
-  effectText: string;
-  triggerText: string | null;
-  rarity: string;
-  originSet: string;
-  effectSchema?: unknown | null;
-}
 
 interface DeckBuilderSearchProps {
   onAddCard: (card: DeckCardEntry["card"]) => void;
@@ -107,12 +89,12 @@ export function DeckBuilderSearch({
       params.set("order", "asc");
 
       try {
-        const json = await apiGet<{
-          data: CardSearchResult[];
-          pagination?: { total: number };
-        }>(`/api/cards?${params.toString()}`);
+        const json = await apiGet(
+          `/api/cards?${params.toString()}`,
+          CardSearchResponseSchema,
+        );
         setResults(json.data || []);
-        setTotal(json.pagination?.total || 0);
+        setTotal(json.pagination.total);
         setLoadFailed(false);
       } catch {
         setResults([]);
@@ -399,16 +381,15 @@ export function DeckBuilderSearch({
               ? 0
               : deckCards.get(inspectCard.id)?.quantity || 0
           }
-          copyLimit={getDeckCardCopyLimit(inspectCard)}
           selectedArtUrl={
             deckCards.get(inspectCard.id)?.selectedArtUrl ??
             pendingArtVariants.get(inspectCard.id) ??
             null
           }
-          onAdd={() => {
-            onAddCard(inspectCard);
-            const pendingArt = pendingArtVariants.get(inspectCard.id);
-            if (pendingArt) onSetArtVariant(inspectCard.id, pendingArt);
+          onAdd={(card) => {
+            onAddCard(card);
+            const pendingArt = pendingArtVariants.get(card.id);
+            if (pendingArt) onSetArtVariant(card.id, pendingArt);
           }}
           onRemove={() => onRemoveCard(inspectCard.id)}
           onSetArtVariant={(artUrl) => {
