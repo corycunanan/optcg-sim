@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Gamepad2, Loader2, Plus } from "lucide-react";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { useAsyncOperation } from "@/hooks/use-async-operation";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -57,13 +58,44 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
   const router = useRouter();
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [activeGameLoading, setActiveGameLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [joining, setJoining] = useState(false);
   const [joinCode, setJoinCode] = useState("");
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [conceding, setConceding] = useState(false);
-  const [concedeError, setConcedeError] = useState<string | null>(null);
+  const {
+    status: createStatus,
+    error: createOperationError,
+    execute: executeCreateLobby,
+  } = useAsyncOperation(() =>
+    apiPost<CreateLobbyResponse>("/api/lobbies", { format: "Standard" })
+  );
+  const {
+    status: joinStatus,
+    error: joinOperationError,
+    execute: executeJoinLobby,
+  } = useAsyncOperation((code: string) =>
+    apiPost<JoinLobbyResponse>("/api/lobbies/join", { code })
+  );
+  const {
+    status: concedeStatus,
+    error: concedeOperationError,
+    execute: executeConcedeGame,
+  } = useAsyncOperation((gameId: string) =>
+    apiPost(`/api/game/${gameId}`, { action: "CONCEDE" })
+  );
+
+  const creating = createStatus === "pending";
+  const joining = joinStatus === "pending";
+  const conceding = concedeStatus === "pending";
+  const createError = operationErrorMessage(
+    createOperationError,
+    "Could not create lobby"
+  );
+  const joinError = operationErrorMessage(
+    joinOperationError,
+    "Could not join lobby"
+  );
+  const concedeError = operationErrorMessage(
+    concedeOperationError,
+    "Network error"
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -86,51 +118,31 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
   }, []);
 
   const createLobby = async () => {
-    setCreating(true);
-    setCreateError(null);
     try {
-      const json = await apiPost<CreateLobbyResponse>("/api/lobbies", {
-        format: "Standard",
-      });
+      const json = await executeCreateLobby();
       router.push(`/lobbies/${json.data.lobbyId}`);
-    } catch (err) {
-      setCreateError(
-        err instanceof ApiError ? err.message : "Could not create lobby"
-      );
-    } finally {
-      setCreating(false);
+    } catch {
+      // The hook exposes the error for the existing inline message.
     }
   };
 
   const joinLobby = async () => {
     if (joinCode.length < 4) return;
-    setJoining(true);
-    setJoinError(null);
     try {
-      const json = await apiPost<JoinLobbyResponse>("/api/lobbies/join", {
-        code: joinCode,
-      });
+      const json = await executeJoinLobby(joinCode);
       router.push(`/lobbies/${json.data.lobbyId}`);
-    } catch (err) {
-      setJoinError(
-        err instanceof ApiError ? err.message : "Could not join lobby"
-      );
-    } finally {
-      setJoining(false);
+    } catch {
+      // The hook exposes the error for the existing inline message.
     }
   };
 
   const concedeGame = async () => {
     if (!activeGameId) return;
-    setConceding(true);
-    setConcedeError(null);
     try {
-      await apiPost(`/api/game/${activeGameId}`, { action: "CONCEDE" });
+      await executeConcedeGame(activeGameId);
       setActiveGameId(null);
-    } catch (err) {
-      setConcedeError(err instanceof ApiError ? err.message : "Network error");
-    } finally {
-      setConceding(false);
+    } catch {
+      // The hook exposes the error for the existing inline message.
     }
   };
 
@@ -285,4 +297,12 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
       </div>
     </div>
   );
+}
+
+function operationErrorMessage(
+  error: unknown | null,
+  fallback: string
+): string | null {
+  if (error === null) return null;
+  return error instanceof ApiError ? error.message : fallback;
 }
