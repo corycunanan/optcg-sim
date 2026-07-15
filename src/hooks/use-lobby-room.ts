@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import {
+  LobbyActionResponseSchema,
   LobbyRoomResponseSchema,
   StartLobbyResponseSchema,
 } from "@/lib/validators/lobbies";
@@ -25,6 +26,7 @@ export function useLobbyRoom(
   const [error, setError] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const cancelledRef = useRef(false);
   const refreshInFlightRef = useRef(false);
   const { subscribe } = useUserChannelEvents();
@@ -110,14 +112,29 @@ export function useLobbyRoom(
     }
   }, [lobbyId]);
 
+  const leaveLobby = useCallback(async () => {
+    setLeaving(true);
+    try {
+      await apiPost(
+        `/api/lobbies/${lobbyId}/leave`,
+        undefined,
+        LobbyActionResponseSchema
+      );
+    } finally {
+      setLeaving(false);
+    }
+  }, [lobbyId]);
+
   return {
     lobby,
     loading,
     error,
     mutating,
     starting,
+    leaving,
     refresh,
     patchLobby,
     startLobby,
+    leaveLobby,
   };
 }

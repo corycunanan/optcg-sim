@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 // Mock React's hooks to run synchronously and capture per-`useState` setter
 // calls in declaration order. The hook declares state in this order:
-//   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting
+//   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting, 5: leaving
 // Tests assert on the lobby setter (index 0) and the error setter (index 2).
 vi.mock("react", async (importActual) => {
   const actual = await importActual<typeof import("react")>();
@@ -55,7 +55,7 @@ vi.mock("@/components/realtime/user-channel-provider", () => ({
   useUserChannelEvents: () => ({
     subscribe: <T extends string>(
       type: T,
-      handler: (event: LobbyEvent) => void,
+      handler: (event: LobbyEvent) => void
     ) => {
       if (type === "lobby:state_changed") {
         mocks.subscribeHandler = handler;
@@ -179,7 +179,7 @@ describe("useLobbyRoom subscribe behavior", () => {
     const initialFetchCount = mocks.apiGet.mock.calls.length;
 
     const visibilityHandler = mocks.addEventListener.mock.calls.find(
-      ([eventName]) => eventName === "visibilitychange",
+      ([eventName]) => eventName === "visibilitychange"
     )?.[1] as (() => void) | undefined;
     expect(visibilityHandler).toBeTypeOf("function");
 
@@ -187,5 +187,20 @@ describe("useLobbyRoom subscribe behavior", () => {
     await Promise.resolve();
 
     expect(mocks.apiGet).toHaveBeenCalledTimes(initialFetchCount + 1);
+  });
+});
+
+describe("useLobbyRoom leave behavior", () => {
+  it("posts to the dedicated guest leave endpoint", async () => {
+    mocks.apiPost.mockResolvedValueOnce({ success: true });
+    const room = useLobbyRoom("lobby-1", lobbyState());
+
+    await room.leaveLobby();
+
+    expect(mocks.apiPost).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/leave",
+      undefined,
+      expect.anything()
+    );
   });
 });
