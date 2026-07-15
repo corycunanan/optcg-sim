@@ -24,6 +24,14 @@ import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+type PatchLobbyData = {
+  mode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+  format?: string;
+  hostDeckId?: string | null;
+  hostReady?: boolean;
+  status?: "WAITING" | "READY";
+};
+
 type CloseFailure = "NOT_FOUND" | "FORBIDDEN" | "ALREADY_STARTED" | "NOT_PVP";
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
@@ -173,7 +181,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     });
   }
 
-  const lobbyData: Record<string, unknown> = {};
+  const lobbyData: PatchLobbyData = {};
   if (parsed.mode !== undefined) lobbyData.mode = parsed.mode;
   if (parsed.format !== undefined) lobbyData.format = parsed.format;
   if (parsed.hostDeckId !== undefined) lobbyData.hostDeckId = parsed.hostDeckId;
@@ -182,83 +190,104 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     lobbyData.hostReady = parsed.ready;
   }
 
-  const operations = [];
-
   if (switchingToSolitaire) {
-    operations.push(prisma.lobbyGuest.deleteMany({ where: { lobbyId: id } }));
-    operations.push(
-      prisma.lobbyGuest.upsert({
-        where: { lobbyId: id },
-        create: {
-          lobbyId: id,
-          userId: lobby.hostUserId,
-          deckId: parsed.guestDeckId ?? null,
-          guestReady: false,
-        },
-        update: {
-          userId: lobby.hostUserId,
-          deckId: parsed.guestDeckId ?? null,
-          guestReady: false,
-        },
-      })
-    );
     lobbyData.status = "READY";
   } else if (lobby.mode === "SOLITAIRE" && targetMode === "PVP") {
-    operations.push(
-      prisma.lobbyGuest.deleteMany({
-        where: { lobbyId: id, userId: lobby.hostUserId },
-      })
-    );
     lobbyData.status = "WAITING";
     lobbyData.hostReady = false;
-  } else if (targetMode === "SOLITAIRE" && isHost && !lobby.guest) {
-    operations.push(
-      prisma.lobbyGuest.upsert({
-        where: { lobbyId: id },
-        create: {
-          lobbyId: id,
-          userId: lobby.hostUserId,
-          deckId: parsed.guestDeckId ?? null,
-          guestReady: false,
-        },
-        update: {
-          userId: lobby.hostUserId,
-          deckId: parsed.guestDeckId ?? null,
-          guestReady: false,
-        },
-      })
-    );
-  } else if (parsed.guestDeckId !== undefined) {
-    operations.push(
-      prisma.lobbyGuest.update({
-        where: { lobbyId: id },
-        data: { deckId: parsed.guestDeckId, guestReady: false },
-      })
-    );
-  } else if (parsed.ready !== undefined && !isHost) {
-    operations.push(
-      prisma.lobbyGuest.update({
-        where: { lobbyId: id },
-        data: { guestReady: parsed.ready },
-      })
-    );
   }
 
-  if (Object.keys(lobbyData).length > 0) {
-    operations.push(prisma.lobby.update({ where: { id }, data: lobbyData }));
-  }
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Lock the exact active snapshot that authorized this PATCH. If close
+      // has already committed CLOSED (or another mutation changed lifecycle
+      // state), no guest-seat write below is allowed to run.
+      const guarded = await tx.lobby.updateMany({
+        where: { id, status: lobby.status, mode: lobby.mode },
+        data:
+          Object.keys(lobbyData).length > 0
+            ? lobbyData
+            : { status: lobby.status },
+      });
 
-  if (operations.length > 0) {
-    try {
-      await prisma.$transaction(operations);
-    } catch (error) {
-      if (isActiveLobbyConflict(error)) {
-        return apiError("An active lobby already exists", 409, {
-          code: "ACTIVE_LOBBY_EXISTS",
+      if (guarded.count !== 1) {
+        const current = await tx.lobby.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+        return {
+          failure:
+            !current || current.status === "CLOSED"
+              ? ("NOT_FOUND" as const)
+              : ("CONFLICT" as const),
+        };
+      }
+
+      if (switchingToSolitaire) {
+        await tx.lobbyGuest.deleteMany({ where: { lobbyId: id } });
+        await tx.lobbyGuest.upsert({
+          where: { lobbyId: id },
+          create: {
+            lobbyId: id,
+            userId: lobby.hostUserId,
+            deckId: parsed.guestDeckId ?? null,
+            guestReady: false,
+          },
+          update: {
+            userId: lobby.hostUserId,
+            deckId: parsed.guestDeckId ?? null,
+            guestReady: false,
+          },
+        });
+      } else if (lobby.mode === "SOLITAIRE" && targetMode === "PVP") {
+        await tx.lobbyGuest.deleteMany({
+          where: { lobbyId: id, userId: lobby.hostUserId },
+        });
+      } else if (targetMode === "SOLITAIRE" && isHost && !lobby.guest) {
+        await tx.lobbyGuest.upsert({
+          where: { lobbyId: id },
+          create: {
+            lobbyId: id,
+            userId: lobby.hostUserId,
+            deckId: parsed.guestDeckId ?? null,
+            guestReady: false,
+          },
+          update: {
+            userId: lobby.hostUserId,
+            deckId: parsed.guestDeckId ?? null,
+            guestReady: false,
+          },
+        });
+      } else if (parsed.guestDeckId !== undefined) {
+        await tx.lobbyGuest.update({
+          where: { lobbyId: id },
+          data: { deckId: parsed.guestDeckId, guestReady: false },
+        });
+      } else if (parsed.ready !== undefined && !isHost) {
+        await tx.lobbyGuest.update({
+          where: { lobbyId: id },
+          data: { guestReady: parsed.ready },
         });
       }
-      throw error;
+
+      return { failure: null };
+    });
+
+    if (result.failure === "NOT_FOUND") {
+      return apiError("Lobby not found or already closed", 404);
     }
+    if (result.failure === "CONFLICT") {
+      return apiError("Lobby state changed before the update completed", 409, {
+        code: "LOBBY_STATE_CHANGED",
+      });
+    }
+  } catch (error) {
+    if (isActiveLobbyConflict(error)) {
+      return apiError("An active lobby already exists", 409, {
+        code: "ACTIVE_LOBBY_EXISTS",
+      });
+    }
+    throw error;
   }
 
   // Capture the ejected guest (if any) so the post-transaction fanout can

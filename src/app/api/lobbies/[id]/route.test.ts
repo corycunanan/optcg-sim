@@ -6,7 +6,6 @@ const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindUniqueMock = vi.fn();
 const lobbyFindFirstMock = vi.fn();
-const lobbyUpdateMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
@@ -49,7 +48,6 @@ vi.mock("@/lib/db", () => ({
     lobby: {
       findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args),
       findFirst: (...args: unknown[]) => lobbyFindFirstMock(...args),
-      update: (...args: unknown[]) => lobbyUpdateMock(...args),
     },
     lobbyGuest: {
       create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
@@ -119,7 +117,6 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   lobbyFindUniqueMock.mockReset();
   lobbyFindFirstMock.mockReset();
-  lobbyUpdateMock.mockReset();
   lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
   lobbyGuestDeleteManyMock.mockReset();
@@ -140,7 +137,6 @@ beforeEach(() => {
     hostUserId: "host-user",
     status: "WAITING",
   });
-  lobbyUpdateMock.mockReturnValue({ query: "update-lobby" });
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
   lobbyGuestDeleteManyMock.mockReturnValue({ query: "delete-guests" });
@@ -153,6 +149,11 @@ beforeEach(() => {
       lobby: {
         updateMany: lobbyUpdateManyMock,
         findUnique: lobbyFindUniqueMock,
+      },
+      lobbyGuest: {
+        deleteMany: lobbyGuestDeleteManyMock,
+        update: lobbyGuestUpdateMock,
+        upsert: lobbyGuestUpsertMock,
       },
     });
   });
@@ -209,15 +210,11 @@ describe("PATCH /api/lobbies/[id]", () => {
         guestReady: false,
       },
     });
-    expect(lobbyUpdateMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1" },
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "PVP" },
       data: { mode: "SOLITAIRE", hostReady: false, status: "READY" },
     });
-    expect(transactionMock).toHaveBeenCalledWith([
-      { query: "delete-guests" },
-      { query: "upsert-guest" },
-      { query: "update-lobby" },
-    ]);
+    expect(transactionMock).toHaveBeenCalledOnce();
   });
 
   it("cleans up host-as-guest state when switching Solitaire back to PVP", async () => {
@@ -239,8 +236,8 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1", userId: "host-user" },
     });
-    expect(lobbyUpdateMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1" },
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "SOLITAIRE" },
       data: { mode: "PVP", hostReady: false, status: "WAITING" },
     });
   });
@@ -321,8 +318,8 @@ describe("PATCH /api/lobbies/[id]", () => {
     const res = await PATCH(buildRequest({ hostDeckId: null }), params);
 
     expect(res.status).toBe(200);
-    expect(lobbyUpdateMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1" },
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "PVP" },
       data: { hostDeckId: null, hostReady: false },
     });
   });
@@ -396,6 +393,28 @@ describe("PATCH /api/lobbies/[id]", () => {
     await flushAfter();
 
     expect(res.status).toBe(404);
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("does not mutate guest seats when close wins before PATCH commits", async () => {
+    lobbyFindUniqueMock
+      .mockResolvedValueOnce(baseLobby())
+      .mockResolvedValueOnce({ status: "CLOSED" });
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const res = await PATCH(
+      buildRequest(
+        { mode: "SOLITAIRE", guestDeckId: "side-b-deck" },
+        "?force=true"
+      ),
+      params
+    );
+    await flushAfter();
+
+    expect(res.status).toBe(404);
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestUpsertMock).not.toHaveBeenCalled();
     expect(notifyLobbyMock).not.toHaveBeenCalled();
     expect(notifyUserMock).not.toHaveBeenCalled();
   });

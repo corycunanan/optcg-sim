@@ -107,9 +107,26 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   // fires on accept) doesn't strand future invites. Two concurrent requests
   // for the same (lobby, recipient) race into the create; the loser sees
   // P2002 and returns 409 instead of persisting a duplicate PENDING row.
-  let invite: LobbyInviteRow;
+  let transactionResult:
+    | { kind: "created"; invite: LobbyInviteRow }
+    | { kind: "unavailable" };
   try {
-    invite = await prisma.$transaction(async (tx) => {
+    transactionResult = await prisma.$transaction(async (tx) => {
+      // Revalidate the active lobby snapshot inside the same transaction as
+      // invite creation. If close commits CLOSED after the preflight read,
+      // this conditional no-op lock returns 0 and no invite can be created.
+      const activeLobby = await tx.lobby.updateMany({
+        where: {
+          id: lobbyId,
+          hostUserId: userId,
+          status: lobby.status,
+          mode: "PVP",
+          guest: { is: null },
+        },
+        data: { status: lobby.status },
+      });
+      if (activeLobby.count !== 1) return { kind: "unavailable" as const };
+
       await tx.lobbyInvite.updateMany({
         where: {
           lobbyId,
@@ -119,7 +136,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         },
         data: { status: "EXPIRED" },
       });
-      return tx.lobbyInvite.create({
+      const invite = await tx.lobbyInvite.create({
         data: {
           lobbyId,
           fromUserId: userId,
@@ -140,6 +157,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           },
         },
       });
+      return { kind: "created" as const, invite };
     });
   } catch (err) {
     if (
@@ -151,13 +169,17 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     throw err;
   }
 
-  const serialized = serializeLobbyInviteForEvent(invite);
+  if (transactionResult.kind === "unavailable") {
+    return apiError("Lobby is closed or already started", 400);
+  }
+
+  const serialized = serializeLobbyInviteForEvent(transactionResult.invite);
 
   after(() =>
     notifyUser(toUserId, {
       type: "lobby:invite_received",
       invite: serialized,
-    }),
+    })
   );
 
   return apiSuccess(serialized, 201);
