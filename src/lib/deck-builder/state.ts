@@ -93,8 +93,8 @@ export type DeckBuilderAction =
   | { type: "SAVE_SUCCESS"; id: string }
   | { type: "SAVE_ERROR" }
   | { type: "MARK_CLEAN" }
-  | { type: "SET_SLEEVE"; sleeveUrl: string }
-  | { type: "SET_DON_ART"; donArtUrl: string }
+  | { type: "SET_SLEEVE"; sleeveUrl: string | null }
+  | { type: "SET_DON_ART"; donArtUrl: string | null }
   | { type: "SET_TEST_ORDER"; testOrder: TestDeckOrder | null };
 
 export function createInitialState(): DeckBuilderState {

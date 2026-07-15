@@ -119,3 +119,41 @@ describe("deckBuilderReducer save revisions", () => {
     expect(state.saveRevision).toBeNull();
   });
 });
+
+describe("deckBuilderReducer deck customization", () => {
+  it("changes the sleeve from default to custom and back to default", () => {
+    let state = createInitialState();
+
+    state = deckBuilderReducer(state, {
+      type: "SET_SLEEVE",
+      sleeveUrl: "/images/card-sleeves/custom.jpg",
+    });
+    expect(state.sleeveUrl).toBe("/images/card-sleeves/custom.jpg");
+
+    state = deckBuilderReducer(state, {
+      type: "SET_SLEEVE",
+      sleeveUrl: null,
+    });
+    expect(state.sleeveUrl).toBeNull();
+    expect(state.isDirty).toBe(true);
+    expect(state.editRevision).toBe(2);
+  });
+
+  it("changes DON art from default to custom and back to default", () => {
+    let state = createInitialState();
+
+    state = deckBuilderReducer(state, {
+      type: "SET_DON_ART",
+      donArtUrl: "/images/DON/custom.jpg",
+    });
+    expect(state.donArtUrl).toBe("/images/DON/custom.jpg");
+
+    state = deckBuilderReducer(state, {
+      type: "SET_DON_ART",
+      donArtUrl: null,
+    });
+    expect(state.donArtUrl).toBeNull();
+    expect(state.isDirty).toBe(true);
+    expect(state.editRevision).toBe(2);
+  });
+});
