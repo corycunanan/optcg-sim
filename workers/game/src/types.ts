@@ -23,6 +23,7 @@ export type {
   EffectStackFrame as SharedEffectStackFrame,
   QueuedTrigger as SharedQueuedTrigger,
 } from "../../../shared/game-types.js";
+export type { LobbyMode } from "../../../shared/game-init.js";
 
 import type {
   CardData as SharedCardData,
@@ -31,6 +32,11 @@ import type {
   PendingGameEvent,
   PendingPromptState as SharedPendingPromptState,
 } from "../../../shared/game-types.js";
+import type {
+  DeckCardData as SharedDeckCardData,
+  GameInitPayload as SharedGameInitPayload,
+  PlayerInitData as SharedPlayerInitData,
+} from "../../../shared/game-init.js";
 import type {
   EffectSchema,
   RuntimeActiveEffect,
@@ -267,38 +273,10 @@ export interface QueuedTrigger {
 
 // ─── Init payload (Next.js → DO on game start) ────────────────────────────────
 
-export type LobbyMode = "PVP" | "SOLITAIRE" | "PVCOMPUTER";
-
-export interface GameInitPayload {
-  gameId: string;
-  player1: PlayerInitData;
-  player2: PlayerInitData;
-  format: string;
-  mode: LobbyMode;
-  /**
-   * OPT-366: deterministic d6 sequence for the pregame priority roll. Each
-   * roll consumes two values (one per player). When the supplied pair is a
-   * tie, the next pair is consumed for the reroll, and so on. Once exhausted
-   * the engine falls back to the persisted execution-context RNG. Test-only.
-   */
-  testPriorityRolls?: number[] | null;
-}
-
-export interface PlayerInitData {
-  userId: string;
-  deck: DeckCardData[];
-  leader: DeckCardData;
-  sleeveUrl?: string | null;
-  donArtUrl?: string | null;
-  /** Fixed card order for testing: life and hand card assignments */
-  testOrder?: { life: string[]; hand: string[] } | null;
-}
-
-export interface DeckCardData {
-  cardId: string;
-  quantity: number;
-  cardData: CardData;
-}
+/** Worker-specialized views of the shared wire contract after schema validation. */
+export type GameInitPayload = SharedGameInitPayload<CardData>;
+export type PlayerInitData = SharedPlayerInitData<CardData>;
+export type DeckCardData = SharedDeckCardData<CardData>;
 
 // ─── Worker environment bindings ─────────────────────────────────────────────
 

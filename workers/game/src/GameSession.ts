@@ -29,8 +29,8 @@ import { configureLogger, log } from "./lib/log.js";
 import { SessionAuthorizer } from "./session/authorization.js";
 import { SessionCoordinator } from "./session/coordinator.js";
 import {
+  DurableObjectSessionStorage,
   SessionRepository,
-  type SessionStorage,
 } from "./session/persistence.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
 import {
@@ -68,6 +68,11 @@ export { DISCONNECT_BROADCAST_DEBOUNCE_MS } from "./session/transport.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
 
+function readDiscriminant(value: unknown, key: "type"): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return Reflect.get(value, key);
+}
+
 export class GameSession implements DurableObject {
   state: DurableObjectState;
   env: Env;
@@ -88,7 +93,7 @@ export class GameSession implements DurableObject {
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
-    const storage = state.storage as unknown as SessionStorage;
+    const storage = new DurableObjectSessionStorage(state.storage);
     this.authorizer = new SessionAuthorizer(storage, env.GAME_WORKER_SECRET);
     this.repository = new SessionRepository(storage, {
       nextJsUrl: env.NEXTJS_URL,
@@ -381,10 +386,7 @@ export class GameSession implements DurableObject {
       return;
     }
 
-    const rawType =
-      typeof raw === "object" && raw !== null
-        ? (raw as { type?: unknown }).type
-        : undefined;
+    const rawType = readDiscriminant(raw, "type");
 
     // Leave stays available; action-shaped messages spend gameplay budget before Zod validation.
     // Unknown or malformed envelopes spend a smaller abuse budget.

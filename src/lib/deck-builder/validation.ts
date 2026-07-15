@@ -11,6 +11,12 @@
  * - Leader deck restrictions: leader-authored card filters may constrain the main deck
  */
 
+import {
+  matchesTargetFilter,
+  type SharedTargetFilter,
+  type SharedTargetFilterCard,
+} from "@shared/target-filter";
+
 export const DEFAULT_COPY_LIMIT = 4;
 export const MAIN_DECK_SIZE = 50;
 
@@ -27,6 +33,13 @@ interface DeckRestrictionCard {
   type: string;
   cost: number | null;
   traits: string[];
+  color?: string[];
+  power?: number | null;
+  counter?: number | null;
+  attribute?: string[];
+  effectText?: string;
+  triggerText?: string | null;
+  effectSchema?: unknown | null;
 }
 
 export interface DeckCard {
@@ -40,6 +53,9 @@ export interface DeckCard {
     cost: number | null;
     power: number | null;
     counter: number | null;
+    attribute?: string[];
+    effectText?: string;
+    triggerText?: string | null;
     imageUrl: string;
     banStatus: string;
     blockNumber: number;
@@ -196,48 +212,78 @@ export function collectDeckRestrictionRules(leader: {
     }));
 }
 
-function matchesCardType(cardType: string, filterType: unknown): boolean {
-  const normalizedCardType = cardType.toUpperCase();
-
-  if (typeof filterType === "string") {
-    return filterType.toUpperCase() === normalizedCardType;
-  }
-
-  if (Array.isArray(filterType)) {
-    return filterType.some(
-      (type) =>
-        typeof type === "string" && type.toUpperCase() === normalizedCardType
-    );
-  }
-
-  return true;
-}
-
-function matchesTraitFilter(
-  cardTraits: string[],
-  filterTraits: unknown
-): boolean {
-  if (!Array.isArray(filterTraits)) return true;
-  return filterTraits.every(
-    (trait) => typeof trait === "string" && cardTraits.includes(trait)
-  );
-}
-
 export function matchesDeckRestrictionFilter(
   card: DeckRestrictionCard,
   filter: RuleModificationJson
 ): boolean {
-  if (
-    typeof filter.cost_min === "number" &&
-    (card.cost ?? 0) < filter.cost_min
-  ) {
-    return false;
-  }
+  const effectText = card.effectText ?? "";
+  const printedKeywords: Record<string, boolean> = {
+    BLOCKER: effectText.includes("[Blocker]"),
+    RUSH: effectText.includes("[Rush]"),
+    RUSH_CHARACTER: effectText.includes("[Rush: Character]"),
+    DOUBLE_ATTACK: effectText.includes("[Double Attack]"),
+    BANISH: effectText.includes("[Banish]"),
+    UNBLOCKABLE: effectText.includes("[Unblockable]"),
+    TRIGGER: Boolean(card.triggerText?.trim()),
+  };
+  const treatsAsAll = (kind: "names" | "types" | "attributes") =>
+    collectRuleModifications(card.effectSchema).some(
+      (mod) =>
+        mod.rule_type === "TREATED_AS_ALL_IDENTITIES" && mod[kind] === true
+    );
+  const sharedCard: SharedTargetFilterCard = {
+    cost: card.cost ?? 0,
+    baseCost: card.cost ?? 0,
+    power: card.power ?? 0,
+    basePower: card.power ?? 0,
+    colors: card.color ?? [],
+    traits: card.traits ?? [],
+    name: card.name,
+    attributes: card.attribute ?? [],
+    cardType: card.type,
+    attachedDonCount: 0,
+    hasTrigger: printedKeywords.TRIGGER,
+    hasEffect: effectText.trim().length > 0,
+    hasBaseEffect: effectText.trim().length > 0,
+    hasCounter: card.counter !== null && card.counter !== undefined,
+    treatsAsAllNames: treatsAsAll("names"),
+    treatsAsAllTraits: treatsAsAll("types"),
+    treatsAsAllAttributes: treatsAsAll("attributes"),
+  };
 
-  if (!matchesCardType(card.type, filter.card_type)) return false;
-  if (!matchesTraitFilter(card.traits ?? [], filter.traits)) return false;
-
-  return true;
+  return matchesTargetFilter(sharedCard, filter as SharedTargetFilter, {
+    getEffectiveCost: ({ cost }) => cost,
+    getEffectivePower: ({ power }) => power,
+    hasKeyword: (_candidate, keyword) =>
+      keyword === "BLOCKER" ||
+      keyword === "RUSH" ||
+      keyword === "RUSH_CHARACTER" ||
+      keyword === "DOUBLE_ATTACK" ||
+      keyword === "BANISH" ||
+      keyword === "UNBLOCKABLE"
+        ? printedKeywords[keyword]
+        : true,
+    hasGrantedAttribute: () => false,
+    hasEffectKeyword: (_candidate, keyword) => {
+      switch (keyword) {
+        case "ON_PLAY":
+          return effectText.includes("[On Play]");
+        case "WHEN_ATTACKING":
+          return effectText.includes("[When Attacking]");
+        case "ON_KO":
+          return effectText.includes("[On K.O.]");
+        case "ON_BLOCK":
+          return effectText.includes("[On Block]");
+        case "COUNTER":
+          return effectText.includes("[Counter]");
+        case "ACTIVATE_MAIN":
+          return effectText.includes("[Activate: Main]");
+        default:
+          return printedKeywords[keyword] ?? false;
+      }
+    },
+    unknownKeyBehavior: "reject",
+  });
 }
 
 export function isCardAllowedByDeckRestrictionRules(

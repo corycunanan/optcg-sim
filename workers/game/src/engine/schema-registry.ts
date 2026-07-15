@@ -26,6 +26,7 @@ import {
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
+import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 
 /**
  * Get the effect schema for a card by ID.
@@ -120,6 +121,13 @@ const IMPLICIT_COST_RESULT_REFS = new Set([
   "__cost_cards_placed_to_deck",
   "__cost_characters_ko",
 ]);
+const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
+  "type", "params", "target", "duration", "chain", "target_ref",
+  "result_ref", "conditions",
+]);
+const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
+  TARGET_FILTER_KEYS,
+);
 
 /**
  * Validate an effect schema and return a list of error messages.
@@ -170,11 +178,25 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
     errors.push(...validateBlock(block, blockPrefix));
   }
 
+  if (candidate.rule_modifications !== undefined) {
+    errors.push(
+      ...validateTargetFiltersInValue(
+        candidate.rule_modifications,
+        `${prefix} rule_modifications`,
+      ),
+    );
+  }
+
   return errors;
 }
 
 function validateBlock(block: EffectBlock, prefix: string): string[] {
   const errors: string[] = [];
+
+  errors.push(...validateTargetFiltersInValue(block, prefix));
+  if (block.trigger !== undefined) {
+    errors.push(...validateTriggerShape(block.trigger, `${prefix}.trigger`));
+  }
 
   switch (block.category) {
     case "auto":
@@ -344,6 +366,84 @@ function validateTargetFilterController(
   return errors;
 }
 
+function validateTargetFilterShape(filter: unknown, prefix: string): string[] {
+  if (!filter || typeof filter !== "object" || Array.isArray(filter)) {
+    return [`${prefix}: Target filter must be an object`];
+  }
+  const errors: string[] = [];
+  for (const key of Object.keys(filter)) {
+    if (!VALID_TARGET_FILTER_FIELDS.has(key)) {
+      errors.push(`${prefix}: Unknown target filter field '${key}'`);
+    }
+  }
+  const anyOf = Reflect.get(filter, "any_of");
+  if (anyOf !== undefined) {
+    if (!Array.isArray(anyOf)) {
+      errors.push(`${prefix}.any_of: Must be an array of target filters`);
+    } else {
+      for (let i = 0; i < anyOf.length; i++) {
+        errors.push(...validateTargetFilterShape(anyOf[i], `${prefix}.any_of[${i}]`));
+      }
+    }
+  }
+  return errors;
+}
+
+function validateTargetFiltersInValue(
+  value: unknown,
+  prefix: string,
+  depth = 0,
+): string[] {
+  if (!value || typeof value !== "object" || depth > 20) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) =>
+      validateTargetFiltersInValue(entry, `${prefix}[${index}]`, depth + 1)
+    );
+  }
+  const errors: string[] = [];
+  const customTriggerFilter = typeof Reflect.get(value, "event") === "string";
+  for (const [key, nested] of Object.entries(value)) {
+    const isTargetFilter =
+      key === "target_filter" ||
+      key === "source_filter" ||
+      key === "shared_filter" ||
+      (key === "filter" && !customTriggerFilter);
+    if (isTargetFilter) {
+      errors.push(...validateTargetFilterShape(nested, `${prefix}.${key}`));
+    }
+    errors.push(
+      ...validateTargetFiltersInValue(nested, `${prefix}.${key}`, depth + 1)
+    );
+  }
+  return errors;
+}
+
+function validateTriggerShape(trigger: unknown, prefix: string): string[] {
+  if (!trigger || typeof trigger !== "object" || Array.isArray(trigger)) {
+    return [`${prefix}: Trigger must be an object`];
+  }
+  if ("any_of" in trigger) {
+    const anyOf = Reflect.get(trigger, "any_of");
+    if (!Array.isArray(anyOf) || anyOf.length === 0) {
+      return [`${prefix}.any_of: Must be a non-empty array of triggers`];
+    }
+    return anyOf.flatMap((entry, index) =>
+      validateTriggerShape(entry, `${prefix}.any_of[${index}]`)
+    );
+  }
+  if ("keyword" in trigger) {
+    return typeof Reflect.get(trigger, "keyword") === "string"
+      ? []
+      : [`${prefix}.keyword: Must be a string`];
+  }
+  if ("event" in trigger) {
+    return typeof Reflect.get(trigger, "event") === "string"
+      ? []
+      : [`${prefix}.event: Must be a string`];
+  }
+  return [`${prefix}: Trigger must define 'keyword', 'event', or 'any_of'`];
+}
+
 function validateTargetController(target: Action["target"], prefix: string): string[] {
   const errors: string[] = [];
   if (target?.type && !VALID_TARGET_TYPES.has(target.type)) {
@@ -367,6 +467,12 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
 
   if (!action || typeof action !== "object" || Array.isArray(action)) {
     return [`${prefix}: Action must be an object`];
+  }
+
+  for (const key of Object.keys(action)) {
+    if (!VALID_ACTION_FIELDS.has(key)) {
+      errors.push(`${prefix}: Unknown action field '${key}'`);
+    }
   }
 
   if (!action.type) {

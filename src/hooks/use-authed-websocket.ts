@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
-export type ConnectionStatus =
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "error"
-  | "failed";
+import type { ConnectionStatus } from "@/types/realtime";
 
 // After MAX_RECONNECT_ATTEMPTS consecutive failed connection attempts we stop
 // retrying and surface a "failed" status so the UI can show an actionable

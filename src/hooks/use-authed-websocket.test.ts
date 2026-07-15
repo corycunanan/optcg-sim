@@ -6,8 +6,8 @@ import {
   RECONNECT_BASE_MS,
   RECONNECT_MAX_MS,
   shouldHandleClose,
-  type ConnectionStatus,
 } from "./use-authed-websocket";
+import type { ConnectionStatus } from "@/types/realtime";
 
 /* ── Mock WebSocket ──────────────────────────────────────────────── */
 

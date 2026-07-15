@@ -2,17 +2,14 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import {
-  useAuthedWebSocket,
-  type ConnectionStatus,
-} from "@/hooks/use-authed-websocket";
+import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
 import {
   createEventDispatcher,
   type EventDispatcher,
 } from "@/lib/realtime/event-dispatcher";
-import type { RealtimeClientEvent } from "@/types/realtime";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { RealtimeTokenResponseSchema } from "@/lib/validators/game";
+import type { ConnectionStatus, RealtimeClientEvent } from "@/types/realtime";
 
 export interface UseUserChannelResult {
   connectionStatus: ConnectionStatus;

@@ -1,6 +1,6 @@
 import type { Card } from "@prisma/client";
+import type { GameInitPayload, LobbyMode } from "@shared/game-init";
 import { toCardData } from "@/lib/game/card-data";
-import type { GameInitPayload, LobbyMode } from "../../../workers/game/src/types";
 
 type DeckCardWithCard = {
   card: Card;

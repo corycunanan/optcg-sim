@@ -31,6 +31,10 @@ import type {
 } from "../types.js";
 import { findCardInstance } from "./state.js";
 import { isPresent } from "./type-guards.js";
+import {
+  matchesTargetFilter,
+  type SharedTargetFilterCard,
+} from "../../../../shared/target-filter.js";
 
 export interface ConditionQueryServices {
   getEffectivePower(
@@ -1010,6 +1014,38 @@ export function cardTreatsAsAll(
  * Check if a card instance matches a TargetFilter.
  * Used by condition evaluator and target resolver.
  */
+function toSharedTargetFilterCard(
+  card: CardInstance,
+  data: CardData
+): SharedTargetFilterCard {
+  return {
+    controller: card.controller,
+    cost: data.cost ?? 0,
+    baseCost: data.cost ?? 0,
+    power: data.power ?? 0,
+    basePower: data.power ?? 0,
+    colors: data.color,
+    traits: data.types ?? [],
+    name: data.name,
+    attributes: data.attribute ?? [],
+    cardType: data.type,
+    state: card.state,
+    attachedDonCount: card.attachedDon.length,
+    instanceId: card.instanceId,
+    hasTrigger: data.keywords.trigger,
+    hasEffect: Boolean(data.effectText?.trim()),
+    hasBaseEffect: hasBaseEffect(data),
+    hasCounter: data.counter !== null && data.counter !== undefined,
+    treatsAsAllNames: cardTreatsAsAll(data, "names"),
+    treatsAsAllTraits: cardTreatsAsAll(data, "types"),
+    treatsAsAllAttributes: cardTreatsAsAll(data, "attributes"),
+  };
+}
+
+/**
+ * Check if a card instance matches a TargetFilter.
+ * Used by condition evaluation, modifiers, replacements, and target resolution.
+ */
 export function matchesFilter(
   card: CardInstance,
   filter: TargetFilter,
@@ -1023,396 +1059,70 @@ export function matchesFilter(
   const data = cardDb.get(card.cardId);
   if (!data) return false;
 
-  if (
-    filter.controller &&
-    filter.controller !== "ANY" &&
-    filter.controller !== "EITHER" &&
-    filterController !== undefined
-  ) {
-    const expected =
-      filter.controller === "SELF"
-        ? filterController
-        : ((1 - filterController) as 0 | 1);
-    if (card.controller !== expected) return false;
-  }
+  const sharedCard = toSharedTargetFilterCard(card, data);
+  const getReferencedCard = (
+    ref: string
+  ): SharedTargetFilterCard | undefined => {
+    const targetId = resultRefs?.get(ref)?.targetInstanceIds[0];
+    if (!targetId) return undefined;
+    const referenced = findInstanceById(state, targetId);
+    if (!referenced) return undefined;
+    const referencedData = cardDb.get(referenced.cardId);
+    return referencedData
+      ? toSharedTargetFilterCard(referenced, referencedData)
+      : undefined;
+  };
 
-  // Disjunctive filter
-  if (filter.any_of) {
-    const baseFilter = { ...filter, any_of: undefined };
-    const baseOk =
-      Object.keys(baseFilter).filter(
-        (k) => baseFilter[k as keyof TargetFilter] !== undefined
-      ).length === 0 ||
-      matchesFilter(
-        card,
-        baseFilter,
-        cardDb,
-        state,
-        resultRefs,
-        costOverride,
-        filterController,
-        queries
-      );
-    if (!baseOk) return false;
-    return filter.any_of.some((f) =>
-      matchesFilter(
-        card,
-        f,
-        cardDb,
-        state,
-        resultRefs,
-        costOverride,
-        filterController,
-        queries
-      )
-    );
-  }
-
-  // Cost filters — OPT-247: cost_* reads the EFFECTIVE (post-modifier) cost per
-  // Bandai's default. Card text "cost of N or less" with no "base" qualifier
-  // means current cost (OP09-098 Black Hole); "base cost of N or less" means
-  // printed value (OP10-098 Liberation).
-  //
-  // OPT-242: during MODIFY_COST fixed-point iteration, the caller passes the
-  // accumulated cost as costOverride — use it directly so the iteration sees a
-  // stable snapshot and cannot recurse back into getEffectiveCost.
-  const baseCost = data.cost ?? 0;
-  const ctrl = card.controller;
-  const hasCurrentCostFilter =
-    filter.cost_exact !== undefined ||
-    filter.cost_min !== undefined ||
-    filter.cost_max !== undefined ||
-    filter.cost_range !== undefined;
-  if (hasCurrentCostFilter) {
-    // OPT-450: zone-aware — on-field candidates must not see pending
-    // play-time discounts (e.g. a −1 "next play" modifier must not make a
-    // cost-5 permanent match "cost 4 or less"). Off-field candidates keep
-    // the play-cost read. costOverride (OPT-242 fixed-point) still wins.
-    if (!queries) return false;
-    const cost =
-      costOverride ??
-      queries.getEffectiveCostForRead(card, data, state, cardDb);
-    if (
-      filter.cost_exact !== undefined &&
-      !matchesDynamicNum(cost, "==", filter.cost_exact, state, ctrl)
-    )
-      return false;
-    if (
-      filter.cost_min !== undefined &&
-      !matchesDynamicNum(cost, ">=", filter.cost_min, state, ctrl)
-    )
-      return false;
-    if (
-      filter.cost_max !== undefined &&
-      !matchesDynamicNum(cost, "<=", filter.cost_max, state, ctrl)
-    )
-      return false;
-    if (
-      filter.cost_range &&
-      (cost < filter.cost_range.min || cost > filter.cost_range.max)
-    )
-      return false;
-  }
-  if (
-    filter.base_cost_exact !== undefined &&
-    baseCost !== filter.base_cost_exact
-  )
-    return false;
-  if (filter.base_cost_min !== undefined && baseCost < filter.base_cost_min)
-    return false;
-  if (filter.base_cost_max !== undefined && baseCost > filter.base_cost_max)
-    return false;
-
-  // Power filters — compute effective power lazily to avoid circular recursion
-  // (getEffectivePower → effectAppliesToCard → matchesFilter → getEffectivePower)
-  const hasPowerFilter =
-    filter.power_exact !== undefined ||
-    filter.power_min !== undefined ||
-    filter.power_max !== undefined ||
-    filter.power_range !== undefined;
-  const hasBasePowerFilter =
-    filter.base_power_exact !== undefined ||
-    filter.base_power_min !== undefined ||
-    filter.base_power_max !== undefined;
-  if (hasPowerFilter) {
-    if (!queries) return false;
-    const effectivePower = queries.getEffectivePower(card, data, state, cardDb);
-    if (
-      filter.power_exact !== undefined &&
-      !matchesDynamicNum(effectivePower, "==", filter.power_exact, state, ctrl)
-    )
-      return false;
-    if (
-      filter.power_min !== undefined &&
-      !matchesDynamicNum(effectivePower, ">=", filter.power_min, state, ctrl)
-    )
-      return false;
-    if (
-      filter.power_max !== undefined &&
-      !matchesDynamicNum(effectivePower, "<=", filter.power_max, state, ctrl)
-    )
-      return false;
-    if (
-      filter.power_range &&
-      (effectivePower < filter.power_range.min ||
-        effectivePower > filter.power_range.max)
-    )
-      return false;
-  }
-  if (hasBasePowerFilter) {
-    const basePower = data.power ?? 0;
-    if (
-      filter.base_power_exact !== undefined &&
-      basePower !== filter.base_power_exact
-    )
-      return false;
-    if (
-      filter.base_power_min !== undefined &&
-      basePower < filter.base_power_min
-    )
-      return false;
-    if (
-      filter.base_power_max !== undefined &&
-      basePower > filter.base_power_max
-    )
-      return false;
-  }
-
-  // Color filters
-  const colors = data.color.map((c) => c.toUpperCase());
-  if (filter.color && !colors.includes(filter.color)) return false;
-  if (
-    filter.color_includes &&
-    !filter.color_includes.some((c) => colors.includes(c))
-  )
-    return false;
-  if (filter.color_not_matching_ref && resultRefs) {
-    const refResult = resultRefs.get(filter.color_not_matching_ref);
-    if (refResult && refResult.targetInstanceIds.length > 0) {
-      const refCard = findInstanceById(state, refResult.targetInstanceIds[0]);
-      if (refCard) {
-        const refData = cardDb.get(refCard.cardId);
-        if (refData) {
-          const refColors = refData.color.map((c) => c.toUpperCase());
-          if (colors.some((c) => refColors.includes(c))) return false;
+  return matchesTargetFilter(sharedCard, filter, {
+    filterController,
+    costOverride,
+    getEffectiveCost: queries
+      ? () => queries.getEffectiveCostForRead(card, data, state, cardDb)
+      : undefined,
+    getEffectivePower: queries
+      ? () => queries.getEffectivePower(card, data, state, cardDb)
+      : undefined,
+    hasKeyword: queries
+      ? (_candidate, keyword) => {
+          if (
+            keyword !== "BLOCKER" &&
+            keyword !== "RUSH" &&
+            keyword !== "RUSH_CHARACTER" &&
+            keyword !== "DOUBLE_ATTACK" &&
+            keyword !== "BANISH" &&
+            keyword !== "UNBLOCKABLE"
+          ) {
+            return true;
+          }
+          return queries.hasEffectiveKeyword(
+            card,
+            data,
+            keyword,
+            state,
+            cardDb
+          );
         }
-      }
-    }
-  }
-
-  // Trait filters — OPT-227: blanket "treated as all types" satisfies positive
-  // trait checks and fails negative (exclude) checks symmetrically.
-  const traits = data.types ?? [];
-  const treatsAsAllTypes = cardTreatsAsAll(data, "types");
-  if (
-    filter.traits &&
-    !treatsAsAllTypes &&
-    !filter.traits.every((t) => traits.includes(t))
-  )
-    return false;
-  if (
-    filter.traits_any_of &&
-    !treatsAsAllTypes &&
-    !filter.traits_any_of.some((t) => traits.includes(t))
-  )
-    return false;
-  if (
-    filter.traits_contains &&
-    !treatsAsAllTypes &&
-    !filter.traits_contains.every((t) => traits.some((tr) => tr.includes(t)))
-  )
-    return false;
-  if (
-    filter.traits_exclude &&
-    (treatsAsAllTypes || filter.traits_exclude.some((t) => traits.includes(t)))
-  )
-    return false;
-
-  // Name filters — OPT-227: blanket "treated as all names" matches any positive
-  // name check and is caught by any exclude_name.
-  const treatsAsAllNames = cardTreatsAsAll(data, "names");
-  if (filter.name && !treatsAsAllNames && data.name !== filter.name)
-    return false;
-  if (
-    filter.name_any_of &&
-    !treatsAsAllNames &&
-    !filter.name_any_of.includes(data.name)
-  )
-    return false;
-  if (
-    filter.name_includes &&
-    !treatsAsAllNames &&
-    !data.name.includes(filter.name_includes)
-  )
-    return false;
-  if (
-    filter.exclude_name &&
-    (treatsAsAllNames || data.name === filter.exclude_name)
-  )
-    return false;
-  if (filter.name_matching_ref && resultRefs) {
-    const refResult = resultRefs.get(filter.name_matching_ref);
-    if (refResult && refResult.targetInstanceIds.length > 0) {
-      const refCard = findInstanceById(state, refResult.targetInstanceIds[0]);
-      if (refCard) {
-        const refData = cardDb.get(refCard.cardId);
-        if (refData && data.name !== refData.name) return false;
-      }
-    }
-  }
-
-  // Keyword / ability filters — OPT-253: the "has X" predicate consults the
-  // runtime keyword state, which respects effect negation of the card's
-  // printed keywords while preserving externally granted keywords. [Trigger]
-  // (on a Life card) is not affected by field-level negation, so the
-  // has_trigger check stays schema-only.
-  if (filter.keywords) {
-    for (const kw of filter.keywords) {
-      if (!queries) return false;
-      if (
-        kw === "BLOCKER" &&
-        !queries.hasEffectiveKeyword(card, data, "BLOCKER", state, cardDb)
-      )
-        return false;
-      if (
-        kw === "RUSH" &&
-        !queries.hasEffectiveKeyword(card, data, "RUSH", state, cardDb) &&
-        !queries.hasEffectiveKeyword(
-          card,
-          data,
-          "RUSH_CHARACTER",
-          state,
-          cardDb
-        )
-      )
-        return false;
-      if (
-        kw === "DOUBLE_ATTACK" &&
-        !queries.hasEffectiveKeyword(card, data, "DOUBLE_ATTACK", state, cardDb)
-      )
-        return false;
-      if (
-        kw === "BANISH" &&
-        !queries.hasEffectiveKeyword(card, data, "BANISH", state, cardDb)
-      )
-        return false;
-      if (
-        kw === "UNBLOCKABLE" &&
-        !queries.hasEffectiveKeyword(card, data, "UNBLOCKABLE", state, cardDb)
-      )
-        return false;
-    }
-  }
-  if (filter.has_trigger === true && !data.keywords.trigger) return false;
-  if (filter.has_trigger === false && data.keywords.trigger) return false;
-
-  // Attribute filters — OPT-227: "treated as all attributes" is omnidirectional.
-  // Positive checks pass; attribute_not excludes (e.g. defender's "cannot be
-  // K.O.'d by Slash" correctly fires vs. the blanket Leader).
-  // Attributes granted at runtime (GRANT_ATTRIBUTE, e.g. OP15-093) count for
-  // both directions, same as granted keywords.
-  const treatsAsAllAttrs = cardTreatsAsAll(data, "attributes");
-  if (filter.attribute && !treatsAsAllAttrs) {
-    const want = filter.attribute.toUpperCase();
-    if (
-      !(data.attribute ?? []).some((a) => a.toUpperCase() === want) &&
-      (!queries || !queries.hasGrantedAttribute(card, want, state, cardDb))
-    )
-      return false;
-  }
-  if (filter.attribute_not) {
-    const want = filter.attribute_not.toUpperCase();
-    if (
-      treatsAsAllAttrs ||
-      (data.attribute ?? []).some((a) => a.toUpperCase() === want) ||
-      (queries?.hasGrantedAttribute(card, want, state, cardDb) ?? false)
-    )
-      return false;
-  }
-
-  if (filter.has_effect === true) {
-    if (!data.effectText || data.effectText.trim() === "") return false;
-  }
-  if (filter.has_effect === false) {
-    if (data.effectText && data.effectText.trim() !== "") return false;
-  }
-
-  if (filter.no_base_effect === true) {
-    if (hasBaseEffect(data)) return false;
-  }
-
-  if (filter.has_counter === true) {
-    if (data.counter === null || data.counter === undefined) return false;
-  }
-  if (filter.has_counter === false) {
-    if (data.counter !== null && data.counter !== undefined) return false;
-  }
-
-  if (filter.lacks_effect_type) {
-    if (hasEffectKeyword(data, filter.lacks_effect_type)) return false;
-  }
-
-  // Card type filter
-  if (filter.card_type) {
-    const cardType = data.type.toUpperCase();
-    if (Array.isArray(filter.card_type)) {
-      if (!filter.card_type.some((t) => t.toUpperCase() === cardType))
-        return false;
-    } else {
-      if (filter.card_type.toUpperCase() !== cardType) return false;
-    }
-  }
-
-  // State filters
-  if (filter.is_rested === true && card.state !== "RESTED") return false;
-  if (filter.is_active === true && card.state !== "ACTIVE") return false;
-  if (filter.state && card.state !== filter.state) return false;
-
-  // Ref-based exclusion filter
-  if (filter.exclude_ref && resultRefs) {
-    const refResult = resultRefs.get(filter.exclude_ref);
-    if (refResult && refResult.targetInstanceIds.includes(card.instanceId))
-      return false;
-  }
-
-  // DON-given filters
-  if (filter.don_given_count) {
-    const donCount = card.attachedDon.length;
-    const val =
-      typeof filter.don_given_count.value === "number"
-      ? filter.don_given_count.value
-      : 0; // DynamicValue resolved at runtime
-    if (!compareNum(donCount, filter.don_given_count.operator, val))
-      return false;
-  }
-
-  return true;
-}
-
-function matchesDynamicNum(
-  actual: number,
-  op: NumericOperator,
-  expected: number | DynamicValue,
-  state?: GameState,
-  controller?: 0 | 1
-): boolean {
-  if (typeof expected === "number") {
-    return compareNum(actual, op, expected);
-  }
-  if (expected.type === "FIXED") {
-    return compareNum(actual, op, expected.value);
-  }
-  if (expected.type === "GAME_STATE" && state) {
-    const resolved = resolveGameStateValue(
-      expected.source,
-      state,
-      expected.controller,
-      controller
-    );
-    if (resolved !== null) return compareNum(actual, op, resolved);
-  }
-  // Unresolvable dynamic values — pass through
-  return true;
+      : undefined,
+    hasGrantedAttribute: queries
+      ? (_candidate, attribute) =>
+          queries.hasGrantedAttribute(card, attribute, state, cardDb)
+      : undefined,
+    hasEffectKeyword: (_candidate, keyword) => hasEffectKeyword(data, keyword),
+    resolveDynamicValue: (value) => {
+      if (value.type !== "GAME_STATE") return null;
+      const source =
+        "source" in value && typeof value.source === "string"
+          ? value.source
+          : "";
+      const controller =
+        "controller" in value && typeof value.controller === "string"
+          ? value.controller
+          : undefined;
+      return resolveGameStateValue(source, state, controller, card.controller);
+    },
+    getReferencedCard,
+    getReferencedInstanceIds: (ref) => resultRefs?.get(ref)?.targetInstanceIds,
+  });
 }
 
 function resolveGameStateValue(

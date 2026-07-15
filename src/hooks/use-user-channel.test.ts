@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConnectionStatus } from "@/hooks/use-authed-websocket";
+import type { ConnectionStatus } from "@/types/realtime";
 
 const mocks = vi.hoisted(() => ({
   authedCalls: [] as Array<{

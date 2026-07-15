@@ -5,6 +5,8 @@
  * This is the canonical type system for the effect schema.
  */
 
+import type { SharedTargetFilter } from "../../../../shared/target-filter.js";
+
 // ─── Core Enums ───────────────────────────────────────────────────────────────
 
 export type EffectCategory =
@@ -1148,6 +1150,17 @@ export interface TargetFilter {
   // Disjunctive (OR)
   any_of?: TargetFilter[];
 }
+
+type TargetFilterMatchesShared = TargetFilter extends SharedTargetFilter
+  ? [
+      Exclude<keyof TargetFilter, keyof SharedTargetFilter>,
+      Exclude<keyof SharedTargetFilter, keyof TargetFilter>,
+    ] extends [never, never]
+    ? true
+    : never
+  : never;
+const targetFilterMatchesShared: TargetFilterMatchesShared = true;
+void targetFilterMatchesShared;
 
 export interface DonGivenFilter {
   operator: NumericOperator;
