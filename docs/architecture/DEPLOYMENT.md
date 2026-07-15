@@ -192,8 +192,42 @@ Before OPT-279, only the images worker had a deploy script (`worker:deploy` in `
 | Secret | Consumers | Storage |
 |--------|-----------|---------|
 | `GAME_WORKER_SECRET` | Next.js API (`/api/game/*`), Cloudflare Game Worker (`workers/game/`) | Vercel env var, `wrangler secret` |
+| `CRON_SECRET` | Vercel Cron, Next.js scheduled maintenance routes | Vercel Production env var |
 | `AUTH_SECRET` | Next.js (NextAuth) | Vercel env var |
 | `DATABASE_URL` / `DIRECT_DATABASE_URL` | Next.js (Prisma), `pipeline/` scripts | `.env` (dev Neon branch), Vercel Production env (prod Neon branch) |
+
+## Scheduled lobby retention
+
+`vercel.json` invokes `GET /api/cron/lobby-retention` daily at `04:00` UTC. Vercel sends the Production `CRON_SECRET` value as `Authorization: Bearer <secret>`; the route fails closed when the secret is missing or does not match.
+
+The retention policy is intentionally narrow:
+
+- keep every `WAITING`, `READY`, and `IN_GAME` lobby;
+- treat `updatedAt` as the closure clock because normal API soft-close paths update the row and `CLOSED` is terminal in the API;
+- keep `CLOSED` lobbies updated within the last 30 days;
+- keep every lobby linked to a `GameSession`, regardless of age;
+- select and delete at most 500 eligible lobby IDs per invocation;
+- re-check status, cutoff, and missing game relation in the delete query so a stale selection cannot broaden the deletion;
+- allow `LobbyGuest` and `LobbyInvite` rows to cascade only after their eligible parent lobby is deleted.
+
+The job logs and returns `eligible`, `selected`, `deleted`, `errors`, and `durationMs`. It is idempotent and safe to invoke again after a partial backlog; Vercel does not retry failed cron invocations automatically, so inspect the function logs and rerun the authenticated endpoint manually when needed.
+
+### Production enablement and dry-run
+
+1. Generate a dedicated secret of at least 16 random characters and set `CRON_SECRET` in the Vercel Production environment. Do not reuse `GAME_WORKER_SECRET`.
+2. Deploy the release. Vercel registers the schedule from `vercel.json` only for the production deployment.
+3. Before the first scheduled invocation, count eligible rows without deleting anything:
+
+   ```bash
+   curl \
+     -H "Authorization: Bearer $CRON_SECRET" \
+     "https://optcg-sim.vercel.app/api/cron/lobby-retention?dryRun=true"
+   ```
+
+4. Confirm the returned cutoff, `eligible` count, and zero `selected`/`deleted` values. Review the matching structured function log.
+5. Invoke the endpoint without `dryRun=true` only if an immediate manual sweep is desired; otherwise let the next daily run process the first bounded batch.
+
+To pause deletion without a code deploy, disable the cron in Vercel's Cron Jobs settings. Keep `CRON_SECRET` configured so manual dry-runs remain authenticated.
 
 ### Rotating `GAME_WORKER_SECRET`
 
