@@ -28,6 +28,10 @@ import {
 import { UserPlus, Check, X, MoreHorizontal, ChevronsUpDown, LogOut, Search } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
+import {
+  MIN_SUBSTRING_SEARCH_LENGTH,
+  normalizeSubstringSearchQuery,
+} from "@/lib/search-query";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import { UserChannelConnectionStatus } from "@/components/realtime/user-channel-connection-status";
 import {
@@ -126,8 +130,14 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
 
   const search = useCallback(async (q: string) => {
     setSearchQ(q);
-    if (q.length < 2) { setSearchResults([]); return; }
-    const json = await apiGet<{ data: SidebarUser[] }>(`/api/users/search?q=${encodeURIComponent(q)}`);
+    const query = normalizeSubstringSearchQuery(q);
+    if (query.length < MIN_SUBSTRING_SEARCH_LENGTH) {
+      setSearchResults([]);
+      return;
+    }
+    const json = await apiGet<{ data: SidebarUser[] }>(
+      `/api/users/search?q=${encodeURIComponent(query)}`,
+    );
     setSearchResults(json.data || []);
   }, []);
 
@@ -153,6 +163,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const friendIds = new Set(friends.map((f) => f.user.id));
   const user = session?.user;
   const userName = user?.username || user?.name || "User";
+  const normalizedSearchQ = normalizeSubstringSearchQuery(searchQ);
 
   // Seed presence for each newly-added friend. The provider ref-counts so
   // re-render cycles with the same friends array don't refetch.
@@ -343,7 +354,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                   type="text"
                   value={searchQ}
                   onChange={(e) => search(e.target.value)}
-                  placeholder="Search by username..."
+                  placeholder="Search 3+ username characters..."
                   className="h-8 text-xs"
                   autoFocus
                 />
@@ -375,9 +386,18 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                     })}
                   </div>
                 )}
-                {searchQ.length >= 2 && searchResults.length === 0 && (
-                  <p className="mt-2 text-center text-xs opacity-50">No users found</p>
-                )}
+                {normalizedSearchQ.length > 0 &&
+                  normalizedSearchQ.length < MIN_SUBSTRING_SEARCH_LENGTH && (
+                    <p className="mt-2 text-center text-xs opacity-50">
+                      Enter at least 3 characters
+                    </p>
+                  )}
+                {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                  searchResults.length === 0 && (
+                    <p className="mt-2 text-center text-xs opacity-50">
+                      No users found
+                    </p>
+                  )}
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

@@ -7,6 +7,11 @@ import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
 import {
+  MIN_SUBSTRING_SEARCH_LENGTH,
+  isSubstringSearchQueryTooShort,
+  normalizeSubstringSearchQuery,
+} from "@/lib/search-query";
+import {
   collectDeckRestrictionRules,
   getDeckCardCopyLimit,
   isCardAllowedByDeckRestrictionRules,
@@ -122,9 +127,24 @@ export function DeckBuilderSearch({
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
+    if (isSubstringSearchQueryTooShort(query)) {
+      setPage(1);
+      setResults([]);
+      setTotal(0);
+      setLoadFailed(false);
+      setIsLoading(false);
+      return;
+    }
     debounceRef.current = setTimeout(() => {
       setPage(1);
-      fetchCards(query, 1, activeColors, activeType, costMin, costMax);
+      fetchCards(
+        normalizeSubstringSearchQuery(query),
+        1,
+        activeColors,
+        activeType,
+        costMin,
+        costMax,
+      );
     }, 300);
     return () => clearTimeout(debounceRef.current);
   }, [query, activeColors, activeType, costMin, costMax, fetchCards]);
@@ -163,6 +183,7 @@ export function DeckBuilderSearch({
   };
 
   const totalPages = Math.ceil(total / 40);
+  const queryTooShort = isSubstringSearchQueryTooShort(query);
 
   return (
     <>
@@ -173,7 +194,7 @@ export function DeckBuilderSearch({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search cards..."
+            placeholder="Search 3+ card-name characters..."
           />
         </div>
 
@@ -245,7 +266,13 @@ export function DeckBuilderSearch({
 
         {/* Results count */}
         <div className="text-content-tertiary px-3 pb-1 text-xs">
-          {isLoading ? "Searching…" : loadFailed ? "" : `${total.toLocaleString()} cards`}
+          {queryTooShort
+            ? `Enter at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`
+            : isLoading
+              ? "Searching…"
+              : loadFailed
+                ? ""
+                : `${total.toLocaleString()} cards`}
         </div>
 
         {/* Results grid */}
@@ -269,7 +296,7 @@ export function DeckBuilderSearch({
               </button>
             </div>
           )}
-          {!loadFailed && !isLoading && results.length === 0 && (
+          {!queryTooShort && !loadFailed && !isLoading && results.length === 0 && (
             <div className="py-10 text-center">
               <p className="text-content-secondary text-sm font-medium">
                 No cards match

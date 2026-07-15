@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 const authMock = vi.fn();
 const findUniqueMock = vi.fn();
 const createMock = vi.fn();
+const findManyMock = vi.fn();
+const countMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
@@ -12,6 +14,8 @@ vi.mock("@/lib/db", () => ({
     card: {
       findUnique: (...args: unknown[]) => findUniqueMock(...args),
       create: (...args: unknown[]) => createMock(...args),
+      findMany: (...args: unknown[]) => findManyMock(...args),
+      count: (...args: unknown[]) => countMock(...args),
     },
   },
 }));
@@ -20,7 +24,7 @@ vi.mock("@/lib/rate-limit", () => ({
   searchLimiter: { check: rateLimitMock },
 }));
 
-const { POST } = await import("./route");
+const { GET, POST } = await import("./route");
 
 const validBody = {
   id: "OP99-999",
@@ -42,6 +46,49 @@ beforeEach(() => {
   authMock.mockReset();
   findUniqueMock.mockReset();
   createMock.mockReset();
+  findManyMock.mockReset();
+  countMock.mockReset();
+  rateLimitMock.mockReset();
+
+  rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
+  findManyMock.mockResolvedValue([]);
+  countMock.mockResolvedValue(0);
+});
+
+describe("GET /api/cards search", () => {
+  it("rejects a 1-2 character name query before Prisma", async () => {
+    const res = await GET(
+      new NextRequest("http://localhost/api/cards?q=lu", {
+        headers: { "x-forwarded-for": "127.0.0.1" },
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Search query must be at least 3 characters",
+      code: "SEARCH_QUERY_TOO_SHORT",
+    });
+    expect(findManyMock).not.toHaveBeenCalled();
+    expect(countMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves case-insensitive substring search for 3+ characters", async () => {
+    const res = await GET(
+      new NextRequest("http://localhost/api/cards?q=luf", {
+        headers: { "x-forwarded-for": "127.0.0.1" },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { name: { contains: "luf", mode: "insensitive" } },
+      }),
+    );
+    expect(countMock).toHaveBeenCalledWith({
+      where: { name: { contains: "luf", mode: "insensitive" } },
+    });
+  });
 });
 
 describe("POST /api/cards admin gate", () => {

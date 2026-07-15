@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
 import { CardBrowser } from "@/components/admin/card-browser";
+import {
+  isSubstringSearchQueryTooShort,
+  normalizeSubstringSearchQuery,
+} from "@/lib/search-query";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +13,8 @@ export default async function AdminCardsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = (params.q as string) || "";
+  const rawQuery = normalizeSubstringSearchQuery(params.q as string);
+  const q = isSubstringSearchQueryTooShort(rawQuery) ? "" : rawQuery;
   const color = (params.color as string) || "";
   const type = (params.type as string) || "";
   const set = (params.set as string) || "";

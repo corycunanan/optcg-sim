@@ -6,6 +6,11 @@
  */
 
 import { type Prisma } from "@prisma/client";
+import {
+  MIN_SUBSTRING_SEARCH_LENGTH,
+  isSubstringSearchQueryTooShort,
+  normalizeSubstringSearchQuery,
+} from "@/lib/search-query";
 
 export interface CardSearchParams {
   q?: string;
@@ -40,8 +45,15 @@ const VALID_SORT_FIELDS = [
 export function buildCardWhereClause(params: CardSearchParams): Prisma.CardWhereInput {
   const where: Prisma.CardWhereInput = {};
 
-  if (params.q) {
-    where.name = { contains: params.q, mode: "insensitive" };
+  if (isSubstringSearchQueryTooShort(params.q)) {
+    throw new RangeError(
+      `Card search queries must be at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`,
+    );
+  }
+
+  const query = normalizeSubstringSearchQuery(params.q);
+  if (query) {
+    where.name = { contains: query, mode: "insensitive" };
   }
 
   if (params.color) {

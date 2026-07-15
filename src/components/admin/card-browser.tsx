@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CardDetailModal } from "@/components/cards/card-detail-modal";
+import { isSubstringSearchQueryTooShort } from "@/lib/search-query";
 import { CardGrid } from "./card-grid";
 import { Pagination } from "./pagination";
 import {
@@ -113,6 +114,7 @@ export function CardBrowser({
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
+      if (isSubstringSearchQueryTooShort(search)) return;
       updateFilters({ q: search });
     },
     [search, updateFilters],
@@ -125,6 +127,7 @@ export function CardBrowser({
     currentFilters.set ||
     currentFilters.block ||
     currentFilters.originOnly;
+  const searchTooShort = isSubstringSearchQueryTooShort(search);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -163,11 +166,17 @@ export function CardBrowser({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search cards by name..."
                 className="flex-1"
+                aria-describedby="card-search-help"
               />
-              <Button type="submit">
+              <Button type="submit" disabled={searchTooShort}>
                 Search
               </Button>
             </div>
+            <p id="card-search-help" className="text-content-tertiary mt-2 text-xs">
+              {searchTooShort
+                ? "Enter at least 3 characters to search by name."
+                : "Search by at least 3 characters, or leave blank to browse."}
+            </p>
           </form>
         </div>
 
