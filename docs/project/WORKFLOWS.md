@@ -6,6 +6,8 @@
 >
 > Priorities, in order: **correctness > speed > cost.**
 
+Standing roles, authority, and per-project kickoff decisions are defined in the [Orchestration Charter](./ORCHESTRATION-CHARTER.md).
+
 ---
 
 ## The pipeline at a glance
