@@ -6,7 +6,9 @@
 import type {
   ActionOf,
   ActionParamsMap,
+  Duration,
   EffectResult,
+  Modifier,
   RuntimeActiveEffect,
   Target,
 } from "../../effect-types.js";
@@ -18,6 +20,36 @@ import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, 
 import { getEffectivePower } from "../../modifiers.js";
 import { findCardInstance } from "../../state.js";
 import { allocateEngineRecord } from "../../execution-context.js";
+
+type PersistedModifierSpec =
+  | { type: "MODIFY_POWER"; params: { amount: number } }
+  | { type: "MODIFY_COST"; params: { amount: number } }
+  | { type: "GRANT_KEYWORD"; params: ActionParamsMap["GRANT_KEYWORD"] }
+  | { type: "GRANT_ATTRIBUTE"; params: ActionParamsMap["GRANT_ATTRIBUTE"] }
+  | { type: "NEGATE_EFFECTS_FLAG"; params: Record<string, never> }
+  | { type: "SET_POWER"; params: { value: number } };
+
+/** Construct only modifier variants that this action module persists. */
+function createPersistedModifier(
+  spec: PersistedModifierSpec,
+  duration: Duration,
+): Modifier {
+  switch (spec.type) {
+    case "MODIFY_POWER":
+    case "MODIFY_COST":
+    case "GRANT_KEYWORD":
+    case "GRANT_ATTRIBUTE":
+    case "NEGATE_EFFECTS_FLAG":
+    case "SET_POWER":
+      return { ...spec, duration };
+    default:
+      return assertNever(spec);
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled persisted modifier: ${JSON.stringify(value)}`);
+}
 
 export function executeModifyPower(
   state: GameState,
@@ -46,11 +78,10 @@ export function executeModifyPower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{
+    modifiers: [createPersistedModifier({
       type: "MODIFY_POWER",
       params: { amount },
-      duration,
-    }],
+    }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -102,11 +133,10 @@ export function executeModifyCost(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{
+    modifiers: [createPersistedModifier({
       type: "MODIFY_COST",
       params: { amount },
-      duration,
-    }],
+    }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -151,11 +181,10 @@ export function executeGrantKeyword(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{
+    modifiers: [createPersistedModifier({
       type: "GRANT_KEYWORD",
       params: { keyword },
-      duration,
-    }],
+    }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -197,13 +226,10 @@ export function executeGrantAttribute(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [
-      {
-        type: "GRANT_ATTRIBUTE",
-        params: { attribute },
-        duration,
-      },
-    ],
+    modifiers: [createPersistedModifier({
+      type: "GRANT_ATTRIBUTE",
+      params: { attribute },
+    }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -253,11 +279,10 @@ export function executeNegateEffects(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{
+    modifiers: [createPersistedModifier({
       type: "NEGATE_EFFECTS_FLAG",
       params: {},
-      duration,
-    }],
+    }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -311,7 +336,7 @@ export function executeSetBasePower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER", params: { value }, duration }],
+    modifiers: [createPersistedModifier({ type: "SET_POWER", params: { value } }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -418,9 +443,10 @@ export function executeCopyPower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [
-      { type: "SET_POWER", params: { value: sourcePower }, duration },
-    ],
+    modifiers: [createPersistedModifier({
+      type: "SET_POWER",
+      params: { value: sourcePower },
+    }, duration)],
     duration,
     expiresAt: computeExpiry(duration, state, controller),
     controller,
@@ -523,7 +549,7 @@ export function executeSwapBasePower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER", params: { value: powerB }, duration }],
+    modifiers: [createPersistedModifier({ type: "SET_POWER", params: { value: powerB } }, duration)],
     duration,
     expiresAt: expiry,
     controller,
@@ -535,7 +561,7 @@ export function executeSwapBasePower(
     sourceCardInstanceId,
     sourceEffectBlockId: "",
     category: "auto",
-    modifiers: [{ type: "SET_POWER", params: { value: powerA }, duration }],
+    modifiers: [createPersistedModifier({ type: "SET_POWER", params: { value: powerA } }, duration)],
     duration,
     expiresAt: expiry,
     controller,

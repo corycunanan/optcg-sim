@@ -1,5 +1,5 @@
 /** Iterative cost payment orchestration and suspension. */
-import type { ChoiceCost, Cost, CostResult, EffectBlock, SimpleCost } from "../../effect-types.js";
+import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
 import { generateFrameId, pushFrame } from "../../effect-stack.js";
 import { isEngineTerminated } from "../../engine-limits.js";
@@ -113,10 +113,9 @@ export function payCostsWithSelection(
 
     // CHOICE — branching cost paths; each option is a full Cost[].
     if (cost.type === "CHOICE") {
-      const choiceCost = cost as ChoiceCost;
       const payableBranchIndices: number[] = [];
-      for (let bi = 0; bi < choiceCost.options.length; bi++) {
-        const branchPayable = choiceCost.options[bi].every((c) =>
+      for (let bi = 0; bi < cost.options.length; bi++) {
+        const branchPayable = cost.options[bi].every((c) =>
           isCostPayable(nextState, c, controller, cardDb, sourceCardInstanceId),
         );
         if (branchPayable) payableBranchIndices.push(bi);
@@ -127,7 +126,7 @@ export function payCostsWithSelection(
       }
 
       if (payableBranchIndices.length === 1) {
-        const branch = choiceCost.options[payableBranchIndices[0]];
+        const branch = cost.options[payableBranchIndices[0]];
         workingCosts.splice(i, 1, ...branch);
         i--;
         continue;
@@ -163,7 +162,7 @@ export function payCostsWithSelection(
           effectDescription: "Select how to pay the cost",
           choices: payableBranchIndices.map((bi) => ({
             id: String(bi),
-            label: choiceCost.labels?.[bi] ?? deriveBranchLabel(choiceCost.options[bi]),
+            label: cost.labels?.[bi] ?? deriveBranchLabel(cost.options[bi]),
           })),
         },
         respondingPlayer: controller,
@@ -179,7 +178,7 @@ export function payCostsWithSelection(
     // (e.g. OP05-080) or for a single card.
     let autoPayTrashToDeck = false;
     if (cost.type === "PLACE_FROM_TRASH_TO_DECK") {
-      const amount = resolveAmount(cost as SimpleCost);
+      const amount = resolveAmount(cost);
       const validTargets = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
       if (validTargets.length < amount) {
         return { state: nextState, events, cannotPay: true };
@@ -281,7 +280,7 @@ export function payCostsWithSelection(
     // player selects WHICH trash cards, then orders the whole group (self +
     // trash) in a single arrange prompt per Comprehensive Rule 3-1-7.
     if (cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" || cost.type === "PLACE_SELF_AND_HAND_TO_DECK") {
-      const amount = resolveAmount(cost as SimpleCost);
+      const amount = resolveAmount(cost);
       const player = nextState.players[controller];
       const sourceOnField = cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
         ? player.stage?.instanceId === sourceCardInstanceId
@@ -388,7 +387,7 @@ export function payCostsWithSelection(
     if (!autoPayTrashToDeck && costNeedsPlayerSelection(cost)) {
       // Special handling for life costs with TOP_OR_BOTTOM — use PLAYER_CHOICE
       if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
-          (cost as SimpleCost).position === "TOP_OR_BOTTOM") {
+          cost.position === "TOP_OR_BOTTOM") {
         const p = nextState.players[controller];
         if (p.life.length === 0) {
           return { state: nextState, events, cannotPay: true };
@@ -437,7 +436,7 @@ export function payCostsWithSelection(
 
       // Build valid targets for this cost
       const validTargets = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
-      const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
+      const amount = typeof cost.amount === "number" ? cost.amount : 1;
 
       if (validTargets.length < amount) {
         return { state: nextState, events, cannotPay: true };

@@ -36,13 +36,14 @@ export function computeCostTargets(
   sourceCardInstanceId?: string,
 ): string[] {
   const player = state.players[controller];
+  const filter = cost.type === "CHOICE" ? undefined : cost.filter;
 
   // OPT-432: honor filter.exclude_self on cost candidates — printed costs
   // like OP05-056's "1 of your Characters other than this Character" must
   // never offer the effect's source. matchesFilter cannot enforce this on
   // the cost path (it never receives the source), so it is applied here.
   const dropSelf = (ids: string[]): string[] =>
-    (cost as SimpleCost).filter?.exclude_self && sourceCardInstanceId
+    filter?.exclude_self && sourceCardInstanceId
       ? ids.filter((id) => id !== sourceCardInstanceId)
       : ids;
 

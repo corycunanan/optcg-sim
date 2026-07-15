@@ -1188,8 +1188,7 @@ export interface MixedPool {
 
 export type Cost = SimpleCost | ChoiceCost;
 
-export interface SimpleCost {
-  type: Exclude<CostType, "CHOICE">;
+interface SimpleCostFields {
   amount?: number | "ANY_NUMBER" | DynamicValue;
   filter?: TargetFilter;
   target?: Target;
@@ -1199,6 +1198,17 @@ export interface SimpleCost {
   options?: Cost[];
   card_name?: string;
 }
+
+type SimpleCostType = Exclude<CostType, "CHOICE">;
+
+/**
+ * Distribute the simple-cost shape over its type so Cost is a true
+ * discriminated union. Runtime data is unchanged; TypeScript can now narrow
+ * every branch without assertions and enforce exhaustive dispatch.
+ */
+export type SimpleCost = {
+  [Type in SimpleCostType]: SimpleCostFields & { type: Type };
+}[SimpleCostType];
 
 export interface ChoiceCost {
   type: "CHOICE";

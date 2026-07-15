@@ -1,5 +1,5 @@
 /** Prompt and display construction for cost selection. */
-import type { Cost, EffectBlock, SimpleCost } from "../../effect-types.js";
+import type { Cost, EffectBlock } from "../../effect-types.js";
 import type {
   CardInstance,
   EffectStackFrame,
@@ -57,7 +57,7 @@ export function buildTrashToDeckArrangePrompt(
 
 /** Build the player-facing instruction for a cost-selection prompt. */
 export function getCostLabel(cost: Cost): string {
-  const amount = typeof (cost as SimpleCost).amount === "number" ? ((cost as SimpleCost).amount as number) : 1;
+  const amount = cost.type !== "CHOICE" && typeof cost.amount === "number" ? cost.amount : 1;
   switch (cost.type) {
     case "TRASH_FROM_HAND": return `Choose ${amount} card(s) from hand to trash as cost`;
     case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;
