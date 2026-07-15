@@ -19,6 +19,13 @@ blocked test, or serve a second consumer. It would instead turn local
 derivations into single-use interfaces and make the player-perspective,
 opponent-presence, and terminal-state rules harder to inspect together.
 
+This decision held after behavior-level verification. The added
+`use-game-session.behavior.test.tsx` renders the real `useGameSession`,
+`useGameWs`, `useAuthedWebSocket`, and `useGameFinalizer` chain while controlling
+only external card/status sources, WebSocket events, API responses, and time.
+All residual behavior was testable through the existing contracts; no new seam
+was needed to observe or drive it.
+
 ## Current responsibility map
 
 | Responsibility                           | Current owner         | Contract / dependencies                                                                                                               | Evidence                                                                                                                                                    |
@@ -102,31 +109,54 @@ should not force that unrelated rewrite without a failing behavior case.
   is covered by the dual-instance composition test and documented on the
   composer because that is where both requested perspective and finalizer
   output are visible.
-- `useGameSession` tests use a shallow mocked-React harness. They cover
+- The legacy `useGameSession` tests use a shallow mocked-React harness for
   per-perspective identity, action routing, independent connection status, and
-  single-owner finalization, but not opponent deadline ticking, pause phases,
-  combined connectivity retry, or terminal display precedence.
+  single-owner finalization. The new behavior suite complements them with an
+  actual React render and the real session -> game-message -> authenticated
+  transport -> finalizer chain.
 - Focused controller tests already cover initial connection, fresh-token
   reconnects, backoff, retry invalidation, failure, and manual close. Focused
   message tests cover prompt identity and accepted/rejected action streams.
-- `useGameFinalizer` has focused fallback-concede coverage, but leave failure,
-  back-to-lobbies behavior, and idempotent finalization deserve direct tests.
-  Those tests can target the existing hook contract; no further extraction is
-  needed first.
+- The new suite verifies facade-level connect/drop/reconnect and combined retry
+  wiring; `game:state` and `game:update` projections; opponent disconnect/LEFT
+  copy, deadline ticking, opponent-turn pauses, and all three response-step
+  pauses; open-match socket leave; rendered leave and fallback-concede failure
+  state; closed-match navigation; terminal-display precedence; and idempotent
+  finalization across persisted, worker-state, and socket terminal signals.
+- Those cases required controllable boundaries, not another domain hook. The
+  tests mock neither `useGameWs`, `useAuthedWebSocket`, nor `useGameFinalizer`.
+  This is direct evidence for keeping the current composer boundary.
+
+## Verification added for OPT-265
+
+`src/hooks/use-game-session.behavior.test.tsx` adds seven behavior tests:
+
+1. Initial connection, server-drop reconnect, and the session retry command
+   coordinating transport plus card-database recovery.
+2. Real message-stream projection of worker state, accepted actions, turn
+   ownership, and undo availability.
+3. Opponent disconnect countdown, LEFT copy, opponent-turn pause, the
+   BLOCK/COUNTER/DAMAGE response pauses, and the non-pausing attack step.
+4. Open-match leave delivery and socket close before lobby navigation.
+5. Leave failure state through the rendered finalizer contract.
+6. Fallback-concede API failure without navigation.
+7. Persisted terminal fallback, worker-state precedence, socket `game:over`
+   precedence, closed-match navigation, and one finalization across duplicate
+   terminal observations.
+
+The transport uses a controllable `WebSocket` implementation and fake time;
+the game message and finalizer hooks remain production implementations. This
+keeps the assertions at behavior boundaries instead of hook internals.
 
 ## Follow-ups
 
-These are test additions, not prerequisites for another abstraction:
+The acceptance behavior is now covered. Remaining cleanup is non-blocking:
 
-1. Add behavior-level `useGameFinalizer` coverage for open-match leave,
-   closed-match finalize-before-navigation, leave failure, and duplicate
-   terminal observations.
-2. Add session behavior coverage with fake time for opponent disconnect/leave
-   copy, deadline countdown, and pause rules during opponent turns and response
-   battle steps.
-3. If `useGameWs` message cases expand, replace setter-index assertions with a
-   pure message-state transition and stream tests. Do this when message changes
-   provide concrete cases, not solely to reduce line count.
+1. Migrate legacy shallow composition cases to the behavior harness when those
+   cases next change, then remove the setter-oriented React mock.
+2. If `useGameWs` message cases expand, replace its setter-index assertions
+   with a pure message-state transition and stream tests. Do this when message
+   changes provide concrete cases, not solely to reduce line count.
 
 Revisit extraction only if one of those rules gains a second consumer, the
 composer begins owning another independent lifecycle, or a behavior test cannot
