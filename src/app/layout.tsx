@@ -6,6 +6,7 @@ import { Navbar } from "@/components/nav/navbar";
 import { SocialShell } from "@/components/social/social-shell";
 import { UserChannelProvider } from "@/components/realtime/user-channel-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { DeckNavigationGuardProvider } from "@/components/deck-builder/deck-navigation-guard";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,17 +45,21 @@ export default function RootLayout({
       >
         <SessionProvider>
           <UserChannelProvider>
-            <SidebarProvider>
-              <div className="flex h-screen w-full overflow-hidden">
-                {/* Left column: navbar + content */}
-                <div className="flex flex-1 flex-col min-w-0">
-                  <Navbar />
-                  <main className="flex flex-1 flex-col overflow-hidden min-w-0 min-h-0">{children}</main>
+            <DeckNavigationGuardProvider>
+              <SidebarProvider>
+                <div className="flex h-screen w-full overflow-hidden">
+                  {/* Left column: navbar + content */}
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <Navbar />
+                    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                      {children}
+                    </main>
+                  </div>
+                  {/* Right column: sidebar (full viewport height) */}
+                  <SocialShell />
                 </div>
-                {/* Right column: sidebar (full viewport height) */}
-                <SocialShell />
-              </div>
-            </SidebarProvider>
+              </SidebarProvider>
+            </DeckNavigationGuardProvider>
           </UserChannelProvider>
         </SessionProvider>
         <Toaster />

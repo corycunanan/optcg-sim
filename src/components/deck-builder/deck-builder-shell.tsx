@@ -18,6 +18,7 @@ import { DeckBuilderList } from "./deck-builder-list";
 import { DeckBuilderBacks } from "./deck-builder-backs";
 import { DeckBuilderDon } from "./deck-builder-don";
 import { DeckBuilderHeader } from "./deck-builder-header";
+import { useRegisterDeckNavigationGuard } from "./deck-navigation-guard";
 import { DeckBuilderValidation } from "./deck-builder-validation";
 import { SleevePicker } from "./sleeve-picker";
 import { DonPicker } from "./don-picker";
@@ -54,6 +55,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
   const [leaderSelectedArtUrl, setLeaderSelectedArtUrl] = useState<
     string | null
   >(null);
+
+  useRegisterDeckNavigationGuard(state.isDirty, state.name);
 
   // Load existing deck
   useEffect(() => {
@@ -105,8 +108,7 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     loadDeck();
   }, [deckId, router]);
 
-  // Work-loss guard: warn on tab close / refresh / external nav while dirty.
-  // In-app nav through the header's back link is guarded in DeckBuilderHeader.
+  // Keep the browser-native warning for refresh, tab close, and external nav.
   useEffect(() => {
     if (!state.isDirty) return;
     const warn = (e: BeforeUnloadEvent) => {
