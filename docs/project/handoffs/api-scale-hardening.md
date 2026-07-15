@@ -1,7 +1,7 @@
 ---
 linear-project: API Scale & Hardening
 linear-project-url: https://linear.app/optcg-sim/project/api-scale-and-hardening-61c480ee38db
-last-updated: 2026-07-14
+last-updated: 2026-07-15
 ---
 
 # API Scale & Hardening — Handoff Doc
@@ -17,7 +17,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-378 | Enforce reciprocal friend-request uniqueness and idempotent accept | — | — | In Review | [#317](https://github.com/corycunanan/optcg-sim/pull/317) | Establishes the partial-index and P2002-handling pattern. |
-| 2 | OPT-381 | Index active-lobby lookup and enforce one WAITING lobby per host | — | OPT-378 | Backlog | — | Reuses the same partial-index and dedup-migration pattern. |
+| 2 | OPT-381 | Index active-lobby lookup and enforce one WAITING lobby per host | — | OPT-378 | In Review | [#318](https://github.com/corycunanan/optcg-sim/pull/318) | Reuses the same partial-index and dedup-migration pattern. |
 | 3 | OPT-380 | Add pg_trgm indexes and measurable search-query acceptance criteria | — | — | Backlog | — | Final raw-SQL migration ticket. |
 | 4 | OPT-489 | Validate message-history cursor timestamps before Prisma queries | — | OPT-375 | Backlog | — | Closes the remaining malformed-date 500 path. |
 | 5 | OPT-382 | Trim /api/cards search payload without weakening deck legality | — | OPT-374 | Backlog | — | Separate list/detail contract while preserving legality data. |
@@ -39,3 +39,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Keep raw partial-expression indexes in migrations rather than Prisma schema declarations; Prisma cannot model this invariant directly.
 - **Unresolved:** none — `pnpm test:db:friends` passed against the approved non-production migrated database on 2026-07-14.
 - **Why this matters for OPT-381:** Its WAITING-lobby invariant follows the same sequence: deterministically deduplicate existing rows, add a partial unique index, then translate the winning database constraint into the route’s expected conflict response.
+
+### OPT-381 → OPT-380
+**From:** session on 2026-07-15 · **Commit:** `3862ece` · **PR:** [#318](https://github.com/corycunanan/optcg-sim/pull/318)
+
+- **Primer:** WAITING lobbies now have a raw PostgreSQL partial unique index, with migration cleanup that preserves the newest lobby per host and closes older duplicates; `POST /api/lobbies` distinguishes that P2002 from join-code collisions.
+- **Read first:** `prisma/migrations/20260714220000_lobby_waiting_host_unique/migration.sql`, `src/app/api/lobbies/route.ts`, `scripts/test-lobby-concurrency.ts`.
+- **Gotchas / do NOT touch:** Keep partial indexes in raw migrations—Prisma schema declarations cannot express their predicates. The database-backed concurrency script needs a disposable migrated database and was not run in this session.
+- **Unresolved:** none for OPT-381; OPT-380 still needs a product decision and benchmark evidence for 1–2 character substring searches.
+- **Pointer:** commit `3862ece` / PR #318; run `git show 3862ece` for the implementation diff.
