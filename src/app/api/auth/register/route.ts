@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       }
       return apiError("An account with these details already exists", 409);
     }
-    console.error("Register error:", error);
+    console.error("[auth:register] failed", error);
     return apiError("Registration failed", 500);
   }
 }

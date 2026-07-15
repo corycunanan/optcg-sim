@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     return apiSuccess(users);
   } catch (error) {
-    console.error("User search error:", error);
+    console.error("[users:search] failed", error);
     return apiError("Search failed", 500);
   }
 }

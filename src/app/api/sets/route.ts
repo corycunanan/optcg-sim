@@ -19,7 +19,7 @@ export async function GET() {
 
     return apiSuccess(sets);
   } catch (error) {
-    console.error("Sets fetch error:", error);
+    console.error("[sets:list] failed", error);
     return apiError("Failed to fetch sets", 500);
   }
 }

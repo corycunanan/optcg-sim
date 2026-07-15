@@ -48,7 +48,7 @@ export async function DELETE(
 
     return apiAction();
   } catch (error) {
-    console.error("Remove friend error:", error);
+    console.error("[friends:remove] failed", error);
     return apiError("Failed to remove friend", 500);
   }
 }

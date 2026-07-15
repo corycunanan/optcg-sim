@@ -99,7 +99,7 @@ export async function GET(
     const reversed = messages.reverse(); // oldest first
     return apiSuccess(reversed, 200, undefined);
   } catch (error) {
-    console.error("Message history error:", error);
+    console.error("[messages:list-history] failed", error);
     return apiError("Failed to fetch messages", 500);
   }
 }
@@ -151,7 +151,7 @@ export async function POST(
 
     return apiSuccess(message, 201);
   } catch (error) {
-    console.error("Message send error:", error);
+    console.error("[messages:send] failed", error);
     return apiError("Failed to send message", 500);
   }
 }

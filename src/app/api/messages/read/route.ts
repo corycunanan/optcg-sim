@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest) {
 
     return apiAction();
   } catch (error) {
-    console.error("Mark read error:", error);
+    console.error("[messages:mark-all-read] failed", error);
     return apiError("Failed to mark message as read", 500);
   }
 }

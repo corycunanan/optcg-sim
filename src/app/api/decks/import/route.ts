@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       totalLines: parsed.length,
     });
   } catch (error) {
-    console.error("Deck import parse error:", error);
+    console.error("[decks:import] parse failed", error);
     return apiError("Failed to parse deck list", 500);
   }
 }

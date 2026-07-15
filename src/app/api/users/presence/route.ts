@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     return apiSuccess<PresenceMap>(data);
   } catch (error) {
-    console.error("presence aggregator error:", error);
+    console.error("[users:aggregate-presence] failed", error);
     return apiError("Failed to load presence", 500);
   }
 }

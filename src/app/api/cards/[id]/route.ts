@@ -31,7 +31,7 @@ export async function GET(
 
     return apiSuccess(card);
   } catch (error) {
-    console.error("Card fetch error:", error);
+    console.error("[cards:get] failed", error);
     return apiError("Failed to fetch card", 500);
   }
 }
@@ -75,7 +75,7 @@ export async function PATCH(
 
     return apiSuccess(card);
   } catch (error) {
-    console.error("Card update error:", error);
+    console.error("[cards:update] failed", error);
     return apiError("Failed to update card", 500);
   }
 }

@@ -72,7 +72,7 @@ export async function GET() {
 
     return apiSuccess(data);
   } catch (error) {
-    console.error("Deck list error:", error);
+    console.error("[decks:list] failed", error);
     return apiError("Failed to list decks", 500);
   }
 }
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(deck, 201);
   } catch (error) {
-    console.error("Deck create error:", error);
+    console.error("[decks:create] failed", error);
     return apiError("Failed to create deck", 500);
   }
 }

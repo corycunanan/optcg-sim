@@ -142,7 +142,7 @@ export async function PUT(
       return apiAction();
     }
   } catch (error) {
-    console.error("Friend request action error:", error);
+    console.error("[friends:resolve-request] failed", error);
     return apiError("Failed to process request", 500);
   }
 }

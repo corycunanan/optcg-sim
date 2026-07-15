@@ -38,7 +38,7 @@ export async function GET() {
 
     return apiSuccess({ incoming, outgoing }, 200, { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" });
   } catch (error) {
-    console.error("Friend requests list error:", error);
+    console.error("[friends:list-requests] failed", error);
     return apiError("Failed to list requests", 500);
   }
 }
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       // persisted.
       return apiError("Request already pending", 409);
     }
-    console.error("Friend request create error:", error);
+    console.error("[friends:create-request] failed", error);
     return apiError("Failed to send request", 500);
   }
 }

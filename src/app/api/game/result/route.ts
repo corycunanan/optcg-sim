@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     return apiAction();
   } catch (error) {
-    console.error("Game result update error:", error);
+    console.error("[game:update-result] failed", error);
     return apiError("Failed to update game result", 500);
   }
 }

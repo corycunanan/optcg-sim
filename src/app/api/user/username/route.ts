@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     ) {
       return apiError("Username is already taken", 409);
     }
-    console.error("Username update error:", error);
+    console.error("[user:update-username] failed", error);
     return apiError("Failed to set username", 500);
   }
 }
