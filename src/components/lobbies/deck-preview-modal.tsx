@@ -13,37 +13,14 @@ import {
   HoverCardContent,
 } from "@/components/ui";
 import { VisuallyHidden } from "radix-ui";
+import { apiGet } from "@/lib/api-client";
+import {
+  DeckDetailResponseSchema,
+  type DeckDetailResponse,
+} from "@/lib/validators/cards";
 
-interface CardInfo {
-  id: string;
-  name: string;
-  imageUrl: string;
-  type: string;
-  cost: number | null;
-  power: number | null;
-  counter: number | null;
-  life: number | null;
-  effectText: string;
-  triggerText: string | null;
-  traits: string[];
-  rarity: string;
-}
-
-interface DeckCard {
-  id: string;
-  quantity: number;
-  selectedArtUrl: string | null;
-  card: CardInfo;
-}
-
-interface DeckData {
-  id: string;
-  name: string;
-  leaderId: string;
-  leaderArtUrl: string | null;
-  leader: CardInfo | null;
-  cards: DeckCard[];
-}
+type DeckData = DeckDetailResponse["data"];
+type CardInfo = NonNullable<DeckData["leader"]>;
 
 interface DeckPreviewModalProps {
   deckId: string | null;
@@ -92,9 +69,9 @@ function StatPill({
   className?: string;
 }) {
   return (
-    <div className="text-center px-2">
-      <div className={cn("font-bold text-sm", className)}>{String(value)}</div>
-      <div className="text-xs text-content-tertiary uppercase tracking-wide">
+    <div className="px-2 text-center">
+      <div className={cn("text-sm font-bold", className)}>{String(value)}</div>
+      <div className="text-content-tertiary text-xs tracking-wide uppercase">
         {label}
       </div>
     </div>
@@ -108,13 +85,13 @@ function CardTooltip({ card }: { card: CardInfo }) {
 
   return (
     <>
-      <div className="font-bold text-sm text-content-primary">{card.name}</div>
-      <div className="text-xs text-content-tertiary mb-3">
+      <div className="text-content-primary text-sm font-bold">{card.name}</div>
+      <div className="text-content-tertiary mb-3 text-xs">
         {card.type} &middot; {card.id}
       </div>
 
       {isFieldCard ? (
-        <div className="flex gap-5 flex-wrap mb-3 text-xs">
+        <div className="mb-3 flex flex-wrap gap-5 text-xs">
           {card.type === "Leader" ? (
             <StatPill
               label="Life"
@@ -142,7 +119,7 @@ function CardTooltip({ card }: { card: CardInfo }) {
           )}
         </div>
       ) : (
-        <div className="flex gap-3 flex-wrap mb-3 text-xs">
+        <div className="mb-3 flex flex-wrap gap-3 text-xs">
           {card.cost != null && (
             <StatPill
               label="Cost"
@@ -151,17 +128,13 @@ function CardTooltip({ card }: { card: CardInfo }) {
             />
           )}
           {card.life != null && (
-            <StatPill
-              label="Life"
-              value={card.life}
-              className="text-error"
-            />
+            <StatPill label="Life" value={card.life} className="text-error" />
           )}
         </div>
       )}
 
       {card.effectText && (
-        <div className="text-xs text-content-secondary leading-relaxed border-t border-border pt-3 flex flex-col gap-2">
+        <div className="text-content-secondary border-border flex flex-col gap-2 border-t pt-3 text-xs leading-relaxed">
           {card.effectText.split(/\n{2,}/).map((paragraph, i) => (
             <p key={i} className="whitespace-pre-wrap">
               {paragraph}
@@ -192,11 +165,11 @@ export function DeckPreviewModal({
     let cancelled = false;
     queueMicrotask(() => setLoading(true));
 
-    fetch(`/api/decks/${deckId}`)
-      .then((res) => (res.ok ? res.json() : null))
+    apiGet(`/api/decks/${deckId}`, DeckDetailResponseSchema)
       .then((json) => {
-        if (!cancelled && json) setDeck(json.data);
+        if (!cancelled) setDeck(json.data);
       })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -224,8 +197,8 @@ export function DeckPreviewModal({
 
         {loading && (
           <div className="flex items-center justify-center p-12">
-            <div className="flex items-center gap-2 text-sm text-content-secondary">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-content-tertiary" />
+            <div className="text-content-secondary flex items-center gap-2 text-sm">
+              <div className="bg-content-tertiary h-2 w-2 animate-pulse rounded-full" />
               Loading deck...
             </div>
           </div>
@@ -234,12 +207,12 @@ export function DeckPreviewModal({
         {!loading && deck && (
           <div className="flex overflow-hidden">
             {/* Left sidebar — deck info + cost curve */}
-            <div className="flex w-48 flex-shrink-0 flex-col gap-6 border-r border-border px-6 py-6">
+            <div className="border-border flex w-48 flex-shrink-0 flex-col gap-6 border-r px-6 py-6">
               <div>
-                <h3 className="text-base font-semibold text-content-primary">
+                <h3 className="text-content-primary text-base font-semibold">
                   {deck.name}
                 </h3>
-                <p className="mt-1 text-sm text-content-tertiary">
+                <p className="text-content-tertiary mt-1 text-sm">
                   {totalCards} cards
                 </p>
               </div>
@@ -254,17 +227,17 @@ export function DeckPreviewModal({
                         (g.card.type !== "Leader" && g.card.cost === cost
                           ? g.count
                           : 0),
-                      0,
+                      0
                     );
                     return (
-                      <div
-                        key={cost}
-                        className="flex items-center text-sm"
-                      >
-                        <Badge variant="secondary" className="w-1/2 justify-center px-0 py-1 text-sm">
+                      <div key={cost} className="flex items-center text-sm">
+                        <Badge
+                          variant="secondary"
+                          className="w-1/2 justify-center px-0 py-1 text-sm"
+                        >
                           {cost}
                         </Badge>
-                        <span className="w-1/2 text-center text-content-tertiary">
+                        <span className="text-content-tertiary w-1/2 text-center">
                           {count}
                         </span>
                       </div>
@@ -285,13 +258,13 @@ export function DeckPreviewModal({
                         count={group.count}
                         className="cursor-pointer"
                         renderCard={(i) => (
-                          <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card hover:-translate-y-2 hover:z-10 transition-transform duration-150">
+                          <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-transform duration-150 hover:z-10 hover:-translate-y-2">
                             <img
                               src={group.imageUrl}
                               alt={group.card.name}
                               className={cn(
                                 "h-full w-full object-cover",
-                                group.count > 1 && i > 0 && "brightness-90",
+                                group.count > 1 && i > 0 && "brightness-90"
                               )}
                               loading="lazy"
                             />
@@ -311,7 +284,7 @@ export function DeckPreviewModal({
 
         {!loading && !deck && deckId && (
           <div className="flex items-center justify-center p-12">
-            <p className="text-sm text-content-secondary">
+            <p className="text-content-secondary text-sm">
               Failed to load deck.
             </p>
           </div>

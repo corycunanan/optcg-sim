@@ -123,7 +123,10 @@ describe("useUserChannel", () => {
     useUserChannel();
 
     const token = await mocks.authedCalls[0].getToken();
-    expect(mocks.fetch).toHaveBeenCalledWith("/api/realtime/token", { method: "POST" });
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/api/realtime/token",
+      expect.objectContaining({ method: "POST" }),
+    );
     expect(token).toBe("tok-abc");
   });
 

@@ -6,6 +6,21 @@ export const RegisterSchema = z.object({
     .string()
     .min(3, "Username must be 3–20 characters")
     .max(20, "Username must be 3–20 characters")
-    .regex(/^[a-zA-Z0-9_]+$/, "Username may only contain letters, numbers, and underscores"),
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      "Username may only contain letters, numbers, and underscores"
+    ),
   password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const RegisterResponseSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    email: z.string(),
+    username: z.string(),
+  }),
+});
+
+export const CsrfTokenResponseSchema = z.object({
+  csrfToken: z.string().min(1),
 });

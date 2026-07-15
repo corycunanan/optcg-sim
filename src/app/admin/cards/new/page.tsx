@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { apiPost } from "@/lib/api-client";
+import { CreateCardResponseSchema } from "@/lib/validators/cards";
 import {
   Select,
   SelectContent,
@@ -74,10 +76,9 @@ export default function NewCardPage() {
     }
 
     try {
-      const res = await fetch("/api/cards", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const json = await apiPost(
+        "/api/cards",
+        {
           id: form.id.trim(),
           name: form.name.trim(),
           type: form.type,
@@ -87,10 +88,16 @@ export default function NewCardPage() {
           counter: form.counter ? parseInt(form.counter) : null,
           life: form.life ? parseInt(form.life) : null,
           attribute: form.attribute
-            ? form.attribute.split(",").map((a) => a.trim()).filter(Boolean)
+            ? form.attribute
+                .split(",")
+                .map((a) => a.trim())
+                .filter(Boolean)
             : [],
           traits: form.traits
-            ? form.traits.split(",").map((t) => t.trim()).filter(Boolean)
+            ? form.traits
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
             : [],
           rarity: form.rarity || "Unknown",
           effectText: form.effectText || "",
@@ -98,13 +105,9 @@ export default function NewCardPage() {
           imageUrl: form.imageUrl || "",
           blockNumber: parseInt(form.blockNumber),
           banStatus: form.banStatus,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "Failed to create card");
-      }
+        },
+        CreateCardResponseSchema
+      );
 
       router.push(`/admin/cards/${json.data.id}`);
     } catch (err) {
@@ -116,7 +119,7 @@ export default function NewCardPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8">
-      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
+      <h1 className="font-display text-content-primary mb-8 text-3xl font-bold tracking-tight">
         Add Card
       </h1>
 
@@ -177,13 +180,17 @@ export default function NewCardPage() {
                   onClick={() => toggleColor(c)}
                   className={cn(
                     "rounded-md border px-3 py-1 text-xs font-medium transition-all",
-                    !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                    !active &&
+                      "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
                   )}
                   style={
                     active
                       ? {
                           background: `var(--card-${c.toLowerCase()})`,
-                          color: c === "Yellow" ? "var(--text-primary)" : "var(--text-inverse)",
+                          color:
+                            c === "Yellow"
+                              ? "var(--text-primary)"
+                              : "var(--text-inverse)",
                           borderColor: `var(--card-${c.toLowerCase()})`,
                         }
                       : undefined
@@ -258,7 +265,10 @@ export default function NewCardPage() {
             />
           </Field>
           <Field label="Ban Status">
-            <Select value={form.banStatus} onValueChange={(v) => update("banStatus", v)}>
+            <Select
+              value={form.banStatus}
+              onValueChange={(v) => update("banStatus", v)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -324,7 +334,7 @@ export default function NewCardPage() {
 
         {/* Preview */}
         {form.imageUrl && (
-          <div className="w-48 overflow-hidden rounded-md border border-border">
+          <div className="border-border w-48 overflow-hidden rounded-md border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={form.imageUrl} alt="Preview" className="w-full" />
           </div>
@@ -360,13 +370,11 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-content-secondary">
+      <label className="text-content-secondary mb-2 block text-sm font-medium">
         {label}
-        {required && (
-          <span className="ml-1 text-error">*</span>
-        )}
+        {required && <span className="text-error ml-1">*</span>}
         {hint && (
-          <span className="ml-1 font-normal text-content-tertiary">
+          <span className="text-content-tertiary ml-1 font-normal">
             ({hint})
           </span>
         )}

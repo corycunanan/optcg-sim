@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { apiPost } from "@/lib/api-client";
+import { SetUsernameResponseSchema } from "@/lib/validators/user";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -39,16 +41,11 @@ export default function OnboardingPage() {
     }
 
     try {
-      const res = await fetch("/api/user/username", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: trimmed }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to set username");
-      }
+      await apiPost(
+        "/api/user/username",
+        { username: trimmed },
+        SetUsernameResponseSchema
+      );
 
       router.push("/decks");
       router.refresh();
@@ -60,23 +57,23 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
+    <main className="bg-background flex min-h-screen flex-col items-center justify-center p-8">
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-content-primary">
+          <h1 className="font-display text-content-primary text-4xl leading-tight font-bold tracking-tight">
             Welcome aboard!
           </h1>
-          <p className="mt-2 text-sm text-content-tertiary">
+          <p className="text-content-tertiary mt-2 text-sm">
             Choose a username to get started
           </p>
         </div>
 
         {/* Form card */}
-        <div className="rounded border border-border bg-surface-1 p-6">
+        <div className="border-border bg-surface-1 rounded border p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="rounded border border-error/20 bg-error-soft p-3 text-sm font-medium text-error">
+              <div className="border-error/20 bg-error-soft text-error rounded border p-3 text-sm font-medium">
                 {error}
               </div>
             )}
@@ -84,7 +81,7 @@ export default function OnboardingPage() {
             <div>
               <label
                 htmlFor="username"
-                className="mb-2 block text-sm font-medium text-content-secondary"
+                className="text-content-secondary mb-2 block text-sm font-medium"
               >
                 Username
               </label>
@@ -96,7 +93,7 @@ export default function OnboardingPage() {
                 placeholder="pirate_king"
                 autoFocus
               />
-              <p className="mt-2 text-xs text-content-tertiary">
+              <p className="text-content-tertiary mt-2 text-xs">
                 3–20 characters. Letters, numbers, hyphens, underscores.
               </p>
             </div>
@@ -104,7 +101,7 @@ export default function OnboardingPage() {
             <button
               type="submit"
               disabled={saving || !username.trim()}
-              className="w-full rounded bg-navy-900 px-4 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800 active:scale-[0.98] disabled:opacity-50"
+              className="bg-navy-900 text-content-inverse hover:bg-navy-800 w-full rounded px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98] disabled:opacity-50"
             >
               {saving ? "Setting up…" : "Set Username"}
             </button>

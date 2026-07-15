@@ -4,17 +4,13 @@ import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSession } from "next-auth/react";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
+import { ApiError, apiGet } from "@/lib/api-client";
+import {
+  RemoteGameStatusResponseSchema,
+  type RemoteGameStatus,
+} from "@/lib/validators/game";
 
-export interface RemoteGameStatus {
-  id: string;
-  mode: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
-  status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
-  winnerId: string | null;
-  winReason: string | null;
-  winnerPerspective: "SELF" | "OPPONENT" | "NONE";
-  canFallbackConcede: boolean;
-  playerIndex?: 0 | 1;
-}
+export type { RemoteGameStatus } from "@/lib/validators/game";
 
 export interface UseRemoteGameStatusReturn {
   remoteGameStatus: RemoteGameStatus | null;
@@ -24,7 +20,7 @@ export interface UseRemoteGameStatusReturn {
 
 function deriveWinnerPerspective(
   winnerId: string | null,
-  userId: string,
+  userId: string
 ): RemoteGameStatus["winnerPerspective"] {
   if (!winnerId) return "NONE";
   return winnerId === userId ? "SELF" : "OPPONENT";
@@ -42,23 +38,21 @@ export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
     let cancelled = false;
 
     const loadGameStatus = async () => {
-      const response = await fetch(`/api/game/${gameId}`, {
-        cache: "no-store",
-      }).catch(() => null);
-      if (cancelled || !response) return;
-      if (response.status === 404) {
-        setRemoteGameStatus(null);
-        setRemoteGameNotFound(true);
-        return;
-      }
-      if (!response.ok) return;
-
-      const json = (await response.json().catch(() => null)) as {
-        data?: RemoteGameStatus;
-      } | null;
-      if (!cancelled && json?.data) {
+      try {
+        const json = await apiGet(
+          `/api/game/${gameId}`,
+          RemoteGameStatusResponseSchema,
+          { cache: "no-store" }
+        );
+        if (cancelled) return;
         setRemoteGameStatus(json.data);
         setRemoteGameNotFound(false);
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof ApiError && error.status === 404) {
+          setRemoteGameStatus(null);
+          setRemoteGameNotFound(true);
+        }
       }
     };
 

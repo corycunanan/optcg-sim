@@ -13,7 +13,7 @@ export const CardSearchParamsSchema = z.object({
     .refine(
       (query) =>
         query.length === 0 || query.length >= MIN_SUBSTRING_SEARCH_LENGTH,
-      `Search query must be at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`,
+      `Search query must be at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`
     )
     .optional(),
   color: z.string().optional(),
@@ -117,6 +117,11 @@ export type CardDetail = z.infer<typeof CardDetailSchema>;
 
 export const CardDetailResponseSchema = z.object({
   data: CardDetailSchema,
+});
+
+/** POST /api/cards response fields consumed after card creation. */
+export const CreateCardResponseSchema = z.object({
+  data: z.object({ id: z.string() }).passthrough(),
 });
 
 /** GET /api/decks/[id] — card entry within a deck response. */

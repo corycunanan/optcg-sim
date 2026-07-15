@@ -7,6 +7,8 @@ import {
   createEventDispatcher,
   type EventDispatcher,
 } from "@/lib/realtime/event-dispatcher";
+import { ApiError, apiPost } from "@/lib/api-client";
+import { RealtimeTokenResponseSchema } from "@/lib/validators/game";
 import type { ConnectionStatus, RealtimeClientEvent } from "@/types/realtime";
 
 export interface UseUserChannelResult {
@@ -59,30 +61,40 @@ export function useUserChannel(): UseUserChannelResult {
   }, [userId]);
 
   const getToken = useCallback(async () => {
-    const res = await fetch("/api/realtime/token", { method: "POST" });
-    if (!res.ok) {
-      throw new Error(`token mint failed: ${res.status}`);
-    }
-    const body = (await res.json()) as { data?: { token?: string } };
-    const token = body.data?.token;
-    if (!token) {
+    try {
+      const body = await apiPost(
+        "/api/realtime/token",
+        undefined,
+        RealtimeTokenResponseSchema
+      );
+      return body.data.token;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw new Error(`token mint failed: ${error.status}`);
+      }
       throw new Error("token mint returned no token");
     }
-    return token;
   }, []);
 
-  const onMessage = useCallback((msg: unknown) => {
-    if (
-      msg
-      && typeof msg === "object"
-      && "type" in msg
-      && typeof (msg as { type: unknown }).type === "string"
-    ) {
-      dispatcher.dispatch(msg as { type: string } & Record<string, unknown>);
-    }
-  }, [dispatcher]);
+  const onMessage = useCallback(
+    (msg: unknown) => {
+      if (
+        msg &&
+        typeof msg === "object" &&
+        "type" in msg &&
+        typeof (msg as { type: unknown }).type === "string"
+      ) {
+        dispatcher.dispatch(msg as { type: string } & Record<string, unknown>);
+      }
+    },
+    [dispatcher]
+  );
 
-  const { connectionStatus, close, send: sendRaw } = useAuthedWebSocket<unknown>({
+  const {
+    connectionStatus,
+    close,
+    send: sendRaw,
+  } = useAuthedWebSocket<unknown>({
     url,
     getToken,
     onMessage,
@@ -102,7 +114,7 @@ export function useUserChannel(): UseUserChannelResult {
 
   const subscribe = useCallback<EventDispatcher["subscribe"]>(
     (type, handler) => dispatcher.subscribe(type, handler),
-    [dispatcher],
+    [dispatcher]
   );
 
   const send = useCallback(
@@ -110,13 +122,15 @@ export function useUserChannel(): UseUserChannelResult {
       if (!userId) return;
       sendRaw(event);
     },
-    [sendRaw, userId],
+    [sendRaw, userId]
   );
 
   // When signed out we never open the socket; `useAuthedWebSocket` reports
   // `connecting` on first render even with `url=null`, which is misleading.
   // Surface a stable `disconnected` for signed-out callers.
-  const reportedStatus: ConnectionStatus = userId ? connectionStatus : "disconnected";
+  const reportedStatus: ConnectionStatus = userId
+    ? connectionStatus
+    : "disconnected";
 
   return { connectionStatus: reportedStatus, subscribe, send };
 }
