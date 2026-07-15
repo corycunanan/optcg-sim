@@ -4,7 +4,6 @@ export interface SchemaSourceModule {
   path: string;
   schemas: Record<string, EffectSchema>;
 }
-
 export function collectExportedSchemas(
   exports: Record<string, unknown>,
 ): Record<string, EffectSchema> {
@@ -58,6 +57,13 @@ export function validateSchemaSourceParity(
       if (!registry[cardId]) {
         diagnostics.push(
           `[schema-source] ${sourceModule.path} exports ${cardId}, but schema-registry.ts does not register it`,
+        );
+      } else if (
+        JSON.stringify(registry[cardId]) !==
+        JSON.stringify(sourceModule.schemas[cardId])
+      ) {
+        diagnostics.push(
+          `[schema-source] ${sourceModule.path} exports ${cardId}, but the generated registry payload differs`,
         );
       }
     }

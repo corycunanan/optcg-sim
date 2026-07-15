@@ -67,6 +67,7 @@ const eslintConfig = defineConfig([
     "storybook-static/**",
     "workers/game/.wrangler/**",
     "workers/game/coverage/**",
+    "workers/game/src/engine/*.generated.ts",
     // Agent worktrees are full repo copies — linting them is runaway duplicate work.
     ".claude/**",
     "**/.claude/**",
