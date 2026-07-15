@@ -20,12 +20,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2 | OPT-381 | Index active-lobby lookup and enforce one WAITING lobby per host | — | OPT-378 | Done | [#318](https://github.com/corycunanan/optcg-sim/pull/318) | Reuses the same partial-index and dedup-migration pattern. |
 | 3 | OPT-380 | Add pg_trgm indexes and measurable search-query acceptance criteria | — | — | Done | [#319](https://github.com/corycunanan/optcg-sim/pull/319) | Final raw-SQL migration ticket. |
 | 4 | OPT-489 | Validate message-history cursor timestamps before Prisma queries | — | OPT-375 | Done | [#320](https://github.com/corycunanan/optcg-sim/pull/320) | Closes the remaining malformed-date 500 path. |
-| 5 | OPT-382 | Trim /api/cards search payload without weakening deck legality | — | OPT-374 | In Review | [#321](https://github.com/corycunanan/optcg-sim/pull/321) | Separate list/detail contract while preserving legality data. |
-| 6 | OPT-488 | Define and automate retention for CLOSED lobbies without game sessions | — | OPT-381 | Backlog | — | Requires an explicit retention policy and scheduler. |
+| 5 | OPT-382 | Trim /api/cards search payload without weakening deck legality | — | OPT-374 | Done | [#321](https://github.com/corycunanan/optcg-sim/pull/321) | Separate list/detail contract while preserving legality data. |
+| 6 | OPT-488 | Define and automate retention for CLOSED lobbies without game sessions | — | OPT-381 | In Review | [#322](https://github.com/corycunanan/optcg-sim/pull/322) | Daily authenticated cleanup with a 30-day policy and bounded batches. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-488; its OPT-381 dependency is complete.
+**Next up:** Project complete — no follow-up tickets remain in this Action Plan.
 
 ---
 
@@ -75,3 +75,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 - **Gotchas / do NOT touch:** Preserve OPT-381's WAITING-lobby partial unique index. Retention may delete only old `CLOSED` lobbies with no `GameSession`; guest and invite cascades are safe only after the parent meets every eligibility condition.
 - **Unresolved:** OPT-488 must document the retention window (the ticket proposes 30 days), scheduler/authentication mechanism, bounded batch behavior, operational metrics, and a production dry-run procedure.
 - **Pointer:** commit `0cece0f` / PR #321; run `git show 0cece0f` for the implementation diff.
+
+### OPT-488 → Project complete
+**From:** session on 2026-07-15 · **Commit:** `74c19e2` · **PR:** [#322](https://github.com/corycunanan/optcg-sim/pull/322)
+
+- **Primer:** Vercel now schedules a daily authenticated sweep that retains active, recent, and game-linked lobbies while deleting at most 500 old orphaned `CLOSED` lobbies per invocation; the cutoff query has a matching composite index and structured metrics.
+- **Read first for operations:** `docs/architecture/DEPLOYMENT.md`, `src/app/api/cron/lobby-retention/route.ts`, and `vercel.json` document the policy, schedule, authentication, dry-run, and retry behavior.
+- **Gotchas / do NOT touch:** Keep the full eligibility predicate on both selection and deletion, preserve the restrictive `GameSession` foreign key, and never reuse `GAME_WORKER_SECRET` as `CRON_SECRET`.
+- **Unresolved:** Production must configure `CRON_SECRET`, run the documented authenticated dry-run, and confirm the registered cron after deployment; no additional code ticket is required.
+- **Pointer:** commit `74c19e2` / PR #322; run `git show 74c19e2` for the implementation diff.
