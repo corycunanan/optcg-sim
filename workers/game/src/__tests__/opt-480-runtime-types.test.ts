@@ -146,7 +146,7 @@ describe("OPT-480 runtime type boundaries", () => {
     ).toThrow("effectSchema is invalid");
   });
 
-  it("keeps unsafe assertions confined to the two infrastructure boundaries", () => {
+  it("keeps the sole unsafe assertion at validated snapshot deserialization", () => {
     const sources = [
       ...readTypeScriptTree(new URL("../engine/", import.meta.url), "engine"),
       ...readTypeScriptTree(new URL("../session/", import.meta.url), "session"),
@@ -176,7 +176,6 @@ describe("OPT-480 runtime type boundaries", () => {
 
     expect(untypedAssertions).toEqual([
       "session/persistence.ts:as unknown as",
-      "GameSession.ts:as unknown as",
     ]);
   });
 
