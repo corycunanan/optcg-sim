@@ -10,6 +10,11 @@ interface AsyncOperationState<TData> {
   error: unknown | null;
 }
 
+export interface AsyncOperationResult<TData> {
+  data: TData;
+  isCurrent: boolean;
+}
+
 const INITIAL_STATE = {
   status: "idle",
   data: null,
@@ -31,7 +36,7 @@ export function useAsyncOperation<TData, TArgs extends unknown[] = []>(
   }, []);
 
   const execute = useCallback(
-    async (...args: TArgs): Promise<TData> => {
+    async (...args: TArgs): Promise<AsyncOperationResult<TData>> => {
       const requestId = ++requestIdRef.current;
 
       if (mountedRef.current) {
@@ -44,10 +49,12 @@ export function useAsyncOperation<TData, TArgs extends unknown[] = []>(
 
       try {
         const data = await operation(...args);
-        if (mountedRef.current && requestId === requestIdRef.current) {
+        const isCurrent =
+          mountedRef.current && requestId === requestIdRef.current;
+        if (isCurrent) {
           setState({ status: "success", data, error: null });
         }
-        return data;
+        return { data, isCurrent };
       } catch (error) {
         if (mountedRef.current && requestId === requestIdRef.current) {
           setState({ status: "error", data: null, error });

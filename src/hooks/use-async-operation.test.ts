@@ -54,9 +54,15 @@ describe("useAsyncOperation", () => {
     const secondExecution = execute("second");
 
     second.resolve("second result");
-    await expect(secondExecution).resolves.toBe("second result");
+    await expect(secondExecution).resolves.toEqual({
+      data: "second result",
+      isCurrent: true,
+    });
     first.resolve("first result");
-    await expect(firstExecution).resolves.toBe("first result");
+    await expect(firstExecution).resolves.toEqual({
+      data: "first result",
+      isCurrent: false,
+    });
 
     expect(operation).toHaveBeenCalledTimes(2);
     expect(mocks.setters[0]).toHaveBeenLastCalledWith({
@@ -88,7 +94,10 @@ describe("useAsyncOperation", () => {
     const execution = execute();
     reset();
     pending.resolve("stale result");
-    await execution;
+    await expect(execution).resolves.toEqual({
+      data: "stale result",
+      isCurrent: false,
+    });
 
     expect(mocks.setters[0]).toHaveBeenLastCalledWith({
       status: "idle",
@@ -105,7 +114,10 @@ describe("useAsyncOperation", () => {
     const callsBeforeUnmount = mocks.setters[0]?.mock.calls.length;
     for (const cleanup of mocks.cleanups) cleanup();
     pending.resolve("late result");
-    await execution;
+    await expect(execution).resolves.toEqual({
+      data: "late result",
+      isCurrent: false,
+    });
 
     expect(mocks.setters[0]).toHaveBeenCalledTimes(callsBeforeUnmount ?? 0);
   });
