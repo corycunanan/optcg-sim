@@ -1,7 +1,7 @@
 /**
  * Shared game types — single source of truth for both worker and client.
  *
- * Worker-only types (GameInitPayload, etc.) live in workers/game/src/types.ts.
+ * App/worker initialization wire contracts live in shared/game-init.ts.
  * Engine-internal types (PendingEvent, ExecuteResult) live there too.
  */
 

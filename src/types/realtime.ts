@@ -1,5 +1,12 @@
 import type { LobbyRoomState } from "@/lib/lobbies/state";
 
+export type ConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "error"
+  | "failed";
+
 /**
  * UserChannel server → client event vocabulary.
  *
@@ -133,5 +140,3 @@ export interface SerializedLobbyInvite {
   fromUser: SerializedUser;
   lobby: SerializedLobbyInvitePreview;
 }
-
-export { type ConnectionStatus } from "@/hooks/use-authed-websocket";

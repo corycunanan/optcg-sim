@@ -1,4 +1,4 @@
-import type { HoloEffect } from "@/components/ui/holo-card";
+import type { HoloEffect } from "@/types/cards";
 
 /**
  * Rarity → effect tier mapping for the holo-card spike.

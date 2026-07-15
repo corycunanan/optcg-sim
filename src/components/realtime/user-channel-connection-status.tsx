@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
-import type { ConnectionStatus } from "@/hooks/use-authed-websocket";
+import type { ConnectionStatus } from "@/types/realtime";
 
 export const RECONNECTING_STATUS_DELAY_MS = 3_000;
 

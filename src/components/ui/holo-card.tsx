@@ -3,9 +3,8 @@
 import type { ReactNode } from "react";
 import { useCardTilt } from "@/hooks/use-card-tilt";
 import { cn } from "@/lib/utils";
+import type { HoloEffect } from "@/types/cards";
 import "./holo-card.css";
-
-export type HoloEffect = "none" | "regular-holo";
 
 interface HoloCardProps {
   effect?: HoloEffect;

@@ -412,26 +412,9 @@ model GameSession {
   player1       User            @relation("GamesAsPlayer1", fields: [player1Id], references: [id])
   player2       User            @relation("GamesAsPlayer2", fields: [player2Id], references: [id])
   lobby         Lobby           @relation(fields: [lobbyId], references: [id])
-  actions       GameActionLog[]
 
   @@index([player1Id])
   @@index([player2Id])
   @@index([status])
   @@map("game_sessions")
-}
-
-model GameActionLog {
-  id            String      @id @default(uuid())
-  gameSessionId String
-  turn          Int
-  phase         String
-  playerIndex   Int         // 0 or 1
-  actionType    String
-  actionData    Json
-  timestamp     DateTime    @default(now())
-
-  gameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
-
-  @@index([gameSessionId, timestamp])
-  @@map("game_action_logs")
 }

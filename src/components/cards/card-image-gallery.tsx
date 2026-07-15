@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { HoloCard, type HoloEffect } from "@/components/ui/holo-card";
+import { HoloCard } from "@/components/ui/holo-card";
+import type { HoloEffect } from "@/types/cards";
 
 interface ArtVariant {
   id: string;
