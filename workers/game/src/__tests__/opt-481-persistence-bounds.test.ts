@@ -205,12 +205,6 @@ describe("OPT-481 bounded session persistence", () => {
     const legacyState = {
       ...state,
       eventLog: turnEvents(1_000),
-      effectStack: [
-        {
-          sourceCardInstanceId: state.players[0].leader.instanceId,
-          pausedAction: null,
-        } as GameState["effectStack"][number],
-      ],
     };
     storage.data.set(SESSION_STORAGE_KEY, {
       state: legacyState,
@@ -228,6 +222,34 @@ describe("OPT-481 bounded session persistence", () => {
       RECENT_EVENT_LOG_LIMIT,
     );
     expect(repo.getHistorySummary().compactedEventCount).toBe(744);
+  });
+
+  it.each([
+    ["a missing player hand zone", (state: GameState) => {
+      Reflect.deleteProperty(state.players[0], "hand");
+    }, "players.0.hand"],
+    ["an invalid turn phase", (state: GameState) => {
+      Reflect.set(state.turn, "phase", "BATTLE");
+    }, "turn.phase"],
+  ] as const)("rejects persisted state with %s during repository load", async (
+    _label,
+    mutate,
+    path,
+  ) => {
+    const storage = new AtomicMemoryStorage();
+    const { state, cardDb } = setupGame();
+    const malformedState = structuredClone(state);
+    mutate(malformedState);
+    storage.data.set(SESSION_STORAGE_KEY, {
+      formatVersion: 2,
+      state: malformedState,
+      cardDb: Object.fromEntries(cardDb),
+      mode: "PVP",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+
+    await expect(repository(storage).load()).rejects.toThrow(path);
   });
 
   it("broadcasts only the bounded detailed history", async () => {

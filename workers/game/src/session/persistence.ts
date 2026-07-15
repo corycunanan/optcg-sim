@@ -21,6 +21,10 @@ import {
   emptyEventHistorySummary,
   type EventHistorySummary,
 } from "./history.js";
+import {
+  hasValidEventPayload,
+  validatePersistedGameStateCore,
+} from "./persisted-game-state.js";
 
 export const SESSION_STORAGE_KEY = "session";
 export const SESSION_CARD_DB_STORAGE_KEY = "session:card-db";
@@ -310,11 +314,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isKnownEvent(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    typeof value.type === "string" &&
-    KNOWN_EVENT_TYPES.has(value.type)
-  );
+  return isKnownPendingEvent(value) &&
+    value.playerIndex !== undefined &&
+    (value.playerIndex === 0 || value.playerIndex === 1) &&
+    typeof value.timestamp === "number" &&
+    Number.isFinite(value.timestamp) &&
+    value.payload !== undefined;
+}
+
+function isKnownPendingEvent(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value) || typeof value.type !== "string" || !isKnownEventType(value.type)) {
+    return false;
+  }
+  if (value.playerIndex !== undefined && value.playerIndex !== 0 && value.playerIndex !== 1) {
+    return false;
+  }
+  return value.payload === undefined || hasValidEventPayload(value.type, value.payload);
 }
 
 function isKnownAction(value: unknown): boolean {
@@ -438,12 +453,19 @@ function hasValidStackFrame(value: unknown): boolean {
       !Array.isArray(triggers) ||
       triggers.some(
         (trigger) =>
-          !isRecord(trigger) || !isKnownEvent(trigger.triggeringEvent)
+          !isRecord(trigger) ||
+          typeof trigger.sourceCardInstanceId !== "string" ||
+          (trigger.controller !== 0 && trigger.controller !== 1) ||
+          !hasValidEffectBlock(trigger.effectBlock) ||
+          !isKnownPendingEvent(trigger.triggeringEvent)
       )
     )
       return false;
   }
-  return true;
+  return (
+    Array.isArray(value.accumulatedEvents) &&
+    value.accumulatedEvents.every(isKnownPendingEvent)
+  );
 }
 
 function hasValidPrompt(value: unknown): boolean {
@@ -452,6 +474,42 @@ function hasValidPrompt(value: unknown): boolean {
   const resume = value.resumeContext;
   if (!isRecord(resume)) return typeof resume === "string" || resume === null;
   if (
+    resume.type === "PREGAME_PRIORITY_CHOICE" ||
+    resume.type === "PREGAME_MULLIGAN"
+  ) {
+    return true;
+  }
+  if (resume.type === "REPLACEMENT") {
+    return (
+      typeof resume.effectId === "string" &&
+      typeof resume.targetInstanceId === "string" &&
+      typeof resume.event === "string"
+    );
+  }
+  if (resume.type === "REPLACEMENT_BATCH") {
+    return (
+      ["KO", "RETURN_TO_HAND", "RETURN_TO_DECK", "SET_REST"].includes(
+        String(resume.actionKind)
+      ) &&
+      typeof resume.event === "string" &&
+      isStringArray(resume.allTargetIds) &&
+      isStringArray(resume.protectedIds) &&
+      Array.isArray(resume.pendingMatches) &&
+      resume.pendingMatches.every(
+        (match) =>
+          isRecord(match) &&
+          typeof match.effectId === "string" &&
+          isStringArray(match.matchedTargetIds) &&
+          typeof match.optional === "boolean"
+      ) &&
+      isNonNegativeInteger(resume.currentMatchIndex) &&
+      (resume.causingController === 0 || resume.causingController === 1) &&
+      (resume.returnToDeckPosition === undefined ||
+        resume.returnToDeckPosition === "TOP" ||
+        resume.returnToDeckPosition === "BOTTOM")
+    );
+  }
+  if (
     resume.pausedAction !== null &&
     resume.pausedAction !== undefined &&
     !isKnownAction(resume.pausedAction)
@@ -459,35 +517,46 @@ function hasValidPrompt(value: unknown): boolean {
     return false;
   }
   return (
-    (resume.remainingActions === undefined ||
-      hasKnownActions(resume.remainingActions)) &&
+    typeof resume.effectSourceInstanceId === "string" &&
+    (resume.controller === 0 || resume.controller === 1) &&
+    (resume.remainingActionsController === undefined ||
+      resume.remainingActionsController === 0 ||
+      resume.remainingActionsController === 1) &&
+    hasKnownActions(resume.remainingActions) &&
+    hasValidResultRefEntries(resume.resultRefs) &&
+    isStringArray(resume.validTargets) &&
     hasValidBatchResumeMarker(resume.batchResumeMarker)
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function hasValidResultRefEntries(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        Array.isArray(entry) &&
+        entry.length === 2 &&
+        typeof entry[0] === "string" &&
+        isRecord(entry[1]) &&
+        isStringArray(entry[1].targetInstanceIds) &&
+        typeof entry[1].count === "number" &&
+        Number.isFinite(entry[1].count)
+    )
   );
 }
 
 function parseStoredGameState(raw: unknown): GameState {
   if (!isRecord(raw)) throw new Error("Stored session state must be an object");
-  const requiredArrays = [
-    "activeEffects",
-    "prohibitions",
-    "scheduledActions",
-    "oneTimeModifiers",
-    "triggerRegistry",
-    "effectStack",
-    "eventLog",
-  ] as const;
-  if (
-    typeof raw.id !== "string" ||
-    !Array.isArray(raw.players) ||
-    raw.players.length !== 2 ||
-    !raw.players.every(isRecord) ||
-    !isRecord(raw.turn) ||
-    !requiredArrays.every((key) => Array.isArray(raw[key])) ||
-    !["IN_PROGRESS", "FINISHED", "ABANDONED"].includes(String(raw.status)) ||
-    (raw.winner !== null && raw.winner !== 0 && raw.winner !== 1) ||
-    !hasValidPrompt(raw.pendingPrompt ?? null)
-  ) {
-    throw new Error("Stored session state has an invalid root shape");
+  const coreError = validatePersistedGameStateCore(raw);
+  if (coreError) {
+    throw new Error(`Stored session state has an invalid core shape at ${coreError}`);
+  }
+  if (!hasValidPrompt(raw.pendingPrompt ?? null)) {
+    throw new Error("Stored session state has an invalid prompt continuation");
   }
   if (!Array.isArray(raw.eventLog) || !raw.eventLog.every(isKnownEvent)) {
     throw new Error("Stored session contains an unknown event variant");
