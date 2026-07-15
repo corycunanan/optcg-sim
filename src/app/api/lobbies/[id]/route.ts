@@ -1,7 +1,7 @@
 /**
  * GET    /api/lobbies/[id] — Poll lobby status (host uses this to discover game start)
  * PATCH  /api/lobbies/[id] — Mutate in-room mode, deck, and ready state
- * DELETE /api/lobbies/[id] — Cancel lobby (host only)
+ * DELETE /api/lobbies/[id] — Close a pre-game PVP lobby (host only)
  */
 
 import { after, NextRequest } from "next/server";
@@ -23,6 +23,8 @@ import { notifyUser } from "@/lib/realtime/fan-out";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+type CloseFailure = "NOT_FOUND" | "FORBIDDEN" | "ALREADY_STARTED" | "NOT_PVP";
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
@@ -294,43 +296,96 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
 
-  const lobby = await prisma.lobby.findFirst({
-    where: { id, hostUserId: userId, status: "WAITING" },
-  });
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // This conditional status transition is the concurrency lock shared
+      // with POST /start. Closing and starting cannot both win a READY room.
+      const closed = await tx.lobby.updateMany({
+        where: {
+          id,
+          hostUserId: userId,
+          mode: "PVP",
+          status: { in: ["WAITING", "READY"] },
+          gameSession: { is: null },
+        },
+        data: { status: "CLOSED" },
+      });
 
-  if (!lobby) {
-    return apiError("Lobby not found or already started", 404);
-  }
+      if (closed.count === 1) return { failure: null };
 
-  await prisma.lobby.update({
-    where: { id },
-    data: { status: "CLOSED" },
-  });
+      const lobby = await tx.lobby.findUnique({
+        where: { id },
+        select: {
+          hostUserId: true,
+          mode: true,
+          status: true,
+          gameSession: { select: { id: true } },
+        },
+      });
 
-  after(async () => {
-    // Pending invites for this lobby become moot the moment it closes; cancel
-    // them and emit `lobby:invite_canceled` so any visible recipient toasts
-    // dismiss without waiting on the 5-minute TTL.
-    await cancelPendingLobbyInvites(id);
+      let failure: CloseFailure;
+      if (!lobby || lobby.status === "CLOSED") failure = "NOT_FOUND";
+      else if (lobby.hostUserId !== userId) failure = "FORBIDDEN";
+      else if (lobby.status === "IN_GAME" || lobby.gameSession)
+        failure = "ALREADY_STARTED";
+      else failure = "NOT_PVP";
 
-    const state = await buildLobbyRoomState(id);
-    if (!state) return;
-
-    // Today, DELETE only operates on `WAITING` lobbies — which by definition
-    // have no guest, so this branch is dormant. Kept so a future broadening
-    // of DELETE (e.g. host can also close a `READY` lobby) automatically
-    // notifies the guest without re-discovering the fanout site.
-    const guestUserId =
-      state.guest && state.guest.user.id !== state.hostUserId
-        ? state.guest.user.id
-        : null;
-    if (!guestUserId) return;
-
-    await notifyUser(guestUserId, {
-      type: "lobby:state_changed",
-      lobby: { ...state, status: "CLOSED" },
+      return { failure };
     });
-  });
 
-  return apiAction();
+    if (result.failure) return closeFailureResponse(result.failure);
+
+    after(async () => {
+      // The CLOSED status blocks join and invite acceptance synchronously.
+      // Cancel the now-moot invite rows and dismiss visible invite toasts.
+      const cancelInvites = cancelPendingLobbyInvites(id).catch((error) => {
+        // Invite fan-out is best-effort and must not suppress the seated
+        // guest's terminal CLOSED event.
+        console.error("[lobbies:close] invite cancellation failed", error);
+      });
+
+      const state = await buildLobbyRoomState(id);
+      if (!state) {
+        await cancelInvites;
+        return;
+      }
+
+      const guestUserId =
+        state.guest && state.guest.user.id !== state.hostUserId
+          ? state.guest.user.id
+          : null;
+      if (!guestUserId) {
+        await cancelInvites;
+        return;
+      }
+
+      await Promise.all([
+        cancelInvites,
+        notifyUser(guestUserId, {
+          type: "lobby:state_changed",
+          lobby: { ...state, status: "CLOSED" },
+        }),
+      ]);
+    });
+
+    return apiAction();
+  } catch (error) {
+    console.error("[lobbies:close] failed", error);
+    return apiError("Failed to close lobby", 500);
+  }
+}
+
+function closeFailureResponse(failure: CloseFailure) {
+  switch (failure) {
+    case "NOT_FOUND":
+      return apiError("Lobby not found", 404);
+    case "FORBIDDEN":
+      return apiError("Forbidden", 403);
+    case "ALREADY_STARTED":
+      return apiError("Lobby already started", 409, {
+        code: "ALREADY_STARTED",
+      });
+    case "NOT_PVP":
+      return apiError("Only a pre-game PVP lobby can be closed", 409);
+  }
 }

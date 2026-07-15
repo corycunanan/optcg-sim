@@ -37,6 +37,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DeckPreviewModal } from "./deck-preview-modal";
 import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
+import { HostCloseAction, runHostClose } from "./host-close-action";
+import { lobbyRoomRecovery } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
 
@@ -63,9 +65,11 @@ export function LobbyRoomShell({
     mutating,
     starting,
     leaving,
+    closing,
     patchLobby,
     startLobby,
     leaveLobby,
+    closeLobby,
   } = useLobbyRoom(lobbyId);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
@@ -89,13 +93,10 @@ export function LobbyRoomShell({
 
   useEffect(() => {
     if (!lobby) return;
-    if (lobby.status === "IN_GAME" && lobby.gameId) {
-      router.push(`/game/${lobby.gameId}`);
-    }
-    if (lobby.status === "EVICTED") {
-      toast.info("Host changed the lobby to solo mode");
-      router.push("/lobbies");
-    }
+    const recovery = lobbyRoomRecovery(lobby);
+    if (!recovery) return;
+    if (recovery.message) toast.info(recovery.message);
+    router.push(recovery.route);
   }, [lobby, router]);
 
   const isHost = lobby?.hostUserId === currentUserId;
@@ -181,6 +182,18 @@ export function LobbyRoomShell({
     });
   };
 
+  const handleClose = async () => {
+    await runHostClose({
+      close: closeLobby,
+      onSuccess: () => toast.success("Lobby closed"),
+      onError: (err) =>
+        toast.error(
+          err instanceof ApiError ? err.message : "Could not close lobby"
+        ),
+      returnToBrowser: () => router.push("/lobbies"),
+    });
+  };
+
   if (loading && !lobby) {
     return (
       <div className="bg-surface-base flex-1 overflow-y-auto">
@@ -227,8 +240,22 @@ export function LobbyRoomShell({
               disabled={mutating}
               onLeave={() => void handleLeave()}
             />
+            <HostCloseAction
+              canClose={Boolean(
+                isHost &&
+                lobby.mode === "PVP" &&
+                (lobby.status === "WAITING" || lobby.status === "READY")
+              )}
+              guestName={realGuestPresent ? guestName : null}
+              closing={closing}
+              disabled={mutating || starting}
+              onClose={() => void handleClose()}
+            />
             {isHost && (
-              <Button onClick={handleStart} disabled={!canStart || starting}>
+              <Button
+                onClick={handleStart}
+                disabled={!canStart || starting || closing}
+              >
                 {starting ? (
                   <Loader2 data-icon="inline-start" className="animate-spin" />
                 ) : (

@@ -65,18 +65,27 @@ Scheduled maintenance endpoints use Bearer token auth (`CRON_SECRET`) for Vercel
 
 ### Lobbies
 
-| Method | Path                | Auth           | Purpose                                                             |
-| ------ | ------------------- | -------------- | ------------------------------------------------------------------- |
-| POST   | `/api/lobbies`      | Session        | Create lobby (generates join code, closes previous WAITING lobbies) |
-| POST   | `/api/lobbies/join` | Session        | Join by code and enter the lobby room                               |
-| GET    | `/api/lobbies/[id]` | Session        | Poll lobby status (guest info, gameId)                              |
-| PATCH  | `/api/lobbies/[id]` | Session (member) | Partially update pre-game mode, deck, or ready state              |
-| DELETE | `/api/lobbies/[id]` | Session (host) | Cancel WAITING lobby                                                |
-| POST   | `/api/lobbies/[id]/start` | Session (host) | Start a ready lobby                                           |
+| Method | Path                      | Auth             | Purpose                                                             |
+| ------ | ------------------------- | ---------------- | ------------------------------------------------------------------- |
+| POST   | `/api/lobbies`            | Session          | Create lobby (generates join code, closes previous WAITING lobbies) |
+| POST   | `/api/lobbies/join`       | Session          | Join by code and enter the lobby room                               |
+| GET    | `/api/lobbies/[id]`       | Session          | Poll lobby status (guest info, gameId)                              |
+| PATCH  | `/api/lobbies/[id]`       | Session (member) | Partially update pre-game mode, deck, or ready state                |
+| DELETE | `/api/lobbies/[id]`       | Session (host)   | Close a WAITING or READY PVP lobby                                  |
+| POST   | `/api/lobbies/[id]/start` | Session (host)   | Start a ready lobby                                                 |
 
 **POST /api/lobbies** — Request: `{ deckId?, format? }`. Returns `{ lobbyId, joinCode }`. Closes any existing WAITING lobbies for the host.
 
 **POST /api/lobbies/join** — Request: `{ code, deckId? }`. Creates a guest seat, marks the PVP lobby `READY`, and returns `{ lobbyId }`. Game creation is handled only by `POST /api/lobbies/[id]/start`.
+
+**DELETE /api/lobbies/[id]** — Host-only pre-game close lifecycle:
+
+- Allowed only for `WAITING` or `READY` PVP lobbies. `SOLITAIRE` and `IN_GAME` lobbies are excluded.
+- Uses a conditional status transition shared with Start's lock, so close and start cannot both win. If Start wins, Close returns `409` with `code: "ALREADY_STARTED"`.
+- A successful transition writes `CLOSED` before responding, making the lobby non-joinable and preventing invite acceptance immediately. Pending invites are canceled and their visible toasts are dismissed through realtime fan-out.
+- If a real guest is seated, they receive a `lobby:state_changed` snapshot with `status: "CLOSED"`; the room UI tells them the host closed the lobby and routes them to `/lobbies`.
+- The host UI requires a destructive confirmation. With a seated guest, its impact copy names the guest, says outstanding invites will be canceled, and says the guest will return to the lobby browser.
+- An already-missing or already-closed lobby returns `404`, matching the terminal-state semantics of guest leave.
 
 ### Game
 
