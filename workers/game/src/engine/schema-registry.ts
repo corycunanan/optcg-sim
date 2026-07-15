@@ -26,6 +26,7 @@ import {
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
+import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 
 /**
  * Get the effect schema for a card by ID.
@@ -124,20 +125,9 @@ const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
   "type", "params", "target", "duration", "chain", "target_ref",
   "result_ref", "conditions",
 ]);
-const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set([
-  "controller",
-  "cost_exact", "cost_min", "cost_max", "cost_range",
-  "base_cost_exact", "base_cost_min", "base_cost_max",
-  "power_exact", "power_min", "power_max", "power_range",
-  "base_power_exact", "base_power_min", "base_power_max",
-  "color", "color_includes", "color_not_matching_ref",
-  "traits", "traits_any_of", "traits_contains", "traits_exclude",
-  "name", "name_any_of", "name_includes", "exclude_name", "exclude_self",
-  "name_matching_ref", "keywords", "has_trigger", "attribute",
-  "attribute_not", "has_effect", "no_base_effect", "lacks_effect_type",
-  "has_counter", "card_type", "is_rested", "is_active", "state",
-  "don_given_count", "exclude_ref", "unique_names", "any_of",
-]);
+const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
+  TARGET_FILTER_KEYS,
+);
 
 /**
  * Validate an effect schema and return a list of error messages.
@@ -186,6 +176,15 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
 
     // Category-specific checks
     errors.push(...validateBlock(block, blockPrefix));
+  }
+
+  if (candidate.rule_modifications !== undefined) {
+    errors.push(
+      ...validateTargetFiltersInValue(
+        candidate.rule_modifications,
+        `${prefix} rule_modifications`,
+      ),
+    );
   }
 
   return errors;

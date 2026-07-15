@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CardData, CardInstance, PlayerState } from "../types.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { validateEffectSchema } from "../engine/schema-registry.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -37,6 +38,35 @@ function makeCharacter(cardId: string, instanceId: string): CardInstance {
 }
 
 describe("OPT-412 shared TargetFilter production path", () => {
+  it("rejects unknown deck-restriction keys at schema ingest recursively", () => {
+    const errors = validateEffectSchema(
+      {
+        effects: [],
+        rule_modifications: [
+          {
+            rule_type: "DECK_RESTRICTION",
+            restriction: "ONLY_INCLUDE",
+            filter: {
+              typo_top_level: true,
+              any_of: [
+                { color: "BLUE" },
+                { traits_any_of: ["Navy"], typo_nested: true },
+              ],
+            },
+          },
+        ],
+      },
+      "OPT-412-INGEST"
+    );
+
+    expect(errors).toContain(
+      "[OPT-412-INGEST] rule_modifications[0].filter: Unknown target filter field 'typo_top_level'"
+    );
+    expect(errors).toContain(
+      "[OPT-412-INGEST] rule_modifications[0].filter.any_of[1]: Unknown target filter field 'typo_nested'"
+    );
+  });
+
   it("filters action targets through runPipeline with the shared predicates", () => {
     const cardDb = createTestCardDb();
     const leader: CardData = {

@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { TARGET_FILTER_KEYS } from "@shared/target-filter";
 import { buildDesiredEffectSchemas } from "../../pipeline/sync-effect-schemas";
 import {
   allowsUnlimitedCopies,
@@ -22,6 +23,32 @@ import {
 const desired = buildDesiredEffectSchemas();
 
 const SUPPORTED_RESTRICTIONS = new Set(["CANNOT_INCLUDE", "ONLY_INCLUDE"]);
+const targetFilterKeys: ReadonlySet<string> = new Set(TARGET_FILTER_KEYS);
+
+function expectSharedTargetFilterVocabulary(
+  cardId: string,
+  filter: unknown,
+  path: string
+): void {
+  if (!filter || typeof filter !== "object" || Array.isArray(filter)) return;
+
+  for (const [key, value] of Object.entries(filter)) {
+    expect(
+      targetFilterKeys.has(key),
+      `${cardId} uses unknown TargetFilter key "${key}" at ${path}`
+    ).toBe(true);
+
+    if (key === "any_of" && Array.isArray(value)) {
+      for (let index = 0; index < value.length; index++) {
+        expectSharedTargetFilterVocabulary(
+          cardId,
+          value[index],
+          `${path}.any_of[${index}]`
+        );
+      }
+    }
+  }
+}
 
 describe("effect schema sync", () => {
   it("extracts unlimited-copy overrides that validation consumes", () => {
@@ -64,6 +91,12 @@ describe("effect schema sync", () => {
           SUPPORTED_RESTRICTIONS.has(mod.restriction as string),
           `${cardId} uses restriction "${String(mod.restriction)}" — extend validation.ts before authoring it`
         ).toBe(true);
+
+        expectSharedTargetFilterVocabulary(
+          cardId,
+          mod.filter,
+          "DECK_RESTRICTION.filter"
+        );
       }
     }
   });
