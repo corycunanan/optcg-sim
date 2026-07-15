@@ -116,7 +116,7 @@ describe("POST /api/lobbies", () => {
       new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
         code: "P2002",
         clientVersion: "test",
-        meta: { target: ["hostUserId"] },
+        meta: { target: "lobbies_waiting_host_unique" },
       })
     );
 
