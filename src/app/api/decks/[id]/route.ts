@@ -1,6 +1,6 @@
 /**
  * GET    /api/decks/[id] — Get a deck with full card list
- * PUT    /api/decks/[id] — Update a deck (name, leader, cards)
+ * PATCH  /api/decks/[id] — Partially update a deck (name, leader, cards)
  * DELETE /api/decks/[id] — Delete a deck
  */
 
@@ -59,7 +59,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
