@@ -10,7 +10,7 @@ import { z } from "zod";
  */
 export interface RuntimeModifier {
   type: string;
-  params?: { amount?: number; value?: number };
+  params?: Record<string, unknown>;
 }
 
 export interface RuntimeEffect {
@@ -20,24 +20,40 @@ export interface RuntimeEffect {
   appliesTo?: string[];
 }
 
-const RuntimeEffectSchema = z.object({
-  id: z.string(),
-  sourceCardInstanceId: z.string(),
-  modifiers: z
-    .array(
-      z.object({
-        type: z.string(),
-        params: z
-          .object({
-            amount: z.number().optional(),
-            value: z.number().optional(),
-          })
-          .optional(),
-      })
-    )
-    .optional(),
-  appliesTo: z.array(z.string()).optional(),
-});
+const RuntimeModifierSchema = z
+  .object({
+    type: z.string(),
+    // Engine-authored modifiers may carry numeric or dynamic values such as
+    // `{ type: "PER_COUNT", ... }`. Preserve the payload here and narrow only
+    // where the display calculation actually consumes a numeric value.
+    params: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough();
+
+const RuntimeEffectEnvelopeSchema = z
+  .object({
+    id: z.string(),
+    sourceCardInstanceId: z.string(),
+    modifiers: z.array(z.unknown()).optional(),
+    appliesTo: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
+function parseRuntimeEffects(effects: ActiveEffect[]): RuntimeEffect[] {
+  return effects.flatMap((effect) => {
+    const parsedEffect = RuntimeEffectEnvelopeSchema.safeParse(effect);
+    if (!parsedEffect.success) return [];
+
+    const modifiers = (parsedEffect.data.modifiers ?? []).flatMap(
+      (modifier) => {
+        const parsedModifier = RuntimeModifierSchema.safeParse(modifier);
+        return parsedModifier.success ? [parsedModifier.data] : [];
+      }
+    );
+
+    return [{ ...parsedEffect.data, modifiers }];
+  });
+}
 
 const ActiveEffectsContext = createContext<RuntimeEffect[]>([]);
 
@@ -48,9 +64,8 @@ export function ActiveEffectsProvider({
   value: ActiveEffect[];
   children: ReactNode;
 }) {
-  const parsed = z.array(RuntimeEffectSchema).safeParse(value);
   return (
-    <ActiveEffectsContext.Provider value={parsed.success ? parsed.data : []}>
+    <ActiveEffectsContext.Provider value={parseRuntimeEffects(value)}>
       {children}
     </ActiveEffectsContext.Provider>
   );
@@ -74,11 +89,14 @@ export function getPowerModDirection(
   for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
-      if (mod.type === "SET_POWER" && mod.params?.value !== undefined) {
+      if (mod.type === "SET_POWER" && typeof mod.params?.value === "number") {
         power = mod.params.value;
         hasSetPower = true;
       }
-      if (mod.type === "MODIFY_POWER" && mod.params?.amount !== undefined) {
+      if (
+        mod.type === "MODIFY_POWER" &&
+        typeof mod.params?.amount === "number"
+      ) {
         power += mod.params.amount;
       }
     }
@@ -101,10 +119,13 @@ export function computeEffectivePower(
   for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
-      if (mod.type === "SET_POWER" && mod.params?.value !== undefined) {
+      if (mod.type === "SET_POWER" && typeof mod.params?.value === "number") {
         power = mod.params.value;
       }
-      if (mod.type === "MODIFY_POWER" && mod.params?.amount !== undefined) {
+      if (
+        mod.type === "MODIFY_POWER" &&
+        typeof mod.params?.amount === "number"
+      ) {
         power += mod.params.amount;
       }
     }
@@ -126,7 +147,10 @@ export function computeEffectiveCost(
   for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
-      if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
+      if (
+        mod.type === "MODIFY_COST" &&
+        typeof mod.params?.amount === "number"
+      ) {
         cost += mod.params.amount;
       }
     }
@@ -146,7 +170,10 @@ export function getCostModDirection(
   for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
-      if (mod.type === "MODIFY_COST" && mod.params?.amount !== undefined) {
+      if (
+        mod.type === "MODIFY_COST" &&
+        typeof mod.params?.amount === "number"
+      ) {
         delta += mod.params.amount;
       }
     }
