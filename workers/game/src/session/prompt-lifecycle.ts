@@ -97,7 +97,8 @@ export function resumePromptLifecycle(
           state,
           costFrame,
           replacement.events,
-          cardDb
+          cardDb,
+          resolverExecutionServices
         );
         state = withPendingPrompt(aborted.state, aborted.pendingPrompt);
       } else {

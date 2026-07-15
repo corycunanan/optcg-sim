@@ -7,17 +7,23 @@ import type {
 } from "../types.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 import { scanEventsForTriggers } from "../engine/trigger-ordering.js";
-import { processRemainingTriggers } from "../engine/effect-resolver/resume/triggers.js";
+import { processRemainingTriggers } from "../engine/effect-resolver/resume.js";
 import { advanceToPhase, setupGame } from "./factories.js";
 
 function deepFreeze<T>(value: T): T {
-  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  if (!value || typeof value !== "object" || Object.isFrozen(value))
+    return value;
   Object.freeze(value);
-  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  for (const child of Object.values(value as Record<string, unknown>))
+    deepFreeze(child);
   return value;
 }
 
-const stubBlock: EffectBlock = { id: "opt-468-frame", category: "auto", actions: [] };
+const stubBlock: EffectBlock = {
+  id: "opt-468-frame",
+  category: "auto",
+  actions: [],
+};
 
 function frameWithEvent(event: PendingEvent): EffectStackFrame {
   return {
@@ -48,7 +54,10 @@ describe("OPT-468 immutable event propagation", () => {
     const event: PendingEvent = {
       type: "CARD_STATE_CHANGED",
       playerIndex: 0,
-      payload: { targetInstanceId: base.players[0].leader.instanceId, newState: "RESTED" },
+      payload: {
+        targetInstanceId: base.players[0].leader.instanceId,
+        newState: "RESTED",
+      },
     };
     const frame = frameWithEvent(event);
     const snapshot = deepFreeze({ ...base, effectStack: [frame] } as GameState);
@@ -60,7 +69,9 @@ describe("OPT-468 immutable event propagation", () => {
     expect(event.propagation).toBeUndefined();
     expect(snapshot.effectStack[0]).toBe(frame);
     expect(snapshot.effectStack[0].accumulatedEvents[0]).toBe(event);
-    expect(snapshot.effectStack[0].accumulatedEvents[0].propagation).toBeUndefined();
+    expect(
+      snapshot.effectStack[0].accumulatedEvents[0].propagation
+    ).toBeUndefined();
   });
 
   it("publishes resume-trigger events once while preserving the frozen input snapshot", () => {
@@ -82,8 +93,12 @@ describe("OPT-468 immutable event propagation", () => {
     const originalDeck = snapshot.players[0].deck;
 
     const result = processRemainingTriggers(snapshot, [trigger], setup.cardDb);
-    const drawEvents = result.events.filter((event) => event.type === "CARD_DRAWN");
-    const loggedDraws = result.state.eventLog.filter((event) => event.type === "CARD_DRAWN");
+    const drawEvents = result.events.filter(
+      (event) => event.type === "CARD_DRAWN"
+    );
+    const loggedDraws = result.state.eventLog.filter(
+      (event) => event.type === "CARD_DRAWN"
+    );
 
     expect(drawEvents).toHaveLength(1);
     expect(drawEvents[0].propagation).toMatchObject({ eventLogEmitted: true });

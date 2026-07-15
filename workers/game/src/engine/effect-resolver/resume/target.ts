@@ -21,14 +21,15 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
-import { executeActionChain, executeEffectAction } from "../resolver.js";
 import { executePlayCard } from "../actions/play.js";
 import { trashCharacter } from "../card-mutations.js";
-import { validateTargetConstraints, buildSelectTargetPrompt } from "../target-resolver.js";
+import {
+  validateTargetConstraints,
+  buildSelectTargetPrompt,
+} from "../target-resolver.js";
 import { applyRedistributeDonTransfers } from "../actions/don.js";
-import type { EffectResolverResult } from "../types.js";
+import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
-import { processRemainingTriggers } from "./triggers.js";
 import { isEngineTerminated } from "../../engine-limits.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../../effect-stack.js";
@@ -56,38 +57,53 @@ export function handleRedistributeDon(
   action: GameAction,
   resumeCtx: ResumeContext,
   resultRefs: Map<string, EffectResult>,
-  events: PendingEvent[],
+  events: PendingEvent[]
 ): TargetBranchResult {
   const { pausedAction, controller, validTargets } = resumeCtx;
-  if (action.type !== "REDISTRIBUTE_DON" || !pausedAction || pausedAction.type !== "REDISTRIBUTE_DON") {
+  if (
+    action.type !== "REDISTRIBUTE_DON" ||
+    !pausedAction ||
+    pausedAction.type !== "REDISTRIBUTE_DON"
+  ) {
     return null;
   }
 
   const transfers = action.transfers ?? [];
-  const amount = ((pausedAction.params?.amount as number) ?? 1);
+  const amount = (pausedAction.params?.amount as number) ?? 1;
 
   // Re-derive valid sources (cards that have DON attached) for this controller.
   const pp = state.players[controller];
   const validSourceSet = new Set<string>();
-  if (pp.leader.attachedDon.length > 0) validSourceSet.add(pp.leader.instanceId);
+  if (pp.leader.attachedDon.length > 0)
+    validSourceSet.add(pp.leader.instanceId);
   for (const c of pp.characters) {
     if (c && c.attachedDon.length > 0) validSourceSet.add(c.instanceId);
   }
   const validTargetSet = new Set(validTargets);
 
-  const allValid = transfers.length <= amount && transfers.every((t) =>
+  const allValid =
+    transfers.length <= amount &&
+    transfers.every(
+      (t) =>
     t.fromCardInstanceId !== t.toCardInstanceId &&
     validSourceSet.has(t.fromCardInstanceId) &&
-    validTargetSet.has(t.toCardInstanceId),
+        validTargetSet.has(t.toCardInstanceId)
   );
 
   if (!allValid) {
-    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
+    return {
+      kind: "terminal",
+      result: { state, events: [], resolved: false, rejected: true },
+    };
   }
 
   let nextState = state;
   if (transfers.length > 0) {
-    const actionResult = applyRedistributeDonTransfers(nextState, transfers, controller);
+    const actionResult = applyRedistributeDonTransfers(
+      nextState,
+      transfers,
+      controller
+    );
     nextState = actionResult.state;
     events.push(...actionResult.events);
     if (actionResult.result && pausedAction.result_ref) {
@@ -115,6 +131,7 @@ export function handleSelectTargetRuleTrashForPlay(
   resultRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
+  services: EffectResolverServices
 ): TargetBranchResult {
   const {
     pausedAction,
@@ -137,12 +154,18 @@ export function handleSelectTargetRuleTrashForPlay(
 
   const selected = action.selectedInstanceIds ?? [];
   if (selected.length !== 1 || !validTargets.includes(selected[0])) {
-    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
+    return {
+      kind: "terminal",
+      result: { state, events: [], resolved: false, rejected: true },
+    };
   }
   const victimId = selected[0];
   const trashResult = trashCharacter(nextState, victimId, controller);
   if (!trashResult) {
-    return { kind: "terminal", result: { state, events: [], resolved: false, rejected: true } };
+    return {
+      kind: "terminal",
+      result: { state, events: [], resolved: false, rejected: true },
+    };
   }
   nextState = trashResult.state;
   events.push(...trashResult.events);
@@ -166,25 +189,36 @@ export function handleSelectTargetRuleTrashForPlay(
           remaining: batch.remaining,
           playedSoFar: batch.playedSoFar,
           forcedFirstState: batch.forcedFirstState,
-        },
+        }
       )
-    : executeEffectAction(
+    : services.executeEffectAction(
         nextState,
         pausedAction,
         effectSourceInstanceId,
         controller,
         cardDb,
         resultRefs,
-        [ruleTrashForPlay.playTargetId],
+        [ruleTrashForPlay.playTargetId]
       );
   nextState = actionResult.state;
   events.push(...actionResult.events);
   if (isEngineTerminated(nextState)) {
-    return { kind: "terminal", result: { state: nextState, events, resolved: false } };
+    return {
+      kind: "terminal",
+      result: { state: nextState, events, resolved: false },
+    };
   }
 
   if (actionResult.pendingPrompt) {
-    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt } };
+    return {
+      kind: "terminal",
+      result: {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: actionResult.pendingPrompt,
+      },
+    };
   }
   if (actionResult.result && pausedAction.result_ref) {
     resultRefs.set(pausedAction.result_ref, actionResult.result);
@@ -192,7 +226,12 @@ export function handleSelectTargetRuleTrashForPlay(
 
   // Scan for triggers produced by the re-entered play (e.g., ON_PLAY)
   if (actionResult.events.length > 0) {
-    const scan = scanEventsForTriggers(nextState, actionResult.events, controller, cardDb);
+    const scan = scanEventsForTriggers(
+      nextState,
+      actionResult.events,
+      controller,
+      cardDb
+    );
     nextState = scan.state;
     replacePendingEventReferences(events, actionResult.events, scan.events);
     // triggers drain via the outer pipeline — fall through to remainingActions
@@ -200,21 +239,32 @@ export function handleSelectTargetRuleTrashForPlay(
 
   // Skip the generic SELECT_TARGET branch below
   if (remainingActions.length > 0) {
-    const chainResult = executeActionChain(
+    const chainResult = services.executeActionChain(
       nextState,
       remainingActions,
       effectSourceInstanceId,
       controller,
       cardDb,
-      resultRefs,
+      resultRefs
     );
     nextState = chainResult.state;
     events.push(...chainResult.events);
     if (chainResult.pendingPrompt) {
-      return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt } };
+      return {
+        kind: "terminal",
+        result: {
+          state: nextState,
+          events,
+          resolved: false,
+          pendingPrompt: chainResult.pendingPrompt,
+        },
+      };
     }
   }
-  return { kind: "terminal", result: { state: nextState, events, resolved: true } };
+  return {
+    kind: "terminal",
+    result: { state: nextState, events, resolved: true },
+  };
 }
 
 /**
@@ -231,8 +281,15 @@ export function handleSelectTarget(
   resultRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
+  services: EffectResolverServices
 ): TargetBranchResult {
-  const { pausedAction, controller, validTargets, remainingActions, effectSourceInstanceId } = resumeCtx;
+  const {
+    pausedAction,
+    controller,
+    validTargets,
+    remainingActions,
+    effectSourceInstanceId,
+  } = resumeCtx;
   if (action.type !== "SELECT_TARGET" || !pausedAction) {
     return null;
   }
@@ -241,32 +298,86 @@ export function handleSelectTarget(
   const selected = action.selectedInstanceIds ?? [];
   // Validate — all selected ids must be in validTargets
   if (selected.some((id) => !validTargets.includes(id))) {
-    const reprompt = buildSelectTargetPrompt(nextState, pausedAction, validTargets, effectSourceInstanceId, controller, cardDb, resultRefs);
-    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt, rejected: true } };
+    const reprompt = buildSelectTargetPrompt(
+      nextState,
+      pausedAction,
+      validTargets,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    );
+    return {
+      kind: "terminal",
+      result: {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: reprompt.pendingPrompt,
+        rejected: true,
+      },
+    };
   }
   // Validate target constraints (aggregate sum, uniqueness, named distribution, dual_targets)
-  if (pausedAction.target && !validateTargetConstraints(selected, pausedAction.target, nextState, cardDb, resultRefs)) {
-    const reprompt = buildSelectTargetPrompt(nextState, pausedAction, validTargets, effectSourceInstanceId, controller, cardDb, resultRefs);
-    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: reprompt.pendingPrompt, rejected: true } };
+  if (
+    pausedAction.target &&
+    !validateTargetConstraints(
+      selected,
+      pausedAction.target,
+      nextState,
+      cardDb,
+      resultRefs
+    )
+  ) {
+    const reprompt = buildSelectTargetPrompt(
+      nextState,
+      pausedAction,
+      validTargets,
+      effectSourceInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    );
+    return {
+      kind: "terminal",
+      result: {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: reprompt.pendingPrompt,
+        rejected: true,
+      },
+    };
   }
 
-  const actionResult = executeEffectAction(
+  const actionResult = services.executeEffectAction(
     nextState,
     pausedAction,
     effectSourceInstanceId,
     controller,
     cardDb,
     resultRefs,
-    selected,
+    selected
   );
   nextState = actionResult.state;
   events.push(...actionResult.events);
   if (isEngineTerminated(nextState)) {
-    return { kind: "terminal", result: { state: nextState, events, resolved: false } };
+    return {
+      kind: "terminal",
+      result: { state: nextState, events, resolved: false },
+    };
   }
 
   if (actionResult.pendingPrompt) {
-    return { kind: "terminal", result: { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt } };
+    return {
+      kind: "terminal",
+      result: {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: actionResult.pendingPrompt,
+      },
+    };
   }
   // OPT-174: SELECT_TARGET resume into a multi-target handler (e.g. KO with
   // dual_targets) can pause mid-batch when frame N's events queue triggers
@@ -283,17 +394,37 @@ export function handleSelectTarget(
       marker,
       triggers,
       remainingActions,
-      resultRefs,
+      resultRefs
     );
     if (isEngineTerminated(nextState)) {
-      return { kind: "terminal", result: { state: nextState, events, resolved: false } };
+      return {
+        kind: "terminal",
+        result: { state: nextState, events, resolved: false },
+      };
     }
-    const drain = processRemainingTriggers(nextState, triggers, cardDb, events);
-    return { kind: "terminal", result: { state: drain.state, events: drain.events, resolved: drain.resolved, pendingPrompt: drain.pendingPrompt } };
+    const drain = services.processRemainingTriggers(
+      nextState,
+      triggers,
+      cardDb,
+      events
+    );
+    return {
+      kind: "terminal",
+      result: {
+        state: drain.state,
+        events: drain.events,
+        resolved: drain.resolved,
+        pendingPrompt: drain.pendingPrompt,
+      },
+    };
   }
   if (actionResult.result && pausedAction.result_ref) {
     resultRefs.set(pausedAction.result_ref, actionResult.result);
   }
 
-  return { kind: "fallthrough", state: nextState, succeeded: actionResult.succeeded };
+  return {
+    kind: "fallthrough",
+    state: nextState,
+    succeeded: actionResult.succeeded,
+  };
 }

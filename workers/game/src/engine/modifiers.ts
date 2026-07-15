@@ -16,11 +16,74 @@ import type {
   RuntimeOneTimeModifier,
   Modifier,
   TargetFilter,
+  EffectResult,
 } from "./effect-types.js";
 import type { CardData as CardDataType } from "../types.js";
-import { evaluateCondition, matchesFilter, type ConditionContext } from "./conditions.js";
+import {
+  evaluateCondition as evaluateConditionQuery,
+  matchesFilter as matchesFilterQuery,
+  type ConditionContext as QueryConditionContext,
+  type ConditionQueryServices,
+} from "./condition-queries.js";
+import {
+  isKeywordEffective,
+  type EffectiveKeyword,
+} from "./effective-keyword.js";
 import { findCardInstance } from "./state.js";
 import { isPresent } from "./type-guards.js";
+
+type ConditionContext = Omit<QueryConditionContext, "queries">;
+
+const modifierConditionQueries: ConditionQueryServices = {
+  getEffectivePower: (card, data, state, cardDb) =>
+    getEffectivePower(card, data, state, cardDb),
+  getEffectiveCostForRead: (card, data, state, cardDb) =>
+    getEffectiveCostForRead(card, data, state, cardDb),
+  getEffectiveFieldCost: (data, state, instanceId, cardDb) =>
+    getEffectiveFieldCost(data, state, instanceId, cardDb),
+  hasGrantedAttribute: (card, attribute, state, cardDb) =>
+    hasGrantedAttribute(card, attribute, state, cardDb),
+  hasEffectiveKeyword: (card, data, keyword, state, cardDb) =>
+    isKeywordEffective(
+      data,
+      keyword as EffectiveKeyword,
+      isCardNegated(card, state, cardDb),
+      hasGrantedKeyword(card, keyword, state, cardDb)
+    ),
+};
+Object.freeze(modifierConditionQueries);
+
+function evaluateCondition(
+  state: GameState,
+  condition: import("./effect-types.js").Condition,
+  ctx: ConditionContext
+): boolean {
+  return evaluateConditionQuery(state, condition, {
+    ...ctx,
+    queries: modifierConditionQueries,
+  });
+}
+
+function matchesFilter(
+  card: CardInstance,
+  filter: TargetFilter,
+  cardDb: Map<string, CardData>,
+  state: GameState,
+  resultRefs?: Map<string, EffectResult>,
+  costOverride?: number,
+  filterController?: 0 | 1
+): boolean {
+  return matchesFilterQuery(
+    card,
+    filter,
+    cardDb,
+    state,
+    resultRefs,
+    costOverride,
+    filterController,
+    modifierConditionQueries
+  );
+}
 
 function numericModifierParam(
   modifier: Modifier,
@@ -41,7 +104,7 @@ function effectAppliesToCard(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>,
-  costOverride?: number,
+  costOverride?: number
 ): boolean {
   // Static match — card is explicitly listed in appliesTo
   if (effect.appliesTo?.includes(card.instanceId)) return true;
@@ -53,10 +116,13 @@ function effectAppliesToCard(
 
     // Controller check — ALL_YOUR_CHARACTERS implies SELF controller
     const targetType = mod.target.type?.toUpperCase();
-    const controller = mod.target.controller ??
+    const controller =
+      mod.target.controller ??
       (targetType === "ALL_YOUR_CHARACTERS" ? "SELF" : undefined);
-    if (controller === "SELF" && card.controller !== effect.controller) continue;
-    if (controller === "OPPONENT" && card.controller === effect.controller) continue;
+    if (controller === "SELF" && card.controller !== effect.controller)
+      continue;
+    if (controller === "OPPONENT" && card.controller === effect.controller)
+      continue;
 
     // Card type check
     if (targetType === "CHARACTER" || targetType === "ALL_YOUR_CHARACTERS") {
@@ -66,7 +132,17 @@ function effectAppliesToCard(
 
     // Apply filter if present
     if (mod.target.filter) {
-      if (matchesFilter(card, mod.target.filter, cardDb, state, undefined, costOverride)) return true;
+      if (
+        matchesFilter(
+          card,
+          mod.target.filter,
+          cardDb,
+          state,
+          undefined,
+          costOverride
+        )
+      )
+        return true;
     } else {
       // No filter — matches all cards of the target type/controller
       return true;
@@ -88,11 +164,12 @@ function effectAppliesToCard(
 export function isCardNegated(
   card: CardInstance,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): boolean {
   const effects = state.activeEffects;
   for (const effect of effects) {
-    if (!effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG")) continue;
+    if (!effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG"))
+      continue;
     if (!effect.appliesTo?.includes(card.instanceId)) continue;
 
     const duration = effect.duration;
@@ -117,7 +194,7 @@ export function isCardNegated(
 function isEffectSourceNegated(
   effect: RuntimeActiveEffect,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): boolean {
   if (!effect.sourceCardInstanceId) return false;
   const source = findCardInstance(state, effect.sourceCardInstanceId);
@@ -136,15 +213,18 @@ function isEffectSourceNegated(
 export function isEffectConditionMet(
   effect: RuntimeActiveEffect,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): boolean {
   if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
   // OPT-253: suppress effects whose source Character is negated. The
   // NEGATE_EFFECTS_FLAG modifier itself is exempt to keep the negation
   // itself resolvable even if the negator is later negated.
-  const isNegationFlag = effect.modifiers?.some((m) => m.type === "NEGATE_EFFECTS_FLAG");
-  if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb)) return false;
+  const isNegationFlag = effect.modifiers?.some(
+    (m) => m.type === "NEGATE_EFFECTS_FLAG"
+  );
+  if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb))
+    return false;
 
   const condCtx: ConditionContext = {
     sourceCardInstanceId: effect.sourceCardInstanceId,
@@ -173,7 +253,7 @@ export function isEffectConditionMet(
  */
 function sortByTurnPlayerPriority<T extends { controller: 0 | 1 }>(
   items: T[],
-  turnPlayerIndex: 0 | 1,
+  turnPlayerIndex: 0 | 1
 ): T[] {
   const turnPlayer: T[] = [];
   const nonTurnPlayer: T[] = [];
@@ -192,7 +272,7 @@ export function getEffectivePower(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): number {
   // Layer 0: base printed value
   let power = cardData.power ?? 0;
@@ -203,7 +283,10 @@ export function getEffectivePower(
   // for filters like OP10-026's "[Kin'emon] with 0 power from your trash"
   // (effectAppliesToCard's dynamic matching has no zone gate, so without
   // this early return broad auras leak into non-field reads).
-  const onField = card.zone === "CHARACTER" || card.zone === "LEADER" || card.zone === "STAGE";
+  const onField =
+    card.zone === "CHARACTER" ||
+    card.zone === "LEADER" ||
+    card.zone === "STAGE";
   if (!onField) return power;
 
   const turnPlayerIndex = state.turn.activePlayerIndex;
@@ -211,12 +294,13 @@ export function getEffectivePower(
   // Layer 1: base-setting effects
   const effects = state.activeEffects;
   const baseSetters = sortByTurnPlayerPriority(
-    effects.filter((e) =>
+    effects.filter(
+      (e) =>
       effectAppliesToCard(e, card, state, cardDb) &&
       e.modifiers?.some((m) => m.type === "SET_POWER") &&
-      isEffectConditionMet(e, state, cardDb),
+        isEffectConditionMet(e, state, cardDb)
     ),
-    turnPlayerIndex,
+    turnPlayerIndex
   );
   if (baseSetters.length > 0) {
     // Last base-setter wins (timestamp/priority order). Turn-player resolves
@@ -230,12 +314,13 @@ export function getEffectivePower(
   // Layer 2: additive/subtractive modifiers (commutative, but sort for
   // determinism and to make ordering visible in event traces).
   const additiveEffects = sortByTurnPlayerPriority(
-    effects.filter((e) =>
+    effects.filter(
+      (e) =>
       effectAppliesToCard(e, card, state, cardDb) &&
       e.modifiers?.some((m) => m.type === "MODIFY_POWER") &&
-      isEffectConditionMet(e, state, cardDb),
+        isEffectConditionMet(e, state, cardDb)
     ),
-    turnPlayerIndex,
+    turnPlayerIndex
   );
   for (const effect of additiveEffects) {
     for (const mod of effect.modifiers ?? []) {
@@ -264,7 +349,7 @@ export function getEffectiveCost(
   state?: GameState,
   cardInstanceId?: string,
   cardDb?: Map<string, CardData>,
-  playTimeAdjustments = true,
+  playTimeAdjustments = true
 ): number {
   // Layer 0
   let cost = cardData.cost ?? 0;
@@ -280,7 +365,8 @@ export function getEffectiveCost(
     // breaks recursion: OPT-247 made cost_* default to getEffectiveCost(), and
     // without an override the filter would call back into us.
     const applyingEffects = effects.filter((effect) => {
-      const applies = card && cardDb
+      const applies =
+        card && cardDb
         ? effectAppliesToCard(effect, card, state, cardDb, cost)
         : effect.appliesTo?.includes(cardInstanceId);
       if (!applies) return false;
@@ -289,8 +375,10 @@ export function getEffectiveCost(
 
     // Layer 1: SET_COST — last wins after turn-player-first sort.
     const setters = sortByTurnPlayerPriority(
-      applyingEffects.filter((e) => e.modifiers?.some((m) => m.type === "SET_COST")),
-      turnPlayerIndex,
+      applyingEffects.filter((e) =>
+        e.modifiers?.some((m) => m.type === "SET_COST")
+      ),
+      turnPlayerIndex
     );
     for (const effect of setters) {
       for (const mod of effect.modifiers ?? []) {
@@ -305,7 +393,15 @@ export function getEffectiveCost(
     // stays applied (even if its own contribution pushes the card past the
     // threshold). We therefore only add new effects, never remove included
     // ones — this also guarantees termination (cycle-free).
-    cost = applyLayer2CostModifiers(cost, cardInstanceId, card, state, cardDb, effects, turnPlayerIndex);
+    cost = applyLayer2CostModifiers(
+      cost,
+      cardInstanceId,
+      card,
+      state,
+      cardDb,
+      effects,
+      turnPlayerIndex
+    );
 
     // Play-time-only adjustments (OPT-444: skipped for on-field cost reads —
     // a pending "next time you play X" discount or hand-zone self-reduction
@@ -324,8 +420,18 @@ export function getEffectiveCost(
 
       // Hand-zone permanent modifiers (self-cost-reduction while in hand)
       if (cardDb) {
-        cost += getHandZoneSelfCostModifier(cardData, state, cardInstanceId, cardDb);
-        cost += getFieldToHandCostModifier(cardData, state, cardInstanceId, cardDb);
+        cost += getHandZoneSelfCostModifier(
+          cardData,
+          state,
+          cardInstanceId,
+          cardDb
+        );
+        cost += getFieldToHandCostModifier(
+          cardData,
+          state,
+          cardInstanceId,
+          cardDb
+        );
       }
     }
   }
@@ -342,7 +448,7 @@ export function getEffectiveFieldCost(
   cardData: CardData,
   state: GameState,
   cardInstanceId: string,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): number {
   return getEffectiveCost(cardData, state, cardInstanceId, cardDb, false);
 }
@@ -369,12 +475,22 @@ export function getEffectiveCostForRead(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): number {
   let cost = getEffectiveCost(cardData, state, card.instanceId, cardDb, false);
   if (card.zone === "HAND" && cardDb) {
-    cost += getHandZoneSelfCostModifier(cardData, state, card.instanceId, cardDb);
-    cost += getFieldToHandCostModifier(cardData, state, card.instanceId, cardDb);
+    cost += getHandZoneSelfCostModifier(
+      cardData,
+      state,
+      card.instanceId,
+      cardDb
+    );
+    cost += getFieldToHandCostModifier(
+      cardData,
+      state,
+      card.instanceId,
+      cardDb
+    );
   }
   return Math.max(0, cost);
 }
@@ -400,7 +516,7 @@ function applyLayer2CostModifiers(
   state: GameState,
   cardDb: Map<string, CardData> | undefined,
   effects: RuntimeActiveEffect[],
-  turnPlayerIndex: 0 | 1,
+  turnPlayerIndex: 0 | 1
 ): number {
   let cost = startingCost;
 
@@ -409,7 +525,7 @@ function applyLayer2CostModifiers(
   const rawCandidates = effects.filter(
     (e) =>
       e.modifiers?.some((m) => m.type === "MODIFY_COST") &&
-      isEffectConditionMet(e, state, cardDb),
+      isEffectConditionMet(e, state, cardDb)
   );
   const candidates = sortByTurnPlayerPriority(rawCandidates, turnPlayerIndex);
 
@@ -419,7 +535,8 @@ function applyLayer2CostModifiers(
     for (const effect of candidates) {
       if (includedEffectIds.has(effect.id)) continue;
 
-      const applies = card && cardDb
+      const applies =
+        card && cardDb
         ? effectAppliesToCard(effect, card, state, cardDb, cost)
         : effect.appliesTo?.includes(cardInstanceId);
       if (!applies) continue;
@@ -450,7 +567,7 @@ function getHandZoneSelfCostModifier(
   cardData: CardData,
   state: GameState,
   cardInstanceId: string,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): number {
   const card = findCardInstance(state, cardInstanceId);
   if (!card || card.zone !== "HAND") return 0;
@@ -472,7 +589,8 @@ function getHandZoneSelfCostModifier(
     if (!block.modifiers) continue;
 
     // Evaluate block-level conditions
-    if (block.conditions && !evaluateCondition(state, block.conditions, ctx)) continue;
+    if (block.conditions && !evaluateCondition(state, block.conditions, ctx))
+      continue;
 
     for (const mod of block.modifiers) {
       const amount = numericModifierParam(mod, "amount");
@@ -496,7 +614,7 @@ function getFieldToHandCostModifier(
   cardData: CardData,
   state: GameState,
   cardInstanceId: string,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): number {
   const card = findCardInstance(state, cardInstanceId);
   if (!card || card.zone !== "HAND") return 0;
@@ -530,7 +648,7 @@ function getFieldToHandCostModifier(
 
         // Only consider blocks that have MODIFY_COST targeting CARD_IN_HAND
         const handCostMods = block.modifiers.filter(
-          (m) => m.type === "MODIFY_COST" && m.target?.type === "CARD_IN_HAND",
+          (m) => m.type === "MODIFY_COST" && m.target?.type === "CARD_IN_HAND"
         );
         if (handCostMods.length === 0) continue;
 
@@ -540,7 +658,11 @@ function getFieldToHandCostModifier(
           controller: fieldCard.controller,
           cardDb,
         };
-        if (block.conditions && !evaluateCondition(state, block.conditions, ctx)) continue;
+        if (
+          block.conditions &&
+          !evaluateCondition(state, block.conditions, ctx)
+        )
+          continue;
 
         // Check if the hand card matches the modifier's target filter
         for (const mod of handCostMods) {
@@ -562,7 +684,11 @@ function getFieldToHandCostModifier(
             continue;
 
           // Filter check
-          if (mod.target.filter && !matchesHandCardFilter(mod.target.filter, cardData)) continue;
+          if (
+            mod.target.filter &&
+            !matchesHandCardFilter(mod.target.filter, cardData)
+          )
+            continue;
 
           const amount = numericModifierParam(mod, "amount");
           if (amount !== undefined) adjustment += amount;
@@ -590,15 +716,22 @@ function matchesHandCardFilter(
       return false;
   }
   if (filter.card_type) {
-    const types = Array.isArray(filter.card_type) ? filter.card_type : [filter.card_type];
+    const types = Array.isArray(filter.card_type)
+      ? filter.card_type
+      : [filter.card_type];
     if (!types.includes(cardData.type?.toUpperCase() ?? "")) return false;
   }
   if (filter.traits) {
     const cardTraits = cardData.types ?? [];
-    if (!filter.traits.every((t: string) => cardTraits.includes(t))) return false;
+    if (!filter.traits.every((t: string) => cardTraits.includes(t)))
+      return false;
   }
   if (filter.cost_max !== undefined) {
-    if (typeof filter.cost_max === "number" && (cardData.cost ?? 0) > filter.cost_max) return false;
+    if (
+      typeof filter.cost_max === "number" &&
+      (cardData.cost ?? 0) > filter.cost_max
+    )
+      return false;
   }
   return true;
 }
@@ -610,7 +743,7 @@ export function hasGrantedKeyword(
   card: CardInstance,
   keyword: string,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): boolean {
   const effects = state.activeEffects;
   return effects.some(
@@ -633,7 +766,7 @@ export function hasGrantedAttribute(
   card: CardInstance,
   attribute: string,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): boolean {
   const want = attribute.toUpperCase();
   const effects = state.activeEffects;
@@ -657,7 +790,7 @@ export function hasRemovedKeyword(
   card: CardInstance,
   keyword: string,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): boolean {
   const effects = state.activeEffects;
   return effects.some(
@@ -679,9 +812,12 @@ export function getBattleDefenderPower(
   defenderCardData: CardData,
   counterPowerAdded: number,
   state: GameState,
-  cardDb?: Map<string, CardDataType>,
+  cardDb?: Map<string, CardDataType>
 ): number {
-  return getEffectivePower(defenderCard, defenderCardData, state, cardDb) + counterPowerAdded;
+  return (
+    getEffectivePower(defenderCard, defenderCardData, state, cardDb) +
+    counterPowerAdded
+  );
 }
 
 // ─── One-Time Modifiers ──────────────────────────────────────────────────────
@@ -693,7 +829,7 @@ export function getBattleDefenderPower(
 export function consumeOneTimeModifiers(
   state: GameState,
   cardData: CardData,
-  controller: 0 | 1,
+  controller: 0 | 1
 ): GameState {
   const modifiers = state.oneTimeModifiers;
   let changed = false;
@@ -739,7 +875,7 @@ export function expireOneTimeModifiers(state: GameState): GameState {
 function matchesOneTimeFilter(
   otm: RuntimeOneTimeModifier,
   cardData: CardData,
-  _state: GameState,
+  _state: GameState
 ): boolean {
   const filter = otm.appliesTo.filter;
   if (!filter) return true;

@@ -4,11 +4,7 @@
  * remaining-batch state carried on the frame's batchResumeMarker.
  */
 
-import type {
-  Action,
-  EffectBlock,
-  EffectResult,
-} from "../../effect-types.js";
+import type { Action, EffectBlock, EffectResult } from "../../effect-types.js";
 import type {
   BatchResumeMarker,
   CardData,
@@ -19,11 +15,13 @@ import type {
 } from "../../../types.js";
 import { popFrame, peekFrame, pushFrame } from "../../effect-stack.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
-import { executeActionChain, resolverExecutionServices } from "../resolver.js";
 import { executePlayCard, executeSetRest } from "../actions/play.js";
 import { executeKO } from "../actions/removal.js";
-import type { EffectResolverResult, ActionResult } from "../types.js";
-import { processRemainingTriggers } from "./triggers.js";
+import type {
+  EffectResolverResult,
+  ActionResult,
+  EffectResolverServices,
+} from "../types.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { generateFrameId } from "../../effect-stack.js";
 
@@ -35,7 +33,8 @@ import { generateFrameId } from "../../effect-stack.js";
 export function reenterBatchResume(
   state: GameState,
   cardDb: Map<string, CardData>,
-  priorEvents: PendingEvent[] = [],
+  services: EffectResolverServices,
+  priorEvents: PendingEvent[] = []
 ): EffectResolverResult {
   let nextState = state;
   const events = [...priorEvents];
@@ -64,19 +63,26 @@ export function reenterBatchResume(
       top.controller,
       cardDb,
       resultRefs,
+      services
     );
     nextState = actionResult.state;
     events.push(...actionResult.events);
 
     if (actionResult.pendingPrompt) {
-      return { state: nextState, events, resolved: false, pendingPrompt: actionResult.pendingPrompt };
+      return {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: actionResult.pendingPrompt,
+      };
     }
 
     // Another mid-batch pause: re-entry produced events that queued more
     // triggers. Push a fresh AWAITING_BATCH_RESUME frame and drain via the
     // same machinery the original push site uses.
     if (actionResult.pendingBatchTriggers) {
-      const { triggers, marker: nextMarker } = actionResult.pendingBatchTriggers;
+      const { triggers, marker: nextMarker } =
+        actionResult.pendingBatchTriggers;
       nextState = pushBatchResumeFrame(
         nextState,
         top.sourceCardInstanceId,
@@ -87,43 +93,77 @@ export function reenterBatchResume(
         top.remainingActions,
         resultRefs
       );
-      return processRemainingTriggers(nextState, triggers, cardDb, events);
+      return services.processRemainingTriggers(
+        nextState,
+        triggers,
+        cardDb,
+        events
+      );
     }
 
     // Scan events emitted by the re-entry. Any new triggers (e.g., the last
     // frame's ON_PLAY) drain via the normal path before we check for another
     // AWAITING_BATCH_RESUME frame underneath.
     if (actionResult.events.length > 0) {
-      const scan = scanEventsForTriggers(nextState, actionResult.events, top.controller, cardDb);
+      const scan = scanEventsForTriggers(
+        nextState,
+        actionResult.events,
+        top.controller,
+        cardDb
+      );
       nextState = scan.state;
       replacePendingEventReferences(events, actionResult.events, scan.events);
       if (scan.triggers.length > 0) {
-        return processRemainingTriggers(nextState, scan.triggers, cardDb, events);
+        return services.processRemainingTriggers(
+          nextState,
+          scan.triggers,
+          cardDb,
+          events
+        );
       }
     }
 
     // Continue any remainingActions queued behind this batch. Matches
     // chain-continuation in other resume branches.
     if (top.remainingActions.length > 0) {
-      const chainResult = executeActionChain(
+      const chainResult = services.executeActionChain(
         nextState,
         top.remainingActions,
         top.sourceCardInstanceId,
         top.controller,
         cardDb,
-        resultRefs,
+        resultRefs
       );
       nextState = chainResult.state;
       events.push(...chainResult.events);
       if (chainResult.pendingPrompt) {
-        return { state: nextState, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+        return {
+          state: nextState,
+          events,
+          resolved: false,
+          pendingPrompt: chainResult.pendingPrompt,
+        };
       }
       if (chainResult.events.length > 0) {
-        const chainScan = scanEventsForTriggers(nextState, chainResult.events, top.controller, cardDb);
+        const chainScan = scanEventsForTriggers(
+          nextState,
+          chainResult.events,
+          top.controller,
+          cardDb
+        );
         nextState = chainScan.state;
-        replacePendingEventReferences(events, chainResult.events, chainScan.events);
+        replacePendingEventReferences(
+          events,
+          chainResult.events,
+          chainScan.events
+        );
         if (chainScan.triggers.length > 0) {
-          return processRemainingTriggers(nextState, chainScan.triggers, cardDb, events);
+          return services.processRemainingTriggers(
+            nextState,
+            chainScan.triggers,
+            cardDb,
+            events
+          );
         }
       }
     }
@@ -138,6 +178,7 @@ function dispatchBatchResume(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  services: EffectResolverServices
 ): ActionResult {
   switch (marker.kind) {
     case "PLAY_CARD":
@@ -149,7 +190,7 @@ function dispatchBatchResume(
         cardDb,
         resultRefs,
         undefined,
-        marker.resumeFrame,
+        marker.resumeFrame
       );
     case "KO":
       return executeKO(
@@ -160,7 +201,7 @@ function dispatchBatchResume(
         cardDb,
         resultRefs,
         marker.remainingTargetIds,
-        resolverExecutionServices,
+        services
       );
     case "SET_REST":
       return executeSetRest(
@@ -171,7 +212,7 @@ function dispatchBatchResume(
         cardDb,
         resultRefs,
         marker.remainingTargetIds,
-        resolverExecutionServices,
+        services
       );
   }
 }
@@ -189,7 +230,7 @@ export function pushBatchResumeFrame(
   marker: BatchResumeMarker,
   triggers: QueuedTrigger[],
   remainingActions: Action[],
-  resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>
 ): GameState {
   const generated = generateFrameId(state);
   const frame: EffectStackFrame = {
