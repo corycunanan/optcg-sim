@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { CARD_SEARCH_SELECT } from "@/lib/cards/card-select";
 
 const authMock = vi.fn();
 const findUniqueMock = vi.fn();
@@ -32,6 +33,16 @@ const validBody = {
   type: "Character",
   color: ["Red"],
   blockNumber: 1,
+};
+
+const slimSearchCard = {
+  id: "OP01-001",
+  name: "Roronoa Zoro",
+  color: ["Red"],
+  type: "Leader",
+  cost: null,
+  traits: ["Supernovas", "Straw Hat Crew"],
+  imageUrl: "https://cdn.example.com/OP01-001.png",
 };
 
 function buildRequest(body: unknown = validBody) {
@@ -88,6 +99,47 @@ describe("GET /api/cards search", () => {
     expect(countMock).toHaveBeenCalledWith({
       where: { name: { contains: "luf", mode: "insensitive" } },
     });
+  });
+
+  it("uses the explicit slim Prisma select", async () => {
+    await GET(new NextRequest("http://localhost/api/cards"));
+
+    const query = findManyMock.mock.calls[0]?.[0];
+    expect(query).toEqual(
+      expect.objectContaining({
+        select: CARD_SEARCH_SELECT,
+      }),
+    );
+    expect(query).not.toHaveProperty("include");
+    expect(query.select).toEqual({
+      id: true,
+      name: true,
+      color: true,
+      type: true,
+      cost: true,
+      traits: true,
+      imageUrl: true,
+    });
+  });
+
+  it("returns only the public slim card shape", async () => {
+    findManyMock.mockResolvedValue([slimSearchCard]);
+    countMock.mockResolvedValue(1);
+
+    const res = await GET(new NextRequest("http://localhost/api/cards"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({
+      data: [slimSearchCard],
+      pagination: { total: 1, page: 1, limit: 40, totalPages: 1 },
+    });
+    expect(Object.keys(body.data[0]).sort()).toEqual(
+      ["id", "name", "color", "type", "cost", "traits", "imageUrl"].sort(),
+    );
+    expect(body.data[0]).not.toHaveProperty("effectSchema");
+    expect(body.data[0]).not.toHaveProperty("artVariants");
+    expect(body.data[0]).not.toHaveProperty("cardSets");
   });
 });
 

@@ -315,9 +315,8 @@ export function DeckBuilderList({
           }}
           isLeader={false}
           quantityInDeck={inspectEntry.quantity}
-          copyLimit={getDeckCardCopyLimit(inspectEntry.card)}
           selectedArtUrl={inspectEntry.selectedArtUrl}
-          onAdd={() => onAddCard(inspectEntry.card)}
+          onAdd={onAddCard}
           onRemove={() => onDecrement(inspectEntry.cardId)}
           onSetArtVariant={(artUrl) =>
             onSetArtVariant(inspectEntry.cardId, artUrl)
@@ -335,7 +334,6 @@ export function DeckBuilderList({
           }}
           isLeader={true}
           quantityInDeck={0}
-          copyLimit={1}
           selectedArtUrl={leaderArtUrl}
           onAdd={() => {}}
           onRemove={() => {}}

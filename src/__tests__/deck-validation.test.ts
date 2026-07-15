@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  collectDeckRestrictionRules,
+  isCardAllowedByDeckRestrictionRules,
   validateDeck,
   type DeckCard,
   type DeckLeader,
@@ -147,6 +149,29 @@ describe("validateDeck copy limit", () => {
 });
 
 describe("validateDeck leader deck restrictions", () => {
+  it("evaluates proactive dimming from the slim search-card fields", () => {
+    const rules = collectDeckRestrictionRules({
+      effectSchema: rayleighRestrictionSchema,
+    });
+
+    expect(
+      isCardAllowedByDeckRestrictionRules(rules, {
+        name: "Legal Low Cost",
+        type: "Character",
+        cost: 4,
+        traits: [],
+      }),
+    ).toBe(true);
+    expect(
+      isCardAllowedByDeckRestrictionRules(rules, {
+        name: "Illegal High Cost",
+        type: "Character",
+        cost: 5,
+        traits: [],
+      }),
+    ).toBe(false);
+  });
+
   it("rejects cost 5+ cards for OP12-001 Silvers Rayleigh", () => {
     const rayleigh: DeckLeader = {
       ...leader,
