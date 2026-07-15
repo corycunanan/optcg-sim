@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error("Card search error:", error);
+    console.error("[cards:search] failed", error);
     return apiError("Failed to search cards", 500);
   }
 }
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(card, 201);
   } catch (error) {
-    console.error("Card create error:", error);
+    console.error("[cards:create] failed", error);
     return apiError("Failed to create card", 500);
   }
 }

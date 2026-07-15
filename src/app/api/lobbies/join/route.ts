@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess({ lobbyId: lobby.id });
   } catch (error) {
-    console.error("Lobby join error:", error);
+    console.error("[lobbies:join] failed", error);
     return apiError("Failed to join lobby", 500);
   }
 }

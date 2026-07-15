@@ -29,7 +29,7 @@ export async function GET() {
 
     return apiSuccess(friends, 200, { "Cache-Control": "private, max-age=15, stale-while-revalidate=30" });
   } catch (error) {
-    console.error("Friends list error:", error);
+    console.error("[friends:list] failed", error);
     return apiError("Failed to list friends", 500);
   }
 }

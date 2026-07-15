@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess({ lobbyId: lobby.id, joinCode: lobby.joinCode }, 201);
   } catch (error) {
-    console.error("Lobby create error:", error);
+    console.error("[lobbies:create] failed", error);
     return apiError("Failed to create lobby", 500);
   }
 }

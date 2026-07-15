@@ -77,7 +77,7 @@ export async function POST(
     }
 
     if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
-      console.error("GAME_WORKER_URL or GAME_WORKER_SECRET not configured");
+      console.error("[lobbies:start] game worker configuration missing");
       return apiError("Game server not configured", 503);
     }
 
@@ -167,27 +167,30 @@ export async function POST(
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      console.error("Worker init request failed:", error);
+      console.error("[lobbies:start] worker init request failed", error);
       await prisma.$transaction([
         prisma.gameSession.delete({ where: { id: startResult.gameSession.id } }),
         prisma.lobby.update({
           where: { id: lobby.id },
           data: { status: lobby.status },
         }),
-      ]).catch((e) => console.error("Rollback failed:", e));
+      ]).catch((e) => console.error("[lobbies:start] rollback failed", e));
       return apiError("Failed to initialize game server", 502);
     }
 
     if (!workerRes.ok) {
       const workerErr = await workerRes.text().catch(() => "unknown");
-      console.error("Worker init failed:", workerRes.status, workerErr);
+      console.error(
+        `[lobbies:start] worker init failed with status ${workerRes.status}`,
+        workerErr,
+      );
       await prisma.$transaction([
         prisma.gameSession.delete({ where: { id: startResult.gameSession.id } }),
         prisma.lobby.update({
           where: { id: lobby.id },
           data: { status: lobby.status },
         }),
-      ]).catch((e) => console.error("Rollback failed:", e));
+      ]).catch((e) => console.error("[lobbies:start] rollback failed", e));
       return apiError("Failed to initialize game server", 502);
     }
 
@@ -214,7 +217,7 @@ export async function POST(
         details: error.details,
       });
     }
-    console.error("Lobby start error:", error);
+    console.error("[lobbies:start] failed", error);
     return apiError("Failed to start lobby", 500);
   }
 }

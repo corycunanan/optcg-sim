@@ -48,7 +48,7 @@ export async function POST(
     if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
       return new NextResponse(null, { status: 204 });
     }
-    console.error("last-seen update error:", error);
+    console.error("[realtime:update-last-seen] failed", error);
     return NextResponse.json({ error: "Failed to update last seen" }, { status: 500 });
   }
 }

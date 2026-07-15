@@ -79,7 +79,7 @@ export async function GET() {
 
     return apiSuccess(conversations);
   } catch (error) {
-    console.error("Conversations list error:", error);
+    console.error("[messages:list-conversations] failed", error);
     return apiError("Failed to list conversations", 500);
   }
 }

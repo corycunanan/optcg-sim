@@ -39,7 +39,7 @@ export async function GET(
 
     return NextResponse.json({ data: { friendIds } });
   } catch (error) {
-    console.error("friends-of error:", error);
+    console.error("[realtime:list-friends-of] failed", error);
     return NextResponse.json({ error: "Failed to load friends" }, { status: 500 });
   }
 }

@@ -78,7 +78,7 @@ export async function POST(
 
     return apiSuccess({ updated: result.count });
   } catch (error) {
-    console.error("Mark messages read error:", error);
+    console.error("[messages:mark-conversation-read] failed", error);
     return apiError("Failed to mark messages as read", 500);
   }
 }

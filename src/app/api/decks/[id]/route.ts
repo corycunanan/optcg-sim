@@ -54,7 +54,7 @@ export async function GET(
 
     return apiSuccess({ ...deck, leader });
   } catch (error) {
-    console.error("Deck fetch error:", error);
+    console.error("[decks:get] failed", error);
     return apiError("Failed to fetch deck", 500);
   }
 }
@@ -157,7 +157,7 @@ export async function PUT(
 
     return apiSuccess({ ...deck, leader });
   } catch (error) {
-    console.error("Deck update error:", error);
+    console.error("[decks:update] failed", error);
     return apiError("Failed to update deck", 500);
   }
 }
@@ -189,7 +189,7 @@ export async function DELETE(
 
     return apiAction();
   } catch (error) {
-    console.error("Deck delete error:", error);
+    console.error("[decks:delete] failed", error);
     return apiError("Failed to delete deck", 500);
   }
 }
