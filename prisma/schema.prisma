@@ -331,7 +331,7 @@ model Lobby {
   gameSession GameSession?
   invites     LobbyInvite[]
 
-  @@index([status])
+  @@index([status, updatedAt, id])
   @@map("lobbies")
 }
 

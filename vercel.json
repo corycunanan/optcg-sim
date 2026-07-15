@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "prisma migrate deploy && next build --webpack"
+  "buildCommand": "prisma migrate deploy && next build --webpack",
+  "crons": [
+    {
+      "path": "/api/cron/lobby-retention",
+      "schedule": "0 4 * * *"
+    }
+  ]
 }

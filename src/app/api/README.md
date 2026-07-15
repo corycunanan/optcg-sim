@@ -1,6 +1,6 @@
 # API Routes Reference
 
-25 endpoints across 8 domains. All routes follow Next.js App Router conventions (`route.ts` files).
+26 endpoints across 9 domains. All routes follow Next.js App Router conventions (`route.ts` files).
 
 ## Auth Pattern
 
@@ -14,6 +14,7 @@ if (!session?.user?.id)
 ```
 
 The game result endpoint uses Bearer token auth (`GAME_WORKER_SECRET`) for worker-to-API calls.
+Scheduled maintenance endpoints use Bearer token auth (`CRON_SECRET`) for Vercel Cron calls.
 
 ## Endpoint Index
 
@@ -128,6 +129,14 @@ The game result endpoint uses Bearer token auth (`GAME_WORKER_SECRET`) for worke
 **POST /api/friends/requests** — Checks: target exists, not self, not already friends (either direction), no pending request (either direction).
 
 **PUT /api/friends/requests/[id]** — Accept creates Friendship with lexicographically sorted user IDs (consistent ordering). Decline deletes the request.
+
+### Scheduled maintenance
+
+| Method | Path                        | Auth                   | Purpose                                          |
+| ------ | --------------------------- | ---------------------- | ------------------------------------------------ |
+| GET    | `/api/cron/lobby-retention` | Bearer (`CRON_SECRET`) | Delete a bounded batch of expired CLOSED lobbies |
+
+**GET /api/cron/lobby-retention** — Runs daily from Vercel Cron. Deletes at most 500 lobbies that have been `CLOSED` for more than 30 days and have no `GameSession`. Add `?dryRun=true` to count eligible rows without selecting or deleting them. Returns structured `eligible`, `selected`, `deleted`, `errors`, and `durationMs` metrics.
 
 ## Adding a New Endpoint
 
