@@ -4,6 +4,7 @@
  */
 
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { generateLobbyCode } from "@/lib/lobbies";
@@ -55,12 +56,13 @@ export async function POST(request: NextRequest) {
           },
         });
       } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          (error as { code: string }).code === "P2002"
-        ) {
+        if (isJoinCodeCollision(error)) {
           continue;
+        }
+        if (isActiveLobbyConflict(error)) {
+          return apiError("An active lobby already exists", 409, {
+            code: "ACTIVE_LOBBY_EXISTS",
+          });
         }
         throw error;
       }
@@ -75,4 +77,24 @@ export async function POST(request: NextRequest) {
     console.error("Lobby create error:", error);
     return apiError("Failed to create lobby", 500);
   }
+}
+
+function isJoinCodeCollision(error: unknown) {
+  return hasUniqueTarget(error, "join_code", "joinCode");
+}
+
+function isActiveLobbyConflict(error: unknown) {
+  return hasUniqueTarget(error, "hostUserId", "lobbies_waiting_host_unique");
+}
+
+function hasUniqueTarget(error: unknown, ...targets: string[]) {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2002"
+  ) {
+    return false;
+  }
+
+  const target = error.meta?.target;
+  return Array.isArray(target) && target.some((value) => targets.includes(value));
 }

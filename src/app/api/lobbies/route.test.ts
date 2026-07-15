@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
@@ -88,5 +89,44 @@ describe("POST /api/lobbies", () => {
 
     expect(res.status).toBe(404);
     expect(lobbyCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("retries a join-code collision", async () => {
+    lobbyCreateMock
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+          meta: { target: ["join_code"] },
+        })
+      )
+      .mockResolvedValueOnce({ id: "lobby-2", joinCode: "EFGH" });
+
+    const res = await POST(buildRequest({ format: "Standard" }));
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      data: { lobbyId: "lobby-2", joinCode: "EFGH" },
+    });
+    expect(lobbyCreateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns a stable conflict when another create wins the active-lobby race", async () => {
+    lobbyCreateMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: ["hostUserId"] },
+      })
+    );
+
+    const res = await POST(buildRequest({ format: "Standard" }));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "An active lobby already exists",
+      code: "ACTIVE_LOBBY_EXISTS",
+    });
+    expect(lobbyCreateMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -24,6 +24,7 @@
     "db:promote-admin": "tsx scripts/promote-admin.ts",
     "test": "vitest run",
     "test:db:friends": "tsx scripts/test-friend-request-concurrency.ts",
+    "test:db:lobbies": "tsx scripts/test-lobby-concurrency.ts",
     "test:contracts": "vitest run src/__tests__/contracts",
     "test:worker": "pnpm --filter optcg-game test",
     "test:worker:coverage": "pnpm --filter optcg-game test:coverage",
