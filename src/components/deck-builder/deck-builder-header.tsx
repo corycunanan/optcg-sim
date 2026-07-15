@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { DeckNavigationGuardLink } from "./deck-navigation-guard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,8 +37,6 @@ export function DeckBuilderHeader({
   onSave,
   onClear,
 }: DeckBuilderHeaderProps) {
-  const router = useRouter();
-  const [confirmLeave, setConfirmLeave] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,17 +57,10 @@ export function DeckBuilderHeader({
   };
 
   return (
-    <header className="flex items-center gap-4 border-b border-border bg-surface-1 px-4 py-3">
-      {/* Back — guarded while dirty so in-app nav can't silently drop work */}
-      <Link
+    <header className="border-border bg-surface-1 flex items-center gap-4 border-b px-4 py-3">
+      <DeckNavigationGuardLink
         href="/decks"
-        onClick={(e) => {
-          if (isDirty) {
-            e.preventDefault();
-            setConfirmLeave(true);
-          }
-        }}
-        className="flex items-center gap-2 rounded px-2 py-1 text-sm text-content-tertiary transition-colors hover:bg-surface-2 hover:text-content-secondary"
+        className="text-content-tertiary hover:bg-surface-2 hover:text-content-secondary flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path
@@ -82,7 +72,7 @@ export function DeckBuilderHeader({
           />
         </svg>
         Decks
-      </Link>
+      </DeckNavigationGuardLink>
 
       {/* Deck name */}
       <div className="flex items-center gap-2">
@@ -100,7 +90,7 @@ export function DeckBuilderHeader({
                 setEditing(false);
               }
             }}
-            className="h-auto border-border-focus px-2 py-1 text-lg font-semibold leading-tight ring-2 ring-navy-900/10"
+            className="border-border-focus ring-navy-900/10 h-auto px-2 py-1 text-lg leading-tight font-semibold ring-2"
           />
         ) : (
           <button
@@ -109,7 +99,7 @@ export function DeckBuilderHeader({
               setEditing(true);
             }}
             aria-label={`Edit deck name: ${name}`}
-            className="group flex items-center gap-2 rounded px-2 py-1 text-lg font-semibold leading-tight text-content-primary transition-colors hover:bg-surface-2"
+            className="group text-content-primary hover:bg-surface-2 flex items-center gap-2 rounded px-2 py-1 text-lg leading-tight font-semibold transition-colors"
           >
             {name}
             <svg
@@ -134,12 +124,12 @@ export function DeckBuilderHeader({
       {/* Save status */}
       <div className="ml-auto flex items-center gap-2">
         {lastSavedAt && !isDirty && (
-          <span className="text-xs text-content-tertiary">
+          <span className="text-content-tertiary text-xs">
             Saved {lastSavedAt.toLocaleTimeString()}
           </span>
         )}
         {isDirty && (
-          <span className="text-xs text-warning">Unsaved changes</span>
+          <span className="text-warning text-xs">Unsaved changes</span>
         )}
       </div>
 
@@ -148,7 +138,9 @@ export function DeckBuilderHeader({
         <div className="flex items-center gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm">Clear</Button>
+              <Button variant="ghost" size="sm">
+                Clear
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -182,28 +174,6 @@ export function DeckBuilderHeader({
           )}
         </div>
       </TooltipProvider>
-
-      {/* Leave-without-saving confirmation for the back link */}
-      <AlertDialog open={confirmLeave} onOpenChange={setConfirmLeave}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              &ldquo;{name}&rdquo; has unsaved changes. Leave anyway and
-              discard them?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Stay</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => router.push("/decks")}
-            >
-              Discard &amp; Leave
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </header>
   );
 }

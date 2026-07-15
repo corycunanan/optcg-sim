@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -37,39 +37,36 @@ export function Navbar() {
     "text-sm font-medium hover:bg-accent/10 focus:bg-accent/10 rounded-md px-3 py-2";
 
   return (
-    <nav className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-8 border-b border-black/20 bg-surface-nav px-6">
+    <nav className="bg-surface-nav sticky top-0 z-40 flex h-16 shrink-0 items-center gap-8 border-b border-black/20 px-6">
       {/* Logo */}
-      <Link
+      <DeckNavigationGuardLink
         href="/"
-        className="shrink-0 font-display text-lg font-bold tracking-tight text-content-inverse"
+        className="font-display text-content-inverse shrink-0 text-lg font-bold tracking-tight"
       >
         OPTCG
-      </Link>
+      </DeckNavigationGuardLink>
 
       {/* Nav links */}
       <NavigationMenu viewport={false}>
         <NavigationMenuList className="gap-1">
           <NavigationMenuItem>
             <NavigationMenuLink asChild>
-              <Link
+              <DeckNavigationGuardLink
                 href="/"
                 className={cn(
                   navigationMenuTriggerStyle(),
                   triggerStyles,
-                  pathname === "/" && activeTriggerStyles,
+                  pathname === "/" && activeTriggerStyles
                 )}
               >
                 Home
-              </Link>
+              </DeckNavigationGuardLink>
             </NavigationMenuLink>
           </NavigationMenuItem>
 
           <NavigationMenuItem>
             <NavigationMenuTrigger
-              className={cn(
-                triggerStyles,
-                cardsActive && activeTriggerStyles,
-              )}
+              className={cn(triggerStyles, cardsActive && activeTriggerStyles)}
             >
               Cards
             </NavigationMenuTrigger>
@@ -77,16 +74,22 @@ export function Navbar() {
               <ul className="flex w-48 flex-col gap-1 p-1">
                 <li>
                   <NavigationMenuLink asChild>
-                    <Link href="/admin/cards" className={linkStyles}>
+                    <DeckNavigationGuardLink
+                      href="/admin/cards"
+                      className={linkStyles}
+                    >
                       All Cards
-                    </Link>
+                    </DeckNavigationGuardLink>
                   </NavigationMenuLink>
                 </li>
                 <li>
                   <NavigationMenuLink asChild>
-                    <Link href="/admin/sets" className={linkStyles}>
+                    <DeckNavigationGuardLink
+                      href="/admin/sets"
+                      className={linkStyles}
+                    >
                       Sets
-                    </Link>
+                    </DeckNavigationGuardLink>
                   </NavigationMenuLink>
                 </li>
               </ul>
@@ -95,40 +98,37 @@ export function Navbar() {
 
           <NavigationMenuItem>
             <NavigationMenuLink asChild>
-              <Link
+              <DeckNavigationGuardLink
                 href="/lobbies"
                 className={cn(
                   navigationMenuTriggerStyle(),
                   triggerStyles,
-                  playActive && activeTriggerStyles,
+                  playActive && activeTriggerStyles
                 )}
               >
                 Play
-              </Link>
+              </DeckNavigationGuardLink>
             </NavigationMenuLink>
           </NavigationMenuItem>
 
           <NavigationMenuItem>
             <NavigationMenuLink asChild>
-              <Link
+              <DeckNavigationGuardLink
                 href="/sandbox"
                 className={cn(
                   navigationMenuTriggerStyle(),
                   triggerStyles,
-                  sandboxActive && activeTriggerStyles,
+                  sandboxActive && activeTriggerStyles
                 )}
               >
                 Sandbox
-              </Link>
+              </DeckNavigationGuardLink>
             </NavigationMenuLink>
           </NavigationMenuItem>
 
           <NavigationMenuItem>
             <NavigationMenuTrigger
-              className={cn(
-                triggerStyles,
-                decksActive && activeTriggerStyles,
-              )}
+              className={cn(triggerStyles, decksActive && activeTriggerStyles)}
             >
               Decks
             </NavigationMenuTrigger>
@@ -136,16 +136,22 @@ export function Navbar() {
               <ul className="flex w-48 flex-col gap-1 p-1">
                 <li>
                   <NavigationMenuLink asChild>
-                    <Link href="/decks" className={linkStyles}>
+                    <DeckNavigationGuardLink
+                      href="/decks"
+                      className={linkStyles}
+                    >
                       My Decks
-                    </Link>
+                    </DeckNavigationGuardLink>
                   </NavigationMenuLink>
                 </li>
                 <li>
                   <NavigationMenuLink asChild>
-                    <Link href="/decks/new" className={linkStyles}>
+                    <DeckNavigationGuardLink
+                      href="/decks/new"
+                      className={linkStyles}
+                    >
                       + New Deck
-                    </Link>
+                    </DeckNavigationGuardLink>
                   </NavigationMenuLink>
                 </li>
               </ul>

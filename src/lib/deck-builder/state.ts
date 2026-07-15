@@ -60,6 +60,8 @@ export interface DeckBuilderState {
   testOrder: TestDeckOrder | null;
   isDirty: boolean;
   isSaving: boolean;
+  editRevision: number;
+  saveRevision: number | null;
   lastSavedAt: Date | null;
 }
 
@@ -75,7 +77,13 @@ export type DeckBuilderAction =
   | { type: "DECREMENT_CARD"; cardId: string }
   | { type: "SET_ART_VARIANT"; cardId: string; artUrl: string | null }
   | { type: "CLEAR_DECK" }
-  | { type: "LOAD_DECK"; state: Omit<DeckBuilderState, "isDirty" | "isSaving"> }
+  | {
+      type: "LOAD_DECK";
+      state: Omit<
+        DeckBuilderState,
+        "isDirty" | "isSaving" | "editRevision" | "saveRevision"
+      >;
+    }
   | {
       type: "IMPORT_CARDS";
       leader: DeckLeaderEntry | null;
@@ -101,7 +109,16 @@ export function createInitialState(): DeckBuilderState {
     testOrder: null,
     isDirty: false,
     isSaving: false,
+    editRevision: 0,
+    saveRevision: null,
     lastSavedAt: null,
+  };
+}
+
+function markDirty(state: DeckBuilderState) {
+  return {
+    isDirty: true as const,
+    editRevision: state.editRevision + 1,
   };
 }
 
@@ -130,17 +147,17 @@ export function deckBuilderReducer(
 ): DeckBuilderState {
   switch (action.type) {
     case "SET_NAME":
-      return { ...state, name: action.name, isDirty: true };
+      return { ...state, name: action.name, ...markDirty(state) };
 
     case "SET_FORMAT":
-      return { ...state, format: action.format, isDirty: true };
+      return { ...state, format: action.format, ...markDirty(state) };
 
     case "SET_LEADER":
       return {
         ...state,
         leader: action.leader,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
 
     case "REMOVE_LEADER":
@@ -148,7 +165,7 @@ export function deckBuilderReducer(
         ...state,
         leader: null,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
 
     case "ADD_CARD": {
@@ -168,7 +185,7 @@ export function deckBuilderReducer(
         ...state,
         cards: newCards,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
     }
 
@@ -179,7 +196,7 @@ export function deckBuilderReducer(
         ...state,
         cards: newCards,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
     }
 
@@ -197,7 +214,7 @@ export function deckBuilderReducer(
         ...state,
         cards: newCards,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
     }
 
@@ -211,7 +228,7 @@ export function deckBuilderReducer(
         ...state,
         cards: newCards,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
     }
 
@@ -232,7 +249,7 @@ export function deckBuilderReducer(
         ...state,
         cards: newCards,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
     }
 
@@ -245,7 +262,7 @@ export function deckBuilderReducer(
           selectedArtUrl: action.artUrl,
         });
       }
-      return { ...state, cards: newCards, isDirty: true };
+      return { ...state, cards: newCards, ...markDirty(state) };
     }
 
     case "CLEAR_DECK":
@@ -256,7 +273,7 @@ export function deckBuilderReducer(
         sleeveUrl: state.sleeveUrl,
         donArtUrl: state.donArtUrl,
         testOrder: null,
-        isDirty: true,
+        ...markDirty(state),
       };
 
     case "LOAD_DECK": {
@@ -268,6 +285,8 @@ export function deckBuilderReducer(
             : new Map(Object.entries(action.state.cards)),
         isDirty: false,
         isSaving: false,
+        editRevision: 0,
+        saveRevision: null,
       };
     }
 
@@ -294,36 +313,43 @@ export function deckBuilderReducer(
         leader: action.leader ?? state.leader,
         cards: newCards,
         ...clearTestOrder(state),
-        isDirty: true,
+        ...markDirty(state),
       };
     }
 
     case "SAVE_START":
-      return { ...state, isSaving: true };
+      return {
+        ...state,
+        isSaving: true,
+        saveRevision: state.editRevision,
+      };
 
-    case "SAVE_SUCCESS":
+    case "SAVE_SUCCESS": {
+      const savedLatestRevision = state.saveRevision === state.editRevision;
       return {
         ...state,
         id: action.id,
         isSaving: false,
-        isDirty: false,
+        isDirty: savedLatestRevision ? false : state.isDirty,
+        saveRevision: null,
         lastSavedAt: new Date(),
       };
+    }
 
     case "SAVE_ERROR":
-      return { ...state, isSaving: false };
+      return { ...state, isSaving: false, saveRevision: null };
 
     case "MARK_CLEAN":
-      return { ...state, isDirty: false };
+      return { ...state, isDirty: false, saveRevision: null };
 
     case "SET_SLEEVE":
-      return { ...state, sleeveUrl: action.sleeveUrl, isDirty: true };
+      return { ...state, sleeveUrl: action.sleeveUrl, ...markDirty(state) };
 
     case "SET_DON_ART":
-      return { ...state, donArtUrl: action.donArtUrl, isDirty: true };
+      return { ...state, donArtUrl: action.donArtUrl, ...markDirty(state) };
 
     case "SET_TEST_ORDER":
-      return { ...state, testOrder: action.testOrder, isDirty: true };
+      return { ...state, testOrder: action.testOrder, ...markDirty(state) };
 
     default:
       return state;

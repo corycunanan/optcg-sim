@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/social/user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import { PendingLobbyInvitesResponseSchema } from "@/lib/validators/realtime";
+import { useDeckNavigationGuard } from "@/components/deck-builder/deck-navigation-guard";
 import {
   EMPTY_INVITES,
   addInvite,
@@ -22,6 +23,7 @@ const TOAST_DURATION_MS = 5 * 60 * 1000;
 
 export function LobbyInviteToasts() {
   const router = useRouter();
+  const { requestLeave } = useDeckNavigationGuard();
   const { subscribe } = useUserChannelEvents();
   const [invites, setInvites] = useState<InviteToastEntry[]>(EMPTY_INVITES);
   const [now, setNow] = useState<number>(() => Date.now());
@@ -72,7 +74,7 @@ export function LobbyInviteToasts() {
     return () => clearInterval(interval);
   }, [invites.length]);
 
-  const onJoin = useCallback(
+  const acceptInvite = useCallback(
     async (invite: InviteToastEntry) => {
       setBusyId(invite.id);
       try {
@@ -94,6 +96,14 @@ export function LobbyInviteToasts() {
       }
     },
     [router]
+  );
+
+  const onJoin = useCallback(
+    (invite: InviteToastEntry) => {
+      const accept = () => void acceptInvite(invite);
+      if (!requestLeave(accept)) accept();
+    },
+    [acceptInvite, requestLeave]
   );
 
   const onDecline = useCallback(async (invite: InviteToastEntry) => {
@@ -141,7 +151,7 @@ export function LobbyInviteToasts() {
           invite={invite}
           now={now}
           busy={busyId === invite.id}
-          onJoin={() => void onJoin(invite)}
+          onJoin={() => onJoin(invite)}
           onDecline={() => void onDecline(invite)}
           onDismiss={() => onDismiss(invite.id)}
         />

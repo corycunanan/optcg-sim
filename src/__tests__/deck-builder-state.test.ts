@@ -80,3 +80,42 @@ describe("deckBuilderReducer copy limits", () => {
     expect(state.cards.get(card.id)?.quantity).toBe(12);
   });
 });
+
+describe("deckBuilderReducer save revisions", () => {
+  it("clears dirty state when the saved revision is still current", () => {
+    let state = deckBuilderReducer(createInitialState(), {
+      type: "SET_NAME",
+      name: "Saved name",
+    });
+    state = deckBuilderReducer(state, { type: "SAVE_START" });
+    state = deckBuilderReducer(state, {
+      type: "SAVE_SUCCESS",
+      id: "deck-1",
+    });
+
+    expect(state.isDirty).toBe(false);
+    expect(state.isSaving).toBe(false);
+    expect(state.saveRevision).toBeNull();
+  });
+
+  it("keeps edits made after save started dirty when that save resolves", () => {
+    let state = deckBuilderReducer(createInitialState(), {
+      type: "SET_NAME",
+      name: "Name sent to server",
+    });
+    state = deckBuilderReducer(state, { type: "SAVE_START" });
+    state = deckBuilderReducer(state, {
+      type: "SET_NAME",
+      name: "Newer local name",
+    });
+    state = deckBuilderReducer(state, {
+      type: "SAVE_SUCCESS",
+      id: "deck-1",
+    });
+
+    expect(state.name).toBe("Newer local name");
+    expect(state.isDirty).toBe(true);
+    expect(state.isSaving).toBe(false);
+    expect(state.saveRevision).toBeNull();
+  });
+});
