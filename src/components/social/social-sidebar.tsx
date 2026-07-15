@@ -110,11 +110,13 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const [requestsLoadState, setRequestsLoadState] =
     useState<LoadState>("loading");
   const searchRequestId = useRef(0);
+  const fetchEpoch = useRef(0);
   const pendingMutations = useRef(new Set<string>());
   const { subscribe, connectionStatus, presence, trackPresence } =
     useUserChannelEvents();
 
   const fetchFriendsData = useCallback(async () => {
+    const epoch = fetchEpoch.current;
     setFriendsLoadState("loading");
     setRequestsLoadState("loading");
 
@@ -122,6 +124,8 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       apiGet("/api/friends", FriendsResponseSchema),
       apiGet("/api/friends/requests", FriendRequestsResponseSchema),
     ]);
+
+    if (epoch !== fetchEpoch.current) return;
 
     if (friendsResult.status === "fulfilled") {
       setFriends(friendsResult.value.data || []);
@@ -218,41 +222,51 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
     }
   }, []);
 
-  const removeFriend = useCallback(async (userId: string) => {
-    const mutationKey = `remove:${userId}`;
-    if (pendingMutations.current.has(mutationKey)) return;
+  const removeFriend = useCallback(
+    async (userId: string) => {
+      const mutationKey = `remove:${userId}`;
+      if (pendingMutations.current.has(mutationKey)) return;
 
-    pendingMutations.current.add(mutationKey);
-    setRemovingFriendId(userId);
-    try {
-      await apiDelete(`/api/friends/${userId}`);
-      setFriends((prev) => prev.filter((f) => f.user.id !== userId));
-      setFriendToRemove(null);
-    } catch {
-      toast.error("Could not remove this friend. Please try again.");
-    } finally {
-      pendingMutations.current.delete(mutationKey);
-      setRemovingFriendId(null);
-    }
-  }, []);
+      pendingMutations.current.add(mutationKey);
+      setRemovingFriendId(userId);
+      try {
+        await apiDelete(`/api/friends/${userId}`);
+        fetchEpoch.current += 1;
+        setFriends((prev) => prev.filter((f) => f.user.id !== userId));
+        setFriendToRemove(null);
+        void fetchFriendsData();
+      } catch {
+        toast.error("Could not remove this friend. Please try again.");
+      } finally {
+        pendingMutations.current.delete(mutationKey);
+        setRemovingFriendId(null);
+      }
+    },
+    [fetchFriendsData]
+  );
 
-  const sendRequest = useCallback(async (toUserId: string) => {
-    const mutationKey = `send:${toUserId}`;
-    if (pendingMutations.current.has(mutationKey)) return;
+  const sendRequest = useCallback(
+    async (toUserId: string) => {
+      const mutationKey = `send:${toUserId}`;
+      if (pendingMutations.current.has(mutationKey)) return;
 
-    pendingMutations.current.add(mutationKey);
-    setSendingRequests((prev) => new Set(prev).add(toUserId));
-    setPendingSent((prev) => new Set(prev).add(toUserId));
-    try {
-      await apiPost("/api/friends/requests", { toUserId });
-    } catch {
-      setPendingSent((prev) => removeFromSet(prev, toUserId));
-      toast.error("Could not send friend request. Please try again.");
-    } finally {
-      pendingMutations.current.delete(mutationKey);
-      setSendingRequests((prev) => removeFromSet(prev, toUserId));
-    }
-  }, []);
+      pendingMutations.current.add(mutationKey);
+      setSendingRequests((prev) => new Set(prev).add(toUserId));
+      setPendingSent((prev) => new Set(prev).add(toUserId));
+      try {
+        await apiPost("/api/friends/requests", { toUserId });
+        fetchEpoch.current += 1;
+        void fetchFriendsData();
+      } catch {
+        setPendingSent((prev) => removeFromSet(prev, toUserId));
+        toast.error("Could not send friend request. Please try again.");
+      } finally {
+        pendingMutations.current.delete(mutationKey);
+        setSendingRequests((prev) => removeFromSet(prev, toUserId));
+      }
+    },
+    [fetchFriendsData]
+  );
 
   const handleFriendRequest = useCallback(
     async (id: string, action: "accept" | "decline") => {
@@ -263,8 +277,9 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       setResolvingRequests((prev) => new Set(prev).add(id));
       try {
         await apiPut(`/api/friends/requests/${id}`, { action });
+        fetchEpoch.current += 1;
         setIncoming((prev) => prev.filter((r) => r.id !== id));
-        if (action === "accept") void fetchFriendsData();
+        void fetchFriendsData();
       } catch {
         toast.error(
           `Could not ${action} this friend request. Please try again.`
