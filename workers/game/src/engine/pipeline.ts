@@ -16,7 +16,7 @@ import type { CardData, GameAction, GameEvent, GameState, ExecuteResult, Pending
 import { validate } from "./validation.js";
 import { execute } from "./execute.js";
 import { recalculateBattlePowers } from "./battle.js";
-import { emitEvent, emitPendingEvent } from "./events.js";
+import { emitEvent, emitPendingEvent, getEventCardInstanceId } from "./events.js";
 import { checkDefeat } from "./defeat.js";
 import { checkProhibitions } from "./prohibitions.js";
 import { checkReplacements } from "./replacements.js";
@@ -323,7 +323,7 @@ function processTriggerQueuePipeline(
       next.sourceCardInstanceId,
       next.controller,
       cardDb,
-      (next.triggeringEvent?.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId ?? null,
+      getEventCardInstanceId(next.triggeringEvent) ?? null,
     );
     nextState = result.state;
     if (isEngineTerminated(nextState)) return { state: nextState };

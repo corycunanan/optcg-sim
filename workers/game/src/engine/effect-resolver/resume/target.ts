@@ -69,7 +69,7 @@ export function handleRedistributeDon(
   }
 
   const transfers = action.transfers ?? [];
-  const amount = (pausedAction.params?.amount as number) ?? 1;
+  const amount = pausedAction.params?.amount ?? 1;
 
   // Re-derive valid sources (cards that have DON attached) for this controller.
   const pp = state.players[controller];

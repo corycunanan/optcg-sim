@@ -37,6 +37,16 @@ export function replacePendingEventReferences(
   }
 }
 
+/** Read an optional card identity without asserting a specific event payload. */
+export function getEventCardInstanceId(
+  event: { payload?: unknown } | null | undefined,
+): string | undefined {
+  const payload = event?.payload;
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const instanceId = Reflect.get(payload, "cardInstanceId");
+  return typeof instanceId === "string" ? instanceId : undefined;
+}
+
 export function emitEvent<T extends GameEventType>(
   state: GameState,
   type: T,

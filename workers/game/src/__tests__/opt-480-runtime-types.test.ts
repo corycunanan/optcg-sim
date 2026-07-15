@@ -57,6 +57,26 @@ describe("OPT-480 runtime type boundaries", () => {
     expect(parsed.cardDb[CARDS.LEADER.id]?.id).toBe(CARDS.LEADER.id);
   });
 
+  it.each([
+    ["missing hand zone", (stored: ReturnType<typeof storedFixture>) => {
+      Reflect.deleteProperty(stored.state.players[0], "hand");
+    }, "players.0.hand"],
+    ["incorrect deck zone", (stored: ReturnType<typeof storedFixture>) => {
+      Reflect.set(stored.state.players[0], "deck", "not-an-array");
+    }, "players.0.deck"],
+    ["missing turn phase", (stored: ReturnType<typeof storedFixture>) => {
+      Reflect.deleteProperty(stored.state.turn, "phase");
+    }, "turn.phase"],
+    ["incorrect turn ledger", (stored: ReturnType<typeof storedFixture>) => {
+      Reflect.set(stored.state.turn, "oncePerTurnUsed", []);
+    }, "turn.oncePerTurnUsed"],
+  ] as const)("rejects a snapshot with %s", (_label, mutate, path) => {
+    const stored = structuredClone(storedFixture());
+    mutate(stored);
+
+    expect(() => parseStoredSession(stored)).toThrow(path);
+  });
+
   it("rejects unknown persisted action variants", () => {
     const stored = storedFixture();
     const malformed = {
@@ -146,7 +166,7 @@ describe("OPT-480 runtime type boundaries", () => {
     ).toThrow("effectSchema is invalid");
   });
 
-  it("keeps unsafe assertions confined to the two infrastructure boundaries", () => {
+  it("keeps the sole unsafe assertion at validated snapshot deserialization", () => {
     const sources = [
       ...readTypeScriptTree(new URL("../engine/", import.meta.url), "engine"),
       ...readTypeScriptTree(new URL("../session/", import.meta.url), "session"),
@@ -176,7 +196,6 @@ describe("OPT-480 runtime type boundaries", () => {
 
     expect(untypedAssertions).toEqual([
       "session/persistence.ts:as unknown as",
-      "GameSession.ts:as unknown as",
     ]);
   });
 
