@@ -18,6 +18,7 @@ import type {
   EffectStackFrame,
 } from "../../types.js";
 import { evaluateCondition, type ConditionContext } from "../conditions.js";
+import { postCostConditionsMet } from "./post-cost.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
   popFrame,
@@ -30,15 +31,19 @@ import type {
   ActionResult,
   ActionHandler,
   ActionHandlerMap,
+  EffectResolverServices,
 } from "./types.js";
 import {
   markOncePerTurnUsed,
   extractEffectDescription,
 } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
-import { pushBatchResumeFrame, processRemainingTriggers } from "./resume.js";
+import {
+  pushBatchResumeFrame,
+  processRemainingTriggers,
+  reenterBatchResume,
+} from "./resume-core.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
-import type { EffectResolverServices } from "./services.js";
 import {
   SIMULTANEOUS_ACTION_TYPES,
   isSimultaneousGroupStart,
@@ -57,9 +62,18 @@ import * as play from "./actions/play.js";
 import * as handDeck from "./actions/hand-deck.js";
 import * as effects from "./actions/effects.js";
 import * as battleActions from "./actions/battle-actions.js";
-import { executeChooseValue, executePlayerChoice, executeOpponentAction, executeReuseEffect } from "./actions/choice.js";
+import {
+  executeChooseValue,
+  executePlayerChoice,
+  executeOpponentAction,
+  executeReuseEffect,
+} from "./actions/choice.js";
 import { log } from "../../lib/log.js";
-import { consumeResolutionAction, isEngineTerminated, terminateForEngineContract } from "../engine-limits.js";
+import {
+  consumeResolutionAction,
+  isEngineTerminated,
+  terminateForEngineContract,
+} from "../engine-limits.js";
 
 import {
   ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
@@ -128,7 +142,15 @@ const ACTION_HANDLERS: Partial<ActionHandlerMap> = {
   GIVE_OPPONENT_DON_TO_OPPONENT: don.executeGiveOpponentDonToOpponent,
 
   // Play / state
-  PLAY_CARD: (state, action, sourceCardInstanceId, controller, cardDb, resultRefs, preselectedTargets) =>
+  PLAY_CARD: (
+    state,
+    action,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    preselectedTargets
+  ) =>
     play.executePlayCard(
       state,
       action,
@@ -136,7 +158,7 @@ const ACTION_HANDLERS: Partial<ActionHandlerMap> = {
       controller,
       cardDb,
       resultRefs,
-      preselectedTargets,
+      preselectedTargets
     ),
   PLAY_SELF: play.executePlaySelf,
   SET_ACTIVE: play.executeSetActive,
@@ -200,23 +222,41 @@ export function listRegisteredActionTypes(): ActionType[] {
 // Adding a new ActionType without registering a handler or adding it here trips
 // this assertion at worker boot rather than no-op'ing in production.
 const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set(
-  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER
 );
 
 const _missingActionHandlers = ALL_ACTION_TYPES.filter(
-  (t) => !(t in ACTION_HANDLERS) && !KNOWN_UNHANDLED_ACTION_TYPES.has(t),
+  (t) => !(t in ACTION_HANDLERS) && !KNOWN_UNHANDLED_ACTION_TYPES.has(t)
 );
 if (_missingActionHandlers.length > 0) {
   throw new Error(
     `[resolver] ActionType union has unhandled types: ${_missingActionHandlers.join(", ")}. ` +
-      `Register a handler in ACTION_HANDLERS or add to KNOWN_UNHANDLED_ACTION_TYPES.`,
+      `Register a handler in ACTION_HANDLERS or add to KNOWN_UNHANDLED_ACTION_TYPES.`
   );
 }
 
 /** Construction-complete recursive services shared by every resolver frame. */
 const completeResolverServices: EffectResolverServices = {
-  executeActionChain: (state, actions, sourceCardInstanceId, controller, cardDb, initialResultRefs) =>
-    executeActionChain(state, actions, sourceCardInstanceId, controller, cardDb, initialResultRefs),
+  executeActionChain: (
+    state,
+    actions,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    initialResultRefs,
+    effectDescription,
+    priorActionSucceeded
+  ) =>
+    executeActionChain(
+      state,
+      actions,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      initialResultRefs,
+      effectDescription,
+      priorActionSucceeded
+    ),
   executeEffectAction: (
     state,
     action,
@@ -224,45 +264,61 @@ const completeResolverServices: EffectResolverServices = {
     controller,
     cardDb,
     resultRefs,
-    preselectedTargets,
-  ) => executeEffectAction(
+    preselectedTargets
+  ) =>
+    executeEffectAction(
     state,
     action,
     sourceCardInstanceId,
     controller,
     cardDb,
     resultRefs,
-    preselectedTargets,
+      preselectedTargets
   ),
-  resolveEffect: (state, block, sourceCardInstanceId, controller, cardDb) =>
-    resolveEffect(state, block, sourceCardInstanceId, controller, cardDb),
-};
-export const resolverExecutionServices = Object.freeze(completeResolverServices);
-
-// ─── Post-cost condition gate (OPT-437) ──────────────────────────────────────
-
-/**
- * Evaluate a block's post-colon "If" gate (`post_cost_conditions`). Called
- * exactly once per resolution, at the point the action chain STARTS — after
- * costs are fully paid (resolveEffect Step 4, finishCostsAndRunActions, and
- * the optional-response accept path). Mid-chain resumes must NOT re-check:
- * per Rules 8-3-1/4-10-1 the clause is evaluated once and, when false, the
- * entire post-colon remainder is skipped while the paid cost stands.
- */
-export function postCostConditionsMet(
-  state: GameState,
-  block: EffectBlock,
-  sourceCardInstanceId: string,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-): boolean {
-  if (!block.post_cost_conditions) return true;
-  return evaluateCondition(state, block.post_cost_conditions, {
+  resolveEffect: (
+    state,
+    block,
     sourceCardInstanceId,
     controller,
     cardDb,
-  });
-}
+    triggeringCardInstanceId
+  ) =>
+    resolveEffect(
+      state,
+      block,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      triggeringCardInstanceId
+    ),
+  continueSimultaneousGroup: (
+    state,
+    plan,
+    sourceCardInstanceId,
+    controller,
+    cardDb
+  ) =>
+    continueSimultaneousGroup(
+      state,
+      plan,
+      sourceCardInstanceId,
+      controller,
+      cardDb
+    ),
+  processRemainingTriggers: (state, triggers, cardDb, events) =>
+    processRemainingTriggers(
+      state,
+      triggers,
+      cardDb,
+      completeResolverServices,
+      events
+    ),
+  reenterBatchResume: (state, cardDb, events) =>
+    reenterBatchResume(state, cardDb, completeResolverServices, events),
+};
+export const resolverExecutionServices = Object.freeze(
+  completeResolverServices
+);
 
 // ─── resolveEffect ───────────────────────────────────────────────────────────
 
@@ -272,7 +328,7 @@ export function resolveEffect(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  triggeringCardInstanceId?: string | null,
+  triggeringCardInstanceId?: string | null
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -300,7 +356,8 @@ export function resolveEffect(
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const fullText = sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "";
+  const fullText =
+    sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "";
   const blockDescription = extractEffectDescription(fullText, block);
 
   // Step 1: Evaluate block-level conditions
@@ -326,7 +383,12 @@ export function resolveEffect(
       pausedAction: null,
       remainingActions: block.actions ?? [],
       resultRefs: triggeringCardInstanceId
-        ? [[TRIGGERING_CARD_REF, { targetInstanceIds: [triggeringCardInstanceId], count: 1 }]]
+        ? [
+            [
+              TRIGGERING_CARD_REF,
+              { targetInstanceIds: [triggeringCardInstanceId], count: 1 },
+            ],
+          ]
         : [],
       validTargets: [],
       costs: block.costs ?? [],
@@ -344,7 +406,11 @@ export function resolveEffect(
     }
 
     const pendingPrompt: PendingPromptState = {
-      options: { promptType: "OPTIONAL_EFFECT", effectDescription: blockDescription, cards },
+      options: {
+        promptType: "OPTIONAL_EFFECT",
+        effectDescription: blockDescription,
+        cards,
+      },
       respondingPlayer: controller,
       resumeContext: frame.id,
     };
@@ -363,11 +429,15 @@ export function resolveEffect(
       cardDb,
       sourceCardInstanceId,
       block,
-      resolverExecutionServices,
+      resolverExecutionServices
     );
 
     if (costPayResult.cannotPay) {
-      state = markOncePerTurnUsed(costPayResult.state, block.id, sourceCardInstanceId);
+      state = markOncePerTurnUsed(
+        costPayResult.state,
+        block.id,
+        sourceCardInstanceId
+      );
       log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
       return { state, events, resolved: false };
     }
@@ -378,7 +448,12 @@ export function resolveEffect(
 
     if (costPayResult.pendingPrompt) {
       log("effect.prompt", { ...logCtx, phase: "cost_selection" });
-      return { state, events, resolved: false, pendingPrompt: costPayResult.pendingPrompt };
+      return {
+        state,
+        events,
+        resolved: false,
+        pendingPrompt: costPayResult.pendingPrompt,
+      };
     }
   }
 
@@ -389,15 +464,29 @@ export function resolveEffect(
 
   // Step 4: Execute action chain — gated by the post-colon "If" (OPT-437),
   // evaluated exactly once now that costs are fully paid.
-  if (!postCostConditionsMet(state, block, sourceCardInstanceId, controller, cardDb)) {
-    log("effect.skipped", { ...logCtx, reason: "post_cost_conditions_not_met" });
+  if (
+    !postCostConditionsMet(
+      state,
+      block,
+      sourceCardInstanceId,
+      controller,
+      cardDb
+    )
+  ) {
+    log("effect.skipped", {
+      ...logCtx,
+      reason: "post_cost_conditions_not_met",
+    });
     return { state, events, resolved: true };
   }
   if (block.actions && block.actions.length > 0) {
     let initialRefs = costResultToRefs(costResult);
     if (triggeringCardInstanceId) {
       initialRefs = initialRefs ?? new Map<string, EffectResult>();
-      initialRefs.set(TRIGGERING_CARD_REF, { targetInstanceIds: [triggeringCardInstanceId], count: 1 });
+      initialRefs.set(TRIGGERING_CARD_REF, {
+        targetInstanceIds: [triggeringCardInstanceId],
+        count: 1,
+      });
     }
     const chainResult = executeActionChain(
       state,
@@ -406,14 +495,19 @@ export function resolveEffect(
       controller,
       cardDb,
       initialRefs,
-      blockDescription,
+      blockDescription
     );
     state = chainResult.state;
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
       log("effect.prompt", { ...logCtx, phase: "action_chain" });
-      return { state, events, resolved: false, pendingPrompt: chainResult.pendingPrompt };
+      return {
+        state,
+        events,
+        resolved: false,
+        pendingPrompt: chainResult.pendingPrompt,
+      };
     }
   }
 
@@ -436,7 +530,7 @@ function promptForSimultaneousSelection(
   validTargetIds: string[],
   sourceCardInstanceId: string,
   controller: 0 | 1,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ChainResult {
   const action = plan.actions[actionIndex];
   const resultRefs = new Map<string, EffectResult>(plan.resultRefs);
@@ -447,7 +541,7 @@ function promptForSimultaneousSelection(
     sourceCardInstanceId,
     controller,
     cardDb,
-    resultRefs,
+    resultRefs
   );
   if (!promptResult.pendingPrompt) return { state, events: [] };
 
@@ -479,7 +573,10 @@ function promptForSimultaneousSelection(
   if (plan.effectDescription && prompt.options) {
     prompt = {
       ...prompt,
-      options: { ...prompt.options, effectDescription: plan.effectDescription } as typeof prompt.options,
+      options: {
+        ...prompt.options,
+        effectDescription: plan.effectDescription,
+      } as typeof prompt.options,
     };
   }
   return { state: nextState, events: [], pendingPrompt: prompt };
@@ -495,10 +592,10 @@ export function continueSimultaneousGroup(
   plan: SimultaneousGroupPlan,
   sourceCardInstanceId: string,
   controller: 0 | 1,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ChainResult {
   const unsupportedAction = plan.actions.find(
-    (action) => !SIMULTANEOUS_ACTION_TYPES.has(action.type),
+    (action) => !SIMULTANEOUS_ACTION_TYPES.has(action.type)
   );
   if (unsupportedAction) {
     const terminated = terminateForEngineContract(state, {
@@ -518,7 +615,8 @@ export function continueSimultaneousGroup(
       contract: "ACTION_HANDLER",
       actionType: dependentTail.type,
       sourceCardInstanceId,
-      message: "IF_DO cannot follow an AND transaction until group-success semantics are defined",
+      message:
+        "IF_DO cannot follow an AND transaction until group-success semantics are defined",
     });
     return { state: terminated, events: [] };
   }
@@ -528,7 +626,7 @@ export function continueSimultaneousGroup(
     plan,
     sourceCardInstanceId,
     controller,
-    cardDb,
+    cardDb
   );
   if (planning.selection) {
     return promptForSimultaneousSelection(
@@ -538,7 +636,7 @@ export function continueSimultaneousGroup(
       planning.selection.validTargetIds,
       sourceCardInstanceId,
       controller,
-      cardDb,
+      cardDb
     );
   }
 
@@ -557,7 +655,7 @@ export function continueSimultaneousGroup(
       controller,
       cardDb,
       resultRefs,
-      lock.targetInstanceIds,
+      lock.targetInstanceIds
     );
     nextState = result.state;
     events.push(...result.events);
@@ -572,10 +670,12 @@ export function continueSimultaneousGroup(
       });
       return { state: nextState, events };
     }
-    if (action.result_ref && result.result) resultRefs.set(action.result_ref, result.result);
+    if (action.result_ref && result.result)
+      resultRefs.set(action.result_ref, result.result);
   }
 
-  if (planning.plan.followingActions.length === 0) return { state: nextState, events };
+  if (planning.plan.followingActions.length === 0)
+    return { state: nextState, events };
   const tail = executeActionChain(
     nextState,
     planning.plan.followingActions,
@@ -583,7 +683,7 @@ export function continueSimultaneousGroup(
     controller,
     cardDb,
     resultRefs,
-    planning.plan.effectDescription,
+    planning.plan.effectDescription
   );
   return {
     state: tail.state,
@@ -600,7 +700,7 @@ export function executeActionChain(
   cardDb: Map<string, CardData>,
   initialResultRefs?: Map<string, EffectResult>,
   effectDescription?: string,
-  priorActionSucceeded?: boolean,
+  priorActionSucceeded?: boolean
 ): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
@@ -618,7 +718,8 @@ export function executeActionChain(
       !lastActionSucceeded
     ) {
       lastActionSucceeded = false;
-      if (isSimultaneousGroupStart(actions, i)) i = simultaneousGroupEnd(actions, i);
+      if (isSimultaneousGroupStart(actions, i))
+        i = simultaneousGroupEnd(actions, i);
       continue;
     }
 
@@ -638,12 +739,14 @@ export function executeActionChain(
         plan,
         sourceCardInstanceId,
         controller,
-        cardDb,
+        cardDb
       );
       return {
         state: groupResult.state,
         events: [...events, ...groupResult.events],
-        ...(groupResult.pendingPrompt ? { pendingPrompt: groupResult.pendingPrompt } : {}),
+        ...(groupResult.pendingPrompt
+          ? { pendingPrompt: groupResult.pendingPrompt }
+          : {}),
       };
     }
 
@@ -678,7 +781,7 @@ export function executeActionChain(
       controller,
       cardDb,
       resultRefs,
-      preselected,
+      preselected
     );
 
     state = result.state;
@@ -716,15 +819,26 @@ export function executeActionChain(
           accumulatedEvents: events,
         };
         const continuationState = pushFrame(frameId.state, continuationFrame);
-        if (isEngineTerminated(continuationState)) return { state: continuationState, events };
-        const restoredPromptState = pushFrame(continuationState, nestedPromptFrame);
+        if (isEngineTerminated(continuationState))
+          return { state: continuationState, events };
+        const restoredPromptState = pushFrame(
+          continuationState,
+          nestedPromptFrame
+        );
         return isEngineTerminated(restoredPromptState)
           ? { state: restoredPromptState, events }
-          : { state: restoredPromptState, events, pendingPrompt: result.pendingPrompt };
+          : {
+              state: restoredPromptState,
+              events,
+              pendingPrompt: result.pendingPrompt,
+            };
       }
 
-      const rawContext = result.pendingPrompt.resumeContext as { type?: unknown } | null;
-      const isReplacementPrompt = rawContext?.type === "REPLACEMENT" ||
+      const rawContext = result.pendingPrompt.resumeContext as {
+        type?: unknown;
+      } | null;
+      const isReplacementPrompt =
+        rawContext?.type === "REPLACEMENT" ||
         rawContext?.type === "REPLACEMENT_BATCH";
       if (isReplacementPrompt) {
         const frameId = generateFrameId(result.state);
@@ -751,11 +865,18 @@ export function executeActionChain(
         const continuationState = pushFrame(frameId.state, continuationFrame);
         return isEngineTerminated(continuationState)
           ? { state: continuationState, events }
-          : { state: continuationState, events, pendingPrompt: result.pendingPrompt };
+          : {
+              state: continuationState,
+              events,
+              pendingPrompt: result.pendingPrompt,
+            };
       }
 
-      const ctx = result.pendingPrompt.resumeContext as import("../../types.js").ResumeContext;
-      const phaseForPrompt = promptTypeToPhase(result.pendingPrompt.options.promptType);
+      const ctx = result.pendingPrompt
+        .resumeContext as import("../../types.js").ResumeContext;
+      const phaseForPrompt = promptTypeToPhase(
+        result.pendingPrompt.options.promptType
+      );
       // Use the resume context's controller — it may differ from the chain's
       // controller when an OPPONENT_ACTION flips who is acting (e.g. opponent
       // trashes from their own hand via Perona OP06-093).
@@ -784,12 +905,16 @@ export function executeActionChain(
         stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
       const updatedState = pushFrame(frameId.state, frame);
-      if (isEngineTerminated(updatedState)) return { state: updatedState, events };
+      if (isEngineTerminated(updatedState))
+        return { state: updatedState, events };
       const prompt = { ...result.pendingPrompt, resumeContext: frame.id };
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
       if (effectDescription && prompt.options) {
-        prompt.options = { ...prompt.options, effectDescription } as typeof prompt.options;
+        prompt.options = {
+          ...prompt.options,
+          effectDescription,
+        } as typeof prompt.options;
       }
       return { state: updatedState, events, pendingPrompt: prompt };
     }
@@ -809,10 +934,17 @@ export function executeActionChain(
         marker,
         triggers,
         actions.slice(i + 1),
-        resultRefs,
+        resultRefs
       );
-      if (isEngineTerminated(stateWithFrame)) return { state: stateWithFrame, events };
-      const drain = processRemainingTriggers(stateWithFrame, triggers, cardDb, events);
+      if (isEngineTerminated(stateWithFrame))
+        return { state: stateWithFrame, events };
+      const drain = processRemainingTriggers(
+        stateWithFrame,
+        triggers,
+        cardDb,
+        resolverExecutionServices,
+        events
+      );
       return {
         state: drain.state,
         events: drain.events,
@@ -830,7 +962,7 @@ export function executeActionChain(
 }
 
 function costResultToRefs(
-  costResult: CostResult | undefined,
+  costResult: CostResult | undefined
 ): Map<string, EffectResult> | undefined {
   if (!costResult) return undefined;
   const hasValues =
@@ -841,14 +973,28 @@ function costResultToRefs(
     costResult.charactersKoCount > 0;
   if (!hasValues) return undefined;
   const refs = new Map<string, EffectResult>();
-  refs.set("__cost_don_rested", { targetInstanceIds: [], count: costResult.donRestedCount });
-  refs.set("__cost_cards_trashed", { targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [], count: costResult.cardsTrashedCount });
-  refs.set("__cost_cards_returned", { targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [], count: costResult.cardsReturnedCount });
-  refs.set("__cost_cards_placed_to_deck", { targetInstanceIds: [], count: costResult.cardsPlacedToDeckCount });
-  refs.set("__cost_characters_ko", { targetInstanceIds: costResult.charactersKoInstanceIds ?? [], count: costResult.charactersKoCount });
+  refs.set("__cost_don_rested", {
+    targetInstanceIds: [],
+    count: costResult.donRestedCount,
+  });
+  refs.set("__cost_cards_trashed", {
+    targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [],
+    count: costResult.cardsTrashedCount,
+  });
+  refs.set("__cost_cards_returned", {
+    targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [],
+    count: costResult.cardsReturnedCount,
+  });
+  refs.set("__cost_cards_placed_to_deck", {
+    targetInstanceIds: [],
+    count: costResult.cardsPlacedToDeckCount,
+  });
+  refs.set("__cost_characters_ko", {
+    targetInstanceIds: costResult.charactersKoInstanceIds ?? [],
+    count: costResult.charactersKoCount,
+  });
   return refs;
 }
-
 
 // ─── Single Action Dispatcher ─────────────────────────────────────────────────
 
@@ -859,7 +1005,7 @@ export function executeEffectAction<K extends ActionType>(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets?: string[]
 ): ActionResult {
   state = consumeResolutionAction(state, action.type, sourceCardInstanceId);
   if (isEngineTerminated(state)) {
@@ -875,12 +1021,16 @@ export function executeEffectAction<K extends ActionType>(
       cardDb,
       resultRefs,
       preselectedTargets,
-      resolverExecutionServices,
+      resolverExecutionServices
     );
   }
   // Boot validation makes this unreachable for authored schemas. Treat any
   // untrusted/runtime drift as a rules-visible terminal engine contract fault.
-  log("action.unhandled", { actionType: action.type, sourceInstanceId: sourceCardInstanceId, controller });
+  log("action.unhandled", {
+    actionType: action.type,
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+  });
   state = terminateForEngineContract(state, {
     kind: "ENGINE_CONTRACT",
     contract: "ACTION_HANDLER",

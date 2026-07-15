@@ -12,6 +12,7 @@
 
 import type { CardData, CardInstance, GameState } from "../types.js";
 import { hasGrantedKeyword, isCardNegated } from "./modifiers.js";
+import { isKeywordEffective } from "./effective-keyword.js";
 
 export function hasRush(cardData: CardData): boolean {
   return cardData.keywords.rush;
@@ -25,7 +26,7 @@ function hasEffectiveRush(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): boolean {
   const negated = isCardNegated(card, state, cardDb);
   const printed = cardData.keywords.rush && !negated;
@@ -36,7 +37,7 @@ function hasEffectiveRushCharacter(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): boolean {
   const negated = isCardNegated(card, state, cardDb);
   const printed = cardData.keywords.rushCharacter && !negated;
@@ -70,23 +71,24 @@ export function hasUnblockable(cardData: CardData): boolean {
 export function hasEffectiveKeyword(
   card: CardInstance,
   cardData: CardData,
-  keyword: "BLOCKER" | "RUSH" | "RUSH_CHARACTER" | "DOUBLE_ATTACK" | "BANISH" | "UNBLOCKABLE" | "TRIGGER",
+  keyword:
+    | "BLOCKER"
+    | "RUSH"
+    | "RUSH_CHARACTER"
+    | "DOUBLE_ATTACK"
+    | "BANISH"
+    | "UNBLOCKABLE"
+    | "TRIGGER",
   state: GameState,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): boolean {
   const negated = isCardNegated(card, state, cardDb);
-  let printed = false;
-  switch (keyword) {
-    case "BLOCKER": printed = cardData.keywords.blocker; break;
-    case "RUSH": printed = cardData.keywords.rush; break;
-    case "RUSH_CHARACTER": printed = cardData.keywords.rushCharacter; break;
-    case "DOUBLE_ATTACK": printed = cardData.keywords.doubleAttack; break;
-    case "BANISH": printed = cardData.keywords.banish; break;
-    case "UNBLOCKABLE": printed = cardData.keywords.unblockable; break;
-    case "TRIGGER": printed = cardData.keywords.trigger; break;
-  }
-  if (printed && !negated) return true;
-  return hasGrantedKeyword(card, keyword, state, cardDb);
+  return isKeywordEffective(
+    cardData,
+    keyword,
+    negated,
+    hasGrantedKeyword(card, keyword, state, cardDb)
+  );
 }
 
 /**
@@ -100,7 +102,7 @@ export function canAttackThisTurn(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): boolean {
   if (cardData.type === "Leader") return true;
   if (card.turnPlayed === null) return true;
@@ -120,7 +122,7 @@ export function canAttackLeader(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
-  cardDb?: Map<string, CardData>,
+  cardDb?: Map<string, CardData>
 ): boolean {
   if (!canAttackThisTurn(card, cardData, state, cardDb)) return false;
   if (card.turnPlayed !== state.turn.number) return true;

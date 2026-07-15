@@ -8,7 +8,11 @@ import {
   resumeReplacementBatch,
 } from "../engine/replacements.js";
 
-const ENGINE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "engine");
+const ENGINE_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "engine"
+);
 const COST_ROOT = join(ENGINE_ROOT, "effect-resolver", "cost");
 
 function source(path: string): string {
@@ -22,6 +26,9 @@ describe("OPT-478 resolver architecture contract", () => {
       executeActionChain: expect.any(Function),
       executeEffectAction: expect.any(Function),
       resolveEffect: expect.any(Function),
+      continueSimultaneousGroup: expect.any(Function),
+      processRemainingTriggers: expect.any(Function),
+      reenterBatchResume: expect.any(Function),
     });
 
     // Required service parameters are part of the runtime JS contract, not
@@ -40,21 +47,25 @@ describe("OPT-478 resolver architecture contract", () => {
     const combined = guardedFiles.map(source).join("\n");
 
     expect(combined).not.toMatch(
-      /set(?:ChoiceDependencies|PlayDependencies|ReplacementDispatcher)|executeActionChainDispatcher/,
+      /set(?:ChoiceDependencies|PlayDependencies|ReplacementDispatcher)|executeActionChainDispatcher/
     );
     expect(combined).not.toContain("dispatcher was not initialized");
     expect(combined).not.toMatch(/\blet\s+_?(?:execute|resolve)[A-Z]\w*\s*:/);
   });
 
   it("keeps the stable cost facade thin and focused modules acyclic", () => {
-    const facade = source(join(ENGINE_ROOT, "effect-resolver", "cost-handler.ts"));
+    const facade = source(
+      join(ENGINE_ROOT, "effect-resolver", "cost-handler.ts")
+    );
     expect(facade.split("\n").length).toBeLessThanOrEqual(40);
 
     const files = readdirSync(COST_ROOT).filter((file) => file.endsWith(".ts"));
     const graph = new Map<string, string[]>();
     for (const file of files) {
       const moduleName = file.replace(/\.ts$/, "");
-      const dependencies = [...source(join(COST_ROOT, file)).matchAll(/from "\.\/([^"/]+)\.js"/g)]
+      const dependencies = [
+        ...source(join(COST_ROOT, file)).matchAll(/from "\.\/([^"/]+)\.js"/g),
+      ]
         .map((match) => match[1])
         .filter((dependency) => files.includes(`${dependency}.ts`));
       graph.set(moduleName, dependencies);
@@ -63,7 +74,8 @@ describe("OPT-478 resolver architecture contract", () => {
     const visiting = new Set<string>();
     const visited = new Set<string>();
     const visit = (moduleName: string): void => {
-      if (visiting.has(moduleName)) throw new Error(`Cost dependency cycle at ${moduleName}`);
+      if (visiting.has(moduleName))
+        throw new Error(`Cost dependency cycle at ${moduleName}`);
       if (visited.has(moduleName)) return;
       visiting.add(moduleName);
       for (const dependency of graph.get(moduleName) ?? []) visit(dependency);

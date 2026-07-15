@@ -9,9 +9,88 @@ import type {
   PendingPromptState,
   QueuedTrigger,
 } from "../../types.js";
-import type { ActionOf, ActionType, EffectResult } from "../effect-types.js";
+import type {
+  Action,
+  ActionOf,
+  ActionType,
+  EffectBlock,
+  EffectResult,
+} from "../effect-types.js";
 import type { CardData } from "../../types.js";
-import type { EffectResolverServices } from "./services.js";
+
+export interface SimultaneousActionLock {
+  execute: boolean;
+  targetInstanceIds?: string[];
+}
+
+export interface SimultaneousGroupPlan {
+  actions: Action[];
+  locks: SimultaneousActionLock[];
+  nextActionIndex: number;
+  followingActions: Action[];
+  resultRefs: [string, EffectResult][];
+  effectDescription?: string;
+}
+
+/** Executable dependencies passed across recursive resolver boundaries. */
+export interface EffectResolverServices {
+  executeActionChain(
+    state: GameState,
+    actions: Action[],
+    sourceCardInstanceId: string,
+    controller: 0 | 1,
+    cardDb: Map<string, CardData>,
+    initialResultRefs?: Map<string, EffectResult>,
+    effectDescription?: string,
+    priorActionSucceeded?: boolean
+  ): {
+    state: GameState;
+    events: PendingEvent[];
+    pendingPrompt?: PendingPromptState;
+  };
+
+  executeEffectAction(
+    state: GameState,
+    action: Action,
+    sourceCardInstanceId: string,
+    controller: 0 | 1,
+    cardDb: Map<string, CardData>,
+    resultRefs: Map<string, EffectResult>,
+    preselectedTargets?: string[]
+  ): ActionResult;
+
+  resolveEffect(
+    state: GameState,
+    block: EffectBlock,
+    sourceCardInstanceId: string,
+    controller: 0 | 1,
+    cardDb: Map<string, CardData>,
+    triggeringCardInstanceId?: string | null
+  ): EffectResolverResult;
+
+  continueSimultaneousGroup(
+    state: GameState,
+    plan: SimultaneousGroupPlan,
+    sourceCardInstanceId: string,
+    controller: 0 | 1,
+    cardDb: Map<string, CardData>
+  ): {
+    state: GameState;
+    events: PendingEvent[];
+    pendingPrompt?: PendingPromptState;
+  };
+  processRemainingTriggers(
+    state: GameState,
+    pendingTriggers: QueuedTrigger[],
+    cardDb: Map<string, CardData>,
+    priorEvents?: PendingEvent[]
+  ): EffectResolverResult;
+  reenterBatchResume(
+    state: GameState,
+    cardDb: Map<string, CardData>,
+    priorEvents?: PendingEvent[]
+  ): EffectResolverResult;
+}
 
 export interface EffectResolverResult {
   state: GameState;
@@ -48,7 +127,7 @@ export type ActionHandler<K extends ActionType = ActionType> = (
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets: string[] | undefined,
-  services: EffectResolverServices,
+  services: EffectResolverServices
 ) => ActionResult;
 
 export type ActionHandlerMap = {
@@ -71,20 +150,44 @@ export interface CostSelectionResult {
 
 /** Serialize CostResult into entries for EffectStackFrame.costResultRefs */
 export function costResultToEntries(
-  costResult: import("../effect-types.js").CostResult,
+  costResult: import("../effect-types.js").CostResult
 ): [string, { targetInstanceIds: string[]; count: number }][] {
   return [
-    ["__cost_don_rested", { targetInstanceIds: [], count: costResult.donRestedCount }],
-    ["__cost_cards_trashed", { targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [], count: costResult.cardsTrashedCount }],
-    ["__cost_cards_returned", { targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [], count: costResult.cardsReturnedCount }],
-    ["__cost_cards_placed_to_deck", { targetInstanceIds: [], count: costResult.cardsPlacedToDeckCount }],
-    ["__cost_characters_ko", { targetInstanceIds: costResult.charactersKoInstanceIds ?? [], count: costResult.charactersKoCount }],
+    [
+      "__cost_don_rested",
+      { targetInstanceIds: [], count: costResult.donRestedCount },
+    ],
+    [
+      "__cost_cards_trashed",
+      {
+        targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [],
+        count: costResult.cardsTrashedCount,
+      },
+    ],
+    [
+      "__cost_cards_returned",
+      {
+        targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [],
+        count: costResult.cardsReturnedCount,
+      },
+    ],
+    [
+      "__cost_cards_placed_to_deck",
+      { targetInstanceIds: [], count: costResult.cardsPlacedToDeckCount },
+    ],
+    [
+      "__cost_characters_ko",
+      {
+        targetInstanceIds: costResult.charactersKoInstanceIds ?? [],
+        count: costResult.charactersKoCount,
+      },
+    ],
   ];
 }
 
 /** Deserialize EffectStackFrame.costResultRefs back into a Map */
 export function costResultRefsFromEntries(
-  entries: [string, { targetInstanceIds: string[]; count: number }][],
+  entries: [string, { targetInstanceIds: string[]; count: number }][]
 ): Map<string, EffectResult> | undefined {
   if (!entries || entries.length === 0) return undefined;
   const hasValues = entries.some(([, v]) => v.count > 0);

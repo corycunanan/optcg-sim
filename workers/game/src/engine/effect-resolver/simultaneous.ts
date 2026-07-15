@@ -1,5 +1,6 @@
 import type { Action, ActionType, EffectResult } from "../effect-types.js";
 import type { CardData, GameState } from "../../types.js";
+import type { SimultaneousGroupPlan } from "./types.js";
 import { evaluateCondition, type ConditionContext } from "../conditions.js";
 import { resolveAmount } from "./action-utils.js";
 import {
@@ -28,20 +29,7 @@ export const SIMULTANEOUS_ACTION_TYPES: ReadonlySet<ActionType> = new Set([
   "APPLY_PROHIBITION",
 ]);
 
-export interface SimultaneousActionLock {
-  execute: boolean;
-  /** Undefined only when the action has no target. Empty means target-locked to none. */
-  targetInstanceIds?: string[];
-}
-
-export interface SimultaneousGroupPlan {
-  actions: Action[];
-  locks: SimultaneousActionLock[];
-  nextActionIndex: number;
-  followingActions: Action[];
-  resultRefs: [string, EffectResult][];
-  effectDescription?: string;
-}
+export type { SimultaneousActionLock, SimultaneousGroupPlan } from "./types.js";
 
 export interface SimultaneousSelectionRequest {
   actionIndex: number;
@@ -59,7 +47,7 @@ function lockDynamicActionValues(
   state: GameState,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>
 ): Action {
   if (action.type === "SET_BASE_POWER") {
     const value = action.params?.value;
@@ -93,7 +81,7 @@ export function planSimultaneousGroup(
   plan: SimultaneousGroupPlan,
   sourceCardInstanceId: string,
   controller: 0 | 1,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): SimultaneousPlanningResult {
   const resultRefs = new Map<string, EffectResult>(plan.resultRefs);
   const locks = [...plan.locks];
@@ -105,7 +93,7 @@ export function planSimultaneousGroup(
       state,
       controller,
       cardDb,
-      resultRefs,
+      resultRefs
     );
     actions[i] = action;
     const conditionContext: ConditionContext = {
@@ -114,7 +102,10 @@ export function planSimultaneousGroup(
       cardDb,
       resultRefs,
     };
-    if (action.conditions && !evaluateCondition(state, action.conditions, conditionContext)) {
+    if (
+      action.conditions &&
+      !evaluateCondition(state, action.conditions, conditionContext)
+    ) {
       locks[i] = { execute: false };
       continue;
     }
@@ -129,7 +120,7 @@ export function planSimultaneousGroup(
         controller,
         cardDb,
         sourceCardInstanceId,
-        resultRefs,
+        resultRefs
       );
     }
 
@@ -142,7 +133,9 @@ export function planSimultaneousGroup(
 
     locks[i] = {
       execute: true,
-      ...(allValidIds ? { targetInstanceIds: autoSelectTargets(action.target, allValidIds) } : {}),
+      ...(allValidIds
+        ? { targetInstanceIds: autoSelectTargets(action.target, allValidIds) }
+        : {}),
     };
   }
 
@@ -151,11 +144,17 @@ export function planSimultaneousGroup(
   };
 }
 
-export function isSimultaneousGroupStart(actions: Action[], index: number): boolean {
+export function isSimultaneousGroupStart(
+  actions: Action[],
+  index: number
+): boolean {
   return index + 1 < actions.length && actions[index + 1].chain === "AND";
 }
 
-export function simultaneousGroupEnd(actions: Action[], startIndex: number): number {
+export function simultaneousGroupEnd(
+  actions: Action[],
+  startIndex: number
+): number {
   let end = startIndex;
   while (end + 1 < actions.length && actions[end + 1].chain === "AND") end++;
   return end;

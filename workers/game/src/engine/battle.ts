@@ -5,35 +5,57 @@
  * All battle-related execution logic, extracted from execute.ts.
  */
 
-import type { CardData, GameState, LifeCard, PendingEvent, ExecuteResult } from "../types.js";
+import type {
+  CardData,
+  GameState,
+  LifeCard,
+  PendingEvent,
+  ExecuteResult,
+} from "../types.js";
 import {
   getActivePlayerIndex,
   getInactivePlayerIndex,
   findCardInState,
-  removeTopLifeCard,
   restDonForCost,
   pushTriggerStaging,
 } from "./state.js";
-import { getEffectivePower, getEffectiveCost, getBattleDefenderPower } from "./modifiers.js";
+import {
+  getEffectivePower,
+  getEffectiveCost,
+  getBattleDefenderPower,
+} from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { expireBattleEffects } from "./duration-tracker.js";
-import { hasTrigger, hasEffectiveKeyword } from "./keywords.js";
+import { hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
-import { resolveEffect, resolverExecutionServices } from "./effect-resolver/index.js";
-import { isCostPayable } from "./effect-resolver/cost-handler.js";
+import {
+  resolveEffect,
+  resolverExecutionServices,
+} from "./effect-resolver/index.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
 import { emitPendingEvent } from "./events.js";
 import { transitionCard, transitionDetachedCard } from "./zone-transition.js";
 import { allocateEngineId, takeEngineTimestamp } from "./execution-context.js";
+import {
+  canOfferTrigger as canOfferTriggerQuery,
+  continueEffectDamageSequence as continueEffectDamageSequenceQuery,
+  moveLifeCardToHand as moveLifeCardToHandQuery,
+  popLifeForDamage as popLifeForDamageQuery,
+} from "./effect-damage.js";
 
-function restoreTriggerStaging(state: GameState, baseline: readonly string[]): GameState {
+function restoreTriggerStaging(
+  state: GameState,
+  baseline: readonly string[]
+): GameState {
   const keep = new Set(baseline);
   return {
     ...state,
     turn: {
       ...state.turn,
-      triggerStagingInstanceIds: (state.turn.triggerStagingInstanceIds ?? []).filter((id) => keep.has(id)),
+      triggerStagingInstanceIds: (
+        state.turn.triggerStagingInstanceIds ?? []
+      ).filter((id) => keep.has(id)),
     },
   };
 }
@@ -44,22 +66,36 @@ export function executeDeclareAttack(
   state: GameState,
   attackerInstanceId: string,
   targetInstanceId: string,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
 
   // Rest the attacker
   let nextState = setCardState(state, pi, attackerInstanceId, "RESTED");
-  events.push({ type: "CARD_STATE_CHANGED", playerIndex: pi, payload: { cardInstanceId: attackerInstanceId, newState: "RESTED" } });
+  events.push({
+    type: "CARD_STATE_CHANGED",
+    playerIndex: pi,
+    payload: { cardInstanceId: attackerInstanceId, newState: "RESTED" },
+  });
 
   const attackerFound = findCardInState(nextState, attackerInstanceId)!;
   const attackerData = cardDb.get(attackerFound.card.cardId)!;
-  const attackerPower = getEffectivePower(attackerFound.card, attackerData, nextState, cardDb);
+  const attackerPower = getEffectivePower(
+    attackerFound.card,
+    attackerData,
+    nextState,
+    cardDb
+  );
 
   const defenderFound = findCardInState(nextState, targetInstanceId)!;
   const defenderData = cardDb.get(defenderFound.card.cardId)!;
-  const defenderPower = getEffectivePower(defenderFound.card, defenderData, nextState, cardDb);
+  const defenderPower = getEffectivePower(
+    defenderFound.card,
+    defenderData,
+    nextState,
+    cardDb
+  );
 
   const allocatedBattle = allocateEngineId(nextState, "battle");
   nextState = allocatedBattle.state;
@@ -93,8 +129,15 @@ export function executeDeclareAttack(
   // [When Attacking] and [On Your Opponent's Attack] fire here in M4
 
   // Advance to BLOCK_STEP
-  nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "BLOCK_STEP" } };
-  events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "ATTACK_STEP", to: "BLOCK_STEP" } });
+  nextState = {
+    ...nextState,
+    turn: { ...nextState.turn, battleSubPhase: "BLOCK_STEP" },
+  };
+  events.push({
+    type: "PHASE_CHANGED",
+    playerIndex: pi,
+    payload: { from: "ATTACK_STEP", to: "BLOCK_STEP" },
+  });
 
   return { state: nextState, events };
 }
@@ -104,23 +147,36 @@ export function executeDeclareAttack(
 export function executeDeclareBlocker(
   state: GameState,
   blockerInstanceId: string,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   const inactiveIdx = getInactivePlayerIndex(state);
 
   // Rest the blocker
   let nextState = setCardState(state, inactiveIdx, blockerInstanceId, "RESTED");
-  events.push({ type: "CARD_STATE_CHANGED", playerIndex: inactiveIdx, payload: { cardInstanceId: blockerInstanceId, newState: "RESTED" } });
+  events.push({
+    type: "CARD_STATE_CHANGED",
+    playerIndex: inactiveIdx,
+    payload: { cardInstanceId: blockerInstanceId, newState: "RESTED" },
+  });
 
   // Replace the target in BattleContext
   const battle = nextState.turn.battle!;
-  const updatedBattle = { ...battle, targetInstanceId: blockerInstanceId, blockerActivated: true };
+  const updatedBattle = {
+    ...battle,
+    targetInstanceId: blockerInstanceId,
+    blockerActivated: true,
+  };
 
   // Recalculate defender power with new target
   const blockerFound = findCardInState(nextState, blockerInstanceId)!;
   const blockerData = cardDb.get(blockerFound.card.cardId)!;
-  const blockerPower = getEffectivePower(blockerFound.card, blockerData, nextState, cardDb);
+  const blockerPower = getEffectivePower(
+    blockerFound.card,
+    blockerData,
+    nextState,
+    cardDb
+  );
 
   nextState = {
     ...nextState,
@@ -130,7 +186,11 @@ export function executeDeclareBlocker(
     },
   };
 
-  events.push({ type: "BLOCK_DECLARED", playerIndex: inactiveIdx, payload: { blockerInstanceId } });
+  events.push({
+    type: "BLOCK_DECLARED",
+    playerIndex: inactiveIdx,
+    payload: { blockerInstanceId },
+  });
   // [On Block] fires in M4
 
   // OPT-246: Block Step closed with the target redirected to the blocker.
@@ -148,15 +208,25 @@ export function executeDeclareBlocker(
   });
 
   // Advance to COUNTER_STEP
-  nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" } };
-  events.push({ type: "PHASE_CHANGED", playerIndex: inactiveIdx, payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" } });
+  nextState = {
+    ...nextState,
+    turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" },
+  };
+  events.push({
+    type: "PHASE_CHANGED",
+    playerIndex: inactiveIdx,
+    payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" },
+  });
 
   return { state: nextState, events };
 }
 
 // ─── Pass (battle sub-phase transitions) ──────────────────────────────────────
 
-export function executePass(state: GameState, cardDb: Map<string, CardData>): ExecuteResult {
+export function executePass(
+  state: GameState,
+  cardDb: Map<string, CardData>
+): ExecuteResult {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
   let nextState = state;
@@ -175,12 +245,26 @@ export function executePass(state: GameState, cardDb: Map<string, CardData>): Ex
         redirected: false,
       },
     });
-    nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" } };
-    events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" } });
+    nextState = {
+      ...nextState,
+      turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" },
+    };
+    events.push({
+      type: "PHASE_CHANGED",
+      playerIndex: pi,
+      payload: { from: "BLOCK_STEP", to: "COUNTER_STEP" },
+    });
   } else if (state.turn.battleSubPhase === "COUNTER_STEP") {
     // Defender passes counter window → advance to DAMAGE_STEP
-    nextState = { ...nextState, turn: { ...nextState.turn, battleSubPhase: "DAMAGE_STEP" } };
-    events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "COUNTER_STEP", to: "DAMAGE_STEP" } });
+    nextState = {
+      ...nextState,
+      turn: { ...nextState.turn, battleSubPhase: "DAMAGE_STEP" },
+    };
+    events.push({
+      type: "PHASE_CHANGED",
+      playerIndex: pi,
+      payload: { from: "COUNTER_STEP", to: "DAMAGE_STEP" },
+    });
     // Run damage resolution immediately
     const dmgResult = executeDamageStep(nextState, cardDb);
     nextState = dmgResult.state;
@@ -189,7 +273,9 @@ export function executePass(state: GameState, cardDb: Map<string, CardData>): Ex
       state: nextState,
       events,
       damagedPlayerIndex: dmgResult.damagedPlayerIndex,
-      ...(dmgResult.pendingPrompt && { pendingPrompt: dmgResult.pendingPrompt }),
+      ...(dmgResult.pendingPrompt && {
+        pendingPrompt: dmgResult.pendingPrompt,
+      }),
     };
   }
 
@@ -202,7 +288,7 @@ export function executeUseCounter(
   state: GameState,
   cardInstanceId: string,
   counterTargetInstanceId: string,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   const inactiveIdx = getInactivePlayerIndex(state);
@@ -210,10 +296,17 @@ export function executeUseCounter(
   const found = findCardInState(state, cardInstanceId)!;
   const cardData = cardDb.get(found.card.cardId)!;
   // OPT-400: honor COUNTER_GRANT rule mods, not just the printed counter.
-  const counterValue = getEffectiveCounterValue(found.card, cardData, state, cardDb);
+  const counterValue = getEffectiveCounterValue(
+    found.card,
+    cardData,
+    state,
+    cardDb
+  );
 
   // Trash the counter card from hand
-  const moved = transitionCard(state, cardInstanceId, "TRASH", { position: "TOP" });
+  const moved = transitionCard(state, cardInstanceId, "TRASH", {
+    position: "TOP",
+  });
   if (!moved) return { state, events };
   let nextState = moved.state;
 
@@ -224,14 +317,23 @@ export function executeUseCounter(
     const targetData = cardDb.get(targetFound.card.cardId);
     const newCounterPower = battle.counterPowerAdded + counterValue;
     const newDefenderPower = targetData
-      ? getBattleDefenderPower(targetFound.card, targetData, newCounterPower, nextState)
+      ? getBattleDefenderPower(
+          targetFound.card,
+          targetData,
+          newCounterPower,
+          nextState
+        )
       : battle.defenderPower + counterValue;
 
     nextState = {
       ...nextState,
       turn: {
         ...nextState.turn,
-        battle: { ...battle, counterPowerAdded: newCounterPower, defenderPower: newDefenderPower },
+        battle: {
+          ...battle,
+          counterPowerAdded: newCounterPower,
+          defenderPower: newDefenderPower,
+        },
       },
     };
   }
@@ -250,7 +352,7 @@ export function executeUseCounter(
 export function executeUseCounterEvent(
   state: GameState,
   cardInstanceId: string,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   const inactiveIdx = getInactivePlayerIndex(state);
@@ -262,14 +364,20 @@ export function executeUseCounterEvent(
   // Pay cost
   let nextState = restDonForCost(state, inactiveIdx, cost)!;
   // Trash the event
-  const moved = transitionCard(nextState, cardInstanceId, "TRASH", { position: "TOP" });
+  const moved = transitionCard(nextState, cardInstanceId, "TRASH", {
+    position: "TOP",
+  });
   if (!moved) return { state: nextState, events };
   nextState = moved.state;
 
   events.push({
     type: "COUNTER_USED",
     playerIndex: inactiveIdx,
-    payload: { cardId: cardData.id, cardInstanceId: moved.fact.newInstanceId, type: "event" },
+    payload: {
+      cardId: cardData.id,
+      cardInstanceId: moved.fact.newInstanceId,
+      type: "event",
+    },
   });
 
   return { state: nextState, events };
@@ -280,7 +388,7 @@ export function executeUseCounterEvent(
 export function executeRevealTrigger(
   state: GameState,
   reveal: boolean,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const battle = state.turn.battle;
   // OPT-259 (F6): effect-sourced damage parks its pending Trigger on turn
@@ -301,13 +409,18 @@ export function executeRevealTrigger(
 
   if (reveal) {
     // Activate trigger — card goes to trash (rules §10-1-5-3)
-    const moved = transitionDetachedCard(nextState, {
+    const moved = transitionDetachedCard(
+      nextState,
+      {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
       source: "LIFE",
       owner: inactiveIdx,
       lifeFace: lifeCard.face,
-    }, "TRASH", { position: "TOP" });
+      },
+      "TRASH",
+      { position: "TOP" }
+    );
     if (!moved) return { state: nextState, events };
     nextState = moved.state;
     const triggerInstanceId = moved.fact.newInstanceId;
@@ -318,7 +431,11 @@ export function executeRevealTrigger(
     // any pending prompt's candidate list is already built/locked at that point.
     const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
     nextState = pushTriggerStaging(nextState, triggerInstanceId);
-    events.push({ type: "TRIGGER_ACTIVATED", playerIndex: inactiveIdx, payload: { cardId: lifeCard.cardId, activated: true } });
+    events.push({
+      type: "TRIGGER_ACTIVATED",
+      playerIndex: inactiveIdx,
+      payload: { cardId: lifeCard.cardId, activated: true },
+    });
 
     // If the trigger card has an effectSchema with a TRIGGER block, resolve it
     const triggerCardData = cardDb.get(lifeCard.cardId);
@@ -332,7 +449,8 @@ export function executeRevealTrigger(
     const schema = triggerCardData?.effectSchema;
     if (schema?.effects) {
       const triggerBlock = schema.effects.find(
-        (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
+        (b) =>
+          b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
       );
       if (triggerBlock) {
         const effectResult = resolveEffect(
@@ -340,7 +458,7 @@ export function executeRevealTrigger(
           triggerBlock,
           triggerInstanceId,
           inactiveIdx,
-          cardDb,
+          cardDb
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
@@ -363,7 +481,11 @@ export function executeRevealTrigger(
 
           const pausedBattle = nextState.turn.battle;
           if (!pausedBattle) {
-            return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
+            return {
+              state: nextState,
+              events,
+              pendingPrompt: effectResult.pendingPrompt,
+            };
           }
           const cleanedBattle = { ...pausedBattle };
           delete cleanedBattle.pendingTriggerLifeCard;
@@ -382,7 +504,11 @@ export function executeRevealTrigger(
               },
             },
           };
-          return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
+          return {
+            state: nextState,
+            events,
+            pendingPrompt: effectResult.pendingPrompt,
+          };
         }
       } else {
         nextState = restoreTriggerStaging(nextState, stagingBaseline);
@@ -392,20 +518,27 @@ export function executeRevealTrigger(
     }
   } else {
     // Decline trigger — add to hand
-    const moved = transitionDetachedCard(nextState, {
+    const moved = transitionDetachedCard(
+      nextState,
+      {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
       source: "LIFE",
       owner: inactiveIdx,
       lifeFace: lifeCard.face,
-    }, "HAND");
+      },
+      "HAND"
+    );
     if (!moved) return { state: nextState, events };
     nextState = moved.state;
     destinationInstanceId = moved.fact.newInstanceId;
     events.push({
       type: "CARD_ADDED_TO_HAND_FROM_LIFE",
       playerIndex: inactiveIdx,
-      payload: { cardId: lifeCard.cardId, cardInstanceId: moved.fact.newInstanceId },
+      payload: {
+        cardId: lifeCard.cardId,
+        cardInstanceId: moved.fact.newInstanceId,
+      },
     });
   }
 
@@ -418,7 +551,9 @@ export function executeRevealTrigger(
     playerIndex: inactiveIdx,
     payload: {
       cardInstanceId: lifeCard.instanceId,
-      ...(destinationInstanceId ? { newCardInstanceId: destinationInstanceId } : {}),
+      ...(destinationInstanceId
+        ? { newCardInstanceId: destinationInstanceId }
+        : {}),
     },
   });
 
@@ -430,11 +565,18 @@ export function executeRevealTrigger(
   delete cleanedBattle.pendingTriggerLifeCard;
   const remainingBefore = cleanedBattle.damagesRemaining ?? 1;
   cleanedBattle.damagesRemaining = Math.max(0, remainingBefore - 1);
-  nextState = { ...nextState, turn: { ...nextState.turn, battle: cleanedBattle } };
+  nextState = {
+    ...nextState,
+    turn: { ...nextState.turn, battle: cleanedBattle },
+  };
 
   const cont = continueLeaderDamageSequence(nextState, cardDb);
   events.push(...cont.events);
-  return { state: cont.state, events, damagedPlayerIndex: cont.damagedPlayerIndex };
+  return {
+    state: cont.state,
+    events,
+    damagedPlayerIndex: cont.damagedPlayerIndex,
+  };
 }
 
 // ─── Effect-damage Trigger resolver (OPT-259 / F6) ───────────────────────────
@@ -453,13 +595,14 @@ export function executeRevealTrigger(
 function executeRevealEffectDamageTrigger(
   state: GameState,
   reveal: boolean,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   const pending = state.turn.pendingTriggerFromEffect;
   if (!pending) return { state, events };
 
-  const { lifeCard, damagedPlayerIndex, remainingDamages, controllerIndex } = pending;
+  const { lifeCard, damagedPlayerIndex, remainingDamages, controllerIndex } =
+    pending;
   let nextState: GameState = {
     ...state,
     turn: { ...state.turn, pendingTriggerFromEffect: null },
@@ -469,13 +612,18 @@ function executeRevealEffectDamageTrigger(
   if (reveal) {
     // Trash the revealed Life card (rules §10-1-5-3) before resolving the
     // trigger block. The trigger block runs from the trash.
-    const moved = transitionDetachedCard(nextState, {
+    const moved = transitionDetachedCard(
+      nextState,
+      {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
       owner: damagedPlayerIndex,
       source: "LIFE",
       lifeFace: lifeCard.face,
-    }, "TRASH", { position: "TOP" });
+      },
+      "TRASH",
+      { position: "TOP" }
+    );
     if (!moved) return { state: nextState, events };
     nextState = moved.state;
     const triggerInstanceId = moved.fact.newInstanceId;
@@ -485,7 +633,11 @@ function executeRevealEffectDamageTrigger(
     // Trigger's effect resolution.
     const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
     nextState = pushTriggerStaging(nextState, triggerInstanceId);
-    events.push({ type: "TRIGGER_ACTIVATED", playerIndex: damagedPlayerIndex, payload: { cardId: lifeCard.cardId, activated: true } });
+    events.push({
+      type: "TRIGGER_ACTIVATED",
+      playerIndex: damagedPlayerIndex,
+      payload: { cardId: lifeCard.cardId, activated: true },
+    });
 
     const triggerCardData = cardDb.get(lifeCard.cardId);
     if (triggerCardData?.type === "Event") {
@@ -498,7 +650,8 @@ function executeRevealEffectDamageTrigger(
     const schema = triggerCardData?.effectSchema;
     if (schema?.effects) {
       const triggerBlock = schema.effects.find(
-        (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
+        (b) =>
+          b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
       );
       if (triggerBlock) {
         const effectResult = resolveEffect(
@@ -506,7 +659,7 @@ function executeRevealEffectDamageTrigger(
           triggerBlock,
           triggerInstanceId,
           damagedPlayerIndex,
-          cardDb,
+          cardDb
         );
         nextState = effectResult.state;
         events.push(...effectResult.events);
@@ -522,7 +675,11 @@ function executeRevealEffectDamageTrigger(
               newCardInstanceId: triggerInstanceId,
             },
           });
-          return { state: nextState, events, pendingPrompt: effectResult.pendingPrompt };
+          return {
+            state: nextState,
+            events,
+            pendingPrompt: effectResult.pendingPrompt,
+          };
         }
       } else {
         nextState = restoreTriggerStaging(nextState, stagingBaseline);
@@ -531,7 +688,11 @@ function executeRevealEffectDamageTrigger(
       nextState = restoreTriggerStaging(nextState, stagingBaseline);
     }
   } else {
-    const handResult = moveLifeCardToHand(nextState, lifeCard, damagedPlayerIndex);
+    const handResult = moveLifeCardToHand(
+      nextState,
+      lifeCard,
+      damagedPlayerIndex
+    );
     nextState = handResult.state;
     events.push(...handResult.events);
     // Decline emits the REMOVED event inside moveLifeCardToHand — we do NOT
@@ -542,7 +703,7 @@ function executeRevealEffectDamageTrigger(
       damagedPlayerIndex,
       remainingDamages,
       pending.sourceCardInstanceId,
-      controllerIndex,
+      controllerIndex
     );
     return {
       state: cont.state,
@@ -558,7 +719,9 @@ function executeRevealEffectDamageTrigger(
     playerIndex: damagedPlayerIndex,
     payload: {
       cardInstanceId: lifeCard.instanceId,
-      ...(destinationInstanceId ? { newCardInstanceId: destinationInstanceId } : {}),
+      ...(destinationInstanceId
+        ? { newCardInstanceId: destinationInstanceId }
+        : {}),
     },
   });
 
@@ -568,7 +731,7 @@ function executeRevealEffectDamageTrigger(
     damagedPlayerIndex,
     remainingDamages,
     pending.sourceCardInstanceId,
-    controllerIndex,
+    controllerIndex
   );
   return {
     state: cont.state,
@@ -593,49 +756,16 @@ export function continueEffectDamageSequence(
   damagedPlayerIndex: 0 | 1,
   remainingDamages: number,
   sourceCardInstanceId: string,
-  controllerIndex: 0 | 1,
+  controllerIndex: 0 | 1
 ): ExecuteResult {
-  const events: PendingEvent[] = [];
-  let nextState = state;
-
-  for (let i = 0; i < remainingDamages; i++) {
-    const popResult = popLifeForDamage(nextState, damagedPlayerIndex);
-    if (popResult.lethal) break;
-    if (!popResult.lifeCard) break;
-    nextState = popResult.state;
-    events.push(...popResult.events);
-
-    const lifeCard = popResult.lifeCard;
-
-    if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, damagedPlayerIndex, lifeCard.instanceId)) {
-      const damagesAfterThis = remainingDamages - i - 1;
-      nextState = {
-        ...nextState,
-        turn: {
-          ...nextState.turn,
-          pendingTriggerFromEffect: {
-            lifeCard,
+  return continueEffectDamageSequenceQuery(
+    state,
+    cardDb,
             damagedPlayerIndex,
-            remainingDamages: damagesAfterThis,
+    remainingDamages,
             sourceCardInstanceId,
-            controllerIndex,
-          },
-        },
-      };
-      events.push({
-        type: "TRIGGER_ACTIVATED",
-        playerIndex: damagedPlayerIndex,
-        payload: { cardId: lifeCard.cardId },
-      });
-      return { state: nextState, events, damagedPlayerIndex };
-    }
-
-    const handResult = moveLifeCardToHand(nextState, lifeCard, damagedPlayerIndex);
-    nextState = handResult.state;
-    events.push(...handResult.events);
-  }
-
-  return { state: nextState, events, damagedPlayerIndex };
+    controllerIndex
+  );
 }
 
 // ─── Leader-damage helpers (OPT-239) ────────────────────────────────────────
@@ -655,24 +785,14 @@ export function continueEffectDamageSequence(
  */
 export function popLifeForDamage(
   state: GameState,
-  damagedPlayerIndex: 0 | 1,
-): { state: GameState; lifeCard: LifeCard | null; lethal: boolean; events: PendingEvent[] } {
-  const events: PendingEvent[] = [];
-
-  if (state.players[damagedPlayerIndex].life.length === 0) {
-    return { state, lifeCard: null, lethal: true, events };
-  }
-
-  const result = removeTopLifeCard(state, damagedPlayerIndex);
-  if (!result) return { state, lifeCard: null, lethal: false, events };
-
-  const { lifeCard, state: nextState } = result;
-
-  if (nextState.players[damagedPlayerIndex].life.length === 0) {
-    events.push({ type: "LIFE_COUNT_BECOMES_ZERO", playerIndex: damagedPlayerIndex, payload: {} });
-  }
-
-  return { state: nextState, lifeCard, lethal: false, events };
+  damagedPlayerIndex: 0 | 1
+): {
+  state: GameState;
+  lifeCard: LifeCard | null;
+  lethal: boolean;
+  events: PendingEvent[];
+} {
+  return popLifeForDamageQuery(state, damagedPlayerIndex);
 }
 
 /**
@@ -685,33 +805,9 @@ export function popLifeForDamage(
 export function moveLifeCardToHand(
   state: GameState,
   lifeCard: LifeCard,
-  damagedPlayerIndex: 0 | 1,
+  damagedPlayerIndex: 0 | 1
 ): { state: GameState; events: PendingEvent[] } {
-  const events: PendingEvent[] = [];
-  const moved = transitionDetachedCard(state, {
-    instanceId: lifeCard.instanceId,
-    cardId: lifeCard.cardId,
-    owner: damagedPlayerIndex,
-    source: "LIFE",
-    lifeFace: lifeCard.face,
-  }, "HAND");
-  if (!moved) return { state, events };
-
-  events.push({
-    type: "CARD_ADDED_TO_HAND_FROM_LIFE",
-    playerIndex: damagedPlayerIndex,
-    payload: { cardId: lifeCard.cardId, cardInstanceId: moved.fact.newInstanceId },
-  });
-  events.push({
-    type: "CARD_REMOVED_FROM_LIFE",
-    playerIndex: damagedPlayerIndex,
-    payload: {
-      cardInstanceId: lifeCard.instanceId,
-      newCardInstanceId: moved.fact.newInstanceId,
-    },
-  });
-
-  return { state: moved.state, events };
+  return moveLifeCardToHandQuery(state, lifeCard, damagedPlayerIndex);
 }
 
 /**
@@ -725,8 +821,14 @@ function dealOneLeaderDamage(
   cardDb: Map<string, CardData>,
   attackerInstanceId: string,
   isBanish: boolean,
-  attackerType: "LEADER" | "CHARACTER",
-): { state: GameState; events: PendingEvent[]; paused: boolean; damagedPlayerIndex?: 0 | 1; lethal?: boolean } {
+  attackerType: "LEADER" | "CHARACTER"
+): {
+  state: GameState;
+  events: PendingEvent[];
+  paused: boolean;
+  damagedPlayerIndex?: 0 | 1;
+  lethal?: boolean;
+} {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
   const inactiveIdx = getInactivePlayerIndex(state);
@@ -736,11 +838,24 @@ function dealOneLeaderDamage(
     events.push({
       type: "DAMAGE_DEALT",
       playerIndex: pi,
-      payload: { target: "leader", amount: 1, lethal: true, attackerInstanceId, attackerType },
+      payload: {
+        target: "leader",
+        amount: 1,
+        lethal: true,
+        attackerInstanceId,
+        attackerType,
+      },
     });
-    return { state: popResult.state, events, paused: false, damagedPlayerIndex: inactiveIdx, lethal: true };
+    return {
+      state: popResult.state,
+      events,
+      paused: false,
+      damagedPlayerIndex: inactiveIdx,
+      lethal: true,
+    };
   }
-  if (!popResult.lifeCard) return { state: popResult.state, events, paused: false };
+  if (!popResult.lifeCard)
+    return { state: popResult.state, events, paused: false };
 
   let nextState = popResult.state;
   const { lifeCard } = popResult;
@@ -753,13 +868,18 @@ function dealOneLeaderDamage(
   events.push(...popResult.events);
 
   if (isBanish) {
-    const moved = transitionDetachedCard(nextState, {
+    const moved = transitionDetachedCard(
+      nextState,
+      {
       instanceId: lifeCard.instanceId,
       cardId: lifeCard.cardId,
       owner: inactiveIdx,
       source: "LIFE",
       lifeFace: lifeCard.face,
-    }, "TRASH", { position: "TOP" });
+      },
+      "TRASH",
+      { position: "TOP" }
+    );
     if (!moved) return { state: nextState, events, paused: false };
     nextState = moved.state;
     events.push({
@@ -773,7 +893,15 @@ function dealOneLeaderDamage(
     return { state: nextState, events, paused: false };
   }
 
-  if (canOfferTrigger(nextState, lifeCard.cardId, cardDb, inactiveIdx, lifeCard.instanceId)) {
+  if (
+    canOfferTrigger(
+      nextState,
+      lifeCard.cardId,
+      cardDb,
+      inactiveIdx,
+      lifeCard.instanceId
+    )
+  ) {
     const curBattle = nextState.turn.battle!;
     const updatedBattle = { ...curBattle, pendingTriggerLifeCard: lifeCard };
     nextState = {
@@ -789,7 +917,11 @@ function dealOneLeaderDamage(
   }
 
   const handResult = moveLifeCardToHand(nextState, lifeCard, inactiveIdx);
-  return { state: handResult.state, events: [...events, ...handResult.events], paused: false };
+  return {
+    state: handResult.state,
+    events: [...events, ...handResult.events],
+    paused: false,
+  };
 }
 
 /**
@@ -803,7 +935,7 @@ function dealOneLeaderDamage(
  */
 function continueLeaderDamageSequence(
   state: GameState,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
   const events: PendingEvent[] = [];
   let nextState = state;
@@ -821,7 +953,8 @@ function continueLeaderDamageSequence(
     const attackerFound = findCardInState(nextState, battle.attackerInstanceId);
     const onField =
       !!attackerFound &&
-      (attackerFound.card.zone === "CHARACTER" || attackerFound.card.zone === "LEADER");
+      (attackerFound.card.zone === "CHARACTER" ||
+        attackerFound.card.zone === "LEADER");
     if (!onField) break;
 
     // Re-apply modifiers so between-damage power conditions are honored.
@@ -831,7 +964,13 @@ function continueLeaderDamageSequence(
     // OPT-253: [Banish] is suppressed while the attacker is effect-negated,
     // preserved if it came from an external GRANT_KEYWORD.
     const isBanish = attackerData
-      ? hasEffectiveKeyword(attackerFound!.card, attackerData, "BANISH", nextState, cardDb)
+      ? hasEffectiveKeyword(
+          attackerFound!.card,
+          attackerData,
+          "BANISH",
+          nextState,
+          cardDb
+        )
       : false;
     const attackerType: "LEADER" | "CHARACTER" =
       attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER";
@@ -841,11 +980,12 @@ function continueLeaderDamageSequence(
       cardDb,
       battle.attackerInstanceId,
       isBanish,
-      attackerType,
+      attackerType
     );
     nextState = one.state;
     events.push(...one.events);
-    if (one.damagedPlayerIndex !== undefined) damagedPlayerIndex = one.damagedPlayerIndex;
+    if (one.damagedPlayerIndex !== undefined)
+      damagedPlayerIndex = one.damagedPlayerIndex;
 
     if (one.paused) {
       // Pending Trigger: defender will send REVEAL_TRIGGER which re-enters
@@ -860,7 +1000,10 @@ function continueLeaderDamageSequence(
         ...nextState,
         turn: {
           ...nextState.turn,
-          battle: { ...curBattle, damagesRemaining: Math.max(0, remaining - 1) },
+          battle: {
+            ...curBattle,
+            damagesRemaining: Math.max(0, remaining - 1),
+          },
         },
       };
     }
@@ -879,7 +1022,7 @@ function continueLeaderDamageSequence(
  */
 export function resumeBattleDamageContinuation(
   state: GameState,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const pending = state.turn.pendingBattleDamageContinuation;
   if (!pending || state.pendingPrompt || state.effectStack.length > 0) {
@@ -905,12 +1048,14 @@ export function resumeBattleDamageContinuation(
     };
     return {
       state: removalState,
-      events: [{
+      events: [
+        {
         type: "CARD_REMOVED_FROM_LIFE",
         playerIndex: pending.damagedPlayerIndex,
         payload: { cardInstanceId: pending.lifeCardInstanceId },
         propagation: { eventLogEmitted: true },
-      }],
+        },
+      ],
     };
   }
 
@@ -926,7 +1071,7 @@ export function resumeBattleDamageContinuation(
  */
 export function recalculateBattlePowers(
   state: GameState,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): GameState {
   const battle = state.turn.battle;
   if (!battle) return state;
@@ -939,12 +1084,24 @@ export function recalculateBattlePowers(
   const defenderData = cardDb.get(defenderFound.card.cardId);
   if (!attackerData || !defenderData) return state;
 
-  const newAttackerPower = getEffectivePower(attackerFound.card, attackerData, state, cardDb);
+  const newAttackerPower = getEffectivePower(
+    attackerFound.card,
+    attackerData,
+    state,
+    cardDb
+  );
   const newDefenderPower = getBattleDefenderPower(
-    defenderFound.card, defenderData, battle.counterPowerAdded, state, cardDb,
+    defenderFound.card,
+    defenderData,
+    battle.counterPowerAdded,
+    state,
+    cardDb
   );
 
-  if (newAttackerPower === battle.attackerPower && newDefenderPower === battle.defenderPower) {
+  if (
+    newAttackerPower === battle.attackerPower &&
+    newDefenderPower === battle.defenderPower
+  ) {
     return state;
   }
 
@@ -952,7 +1109,11 @@ export function recalculateBattlePowers(
     ...state,
     turn: {
       ...state.turn,
-      battle: { ...battle, attackerPower: newAttackerPower, defenderPower: newDefenderPower },
+      battle: {
+        ...battle,
+        attackerPower: newAttackerPower,
+        defenderPower: newDefenderPower,
+      },
     },
   };
 }
@@ -968,16 +1129,18 @@ export function recalculateBattlePowers(
  */
 function isOnField(
   state: GameState,
-  instanceId: string,
+  instanceId: string
 ): { found: ReturnType<typeof findCardInState>; onField: boolean } {
   const found = findCardInState(state, instanceId);
-  const onField = !!found && (found.card.zone === "LEADER" || found.card.zone === "CHARACTER");
+  const onField =
+    !!found &&
+    (found.card.zone === "LEADER" || found.card.zone === "CHARACTER");
   return { found, onField };
 }
 
 function executeDamageStep(
   state: GameState,
-  cardDb: Map<string, CardData>,
+  cardDb: Map<string, CardData>
 ): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
@@ -989,7 +1152,9 @@ function executeDamageStep(
   const attackerCheck = isOnField(state, battleBeforeRecalc.attackerInstanceId);
   const targetCheck = isOnField(state, battleBeforeRecalc.targetInstanceId);
   if (!attackerCheck.onField || !targetCheck.onField) {
-    const reason = !attackerCheck.onField ? "ATTACKER_LEFT_FIELD" : "TARGET_LEFT_FIELD";
+    const reason = !attackerCheck.onField
+      ? "ATTACKER_LEFT_FIELD"
+      : "TARGET_LEFT_FIELD";
     events.push({
       type: "BATTLE_ABORTED",
       playerIndex: pi,
@@ -1033,18 +1198,33 @@ function executeDamageStep(
         // continueLeaderDamageSequence so the [Trigger] window can pause
         // between damages (§7-1-4-1-1-3, OPT-239).
         const attackerFound = findCardInState(state, battle.attackerInstanceId);
-        const attackerData = attackerFound ? cardDb.get(attackerFound.card.cardId) : undefined;
+        const attackerData = attackerFound
+          ? cardDb.get(attackerFound.card.cardId)
+          : undefined;
         // OPT-253: consult runtime keyword state so a negated attacker with
         // printed [Double Attack] locks in 1 damage, while a negated attacker
         // that was externally granted [Double Attack] still locks in 2.
-        const damageCount = attackerFound && attackerData
-          && hasEffectiveKeyword(attackerFound.card, attackerData, "DOUBLE_ATTACK", state, cardDb) ? 2 : 1;
+        const damageCount =
+          attackerFound &&
+          attackerData &&
+          hasEffectiveKeyword(
+            attackerFound.card,
+            attackerData,
+            "DOUBLE_ATTACK",
+            state,
+            cardDb
+          )
+            ? 2
+            : 1;
 
         nextState = {
           ...nextState,
           turn: {
             ...nextState.turn,
-            battle: { ...nextState.turn.battle!, damagesRemaining: damageCount },
+            battle: {
+              ...nextState.turn.battle!,
+              damagesRemaining: damageCount,
+            },
           },
         };
 
@@ -1057,7 +1237,14 @@ function executeDamageStep(
         };
       } else if (targetFound.card.zone === "CHARACTER") {
         // Emit COMBAT_VICTORY — attacker won against a character
-        events.push({ type: "COMBAT_VICTORY", playerIndex: pi, payload: { cardInstanceId: battle.attackerInstanceId, targetInstanceId } });
+        events.push({
+          type: "COMBAT_VICTORY",
+          playerIndex: pi,
+          payload: {
+            cardInstanceId: battle.attackerInstanceId,
+            targetInstanceId,
+          },
+        });
 
         // Check for replacement effects before KO
         const replacement = checkReplacementForKO(
@@ -1066,16 +1253,22 @@ function executeDamageStep(
           "battle",
           pi as 0 | 1,
           cardDb,
-          resolverExecutionServices,
+          resolverExecutionServices
         );
         if (replacement.pendingPrompt) {
           events.push(...replacement.events);
-          return { state: replacement.state, events, damagedPlayerIndex, pendingPrompt: replacement.pendingPrompt };
+          return {
+            state: replacement.state,
+            events,
+            damagedPlayerIndex,
+            pendingPrompt: replacement.pendingPrompt,
+          };
         }
         if (replacement.replaced) {
           nextState = replacement.state;
           events.push(...replacement.events);
-        } else if (isRemovalProhibited(
+        } else if (
+          isRemovalProhibited(
           nextState,
           targetInstanceId,
           {
@@ -1084,15 +1277,20 @@ function executeDamageStep(
             causingController: pi as 0 | 1,
             sourceCardInstanceId: battle.attackerInstanceId,
           },
-          cardDb,
-        )) {
+            cardDb
+          )
+        ) {
           // OPT-251: CANNOT_BE_KO (with cause BATTLE or ANY) prevents battle
           // K.O.'s like Luffy's "cannot be K.O.'d in battle by Strike Characters".
           // Combat Victory still fired; the character just doesn't leave the field.
         } else {
           // KO the character — use koCharacter() to preserve instanceId for ON_KO triggers
           const preKODonCount = targetFound.card.attachedDon.length;
-          const koResult = koCharacter(nextState, targetInstanceId, pi as 0 | 1);
+          const koResult = koCharacter(
+            nextState,
+            targetInstanceId,
+            pi as 0 | 1
+          );
           if (koResult) {
             nextState = koResult.state;
             for (const ev of koResult.events) {
@@ -1100,7 +1298,11 @@ function executeDamageStep(
                 events.push({
                   type: "CARD_KO",
                   playerIndex: ev.playerIndex,
-                  payload: { ...ev.payload, cause: "BATTLE", preKO_donCount: preKODonCount },
+                  payload: {
+                    ...ev.payload,
+                    cause: "BATTLE",
+                    preKO_donCount: preKODonCount,
+                  },
                 });
               } else {
                 events.push(ev);
@@ -1125,7 +1327,7 @@ function setCardState(
   state: GameState,
   playerIndex: 0 | 1,
   instanceId: string,
-  cardState: "ACTIVE" | "RESTED",
+  cardState: "ACTIVE" | "RESTED"
 ): GameState {
   const player = state.players[playerIndex];
   const update = (card: { instanceId: string; state: string }) =>
@@ -1135,7 +1337,9 @@ function setCardState(
   newPlayers[playerIndex] = {
     ...player,
     leader: update(player.leader) as typeof player.leader,
-    characters: player.characters.map((c) => c ? update(c) as typeof c : null),
+    characters: player.characters.map((c) =>
+      c ? (update(c) as typeof c) : null
+    ),
   };
   return { ...state, players: newPlayers };
 }
@@ -1155,23 +1359,21 @@ export function canOfferTrigger(
   cardId: string,
   cardDb: Map<string, CardData>,
   ownerIndex: 0 | 1,
-  sourceCardInstanceId?: string,
+  sourceCardInstanceId?: string
 ): boolean {
-  const cardData = cardDb.get(cardId);
-  if (!cardData || !hasTrigger(cardData)) return false;
-
-  const schema = cardData.effectSchema;
-  const block = schema?.effects?.find(
-    (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER",
+  return canOfferTriggerQuery(
+    state,
+    cardId,
+    cardDb,
+    ownerIndex,
+    sourceCardInstanceId
   );
-  if (!block?.costs?.length) return true;
-  return block.costs.every((c) => isCostPayable(state, c, ownerIndex, cardDb, sourceCardInstanceId));
 }
 
 function endBattle(
   state: GameState,
   events: PendingEvent[],
-  options: { aborted?: boolean } = {},
+  options: { aborted?: boolean } = {}
 ): GameState {
   // Expire battle-scoped effects before clearing battle state
   const battleId = state.turn.battle?.battleId;
@@ -1210,7 +1412,7 @@ function endBattle(
     state = stamped.state;
     const attackerIndex = state.turn.activePlayerIndex;
     const targetIsLeader = state.players.some(
-      (pl) => pl.leader.instanceId === battle.targetInstanceId,
+      (pl) => pl.leader.instanceId === battle.targetInstanceId
     );
     state = {
       ...state,
@@ -1231,7 +1433,10 @@ function endBattle(
     };
   }
 
-  events.push({ type: "BATTLE_RESOLVED", playerIndex: state.turn.activePlayerIndex });
+  events.push({
+    type: "BATTLE_RESOLVED",
+    playerIndex: state.turn.activePlayerIndex,
+  });
   events.push({
     type: "PHASE_CHANGED",
     playerIndex: state.turn.activePlayerIndex,

@@ -5,8 +5,13 @@
 import type { ActionOf, EffectResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
-import { continueEffectDamageSequence } from "../../battle.js";
+import {
+  computeAllValidTargets,
+  autoSelectTargets,
+  needsPlayerTargetSelection,
+  buildSelectTargetPrompt,
+} from "../target-resolver.js";
+import { continueEffectDamageSequence } from "../../effect-damage.js";
 import { transitionCard } from "../../zone-transition.js";
 import { resolveAmount } from "../action-utils.js";
 
@@ -19,16 +24,36 @@ export function executeRedirectAttack(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets?: string[]
 ): ActionResult {
   const events: PendingEvent[] = [];
 
   // Only valid during an active battle
   if (!state.turn.battle) return { state, events, succeeded: false };
 
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  const allValidIds =
+    preselectedTargets ??
+    computeAllValidTargets(
+      state,
+      action.target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs
+    );
+  if (
+    !preselectedTargets &&
+    needsPlayerTargetSelection(action.target, allValidIds)
+  ) {
+    return buildSelectTargetPrompt(
+      state,
+      action,
+      allValidIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
@@ -37,7 +62,11 @@ export function executeRedirectAttack(
   const newBattle = { ...state.turn.battle, targetInstanceId: newTarget };
   const newTurn = { ...state.turn, battle: newBattle };
 
-  events.push({ type: "ATTACK_REDIRECTED", playerIndex: controller, payload: { newTargetInstanceId: newTarget } });
+  events.push({
+    type: "ATTACK_REDIRECTED",
+    playerIndex: controller,
+    payload: { newTargetInstanceId: newTarget },
+  });
 
   return {
     state: { ...state, turn: newTurn },
@@ -70,7 +99,7 @@ export function executeDealDamage(
     resultRefs,
     state,
     controller,
-    cardDb,
+    cardDb
   );
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
   const startingLife = state.players[opp].life.length;
@@ -81,10 +110,13 @@ export function executeDealDamage(
     opp,
     amount,
     sourceCardInstanceId,
-    controller,
+    controller
   );
 
-  const dealtSoFar = Math.max(0, startingLife - cont.state.players[opp].life.length);
+  const dealtSoFar = Math.max(
+    0,
+    startingLife - cont.state.players[opp].life.length
+  );
 
   return {
     state: cont.state,
@@ -111,7 +143,7 @@ export function executeSelfTakeDamage(
     resultRefs,
     state,
     controller,
-    cardDb,
+    cardDb
   );
 
   let nextState = state;
@@ -136,5 +168,10 @@ export function executeSelfTakeDamage(
     });
   }
 
-  return { state: nextState, events, succeeded: dealt > 0, result: { targetInstanceIds: [], count: dealt } };
+  return {
+    state: nextState,
+    events,
+    succeeded: dealt > 0,
+    result: { targetInstanceIds: [], count: dealt },
+  };
 }
