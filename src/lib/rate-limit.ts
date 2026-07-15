@@ -115,5 +115,5 @@ export const socialLimiter = createLimiter("social", 60_000, 30);
 /** Search / read-heavy endpoints — 60 requests per minute. */
 export const searchLimiter = createLimiter("search", 60_000, 60);
 
-/** General mutating endpoints (POST/PUT/DELETE) — 30 requests per minute. */
+/** General mutating endpoints (POST/PUT/PATCH/DELETE) — 30 requests per minute. */
 export const apiLimiter = createLimiter("api", 60_000, 30);
