@@ -9,6 +9,12 @@
  */
 
 import type { RawVegapullCard, PackMap } from "./load";
+import {
+  cardIdToOriginSet,
+  decodeHtmlEntities,
+  detectVariantType,
+  stripVariantSuffix,
+} from "@shared/card-parsing";
 
 export interface TransformedCard {
   /** Full vegapull ID including suffix (e.g. "OP01-001_p1") */
@@ -51,20 +57,6 @@ export interface TransformedCard {
   blockNumber: number;
 }
 
-// ─── HTML entity decoding ───────────────────────────────────
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, "/")
-    .replace(/&apos;/g, "'");
-}
-
 // ─── Effect text sanitization ───────────────────────────────
 
 // The five card attributes are rendered as bracketed tokens in effect text,
@@ -96,32 +88,6 @@ export function sanitizeEffectText(text: string, warnContext?: string): string {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-// ─── Card ID parsing ────────────────────────────────────────
-
-function stripVariantSuffix(vegapullId: string): string {
-  return vegapullId.replace(/_[pr]\d+$/, "");
-}
-
-function detectVariantType(
-  vegapullId: string
-): "base" | "parallel" | "reprint" {
-  if (/_p\d+$/.test(vegapullId)) return "parallel";
-  if (/_r\d+$/.test(vegapullId)) return "reprint";
-  return "base";
-}
-
-/**
- * Derive origin set from card ID prefix.
- * e.g. "OP01-001" → "OP-01", "ST01-001" → "ST-01", "EB01-015" → "EB-01"
- * Special cases: "P-001" → "P", "DON-001" → "DON"
- */
-function cardIdToOriginSet(cardId: string): string {
-  const match = cardId.match(/^([A-Z]+)(\d+)-/);
-  if (!match) return "UNKNOWN";
-  const [, prefix, num] = match;
-  return `${prefix}-${num}`;
 }
 
 // ─── Category → CardType mapping ────────────────────────────

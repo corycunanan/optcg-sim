@@ -5,30 +5,18 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+export {
+  cardIdToOriginSet,
+  decodeHtmlEntities,
+  detectVariantType,
+  stripVariantSuffix,
+} from "@shared/card-parsing";
+
 /**
  * Merge Tailwind CSS classes with conflict resolution.
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-/**
- * Parse a card ID prefix into an origin set label.
- * e.g. "OP01-001" → "OP-01", "ST01-001" → "ST-01", "EB01-001" → "EB-01"
- */
-export function cardIdToOriginSet(cardId: string): string {
-  const match = cardId.match(/^([A-Z]+)(\d+)-/);
-  if (!match) return "UNKNOWN";
-  const [, prefix, num] = match;
-  return `${prefix}-${num}`;
-}
-
-/**
- * Strip the variant suffix from a vegapull card ID.
- * e.g. "OP01-001_p1" → "OP01-001", "OP01-001_r1" → "OP01-001", "OP01-001" → "OP01-001"
- */
-export function stripVariantSuffix(vegapullId: string): string {
-  return vegapullId.replace(/_[pr]\d+$/, "");
 }
 
 /**
