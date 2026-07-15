@@ -152,3 +152,10 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 3. **Tight system, loose expression** — Every spacing, type, and color decision traces back to a token. Within that system, layouts can be expressive.
 4. **Motion earns its place** — Transitions communicate state. One clear animation per interaction, not stacked effects.
 5. **Progressive clarity** — Simple at rest, detailed on interaction. Dense information (stats, filters) is scannable through hierarchy, not visual noise.
+
+## Standing policy for implementation agents
+
+- Unrelated open PRs never block ticket work; proceed without asking.
+- Implementation agents never merge PRs and never write to Linear.
+- Record deferred or out-of-scope findings in the PR body's **Follow-ups** section.
+- Record validation baselines and results in every PR body.

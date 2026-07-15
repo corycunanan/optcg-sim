@@ -58,6 +58,8 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 - [Planning & Risk Assessment](./project/PLANNING.md) — unknowns, timeline estimates, prioritization
 - [Workflows & Tooling Guide](./project/WORKFLOWS.md) — GSD best practices, multi-agent usage, tool selection, documentation practices
+- [Orchestration Charter](./project/ORCHESTRATION-CHARTER.md) — standing roles, policies, safety gates, and project kickoff decisions for agent-run delivery
+- [Tech Debt Project Retro](./project/tech-debt-retro.md) — outcomes, lessons, and follow-ups from the 2026-07-15 tech-debt close-out
 - [Learnings](./project/LEARNINGS.md) — running log of decisions and discoveries
 
 ## Reference
