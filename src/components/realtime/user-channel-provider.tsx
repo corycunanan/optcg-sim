@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useUserChannel } from "@/hooks/use-user-channel";
-import type { ConnectionStatus } from "@/hooks/use-authed-websocket";
+import type { ConnectionStatus } from "@/types/realtime";
 import type { EventDispatcher } from "@/lib/realtime/event-dispatcher";
 import { apiGet } from "@/lib/api-client";
 import type { RealtimeClientEvent } from "@/types/realtime";

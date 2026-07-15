@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameAction, GameState } from "@shared/game-types";
-import type { ConnectionStatus } from "@/hooks/use-game-ws";
+import type { ConnectionStatus } from "@/types/realtime";
 
 const mocks = vi.hoisted(() => ({
   wsReturns: [] as Array<{

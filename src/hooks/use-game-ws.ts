@@ -7,12 +7,8 @@ import type {
   PromptOptions,
   ServerMessage,
 } from "@shared/game-types";
-import {
-  useAuthedWebSocket,
-  type ConnectionStatus,
-} from "@/hooks/use-authed-websocket";
-
-export type { ConnectionStatus };
+import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
+import type { ConnectionStatus } from "@/types/realtime";
 
 export interface ActionRejection {
   action: GameAction;
