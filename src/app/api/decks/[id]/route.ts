@@ -162,6 +162,18 @@ export async function PATCH(
   }
 }
 
+/**
+ * Deprecated 2026-07-15: PUT accepted for pre-deploy clients; remove after
+ * next release.
+ */
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  console.warn("[decks:update] PUT is deprecated; use PATCH");
+  return PATCH(request, context);
+}
+
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

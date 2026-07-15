@@ -28,11 +28,11 @@ vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
 }));
 
-const { PATCH } = await import("./route");
+const { PATCH, PUT } = await import("./route");
 
-function buildRequest(body: unknown) {
+function buildRequest(body: unknown, method = "PATCH") {
   return new NextRequest("http://localhost/api/decks/deck-1", {
-    method: "PATCH",
+    method,
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -126,5 +126,21 @@ describe("PATCH /api/decks/[id]", () => {
         name: "New name",
       }),
     });
+  });
+
+  it("temporarily accepts PUT from pre-deploy clients via PATCH delegation", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await PUT(buildRequest({ name: "New name" }, "PUT"), params);
+
+    expect(res.status).toBe(200);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[decks:update] PUT is deprecated; use PATCH"
+    );
+    expect(deckUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: "New name" } })
+    );
+
+    warnSpy.mockRestore();
   });
 });
