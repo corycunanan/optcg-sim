@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MIN_SUBSTRING_SEARCH_LENGTH } from "@/lib/search-query";
 
 const CardTypeEnum = z.enum(["Leader", "Character", "Event", "Stage"]);
 const BanStatusEnum = z.enum(["LEGAL", "BANNED", "RESTRICTED"]);
@@ -6,7 +7,15 @@ const BanStatusEnum = z.enum(["LEGAL", "BANNED", "RESTRICTED"]);
 // ─── Query param validation (GET /api/cards) ────────────────
 
 export const CardSearchParamsSchema = z.object({
-  q: z.string().optional(),
+  q: z
+    .string()
+    .trim()
+    .refine(
+      (query) =>
+        query.length === 0 || query.length >= MIN_SUBSTRING_SEARCH_LENGTH,
+      `Search query must be at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`,
+    )
+    .optional(),
   color: z.string().optional(),
   type: z.string().optional(),
   costMin: z.string().optional(),

@@ -10,6 +10,7 @@ import { cardIdToOriginSet } from "@/lib/utils";
 import { CreateCardSchema, CardSearchParamsSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { searchLimiter, apiLimiter } from "@/lib/rate-limit";
+import { isSubstringSearchQueryTooShort } from "@/lib/search-query";
 import {
   buildCardWhereClause,
   buildCardOrderBy,
@@ -21,6 +22,12 @@ export async function GET(request: NextRequest) {
   const { limited } = await searchLimiter.check(`card-search:${ip}`);
   if (limited) {
     return apiError("Too many requests. Try again later.", 429);
+  }
+
+  if (isSubstringSearchQueryTooShort(request.nextUrl.searchParams.get("q"))) {
+    return apiError("Search query must be at least 3 characters", 400, {
+      code: "SEARCH_QUERY_TOO_SHORT",
+    });
   }
 
   const parsed = CardSearchParamsSchema.safeParse(
