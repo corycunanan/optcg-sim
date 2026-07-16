@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
 import { computeEffectAvailability } from "../engine/availability.js";
-import type { EffectSchema } from "../engine/effect-types.js";
+import type {
+  EffectSchema,
+  RuntimeActiveEffect,
+} from "../engine/effect-types.js";
+import { EB02_047_BLUENO } from "../engine/schemas/eb02.js";
+import { EB03_014_KUINA } from "../engine/schemas/eb03.js";
 import { ST27_004_SANJUAN_WOLF } from "../engine/schemas/st27.js";
 import type { CardData, Env, GameState } from "../types.js";
 import {
@@ -127,6 +132,45 @@ describe("computeEffectAvailability", () => {
     ]);
   });
 
+  it("blocks a permanent effect while its source card is effect-negated", () => {
+    const cardDb = createTestCardDb();
+    setSchema(cardDb, CARDS.VANILLA.id, ST27_004_SANJUAN_WOLF);
+    const state = createBattleReadyState(cardDb);
+    const sourceId = state.players[0].characters[0]!.instanceId;
+    const leaderData = cardDb.get(CARDS.LEADER.id)!;
+    cardDb.set(CARDS.LEADER.id, {
+      ...leaderData,
+      types: ["Blackbeard Pirates"],
+    });
+    const negation = {
+      id: `negate-${sourceId}`,
+      sourceCardInstanceId: "negator",
+      sourceEffectBlockId: "negate",
+      category: "auto",
+      modifiers: [
+        {
+          type: "NEGATE_EFFECTS_FLAG",
+          params: {},
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+      duration: { type: "THIS_TURN" },
+      expiresAt: { wave: "END_OF_TURN", turn: state.turn.number },
+      controller: 1,
+      appliesTo: [sourceId],
+      timestamp: 0,
+    } as RuntimeActiveEffect;
+    const negated = { ...state, activeEffects: [negation] };
+
+    expect(computeEffectAvailability(negated, cardDb)[sourceId]).toEqual([
+      {
+        effectId: "conditional_blocker_cost",
+        status: "blocked",
+        reason: "CONDITION",
+      },
+    ]);
+  });
+
   it("omits cards with no effect schema", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
@@ -137,30 +181,21 @@ describe("computeEffectAvailability", () => {
     );
   });
 
-  it("reports NO_TARGET when every action target has no candidates", () => {
+  it("does not pre-cost block Blueno when trashing from hand can create its target", () => {
     const { state, cardDb, sourceId } = activateMainFixture();
-    setSchema(cardDb, CARDS.VANILLA.id, {
-      effects: [
-        {
-          id: "targetless_effect",
-          category: "activate",
-          trigger: { keyword: "ACTIVATE_MAIN" },
-          actions: [
-            {
-              type: "KO",
-              target: {
-                type: "CHARACTER",
-                controller: "OPPONENT",
-                filter: { name: "Missing target" },
-              },
-            },
-          ],
-        },
-      ],
-    });
+    setSchema(cardDb, CARDS.VANILLA.id, EB02_047_BLUENO);
 
     expect(computeEffectAvailability(state, cardDb)[sourceId]).toEqual([
-      { effectId: "targetless_effect", status: "blocked", reason: "NO_TARGET" },
+      { effectId: "activate_play_from_trash", status: "usable" },
+    ]);
+  });
+
+  it("keeps NO_TARGET for Kuina's rest cost when the Leader is not Slash", () => {
+    const { state, cardDb, sourceId } = activateMainFixture();
+    setSchema(cardDb, CARDS.VANILLA.id, EB03_014_KUINA);
+
+    expect(computeEffectAvailability(state, cardDb)[sourceId]).toEqual([
+      { effectId: "activate_give_don", status: "blocked", reason: "NO_TARGET" },
     ]);
   });
 });
@@ -223,7 +258,7 @@ type GameSessionTestAccess = {
 };
 
 describe("GameSession availability broadcast", () => {
-  it("attaches the same computed availability to both filtered payloads", () => {
+  it("only sends each player availability for cards they control", () => {
     const durableState = new MockDurableObjectState();
     const session = new GameSession(
       durableState as unknown as DurableObjectState,
@@ -233,6 +268,7 @@ describe("GameSession availability broadcast", () => {
       } as Env
     ) as unknown as GameSessionTestAccess;
     const { state, cardDb, sourceId } = activateMainFixture();
+    const opponentSourceId = state.players[1].characters[0]!.instanceId;
     session.gameState = state;
     session.cardDb = cardDb;
 
@@ -254,8 +290,12 @@ describe("GameSession availability broadcast", () => {
     expect(payload0.state.effectAvailability?.[sourceId]).toEqual([
       { effectId: "rest_self_effect", status: "usable" },
     ]);
-    expect(payload1.state.effectAvailability).toEqual(
-      payload0.state.effectAvailability
+    expect(payload0.state.effectAvailability).not.toHaveProperty(
+      opponentSourceId
     );
+    expect(payload1.state.effectAvailability?.[opponentSourceId]).toEqual([
+      { effectId: "rest_self_effect", status: "blocked", reason: "PHASE" },
+    ]);
+    expect(payload1.state.effectAvailability).not.toHaveProperty(sourceId);
   });
 });

@@ -2,12 +2,14 @@ import type { EffectAvailability } from "../../../../shared/game-types.js";
 import type { CardData, CardInstance, GameState } from "../types.js";
 import { evaluateCondition } from "./conditions.js";
 import {
+  type Cost,
   isOncePerTurnBlock,
   type EffectBlock,
   type EffectResult,
   type Target,
 } from "./effect-types.js";
 import { computeAllValidTargets } from "./effect-resolver/target-resolver.js";
+import { isCardNegated } from "./modifiers.js";
 import {
   areEffectCostsPayable,
   getActivateEffectTimingError,
@@ -36,6 +38,35 @@ function isActivateMain(block: EffectBlock): boolean {
   );
 }
 
+function costMayChangeZones(cost: Cost): boolean {
+  switch (cost.type) {
+    case "CHOICE":
+      return (
+        cost.options.length === 0 ||
+        cost.options.some((branch) =>
+          branch.some((option) => costMayChangeZones(option))
+        )
+      );
+    case "CHOOSE_ONE_COST":
+      return (
+        !cost.options?.length ||
+        cost.options.some((option) => costMayChangeZones(option))
+      );
+    case "DON_REST":
+    case "REST_SELF":
+    case "REST_CARDS":
+    case "REST_NAMED_CARD":
+    case "LEADER_POWER_REDUCTION":
+    case "REST_DON":
+    case "TURN_LIFE_FACE_UP":
+    case "TURN_LIFE_FACE_DOWN":
+      return false;
+    default:
+      // Fail closed for every movement-like cost and any future Cost variant.
+      return true;
+  }
+}
+
 function lacksAllActionTargets(
   state: GameState,
   block: EffectBlock,
@@ -45,6 +76,10 @@ function lacksAllActionTargets(
 ): boolean {
   const actions = block.actions;
   if (!actions?.length) return false;
+
+  // Costs resolve before actions and can create an otherwise-empty target
+  // population. Predicting from the pre-cost state would be a false negative.
+  if (block.costs?.some((cost) => costMayChangeZones(cost))) return false;
 
   // Targets fed by earlier action results or trigger context cannot be known
   // until live resolution. Skip the enhancement for the whole block.
@@ -87,6 +122,9 @@ function availabilityForBlock(
   };
 
   if (block.category === "permanent") {
+    if (isCardNegated(card, state, cardDb)) {
+      return { effectId: block.id, status: "blocked", reason: "CONDITION" };
+    }
     const conditionMet =
       block.conditions === undefined ||
       evaluateCondition(state, block.conditions, conditionContext);
@@ -158,4 +196,23 @@ export function computeEffectAvailability(
   }
 
   return availability;
+}
+
+/** Restrict derived availability to the cards controlled by one recipient. */
+export function effectAvailabilityForController(
+  state: GameState,
+  availability: Record<string, EffectAvailability[]>,
+  controller: 0 | 1
+): Record<string, EffectAvailability[]> {
+  const controlledInstanceIds = new Set(
+    relevantCards(state)
+      .filter((card) => card.controller === controller)
+      .map((card) => card.instanceId)
+  );
+
+  return Object.fromEntries(
+    Object.entries(availability).filter(([instanceId]) =>
+      controlledInstanceIds.has(instanceId)
+    )
+  );
 }
