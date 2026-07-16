@@ -84,12 +84,6 @@ export async function writeToDatabase(
     }
   }
 
-  // ─── Clear existing art variants and card sets, then re-create ─
-
-  // Delete existing card sets for a clean import (variants use upsert to preserve CDN imageUrls)
-  console.log(`  Clearing existing card sets...`);
-  await prisma.cardSet.deleteMany({});
-
   // ─── Upsert art variants in batches ───────────────────────
 
   console.log(`  Upserting ${artVariants.length} art variants...`);
@@ -129,28 +123,28 @@ export async function writeToDatabase(
 
   // ─── Create card set entries in batches ───────────────────
 
-  console.log(`  Creating ${cardSets.length} card-set entries...`);
+  console.log(`  Replacing ${cardSets.length} card-set entries atomically...`);
+  const cardSetCreates = [];
   for (let i = 0; i < cardSets.length; i += BATCH_SIZE) {
     const batch = cardSets.slice(i, i + BATCH_SIZE);
 
-    await prisma.cardSet.createMany({
-      data: batch.map((cs) => ({
-        cardId: cs.cardId,
-        packId: cs.packId,
-        setLabel: cs.setLabel,
-        setName: cs.setName,
-        isOrigin: cs.isOrigin,
-      })),
-      skipDuplicates: true,
-    });
-
-    cardSetsCreated += batch.length;
-    if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= cardSets.length) {
-      console.log(
-        `    Card sets: ${Math.min(i + BATCH_SIZE, cardSets.length)}/${cardSets.length}`
-      );
-    }
+    cardSetCreates.push(
+      prisma.cardSet.createMany({
+        data: batch.map((cs) => ({
+          cardId: cs.cardId,
+          packId: cs.packId,
+          setLabel: cs.setLabel,
+          setName: cs.setName,
+          isOrigin: cs.isOrigin,
+        })),
+        skipDuplicates: true,
+      })
+    );
   }
+
+  await prisma.$transaction([prisma.cardSet.deleteMany({}), ...cardSetCreates]);
+  cardSetsCreated = cardSets.length;
+  console.log(`    Card sets: ${cardSetsCreated}/${cardSets.length}`);
 
   return { cardsUpserted, variantsCreated, cardSetsCreated };
 }

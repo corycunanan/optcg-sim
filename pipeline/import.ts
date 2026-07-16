@@ -17,6 +17,7 @@ import { buildSetMembership } from "./build-set-membership";
 import { writeToDatabase } from "./write";
 import { verify } from "./verify";
 import { syncEffectSchemas } from "./sync-effect-schemas";
+import { selectPipelineDatabaseUrl } from "./database-url";
 
 const DEFAULT_DATA_DIR = "data/vegapull-full/json";
 
@@ -26,6 +27,7 @@ async function main() {
   const dataDirIdx = args.indexOf("--data-dir");
   const dataDir =
     dataDirIdx !== -1 ? args[dataDirIdx + 1] : DEFAULT_DATA_DIR;
+  const databaseConfig = dryRun ? null : selectPipelineDatabaseUrl();
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║   OPTCG Data Import Pipeline             ║");
@@ -33,6 +35,9 @@ async function main() {
   console.log();
   console.log(`  Data directory: ${dataDir}`);
   console.log(`  Dry run:        ${dryRun}`);
+  if (databaseConfig) {
+    console.log(`  Database URL:   ${databaseConfig.source}`);
+  }
   console.log();
 
   // Step 1: Load vegapull JSON
@@ -72,7 +77,12 @@ async function main() {
 
   // Step 5: Write to database
   console.log("━━━ Step 5: Writing to database ━━━");
-  const prisma = new PrismaClient();
+  if (!databaseConfig) {
+    throw new Error("Database configuration is unavailable for import.");
+  }
+  const prisma = new PrismaClient({
+    datasources: { db: { url: databaseConfig.url } },
+  });
   try {
     const writeResult = await writeToDatabase(
       prisma,

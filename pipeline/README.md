@@ -56,11 +56,15 @@ pnpm pipeline:migrate-images [--dry-run] [--concurrency <n>] [--limit <n>]
 
 ## Environment Variables
 
-**Required for import:**
+**Database connection for import (`DIRECT_DATABASE_URL` preferred):**
 ```
-DATABASE_URL=postgresql://user:password@host:5432/optcg_sim?schema=public
 DIRECT_DATABASE_URL=postgresql://user:password@host:5432/optcg_sim?schema=public
+DATABASE_URL=postgresql://user:password@host:5432/optcg_sim?schema=public
 ```
+
+The import uses `DIRECT_DATABASE_URL` when it is set and otherwise falls back to
+`DATABASE_URL`. A fallback URL with `connection_limit=1` is rejected before the import
+starts because the parallel art-variant upserts require more than one connection.
 
 Pipeline scripts run against whatever DB `.env` points at — after the OPT-278 split, that's
 the dev Neon branch by default. To promote card data to prod, see the "Promoting card data
@@ -134,7 +138,7 @@ Creates CardSet entries linking each card to every pack it appears in. `isOrigin
 Batch upserts in groups of 100 (transactional):
 - **Cards**: Upsert on `Card.id`. Updates all fields except `imageUrl` (preserves CDN URLs set by image migration)
 - **Art Variants**: Upsert on `ArtVariant.variantId`. Same imageUrl preservation
-- **Card Sets**: Delete all → recreate (clean slate each run)
+- **Card Sets**: Atomically delete all → recreate after card and art-variant upserts succeed
 
 ### Step 6: Verify (`verify.ts`)
 
