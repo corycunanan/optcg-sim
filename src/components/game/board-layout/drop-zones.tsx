@@ -16,6 +16,8 @@ import { cardReject, cardRejectReduced } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
 import { getActivateMainState } from "@/lib/game/activate-main";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
+import { useEffectAvailability } from "@/contexts/effect-availability-context";
+import { resolveCardHighlightRingColor } from "../card/overlays/card-highlight-ring";
 
 /** Colored overlay that sits behind the card in a zone during drag. */
 export function DropOverlay({
@@ -179,6 +181,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const inputSuppressed = interactionMode !== "full";
   const reducedMotion = useReducedMotion();
   const rejectionSequence = useCardRejection(card?.instanceId ?? "");
+  const { hasUsableEffect } = useEffectAvailability();
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
   const activation = card
     ? getActivateMainState(card, cardDb, oncePerTurnUsed)
@@ -239,6 +242,14 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   );
   const cardName = card ? cardDb[card.cardId]?.name ?? card.cardId : "Stage";
   const disabledReason = targetSelection?.disabledReason ?? null;
+  const highlightRing = resolveCardHighlightRingColor(
+    targetSelection?.selected
+      ? "selected"
+      : targetSelection?.eligible
+        ? "eligible"
+        : undefined,
+    card ? hasUsableEffect(card.instanceId) : false,
+  );
 
   return (
     <div
@@ -303,11 +314,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
                 state={card.state === "RESTED" ? "rest" : "active"}
                 overlays={{
                   effectAction,
-                  highlightRing: targetSelection?.selected
-                    ? "selected"
-                    : targetSelection?.eligible
-                      ? "eligible"
-                      : undefined,
+                  highlightRing,
                 }}
                 interaction={{
                   tooltipNotice: targetSelection?.disabledReason ?? undefined,

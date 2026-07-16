@@ -20,18 +20,26 @@ import type { HighlightRingColor } from "../types";
  *              linked; kept as a separate color so future divergence
  *              doesn't require retrofitting consumers)
  *   counter  → amber flash (OPT-273 counter pulse, one-shot fade)
+ *   usable-effect → gold static (ambient server-computed effect availability)
  *   invalid  → no ring (opacity dim lives in the state preset instead)
  */
+export function resolveCardHighlightRingColor(
+  activeRing: HighlightRingColor | undefined,
+  hasUsableEffect: boolean,
+): HighlightRingColor | undefined {
+  return activeRing ?? (hasUsableEffect ? "usable-effect" : undefined);
+}
+
 export function CardHighlightRing({
   color,
   className,
 }: {
-  color: HighlightRingColor;
+  color?: HighlightRingColor;
   className?: string;
 }) {
   const reducedMotion = useReducedMotion();
 
-  if (color === "invalid") return null;
+  if (!color || color === "invalid") return null;
 
   if (color === "attacker" || color === "defender") {
     return (
@@ -84,7 +92,9 @@ export function CardHighlightRing({
   const staticRingClass =
     color === "selected"
       ? "ring-4 ring-gb-signal-selected shadow-[0_0_10px_var(--gb-signal-selected)]"
-      : "ring-4 ring-gb-signal-eligible/60";
+      : color === "usable-effect"
+        ? "ring-4 ring-gold-500"
+        : "ring-4 ring-gb-signal-eligible/60";
 
   return (
     <div
