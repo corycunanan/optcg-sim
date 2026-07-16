@@ -36,7 +36,9 @@ Confirm the resolved scope (issue list + proposed ordering/waves) with the user 
 
 ## 2. Per-issue pipeline
 
-For each issue, in wave order (one issue per dependency track in parallel; wide-surface sweeps run alone, last):
+For each issue, in wave order (one issue per dependency track in parallel; wide-surface sweeps run alone, last).
+
+**Queue discipline:** when a wave dispatches, every ratified-scope issue that is NOT part of the in-flight wave moves to Todo (queued for this run) — only actively dispatched issues sit In Progress. Apply at first dispatch (all later-wave issues → Todo) and re-assert at every wave boundary.
 
 1. Linear → In Progress.
 2. Fresh standalone clone: `git clone <local-repo> /private/tmp/optcg-opt<NNN>`, origin → GitHub URL, branch = the issue's `gitBranchName` from `origin/main`. Never git worktrees.
