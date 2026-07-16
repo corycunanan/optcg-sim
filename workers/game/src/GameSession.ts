@@ -35,6 +35,10 @@ import {
 import { createResultCallbackFetch } from "./session/result-callback.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
 import {
+  computeEffectAvailability,
+  effectAvailabilityForController,
+} from "./engine/availability.js";
+import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
   INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON,
   MAX_CLIENT_MESSAGE_BYTES,
@@ -839,10 +843,24 @@ export class GameSession implements DurableObject {
     exclude?: WebSocket
   ): void {
     if (!this.gameState || !this.cardDb) return;
+    const state = this.gameState;
+    const cardDb = this.cardDb;
+    const availability = computeEffectAvailability(state, cardDb);
     this.transport.broadcastFilteredState(
-      this.gameState,
-      this.cardDb,
-      build,
+      state,
+      cardDb,
+      (filteredState, recipientPlayerIndex) =>
+        build(
+          {
+            ...filteredState,
+            effectAvailability: effectAvailabilityForController(
+              state,
+              availability,
+              recipientPlayerIndex
+            ),
+          },
+          recipientPlayerIndex
+        ),
       exclude
     );
   }

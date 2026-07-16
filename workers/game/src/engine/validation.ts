@@ -11,6 +11,7 @@ import { getEffectiveCost, hasGrantedKeyword, hasRemovedKeyword, isCardNegated }
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
+import type { Cost } from "./effect-types.js";
 
 export function validate(
   state: GameState,
@@ -308,14 +309,32 @@ function validatePass(state: GameState): string | null {
   return null;
 }
 
+export function getActivateEffectTimingError(state: GameState): string | null {
+  if (state.turn.phase !== "MAIN") return "Effects can only be activated during Main Phase";
+  if (state.turn.battleSubPhase !== null) return "[Activate: Main] cannot be used during battle";
+  return null;
+}
+
+export function areEffectCostsPayable(
+  state: GameState,
+  costs: readonly Cost[],
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+): boolean {
+  return costs.every((cost) =>
+    isCostPayable(state, cost, controller, cardDb, sourceCardInstanceId),
+  );
+}
+
 function validateActivateEffect(
   state: GameState,
   cardInstanceId: string,
   effectId: string,
   cardDb: Map<string, CardData>,
 ): string | null {
-  if (state.turn.phase !== "MAIN") return "Effects can only be activated during Main Phase";
-  if (state.turn.battleSubPhase !== null) return "[Activate: Main] cannot be used during battle";
+  const timingError = getActivateEffectTimingError(state);
+  if (timingError) return timingError;
 
   const found = findCardInState(state, cardInstanceId);
   if (!found) return null; // executeActivateEffect will no-op; keep behavior parity
@@ -326,10 +345,8 @@ function validateActivateEffect(
   if (!block || block.category !== "activate" || !block.costs?.length) return null;
 
   const controller = found.playerIndex;
-  for (const cost of block.costs) {
-    if (!isCostPayable(state, cost, controller, cardDb, cardInstanceId)) {
-      return "Cost cannot be paid";
-    }
+  if (!areEffectCostsPayable(state, block.costs, controller, cardDb, cardInstanceId)) {
+    return "Cost cannot be paid";
   }
   return null;
 }
