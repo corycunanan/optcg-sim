@@ -422,7 +422,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                             {req.fromUser?.username || req.fromUser?.name}
                           </span>
                         </SidebarMenuButton>
-                        <div className="absolute top-1.5 right-1 flex gap-1">
+                        <div className="absolute top-1 right-1 flex gap-1">
                           <Button
                             variant="ghost"
                             size="icon-sm"

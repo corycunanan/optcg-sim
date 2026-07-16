@@ -308,7 +308,7 @@ export function ChatWidget({
     <div
       className={cn(
         "border-border fixed bottom-0 z-40 flex w-80 flex-col rounded-t-lg border border-b-0 shadow-xl",
-        sidebarCollapsed ? "right-10" : "right-64"
+        sidebarCollapsed ? "right-10" : "right-16"
       )}
     >
       {/* Header */}

@@ -153,11 +153,11 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
         <DialogBody className="space-y-3">
           <p className="text-content-tertiary text-xs">
             Paste your deck list below. Supports{" "}
-            <code className="bg-surface-3 rounded px-1 py-1">
+            <code className="bg-surface-3 rounded px-1">
               4x OP01-004
             </code>{" "}
             or{" "}
-            <code className="bg-surface-3 rounded px-1 py-1">
+            <code className="bg-surface-3 rounded px-1">
               4 Card Name (OP01-004)
             </code>{" "}
             formats, with optional section headers.

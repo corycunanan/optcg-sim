@@ -23,7 +23,7 @@ function CardGridItem({
     <button
       type="button"
       onClick={() => onCardClick(card.id)}
-      className="group relative overflow-hidden rounded-lg bg-surface-1 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="group relative overflow-hidden rounded-lg bg-surface-1 text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
     >
       {/* Card image */}
       <div className="relative aspect-card w-full overflow-hidden">

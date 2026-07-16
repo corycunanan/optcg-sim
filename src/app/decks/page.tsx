@@ -93,7 +93,7 @@ export default async function DecksPage() {
               <Link
                 key={deck.id}
                 href={`/decks/${deck.id}`}
-                className="group relative overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md"
+                className="group relative overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-md"
               >
                 {leader && (
                   <div className="relative h-36 overflow-hidden">

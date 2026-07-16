@@ -1,3 +1,15 @@
+/**
+ * Mechanical checks for design-system rules that are safe to enforce with
+ * source-text matching. Spacing covers box rhythm plus positional/inset and
+ * translation utilities: padding, margin, gap, space, top/right/bottom/left,
+ * inset(-x/-y), start/end, and translate(-x/-y). Width, height, and size are
+ * intentionally excluded because dimensions are not box-spacing rhythm.
+ *
+ * Comment contents are stripped before regex matching. This remains a
+ * pragmatic text scan rather than a JSX parser, so matching syntax inside
+ * string literals in non-className positions can still produce a false
+ * positive.
+ */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,86 +126,109 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
   }).map(([path, properties]) => [path, new Set(properties)])
 );
 
+// Every CSS custom property assigned through a JSX inline-style object. These
+// are runtime feeds consumed by token-backed component classes; no other --*
+// property is implicitly allowed.
+const INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST = new Map(
+  Object.entries({
+    "src/components/ui/sidebar.tsx": [
+      "--sidebar-width",
+      "--sidebar-width-icon",
+      "--skeleton-width",
+    ],
+    "src/components/ui/sonner.tsx": [
+      "--normal-bg",
+      "--normal-text",
+      "--normal-border",
+      "--border-radius",
+    ],
+  }).map(([path, properties]) => [path, new Set(properties)])
+);
+
 const RULES = [
   {
     name: "font-size",
-    regex: /(?<![\w-])text-\[[0-9]+(?:\.[0-9]+)?px\]/g,
+    regex:
+      /(?<![\w-])(?:text-\[(?:length:)?[0-9]+(?:\.[0-9]+)?px\]|\[font-size:[0-9]+(?:\.[0-9]+)?px\])/g,
     describe: (match) =>
       `arbitrary font size ${JSON.stringify(match[0])}; use the Tailwind type scale`,
   },
   {
     name: "raw-color",
-    regex: /\[(?:#[0-9a-f]{3,8}|oklch\([^\]\r\n]+\))\]/gi,
+    regex: /\[(?:[-\w]+:)?(?:#[0-9a-f]{3,8}|oklch\([^\]\r\n]+\))\]/gi,
     describe: (match) =>
       `raw color ${JSON.stringify(match[0])}; define a token in src/app/globals.css`,
   },
 ];
 const SPACING_RE =
-  /(?<![\w-])-?(?:p[trblxy]?|m[trblxy]?|gap(?:-[xy])?|space-[xy])-([0-9]+(?:\.[0-9]+)?)(?:!)?(?![\w.])/g;
+  /(?<![\w-])-?(?:p[trblxy]?|m[trblxy]?|gap(?:-[xy])?|space-[xy]|top|right|bottom|left|inset(?:-[xy])?|start|end|translate-[xy])-(?:([0-9]+(?:\.[0-9]+)?)|\[([^\]\r\n]+)\])(?:!)?(?![\w.])/g;
 
-const files = collectTsxFiles(SOURCE_ROOT);
+const IS_MAIN =
+  process.argv[1] &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+const files = IS_MAIN ? collectTsxFiles(SOURCE_ROOT) : [];
 const violations = [];
 let buttonOverrideCount = 0;
 let exemptSpacingFileCount = 0;
 
-for (const absolutePath of files) {
-  const path = toRepoPath(absolutePath);
-  const source = readFileSync(absolutePath, "utf8");
-  const sourceFile = ts.createSourceFile(
-    path,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX
-  );
-
-  for (const rule of RULES) {
-    collectRegexViolations({ path, sourceFile, source, ...rule });
-  }
-
-  if (SPACING_EXEMPT_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    exemptSpacingFileCount += 1;
-  } else {
-    collectRegexViolations({
+if (IS_MAIN) {
+  for (const absolutePath of files) {
+    const path = toRepoPath(absolutePath);
+    const source = readFileSync(absolutePath, "utf8");
+    const sourceFile = ts.createSourceFile(
       path,
-      sourceFile,
       source,
-      name: "spacing",
-      regex: SPACING_RE,
-      shouldReport: (match) => !ALLOWED_SPACING_STEPS.has(match[1]),
-      describe: (match) =>
-        `off-scale spacing ${JSON.stringify(match[0])}; allowed positive steps are 1/2/3/4/5/6/8/10/12/16`,
-    });
-  }
-
-  inspectTsx(sourceFile, path);
-}
-
-violations.sort(
-  (a, b) =>
-    a.path.localeCompare(b.path) ||
-    a.line - b.line ||
-    a.column - b.column ||
-    a.rule.localeCompare(b.rule)
-);
-
-if (violations.length > 0) {
-  console.error(
-    `Design-system lint failed with ${violations.length} violation(s):`
-  );
-  for (const violation of violations) {
-    console.error(
-      `${violation.path}:${violation.line}:${violation.column} [${violation.rule}] ${violation.message}`
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX
     );
+
+    const spacingExempt = SPACING_EXEMPT_PATH_PREFIXES.some((prefix) =>
+      path.startsWith(prefix)
+    );
+    if (spacingExempt) exemptSpacingFileCount += 1;
+
+    for (const violation of findTextViolations(source, {
+      includeSpacing: !spacingExempt,
+    })) {
+      addViolation(
+        path,
+        sourceFile,
+        violation.index,
+        violation.rule,
+        violation.message
+      );
+    }
+
+    inspectTsx(sourceFile, path);
   }
-  console.error("");
-  printInfo();
-  process.exitCode = 1;
-} else {
-  console.log(
-    `Design-system lint passed (${files.length} .tsx files checked).`
+
+  violations.sort(
+    (a, b) =>
+      a.path.localeCompare(b.path) ||
+      a.line - b.line ||
+      a.column - b.column ||
+      a.rule.localeCompare(b.rule)
   );
-  printInfo();
+
+  if (violations.length > 0) {
+    console.error(
+      `Design-system lint failed with ${violations.length} violation(s):`
+    );
+    for (const violation of violations) {
+      console.error(
+        `${violation.path}:${violation.line}:${violation.column} [${violation.rule}] ${violation.message}`
+      );
+    }
+    console.error("");
+    printInfo();
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `Design-system lint passed (${files.length} .tsx files checked).`
+    );
+    printInfo();
+  }
 }
 
 function collectTsxFiles(directory) {
@@ -206,20 +241,74 @@ function collectTsxFiles(directory) {
     .sort();
 }
 
-function collectRegexViolations({
-  path,
-  sourceFile,
-  source,
-  name,
-  regex,
-  shouldReport = () => true,
-  describe,
-}) {
-  regex.lastIndex = 0;
-  for (const match of source.matchAll(regex)) {
-    if (!shouldReport(match)) continue;
-    addViolation(path, sourceFile, match.index, name, describe(match));
+export function findTextViolations(source, { includeSpacing = true } = {}) {
+  const scanSource = stripComments(source);
+  const matches = [];
+
+  for (const rule of RULES) {
+    rule.regex.lastIndex = 0;
+    for (const match of scanSource.matchAll(rule.regex)) {
+      matches.push({
+        index: match.index,
+        rule: rule.name,
+        message: rule.describe(match),
+      });
+    }
   }
+
+  if (includeSpacing) {
+    SPACING_RE.lastIndex = 0;
+    for (const match of scanSource.matchAll(SPACING_RE)) {
+      const scaleStep = match[1];
+      const arbitraryValue = match[2];
+      if (scaleStep && ALLOWED_SPACING_STEPS.has(scaleStep)) continue;
+
+      matches.push({
+        index: match.index,
+        rule: "spacing",
+        message: `${arbitraryValue ? "arbitrary" : "off-scale"} spacing ${JSON.stringify(match[0])}; allowed positive steps are 1/2/3/4/5/6/8/10/12/16`,
+      });
+    }
+  }
+
+  return matches.sort(
+    (a, b) => a.index - b.index || a.rule.localeCompare(b.rule)
+  );
+}
+
+export function stripComments(source) {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    ts.LanguageVariant.JSX,
+    source
+  );
+  const chunks = [];
+  let sourceIndex = 0;
+
+  for (
+    let token = scanner.scan();
+    token !== ts.SyntaxKind.EndOfFileToken;
+    token = scanner.scan()
+  ) {
+    if (
+      token !== ts.SyntaxKind.SingleLineCommentTrivia &&
+      token !== ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      continue;
+    }
+
+    const commentStart = scanner.getTokenPos();
+    const commentEnd = scanner.getTextPos();
+    chunks.push(source.slice(sourceIndex, commentStart));
+    chunks.push(
+      source.slice(commentStart, commentEnd).replace(/[^\r\n]/g, " ")
+    );
+    sourceIndex = commentEnd;
+  }
+
+  chunks.push(source.slice(sourceIndex));
+  return chunks.join("");
 }
 
 function inspectTsx(sourceFile, path) {
@@ -254,6 +343,8 @@ function findJsxAttribute(node, name) {
 
 function inspectInlineStyle(path, sourceFile, styleAttribute, expression) {
   const fileExemptions = INLINE_STYLE_FILE_EXEMPTIONS.get(path);
+  const customPropertyExemptions =
+    INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST.get(path);
 
   for (const objectLiteral of findInlineObjectLiterals(expression)) {
     const properties = objectLiteral.properties
@@ -263,11 +354,11 @@ function inspectInlineStyle(path, sourceFile, styleAttribute, expression) {
           ts.isShorthandPropertyAssignment(property)
       )
       .map((property) => propertyName(property.name));
-    const disallowed = properties.filter(
-      (property) =>
-        !property.startsWith("--") &&
-        !INLINE_STYLE_PROPERTY_ALLOWLIST.has(property) &&
-        !fileExemptions?.has(property)
+    const disallowed = properties.filter((property) =>
+      property.startsWith("--")
+        ? !customPropertyExemptions?.has(property)
+        : !INLINE_STYLE_PROPERTY_ALLOWLIST.has(property) &&
+          !fileExemptions?.has(property)
     );
 
     if (disallowed.length > 0) {
