@@ -328,6 +328,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     connectionStatus: game.connectionStatus,
     eventLog: game.gameState.eventLog,
     activeEffects: game.gameState.activeEffects,
+    effectAvailability: game.gameState.effectAvailability,
     activePrompt,
     activePromptId,
     matchClosed: game.matchClosed,
