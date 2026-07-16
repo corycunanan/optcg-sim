@@ -2615,6 +2615,7 @@ export const EB04_057_VEGAPUNK: EffectSchema = {
     {
       id: "permanent_cannot_be_removed",
       category: "permanent",
+      source_text: "If you have 2 or less Life cards, all of your yellow {Scientist} type Characters cannot be removed from the field by your opponent's effects.",
       conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
@@ -2641,6 +2642,7 @@ export const EB04_057_VEGAPUNK: EffectSchema = {
     {
       id: "don_blocker",
       category: "permanent",
+      source_text: "[DON!! x1] This Character gains [Blocker].",
       modifiers: [
         {
           type: "GRANT_KEYWORD",

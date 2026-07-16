@@ -6,6 +6,7 @@ export interface EffectClause {
 export interface EffectBlockView {
   id: string;
   category: string;
+  sourceText?: string;
   triggerKeyword?: string;
   triggerKeywords?: string[];
 }
@@ -89,6 +90,10 @@ export function parseEffectBlocks(effectSchema: unknown): EffectBlockView[] {
       category: effect.category,
     };
 
+    if (typeof effect.source_text === "string") {
+      block.sourceText = effect.source_text;
+    }
+
     if (isRecord(effect.trigger)) {
       if (typeof effect.trigger.keyword === "string") {
         block.triggerKeyword = effect.trigger.keyword;
@@ -137,12 +142,17 @@ function isEffectBlockView(value: unknown): value is EffectBlockView {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.category === "string" &&
+    (value.sourceText === undefined || typeof value.sourceText === "string") &&
     (value.triggerKeyword === undefined ||
       typeof value.triggerKeyword === "string") &&
     (value.triggerKeywords === undefined ||
       (Array.isArray(value.triggerKeywords) &&
         value.triggerKeywords.every((keyword) => typeof keyword === "string")))
   );
+}
+
+function normalizeWhitespace(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
 }
 
 function blockHasTriggerKeyword(
@@ -170,49 +180,75 @@ export function segmentEffectText(
     ? blocks.filter(isEffectBlockView)
     : [];
 
-  return effectText
+  const clauses = effectText
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((text): EffectClause => {
-      const leading = text.match(LEADING_BRACKET_TOKENS)?.[0] ?? "";
-      const tokens = Array.from(leading.matchAll(/\[[^\]]+\]/g), ([token]) =>
-        normalizeToken(token)
+    .filter((line) => line.length > 0);
+  const normalizedClauses = clauses.map(normalizeWhitespace);
+  const freshSourceBlocks = new Set(
+    safeBlocks.filter((block) => {
+      if (block.sourceText === undefined) return false;
+      const sourceText = normalizeWhitespace(block.sourceText);
+      return (
+        sourceText.length > 0 &&
+        normalizedClauses.some((clause) => clause.includes(sourceText))
       );
-      const remainder = text.slice(leading.length).trim();
+    })
+  );
+  const heuristicBlocks = safeBlocks.filter(
+    (block) => !freshSourceBlocks.has(block)
+  );
 
-      if (isKeywordOnlyLine(tokens, remainder)) {
-        return { text, blockId: null };
-      }
-
-      const timingKeywords = new Set(
-        tokens.flatMap((token) =>
-          isModifierToken(token) ? [] : (TIMING_KEYWORDS[token] ?? [])
+  return clauses.map((text, clauseIndex): EffectClause => {
+    const sourceMatches = safeBlocks.filter(
+      (block) =>
+        freshSourceBlocks.has(block) &&
+        normalizedClauses[clauseIndex].includes(
+          normalizeWhitespace(block.sourceText!)
         )
-      );
+    );
+    if (sourceMatches.length > 0) {
+      return { text, blockId: uniqueBlockId(sourceMatches) };
+    }
 
-      if (timingKeywords.size > 0) {
-        return {
-          text,
-          blockId: uniqueBlockId(
-            safeBlocks.filter((block) =>
-              blockHasTriggerKeyword(block, timingKeywords)
-            )
-          ),
-        };
-      }
+    const leading = text.match(LEADING_BRACKET_TOKENS)?.[0] ?? "";
+    const tokens = Array.from(leading.matchAll(/\[[^\]]+\]/g), ([token]) =>
+      normalizeToken(token)
+    );
+    const remainder = text.slice(leading.length).trim();
 
-      const hasOnlyModifiers =
-        tokens.length > 0 && tokens.every(isModifierToken);
-      if (tokens.length === 0 || hasOnlyModifiers) {
-        return {
-          text,
-          blockId: uniqueBlockId(
-            safeBlocks.filter((block) => block.category === "permanent")
-          ),
-        };
-      }
-
+    if (isKeywordOnlyLine(tokens, remainder)) {
       return { text, blockId: null };
-    });
+    }
+
+    const timingKeywords = new Set(
+      tokens.flatMap((token) =>
+        isModifierToken(token) ? [] : (TIMING_KEYWORDS[token] ?? [])
+      )
+    );
+
+    if (timingKeywords.size > 0) {
+      return {
+        text,
+        blockId: uniqueBlockId(
+          heuristicBlocks.filter((block) =>
+            blockHasTriggerKeyword(block, timingKeywords)
+          )
+        ),
+      };
+    }
+
+    const hasOnlyModifiers =
+      tokens.length > 0 && tokens.every(isModifierToken);
+    if (tokens.length === 0 || hasOnlyModifiers) {
+      return {
+        text,
+        blockId: uniqueBlockId(
+          heuristicBlocks.filter((block) => block.category === "permanent")
+        ),
+      };
+    }
+
+    return { text, blockId: null };
+  });
 }

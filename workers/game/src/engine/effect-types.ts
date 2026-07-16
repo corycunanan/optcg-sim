@@ -44,6 +44,12 @@ export interface EffectBlock {
   id: string;
   category: EffectCategory;
 
+  /** Verbatim clause of the card's effectText this block encodes. Enables
+   * exact clause↔block mapping in the UI; falls back to the bracket heuristic
+   * when absent. Must be a contiguous substring of the sanitized effectText
+   * (or triggerText for TRIGGER blocks). */
+  source_text?: string;
+
   // Activation (auto / activate)
   trigger?: Trigger;
   costs?: Cost[];

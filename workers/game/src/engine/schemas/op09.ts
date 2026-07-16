@@ -2814,6 +2814,7 @@ export const OP09_086_JESUS_BURGESS: EffectSchema = {
     {
       id: "ko_protection",
       category: "permanent",
+      source_text: "This Character cannot be K.O.'d by your opponent's effects.",
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
@@ -2824,6 +2825,7 @@ export const OP09_086_JESUS_BURGESS: EffectSchema = {
     {
       id: "conditional_power_boost",
       category: "permanent",
+      source_text: "If your Leader has the {Blackbeard Pirates} type, this Character gains +1000 power for every 4 cards in your trash.",
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",

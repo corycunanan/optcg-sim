@@ -2130,6 +2130,7 @@ export const P_084_BUGGY: EffectSchema = {
     {
       id: "cannot_attack_self",
       category: "permanent",
+      source_text: "This Character cannot attack.",
       prohibitions: [
         { type: "CANNOT_ATTACK" },
       ],
@@ -2137,6 +2138,7 @@ export const P_084_BUGGY: EffectSchema = {
     {
       id: "leader_buggy_cannot_attack_aura",
       category: "permanent",
+      source_text: "If your Leader is [Buggy], all Characters with a cost of 3 or 4 cannot attack.",
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",

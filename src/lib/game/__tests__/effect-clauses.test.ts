@@ -13,6 +13,7 @@ describe("parseEffectBlocks", () => {
           {
             id: "on_play_search",
             category: "auto",
+            source_text: "[On Play] Search your deck.",
             trigger: { keyword: "ON_PLAY", once_per_turn: true },
           },
           { id: "permanent", category: "permanent" },
@@ -24,6 +25,7 @@ describe("parseEffectBlocks", () => {
       {
         id: "on_play_search",
         category: "auto",
+        sourceText: "[On Play] Search your deck.",
         triggerKeyword: "ON_PLAY",
       },
       { id: "permanent", category: "permanent" },
@@ -39,6 +41,68 @@ describe("parseEffectBlocks", () => {
 });
 
 describe("segmentEffectText", () => {
+  it("uses normalized source text to disambiguate same-trigger blocks", () => {
+    const text =
+      "[Your Turn] This Character gains +2000 power.\n[Opponent's Turn] Give this Character −2000 power.";
+    const blocks = parseEffectBlocks({
+      effects: [
+        {
+          id: "your_turn_power_up",
+          category: "auto",
+          source_text: "[Your Turn]   This Character gains +2000 power.",
+          trigger: { keyword: "START_OF_TURN" },
+        },
+        {
+          id: "opponent_turn_power_down",
+          category: "auto",
+          source_text:
+            "[Opponent's Turn] Give this Character −2000 power.",
+          trigger: { keyword: "START_OF_TURN" },
+        },
+      ],
+    });
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["your_turn_power_up", "opponent_turn_power_down"]);
+  });
+
+  it("lets exact source text win and leaves remaining blocks to the heuristic", () => {
+    const text = "[On Play] First effect.\n[On Play] Second effect.";
+    const blocks = [
+      {
+        id: "first",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "[On Play] First effect.",
+      },
+      { id: "second", category: "auto", triggerKeyword: "ON_PLAY" },
+    ];
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["first", "second"]);
+  });
+
+  it("treats stale source text as absent and never mis-highlights", () => {
+    const stale = [
+      {
+        id: "first",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "[On Play] Old imported text.",
+      },
+      { id: "second", category: "auto", triggerKeyword: "ON_PLAY" },
+    ];
+
+    expect(segmentEffectText("[On Play] Current text.", stale)).toEqual([
+      { text: "[On Play] Current text.", blockId: null },
+    ]);
+    expect(segmentEffectText("[On Play] Current text.", [stale[0]])).toEqual([
+      { text: "[On Play] Current text.", blockId: "first" },
+    ]);
+  });
+
   it.each([
     ["[Activate: Main]", "ACTIVATE_MAIN"],
     ["[On Play]", "ON_PLAY"],

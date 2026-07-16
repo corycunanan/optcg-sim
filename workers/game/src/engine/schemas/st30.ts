@@ -14,6 +14,7 @@ export const ST30_001_LUFFY_ACE: EffectSchema = {
     {
       id: "base_power_character_self_debuff",
       category: "permanent",
+      source_text: "If you have a Character with 7000 base power or more, give this Leader −2000 power.",
       conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
@@ -30,6 +31,7 @@ export const ST30_001_LUFFY_ACE: EffectSchema = {
     {
       id: "opponent_turn_luffy_ace_power",
       category: "permanent",
+      source_text: "[Opponent's Turn] All of your [Portgas.D.Ace] and [Monkey.D.Luffy] cards gain +3000 power.",
       modifiers: [
         {
           type: "MODIFY_POWER",

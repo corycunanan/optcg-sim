@@ -2739,6 +2739,7 @@ export const OP15_070_FUZA: EffectSchema = {
     {
       id: "OP15-070_unblockable",
       category: "permanent",
+      source_text: "All of your [Shura] cards and this Character gain [Unblockable].",
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -2760,6 +2761,7 @@ export const OP15_070_FUZA: EffectSchema = {
     {
       id: "OP15-070_opponent_turn_base_power",
       category: "permanent",
+      source_text: "[Opponent's Turn] All of your [Shura] cards' base power and this Character's base power become 6000.",
       modifiers: [
         {
           type: "SET_BASE_POWER",
@@ -2795,6 +2797,7 @@ export const OP15_071_HOLLY: EffectSchema = {
     {
       id: "OP15-071_double_attack",
       category: "permanent",
+      source_text: "All of your [Ohm] cards and this Character gain [Double Attack].",
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -2816,6 +2819,7 @@ export const OP15_071_HOLLY: EffectSchema = {
     {
       id: "OP15-071_opponent_turn_base_power",
       category: "permanent",
+      source_text: "[Opponent's Turn] All of your [Ohm] cards' base power and this Character's base power become 6000.",
       modifiers: [
         {
           type: "SET_BASE_POWER",
@@ -3705,6 +3709,7 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
     {
       id: "OP15-092_trash_10",
       category: "permanent",
+      source_text: "• If there are 10 or more cards, this Character's base power becomes 9000 and it gains +10 cost.",
       conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
@@ -3727,6 +3732,7 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
     {
       id: "OP15-092_trash_20",
       category: "permanent",
+      source_text: "• If you have 20 or more cards, during your opponent's turn, your Leader's base power becomes 7000.",
       conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
@@ -3744,6 +3750,7 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
     {
       id: "OP15-092_trash_30",
       category: "permanent",
+      source_text: "• If you have 30 or more cards, this Character gains +1000 power.",
       conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
