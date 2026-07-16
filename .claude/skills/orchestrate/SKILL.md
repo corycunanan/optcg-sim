@@ -5,7 +5,20 @@ description: Run a Linear scope (project, issue list, or single issue) through t
 
 # Orchestrate — Codex implementation pipeline
 
-You are the orchestrator/PM. Codex (via the codex-companion runtime) implements every issue and authors every PR. You never write implementation code. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`. Operational gotchas and validated recipes (sandbox, model routing, computer-use/VQA): recall from project memory (`project-codex-orchestration`).
+You are the orchestrator/PM. Codex implements every issue and authors every PR. You never write implementation code. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`. Operational gotchas and validated recipes (sandbox, model routing, computer-use/VQA): recall from project memory (`project-codex-orchestration`) if present on this machine.
+
+## Dispatch runtime (per machine)
+
+Two supported backends — detect at kickoff and use one consistently for the run:
+
+- **codex-companion** (original authoring machine): `codex-companion.mjs` on PATH. Dispatch with `task --background --write --model <model>`; poll `status <job-id>` / fetch `result <job-id>`; findings loops resume the implementation thread; adversarial reviews via `adversarial-review --base main --scope branch "<hunt brief>"`.
+- **raw codex CLI fallback** (any machine with `codex` ≥ 0.144, validated 2026-07-15): dispatch as a **background shell task** — `codex exec -C <clone> -m <model> --sandbox workspace-write -c sandbox_workspace_write.network_access=true -` with the prompt on stdin (heredoc). Command equivalents:
+  - *status/result polling* → not needed: the harness notifies on background-task completion; interim progress via the task's output file. The dispatching session must stay alive — jobs are not detached from it.
+  - *thread resume (findings loop)* → `codex exec resume <session-id>` (session id is printed in the run header; capture it from the output file). Flag ordering: `resume` rejects `-C` — `cd` into the clone first and pass `--sandbox`/`-c` before the `resume` subcommand: `cd <clone> && codex exec --sandbox workspace-write -c sandbox_workspace_write.network_access=true resume <id> -`.
+  - *adversarial-review* → `codex exec review` in the synced clone, or a fresh `codex exec` read-only task carrying the hunt brief against `git diff main...HEAD`.
+  - *companion state-dir failure mode* → does not exist; sessions live in `~/.codex/sessions`. The "resumed threads pin creation-time sandbox policy" caveat still applies — dispatch fresh after config changes.
+  - Codex may auto-add `[projects."/private/tmp/optcg-opt<NNN>"]` trust entries to `~/.codex/config.toml`; expected, leave them.
+  - If `~/.codex/config.toml` lacks the sandbox network grant, pass it per-invocation as shown above rather than editing the config.
 
 ## 0. Resolve scope (flexible)
 
@@ -27,15 +40,15 @@ For each issue, in wave order (one issue per dependency track in parallel; wide-
 
 1. Linear → In Progress.
 2. Fresh standalone clone: `git clone <local-repo> /private/tmp/optcg-opt<NNN>`, origin → GitHub URL, branch = the issue's `gitBranchName` from `origin/main`. Never git worktrees.
-3. Dispatch `codex-companion.mjs task --background --write --model <model>` from the clone. Prompt embeds: full ticket text, fresh-inventory instruction, behavior-preservation + scope-freeze rules, scope fences naming sibling tickets' surfaces, validation expectations (baseline + post-change in PR body), deliverable spec (commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review NOT draft, no merge, no Linear writes).
-4. On completion: sync clone to PR head (`git branch main origin/main` for review base), run `adversarial-review --base main --scope branch "<targeted hunt brief naming failure classes>"`, plus your own orchestrator review of the diff.
-5. Findings → resume the implementation thread with the findings verbatim; re-verify the fix (delta review). Cap: 1 full + 1 delta; unresolved survivors stop the merge and surface to the user.
+3. Dispatch via the machine's runtime (see **Dispatch runtime**) from the clone. Prompt embeds: full ticket text, fresh-inventory instruction, behavior-preservation + scope-freeze rules, scope fences naming sibling tickets' surfaces, validation expectations (baseline + post-change in PR body), deliverable spec (commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review NOT draft, no merge, no Linear writes).
+4. On completion: sync clone to PR head (`git branch main origin/main` for review base), run the runtime's adversarial review with a targeted hunt brief naming failure classes, plus your own orchestrator review of the diff.
+5. Findings → resume the implementation thread (runtime's resume mechanism) with the findings verbatim; re-verify the fix (delta review). Cap: 1 full + 1 delta; unresolved survivors stop the merge and surface to the user.
 6. Merge gate: CI green + adversarial approve + your review clean → `gh pr merge <N> --squash --match-head-commit <reviewed-sha>`. Conflicts: merge `origin/main` into the branch (never rebase/force-push an open PR).
 7. Linear → Done; verify the PR attachment; dispatch newly-unblocked issues.
 
 ## 3. Monitoring
 
-Poll job status via a background watcher loop (`status <job-id>` per workspace, every ~2 min, exit when all terminal). Fetch results with `result <job-id>`. Known failure modes and fixes are in memory — notably: stale per-workspace state dirs break new thread creation (move aside, re-dispatch); resumed threads pin creation-time sandbox policy (dispatch fresh after config changes).
+**Companion:** poll job status via a background watcher loop (`status <job-id>` per workspace, every ~2 min, exit when all terminal); fetch results with `result <job-id>`. Known failure modes: stale per-workspace state dirs break new thread creation (move aside, re-dispatch). **Raw CLI:** rely on harness background-task completion notifications; read the task output file for interim progress. Both: resumed threads pin creation-time sandbox policy — dispatch fresh after config changes.
 
 ## 4. Close-out (scope complete)
 
