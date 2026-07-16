@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardImageGallery } from "@/components/cards/card-image-gallery";
-import { holoEffectForRarity, HOLO_FEATURE_ENABLED } from "@/lib/cards/holo";
 
 export const dynamic = "force-dynamic";
 
@@ -66,8 +65,8 @@ export default async function CardDetailPage({
         <CardImageGallery
           cardName={card.name}
           baseImageUrl={card.imageUrl}
+          baseRarity={card.rarity}
           artVariants={card.artVariants}
-          effect={HOLO_FEATURE_ENABLED ? holoEffectForRarity(card.rarity) : "none"}
         />
 
         {/* Right: Card details */}

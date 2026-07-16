@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardImageGallery } from "./card-image-gallery";
-import { holoEffectForRarity, HOLO_FEATURE_ENABLED } from "@/lib/cards/holo";
 import { apiGet } from "@/lib/api-client";
 import {
   CardDetailResponseSchema,
@@ -133,10 +132,10 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
               <CardImageGallery
                 cardName={card.name}
                 baseImageUrl={card.imageUrl}
+                baseRarity={card.rarity}
                 artVariants={card.artVariants}
                 controlledImage={controlledImage}
                 onImageSelect={onImageSelect}
-                effect={HOLO_FEATURE_ENABLED ? holoEffectForRarity(card.rarity) : "none"}
               />
             )}
           </div>

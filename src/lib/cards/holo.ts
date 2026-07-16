@@ -1,20 +1,46 @@
 import type { HoloEffect } from "@/types/cards";
 
 /**
- * Rarity → effect tier mapping for the holo-card spike.
+ * Rarity → effect tier mapping for inspected card artwork.
  *
- * The current `regular-holo` is intentionally subtle (pearlescent shimmer +
- * cursor-anchored highlight) — too soft to function as a rarity differentiator
- * on its own — so every card gets it. Future iterations will introduce more
- * pronounced tiers (e.g. iridescent rainbow for SecretRare, cosmos for Leader)
- * and reintroduce a rarity gate at that point.
+ * Keep this exhaustive over the values emitted by the card import pipeline so a
+ * newly introduced rarity fails visibly as `none` instead of inheriting an
+ * arbitrary premium treatment.
  *
  * Vegapull rarity strings as stored: Common, Uncommon, Rare, SuperRare,
- * SecretRare, Promo, Leader (no spaces — verified against the live DB).
+ * SecretRare, Leader, Special, TreasureRare, Promo (no spaces).
  */
-export function holoEffectForRarity(rarity: string | null | undefined): HoloEffect {
+export type OptcgCardRarity =
+  | "Common"
+  | "Uncommon"
+  | "Rare"
+  | "SuperRare"
+  | "SecretRare"
+  | "Leader"
+  | "Special"
+  | "TreasureRare"
+  | "Promo";
+
+export const HOLO_EFFECT_BY_RARITY = {
+  Common: "regular-holo",
+  Uncommon: "regular-holo",
+  Rare: "regular-holo",
+  SuperRare: "prism-holo",
+  Promo: "prism-holo",
+  SecretRare: "rainbow-holo",
+  Special: "rainbow-holo",
+  TreasureRare: "rainbow-holo",
+  Leader: "cosmos-holo",
+} as const satisfies Readonly<Record<OptcgCardRarity, HoloEffect>>;
+
+export function holoEffectForRarity(
+  rarity: string | null | undefined
+): HoloEffect {
   if (!rarity) return "none";
-  return "regular-holo";
+  if (!Object.prototype.hasOwnProperty.call(HOLO_EFFECT_BY_RARITY, rarity)) {
+    return "none";
+  }
+  return HOLO_EFFECT_BY_RARITY[rarity as OptcgCardRarity];
 }
 
 /**

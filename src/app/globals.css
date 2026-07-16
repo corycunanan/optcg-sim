@@ -76,6 +76,18 @@
   --card-black:  oklch(28% 0.01 245);
   --card-yellow: oklch(78% 0.18 90);
 
+  /* ── Holofoil spectrum (card inspection lighting) ── */
+  --holo-red:         oklch(76% 0.12 25);
+  --holo-gold:        oklch(84% 0.12 80);
+  --holo-green:       oklch(80% 0.10 155);
+  --holo-cyan:        oklch(82% 0.10 210);
+  --holo-blue:        oklch(76% 0.12 250);
+  --holo-violet:      oklch(76% 0.13 310);
+  --holo-highlight:   oklch(98% 0.005 75);
+  --holo-cosmos-blue: oklch(72% 0.13 255);
+  --holo-cosmos-deep: oklch(58% 0.14 300);
+  --holo-mask-solid:  oklch(0% 0 0);
+
   /* ── Game Board (dark testing environment) ──
      All text tokens pass WCAG AA (4.5:1) against --gb-surface (9%).
      --gb-text-dim ≈5.2:1, --gb-text-muted ≈6.3:1, --gb-text-subtle ≈7.5:1 */
