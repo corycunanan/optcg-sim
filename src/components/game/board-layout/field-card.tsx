@@ -21,6 +21,8 @@ import {
   getActivateMainState,
 } from "@/lib/game/activate-main";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
+import { useEffectAvailability } from "@/contexts/effect-availability-context";
+import { resolveCardHighlightRingColor } from "../card/overlays/card-highlight-ring";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
  *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
@@ -116,6 +118,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const interactionMode = useInteractionMode();
   const inputSuppressed = interactionMode !== "full";
   const rejectionSequence = useCardRejection(card.instanceId);
+  const { hasUsableEffect } = useEffectAvailability();
   const activation = getActivateMainState(card, cardDb, oncePerTurnUsed);
   const sourceStateAllowsActivation =
     !activation?.requiresActiveSelf || card.state === "ACTIVE";
@@ -262,13 +265,14 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // live in one place and can compose with motion presets. Precedence (top
   // wins): counter flash (transient) > attacker (current aggressor) > defender
   // (OPT-274 — current battle target, same amber pulse as attacker) > selected
-  // (user-chosen blocker or effect target) > eligible candidate.
+  // (user-chosen blocker or effect target) > eligible candidate > ambient
+  // usable-effect availability.
   const selectionSelected = !!selected || !!targetSelection?.selected;
   const selectionEligible = !!blockerSelectable || !!targetSelection?.eligible;
   const selectionControl = !!blockerSelectable || !!targetSelection;
   const disabledReason = targetSelection?.disabledReason ?? null;
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
-  const highlightRing = counterPulse
+  const activeHighlightRing = counterPulse
     ? ("counter" as const)
     : isAttacker
       ? ("attacker" as const)
@@ -279,6 +283,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           : selectionEligible
             ? ("eligible" as const)
             : undefined;
+  const highlightRing = resolveCardHighlightRingColor(
+    activeHighlightRing,
+    hasUsableEffect(card.instanceId),
+  );
 
   // Entry pop (OPT-274): only triggers on first render when the parent
   // flagged this card as newly-arrived. `isDragging` opacity still wins

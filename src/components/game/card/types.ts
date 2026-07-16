@@ -44,7 +44,8 @@ export type HighlightRingColor =
   | "eligible"
   | "attacker"
   | "defender"
-  | "counter";
+  | "counter"
+  | "usable-effect";
 
 export interface CardOverlays {
   /** +N DON badge (attached DON counter) — rendered along the bottom edge. */
