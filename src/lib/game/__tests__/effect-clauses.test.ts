@@ -93,11 +93,15 @@ describe("segmentEffectText", () => {
         category: "permanent",
         sourceText: "This Character cannot attack.",
       },
+      {
+        id: "opponent_turn",
+        category: "permanent",
+      },
     ];
 
     expect(
       segmentEffectText(text, blocks).map((clause) => clause.blockId)
-    ).toEqual(["always", null]);
+    ).toEqual(["always", "opponent_turn"]);
   });
 
   it("does not treat a stale fragment inside an unrelated clause as fresh", () => {
@@ -119,33 +123,37 @@ describe("segmentEffectText", () => {
     const text = "Repeated effect.\nRepeated effect.";
     const blocks = [
       {
-        id: "repeated",
-        category: "permanent",
+        id: "ambiguous_source",
+        category: "auto",
         sourceText: "Repeated effect.",
       },
+      { id: "permanent_fallback", category: "permanent" },
     ];
 
     expect(
       segmentEffectText(text, blocks).map((clause) => clause.blockId)
-    ).toEqual(["repeated", "repeated"]);
+    ).toEqual(["permanent_fallback", "permanent_fallback"]);
   });
 
-  it("returns null when multiple source lines claim the same clause", () => {
-    const text = "This Character cannot attack.";
+  it("falls back when multiple source fragments claim the same clause", () => {
+    const text = "[On Play] Draw 1 card.";
     const blocks = [
       {
-        id: "first",
-        category: "permanent",
-        sourceText: text,
+        id: "on_play",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "Draw 1 card.",
       },
       {
-        id: "second",
+        id: "permanent_fragment",
         category: "permanent",
-        sourceText: text,
+        sourceText: "[On Play]",
       },
     ];
 
-    expect(segmentEffectText(text, blocks)).toEqual([{ text, blockId: null }]);
+    expect(segmentEffectText(text, blocks)).toEqual([
+      { text, blockId: "on_play" },
+    ]);
   });
 
   it("treats stale source text as absent and never mis-highlights", () => {
