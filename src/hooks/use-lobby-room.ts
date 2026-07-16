@@ -17,6 +17,9 @@ import type {
 
 export type { LobbyRoomDeck, LobbyRoomMode, LobbyRoomState, LobbyRoomStatus };
 
+export const LOBBY_RECONCILIATION_INTERVAL_MS = 10_000;
+export const LOBBY_RECONCILIATION_MAX_ATTEMPTS = 6;
+
 export function useLobbyRoom(
   lobbyId: string,
   initialLobby: LobbyRoomState | null = null
@@ -30,7 +33,35 @@ export function useLobbyRoom(
   const [closing, setClosing] = useState(false);
   const cancelledRef = useRef(false);
   const refreshInFlightRef = useRef(false);
-  const { subscribe } = useUserChannelEvents();
+  const latestVersionRef = useRef<{
+    lobbyId: string;
+    version: string;
+  } | null>(
+    initialLobby
+      ? { lobbyId: initialLobby.id, version: initialLobby.version }
+      : null
+  );
+  const { connectionStatus, subscribe } = useUserChannelEvents();
+  const previousConnectionStatusRef = useRef(connectionStatus);
+
+  const applySnapshot = useCallback(
+    (snapshot: LobbyRoomState) => {
+      if (snapshot.id !== lobbyId) return false;
+
+      const current = latestVersionRef.current;
+      if (current?.lobbyId === lobbyId && snapshot.version <= current.version) {
+        return false;
+      }
+
+      latestVersionRef.current = {
+        lobbyId: snapshot.id,
+        version: snapshot.version,
+      };
+      setLobby(snapshot);
+      return true;
+    },
+    [lobbyId]
+  );
 
   const refresh = useCallback(async () => {
     if (refreshInFlightRef.current) return null;
@@ -41,7 +72,7 @@ export function useLobbyRoom(
         LobbyRoomResponseSchema
       );
       if (cancelledRef.current) return null;
-      setLobby(json.data);
+      applySnapshot(json.data);
       setError(null);
       return json.data;
     } catch {
@@ -51,7 +82,7 @@ export function useLobbyRoom(
       refreshInFlightRef.current = false;
       if (!cancelledRef.current) setLoading(false);
     }
-  }, [lobbyId]);
+  }, [applySnapshot, lobbyId]);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -64,13 +95,21 @@ export function useLobbyRoom(
   useEffect(() => {
     return subscribe("lobby:state_changed", (event) => {
       if (event.lobby.id !== lobbyId) return;
-      setLobby(event.lobby);
+      applySnapshot(event.lobby);
       // A successful push proves the lobby is reachable; clear any stale
       // "Lobby unavailable" left from a prior `refresh()` failure so the
       // banner doesn't linger after the room recovers.
       setError(null);
     });
-  }, [subscribe, lobbyId]);
+  }, [applySnapshot, subscribe, lobbyId]);
+
+  useEffect(() => {
+    const previousStatus = previousConnectionStatusRef.current;
+    previousConnectionStatusRef.current = connectionStatus;
+    if (connectionStatus === "connected" && previousStatus !== "connected") {
+      void refresh();
+    }
+  }, [connectionStatus, refresh]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -81,6 +120,24 @@ export function useLobbyRoom(
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [refresh]);
+
+  const isActivePreGameRoom =
+    lobby?.status === "WAITING" || lobby?.status === "READY";
+
+  useEffect(() => {
+    if (!isActivePreGameRoom) return;
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      void refresh();
+      if (attempts >= LOBBY_RECONCILIATION_MAX_ATTEMPTS) {
+        clearInterval(interval);
+      }
+    }, LOBBY_RECONCILIATION_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isActivePreGameRoom, lobbyId, refresh]);
 
   const patchLobby = useCallback(
     async (
