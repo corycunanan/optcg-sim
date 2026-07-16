@@ -32,6 +32,7 @@ vi.mock("@/components/realtime/user-channel-provider", () => ({
 }));
 
 import {
+  LOBBY_IN_GAME_CONFIRM_DELAY_MS,
   LOBBY_RECONCILIATION_INTERVAL_MS,
   LOBBY_RECONCILIATION_MAX_ATTEMPTS,
   useLobbyRoom,
@@ -58,7 +59,7 @@ function room(): LobbyRoomResult {
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
     id: "lobby-1",
-    version: "2026-07-16T12:00:00.000Z",
+    version: 1,
     status: "WAITING",
     joinCode: "ABCD",
     format: "Standard",
@@ -131,14 +132,57 @@ afterEach(async () => {
 });
 
 describe("useLobbyRoom degraded delivery recovery", () => {
+  it("applies an equal-revision authoritative GET", async () => {
+    const initial = lobbyState({ version: 4, format: "Standard" });
+    const refreshed = lobbyState({ version: 4, format: "Eternal" });
+    mocks.apiGet.mockResolvedValue({ data: refreshed });
+
+    await mount(initial);
+
+    expect(room().lobby).toEqual(refreshed);
+  });
+
+  it("picks up deck-detail drift with an unchanged revision on reconciliation", async () => {
+    const initial = lobbyState({
+      version: 4,
+      hostDeck: {
+        id: "deck-1",
+        name: "Old name",
+        leaderId: "leader-1",
+        leaderName: "Leader",
+        leaderImageUrl: "/old-art.png",
+      },
+    });
+    const renamedDeck = lobbyState({
+      version: 4,
+      hostDeck: {
+        id: "deck-1",
+        name: "Renamed deck",
+        leaderId: "leader-1",
+        leaderName: "Leader",
+        leaderImageUrl: "/new-art.png",
+      },
+    });
+    let serverState = initial;
+    mocks.apiGet.mockImplementation(async () => ({ data: serverState }));
+    await mount(initial);
+
+    serverState = renamedDeck;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOBBY_RECONCILIATION_INTERVAL_MS);
+    });
+
+    expect(room().lobby).toEqual(renamedDeck);
+  });
+
   it("recovers a dropped guest-leave fanout when the user channel reconnects", async () => {
     const staleOccupied = lobbyState({
-      version: "2026-07-16T12:00:01.000Z",
+      version: 2,
       status: "READY",
       guest: guest("departed-guest"),
     });
     const releasedSeat = lobbyState({
-      version: "2026-07-16T12:00:02.000Z",
+      version: 3,
       status: "WAITING",
       guest: null,
     });
@@ -162,19 +206,19 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     expect(room().lobby).toEqual(releasedSeat);
   });
 
-  it("rejects a leave snapshot delivered after a newer join snapshot", async () => {
+  it("rejects an older realtime event delivered after a newer event", async () => {
     const initial = lobbyState({
-      version: "2026-07-16T12:00:01.000Z",
+      version: 2,
       status: "READY",
       guest: guest("first-guest"),
     });
     const afterLeave = lobbyState({
-      version: "2026-07-16T12:00:02.000Z",
+      version: 3,
       status: "WAITING",
       guest: null,
     });
     const afterJoin = lobbyState({
-      version: "2026-07-16T12:00:03.000Z",
+      version: 4,
       status: "READY",
       guest: guest("second-guest"),
     });
@@ -196,14 +240,29 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     expect(room().lobby).toEqual(afterJoin);
   });
 
+  it("rejects an equal-revision realtime event", async () => {
+    const initial = lobbyState({ version: 4, format: "Standard" });
+    mocks.apiGet.mockResolvedValue({ data: initial });
+    await mount(initial);
+
+    await act(async () => {
+      mocks.subscribeHandler?.({
+        type: "lobby:state_changed",
+        lobby: lobbyState({ version: 4, format: "Eternal" }),
+      });
+    });
+
+    expect(room().lobby).toEqual(initial);
+  });
+
   it("recovers a missed CLOSED event during the bounded fallback window", async () => {
     const active = lobbyState({
-      version: "2026-07-16T12:00:01.000Z",
+      version: 2,
       status: "READY",
       guest: guest("guest-user"),
     });
     const closed = lobbyState({
-      version: "2026-07-16T12:00:02.000Z",
+      version: 3,
       status: "CLOSED",
       guest: guest("guest-user"),
     });
@@ -244,6 +303,113 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     expect(mocks.apiGet).toHaveBeenCalledTimes(
       LOBBY_RECONCILIATION_MAX_ATTEMPTS
     );
+  });
+
+  it("does not spend reconciliation attempts while the mount refresh is in flight", async () => {
+    const active = lobbyState();
+    let calls = 0;
+    mocks.apiGet.mockImplementation(
+      async (
+        _url: string,
+        _schema: unknown,
+        options?: { signal?: AbortSignal }
+      ) => {
+        calls += 1;
+        if (calls !== 1) return { data: active };
+
+        return new Promise((_, reject) => {
+          options?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        });
+      }
+    );
+
+    await mount(active);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(
+        LOBBY_RECONCILIATION_INTERVAL_MS *
+          LOBBY_RECONCILIATION_MAX_ATTEMPTS
+      );
+    });
+
+    // One timed-out mount GET plus six reconciliation requests launched at
+    // 10-second intervals. The blocked mount request consumes no attempt.
+    expect(mocks.apiGet).toHaveBeenCalledTimes(
+      LOBBY_RECONCILIATION_MAX_ATTEMPTS + 1
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOBBY_RECONCILIATION_INTERVAL_MS * 3);
+    });
+    expect(mocks.apiGet).toHaveBeenCalledTimes(
+      LOBBY_RECONCILIATION_MAX_ATTEMPTS + 1
+    );
+  });
+
+  it("requires a confirming GET before applying a polled IN_GAME snapshot", async () => {
+    const active = lobbyState({ version: 4, status: "READY" });
+    const transientStart = lobbyState({
+      version: 5,
+      status: "IN_GAME",
+      gameId: "game-1",
+    });
+    const rolledBack = lobbyState({ version: 6, status: "READY" });
+    mocks.apiGet
+      .mockResolvedValueOnce({ data: transientStart })
+      .mockResolvedValueOnce({ data: rolledBack });
+
+    await mount(active);
+    expect(room().lobby).toEqual(active);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOBBY_IN_GAME_CONFIRM_DELAY_MS);
+    });
+
+    expect(mocks.apiGet).toHaveBeenCalledTimes(2);
+    expect(room().lobby).toEqual(rolledBack);
+  });
+
+  it("applies a polled IN_GAME snapshot after confirmation", async () => {
+    const active = lobbyState({ version: 4, status: "READY" });
+    const started = lobbyState({
+      version: 5,
+      status: "IN_GAME",
+      gameId: "game-1",
+    });
+    mocks.apiGet.mockResolvedValue({ data: started });
+
+    await mount(active);
+    expect(room().lobby).toEqual(active);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOBBY_IN_GAME_CONFIRM_DELAY_MS);
+    });
+
+    expect(mocks.apiGet).toHaveBeenCalledTimes(2);
+    expect(room().lobby).toEqual(started);
+  });
+
+  it("applies realtime IN_GAME events without GET confirmation", async () => {
+    const active = lobbyState({ version: 4, status: "READY" });
+    const started = lobbyState({
+      version: 5,
+      status: "IN_GAME",
+      gameId: "game-1",
+    });
+    mocks.apiGet.mockResolvedValue({ data: active });
+    await mount(active);
+    mocks.apiGet.mockClear();
+
+    await act(async () => {
+      mocks.subscribeHandler?.({
+        type: "lobby:state_changed",
+        lobby: started,
+      });
+    });
+
+    expect(mocks.apiGet).not.toHaveBeenCalled();
+    expect(room().lobby).toEqual(started);
   });
 
   it("does not reconcile a terminal room", async () => {

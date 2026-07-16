@@ -74,7 +74,7 @@ import { useLobbyRoom } from "@/hooks/use-lobby-room";
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
     id: "lobby-1",
-    version: "2026-07-16T12:00:00.000Z",
+    version: 1,
     status: "WAITING",
     joinCode: "ABCD",
     format: "Standard",
@@ -123,7 +123,7 @@ describe("useLobbyRoom subscribe behavior", () => {
     useLobbyRoom("lobby-1", lobbyState());
 
     const updated = lobbyState({
-      version: "2026-07-16T12:00:01.000Z",
+      version: 2,
       format: "Eternal",
       hostReady: true,
     });

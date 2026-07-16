@@ -212,7 +212,12 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "lobby-1", status: "READY", mode: "PVP" },
-      data: { mode: "SOLITAIRE", hostReady: false, status: "READY" },
+      data: {
+        mode: "SOLITAIRE",
+        hostReady: false,
+        status: "READY",
+        revision: { increment: 1 },
+      },
     });
     expect(transactionMock).toHaveBeenCalledOnce();
   });
@@ -238,7 +243,12 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "lobby-1", status: "READY", mode: "SOLITAIRE" },
-      data: { mode: "PVP", hostReady: false, status: "WAITING" },
+      data: {
+        mode: "PVP",
+        hostReady: false,
+        status: "WAITING",
+        revision: { increment: 1 },
+      },
     });
   });
 
@@ -289,6 +299,13 @@ describe("PATCH /api/lobbies/[id]", () => {
       where: { lobbyId: "lobby-1" },
       data: { deckId: "new-guest-deck", guestReady: false },
     });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "PVP" },
+      data: {
+        status: "READY",
+        revision: { increment: 1 },
+      },
+    });
   });
 
   it("rejects host attempts to mutate the PVP guest deck slot", async () => {
@@ -320,7 +337,11 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(res.status).toBe(200);
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "lobby-1", status: "READY", mode: "PVP" },
-      data: { hostDeckId: null, hostReady: false },
+      data: {
+        hostDeckId: null,
+        hostReady: false,
+        revision: { increment: 1 },
+      },
     });
   });
 
@@ -439,7 +460,7 @@ describe("DELETE /api/lobbies/[id]", () => {
         status: { in: ["WAITING", "READY"] },
         gameSession: { is: null },
       },
-      data: { status: "CLOSED" },
+      data: { status: "CLOSED", revision: { increment: 1 } },
     });
     expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith("lobby-1");
     expect(notifyUserMock).not.toHaveBeenCalled();

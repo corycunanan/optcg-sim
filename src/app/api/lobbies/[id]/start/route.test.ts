@@ -196,7 +196,7 @@ describe("POST /api/lobbies/[id]/start", () => {
     expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(2, "guest-deck", "guest-user");
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "lobby-1", status: "READY" },
-      data: { status: "IN_GAME" },
+      data: { status: "IN_GAME", revision: { increment: 1 } },
     });
     expect(gameSessionCreateMock).toHaveBeenCalledWith({
       data: {
@@ -338,7 +338,7 @@ describe("POST /api/lobbies/[id]/start", () => {
     expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
     expect(lobbyUpdateMock).toHaveBeenCalledWith({
       where: { id: "lobby-1" },
-      data: { status: "READY" },
+      data: { status: "READY", revision: { increment: 1 } },
     });
   });
 
@@ -362,7 +362,7 @@ describe("POST /api/lobbies/[id]/start", () => {
     expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
     expect(lobbyUpdateMock).toHaveBeenCalledWith({
       where: { id: "lobby-1" },
-      data: { status: "READY" },
+      data: { status: "READY", revision: { increment: 1 } },
     });
   });
 
@@ -401,7 +401,7 @@ describe("POST /api/lobbies/[id]/start", () => {
       expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
       expect(lobbyUpdateMock).toHaveBeenCalledWith({
         where: { id: "lobby-1" },
-        data: { status: "READY" },
+        data: { status: "READY", revision: { increment: 1 } },
       });
     } finally {
       vi.useRealTimers();
@@ -449,7 +449,7 @@ describe("POST /api/lobbies/[id]/start", () => {
       expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
       expect(lobbyUpdateMock).toHaveBeenCalledWith({
         where: { id: "lobby-1" },
-        data: { status: "READY" },
+        data: { status: "READY", revision: { increment: 1 } },
       });
     } finally {
       vi.useRealTimers();
@@ -493,9 +493,14 @@ describe("POST /api/lobbies/[id]/start", () => {
     );
   });
 
-  it("does not fan out when worker init fails and the start is rolled back", async () => {
+  it("fans out the restored lobby state after worker init rollback", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      id: "lobby-1",
+      status: "READY",
+      hostUserId: "host-user",
+    });
 
     const res = await POST(buildRequest(), params);
     await flushAfter();
@@ -505,6 +510,9 @@ describe("POST /api/lobbies/[id]/start", () => {
       "[lobbies:start] worker init failed with status 500",
       "nope",
     );
-    expect(notifyLobbyMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("lobby-1");
+    expect(notifyLobbyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "lobby-1", status: "READY" }),
+    );
   });
 });

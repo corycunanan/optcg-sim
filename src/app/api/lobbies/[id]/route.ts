@@ -204,10 +204,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       // state), no guest-seat write below is allowed to run.
       const guarded = await tx.lobby.updateMany({
         where: { id, status: lobby.status, mode: lobby.mode },
-        data:
-          Object.keys(lobbyData).length > 0
+        data: {
+          ...(Object.keys(lobbyData).length > 0
             ? lobbyData
-            : { status: lobby.status },
+            : { status: lobby.status }),
+          revision: { increment: 1 },
+        },
       });
 
       if (guarded.count !== 1) {
@@ -337,7 +339,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           status: { in: ["WAITING", "READY"] },
           gameSession: { is: null },
         },
-        data: { status: "CLOSED" },
+        data: { status: "CLOSED", revision: { increment: 1 } },
       });
 
       if (closed.count === 1) return { failure: null };

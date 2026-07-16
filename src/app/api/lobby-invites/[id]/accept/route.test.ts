@@ -166,7 +166,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     });
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: { id: LOBBY_ID, status: "WAITING" },
-      data: { status: "READY" },
+      data: { status: "READY", revision: { increment: 1 } },
     });
     expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
       data: { lobbyId: LOBBY_ID, userId: RECIPIENT_ID },

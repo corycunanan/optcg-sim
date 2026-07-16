@@ -24,8 +24,8 @@ export interface LobbyRoomDeck {
 
 export interface LobbyRoomState {
   id: string;
-  /** ISO timestamp derived from Lobby.updatedAt for snapshot ordering. */
-  version: string;
+  /** Monotonic Lobby.revision used for snapshot ordering. */
+  version: number;
   status: LobbyRoomStatus;
   joinCode: string;
   format: string;

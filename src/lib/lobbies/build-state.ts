@@ -15,7 +15,7 @@ export async function buildLobbyRoomState(
     where: { id: lobbyId },
     select: {
       id: true,
-      updatedAt: true,
+      revision: true,
       status: true,
       joinCode: true,
       format: true,
@@ -91,7 +91,7 @@ export async function buildLobbyRoomState(
 
   return {
     id: lobby.id,
-    version: lobby.updatedAt.toISOString(),
+    version: lobby.revision,
     status: LobbyStatusSchema.parse(lobby.status),
     joinCode: lobby.joinCode,
     format: lobby.format,

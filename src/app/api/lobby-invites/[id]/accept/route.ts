@@ -104,7 +104,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
     // the lobby off WAITING, count is 0 and we return 409.
     const lobbyUpdate = await tx.lobby.updateMany({
       where: { id: lobby.id, status: "WAITING" },
-      data: { status: "READY" },
+      data: { status: "READY", revision: { increment: 1 } },
     });
     if (lobbyUpdate.count !== 1) return { kind: "started" };
 

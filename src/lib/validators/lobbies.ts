@@ -26,7 +26,7 @@ const LobbyDeckSchema = z.object({
 
 export const LobbyRoomStateSchema = z.object({
   id: z.string(),
-  version: z.iso.datetime(),
+  version: z.number().int().nonnegative(),
   status: LobbyStatusSchema,
   joinCode: z.string(),
   format: z.string(),

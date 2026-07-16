@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Close any existing WAITING lobby by this host
     await prisma.lobby.updateMany({
       where: { hostUserId: userId, status: "WAITING" },
-      data: { status: "CLOSED" },
+      data: { status: "CLOSED", revision: { increment: 1 } },
     });
 
     let lobby = null;

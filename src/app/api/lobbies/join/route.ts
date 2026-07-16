@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           mode: "PVP",
           guest: { is: null },
         },
-        data: { status: "READY" },
+        data: { status: "READY", revision: { increment: 1 } },
       });
       if (acquired.count !== 1) return { kind: "not_found" as const };
 
