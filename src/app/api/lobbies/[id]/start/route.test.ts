@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
@@ -179,6 +179,10 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("POST /api/lobbies/[id]/start", () => {
   it("starts a ready PVP lobby and initializes the worker", async () => {
     const res = await POST(buildRequest(), params);
@@ -315,11 +319,16 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("rolls back GameSession and lobby status when worker init fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
 
     const res = await POST(buildRequest(), params);
 
     expect(res.status).toBe(502);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[lobbies:start] worker init failed with status 500",
+      "nope",
+    );
     expect(transactionMock).toHaveBeenNthCalledWith(2, [
       { query: "delete-game" },
       { query: "update-lobby" },
@@ -332,6 +341,7 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("rolls back GameSession and lobby status when worker init cannot connect", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("fetch failed");
     }));
@@ -339,6 +349,10 @@ describe("POST /api/lobbies/[id]/start", () => {
     const res = await POST(buildRequest(), params);
 
     expect(res.status).toBe(502);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[lobbies:start] worker init request failed",
+      expect.objectContaining({ message: "fetch failed" }),
+    );
     expect(transactionMock).toHaveBeenNthCalledWith(2, [
       { query: "delete-game" },
       { query: "update-lobby" },
@@ -373,12 +387,17 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("does not fan out when worker init fails and the start is rolled back", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
 
     const res = await POST(buildRequest(), params);
     await flushAfter();
 
     expect(res.status).toBe(502);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[lobbies:start] worker init failed with status 500",
+      "nope",
+    );
     expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 });
