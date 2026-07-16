@@ -8,6 +8,7 @@ export const MessageIdSchema = z.object({
 });
 
 export const SendMessageSchema = z.object({
+  idempotencyKey: z.string().uuid("idempotencyKey must be a valid UUID"),
   body: z
     .string()
     .min(1, "Message body is required")
