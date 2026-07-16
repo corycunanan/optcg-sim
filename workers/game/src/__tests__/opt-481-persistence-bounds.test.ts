@@ -17,6 +17,7 @@ import {
 import {
   SESSION_CARD_DB_STORAGE_KEY,
   SESSION_STORAGE_KEY,
+  SESSION_UNDO_HISTORY_STORAGE_KEY,
   SESSION_VALUE_HARD_LIMIT_BYTES,
   SESSION_VALUE_SOFT_LIMIT_BYTES,
   SessionPersistenceLimitError,
@@ -167,8 +168,10 @@ describe("OPT-481 bounded session persistence", () => {
     );
     expect(saved.undoHistory).toHaveLength(UNDO_HISTORY_LIMIT);
     expect(storage.data.get(SESSION_CARD_DB_STORAGE_KEY)).toBeDefined();
+    expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toBeDefined();
     const rawSession = storage.data.get(SESSION_STORAGE_KEY);
     expect(rawSession).not.toHaveProperty("cardDb");
+    expect(rawSession).not.toHaveProperty("undoHistory");
 
     const summary = repo.getHistorySummary();
     expect(summary.compactedEventCount).toBe(144);
@@ -194,8 +197,12 @@ describe("OPT-481 bounded session persistence", () => {
     expect(resaved.state.eventLog).toHaveLength(RECENT_EVENT_LOG_LIMIT + 1);
     expect(repo.getHistorySummary().compactedEventCount).toBe(154);
     expect(storage.writes).toEqual([
-      [SESSION_CARD_DB_STORAGE_KEY, SESSION_STORAGE_KEY],
-      [SESSION_STORAGE_KEY],
+      [
+        SESSION_CARD_DB_STORAGE_KEY,
+        SESSION_STORAGE_KEY,
+        SESSION_UNDO_HISTORY_STORAGE_KEY,
+      ],
+      [SESSION_STORAGE_KEY, SESSION_UNDO_HISTORY_STORAGE_KEY],
     ]);
   });
 
