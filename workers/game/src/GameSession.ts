@@ -33,6 +33,7 @@ import {
   SessionRepository,
 } from "./session/persistence.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
+import { computeEffectAvailability } from "./engine/availability.js";
 import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
   INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON,
@@ -834,8 +835,12 @@ export class GameSession implements DurableObject {
     exclude?: WebSocket
   ): void {
     if (!this.gameState || !this.cardDb) return;
+    const stateWithAvailability: GameState = {
+      ...this.gameState,
+      effectAvailability: computeEffectAvailability(this.gameState, this.cardDb),
+    };
     this.transport.broadcastFilteredState(
-      this.gameState,
+      stateWithAvailability,
       this.cardDb,
       build,
       exclude

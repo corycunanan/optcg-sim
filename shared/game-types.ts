@@ -543,6 +543,14 @@ export interface EngineExecutionContext {
 
 // ─── Game State ───────────────────────────────────────────────────────────────
 
+export type EffectAvailabilityStatus = "active" | "usable" | "used" | "blocked";
+export type EffectBlockedReason = "COST" | "CONDITION" | "PHASE" | "ONCE_PER_TURN" | "NO_TARGET";
+export interface EffectAvailability {
+  effectId: string;
+  status: EffectAvailabilityStatus;
+  reason?: EffectBlockedReason;
+}
+
 export interface GameState {
   id: string;
   executionContext: EngineExecutionContext;
@@ -573,6 +581,7 @@ export interface GameState {
   engineOutcome?: EngineTerminalOutcome | null;
   /** Actions executed in the current resolver sequence, persisted across prompts. */
   engineActionCount?: number;
+  effectAvailability?: Record<string, EffectAvailability[]>;
 }
 
 // ─── Card DB snapshot (loaded at game init) ───────────────────────────────────
