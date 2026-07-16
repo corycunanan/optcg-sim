@@ -37,7 +37,7 @@ function hasSingleConnectionLimit(databaseUrl: string): boolean {
   try {
     return new URL(databaseUrl).searchParams
       .getAll("connection_limit")
-      .includes("1");
+      .some((value) => Number(value) === 1);
   } catch {
     return false;
   }

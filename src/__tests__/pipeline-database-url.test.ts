@@ -37,6 +37,29 @@ describe("pipeline database URL selection", () => {
     );
   });
 
+  it("rejects a numerically single-connection DATABASE_URL", () => {
+    expect(() =>
+      selectPipelineDatabaseUrl({
+        DATABASE_URL:
+          "postgresql://pooled.example/optcg?pgbouncer=true&connection_limit=01",
+      })
+    ).toThrow(
+      "DATABASE_URL uses connection_limit=1, which is unsafe for the parallel pipeline import. Set DIRECT_DATABASE_URL to a direct PostgreSQL connection and retry."
+    );
+  });
+
+  it("allows a leading-zero connection limit that is not one", () => {
+    expect(
+      selectPipelineDatabaseUrl({
+        DATABASE_URL:
+          "postgresql://database.example/optcg?connection_limit=010",
+      })
+    ).toEqual({
+      source: "DATABASE_URL",
+      url: "postgresql://database.example/optcg?connection_limit=010",
+    });
+  });
+
   it("requires at least one database URL", () => {
     expect(() => selectPipelineDatabaseUrl({})).toThrow(
       "Pipeline import requires DIRECT_DATABASE_URL or DATABASE_URL."
