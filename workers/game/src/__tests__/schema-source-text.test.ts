@@ -85,15 +85,19 @@ describe("schema lint: effect-block source_text", () => {
           failures.push(`${cardId} :: ${block.id} — source_text is empty`);
           continue;
         }
+        const triggerKeyword =
+          block.trigger && "keyword" in block.trigger
+            ? block.trigger.keyword
+            : undefined;
         if (
           !sourceTextMatchesCardClause(
             block.source_text,
-            block.trigger?.keyword,
+            triggerKeyword,
             source
           )
         ) {
           failures.push(
-            `${cardId} :: ${block.id} — source_text is stale or ambiguous in ${block.trigger?.keyword === "TRIGGER" ? "triggerText" : "effectText"}: ${JSON.stringify(block.source_text)}`
+            `${cardId} :: ${block.id} — source_text is stale or ambiguous in ${triggerKeyword === "TRIGGER" ? "triggerText" : "effectText"}: ${JSON.stringify(block.source_text)}`
           );
         }
       }
