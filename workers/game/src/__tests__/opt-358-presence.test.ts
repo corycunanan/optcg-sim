@@ -18,6 +18,7 @@ import {
   FRIENDS_CACHE_TTL_MS,
   UserChannel,
 } from "../UserChannel.js";
+import { log } from "../lib/log.js";
 import type { Env } from "../types.js";
 
 // Local HS256 minter — mirrors src/lib/game/token.ts so this worker test
@@ -584,11 +585,17 @@ describe("OPT-358 presence — friends-of cache", () => {
   it("swallows a friends-of fetch failure without throwing", async () => {
     const h = createHarness();
     h.setFriendsHttpStatus(500);
+    const logMock = vi.mocked(log);
+    logMock.mockClear();
 
     // Online broadcast tries fetchFriends and logs+returns; should not throw.
     await expect(attach(h.channel, USER_ID, "fail-1")).resolves.toBeUndefined();
     await vi.runAllTimersAsync();
 
     expect(h.userChannelNs.notifies).toHaveLength(0);
+    expect(logMock).toHaveBeenCalledWith("user_channel.friends_fetch_failed", {
+      userId: USER_ID,
+      error: "friends-of 500",
+    });
   });
 });
