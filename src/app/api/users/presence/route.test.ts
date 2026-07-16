@@ -37,6 +37,8 @@ function healthResponse(connections: number): Response {
 }
 
 beforeEach(() => {
+  vi.stubEnv("GAME_WORKER_URL", "https://worker.example.test");
+  vi.stubEnv("GAME_WORKER_SECRET", "test-secret");
   authMock.mockReset();
   friendshipFindManyMock.mockReset();
   userFindManyMock.mockReset();
@@ -108,6 +110,71 @@ describe("GET /api/users/presence", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data["friend-x"]).toEqual({ online: false, lastSeen: null });
+  });
+
+  it("treats a stalled worker health body as offline within the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      friendshipFindManyMock.mockResolvedValue([
+        { userAId: "user-self", userBId: "friend-x" },
+      ]);
+      userFindManyMock.mockResolvedValue([
+        { id: "friend-x", lastSeen: null },
+      ]);
+      let markFetchStarted: (() => void) | undefined;
+      const fetchStarted = new Promise<void>((resolve) => {
+        markFetchStarted = resolve;
+      });
+      fetchMock.mockImplementation(
+        async (_url: string, init?: RequestInit) => {
+          markFetchStarted?.();
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                init?.signal?.addEventListener("abort", () => {
+                  controller.error(new DOMException("aborted", "AbortError"));
+                });
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+      );
+
+      const pending = GET(buildRequest(["friend-x"]));
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(1_500);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data["friend-x"]).toEqual({ online: false, lastSeen: null });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats every visible friend as offline when worker configuration is missing", async () => {
+    vi.stubEnv("GAME_WORKER_SECRET", "");
+    friendshipFindManyMock.mockResolvedValue([
+      { userAId: "user-self", userBId: "friend-x" },
+    ]);
+    userFindManyMock.mockResolvedValue([
+      { id: "friend-x", lastSeen: new Date("2026-05-02T12:00:00.000Z") },
+    ]);
+
+    const res = await GET(buildRequest(["friend-x"]));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data["friend-x"]).toEqual({
+      online: false,
+      lastSeen: "2026-05-02T12:00:00.000Z",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects too many ids", async () => {

@@ -22,12 +22,11 @@ describe("notifyUser", () => {
     expect(url).toBe("https://worker.example/user/user-42/notify");
     expect(init).toMatchObject({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer secret-123",
-      },
       body: JSON.stringify(fakeEvent),
     });
+    const headers = new Headers(init.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("Authorization")).toBe("Bearer secret-123");
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 

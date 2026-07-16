@@ -130,6 +130,8 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  vi.stubEnv("GAME_WORKER_URL", "https://worker.example.test");
+  vi.stubEnv("GAME_WORKER_SECRET", "secret");
   authMock.mockReset();
   rateLimitMock.mockReset();
   requirePlayableDeckMock.mockReset();
@@ -362,6 +364,111 @@ describe("POST /api/lobbies/[id]/start", () => {
       where: { id: "lobby-1" },
       data: { status: "READY" },
     });
+  });
+
+  it("rolls back GameSession and lobby status when worker init times out", async () => {
+    vi.useFakeTimers();
+    try {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      let markFetchStarted: (() => void) | undefined;
+      const fetchStarted = new Promise<void>((resolve) => {
+        markFetchStarted = resolve;
+      });
+      vi.stubGlobal("fetch", vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            markFetchStarted?.();
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("aborted", "AbortError"));
+            });
+          }),
+      ));
+
+      const pending = POST(buildRequest(), params);
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(2_000);
+      const res = await pending;
+
+      expect(res.status).toBe(502);
+      expect(consoleError).toHaveBeenCalledWith(
+        "[lobbies:start] worker init request failed",
+        expect.objectContaining({ name: "AbortError" }),
+      );
+      expect(transactionMock).toHaveBeenNthCalledWith(2, [
+        { query: "delete-game" },
+        { query: "update-lobby" },
+      ]);
+      expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+      expect(lobbyUpdateMock).toHaveBeenCalledWith({
+        where: { id: "lobby-1" },
+        data: { status: "READY" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rolls back when worker init returns error headers but stalls its body", async () => {
+    vi.useFakeTimers();
+    try {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      let markFetchStarted: (() => void) | undefined;
+      const fetchStarted = new Promise<void>((resolve) => {
+        markFetchStarted = resolve;
+      });
+      vi.stubGlobal("fetch", vi.fn(
+        async (_url: string, init?: RequestInit) => {
+          markFetchStarted?.();
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                init?.signal?.addEventListener("abort", () => {
+                  controller.error(new DOMException("aborted", "AbortError"));
+                });
+              },
+            }),
+            { status: 500 },
+          );
+        },
+      ));
+
+      const pending = POST(buildRequest(), params);
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(2_000);
+      const res = await pending;
+
+      expect(res.status).toBe(502);
+      expect(consoleError).toHaveBeenCalledWith(
+        "[lobbies:start] worker init request failed",
+        expect.objectContaining({ name: "AbortError" }),
+      );
+      expect(transactionMock).toHaveBeenNthCalledWith(2, [
+        { query: "delete-game" },
+        { query: "update-lobby" },
+      ]);
+      expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+      expect(lobbyUpdateMock).toHaveBeenCalledWith({
+        where: { id: "lobby-1" },
+        data: { status: "READY" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves the 503 response when worker configuration is missing", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubEnv("GAME_WORKER_URL", "");
+
+    const res = await POST(buildRequest(), params);
+
+    expect(res.status).toBe(503);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[lobbies:start] game worker configuration missing",
+    );
+    expect(requirePlayableDeckMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("rejects PVComputer start attempts until implemented", async () => {

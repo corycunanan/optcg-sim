@@ -8,14 +8,15 @@ import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { finalizeGameResult } from "@/lib/game/finalize";
 import { buildNotifyEndPayload } from "@/lib/game/notify-end";
+import {
+  gameWorkerFetch,
+  isGameWorkerConfigured,
+} from "@/lib/game-worker/client";
 import { notifyGame } from "@/lib/realtime/fanout-game";
 import { GameActionSchema } from "@/lib/validators/game";
 import type { GameEndReasonCode } from "@/lib/validators/game";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
-
-const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
-const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 
 type WinnerPerspective = "SELF" | "OPPONENT" | "NONE";
 
@@ -232,12 +233,11 @@ async function handleConcede(gameId: string, userId: string) {
   );
 
   const winnerIndex = winnerId === game.player1Id ? 0 : 1;
-  if (GAME_WORKER_URL && GAME_WORKER_SECRET) {
-    void fetch(`${GAME_WORKER_URL}/game/${game.id}/notify-end`, {
+  if (isGameWorkerConfigured()) {
+    void gameWorkerFetch(`/game/${game.id}/notify-end`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${GAME_WORKER_SECRET}`,
       },
       body: JSON.stringify(
         buildNotifyEndPayload(

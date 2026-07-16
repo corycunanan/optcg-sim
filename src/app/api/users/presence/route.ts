@@ -18,10 +18,12 @@
 import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
+import {
+  gameWorkerFetch,
+  isGameWorkerConfigured,
+} from "@/lib/game-worker/client";
 import { z } from "zod";
 
-const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
-const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 const HEALTH_TIMEOUT_MS = 1_500;
 const MAX_IDS = 200;
 const HealthResponseSchema = z.object({ connections: z.number().optional() });
@@ -105,7 +107,7 @@ function parseIds(raw: string[]): string[] {
 
 async function aggregateOnline(ids: string[]): Promise<Map<string, boolean>> {
   const result = new Map<string, boolean>();
-  if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
+  if (!isGameWorkerConfigured()) {
     // Misconfigured environment — degrade to all-offline rather than 500.
     for (const id of ids) result.set(id, false);
     return result;
@@ -121,22 +123,15 @@ async function aggregateOnline(ids: string[]): Promise<Map<string, boolean>> {
 }
 
 async function fetchHealth(userId: string): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
   try {
-    const res = await fetch(
-      `${GAME_WORKER_URL}/user/${encodeURIComponent(userId)}/health`,
-      {
-        headers: { Authorization: `Bearer ${GAME_WORKER_SECRET}` },
-        signal: controller.signal,
-      }
+    const res = await gameWorkerFetch(
+      `/user/${encodeURIComponent(userId)}/health`,
+      { timeoutMs: HEALTH_TIMEOUT_MS },
     );
     if (!res.ok) return false;
     const body = HealthResponseSchema.safeParse(await res.json());
     return body.success && (body.data.connections ?? 0) > 0;
   } catch {
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
 }

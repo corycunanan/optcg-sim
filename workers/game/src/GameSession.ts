@@ -32,6 +32,7 @@ import {
   DurableObjectSessionStorage,
   SessionRepository,
 } from "./session/persistence.js";
+import { createResultCallbackFetch } from "./session/result-callback.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
 import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
@@ -95,10 +96,14 @@ export class GameSession implements DurableObject {
     this.env = env;
     const storage = new DurableObjectSessionStorage(state.storage);
     this.authorizer = new SessionAuthorizer(storage, env.GAME_WORKER_SECRET);
-    this.repository = new SessionRepository(storage, {
-      nextJsUrl: env.NEXTJS_URL,
-      workerSecret: env.GAME_WORKER_SECRET,
-    });
+    this.repository = new SessionRepository(
+      storage,
+      {
+        nextJsUrl: env.NEXTJS_URL,
+        workerSecret: env.GAME_WORKER_SECRET,
+      },
+      createResultCallbackFetch(),
+    );
     this.transport = new SessionTransport(state, (playerIndex) =>
       this.handlePlayerAway(playerIndex, "DISCONNECTED")
     );
