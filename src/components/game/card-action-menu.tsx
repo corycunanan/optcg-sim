@@ -8,7 +8,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui";
+import { useEffectAvailability } from "@/contexts/effect-availability-context";
 import type { ActivateMainState } from "@/lib/game/activate-main";
+import {
+  BLOCKED_REASON_COPY,
+  parseEffectBlocks,
+} from "@/lib/game/effect-clauses";
 
 interface CardActionMenuContentProps {
   card: CardInstance;
@@ -26,58 +31,94 @@ interface CardActionMenuContentProps {
 export function CardActionMenuContent({
   card,
   cardDb,
-  activation,
-  canActivateNow,
   onAction,
   onClose,
 }: CardActionMenuContentProps) {
   const data = cardDb[card.cardId];
-  const hasMainEffect = !!activation;
-  const activationDisabled =
-    !activation || !canActivateNow || activation.usedThisTurn;
+  const { getEffectStatus } = useEffectAvailability();
+  const activateMainItems = parseEffectBlocks(data?.effectSchema).flatMap(
+    (block) => {
+      const isDirectActivateMain = block.triggerKeyword === "ACTIVATE_MAIN";
+      const isCompoundActivateMain =
+        !isDirectActivateMain &&
+        block.triggerKeywords?.includes("ACTIVATE_MAIN");
+      if (
+        block.category !== "activate" ||
+        (!isDirectActivateMain && !isCompoundActivateMain)
+      ) {
+        return [];
+      }
 
-  const handleActivate = useCallback(() => {
-    if (!activation || activationDisabled) return;
-    onAction({
-      type: "ACTIVATE_EFFECT",
-      cardInstanceId: card.instanceId,
-      effectId: activation.effectId,
-    });
-    onClose();
-  }, [activation, activationDisabled, card.instanceId, onAction, onClose]);
+      const availability = getEffectStatus(card.instanceId, block.id);
+      if (isCompoundActivateMain && availability?.status !== "usable") {
+        return [];
+      }
 
-  const actionLabel = !activation
-    ? "No [Main] effect"
-    : activation.usedThisTurn
-      ? "Used this turn"
-      : !canActivateNow
-        ? "Available during your Main phase"
-        : "Activate [Main] effect";
+      return [{ block, availability }];
+    }
+  );
+
+  const handleActivate = useCallback(
+    (effectId: string) => {
+      onAction({
+        type: "ACTIVATE_EFFECT",
+        cardInstanceId: card.instanceId,
+        effectId,
+      });
+      onClose();
+    },
+    [card.instanceId, onAction, onClose]
+  );
 
   return (
     <DropdownMenuContent
-      className="min-w-[200px] bg-gb-surface border-gb-border-strong"
+      className="bg-gb-surface border-gb-border-strong min-w-[200px]"
       sideOffset={4}
     >
       <DropdownMenuLabel className="text-gb-text-bright">
-        <span className="block text-xs font-bold truncate">
+        <span className="block truncate text-xs font-bold">
           {data?.name ?? "Unknown Card"}
         </span>
-        <span className="block text-xs font-normal text-gb-text-dim">
+        <span className="text-gb-text-dim block text-xs font-normal">
           {data?.type}
         </span>
       </DropdownMenuLabel>
       <DropdownMenuSeparator className="bg-gb-border" />
-      <DropdownMenuItem
-        onClick={handleActivate}
-        disabled={activationDisabled}
-        className="text-sm text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised"
-      >
-        <span className="text-xs shrink-0">
-          {hasMainEffect ? "\u26A1" : "\u2014"}
-        </span>
-        <span>{actionLabel}</span>
-      </DropdownMenuItem>
+      {activateMainItems.length === 0 ? (
+        <DropdownMenuItem
+          disabled
+          className="text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised text-sm"
+        >
+          <span className="shrink-0 text-xs">{"\u2014"}</span>
+          <span>No [Main] effect</span>
+        </DropdownMenuItem>
+      ) : (
+        activateMainItems.map(({ block, availability }) => {
+          const disabled =
+            availability !== null && availability.status !== "usable";
+          const disabledReason =
+            availability?.status === "used"
+              ? BLOCKED_REASON_COPY.ONCE_PER_TURN
+              : availability?.status === "blocked" && availability.reason
+                ? BLOCKED_REASON_COPY[availability.reason]
+                : undefined;
+
+          return (
+            <DropdownMenuItem
+              key={block.id}
+              onClick={() => handleActivate(block.id)}
+              disabled={disabled}
+              className="text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised text-sm"
+            >
+              <span className="shrink-0 text-xs">{"\u26A1"}</span>
+              <span>Activate [Main] effect</span>
+              {disabledReason && (
+                <span className="ml-auto text-xs">{disabledReason}</span>
+              )}
+            </DropdownMenuItem>
+          );
+        })
+      )}
     </DropdownMenuContent>
   );
 }
