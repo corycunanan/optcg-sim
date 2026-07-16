@@ -113,7 +113,7 @@ describe("CardActionMenuContent", () => {
     expect(item.props.disabled).toBe(false);
   });
 
-  it("renders every Activate Main block, including compound triggers", () => {
+  it("fails compound triggers closed until usable and dispatches each rendered block id", () => {
     const compoundCardDb = {
       "TEST-001": {
         ...cardDb["TEST-001"],
@@ -128,19 +128,43 @@ describe("CardActionMenuContent", () => {
               id: "activate-main-2",
               category: "activate",
               trigger: {
-                any_of: [
-                  { keyword: "ON_PLAY" },
-                  { keyword: "ACTIVATE_MAIN" },
-                ],
+                any_of: [{ keyword: "ON_PLAY" }, { keyword: "ACTIVATE_MAIN" }],
               },
             },
           ],
         },
       },
     } as unknown as CardDb;
+    const onAction = vi.fn();
 
+    const missingAvailabilityItems = actionItems(
+      renderMenu(undefined, { cardDb: compoundCardDb, onAction })
+    );
+    expect(missingAvailabilityItems).toHaveLength(1);
+    act(() => missingAvailabilityItems[0].props.onClick());
+    expect(onAction).toHaveBeenLastCalledWith({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: "card-1",
+      effectId: "activate-main-1",
+    });
+
+    const usableItems = actionItems(
+      renderMenu(
+        {
+          "card-1": [{ effectId: "activate-main-2", status: "usable" }],
+        },
+        { cardDb: compoundCardDb, onAction }
+      )
+    );
+    expect(usableItems).toHaveLength(2);
+    expect(usableItems.every((item) => item.props.disabled === false)).toBe(
+      true
+    );
+
+    act(() => usableItems[0].props.onClick());
+    act(() => usableItems[1].props.onClick());
     expect(
-      actionItems(renderMenu(undefined, { cardDb: compoundCardDb }))
-    ).toHaveLength(2);
+      onAction.mock.calls.slice(-2).map(([action]) => action.effectId)
+    ).toEqual(["activate-main-1", "activate-main-2"]);
   });
 });

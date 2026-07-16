@@ -36,11 +36,26 @@ export function CardActionMenuContent({
 }: CardActionMenuContentProps) {
   const data = cardDb[card.cardId];
   const { getEffectStatus } = useEffectAvailability();
-  const activateMainBlocks = parseEffectBlocks(data?.effectSchema).filter(
-    (block) =>
-      block.category === "activate" &&
-      (block.triggerKeyword === "ACTIVATE_MAIN" ||
-        block.triggerKeywords?.includes("ACTIVATE_MAIN"))
+  const activateMainItems = parseEffectBlocks(data?.effectSchema).flatMap(
+    (block) => {
+      const isDirectActivateMain = block.triggerKeyword === "ACTIVATE_MAIN";
+      const isCompoundActivateMain =
+        !isDirectActivateMain &&
+        block.triggerKeywords?.includes("ACTIVATE_MAIN");
+      if (
+        block.category !== "activate" ||
+        (!isDirectActivateMain && !isCompoundActivateMain)
+      ) {
+        return [];
+      }
+
+      const availability = getEffectStatus(card.instanceId, block.id);
+      if (isCompoundActivateMain && availability?.status !== "usable") {
+        return [];
+      }
+
+      return [{ block, availability }];
+    }
   );
 
   const handleActivate = useCallback(
@@ -57,29 +72,28 @@ export function CardActionMenuContent({
 
   return (
     <DropdownMenuContent
-      className="min-w-[200px] bg-gb-surface border-gb-border-strong"
+      className="bg-gb-surface border-gb-border-strong min-w-[200px]"
       sideOffset={4}
     >
       <DropdownMenuLabel className="text-gb-text-bright">
-        <span className="block text-xs font-bold truncate">
+        <span className="block truncate text-xs font-bold">
           {data?.name ?? "Unknown Card"}
         </span>
-        <span className="block text-xs font-normal text-gb-text-dim">
+        <span className="text-gb-text-dim block text-xs font-normal">
           {data?.type}
         </span>
       </DropdownMenuLabel>
       <DropdownMenuSeparator className="bg-gb-border" />
-      {activateMainBlocks.length === 0 ? (
+      {activateMainItems.length === 0 ? (
         <DropdownMenuItem
           disabled
-          className="text-sm text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised"
+          className="text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised text-sm"
         >
-          <span className="text-xs shrink-0">{"\u2014"}</span>
+          <span className="shrink-0 text-xs">{"\u2014"}</span>
           <span>No [Main] effect</span>
         </DropdownMenuItem>
       ) : (
-        activateMainBlocks.map((block) => {
-          const availability = getEffectStatus(card.instanceId, block.id);
+        activateMainItems.map(({ block, availability }) => {
           const disabled =
             availability !== null && availability.status !== "usable";
           const disabledReason =
@@ -94,9 +108,9 @@ export function CardActionMenuContent({
               key={block.id}
               onClick={() => handleActivate(block.id)}
               disabled={disabled}
-              className="text-sm text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised"
+              className="text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised text-sm"
             >
-              <span className="text-xs shrink-0">{"\u26A1"}</span>
+              <span className="shrink-0 text-xs">{"\u26A1"}</span>
               <span>Activate [Main] effect</span>
               {disabledReason && (
                 <span className="ml-auto text-xs">{disabledReason}</span>
