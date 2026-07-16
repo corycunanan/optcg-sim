@@ -34,9 +34,10 @@ beforeEach(() => {
 
 describe("writeResultToDb callback retries", () => {
   it("retries a transient response and succeeds on the next attempt", async () => {
+    const firstResponse = new Response("unavailable", { status: 503 });
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(firstResponse)
       .mockResolvedValueOnce(new Response("ok", { status: 200 }));
     const wait = vi.fn().mockResolvedValue(undefined);
     const repository = repositoryWith(
@@ -51,6 +52,7 @@ describe("writeResultToDb callback retries", () => {
     ).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(firstResponse.bodyUsed).toBe(true);
     expect(wait).toHaveBeenCalledWith(250);
     expect(log).not.toHaveBeenCalledWith(
       "game.result_write_failed",
@@ -94,16 +96,23 @@ describe("writeResultToDb callback retries", () => {
     );
   });
 
-  it("times out each hung attempt and remains non-fatal after exhaustion", async () => {
+  it("times out stalled response bodies and remains non-fatal after exhaustion", async () => {
     vi.useFakeTimers();
     try {
       const fetchMock = vi.fn(
         (_url: string, init?: RequestInit) =>
-          new Promise<Response>((_resolve, reject) => {
-            init?.signal?.addEventListener("abort", () => {
-              reject(new DOMException("aborted", "AbortError"));
-            });
-          })
+          Promise.resolve(
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  init?.signal?.addEventListener("abort", () => {
+                    controller.error(new DOMException("aborted", "AbortError"));
+                  });
+                },
+              }),
+              { status: 500 }
+            )
+          )
       );
       const wait = vi.fn().mockResolvedValue(undefined);
       const consoleError = vi

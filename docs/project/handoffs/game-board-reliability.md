@@ -1,12 +1,12 @@
 ---
 linear-project: Game Board Reliability
 linear-project-url: https://linear.app/optcg-sim/project/game-board-reliability-dff1375ce5d6
-last-updated: 2026-05-01
+last-updated: 2026-07-15
 ---
 
 # Game Board Reliability — Handoff Doc
 
-Bugs and performance issues affecting game board stability under load — WebSocket drops, race conditions, render throttling. Currently winding down: OPT-350 closes the disconnect-flicker storyline, leaving OPT-162 (memoization + action throttle) as the only remaining active ticket.
+Bugs and performance issues affecting game board stability under load — WebSocket drops, race conditions, render throttling, and worker-boundary reliability. OPT-376 is in review alongside the remaining OPT-162 performance backlog.
 
 ---
 
@@ -18,6 +18,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 |-------|---------|------------------------------------------------------------------|----------|------------|-------------|----|-------|
 | 1     | OPT-350 | Fix runaway WebSocket reconnect loop (Solitaire OPPONENT AWAY)   | 2        | —          | In Review   | [#204](https://github.com/corycunanan/optcg-sim/pull/204) | Both layers — client orphan-onclose guard + server DISCONNECTED debounce. |
 | 2     | OPT-162 | Add React.memo to field components and throttle game actions     | 3        | —          | Backlog     | —  | Pure perf hardening; independent of OPT-350. |
+| 3     | OPT-376 | Game-worker fetches: add timeouts + retry, extract shared client | —        | —          | In Review   | [#352](https://github.com/corycunanan/optcg-sim/pull/352) | Shared app client with headers-and-body deadlines; bounded, idempotent result-callback retries. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 

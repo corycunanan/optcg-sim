@@ -112,6 +112,51 @@ describe("GET /api/users/presence", () => {
     expect(body.data["friend-x"]).toEqual({ online: false, lastSeen: null });
   });
 
+  it("treats a stalled worker health body as offline within the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      friendshipFindManyMock.mockResolvedValue([
+        { userAId: "user-self", userBId: "friend-x" },
+      ]);
+      userFindManyMock.mockResolvedValue([
+        { id: "friend-x", lastSeen: null },
+      ]);
+      let markFetchStarted: (() => void) | undefined;
+      const fetchStarted = new Promise<void>((resolve) => {
+        markFetchStarted = resolve;
+      });
+      fetchMock.mockImplementation(
+        async (_url: string, init?: RequestInit) => {
+          markFetchStarted?.();
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                init?.signal?.addEventListener("abort", () => {
+                  controller.error(new DOMException("aborted", "AbortError"));
+                });
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+      );
+
+      const pending = GET(buildRequest(["friend-x"]));
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(1_500);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data["friend-x"]).toEqual({ online: false, lastSeen: null });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("treats every visible friend as offline when worker configuration is missing", async () => {
     vi.stubEnv("GAME_WORKER_SECRET", "");
     friendshipFindManyMock.mockResolvedValue([

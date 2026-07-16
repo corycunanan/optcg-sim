@@ -78,4 +78,39 @@ describe("gameWorkerFetch", () => {
       vi.useRealTimers();
     }
   });
+
+  it("does not install timeout resources when header validation fails", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn();
+      const callerController = new AbortController();
+      const addEventListener = vi.spyOn(
+        callerController.signal,
+        "addEventListener"
+      );
+      const removeEventListener = vi.spyOn(
+        callerController.signal,
+        "removeEventListener"
+      );
+
+      await expect(
+        gameWorkerFetch(
+          "/health",
+          { signal: callerController.signal },
+          {
+            fetch: fetchMock,
+            workerUrl: "https://worker.example",
+            workerSecret: "bad\nsecret",
+          }
+        )
+      ).rejects.toThrow(/invalid header value/i);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(addEventListener).not.toHaveBeenCalled();
+      expect(removeEventListener).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -39,6 +39,11 @@ export async function gameWorkerFetch(
     signal: callerSignal,
     ...requestInit
   } = init;
+  // Header validation can throw. Finish it before installing abort resources
+  // so malformed configuration cannot leak a timer or caller-signal listener.
+  const headers = new Headers(requestInit.headers);
+  headers.set("Authorization", `Bearer ${workerSecret}`);
+
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort(callerSignal?.reason);
 
@@ -49,11 +54,9 @@ export async function gameWorkerFetch(
   }
 
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const headers = new Headers(requestInit.headers);
-  headers.set("Authorization", `Bearer ${workerSecret}`);
 
   try {
-    return await (deps.fetch ?? globalThis.fetch)(
+    const response = await (deps.fetch ?? globalThis.fetch)(
       buildWorkerUrl(workerUrl, path),
       {
         ...requestInit,
@@ -61,10 +64,21 @@ export async function gameWorkerFetch(
         signal: controller.signal,
       }
     );
+    const bodyText = await response.text();
+    return bufferedResponse(response, bodyText);
   } finally {
     clearTimeout(timeoutId);
     callerSignal?.removeEventListener("abort", abortFromCaller);
   }
+}
+
+function bufferedResponse(response: Response, bodyText: string): Response {
+  const body = [204, 205, 304].includes(response.status) ? null : bodyText;
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 function readGameWorkerConfig(deps: GameWorkerClientDeps) {

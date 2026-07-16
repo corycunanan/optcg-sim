@@ -53,6 +53,11 @@ export function createResultCallbackFetch(
           });
           return response;
         }
+
+        // The network body was already materialized under this attempt's
+        // deadline. Cancel the in-memory retry response before backoff so no
+        // response body remains open across attempts.
+        await response.body?.cancel();
       } catch (error) {
         lastError = error;
         if (attempt === maxAttempts) {
@@ -94,11 +99,25 @@ async function fetchWithTimeout(
 
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetchImpl(input, { ...init, signal: controller.signal });
+    const response = await fetchImpl(input, {
+      ...init,
+      signal: controller.signal,
+    });
+    const bodyText = await response.text();
+    return bufferedResponse(response, bodyText);
   } finally {
     clearTimeout(timeoutId);
     callerSignal?.removeEventListener("abort", abortFromCaller);
   }
+}
+
+function bufferedResponse(response: Response, bodyText: string): Response {
+  const body = [204, 205, 304].includes(response.status) ? null : bodyText;
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 function isRetryableStatus(status: number): boolean {

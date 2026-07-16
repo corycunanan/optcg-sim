@@ -408,6 +408,54 @@ describe("POST /api/lobbies/[id]/start", () => {
     }
   });
 
+  it("rolls back when worker init returns error headers but stalls its body", async () => {
+    vi.useFakeTimers();
+    try {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      let markFetchStarted: (() => void) | undefined;
+      const fetchStarted = new Promise<void>((resolve) => {
+        markFetchStarted = resolve;
+      });
+      vi.stubGlobal("fetch", vi.fn(
+        async (_url: string, init?: RequestInit) => {
+          markFetchStarted?.();
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                init?.signal?.addEventListener("abort", () => {
+                  controller.error(new DOMException("aborted", "AbortError"));
+                });
+              },
+            }),
+            { status: 500 },
+          );
+        },
+      ));
+
+      const pending = POST(buildRequest(), params);
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(2_000);
+      const res = await pending;
+
+      expect(res.status).toBe(502);
+      expect(consoleError).toHaveBeenCalledWith(
+        "[lobbies:start] worker init request failed",
+        expect.objectContaining({ name: "AbortError" }),
+      );
+      expect(transactionMock).toHaveBeenNthCalledWith(2, [
+        { query: "delete-game" },
+        { query: "update-lobby" },
+      ]);
+      expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+      expect(lobbyUpdateMock).toHaveBeenCalledWith({
+        where: { id: "lobby-1" },
+        data: { status: "READY" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("preserves the 503 response when worker configuration is missing", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubEnv("GAME_WORKER_URL", "");
