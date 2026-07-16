@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type {
   ActiveEffect,
   CardDb,
+  EffectAvailability,
   GameAction,
   GameEvent,
   PlayerState,
@@ -33,6 +34,7 @@ import { OpponentField } from "./opponent-field";
 import { PlayerField } from "./player-field";
 import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
 import { ActiveEffectsProvider } from "@/contexts/active-effects-context";
+import { EffectAvailabilityProvider } from "@/contexts/effect-availability-context";
 import {
   InteractionModeProvider,
   type InteractionMode,
@@ -63,6 +65,7 @@ export interface BoardLayoutProps {
   connectionStatus: string;
   eventLog: GameEvent[];
   activeEffects: ActiveEffect[];
+  effectAvailability?: Record<string, EffectAvailability[]>;
   activePrompt: PromptOptions | null;
   activePromptId: string | null;
   onAction: (action: GameAction) => void;
@@ -94,11 +97,15 @@ export function BoardLayout(props: BoardLayoutProps) {
   return (
     <ZonePositionProvider>
       <ActiveEffectsProvider value={props.activeEffects}>
-        <ActionFeedbackProvider rejection={props.actionRejection ?? null}>
-          <InteractionModeProvider value={interactionMode}>
-            <BoardLayoutInner {...props} interactionMode={interactionMode} />
-          </InteractionModeProvider>
-        </ActionFeedbackProvider>
+        <EffectAvailabilityProvider
+          effectAvailability={props.effectAvailability}
+        >
+          <ActionFeedbackProvider rejection={props.actionRejection ?? null}>
+            <InteractionModeProvider value={interactionMode}>
+              <BoardLayoutInner {...props} interactionMode={interactionMode} />
+            </InteractionModeProvider>
+          </ActionFeedbackProvider>
+        </EffectAvailabilityProvider>
       </ActiveEffectsProvider>
     </ZonePositionProvider>
   );
