@@ -8,14 +8,16 @@
  */
 
 import type { RealtimeServerEvent } from "@/types/realtime";
+import {
+  gameWorkerFetch,
+  isGameWorkerConfigured,
+  type GameWorkerClientDeps,
+} from "@/lib/game-worker/client";
 
 const NOTIFY_TIMEOUT_MS = 2_000;
 
 /** Test seam — production callers leave this undefined. */
-export interface NotifyUserDeps {
-  fetch?: typeof fetch;
-  workerUrl?: string;
-  workerSecret?: string;
+export interface NotifyUserDeps extends GameWorkerClientDeps {
   /** Defaults to console.warn — useful for capturing structured logs in tests. */
   logger?: (message: string, fields: Record<string, unknown>) => void;
 }
@@ -25,14 +27,11 @@ export async function notifyUser(
   event: RealtimeServerEvent,
   deps: NotifyUserDeps = {},
 ): Promise<void> {
-  const fetchImpl = deps.fetch ?? globalThis.fetch;
-  const workerUrl = deps.workerUrl ?? process.env.GAME_WORKER_URL ?? "";
-  const workerSecret = deps.workerSecret ?? process.env.GAME_WORKER_SECRET ?? "";
   const log = deps.logger ?? defaultLogger;
 
   const eventType = event.type;
 
-  if (!workerUrl || !workerSecret) {
+  if (!isGameWorkerConfigured(deps)) {
     log("realtime fanout misconfigured", {
       source: "realtime.fan-out",
       targetUserId,
@@ -42,19 +41,19 @@ export async function notifyUser(
     return;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), NOTIFY_TIMEOUT_MS);
-
   try {
-    const res = await fetchImpl(`${workerUrl}/user/${encodeURIComponent(targetUserId)}/notify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${workerSecret}`,
+    const res = await gameWorkerFetch(
+      `/user/${encodeURIComponent(targetUserId)}/notify`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+        timeoutMs: NOTIFY_TIMEOUT_MS,
       },
-      body: JSON.stringify(event),
-      signal: controller.signal,
-    });
+      deps,
+    );
     if (!res.ok) {
       log("realtime fanout non-ok response", {
         source: "realtime.fan-out",
@@ -70,8 +69,6 @@ export async function notifyUser(
       eventType,
       error: error instanceof Error ? error.message : String(error),
     });
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 

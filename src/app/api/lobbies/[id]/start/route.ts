@@ -11,6 +11,10 @@ import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
 import { buildGameInitPayload } from "@/lib/game/init-payload";
 import {
+  gameWorkerFetch,
+  isGameWorkerConfigured,
+} from "@/lib/game-worker/client";
+import {
   DECK_INVALID_CODE,
   DeckInvalidError,
   DeckNotFoundError,
@@ -19,9 +23,6 @@ import {
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
-
-const GAME_WORKER_URL = process.env.GAME_WORKER_URL ?? "";
-const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -76,7 +77,7 @@ export async function POST(
       return apiError("PVComputer mode is not yet implemented", 501);
     }
 
-    if (!GAME_WORKER_URL || !GAME_WORKER_SECRET) {
+    if (!isGameWorkerConfigured()) {
       console.error("[lobbies:start] game worker configuration missing");
       return apiError("Game server not configured", 503);
     }
@@ -158,14 +159,16 @@ export async function POST(
 
     let workerRes: Response;
     try {
-      workerRes = await fetch(`${GAME_WORKER_URL}/game/${startResult.gameSession.id}/init`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${GAME_WORKER_SECRET}`,
+      workerRes = await gameWorkerFetch(
+        `/game/${startResult.gameSession.id}/init`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
     } catch (error) {
       console.error("[lobbies:start] worker init request failed", error);
       await prisma.$transaction([
