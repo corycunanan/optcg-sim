@@ -6,6 +6,8 @@
 
 import { z } from "zod";
 
+import type { GameAction } from "../game-types";
+
 const id = () => z.string().min(1);
 const promptId = { promptId: id().optional() };
 
@@ -153,6 +155,67 @@ export const GameActionSchema = z.discriminatedUnion("type", [
   ManualEffect,
   Undo,
 ]);
+
+type ActionOf<T extends GameAction["type"]> = Extract<GameAction, { type: T }>;
+type IsExact<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? (<T>() => T extends B ? 1 : 2) extends <T>() => T extends A ? 1 : 2
+      ? true
+      : false
+    : false;
+type Assert<T extends true> = T;
+
+/** One erased compile-time assertion for each action schema. */
+type ActionSchemaAssertions = {
+  ADVANCE_PHASE: Assert<
+    IsExact<z.infer<typeof AdvancePhase>, ActionOf<"ADVANCE_PHASE">>
+  >;
+  PLAY_CARD: Assert<IsExact<z.infer<typeof PlayCard>, ActionOf<"PLAY_CARD">>>;
+  ATTACH_DON: Assert<
+    IsExact<z.infer<typeof AttachDon>, ActionOf<"ATTACH_DON">>
+  >;
+  ACTIVATE_EFFECT: Assert<
+    IsExact<z.infer<typeof ActivateEffect>, ActionOf<"ACTIVATE_EFFECT">>
+  >;
+  DECLARE_ATTACK: Assert<
+    IsExact<z.infer<typeof DeclareAttack>, ActionOf<"DECLARE_ATTACK">>
+  >;
+  DECLARE_BLOCKER: Assert<
+    IsExact<z.infer<typeof DeclareBlocker>, ActionOf<"DECLARE_BLOCKER">>
+  >;
+  USE_COUNTER: Assert<
+    IsExact<z.infer<typeof UseCounter>, ActionOf<"USE_COUNTER">>
+  >;
+  USE_COUNTER_EVENT: Assert<
+    IsExact<z.infer<typeof UseCounterEvent>, ActionOf<"USE_COUNTER_EVENT">>
+  >;
+  REVEAL_TRIGGER: Assert<
+    IsExact<z.infer<typeof RevealTrigger>, ActionOf<"REVEAL_TRIGGER">>
+  >;
+  ARRANGE_TOP_CARDS: Assert<
+    IsExact<z.infer<typeof ArrangeTopCards>, ActionOf<"ARRANGE_TOP_CARDS">>
+  >;
+  SELECT_TARGET: Assert<
+    IsExact<z.infer<typeof SelectTarget>, ActionOf<"SELECT_TARGET">>
+  >;
+  REDISTRIBUTE_DON: Assert<
+    IsExact<z.infer<typeof RedistributeDon>, ActionOf<"REDISTRIBUTE_DON">>
+  >;
+  PLAYER_CHOICE: Assert<
+    IsExact<z.infer<typeof PlayerChoice>, ActionOf<"PLAYER_CHOICE">>
+  >;
+  PASS: Assert<IsExact<z.infer<typeof Pass>, ActionOf<"PASS">>>;
+  CONCEDE: Assert<IsExact<z.infer<typeof Concede>, ActionOf<"CONCEDE">>>;
+  MANUAL_EFFECT: Assert<
+    IsExact<z.infer<typeof ManualEffect>, ActionOf<"MANUAL_EFFECT">>
+  >;
+  UNDO: Assert<IsExact<z.infer<typeof Undo>, ActionOf<"UNDO">>>;
+};
+
+/** Ensures every GameAction variant has a corresponding schema assertion. */
+export type GameActionSchemaAssertions = Assert<
+  IsExact<keyof ActionSchemaAssertions, GameAction["type"]>
+>;
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("game:leave") }).strict(),
