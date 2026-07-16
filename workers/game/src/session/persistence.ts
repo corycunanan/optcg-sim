@@ -28,10 +28,11 @@ import {
 
 export const SESSION_STORAGE_KEY = "session";
 export const SESSION_CARD_DB_STORAGE_KEY = "session:card-db";
+export const SESSION_UNDO_HISTORY_STORAGE_KEY = "session:undo-history";
 /** SQLite-backed Durable Object values are limited to 2 MB; keep 25% headroom. */
 export const SESSION_VALUE_HARD_LIMIT_BYTES = 1_500_000;
 export const SESSION_VALUE_SOFT_LIMIT_BYTES = 1_000_000;
-export const SESSION_STORAGE_FORMAT_VERSION = 2;
+export const SESSION_STORAGE_FORMAT_VERSION = 3;
 
 export interface SessionStorage extends TokenJtiStorage {
   put(key: string, value: unknown): Promise<void>;
@@ -76,29 +77,29 @@ export interface SessionSnapshot {
 }
 
 export interface StoredSession {
-  formatVersion: 1 | 2;
+  formatVersion: 1 | 2 | 3;
   state: GameState;
   cardDb: Record<string, CardData>;
   /** Legacy OPT-366 field retained for structured-clone compatibility. */
   mulliganDone?: [boolean, boolean];
   mode?: LobbyMode;
   testPriorityRolls?: number[] | null;
-  undoHistory?: GameState[];
+  undoHistory: GameState[];
   historySummary: EventHistorySummary;
 }
 
 interface PersistedSession {
-  formatVersion: 2;
+  formatVersion: 3;
   state: GameState;
   mode: LobbyMode;
   testPriorityRolls: number[] | null;
-  undoHistory: GameState[];
   historySummary: EventHistorySummary;
 }
 
 export interface SessionPersistenceMetrics {
   sessionBytes: number;
   cardDbBytes: number;
+  undoHistoryBytes: number;
   recentEventCount: number;
   compactedEventCount: number;
   undoSnapshotCount: number;
@@ -107,7 +108,7 @@ export interface SessionPersistenceMetrics {
 
 export class SessionPersistenceLimitError extends Error {
   constructor(
-    readonly valueName: "session" | "cardDb",
+    readonly valueName: "session" | "cardDb" | "undoHistory",
     readonly bytes: number,
     readonly limitBytes: number,
   ) {
@@ -152,11 +153,12 @@ export class SessionRepository {
       state: compacted.state,
       mode: snapshot.mode,
       testPriorityRolls: snapshot.testPriorityRolls,
-      undoHistory: compacted.undoHistory,
       historySummary: compacted.historySummary,
     };
     const sessionBytes = serializedByteLength(stored);
     assertWithinValueLimit("session", sessionBytes);
+    const undoHistoryBytes = serializedByteLength(compacted.undoHistory);
+    assertWithinValueLimit("undoHistory", undoHistoryBytes);
 
     const needsCardDb = this.persistedGameId !== compacted.state.id;
     let cardDbRecord: Record<string, CardData> | null = null;
@@ -167,14 +169,15 @@ export class SessionRepository {
       assertWithinValueLimit("cardDb", cardDbBytes);
     }
 
-    if (cardDbRecord) {
-      await this.storage.put({
-        [SESSION_CARD_DB_STORAGE_KEY]: cardDbRecord,
-        [SESSION_STORAGE_KEY]: stored,
-      });
-    } else {
-      await this.storage.put(SESSION_STORAGE_KEY, stored);
-    }
+    await this.storage.put({
+      ...(cardDbRecord
+        ? {
+            [SESSION_CARD_DB_STORAGE_KEY]: cardDbRecord,
+          }
+        : {}),
+      [SESSION_STORAGE_KEY]: stored,
+      [SESSION_UNDO_HISTORY_STORAGE_KEY]: compacted.undoHistory,
+    });
 
     this.historySummary = compacted.historySummary;
     this.persistedGameId = compacted.state.id;
@@ -182,12 +185,14 @@ export class SessionRepository {
     this.lastMetrics = {
       sessionBytes,
       cardDbBytes,
+      undoHistoryBytes,
       recentEventCount: compacted.state.eventLog.length,
       compactedEventCount: compacted.historySummary.compactedEventCount,
       undoSnapshotCount: compacted.undoHistory.length,
       softLimitExceeded:
         sessionBytes > SESSION_VALUE_SOFT_LIMIT_BYTES ||
-        cardDbBytes > SESSION_VALUE_SOFT_LIMIT_BYTES,
+        cardDbBytes > SESSION_VALUE_SOFT_LIMIT_BYTES ||
+        undoHistoryBytes > SESSION_VALUE_SOFT_LIMIT_BYTES,
     };
     if (this.lastMetrics.softLimitExceeded) {
       console.warn("[GameSession] persistence soft limit exceeded", {
@@ -207,10 +212,17 @@ export class SessionRepository {
     if (!raw) return null;
     const embeddedCardDb =
       isRecord(raw) && isRecord(raw.cardDb) ? raw.cardDb : undefined;
-    const separateCardDb = embeddedCardDb
-      ? undefined
-      : await this.storage.get<unknown>(SESSION_CARD_DB_STORAGE_KEY);
-    const stored = parseStoredSession(raw, separateCardDb);
+    const hasEmbeddedUndoHistory =
+      isRecord(raw) && raw.undoHistory !== undefined;
+    const [separateCardDb, separateUndoHistory] = await Promise.all([
+      embeddedCardDb
+        ? Promise.resolve(undefined)
+        : this.storage.get<unknown>(SESSION_CARD_DB_STORAGE_KEY),
+      hasEmbeddedUndoHistory
+        ? Promise.resolve(undefined)
+        : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
+    ]);
+    const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
     const restoredState = ensureExecutionContext(stored.state);
     const restoredUndoHistory = (stored.undoHistory ?? []).map((snapshot) =>
       ensureExecutionContext(snapshot),
@@ -226,12 +238,15 @@ export class SessionRepository {
     this.lastMetrics = {
       sessionBytes: serializedByteLength(raw),
       cardDbBytes: this.cardDbBytes,
+      undoHistoryBytes: serializedByteLength(stored.undoHistory),
       recentEventCount: compacted.state.eventLog.length,
       compactedEventCount: compacted.historySummary.compactedEventCount,
       undoSnapshotCount: compacted.undoHistory.length,
       softLimitExceeded:
         serializedByteLength(raw) > SESSION_VALUE_SOFT_LIMIT_BYTES ||
-        this.cardDbBytes > SESSION_VALUE_SOFT_LIMIT_BYTES,
+        this.cardDbBytes > SESSION_VALUE_SOFT_LIMIT_BYTES ||
+        serializedByteLength(stored.undoHistory) >
+          SESSION_VALUE_SOFT_LIMIT_BYTES,
     };
     return {
       state: compacted.state,
@@ -607,6 +622,7 @@ function parseStoredGameState(raw: unknown): GameState {
 export function parseStoredSession(
   raw: unknown,
   separateCardDb?: unknown,
+  separateUndoHistory?: unknown,
 ): StoredSession {
   if (!isRecord(raw)) {
     throw new Error("Stored session must be an object");
@@ -616,7 +632,7 @@ export function parseStoredSession(
     throw new Error("Stored session must contain a cardDb object");
   }
   const formatVersion = raw.formatVersion ?? 1;
-  if (formatVersion !== 1 && formatVersion !== 2) {
+  if (formatVersion !== 1 && formatVersion !== 2 && formatVersion !== 3) {
     throw new Error("Stored session formatVersion is invalid");
   }
   const cardDb: Record<string, CardData> = {};
@@ -636,7 +652,10 @@ export function parseStoredSession(
   if (!isPriorityRollSequence(testPriorityRolls)) {
     throw new Error("Stored session testPriorityRolls is invalid");
   }
-  const undoHistoryRaw = raw.undoHistory ?? [];
+  const undoHistoryRaw = raw.undoHistory ?? separateUndoHistory ?? [];
+  if (formatVersion === 3 && separateUndoHistory === undefined) {
+    throw new Error("Stored session must contain separate undoHistory");
+  }
   if (!Array.isArray(undoHistoryRaw))
     throw new Error("Stored session undoHistory is invalid");
   return {
@@ -751,7 +770,7 @@ function serializedByteLength(value: unknown): number {
 }
 
 function assertWithinValueLimit(
-  valueName: "session" | "cardDb",
+  valueName: "session" | "cardDb" | "undoHistory",
   bytes: number,
 ): void {
   if (bytes > SESSION_VALUE_HARD_LIMIT_BYTES) {
