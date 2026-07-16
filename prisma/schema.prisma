@@ -294,20 +294,22 @@ model Friendship {
 }
 
 model Message {
-  id         String    @id @default(uuid())
-  fromUserId String
-  toUserId   String
-  body       String
+  id             String    @id @default(uuid())
+  fromUserId     String
+  toUserId       String
+  idempotencyKey String    @default(dbgenerated("(gen_random_uuid())::text"))
+  body           String
   // OPT-359: `readAt` is the receipt-timestamp of truth. `read` stays in
   // sync (`read = readAt != null`) for backward compatibility with the
   // unread-count subquery in `/api/messages/conversations`.
-  read       Boolean   @default(false)
-  readAt     DateTime?
-  createdAt  DateTime  @default(now())
+  read           Boolean   @default(false)
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
 
   fromUser User @relation("SentMessages", fields: [fromUserId], references: [id])
   toUser   User @relation("ReceivedMessages", fields: [toUserId], references: [id])
 
+  @@unique([fromUserId, toUserId, idempotencyKey])
   @@index([fromUserId, toUserId, createdAt])
   @@index([toUserId, read])
   @@map("messages")

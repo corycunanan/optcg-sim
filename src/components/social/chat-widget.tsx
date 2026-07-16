@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { X, Minus, ChevronUp, Check, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -64,6 +64,11 @@ export function ChatWidget({
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
   const activeSendRef = useRef<symbol | null>(null);
+  const pendingSendRef = useRef<{
+    body: string;
+    idempotencyKey: string;
+    hadAmbiguousFailure: boolean;
+  } | null>(null);
   const historyRequestRef = useRef<symbol | null>(null);
   const lastTypingEmitRef = useRef<number>(NEVER_EMITTED);
   const lastReadCutoffRef = useRef<string>("");
@@ -84,6 +89,7 @@ export function ChatWidget({
     setBody("");
     setSending(false);
     activeSendRef.current = null;
+    pendingSendRef.current = null;
     historyRequestRef.current = null;
     setTypingUntil(null);
     lastTypingEmitRef.current = NEVER_EMITTED;
@@ -261,20 +267,49 @@ export function ChatWidget({
       e.preventDefault();
       const messageBody = body.trim();
       if (!messageBody || activeSendRef.current !== null) return;
+      const pendingSend =
+        pendingSendRef.current?.body === messageBody
+          ? pendingSendRef.current
+          : {
+              body: messageBody,
+              idempotencyKey: crypto.randomUUID(),
+              hadAmbiguousFailure: false,
+            };
+      pendingSendRef.current = pendingSend;
       const request = Symbol("send-request");
       activeSendRef.current = request;
       setSending(true);
       try {
         const json = await apiPost(
           `/api/messages/${user.id}`,
-          { body: messageBody },
+          {
+            body: messageBody,
+            idempotencyKey: pendingSend.idempotencyKey,
+          },
           SendMessageResponseSchema
         );
         if (activeSendRef.current !== request) return;
-        setMessages((prev) => [...prev, json.data]);
+        setMessages((prev) =>
+          prev.some((message) => message.id === json.data.id)
+            ? prev
+            : [...prev, json.data]
+        );
+        pendingSendRef.current = null;
         setBody("");
-      } catch {
+      } catch (error) {
         if (activeSendRef.current !== request) return;
+        const confirmedNonPersistedFailure =
+          error instanceof ApiError &&
+          error.status >= 400 &&
+          error.status < 500;
+        // Once any attempt is ambiguous, a later 4xx cannot prove that the
+        // earlier request did not persist. Keep its key until success so a
+        // late commit and the eventual retry deduplicate at the database.
+        if (confirmedNonPersistedFailure && !pendingSend.hadAmbiguousFailure) {
+          pendingSendRef.current = null;
+        } else if (!confirmedNonPersistedFailure) {
+          pendingSend.hadAmbiguousFailure = true;
+        }
         toast.error("Message couldn't be sent. Try again.");
       } finally {
         if (activeSendRef.current === request) {

@@ -4,6 +4,7 @@
  */
 
 import { after, NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import {
@@ -14,6 +15,29 @@ import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { serializeMessageForEvent } from "@/lib/realtime/serialize-message";
+
+const messageWithSender = {
+  fromUser: {
+    select: { id: true, username: true, name: true, image: true },
+  },
+} satisfies Prisma.MessageInclude;
+
+function findMessageByIdempotencyKey(
+  fromUserId: string,
+  toUserId: string,
+  idempotencyKey: string,
+) {
+  return prisma.message.findUnique({
+    where: {
+      fromUserId_toUserId_idempotencyKey: {
+        fromUserId,
+        toUserId,
+        idempotencyKey,
+      },
+    },
+    include: messageWithSender,
+  });
+}
 
 export async function GET(
   request: NextRequest,
@@ -114,17 +138,32 @@ export async function POST(
 
   const { userId: toUserId } = await params;
 
-  const { limited } = await socialLimiter.check(`msg:${fromUserId}`);
-  if (limited) {
-    return apiError("Too many requests. Try again later.", 429);
-  }
-
   try {
     const parsed = await parseBody(request, SendMessageSchema);
     if (isErrorResponse(parsed)) return parsed;
-    const { body } = parsed;
+    const { body, idempotencyKey: clientIdempotencyKey } = parsed;
     if (toUserId === fromUserId) {
       return apiError("Cannot message yourself", 400);
+    }
+    // Stale clients that predate idempotent sends remain compatible. Their
+    // server-generated key is unique to this request, preserving the legacy
+    // non-idempotent behavior while satisfying the database constraint.
+    const idempotencyKey = clientIdempotencyKey ?? crypto.randomUUID();
+
+    // A retry after an ambiguous client failure must succeed even if the
+    // original request consumed the sender's rate-limit budget.
+    const existingMessage = await findMessageByIdempotencyKey(
+      fromUserId,
+      toUserId,
+      idempotencyKey,
+    );
+    if (existingMessage) {
+      return apiSuccess(existingMessage, 200);
+    }
+
+    const { limited } = await socialLimiter.check(`msg:${fromUserId}`);
+    if (limited) {
+      return apiError("Too many requests. Try again later.", 429);
     }
 
     // Verify the target user exists
@@ -133,12 +172,31 @@ export async function POST(
       return apiError("User not found", 404);
     }
 
-    const message = await prisma.message.create({
-      data: { fromUserId, toUserId, body: body.trim() },
-      include: {
-        fromUser: { select: { id: true, username: true, name: true, image: true } },
-      },
-    });
+    let message;
+    try {
+      message = await prisma.message.create({
+        data: { fromUserId, toUserId, idempotencyKey, body },
+        include: messageWithSender,
+      });
+    } catch (error) {
+      // Two requests with the same key can both miss the lookup above. The
+      // database unique index chooses the winner; the loser returns that row
+      // without repeating recipient fanout.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const concurrentMessage = await findMessageByIdempotencyKey(
+          fromUserId,
+          toUserId,
+          idempotencyKey,
+        );
+        if (concurrentMessage) {
+          return apiSuccess(concurrentMessage, 200);
+        }
+      }
+      throw error;
+    }
 
     // `after` keeps the fanout alive past the response on Vercel Fluid Compute;
     // a bare `void notifyUser()` can be cancelled when the runtime terminates.

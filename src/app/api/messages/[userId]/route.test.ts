@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const userFindUniqueMock = vi.fn();
 const messageCreateMock = vi.fn();
+const messageFindUniqueMock = vi.fn();
 const messageFindManyMock = vi.fn();
 const notifyUserMock = vi.fn();
 
@@ -29,6 +31,7 @@ vi.mock("@/lib/db", () => ({
     },
     message: {
       create: (...args: unknown[]) => messageCreateMock(...args),
+      findUnique: (...args: unknown[]) => messageFindUniqueMock(...args),
       findMany: (...args: unknown[]) => messageFindManyMock(...args),
     },
   },
@@ -63,7 +66,31 @@ function fakeMessage(i: number) {
   };
 }
 
-function buildRequest(toUserId: string, body: unknown = { body: "hello" }) {
+const idempotencyKey = "b5625bea-b3df-4a58-9e5f-1fbb44ba7901";
+
+function sentMessage() {
+  return {
+    id: "msg-1",
+    fromUserId: "user-sender",
+    toUserId: "user-recipient",
+    idempotencyKey,
+    body: "hello",
+    read: false,
+    readAt: null,
+    createdAt: new Date("2026-05-02T12:00:00.000Z"),
+    fromUser: {
+      id: "user-sender",
+      username: "ace",
+      name: "Ace",
+      image: null,
+    },
+  };
+}
+
+function buildRequest(
+  toUserId: string,
+  body: unknown = { body: "hello", idempotencyKey },
+) {
   return {
     request: new NextRequest(`http://localhost/api/messages/${toUserId}`, {
       method: "POST",
@@ -79,27 +106,15 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   userFindUniqueMock.mockReset();
   messageCreateMock.mockReset();
+  messageFindUniqueMock.mockReset();
   messageFindManyMock.mockReset();
   notifyUserMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-sender" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   userFindUniqueMock.mockResolvedValue({ id: "user-recipient" });
-  messageCreateMock.mockResolvedValue({
-    id: "msg-1",
-    fromUserId: "user-sender",
-    toUserId: "user-recipient",
-    body: "hello",
-    read: false,
-    readAt: null,
-    createdAt: new Date("2026-05-02T12:00:00.000Z"),
-    fromUser: {
-      id: "user-sender",
-      username: "ace",
-      name: "Ace",
-      image: null,
-    },
-  });
+  messageFindUniqueMock.mockResolvedValue(null);
+  messageCreateMock.mockResolvedValue(sentMessage());
   notifyUserMock.mockResolvedValue(undefined);
 });
 
@@ -216,11 +231,62 @@ describe("GET /api/messages/[userId] history branch (?cursor)", () => {
 });
 
 describe("POST /api/messages/[userId]", () => {
-  it("calls notifyUser on the recipient with the serialized message:new event", async () => {
+  it("rejects an invalid idempotency key before querying Prisma", async () => {
+    const { request, params } = buildRequest("user-recipient", {
+      body: "hello",
+      idempotencyKey: "not-a-uuid",
+    });
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(400);
+    expect(messageFindUniqueMock).not.toHaveBeenCalled();
+    expect(messageCreateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("generates a key for a legacy client that omits one", async () => {
+    const { request, params } = buildRequest("user-recipient", {
+      body: "hello",
+    });
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(201);
+    const generatedKey = messageFindUniqueMock.mock.calls[0]?.[0].where
+      .fromUserId_toUserId_idempotencyKey.idempotencyKey;
+    expect(generatedKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(messageCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          fromUserId: "user-sender",
+          toUserId: "user-recipient",
+          idempotencyKey: generatedKey,
+          body: "hello",
+        },
+      }),
+    );
+    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists a new key and notifies the recipient once", async () => {
     const { request, params } = buildRequest("user-recipient");
 
     const res = await POST(request, { params });
     expect(res.status).toBe(201);
+
+    expect(messageCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          fromUserId: "user-sender",
+          toUserId: "user-recipient",
+          idempotencyKey,
+          body: "hello",
+        },
+      }),
+    );
 
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledWith("user-recipient", {
@@ -240,6 +306,43 @@ describe("POST /api/messages/[userId]", () => {
         },
       },
     });
+  });
+
+  it("returns an existing message for a duplicate key without persisting or fanning out", async () => {
+    messageFindUniqueMock.mockResolvedValueOnce(sentMessage());
+    const { request, params } = buildRequest("user-recipient");
+
+    const res = await POST(request, { params });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.id).toBe("msg-1");
+    expect(messageCreateMock).not.toHaveBeenCalled();
+    expect(rateLimitMock).not.toHaveBeenCalled();
+    expect(userFindUniqueMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the winning row when concurrent inserts race on the same key", async () => {
+    const existingMessage = sentMessage();
+    messageCreateMock.mockReset();
+    messageCreateMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "6.19.2",
+      }),
+    );
+    messageFindUniqueMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingMessage);
+    const { request, params } = buildRequest("user-recipient");
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(messageCreateMock).toHaveBeenCalledTimes(1);
+    expect(messageFindUniqueMock).toHaveBeenCalledTimes(2);
+    expect(notifyUserMock).not.toHaveBeenCalled();
   });
 
   it("does not fan out when rate limited", async () => {
