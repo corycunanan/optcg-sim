@@ -7,6 +7,7 @@ export interface EffectBlockView {
   id: string;
   category: string;
   triggerKeyword?: string;
+  triggerKeywords?: string[];
 }
 
 export const BLOCKED_REASON_COPY: Record<string, string> = {
@@ -17,20 +18,20 @@ export const BLOCKED_REASON_COPY: Record<string, string> = {
   NO_TARGET: "no valid target",
 };
 
-const TIMING_KEYWORDS: Record<string, string> = {
-  "activate: main": "ACTIVATE_MAIN",
-  "on play": "ON_PLAY",
-  "when attacking": "WHEN_ATTACKING",
-  "when attacked": "WHEN_ATTACKED",
-  "on k.o.": "ON_KO",
-  "on block": "ON_BLOCK",
-  "on your opponent's attack": "ON_OPPONENT_ATTACK",
-  counter: "COUNTER",
-  main: "MAIN_EVENT",
-  trigger: "TRIGGER",
-  "end of your turn": "END_OF_YOUR_TURN",
-  "end of your opponent's turn": "END_OF_OPPONENT_TURN",
-  "start of your turn": "START_OF_TURN",
+const TIMING_KEYWORDS: Record<string, readonly string[]> = {
+  "activate: main": ["ACTIVATE_MAIN"],
+  "on play": ["ON_PLAY"],
+  "when attacking": ["WHEN_ATTACKING"],
+  "when attacked": ["WHEN_ATTACKED"],
+  "on k.o.": ["ON_KO"],
+  "on block": ["ON_BLOCK"],
+  "on your opponent's attack": ["ON_OPPONENT_ATTACK"],
+  counter: ["COUNTER", "COUNTER_EVENT"],
+  main: ["MAIN_EVENT"],
+  trigger: ["TRIGGER"],
+  "end of your turn": ["END_OF_YOUR_TURN"],
+  "end of your opponent's turn": ["END_OF_OPPONENT_TURN"],
+  "start of your turn": ["START_OF_TURN"],
 };
 
 const MODIFIER_TOKEN_PATTERNS = [
@@ -48,7 +49,7 @@ const KEYWORD_TOKENS = new Set([
   "unblockable",
 ]);
 
-const LEADING_BRACKET_TOKENS = /^(\[[^\]]+\]\s*)+/;
+const LEADING_BRACKET_TOKENS = /^(\[[^\]]+\]\s*\/?\s*)+/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -88,11 +89,23 @@ export function parseEffectBlocks(effectSchema: unknown): EffectBlockView[] {
       category: effect.category,
     };
 
-    if (
-      isRecord(effect.trigger) &&
-      typeof effect.trigger.keyword === "string"
-    ) {
-      block.triggerKeyword = effect.trigger.keyword;
+    if (isRecord(effect.trigger)) {
+      if (typeof effect.trigger.keyword === "string") {
+        block.triggerKeyword = effect.trigger.keyword;
+      }
+
+      if (Array.isArray(effect.trigger.any_of)) {
+        const triggerKeywords = effect.trigger.any_of.flatMap((trigger) =>
+          isRecord(trigger) && typeof trigger.keyword === "string"
+            ? [trigger.keyword]
+            : []
+        );
+
+        if (block.triggerKeyword) triggerKeywords.unshift(block.triggerKeyword);
+        if (triggerKeywords.length > 0) {
+          block.triggerKeywords = [...new Set(triggerKeywords)];
+        }
+      }
     }
 
     return [block];
@@ -125,7 +138,24 @@ function isEffectBlockView(value: unknown): value is EffectBlockView {
     typeof value.id === "string" &&
     typeof value.category === "string" &&
     (value.triggerKeyword === undefined ||
-      typeof value.triggerKeyword === "string")
+      typeof value.triggerKeyword === "string") &&
+    (value.triggerKeywords === undefined ||
+      (Array.isArray(value.triggerKeywords) &&
+        value.triggerKeywords.every((keyword) => typeof keyword === "string")))
+  );
+}
+
+function blockHasTriggerKeyword(
+  block: EffectBlockView,
+  timingKeywords: Set<string>
+): boolean {
+  if (block.triggerKeyword && timingKeywords.has(block.triggerKeyword)) {
+    return true;
+  }
+
+  return (
+    block.triggerKeywords?.some((keyword) => timingKeywords.has(keyword)) ??
+    false
   );
 }
 
@@ -155,16 +185,19 @@ export function segmentEffectText(
         return { text, blockId: null };
       }
 
-      const timingToken = tokens.find(
-        (token) => !isModifierToken(token) && TIMING_KEYWORDS[token]
+      const timingKeywords = new Set(
+        tokens.flatMap((token) =>
+          isModifierToken(token) ? [] : (TIMING_KEYWORDS[token] ?? [])
+        )
       );
 
-      if (timingToken) {
-        const keyword = TIMING_KEYWORDS[timingToken];
+      if (timingKeywords.size > 0) {
         return {
           text,
           blockId: uniqueBlockId(
-            safeBlocks.filter((block) => block.triggerKeyword === keyword)
+            safeBlocks.filter((block) =>
+              blockHasTriggerKeyword(block, timingKeywords)
+            )
           ),
         };
       }

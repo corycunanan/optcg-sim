@@ -100,6 +100,93 @@ describe("segmentEffectText", () => {
     ]);
   });
 
+  it("maps OP02-045's real Counter Event schema block", () => {
+    const text =
+      "[Counter] Up to 1 of your Leader or Character cards gains +6000 power during this battle. Then, play up to 1 Character card with a cost of 3 or less and no base effect from your hand.";
+    const blocks = parseEffectBlocks({
+      card_id: "OP02-045",
+      effects: [
+        {
+          id: "counter_boost_play",
+          category: "auto",
+          trigger: { keyword: "COUNTER_EVENT" },
+        },
+        {
+          id: "trigger_rest",
+          category: "auto",
+          trigger: { keyword: "TRIGGER" },
+        },
+      ],
+    });
+
+    expect(segmentEffectText(text, blocks)).toEqual([
+      { text, blockId: "counter_boost_play" },
+    ]);
+  });
+
+  it("maps OP16-069's combined timing text to its any-of block", () => {
+    const text =
+      "[On Play]/[When Attacking] Add up to 1 DON!! card from your DON!! deck and set it as active.";
+    const blocks = parseEffectBlocks({
+      card_id: "OP16-069",
+      effects: [
+        {
+          id: "on_play_or_attack_add_don",
+          category: "auto",
+          trigger: {
+            any_of: [{ keyword: "ON_PLAY" }, { keyword: "WHEN_ATTACKING" }],
+          },
+        },
+      ],
+    });
+
+    expect(blocks).toEqual([
+      {
+        id: "on_play_or_attack_add_don",
+        category: "auto",
+        triggerKeywords: ["ON_PLAY", "WHEN_ATTACKING"],
+      },
+    ]);
+    expect(segmentEffectText(text, blocks)).toEqual([
+      { text, blockId: "on_play_or_attack_add_don" },
+    ]);
+    expect(
+      segmentEffectText(
+        "[On Play] Add 1 DON!!.\n[When Attacking] Add 1 DON!!.",
+        blocks
+      ).map((clause) => clause.blockId)
+    ).toEqual(["on_play_or_attack_add_don", "on_play_or_attack_add_don"]);
+  });
+
+  it("maps OP01-078's modifier-prefixed any-of timing clause", () => {
+    const text =
+      "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[DON!! x1] [When Attacking]/[On Block] Draw 1 card if you have 5 or less cards in your hand.";
+    const blocks = parseEffectBlocks({
+      card_id: "OP01-078",
+      effects: [
+        {
+          id: "OP01_078_keywords",
+          category: "permanent",
+          flags: { keywords: ["BLOCKER"] },
+        },
+        {
+          id: "draw_on_attack_or_block",
+          category: "auto",
+          trigger: {
+            any_of: [
+              { keyword: "WHEN_ATTACKING", don_requirement: 1 },
+              { keyword: "ON_BLOCK", don_requirement: 1 },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual([null, "draw_on_attack_or_block"]);
+  });
+
   it("maps OP12-021 Ipponmatsu's bare permanent and leaves Blocker neutral", () => {
     const text =
       "If your Leader has the Slash attribute and you have 6 or more rested DON!! cards, this Character cannot be rested by your opponent's effects.\n[Blocker]";
