@@ -67,6 +67,7 @@ export function ChatWidget({
   const pendingSendRef = useRef<{
     body: string;
     idempotencyKey: string;
+    hadAmbiguousFailure: boolean;
   } | null>(null);
   const historyRequestRef = useRef<symbol | null>(null);
   const lastTypingEmitRef = useRef<number>(NEVER_EMITTED);
@@ -269,7 +270,11 @@ export function ChatWidget({
       const pendingSend =
         pendingSendRef.current?.body === messageBody
           ? pendingSendRef.current
-          : { body: messageBody, idempotencyKey: crypto.randomUUID() };
+          : {
+              body: messageBody,
+              idempotencyKey: crypto.randomUUID(),
+              hadAmbiguousFailure: false,
+            };
       pendingSendRef.current = pendingSend;
       const request = Symbol("send-request");
       activeSendRef.current = request;
@@ -293,15 +298,17 @@ export function ChatWidget({
         setBody("");
       } catch (error) {
         if (activeSendRef.current !== request) return;
-        // Explicit client errors are returned before persistence by this
-        // endpoint. Network, response-schema, and 5xx failures remain
-        // ambiguous, so their key must survive the retry.
-        if (
+        const confirmedNonPersistedFailure =
           error instanceof ApiError &&
           error.status >= 400 &&
-          error.status < 500
-        ) {
+          error.status < 500;
+        // Once any attempt is ambiguous, a later 4xx cannot prove that the
+        // earlier request did not persist. Keep its key until success so a
+        // late commit and the eventual retry deduplicate at the database.
+        if (confirmedNonPersistedFailure && !pendingSend.hadAmbiguousFailure) {
           pendingSendRef.current = null;
+        } else if (!confirmedNonPersistedFailure) {
+          pendingSend.hadAmbiguousFailure = true;
         }
         toast.error("Message couldn't be sent. Try again.");
       } finally {

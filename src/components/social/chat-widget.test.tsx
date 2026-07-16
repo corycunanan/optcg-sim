@@ -212,6 +212,62 @@ describe("ChatWidget send lifecycle", () => {
     expect(mocks.toastError).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the key when a 429 follows an ambiguous attempt", async () => {
+    mocks.apiPost
+      .mockRejectedValueOnce(new TypeError("network interrupted"))
+      .mockRejectedValueOnce(new ApiError("Too many requests", 429))
+      // The first request commits after the 429; retry returns that same row.
+      .mockResolvedValueOnce({
+        data: {
+          id: "message-a",
+          body: "commit eventually",
+          createdAt: "2026-07-15T22:00:00.000Z",
+          fromUserId: "current-user",
+          readAt: null,
+        },
+      });
+
+    await act(async () => {
+      renderer = create(widget(userA));
+      await Promise.resolve();
+    });
+    act(() => {
+      renderer?.root.findByType("input").props.onChange({
+        target: { value: "commit eventually" },
+      });
+    });
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await act(async () => {
+        await renderer?.root
+          .findByType("form")
+          .props.onSubmit({ preventDefault() {} });
+      });
+    }
+
+    expect(mocks.apiPost.mock.calls.slice(-3).map((call) => call[1])).toEqual([
+      {
+        body: "commit eventually",
+        idempotencyKey: "b5625bea-b3df-4a58-9e5f-1fbb44ba7901",
+      },
+      {
+        body: "commit eventually",
+        idempotencyKey: "b5625bea-b3df-4a58-9e5f-1fbb44ba7901",
+      },
+      {
+        body: "commit eventually",
+        idempotencyKey: "b5625bea-b3df-4a58-9e5f-1fbb44ba7901",
+      },
+    ]);
+    expect(mocks.randomUUID).toHaveBeenCalledTimes(1);
+    expect(
+      renderer?.root.findAll(
+        (node) =>
+          node.type === "p" && node.children.join("") === "commit eventually",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("issues a new key after a confirmed non-persisted failure", async () => {
     mocks.randomUUID
       .mockReturnValueOnce("b5625bea-b3df-4a58-9e5f-1fbb44ba7901")

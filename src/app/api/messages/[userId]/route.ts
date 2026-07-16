@@ -141,10 +141,14 @@ export async function POST(
   try {
     const parsed = await parseBody(request, SendMessageSchema);
     if (isErrorResponse(parsed)) return parsed;
-    const { body, idempotencyKey } = parsed;
+    const { body, idempotencyKey: clientIdempotencyKey } = parsed;
     if (toUserId === fromUserId) {
       return apiError("Cannot message yourself", 400);
     }
+    // Stale clients that predate idempotent sends remain compatible. Their
+    // server-generated key is unique to this request, preserving the legacy
+    // non-idempotent behavior while satisfying the database constraint.
+    const idempotencyKey = clientIdempotencyKey ?? crypto.randomUUID();
 
     // A retry after an ambiguous client failure must succeed even if the
     // original request consumed the sender's rate-limit budget.

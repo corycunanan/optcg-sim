@@ -231,22 +231,45 @@ describe("GET /api/messages/[userId] history branch (?cursor)", () => {
 });
 
 describe("POST /api/messages/[userId]", () => {
-  it.each([
-    ["missing", { body: "hello" }],
-    ["invalid", { body: "hello", idempotencyKey: "not-a-uuid" }],
-  ])(
-    "rejects a %s idempotency key before querying Prisma",
-    async (_label, body) => {
-      const { request, params } = buildRequest("user-recipient", body);
+  it("rejects an invalid idempotency key before querying Prisma", async () => {
+    const { request, params } = buildRequest("user-recipient", {
+      body: "hello",
+      idempotencyKey: "not-a-uuid",
+    });
 
-      const res = await POST(request, { params });
+    const res = await POST(request, { params });
 
-      expect(res.status).toBe(400);
-      expect(messageFindUniqueMock).not.toHaveBeenCalled();
-      expect(messageCreateMock).not.toHaveBeenCalled();
-      expect(notifyUserMock).not.toHaveBeenCalled();
-    },
-  );
+    expect(res.status).toBe(400);
+    expect(messageFindUniqueMock).not.toHaveBeenCalled();
+    expect(messageCreateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("generates a key for a legacy client that omits one", async () => {
+    const { request, params } = buildRequest("user-recipient", {
+      body: "hello",
+    });
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(201);
+    const generatedKey = messageFindUniqueMock.mock.calls[0]?.[0].where
+      .fromUserId_toUserId_idempotencyKey.idempotencyKey;
+    expect(generatedKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(messageCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          fromUserId: "user-sender",
+          toUserId: "user-recipient",
+          idempotencyKey: generatedKey,
+          body: "hello",
+        },
+      }),
+    );
+    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+  });
 
   it("persists a new key and notifies the recipient once", async () => {
     const { request, params } = buildRequest("user-recipient");
