@@ -69,6 +69,7 @@ export const ST25_002_CABAJI: EffectSchema = {
     {
       id: "conditional_blocker_cost",
       category: "permanent",
+      source_text: "If you have 2 or more Characters with a base cost of 5 or more, this Character gains [Blocker] and +1 cost.",
       conditions: {
         type: "CARD_ON_FIELD",
         controller: "SELF",
@@ -91,6 +92,7 @@ export const ST25_002_CABAJI: EffectSchema = {
     {
       id: "opponent_turn_power",
       category: "permanent",
+      source_text: "[Opponent's Turn] This Character gains +5000 power.",
       modifiers: [
         {
           type: "MODIFY_POWER",

@@ -142,6 +142,7 @@ export const OP13_003_GOL_D_ROGER: EffectSchema = {
     {
       id: "OP13-003_don_phase",
       category: "permanent",
+      source_text: "If you have any DON!! cards on your field, 1 DON!! card placed during your DON!! Phase is given to your Leader.",
       conditions: {
         type: "DON_FIELD_COUNT",
         controller: "SELF",
@@ -159,6 +160,7 @@ export const OP13_003_GOL_D_ROGER: EffectSchema = {
     {
       id: "OP13-003_power_penalty",
       category: "permanent",
+      source_text: "If you have 9 or less DON!! cards on your field, give this Leader −2000 power.",
       conditions: {
         type: "DON_FIELD_COUNT",
         controller: "SELF",
@@ -202,6 +204,7 @@ export const OP13_004_SABO: EffectSchema = {
     {
       id: "OP13-004_power_penalty",
       category: "permanent",
+      source_text: "If you have 4 or more Life cards, give this Leader −1000 power.",
       conditions: {
         type: "LIFE_COUNT",
         controller: "SELF",
@@ -219,6 +222,7 @@ export const OP13_004_SABO: EffectSchema = {
     {
       id: "OP13-004_don_x1_aura",
       category: "permanent",
+      source_text: "[DON!! x1] If you have a Character with a cost of 8 or more, your Leader and all of your Characters gain +1000 power.",
       conditions: {
         all_of: [
           {
@@ -3043,6 +3047,7 @@ export const OP13_084_ST_SHEPHERD_JU_PETER: EffectSchema = {
     {
       id: "OP13-084_conditional_protection",
       category: "permanent",
+      source_text: "If you have 7 or more cards in your trash, this Character cannot be removed from the field by your opponent's effects.",
       conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",
@@ -3059,6 +3064,7 @@ export const OP13_084_ST_SHEPHERD_JU_PETER: EffectSchema = {
     {
       id: "OP13-084_your_turn_set_power",
       category: "permanent",
+      source_text: "[Your Turn] If you have 10 or more cards in your trash, set the base power of all of your {Five Elders} type Characters to 7000.",
       conditions: {
         type: "TRASH_COUNT",
         controller: "SELF",

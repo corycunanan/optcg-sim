@@ -1235,6 +1235,7 @@ export const OP12_036_RORONOA_ZORO: EffectSchema = {
     {
       id: "OP12-036_cannot_be_played",
       category: "permanent",
+      source_text: "This card in your hand cannot be played by effects.",
       zone: "HAND",
       prohibitions: [
         {
@@ -1245,6 +1246,7 @@ export const OP12_036_RORONOA_ZORO: EffectSchema = {
     {
       id: "OP12-036_battle_protection",
       category: "permanent",
+      source_text: "If your Leader has the Slash attribute, this Character cannot be K.O.'d in battle by Slash attribute cards and gains +1000 power.",
       conditions: {
         type: "LEADER_PROPERTY",
         controller: "SELF",

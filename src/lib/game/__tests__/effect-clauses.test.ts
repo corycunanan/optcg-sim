@@ -13,6 +13,7 @@ describe("parseEffectBlocks", () => {
           {
             id: "on_play_search",
             category: "auto",
+            source_text: "[On Play] Search your deck.",
             trigger: { keyword: "ON_PLAY", once_per_turn: true },
           },
           { id: "permanent", category: "permanent" },
@@ -24,6 +25,7 @@ describe("parseEffectBlocks", () => {
       {
         id: "on_play_search",
         category: "auto",
+        sourceText: "[On Play] Search your deck.",
         triggerKeyword: "ON_PLAY",
       },
       { id: "permanent", category: "permanent" },
@@ -39,6 +41,140 @@ describe("parseEffectBlocks", () => {
 });
 
 describe("segmentEffectText", () => {
+  it("uses normalized source text to disambiguate same-trigger blocks", () => {
+    const text =
+      "[Your Turn] This Character gains +2000 power.\n[Opponent's Turn] Give this Character −2000 power.";
+    const blocks = parseEffectBlocks({
+      effects: [
+        {
+          id: "your_turn_power_up",
+          category: "auto",
+          source_text: "[Your Turn]   This Character gains +2000 power.",
+          trigger: { keyword: "START_OF_TURN" },
+        },
+        {
+          id: "opponent_turn_power_down",
+          category: "auto",
+          source_text:
+            "[Opponent's Turn] Give this Character −2000 power.",
+          trigger: { keyword: "START_OF_TURN" },
+        },
+      ],
+    });
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["your_turn_power_up", "opponent_turn_power_down"]);
+  });
+
+  it("lets exact source text win and leaves remaining blocks to the heuristic", () => {
+    const text = "[On Play] First effect.\n[On Play] Second effect.";
+    const blocks = [
+      {
+        id: "first",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "[On Play] First effect.",
+      },
+      { id: "second", category: "auto", triggerKeyword: "ON_PLAY" },
+    ];
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["first", "second"]);
+  });
+
+  it("does not match a complete clause that is a substring of another clause", () => {
+    const text =
+      "This Character cannot attack.\n[Opponent's Turn] This Character cannot attack.";
+    const blocks = [
+      {
+        id: "always",
+        category: "permanent",
+        sourceText: "This Character cannot attack.",
+      },
+      {
+        id: "opponent_turn",
+        category: "permanent",
+      },
+    ];
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["always", "opponent_turn"]);
+  });
+
+  it("does not treat a stale fragment inside an unrelated clause as fresh", () => {
+    const text = "[On Play] This Character cannot attack during this turn.";
+    const blocks = [
+      {
+        id: "stale",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "This Character cannot attack",
+      },
+      { id: "current", category: "auto", triggerKeyword: "ON_PLAY" },
+    ];
+
+    expect(segmentEffectText(text, blocks)).toEqual([{ text, blockId: null }]);
+  });
+
+  it("falls back when one source line equals multiple clauses", () => {
+    const text = "Repeated effect.\nRepeated effect.";
+    const blocks = [
+      {
+        id: "ambiguous_source",
+        category: "auto",
+        sourceText: "Repeated effect.",
+      },
+      { id: "permanent_fallback", category: "permanent" },
+    ];
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["permanent_fallback", "permanent_fallback"]);
+  });
+
+  it("falls back when multiple source fragments claim the same clause", () => {
+    const text = "[On Play] Draw 1 card.";
+    const blocks = [
+      {
+        id: "on_play",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "Draw 1 card.",
+      },
+      {
+        id: "permanent_fragment",
+        category: "permanent",
+        sourceText: "[On Play]",
+      },
+    ];
+
+    expect(segmentEffectText(text, blocks)).toEqual([
+      { text, blockId: "on_play" },
+    ]);
+  });
+
+  it("treats stale source text as absent and never mis-highlights", () => {
+    const stale = [
+      {
+        id: "first",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "[On Play] Old imported text.",
+      },
+      { id: "second", category: "auto", triggerKeyword: "ON_PLAY" },
+    ];
+
+    expect(segmentEffectText("[On Play] Current text.", stale)).toEqual([
+      { text: "[On Play] Current text.", blockId: null },
+    ]);
+    expect(segmentEffectText("[On Play] Current text.", [stale[0]])).toEqual([
+      { text: "[On Play] Current text.", blockId: "first" },
+    ]);
+  });
+
   it.each([
     ["[Activate: Main]", "ACTIVATE_MAIN"],
     ["[On Play]", "ON_PLAY"],

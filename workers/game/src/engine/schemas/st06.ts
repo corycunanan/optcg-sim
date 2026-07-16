@@ -83,6 +83,7 @@ export const ST06_004_SMOKER: EffectSchema = {
     {
       id: "ko_protection",
       category: "permanent",
+      source_text: "This Character cannot be K.O.'d by effects.",
       prohibitions: [
         { type: "CANNOT_BE_KO", target: { type: "SELF" }, scope: { cause: "BY_OPPONENT_EFFECT" } },
       ],
@@ -90,6 +91,7 @@ export const ST06_004_SMOKER: EffectSchema = {
     {
       id: "don_double_attack",
       category: "permanent",
+      source_text: "[DON!! x1] If there is a Character with a cost of 0, this Character gains [Double Attack].",
       conditions: {
         all_of: [
           {

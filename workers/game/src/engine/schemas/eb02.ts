@@ -112,6 +112,7 @@ export const EB02_005_FAKE_STRAW_HAT_CREW: EffectSchema = {
     {
       id: "your_turn_power_up",
       category: "auto",
+      source_text: "[Your Turn] This Character gains +2000 power.",
       trigger: { keyword: "START_OF_TURN" },
       actions: [
         {
@@ -125,6 +126,7 @@ export const EB02_005_FAKE_STRAW_HAT_CREW: EffectSchema = {
     {
       id: "opponent_turn_power_down",
       category: "auto",
+      source_text: "[Opponent's Turn] Give this Character −2000 power.",
       trigger: { keyword: "START_OF_TURN", turn_restriction: "OPPONENT_TURN" },
       actions: [
         {

@@ -16,6 +16,24 @@
 
 ---
 
+## Preserve the Source Clause
+
+New effect blocks SHOULD set `source_text` to the complete clause line that the block encodes. Copy the full line verbatim from the card's entry in `docs/cards/<set>.md`; whitespace normalization is allowed only when matching at runtime.
+
+```typescript
+{
+  id: "on_play_draw",
+  category: "auto",
+  source_text: "[On Play] Draw 1 card.",
+  trigger: { keyword: "ON_PLAY" },
+  actions: [{ type: "DRAW", params: { amount: 1 } }]
+}
+```
+
+`source_text` is a complete clause-line copy, never a fragment or paraphrase. It must equal one full line of `effectText`, or one full line of `triggerText` for a `[Trigger]` block. If the authoritative card line is missing or uncertain, defer the field rather than guessing; the client will keep using its conservative bracket heuristic.
+
+---
+
 ## Category Classification
 
 | If you see... | Category | Key fields |
