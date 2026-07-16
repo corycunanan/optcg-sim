@@ -8,6 +8,11 @@ import type {
 import { EffectAvailabilityProvider } from "@/contexts/effect-availability-context";
 import { CardTooltipContent } from "./card-tooltip-content";
 
+const EFFECT_WRAPPER_CLASS =
+  "text-xs text-gb-text leading-relaxed border-t border-gb-border-strong pt-3 flex flex-col gap-2";
+const LEGACY_EFFECT_TEXT =
+  "[On Play] Draw 1 card.  \n[Activate: Main] Rest this card. \t\n\nTrailing paragraph.  ";
+
 const card: CardInstance = {
   instanceId: "card-1",
   cardId: "OP01-001",
@@ -30,7 +35,7 @@ const data: CardData = {
   life: null,
   attribute: ["Strike"],
   types: ["Test"],
-  effectText: "[On Play] Draw 1 card.\n[Activate: Main] Rest this card.",
+  effectText: LEGACY_EFFECT_TEXT,
   triggerText: null,
   keywords: {
     rush: false,
@@ -58,43 +63,106 @@ const data: CardData = {
   imageUrl: null,
 };
 
-function renderTooltip(
-  effectAvailability?: Record<string, EffectAvailability[]>,
-  cardData: CardData = data
-) {
+interface RenderOptions {
+  cardData?: CardData;
+  cardInstance?: CardInstance | null;
+  effectAvailability?: Record<string, EffectAvailability[]>;
+  withProvider?: boolean;
+}
+
+function renderTooltip({
+  cardData = data,
+  cardInstance = card,
+  effectAvailability,
+  withProvider = true,
+}: RenderOptions = {}) {
+  const tooltip = (
+    <CardTooltipContent
+      data={cardData}
+      cardId={cardData.id}
+      card={cardInstance}
+    />
+  );
+
   return renderToStaticMarkup(
-    <EffectAvailabilityProvider effectAvailability={effectAvailability}>
-      <CardTooltipContent data={cardData} cardId={cardData.id} card={card} />
-    </EffectAvailabilityProvider>
+    withProvider ? (
+      <EffectAvailabilityProvider effectAvailability={effectAvailability}>
+        {tooltip}
+      </EffectAvailabilityProvider>
+    ) : (
+      tooltip
+    )
   );
 }
 
+function extractEffectBody(markup: string): string {
+  const opening = `<div class="${EFFECT_WRAPPER_CLASS}">`;
+  const start = markup.indexOf(opening);
+  if (start === -1) throw new Error("Effect body not found");
+  const end = markup.indexOf("</div>", start);
+  if (end === -1) throw new Error("Effect body did not close");
+  return markup.slice(start, end + "</div>".length);
+}
+
+function legacyEffectBody(effectText: string): string {
+  const paragraphs = effectText
+    .split(/\n{2,}/)
+    .map(
+      (paragraph) =>
+        `<p class="whitespace-pre-wrap">${paragraph}</p>`
+    )
+    .join("");
+
+  return `<div class="${EFFECT_WRAPPER_CLASS}">${paragraphs}</div>`;
+}
+
+function expectLegacyEffectBody(markup: string, effectText = LEGACY_EFFECT_TEXT) {
+  expect(extractEffectBody(markup)).toBe(legacyEffectBody(effectText));
+}
+
+function openingTagForBlock(effectBody: string, blockId: string): string {
+  const marker = `data-effect-block="${blockId}"`;
+  const markerIndex = effectBody.indexOf(marker);
+  if (markerIndex === -1) throw new Error(`Block ${blockId} not found`);
+  const start = effectBody.lastIndexOf("<span", markerIndex);
+  const end = effectBody.indexOf(">", markerIndex);
+  return effectBody.slice(start, end + 1);
+}
+
 describe("CardTooltipContent effect availability", () => {
-  it("adds a gold affordance to usable clauses", () => {
-    const markup = renderTooltip({
-      "card-1": [{ effectId: "on-play", status: "usable" }],
-    });
-
-    expect(markup).toContain("border-l-2");
-    expect(markup).toContain("border-gold-500");
-    expect(markup).toContain("text-gb-text-bright");
+  it("preserves exact legacy paragraphs outside the provider", () => {
+    expectLegacyEffectBody(renderTooltip({ withProvider: false }));
   });
 
-  it("dims blocked clauses and shows their terse reason", () => {
-    const markup = renderTooltip({
-      "card-1": [
-        { effectId: "activate-main", status: "blocked", reason: "COST" },
-      ],
-    });
-
-    expect(markup).toContain("text-gb-text-muted");
-    expect(markup).toContain("cost unavailable");
+  it("preserves exact legacy paragraphs when the provider has no card entries", () => {
+    expectLegacyEffectBody(renderTooltip({ effectAvailability: {} }));
   });
 
-  it("leaves an unmapped clause neutral", () => {
-    const markup = renderTooltip(undefined, {
+  it("preserves exact legacy paragraphs when the card instance is null", () => {
+    expectLegacyEffectBody(
+      renderTooltip({
+        cardInstance: null,
+        effectAvailability: {
+          "card-1": [{ effectId: "on-play", status: "usable" }],
+        },
+      })
+    );
+  });
+
+  it("preserves exact legacy paragraphs for an unparseable schema", () => {
+    expectLegacyEffectBody(
+      renderTooltip({
+        cardData: { ...data, effectSchema: null },
+        effectAvailability: {
+          "card-1": [{ effectId: "on-play", status: "usable" }],
+        },
+      })
+    );
+  });
+
+  it("preserves exact legacy paragraphs when every clause is ambiguous", () => {
+    const ambiguousData: CardData = {
       ...data,
-      effectText: "[On Play] Draw 1 card.",
       effectSchema: {
         effects: [
           {
@@ -107,26 +175,56 @@ describe("CardTooltipContent effect availability", () => {
             category: "triggered",
             trigger: { keyword: "ON_PLAY" },
           },
+          {
+            id: "activate-main-a",
+            category: "activated",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+          },
+          {
+            id: "activate-main-b",
+            category: "activated",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+          },
         ],
       },
-    });
+    };
 
-    expect(markup).toContain(
-      '<p class="whitespace-pre-wrap">[On Play] Draw 1 card.</p>'
+    expectLegacyEffectBody(
+      renderTooltip({
+        cardData: ambiguousData,
+        effectAvailability: {
+          "card-1": [{ effectId: "on-play-a", status: "usable" }],
+        },
+      })
     );
-    expect(markup).not.toContain("border-l-2");
   });
 
-  it("leaves mapped clauses neutral outside an availability provider", () => {
-    const markup = renderToStaticMarkup(
-      <CardTooltipContent data={data} cardId={data.id} card={card} />
+  it("styles only the matching clause while preserving raw clause text", () => {
+    const effectBody = extractEffectBody(
+      renderTooltip({
+        effectAvailability: {
+          "card-1": [
+            { effectId: "on-play", status: "usable" },
+            {
+              effectId: "activate-main",
+              status: "blocked",
+              reason: "COST",
+            },
+          ],
+        },
+      })
     );
+    const usableTag = openingTagForBlock(effectBody, "on-play");
+    const blockedTag = openingTagForBlock(effectBody, "activate-main");
 
-    expect(markup).toContain(
-      '<p class="whitespace-pre-wrap">[On Play] Draw 1 card.</p>'
-    );
-    expect(markup).not.toContain("border-l-2");
-    expect(markup).not.toContain("used this turn");
-    expect(markup).not.toContain("cost unavailable");
+    expect(usableTag).toContain("border-l-2");
+    expect(usableTag).toContain("border-gold-500");
+    expect(usableTag).not.toContain("text-gb-text-muted");
+    expect(blockedTag).toContain("text-gb-text-muted");
+    expect(blockedTag).not.toContain("border-l-2");
+    expect(effectBody).toContain("[On Play] Draw 1 card.  ");
+    expect(effectBody).toContain("[Activate: Main] Rest this card. \t");
+    expect(effectBody).toContain("Trailing paragraph.  ");
+    expect(effectBody).toContain("cost unavailable");
   });
 });
