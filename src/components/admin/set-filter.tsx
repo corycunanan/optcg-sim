@@ -108,7 +108,7 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
           )}
         >
           {draft.length === 0 ? (
-            <span className="py-0.5 text-content-tertiary">All Sets</span>
+            <span className="py-1 text-content-tertiary">All Sets</span>
           ) : (
             draft.map((label) => (
               <Badge key={label} variant="default" className="gap-1">
@@ -131,7 +131,7 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
                 type="button"
                 tabIndex={-1}
                 onClick={clearAll}
-                className="rounded p-0.5 text-content-tertiary transition-colors hover:text-content-secondary"
+                className="rounded p-1 text-content-tertiary transition-colors hover:text-content-secondary"
                 title="Clear selection"
               >
                 <X className="size-3" />

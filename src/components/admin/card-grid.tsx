@@ -62,7 +62,7 @@ function CardGridItem({
 export function CardGrid({ cards, onCardClick }: CardGridProps) {
   if (cards.length === 0) {
     return (
-      <div className="py-20 text-center text-sm text-content-tertiary">
+      <div className="py-16 text-center text-sm text-content-tertiary">
         No cards found. Try adjusting your filters.
       </div>
     );

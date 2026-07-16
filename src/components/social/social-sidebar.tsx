@@ -330,7 +330,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                       }}
                       size="sm"
                     />
-                    <div className="flex flex-col gap-0.5 leading-none">
+                    <div className="flex flex-col gap-1 leading-none">
                       <span className="truncate font-semibold">{userName}</span>
                       {user?.email && (
                         <span className="truncate text-xs opacity-60">
@@ -358,7 +358,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                       }}
                       size="sm"
                     />
-                    <div className="flex flex-col gap-0.5 leading-none">
+                    <div className="flex flex-col gap-1 leading-none">
                       <span className="truncate font-semibold">{userName}</span>
                       {user?.email && (
                         <span className="truncate text-xs opacity-60">
@@ -422,7 +422,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                             {req.fromUser?.username || req.fromUser?.name}
                           </span>
                         </SidebarMenuButton>
-                        <div className="absolute top-1.5 right-1 flex gap-0.5">
+                        <div className="absolute top-1.5 right-1 flex gap-1">
                           <Button
                             variant="ghost"
                             size="icon-sm"
@@ -537,7 +537,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                     <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 items-center justify-center rounded-md">
                       <Search className="size-4" />
                     </div>
-                    <div className="flex flex-col gap-0.5 leading-none">
+                    <div className="flex flex-col gap-1 leading-none">
                       <span className="font-semibold">Add Friend</span>
                       <span className="text-xs opacity-60">
                         Search by username
@@ -568,7 +568,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                         return (
                           <div
                             key={u.id}
-                            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                            className="flex items-center gap-2 rounded-md px-2 py-2 text-sm"
                           >
                             <UserAvatar user={u} size="sm" />
                             <span className="flex-1 truncate">

@@ -22,7 +22,7 @@ export default async function Home() {
 
       {/* Left — header and subtitle, vertically centered */}
       <div className="relative z-10 my-auto translate-y-10">
-        <h1 className="font-display text-6xl font-bold leading-none tracking-tight bg-gradient-to-b from-gold-400 to-[oklch(60%_0.14_75)] bg-clip-text text-transparent">
+        <h1 className="font-display text-6xl font-bold leading-none tracking-tight bg-gradient-to-b from-gold-400 to-gold-600 bg-clip-text text-transparent">
           One Piece
           <br />
           TCG Simulator
