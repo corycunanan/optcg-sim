@@ -32,7 +32,7 @@ export const SESSION_UNDO_HISTORY_STORAGE_KEY = "session:undo-history";
 /** SQLite-backed Durable Object values are limited to 2 MB; keep 25% headroom. */
 export const SESSION_VALUE_HARD_LIMIT_BYTES = 1_500_000;
 export const SESSION_VALUE_SOFT_LIMIT_BYTES = 1_000_000;
-export const SESSION_STORAGE_FORMAT_VERSION = 3;
+export const SESSION_STORAGE_FORMAT_VERSION = 2;
 
 export interface SessionStorage extends TokenJtiStorage {
   put(key: string, value: unknown): Promise<void>;
@@ -77,7 +77,7 @@ export interface SessionSnapshot {
 }
 
 export interface StoredSession {
-  formatVersion: 1 | 2 | 3;
+  formatVersion: 1 | 2;
   state: GameState;
   cardDb: Record<string, CardData>;
   /** Legacy OPT-366 field retained for structured-clone compatibility. */
@@ -89,7 +89,7 @@ export interface StoredSession {
 }
 
 interface PersistedSession {
-  formatVersion: 3;
+  formatVersion: 2;
   state: GameState;
   mode: LobbyMode;
   testPriorityRolls: number[] | null;
@@ -632,7 +632,7 @@ export function parseStoredSession(
     throw new Error("Stored session must contain a cardDb object");
   }
   const formatVersion = raw.formatVersion ?? 1;
-  if (formatVersion !== 1 && formatVersion !== 2 && formatVersion !== 3) {
+  if (formatVersion !== 1 && formatVersion !== 2) {
     throw new Error("Stored session formatVersion is invalid");
   }
   const cardDb: Record<string, CardData> = {};
@@ -653,9 +653,6 @@ export function parseStoredSession(
     throw new Error("Stored session testPriorityRolls is invalid");
   }
   const undoHistoryRaw = raw.undoHistory ?? separateUndoHistory ?? [];
-  if (formatVersion === 3 && separateUndoHistory === undefined) {
-    throw new Error("Stored session must contain separate undoHistory");
-  }
   if (!Array.isArray(undoHistoryRaw))
     throw new Error("Stored session undoHistory is invalid");
   return {

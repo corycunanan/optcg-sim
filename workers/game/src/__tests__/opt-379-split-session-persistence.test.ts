@@ -9,6 +9,7 @@ import {
   SESSION_VALUE_HARD_LIMIT_BYTES,
   SessionPersistenceLimitError,
   SessionRepository,
+  parseStoredSession,
   type SessionStorage,
 } from "../session/persistence.js";
 import { setupGame } from "./factories.js";
@@ -124,6 +125,39 @@ describe("OPT-379 split session persistence", () => {
       ],
       [SESSION_STORAGE_KEY, SESSION_UNDO_HISTORY_STORAGE_KEY],
     ]);
+  });
+
+  it("keeps new writer output readable by the format 2 rollback parser", async () => {
+    const storage = new MemoryStorage();
+    const { state, cardDb } = setupGame();
+    const saved = await repository(storage).save({
+      state,
+      cardDb,
+      mode: "PVP",
+      testPriorityRolls: null,
+      undoHistory: [checkpoint(state, 99)],
+    });
+    const rawSession = storage.data.get(SESSION_STORAGE_KEY);
+
+    expect(rawSession).toMatchObject({ formatVersion: 2 });
+    expect(rawSession).not.toHaveProperty("undoHistory");
+
+    // origin/main calls parseStoredSession with only the session value and the
+    // split cardDb. Omitting the new third argument models that rollback path.
+    const rollbackRestored = parseStoredSession(
+      rawSession,
+      storage.data.get(SESSION_CARD_DB_STORAGE_KEY)
+    );
+
+    expect(rollbackRestored).toMatchObject({
+      formatVersion: 2,
+      state: saved.state,
+      cardDb: Object.fromEntries(cardDb),
+      undoHistory: [],
+    });
+    expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toEqual(
+      saved.undoHistory
+    );
   });
 
   it("restores and migrates the legacy combined session blob", async () => {
