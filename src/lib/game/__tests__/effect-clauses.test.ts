@@ -84,6 +84,70 @@ describe("segmentEffectText", () => {
     ).toEqual(["first", "second"]);
   });
 
+  it("does not match a complete clause that is a substring of another clause", () => {
+    const text =
+      "This Character cannot attack.\n[Opponent's Turn] This Character cannot attack.";
+    const blocks = [
+      {
+        id: "always",
+        category: "permanent",
+        sourceText: "This Character cannot attack.",
+      },
+    ];
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["always", null]);
+  });
+
+  it("does not treat a stale fragment inside an unrelated clause as fresh", () => {
+    const text = "[On Play] This Character cannot attack during this turn.";
+    const blocks = [
+      {
+        id: "stale",
+        category: "auto",
+        triggerKeyword: "ON_PLAY",
+        sourceText: "This Character cannot attack",
+      },
+      { id: "current", category: "auto", triggerKeyword: "ON_PLAY" },
+    ];
+
+    expect(segmentEffectText(text, blocks)).toEqual([{ text, blockId: null }]);
+  });
+
+  it("falls back when one source line equals multiple clauses", () => {
+    const text = "Repeated effect.\nRepeated effect.";
+    const blocks = [
+      {
+        id: "repeated",
+        category: "permanent",
+        sourceText: "Repeated effect.",
+      },
+    ];
+
+    expect(
+      segmentEffectText(text, blocks).map((clause) => clause.blockId)
+    ).toEqual(["repeated", "repeated"]);
+  });
+
+  it("returns null when multiple source lines claim the same clause", () => {
+    const text = "This Character cannot attack.";
+    const blocks = [
+      {
+        id: "first",
+        category: "permanent",
+        sourceText: text,
+      },
+      {
+        id: "second",
+        category: "permanent",
+        sourceText: text,
+      },
+    ];
+
+    expect(segmentEffectText(text, blocks)).toEqual([{ text, blockId: null }]);
+  });
+
   it("treats stale source text as absent and never mis-highlights", () => {
     const stale = [
       {

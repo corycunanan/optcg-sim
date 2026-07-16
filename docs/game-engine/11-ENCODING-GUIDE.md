@@ -18,7 +18,7 @@
 
 ## Preserve the Source Clause
 
-New effect blocks SHOULD set `source_text` to the complete clause that the block encodes. Copy it verbatim from the card's entry in `docs/cards/<set>.md`; whitespace normalization is allowed only when matching at runtime.
+New effect blocks SHOULD set `source_text` to the complete clause line that the block encodes. Copy the full line verbatim from the card's entry in `docs/cards/<set>.md`; whitespace normalization is allowed only when matching at runtime.
 
 ```typescript
 {
@@ -30,7 +30,7 @@ New effect blocks SHOULD set `source_text` to the complete clause that the block
 }
 ```
 
-`source_text` is a copy, never a paraphrase. It must be a contiguous substring of `effectText`, or of `triggerText` for a `[Trigger]` block. If the authoritative card line is missing or uncertain, defer the field rather than guessing; the client will keep using its conservative bracket heuristic.
+`source_text` is a complete clause-line copy, never a fragment or paraphrase. It must equal one full line of `effectText`, or one full line of `triggerText` for a `[Trigger]` block. If the authoritative card line is missing or uncertain, defer the field rather than guessing; the client will keep using its conservative bracket heuristic.
 
 ---
 

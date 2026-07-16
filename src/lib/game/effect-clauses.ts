@@ -191,7 +191,7 @@ export function segmentEffectText(
       const sourceText = normalizeWhitespace(block.sourceText);
       return (
         sourceText.length > 0 &&
-        normalizedClauses.some((clause) => clause.includes(sourceText))
+        normalizedClauses.filter((clause) => clause === sourceText).length === 1
       );
     })
   );
@@ -203,9 +203,8 @@ export function segmentEffectText(
     const sourceMatches = safeBlocks.filter(
       (block) =>
         freshSourceBlocks.has(block) &&
-        normalizedClauses[clauseIndex].includes(
+        normalizedClauses[clauseIndex] ===
           normalizeWhitespace(block.sourceText!)
-        )
     );
     if (sourceMatches.length > 0) {
       return { text, blockId: uniqueBlockId(sourceMatches) };
