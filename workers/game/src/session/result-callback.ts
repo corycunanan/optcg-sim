@@ -103,8 +103,15 @@ async function fetchWithTimeout(
       ...init,
       signal: controller.signal,
     });
-    const bodyText = await response.text();
-    return bufferedResponse(response, bodyText);
+    try {
+      const bodyText = await response.text();
+      return bufferedResponse(response, bodyText);
+    } catch (error) {
+      if (!response.ok && !isRetryableStatus(response.status)) {
+        return bufferedResponse(response, "");
+      }
+      throw error;
+    }
   } finally {
     clearTimeout(timeoutId);
     callerSignal?.removeEventListener("abort", abortFromCaller);

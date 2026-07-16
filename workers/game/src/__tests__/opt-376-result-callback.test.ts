@@ -148,4 +148,56 @@ describe("writeResultToDb callback retries", () => {
       vi.useRealTimers();
     }
   });
+
+  it("does not retry a non-retryable response when its body stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          Promise.resolve(
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  init?.signal?.addEventListener("abort", () => {
+                    controller.error(new DOMException("aborted", "AbortError"));
+                  });
+                },
+              }),
+              { status: 400 }
+            )
+          )
+      );
+      const wait = vi.fn().mockResolvedValue(undefined);
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      const repository = repositoryWith(
+        createResultCallbackFetch({
+          fetch: fetchMock as typeof fetch,
+          wait,
+          timeoutMs: 25,
+        })
+      );
+
+      const pending = repository.writeResult(terminalState());
+      await vi.advanceTimersByTimeAsync(25);
+      await expect(pending).resolves.toBeUndefined();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(wait).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith("game.result_write_failed", {
+        source: "GameSession.writeResultToDb",
+        gameId: "test-game-001",
+        attempts: 1,
+        status: 400,
+      });
+      expect(consoleError).toHaveBeenCalledWith(
+        "[GameSession] writeResultToDb HTTP",
+        400,
+        ""
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
