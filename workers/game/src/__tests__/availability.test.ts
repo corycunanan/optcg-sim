@@ -5,6 +5,7 @@ import type {
   EffectSchema,
   RuntimeActiveEffect,
 } from "../engine/effect-types.js";
+import { EB01_016_BINGOH } from "../engine/schemas/eb01.js";
 import { EB02_047_BLUENO } from "../engine/schemas/eb02.js";
 import { EB03_014_KUINA } from "../engine/schemas/eb03.js";
 import { ST27_004_SANJUAN_WOLF } from "../engine/schemas/st27.js";
@@ -196,6 +197,45 @@ describe("computeEffectAvailability", () => {
 
     expect(computeEffectAvailability(state, cardDb)[sourceId]).toEqual([
       { effectId: "activate_give_don", status: "blocked", reason: "NO_TARGET" },
+    ]);
+  });
+
+  it("skips NO_TARGET when resting self can create a rested own-card target", () => {
+    const { state, cardDb, sourceId } = activateMainFixture();
+    setSchema(cardDb, CARDS.VANILLA.id, {
+      effects: [
+        {
+          id: "rest_then_target_self",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          costs: [{ type: "REST_SELF" }],
+          actions: [
+            {
+              type: "MODIFY_POWER",
+              target: {
+                type: "CHARACTER",
+                controller: "SELF",
+                filter: { is_rested: true, name: CARDS.VANILLA.name },
+              },
+              params: { amount: 1000 },
+              duration: { type: "THIS_TURN" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(computeEffectAvailability(state, cardDb)[sourceId]).toEqual([
+      { effectId: "rest_then_target_self", status: "usable" },
+    ]);
+  });
+
+  it("keeps NO_TARGET for Bingoh's opponent-only rested target", () => {
+    const { state, cardDb, sourceId } = activateMainFixture();
+    setSchema(cardDb, CARDS.VANILLA.id, EB01_016_BINGOH);
+
+    expect(computeEffectAvailability(state, cardDb)[sourceId]).toEqual([
+      { effectId: "activate_ko", status: "blocked", reason: "NO_TARGET" },
     ]);
   });
 });

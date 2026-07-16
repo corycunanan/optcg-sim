@@ -7,6 +7,7 @@ import {
   type EffectBlock,
   type EffectResult,
   type Target,
+  type TargetFilter,
 } from "./effect-types.js";
 import { computeAllValidTargets } from "./effect-resolver/target-resolver.js";
 import { isCardNegated } from "./modifiers.js";
@@ -38,33 +39,110 @@ function isActivateMain(block: EffectBlock): boolean {
   );
 }
 
-function costMayChangeZones(cost: Cost): boolean {
+type CostMutationDimension = "ZONE" | "REST" | "POWER" | "LIFE_FACE";
+
+function costMutationDimensions(cost: Cost): CostMutationDimension[] {
   switch (cost.type) {
     case "CHOICE":
-      return (
-        cost.options.length === 0 ||
-        cost.options.some((branch) =>
-          branch.some((option) => costMayChangeZones(option))
-        )
-      );
+      return cost.options.length === 0
+        ? ["ZONE"]
+        : cost.options.flatMap((branch) =>
+            branch.flatMap((option) => costMutationDimensions(option))
+          );
     case "CHOOSE_ONE_COST":
-      return (
-        !cost.options?.length ||
-        cost.options.some((option) => costMayChangeZones(option))
-      );
+      return !cost.options?.length
+        ? ["ZONE"]
+        : cost.options.flatMap((option) => costMutationDimensions(option));
     case "DON_REST":
     case "REST_SELF":
     case "REST_CARDS":
     case "REST_NAMED_CARD":
-    case "LEADER_POWER_REDUCTION":
     case "REST_DON":
+      return ["REST"];
+    case "LEADER_POWER_REDUCTION":
+      return ["POWER"];
     case "TURN_LIFE_FACE_UP":
     case "TURN_LIFE_FACE_DOWN":
-      return false;
+      return ["LIFE_FACE"];
     default:
       // Fail closed for every movement-like cost and any future Cost variant.
-      return true;
+      return ["ZONE"];
   }
+}
+
+function targetFilters(target: Target): TargetFilter[] {
+  return [
+    ...(target.filter ? [target.filter] : []),
+    ...(target.dual_targets?.map((dualTarget) => dualTarget.filter) ?? []),
+    ...(target.named_distribution?.shared_filter
+      ? [target.named_distribution.shared_filter]
+      : []),
+  ];
+}
+
+function filterTreeReads(
+  filter: TargetFilter,
+  dimension: Exclude<CostMutationDimension, "ZONE">
+): boolean {
+  const readsHere = (() => {
+    switch (dimension) {
+      case "REST":
+        return (
+          filter.is_rested !== undefined ||
+          filter.is_active !== undefined ||
+          filter.state !== undefined
+        );
+      case "POWER":
+        return (
+          filter.power_exact !== undefined ||
+          filter.power_min !== undefined ||
+          filter.power_max !== undefined ||
+          filter.power_range !== undefined ||
+          filter.base_power_exact !== undefined ||
+          filter.base_power_min !== undefined ||
+          filter.base_power_max !== undefined
+        );
+      case "LIFE_FACE": {
+        // No authored TargetFilter field currently reads Life face state. Keep
+        // common future spellings fail-closed until the typed union owns one.
+        const fields = filter as TargetFilter & Record<string, unknown>;
+        return [
+          "face",
+          "life_face",
+          "is_face_up",
+          "is_face_down",
+          "face_up",
+          "face_down",
+        ].some((field) => fields[field] !== undefined);
+      }
+    }
+  })();
+
+  return (
+    readsHere ||
+    (filter.any_of?.some((nested) => filterTreeReads(nested, dimension)) ??
+      false)
+  );
+}
+
+function costsCanCreateActionTargets(block: EffectBlock): boolean {
+  const mutations =
+    block.costs?.flatMap((cost) => costMutationDimensions(cost)) ?? [];
+  if (mutations.includes("ZONE")) return true;
+  const stateMutations = mutations.filter(
+    (dimension): dimension is Exclude<CostMutationDimension, "ZONE"> =>
+      dimension !== "ZONE"
+  );
+
+  return stateMutations.some((dimension) =>
+    block.actions?.some((action) => {
+      const target = action.target;
+      if (!target || target.controller === "OPPONENT") return false;
+      return targetFilters(target).some((filter) =>
+        filterTreeReads(filter, dimension)
+      );
+    })
+  );
 }
 
 function lacksAllActionTargets(
@@ -78,8 +156,9 @@ function lacksAllActionTargets(
   if (!actions?.length) return false;
 
   // Costs resolve before actions and can create an otherwise-empty target
-  // population. Predicting from the pre-cost state would be a false negative.
-  if (block.costs?.some((cost) => costMayChangeZones(cost))) return false;
+  // population. Skip only where the mutation and target-filter population can
+  // interact; explicit opponent-only targets cannot overlap own-card costs.
+  if (costsCanCreateActionTargets(block)) return false;
 
   // Targets fed by earlier action results or trigger context cannot be known
   // until live resolution. Skip the enhancement for the whole block.
