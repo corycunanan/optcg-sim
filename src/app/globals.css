@@ -27,6 +27,7 @@
   --navy-100:     oklch(94%  0.015 245);  /* very light navy bg */
 
   /* ── Gold (secondary accent — treasure, premium moments) ── */
+  --gold-600:     oklch(60%  0.14 75);    /* dark gold gradient stop */
   --gold-500:     oklch(72%  0.14 75);    /* secondary CTAs, highlights */
   --gold-400:     oklch(78%  0.12 75);    /* hover on gold */
   --gold-100:     oklch(95%  0.04 75);    /* soft gold background */
@@ -175,6 +176,7 @@
   --color-navy-100: var(--navy-100);
 
   /* Gold */
+  --color-gold-600: var(--gold-600);
   --color-gold-500: var(--gold-500);
   --color-gold-400: var(--gold-400);
   --color-gold-100: var(--gold-100);

@@ -124,7 +124,7 @@ export function InviteFriendPopover({ lobbyId }: Props) {
               return (
                 <div
                   key={friendshipId}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                  className="flex items-center gap-2 rounded-md px-2 py-2 text-sm"
                 >
                   <UserAvatar user={user} size="sm" />
                   <span className="flex-1 truncate">{displayName(user)}</span>

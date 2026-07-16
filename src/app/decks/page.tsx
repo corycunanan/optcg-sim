@@ -68,7 +68,7 @@ export default async function DecksPage() {
 
       <div className="mx-auto w-full max-w-5xl px-6 py-8">
       {decks.length === 0 ? (
-        <div className="py-20 text-center">
+        <div className="py-16 text-center">
           <p className="text-lg font-semibold text-content-secondary">No decks yet</p>
           <p className="mt-1 text-sm text-content-tertiary">
             Create your first deck to get started
@@ -93,7 +93,7 @@ export default async function DecksPage() {
               <Link
                 key={deck.id}
                 href={`/decks/${deck.id}`}
-                className="group relative overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md"
+                className="group relative overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-md"
               >
                 {leader && (
                   <div className="relative h-36 overflow-hidden">

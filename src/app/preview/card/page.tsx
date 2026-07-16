@@ -143,7 +143,7 @@ export default function CardPreviewPage() {
             </h1>
             <p className="text-sm text-gb-text-subtle">
               Internal visual QA for the{" "}
-              <code className="rounded bg-gb-surface-raised px-1 py-0.5 text-xs">
+              <code className="rounded bg-gb-surface-raised px-1 text-xs">
                 {"<Card>"}
               </code>{" "}
               primitive (OPT-266). Not linked from the app.

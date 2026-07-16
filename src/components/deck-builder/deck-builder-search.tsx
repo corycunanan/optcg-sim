@@ -191,7 +191,7 @@ export function DeckBuilderSearch({
                   key={c}
                   onClick={() => toggleColor(c)}
                   className={cn(
-                    "rounded px-2 py-0.5 text-xs font-medium transition-all",
+                    "rounded px-2 py-1 text-xs font-medium transition-all",
                     active
                       ? c === "Yellow"
                         ? "text-content-primary"
@@ -330,7 +330,7 @@ export function DeckBuilderSearch({
                     )}
                   </div>
                   {/* Mini info */}
-                  <div className="px-1.5 py-1">
+                  <div className="px-2 py-1">
                     <p className="text-content-primary truncate text-xs leading-tight font-medium">
                       {card.name}
                     </p>

@@ -390,7 +390,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
       )}
 
       {turnBanner && (
-        <div className="pointer-events-none fixed inset-x-0 top-20 z-[65] flex justify-center">
+        <div className="pointer-events-none fixed inset-x-0 top-16 z-[65] flex justify-center">
           <div className="border-gb-accent-amber/30 bg-gb-prompt-bg text-gb-accent-amber rounded-lg border px-5 py-3 text-sm font-semibold shadow-lg">
             {turnBanner}
           </div>
