@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import type { CostEvaluationDiagnostics } from "../engine/modifiers.js";
 import { getEffectiveCost } from "../engine/modifiers.js";
 import { setupGame, createTestCardDb, CARDS, padChars } from "./helpers.js";
 
@@ -220,14 +221,20 @@ describe("OPT-242 D4: threshold-filtered permanent modifiers re-evaluate on effe
       timestamp: 2,
     };
 
-    const t0 = performance.now();
     const { state, cardDb } = buildState(instance, [plusOne, minusOne], [card]);
-    const cost = getEffectiveCost(card, state, instance.instanceId, cardDb);
-    const elapsed = performance.now() - t0;
+    const diagnostics: CostEvaluationDiagnostics = { layer2Iterations: 0 };
+    const cost = getEffectiveCost(
+      card,
+      state,
+      instance.instanceId,
+      cardDb,
+      true,
+      diagnostics
+    );
 
     expect(cost).toBe(3);
-    // Liveness check — iteration should terminate quickly, well under 50ms.
-    expect(elapsed).toBeLessThan(50);
+    // Liveness check — one applying pass plus one stable pass, independent of load.
+    expect(diagnostics.layer2Iterations).toBe(2);
   });
 
   it("Usopp does not apply to non-Dressrosa characters regardless of cost", () => {

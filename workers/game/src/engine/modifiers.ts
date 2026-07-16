@@ -39,6 +39,10 @@ import {
 
 type ConditionContext = Omit<QueryConditionContext, "queries">;
 
+export interface CostEvaluationDiagnostics {
+  layer2Iterations: number;
+}
+
 const modifierConditionQueries: ConditionQueryServices = {
   getEffectivePower: (card, data, state, cardDb) =>
     getEffectivePower(card, data, state, cardDb),
@@ -354,10 +358,12 @@ export function getEffectiveCost(
   state?: GameState,
   cardInstanceId?: string,
   cardDb?: Map<string, CardData>,
-  playTimeAdjustments = true
+  playTimeAdjustments = true,
+  diagnostics?: CostEvaluationDiagnostics
 ): number {
   // Layer 0
   let cost = cardData.cost ?? 0;
+  if (diagnostics) diagnostics.layer2Iterations = 0;
 
   // Layer 1 & 2: Cost modifiers from active effects
   if (state && cardInstanceId) {
@@ -405,7 +411,8 @@ export function getEffectiveCost(
       state,
       cardDb,
       effects,
-      turnPlayerIndex
+      turnPlayerIndex,
+      diagnostics
     );
 
     // Play-time-only adjustments (OPT-444: skipped for on-field cost reads —
@@ -521,7 +528,8 @@ function applyLayer2CostModifiers(
   state: GameState,
   cardDb: Map<string, CardData> | undefined,
   effects: RuntimeActiveEffect[],
-  turnPlayerIndex: 0 | 1
+  turnPlayerIndex: 0 | 1,
+  diagnostics?: CostEvaluationDiagnostics
 ): number {
   let cost = startingCost;
 
@@ -536,6 +544,7 @@ function applyLayer2CostModifiers(
 
   const includedEffectIds = new Set<string>();
   for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
+    if (diagnostics) diagnostics.layer2Iterations = iter + 1;
     let addedThisPass = false;
     for (const effect of candidates) {
       if (includedEffectIds.has(effect.id)) continue;
