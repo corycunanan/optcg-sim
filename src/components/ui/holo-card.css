@@ -13,9 +13,13 @@
 .holo-card {
   --pointer-x: 50%;
   --pointer-y: 50%;
+  --pointer-from-left: 0.5;
+  --pointer-from-top: 0.5;
   --pointer-from-center: 0;
   --pointer-from-center-x: 0;
   --pointer-from-center-y: 0;
+  --background-x: 50%;
+  --background-y: 50%;
   --tilt-x: 0deg;
   --tilt-y: 0deg;
   --active: 0;
@@ -30,13 +34,15 @@
   display: block;
   border-radius: inherit;
   overflow: hidden;
+  isolation: isolate;
+  contain: paint;
   transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
-  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: transform;
+  transition: transform 320ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .holo-card[data-active="true"] .holo-card__inner {
   transition: transform 80ms linear;
+  will-change: transform;
 }
 
 .holo-card__inner > :not(.holo-card__shine):not(.holo-card__glare) {
@@ -52,8 +58,12 @@
   border-radius: inherit;
   pointer-events: none;
   opacity: var(--active);
-  transition: opacity 280ms ease-out;
-  will-change: opacity, background-position, filter;
+  transition: opacity 240ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.holo-card[data-active="true"] .holo-card__shine,
+.holo-card[data-active="true"] .holo-card__glare {
+  will-change: opacity;
 }
 
 /* -------- regular-holo --------
@@ -73,13 +83,14 @@
 
 .holo-card[data-effect="regular-holo"] .holo-card__shine {
   background-image: conic-gradient(
-    from calc(var(--pointer-from-center-x) * 1deg) at var(--pointer-x) var(--pointer-y),
-    hsl(0 70% 70% / 0.18),
-    hsl(45 75% 72% / 0.22),
-    hsl(160 60% 70% / 0.20),
-    hsl(220 65% 72% / 0.22),
-    hsl(290 60% 72% / 0.20),
-    hsl(0 70% 70% / 0.18)
+    from calc(var(--pointer-from-center-x) * 1deg) at var(--pointer-x)
+      var(--pointer-y),
+    color-mix(in oklch, var(--holo-red) 18%, transparent),
+    color-mix(in oklch, var(--holo-gold) 22%, transparent),
+    color-mix(in oklch, var(--holo-green) 20%, transparent),
+    color-mix(in oklch, var(--holo-blue) 22%, transparent),
+    color-mix(in oklch, var(--holo-violet) 20%, transparent),
+    color-mix(in oklch, var(--holo-red) 18%, transparent)
   );
   mix-blend-mode: soft-light;
   opacity: calc(var(--active) * 0.55);
@@ -88,12 +99,358 @@
 .holo-card[data-effect="regular-holo"] .holo-card__glare {
   background-image: radial-gradient(
     farthest-corner circle at var(--pointer-x) var(--pointer-y),
-    hsl(0 0% 100% / 0.32) 0%,
-    hsl(0 0% 100% / 0.12) 28%,
-    hsl(0 0% 100% / 0) 55%
+    color-mix(in oklch, var(--holo-highlight) 32%, transparent) 0%,
+    color-mix(in oklch, var(--holo-highlight) 12%, transparent) 28%,
+    transparent 55%
   );
   mix-blend-mode: overlay;
   opacity: calc(var(--active) * 0.7);
+}
+
+/* -------- premium tier mask --------
+ *
+ * OPTCG rules text sits over the illustration instead of in a fixed white
+ * panel. Premium spectra therefore taper through the lower third rather than
+ * using a brittle card-type clip path. Glare follows the same fade so the
+ * printed rules remain readable at peak hover.
+ */
+
+.holo-card:is(
+    [data-effect="prism-holo"],
+    [data-effect="rainbow-holo"],
+    [data-effect="cosmos-holo"]
+  )
+  :is(.holo-card__shine, .holo-card__glare) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--holo-mask-solid) 0%,
+    var(--holo-mask-solid) 55%,
+    transparent 92%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--holo-mask-solid) 0%,
+    var(--holo-mask-solid) 55%,
+    transparent 92%
+  );
+}
+
+.holo-card:is(
+    [data-effect="prism-holo"],
+    [data-effect="rainbow-holo"],
+    [data-effect="cosmos-holo"]
+  )
+  .holo-card__shine::before,
+.holo-card:is(
+    [data-effect="prism-holo"],
+    [data-effect="rainbow-holo"],
+    [data-effect="cosmos-holo"]
+  )
+  .holo-card__shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* -------- prism-holo --------
+ *
+ * Super Rare / Promo — classic foil sheet.
+ *   - Base: an opaque spectrum sweep striated by two-pixel scanlines.
+ *   - ::before: two irregular foil-bar fields pan in opposite directions.
+ *   - ::after: a high-contrast luminosity spot makes the foil follow the cursor.
+ *   - Glare: a restrained white-hot bloom adds the final specular edge.
+ */
+
+.holo-card[data-effect="prism-holo"] .holo-card__shine {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--holo-foil-dark) 0 1px,
+      var(--holo-foil-mid) 1px 2px
+    ),
+    linear-gradient(
+      110deg,
+      var(--holo-spectrum-1) 0%,
+      var(--holo-spectrum-2) 6%,
+      var(--holo-spectrum-3) 12%,
+      var(--holo-spectrum-4) 18%,
+      var(--holo-spectrum-5) 24%,
+      var(--holo-spectrum-6) 30%,
+      var(--holo-spectrum-1) 36%,
+      var(--holo-spectrum-2) 42%,
+      var(--holo-spectrum-3) 48%,
+      var(--holo-spectrum-4) 54%,
+      var(--holo-spectrum-5) 60%,
+      var(--holo-spectrum-6) 66%,
+      var(--holo-spectrum-1) 72%,
+      var(--holo-spectrum-2) 78%,
+      var(--holo-spectrum-3) 84%,
+      var(--holo-spectrum-4) 90%,
+      var(--holo-spectrum-5) 96%,
+      var(--holo-spectrum-6) 100%
+    );
+  background-blend-mode: overlay;
+  background-size:
+    100% 100%,
+    360% 360%;
+  background-position:
+    center,
+    calc(var(--background-x) + var(--background-x) - 50%)
+      calc(var(--background-y) + var(--background-y) - 50%);
+  mix-blend-mode: color-dodge;
+  filter: brightness(1.08) contrast(1.25) saturate(1.3);
+  opacity: calc(var(--active) * 0.84);
+}
+
+.holo-card[data-effect="prism-holo"] .holo-card__shine::before {
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      var(--holo-foil-black) 0 2%,
+      var(--holo-foil-light) 2% 3.5%,
+      var(--holo-foil-black) 3.5% 9%,
+      var(--holo-foil-mid) 9% 13%,
+      var(--holo-foil-black) 13% 21%,
+      var(--holo-foil-light) 21% 23%,
+      var(--holo-foil-black) 23% 31%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--holo-foil-black) 0 5%,
+      var(--holo-foil-mid) 5% 7%,
+      var(--holo-foil-black) 7% 14%,
+      var(--holo-foil-light) 14% 18%,
+      var(--holo-foil-black) 18% 27%
+    );
+  background-blend-mode: screen;
+  background-size:
+    83% 100%,
+    137% 100%;
+  background-position:
+    calc(var(--pointer-x) + var(--pointer-x) - 50%) center,
+    calc(var(--background-x) + var(--background-x) - 50%) center;
+  mix-blend-mode: hard-light;
+  filter: brightness(1.18) contrast(1.25);
+  opacity: 0.66;
+}
+
+.holo-card[data-effect="prism-holo"] .holo-card__shine::after {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    var(--holo-foil-light) 0%,
+    var(--holo-foil-mid) 18%,
+    var(--holo-foil-black) 58%
+  );
+  mix-blend-mode: luminosity;
+  filter: brightness(1.02) contrast(3.2) saturate(1.15);
+  opacity: 0.5;
+}
+
+.holo-card[data-effect="prism-holo"] .holo-card__glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    var(--holo-star-white) 0%,
+    transparent 34%
+  );
+  mix-blend-mode: overlay;
+  filter: brightness(1.05) contrast(1.5);
+  opacity: calc(var(--active) * 0.24);
+}
+
+/* -------- rainbow-holo --------
+ *
+ * Secret / Special / Treasure Rare — oil-slick rainbow.
+ *   - Base: broad diagonal bands held in the midtones by a dark ramp.
+ *   - ::before: fine diagonal ridges give the color field a foil texture.
+ *   - ::after: a counter-moving dodge field blooms as the pointer travels.
+ *   - Glare: pointer-following hard light, capped below the text-safe fade.
+ */
+
+.holo-card[data-effect="rainbow-holo"] .holo-card__shine {
+  background-image:
+    repeating-linear-gradient(
+      132deg,
+      var(--holo-spectrum-1) 0 7%,
+      var(--holo-spectrum-2) 10% 17%,
+      var(--holo-spectrum-3) 20% 27%,
+      var(--holo-spectrum-4) 30% 37%,
+      var(--holo-spectrum-5) 40% 47%,
+      var(--holo-spectrum-6) 50% 57%,
+      var(--holo-spectrum-1) 60%
+    ),
+    linear-gradient(
+      145deg,
+      var(--holo-foil-black) 0%,
+      var(--holo-foil-dark) 34%,
+      var(--holo-foil-mid) 52%,
+      var(--holo-foil-dark) 70%,
+      var(--holo-foil-black) 100%
+    );
+  background-blend-mode: luminosity, soft-light;
+  background-size:
+    260% 260%,
+    100% 100%;
+  background-position:
+    calc(20% + var(--pointer-from-left) * 60%)
+      calc(20% + var(--pointer-from-top) * 60%),
+    center;
+  mix-blend-mode: overlay;
+  filter: brightness(1.06) contrast(1.35) saturate(1.4);
+  opacity: calc(var(--active) * 0.82);
+}
+
+.holo-card[data-effect="rainbow-holo"] .holo-card__shine::before {
+  background-image: repeating-linear-gradient(
+    138deg,
+    var(--holo-foil-black) 0 1px,
+    var(--holo-foil-mid) 1px 2px,
+    var(--holo-foil-dark) 2px 5px
+  );
+  background-size: 180% 180%;
+  background-position:
+    calc(var(--pointer-x) + var(--background-x) - 50%)
+    calc(var(--pointer-y) + var(--background-y) - 50%);
+  mix-blend-mode: overlay;
+  filter: brightness(1.05) contrast(1.7);
+  opacity: 0.3;
+}
+
+.holo-card[data-effect="rainbow-holo"] .holo-card__shine::after {
+  background-image: linear-gradient(
+    58deg,
+    var(--holo-foil-black) 0 8%,
+    var(--holo-spectrum-5) 13% 22%,
+    var(--holo-spectrum-4) 28% 36%,
+    var(--holo-spectrum-3) 42% 50%,
+    var(--holo-spectrum-2) 56% 64%,
+    var(--holo-spectrum-1) 70% 78%,
+    var(--holo-spectrum-6) 84% 92%,
+    var(--holo-foil-black) 100%
+  );
+  background-size: 280% 280%;
+  background-position:
+    calc(var(--background-x) + var(--background-x) - 50%)
+    calc(var(--background-y) + var(--background-y) - 50%);
+  mix-blend-mode: color-dodge;
+  filter: brightness(calc(0.92 + var(--pointer-from-center) * 0.2))
+    contrast(2.1) saturate(1.4);
+  opacity: 0.68;
+}
+
+.holo-card[data-effect="rainbow-holo"] .holo-card__glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    var(--holo-star-white) 0%,
+    var(--holo-foil-mid) 22%,
+    var(--holo-foil-black) 68%
+  );
+  mix-blend-mode: hard-light;
+  filter: brightness(1.02) contrast(1.7);
+  opacity: calc(
+    var(--active) * (0.1 + var(--pointer-from-center) * 0.18)
+  );
+}
+
+/* -------- cosmos-holo --------
+ *
+ * Leader — deep-space galaxy foil.
+ *   - Base: indigo space and a low-brightness rainbow nebula under dodge.
+ *   - ::before / ::after: two hard-stop star fields drift at different depths.
+ *   - Glare: an amplified soft spotlight blooms as the pointer moves off-axis.
+ */
+
+.holo-card[data-effect="cosmos-holo"] .holo-card__shine {
+  background-image:
+    linear-gradient(
+      124deg,
+      var(--holo-foil-black) 0 12%,
+      var(--holo-spectrum-5) 22%,
+      var(--holo-spectrum-4) 34%,
+      var(--holo-spectrum-2) 48%,
+      var(--holo-spectrum-1) 62%,
+      var(--holo-spectrum-6) 76%,
+      var(--holo-foil-black) 90% 100%
+    ),
+    linear-gradient(
+      150deg,
+      var(--holo-space-deep) 0%,
+      var(--holo-space-blue) 48%,
+      var(--holo-foil-black) 100%
+    );
+  background-blend-mode: soft-light;
+  background-size:
+    340% 340%,
+    100% 100%;
+  background-position:
+    calc(var(--background-x) + var(--background-x) - 50%)
+      calc(var(--background-y) + var(--background-y) - 50%),
+    center;
+  mix-blend-mode: color-dodge;
+  filter: brightness(calc(1 + var(--pointer-from-center) * 0.15))
+    contrast(1.65) saturate(1.35);
+  opacity: calc(var(--active) * 0.84);
+}
+
+.holo-card[data-effect="cosmos-holo"] .holo-card__shine::before {
+  background-image:
+    radial-gradient(circle at 8% 12%, var(--holo-star-white) 0 0.35%, var(--holo-star-cyan) 0.45%, transparent 0.9%),
+    radial-gradient(circle at 22% 38%, var(--holo-star-gold) 0 0.3%, transparent 0.85%),
+    radial-gradient(circle at 37% 18%, var(--holo-star-cyan) 0 0.25%, transparent 0.75%),
+    radial-gradient(circle at 51% 46%, var(--holo-star-white) 0 0.4%, transparent 1%),
+    radial-gradient(circle at 66% 9%, var(--holo-star-gold) 0 0.25%, transparent 0.8%),
+    radial-gradient(circle at 82% 32%, var(--holo-star-cyan) 0 0.35%, transparent 0.95%),
+    radial-gradient(circle at 94% 17%, var(--holo-star-white) 0 0.3%, transparent 0.8%),
+    radial-gradient(circle at 14% 67%, var(--holo-star-cyan) 0 0.25%, transparent 0.75%),
+    radial-gradient(circle at 29% 83%, var(--holo-star-white) 0 0.35%, transparent 0.9%),
+    radial-gradient(circle at 48% 69%, var(--holo-star-gold) 0 0.3%, transparent 0.8%),
+    radial-gradient(circle at 71% 88%, var(--holo-star-white) 0 0.4%, transparent 1%),
+    radial-gradient(circle at 89% 72%, var(--holo-star-cyan) 0 0.3%, transparent 0.85%);
+  background-size: 126% 126%;
+  background-position:
+    calc(50% + (var(--background-x) - 50%) * 0.45)
+    calc(50% + (var(--background-y) - 50%) * 0.45);
+  mix-blend-mode: screen;
+  filter: brightness(1.35) contrast(2.2);
+  opacity: 0.95;
+}
+
+.holo-card[data-effect="cosmos-holo"] .holo-card__shine::after {
+  background-image:
+    radial-gradient(circle at 12% 27%, var(--holo-star-gold) 0 0.2%, transparent 0.65%),
+    radial-gradient(circle at 25% 8%, var(--holo-star-white) 0 0.25%, transparent 0.75%),
+    radial-gradient(circle at 41% 35%, var(--holo-star-cyan) 0 0.2%, transparent 0.7%),
+    radial-gradient(circle at 58% 14%, var(--holo-star-white) 0 0.3%, transparent 0.8%),
+    radial-gradient(circle at 73% 44%, var(--holo-star-gold) 0 0.2%, transparent 0.65%),
+    radial-gradient(circle at 91% 6%, var(--holo-star-cyan) 0 0.25%, transparent 0.75%),
+    radial-gradient(circle at 6% 88%, var(--holo-star-white) 0 0.2%, transparent 0.65%),
+    radial-gradient(circle at 34% 61%, var(--holo-star-gold) 0 0.25%, transparent 0.75%),
+    radial-gradient(circle at 53% 91%, var(--holo-star-cyan) 0 0.2%, transparent 0.65%),
+    radial-gradient(circle at 68% 65%, var(--holo-star-white) 0 0.3%, transparent 0.85%),
+    radial-gradient(circle at 79% 81%, var(--holo-star-gold) 0 0.2%, transparent 0.7%),
+    radial-gradient(circle at 96% 58%, var(--holo-star-white) 0 0.25%, transparent 0.75%);
+  background-size: 148% 148%;
+  background-position:
+    calc(50% + (var(--pointer-x) - 50%) * 0.3)
+    calc(50% + (var(--pointer-y) - 50%) * 0.3);
+  mix-blend-mode: screen;
+  filter: brightness(1.22) contrast(2.25);
+  opacity: 0.8;
+}
+
+.holo-card[data-effect="cosmos-holo"] .holo-card__glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    var(--holo-star-white) 0%,
+    var(--holo-space-blue) 26%,
+    var(--holo-foil-black) 72%
+  );
+  mix-blend-mode: overlay;
+  filter: brightness(1.02) contrast(1.8) saturate(1.15);
+  opacity: calc(
+    var(--active) * (0.08 + var(--pointer-from-center) * 0.16)
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {

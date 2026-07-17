@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { HoloCard } from "@/components/ui/holo-card";
-import type { HoloEffect } from "@/types/cards";
+import { holoEffectForRarity, HOLO_FEATURE_ENABLED } from "@/lib/cards/holo";
 
 interface ArtVariant {
   id: string;
@@ -17,21 +17,20 @@ interface ArtVariant {
 interface CardImageGalleryProps {
   cardName: string;
   baseImageUrl: string;
+  baseRarity: string;
   artVariants: ArtVariant[];
   // Controlled mode — when provided, selected image is managed externally
   controlledImage?: string;
   onImageSelect?: (imageUrl: string, isBase: boolean) => void;
-  /** Holo effect tier for the main image. Defaults to "none". */
-  effect?: HoloEffect;
 }
 
 export function CardImageGallery({
   cardName,
   baseImageUrl,
+  baseRarity,
   artVariants,
   controlledImage,
   onImageSelect,
-  effect = "none",
 }: CardImageGalleryProps) {
   const [internalImage, setInternalImage] = useState(baseImageUrl);
   const selectedImage = controlledImage ?? internalImage;
@@ -46,13 +45,25 @@ export function CardImageGallery({
 
   // Build the full list: origin artwork first, then variants
   const allArtworks = [
-    { id: "__origin", label: "Original", imageUrl: baseImageUrl },
+    {
+      id: "__origin",
+      label: "Original",
+      rarity: baseRarity,
+      imageUrl: baseImageUrl,
+    },
     ...artVariants.map((v) => ({
       id: v.id,
       label: v.label,
+      rarity: v.rarity,
       imageUrl: v.imageUrl,
     })),
   ];
+  const selectedRarity =
+    allArtworks.find((art) => art.imageUrl === selectedImage)?.rarity ??
+    baseRarity;
+  const effect = HOLO_FEATURE_ENABLED
+    ? holoEffectForRarity(selectedRarity)
+    : "none";
 
   return (
     <div>
