@@ -21,7 +21,10 @@ interface UseCardTiltOptions {
  * Honors `prefers-reduced-motion`: pointer tracking still runs (so the static
  * shine still slides), but the 3D rotation is held at 0.
  */
-export function useCardTilt({ enabled = true, maxTiltDeg = 9 }: UseCardTiltOptions = {}) {
+export function useCardTilt({
+  enabled = true,
+  maxTiltDeg = 9,
+}: UseCardTiltOptions = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingRef = useRef<{ x: number; y: number } | null>(null);
@@ -47,11 +50,21 @@ export function useCardTilt({ enabled = true, maxTiltDeg = 9 }: UseCardTiltOptio
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
-    const px = ((pending.x - rect.left) / rect.width) * 100;
-    const py = ((pending.y - rect.top) / rect.height) * 100;
+    const fromLeft = Math.min(
+      1,
+      Math.max(0, (pending.x - rect.left) / rect.width)
+    );
+    const fromTop = Math.min(
+      1,
+      Math.max(0, (pending.y - rect.top) / rect.height)
+    );
+    const px = fromLeft * 100;
+    const py = fromTop * 100;
     const cx = px - 50;
     const cy = py - 50;
     const distance = Math.min(50, Math.hypot(cx, cy)) / 50;
+    const backgroundX = 70 - fromLeft * 40;
+    const backgroundY = 70 - fromTop * 40;
 
     const reduceMotion = reduceMotionRef.current;
     const tiltY = reduceMotion ? 0 : (cx / 50) * maxTiltDeg;
@@ -59,9 +72,13 @@ export function useCardTilt({ enabled = true, maxTiltDeg = 9 }: UseCardTiltOptio
 
     el.style.setProperty("--pointer-x", `${px.toFixed(2)}%`);
     el.style.setProperty("--pointer-y", `${py.toFixed(2)}%`);
+    el.style.setProperty("--pointer-from-left", fromLeft.toFixed(3));
+    el.style.setProperty("--pointer-from-top", fromTop.toFixed(3));
     el.style.setProperty("--pointer-from-center", distance.toFixed(3));
     el.style.setProperty("--pointer-from-center-x", cx.toFixed(2));
     el.style.setProperty("--pointer-from-center-y", cy.toFixed(2));
+    el.style.setProperty("--background-x", `${backgroundX.toFixed(2)}%`);
+    el.style.setProperty("--background-y", `${backgroundY.toFixed(2)}%`);
     el.style.setProperty("--tilt-x", `${tiltX.toFixed(2)}deg`);
     el.style.setProperty("--tilt-y", `${tiltY.toFixed(2)}deg`);
   }, [maxTiltDeg]);
@@ -74,7 +91,7 @@ export function useCardTilt({ enabled = true, maxTiltDeg = 9 }: UseCardTiltOptio
         rafRef.current = requestAnimationFrame(apply);
       }
     },
-    [enabled, apply],
+    [enabled, apply]
   );
 
   const onPointerEnter = useCallback(() => {
@@ -92,6 +109,10 @@ export function useCardTilt({ enabled = true, maxTiltDeg = 9 }: UseCardTiltOptio
       el.style.setProperty("--active", "0");
       el.style.setProperty("--tilt-x", "0deg");
       el.style.setProperty("--tilt-y", "0deg");
+      el.style.setProperty("--pointer-from-left", "0.500");
+      el.style.setProperty("--pointer-from-top", "0.500");
+      el.style.setProperty("--background-x", "50.00%");
+      el.style.setProperty("--background-y", "50.00%");
     }
     if (rafRef.current != null) {
       cancelAnimationFrame(rafRef.current);
