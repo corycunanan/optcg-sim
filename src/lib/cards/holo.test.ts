@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { HOLO_EFFECT_BY_RARITY, holoEffectForRarity } from "./holo";
+import { holoEffectForRarity } from "./holo";
 
 describe("holoEffectForRarity", () => {
-  it.each(Object.entries(HOLO_EFFECT_BY_RARITY))(
-    "maps %s artwork to %s",
-    (rarity, effect) => {
-      expect(holoEffectForRarity(rarity)).toBe(effect);
-    }
-  );
+  it.each([
+    ["Common", "regular-holo"],
+    ["Uncommon", "regular-holo"],
+    ["Rare", "regular-holo"],
+    ["SuperRare", "prism-holo"],
+    ["Promo", "prism-holo"],
+    ["SecretRare", "rainbow-holo"],
+    ["Special", "rainbow-holo"],
+    ["TreasureRare", "rainbow-holo"],
+    ["Leader", "cosmos-holo"],
+  ] as const)("maps %s artwork to %s", (rarity, effect) => {
+    expect(holoEffectForRarity(rarity)).toBe(effect);
+  });
 
   it.each([undefined, null, "", "Unknown", "SEC", "__proto__"])(
     "leaves unsupported rarity %s untreated",

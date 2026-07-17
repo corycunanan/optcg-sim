@@ -81,6 +81,8 @@ export function useCardTilt({
     el.style.setProperty("--background-y", `${backgroundY.toFixed(2)}%`);
     el.style.setProperty("--tilt-x", `${tiltX.toFixed(2)}deg`);
     el.style.setProperty("--tilt-y", `${tiltY.toFixed(2)}deg`);
+    el.dataset.active = "true";
+    el.style.setProperty("--active", "1");
   }, [maxTiltDeg]);
 
   const onPointerMove = useCallback(
@@ -109,8 +111,13 @@ export function useCardTilt({
       el.style.setProperty("--active", "0");
       el.style.setProperty("--tilt-x", "0deg");
       el.style.setProperty("--tilt-y", "0deg");
+      el.style.setProperty("--pointer-x", "50.00%");
+      el.style.setProperty("--pointer-y", "50.00%");
       el.style.setProperty("--pointer-from-left", "0.500");
       el.style.setProperty("--pointer-from-top", "0.500");
+      el.style.setProperty("--pointer-from-center", "0.000");
+      el.style.setProperty("--pointer-from-center-x", "0.00");
+      el.style.setProperty("--pointer-from-center-y", "0.00");
       el.style.setProperty("--background-x", "50.00%");
       el.style.setProperty("--background-y", "50.00%");
     }

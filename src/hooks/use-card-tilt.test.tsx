@@ -89,10 +89,43 @@ describe("useCardTilt", () => {
     act(() => root.props.onPointerLeave());
 
     expect(node.dataset.active).toBe("false");
+    expect(properties.get("--active")).toBe("0");
+    expect(properties.get("--pointer-x")).toBe("50.00%");
+    expect(properties.get("--pointer-y")).toBe("50.00%");
     expect(properties.get("--pointer-from-left")).toBe("0.500");
     expect(properties.get("--pointer-from-top")).toBe("0.500");
+    expect(properties.get("--pointer-from-center")).toBe("0.000");
+    expect(properties.get("--pointer-from-center-x")).toBe("0.00");
+    expect(properties.get("--pointer-from-center-y")).toBe("0.00");
     expect(properties.get("--background-x")).toBe("50.00%");
     expect(properties.get("--background-y")).toBe("50.00%");
+    expect(properties.get("--tilt-x")).toBe("0deg");
+    expect(properties.get("--tilt-y")).toBe("0deg");
+  });
+
+  it("re-enters at neutral and activates pointer movement with fresh coordinates", () => {
+    const { node, root } = renderTiltHarness();
+
+    act(() => root.props.onPointerMove({ clientX: 190, clientY: 40 }));
+    act(() => frameCallback?.(0));
+    act(() => root.props.onPointerLeave());
+    act(() => root.props.onPointerEnter());
+
+    expect(node.dataset.active).toBe("true");
+    expect(properties.get("--active")).toBe("1");
+    expect(properties.get("--pointer-x")).toBe("50.00%");
+    expect(properties.get("--pointer-y")).toBe("50.00%");
+
+    act(() => root.props.onPointerLeave());
+    act(() => root.props.onPointerMove({ clientX: 60, clientY: 95 }));
+    act(() => frameCallback?.(0));
+
+    expect(node.dataset.active).toBe("true");
+    expect(properties.get("--active")).toBe("1");
+    expect(properties.get("--pointer-x")).toBe("25.00%");
+    expect(properties.get("--pointer-y")).toBe("75.00%");
+    expect(properties.get("--pointer-from-center-x")).toBe("-25.00");
+    expect(properties.get("--pointer-from-center-y")).toBe("25.00");
   });
 
   it("keeps pointer tracking active while reduced motion suppresses rotation", () => {

@@ -87,12 +87,12 @@
   --holo-cosmos-blue: oklch(72% 0.13 255);
   --holo-cosmos-deep: oklch(58% 0.14 300);
   --holo-mask-solid:  oklch(0% 0 0);
-  --holo-spectrum-1:  oklch(72% 0.15 25);
-  --holo-spectrum-2:  oklch(80% 0.14 78);
-  --holo-spectrum-3:  oklch(74% 0.13 145);
-  --holo-spectrum-4:  oklch(76% 0.12 205);
-  --holo-spectrum-5:  oklch(68% 0.15 260);
-  --holo-spectrum-6:  oklch(70% 0.15 315);
+  --holo-spectrum-1:  oklch(78% 0.18 25);
+  --holo-spectrum-2:  oklch(86% 0.17 78);
+  --holo-spectrum-3:  oklch(82% 0.16 145);
+  --holo-spectrum-4:  oklch(84% 0.15 205);
+  --holo-spectrum-5:  oklch(76% 0.18 260);
+  --holo-spectrum-6:  oklch(78% 0.18 315);
   --holo-foil-black:  oklch(10% 0.02 255);
   --holo-foil-dark:   oklch(25% 0.025 255);
   --holo-foil-mid:    oklch(55% 0.02 255);
