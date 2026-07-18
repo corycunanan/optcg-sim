@@ -45,6 +45,7 @@ export type HighlightRingColor =
   | "attacker"
   | "defender"
   | "counter"
+  | "winner"
   | "usable-effect";
 
 export interface CardOverlays {

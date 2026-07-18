@@ -40,6 +40,9 @@ interface OpponentFieldProps {
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
+  winnerPulseIds?: Set<string>;
+  lifeTriggerPulse?: boolean;
+  lifeDamagePulseNonce?: number;
   /** Signed offsets merged into displayed DON count per target card
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
@@ -65,6 +68,9 @@ export function OpponentField({
   attackerInstanceId,
   defenderInstanceId,
   counterPulseIds,
+  winnerPulseIds,
+  lifeTriggerPulse,
+  lifeDamagePulseNonce,
   donCountAdjustments,
   pileArrivingCounts,
   targetSelectionById,
@@ -206,6 +212,7 @@ export function OpponentField({
           attackTargetEligible={isAttackTargetEligible("leader", opp.leader.state)}
           isAttacker={attackerInstanceId === opp.leader.instanceId}
           isDefender={defenderInstanceId === opp.leader.instanceId}
+          winnerPulse={winnerPulseIds?.has(opp.leader.instanceId)}
           counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
           targetSelection={targetSelectionById?.get(opp.leader.instanceId)}
           onTargetToggle={() => onTargetToggle?.(opp.leader.instanceId)}
@@ -242,6 +249,7 @@ export function OpponentField({
             attackTargetEligible={isAttackTargetEligible("character", char.state)}
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
+            winnerPulse={winnerPulseIds?.has(char.instanceId)}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             targetSelection={targetSelectionById?.get(char.instanceId)}
             onTargetToggle={() => onTargetToggle?.(char.instanceId)}
@@ -267,6 +275,8 @@ export function OpponentField({
         zoneKey="o-life"
         sleeveUrl={opp?.sleeveUrl}
         arrivingCount={pileArrivingCounts?.get("o-life")}
+        triggerPulse={lifeTriggerPulse}
+        damagePulseNonce={lifeDamagePulseNonce}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

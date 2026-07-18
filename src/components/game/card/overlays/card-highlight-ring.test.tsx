@@ -1,14 +1,17 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { cardWinnerPulse } from "@/lib/motion";
 import {
   CardHighlightRing,
   resolveCardHighlightRingColor,
 } from "./card-highlight-ring";
 
+const motionState = vi.hoisted(() => ({ reduced: true }));
+
 vi.mock("motion/react", () => ({
   motion: { div: "div" },
-  useReducedMotion: () => true,
+  useReducedMotion: () => motionState.reduced,
 }));
 
 let renderer: ReactTestRenderer | null = null;
@@ -56,6 +59,37 @@ describe("CardHighlightRing usable-effect precedence", () => {
 
   it("renders no ring when the server sent no usable availability", () => {
     const ring = renderRing(undefined, false);
+
+    expect(ring?.toJSON()).toBeNull();
+  });
+});
+
+describe("CardHighlightRing winner feedback", () => {
+  it("uses a green board-floor ring distinct from amber battle rings", () => {
+    motionState.reduced = false;
+    const ring = renderRing("winner", false);
+    const className = ring?.root.findByType("div").props.className;
+
+    expect(className).toContain("ring-4");
+    expect(className).toContain("ring-gb-signal-selected");
+    expect(className).not.toContain("ring-gb-signal-battle");
+  });
+
+  it("keeps recoil off the ring overlay while retaining its pulse", () => {
+    motionState.reduced = false;
+    const ring = renderRing("winner", false);
+    const props = ring?.root.findByType("div").props;
+    if (!props) throw new Error("Winner ring did not render");
+
+    expect(props.initial).not.toHaveProperty("x");
+    expect(props.animate).not.toHaveProperty("x");
+    expect(props.animate.opacity).toEqual(cardWinnerPulse.opacity);
+    expect(props.animate.scale).toEqual(cardWinnerPulse.scale);
+  });
+
+  it("renders no winner effect for reduced motion", () => {
+    motionState.reduced = true;
+    const ring = renderRing("winner", false);
 
     expect(ring?.toJSON()).toBeNull();
   });

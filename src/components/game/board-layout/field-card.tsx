@@ -8,7 +8,12 @@ import { cn } from "@/lib/utils";
 import { canPlayCardInZone } from "@/lib/game/client-legality";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
-import { cardEntry, cardReject, cardRejectReduced } from "@/lib/motion";
+import {
+  cardEntry,
+  cardReject,
+  cardRejectReduced,
+  cardWinnerPulse,
+} from "@/lib/motion";
 import { Card } from "../card";
 import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
@@ -48,6 +53,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected,
   isAttacker,
   isDefender,
+  winnerPulse,
   counterTarget,
   counterDragActive,
   eventDropTarget,
@@ -82,6 +88,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
    *  Moves with the battle: leader at declare-attack, then the blocker once
    *  block is declared. Drives the amber pulse ring (OPT-274). */
   isDefender?: boolean;
+  /** One-shot COMBAT_VICTORY feedback. Wins ring precedence while active. */
+  winnerPulse?: boolean;
   /** Current battle defender while a Character counter is being dragged. */
   counterTarget?: boolean;
   /** A Character-counter drag is in progress. Board-full replacement is never
@@ -263,7 +271,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // Ring consolidation (OPT-273): formerly consumer className `ring-2 ring-gb-accent-*`.
   // Now routed through the primitive's highlightRing overlay so ring semantics
   // live in one place and can compose with motion presets. Precedence (top
-  // wins): counter flash (transient) > attacker (current aggressor) > defender
+  // wins): combat winner (transient) > counter flash (transient) > attacker
+  // (current aggressor) > defender
   // (OPT-274 — current battle target, same amber pulse as attacker) > selected
   // (user-chosen blocker or effect target) > eligible candidate > ambient
   // usable-effect availability.
@@ -272,17 +281,19 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const selectionControl = !!blockerSelectable || !!targetSelection;
   const disabledReason = targetSelection?.disabledReason ?? null;
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
-  const activeHighlightRing = counterPulse
-    ? ("counter" as const)
-    : isAttacker
-      ? ("attacker" as const)
-      : isDefender
-        ? ("defender" as const)
-        : selectionSelected
-          ? ("selected" as const)
-          : selectionEligible
-            ? ("eligible" as const)
-            : undefined;
+  const activeHighlightRing = winnerPulse
+    ? ("winner" as const)
+    : counterPulse
+      ? ("counter" as const)
+      : isAttacker
+        ? ("attacker" as const)
+        : isDefender
+          ? ("defender" as const)
+          : selectionSelected
+            ? ("selected" as const)
+            : selectionEligible
+              ? ("eligible" as const)
+              : undefined;
   const highlightRing = resolveCardHighlightRingColor(
     activeHighlightRing,
     hasUsableEffect(card.instanceId),
@@ -292,20 +303,23 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // flagged this card as newly-arrived. `isDragging` opacity still wins
   // (composes via `animate` overriding scale/opacity post-mount).
   const shouldEnter = !!entering && !reducedMotion;
+  const winnerFeedbackActive = !!winnerPulse && !reducedMotion;
   const initialTarget = shouldEnter ? ENTRY_INITIAL : false;
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
   const animateTarget = rejectionSequence
     ? { scale: 1, ...rejectionAnimation }
     : {
         scale: 1,
-        x: 0,
+        x: winnerFeedbackActive ? cardWinnerPulse.x : 0,
         opacity: isDragging ? 0.3 : targetSelection?.disabledReason ? 0.35 : 1,
       };
   const wrapperTransition = rejectionSequence
     ? rejectionAnimation.transition
-    : shouldEnter
-      ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
-      : { duration: 0.15, ease: "easeOut" as const };
+    : winnerFeedbackActive
+      ? cardWinnerPulse.transition
+      : shouldEnter
+        ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
+        : { duration: 0.15, ease: "easeOut" as const };
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -482,6 +496,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   attackTargetEligible,
   isAttacker,
   isDefender,
+  winnerPulse,
   counterPulse,
   targetSelection,
   onTargetToggle,
@@ -499,6 +514,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   /** See `PlayerFieldCard.isDefender` — identical semantics on the opposing
    *  side. */
   isDefender?: boolean;
+  winnerPulse?: boolean;
   counterPulse?: boolean;
   targetSelection?: TargetCardSelectionState;
   onTargetToggle?: () => void;
@@ -548,19 +564,22 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   const cardState: "attacking" | "rest" | "active" = isAttacker
     ? "attacking"
     : baseState;
-  const highlightRing = counterPulse
-    ? ("counter" as const)
-    : isAttacker
-      ? ("attacker" as const)
-      : isDefender
-        ? ("defender" as const)
-        : targetSelection?.selected
-          ? ("selected" as const)
-          : targetSelection?.eligible
-            ? ("eligible" as const)
-            : undefined;
+  const highlightRing = winnerPulse
+    ? ("winner" as const)
+    : counterPulse
+      ? ("counter" as const)
+      : isAttacker
+        ? ("attacker" as const)
+        : isDefender
+          ? ("defender" as const)
+          : targetSelection?.selected
+            ? ("selected" as const)
+            : targetSelection?.eligible
+              ? ("eligible" as const)
+              : undefined;
 
   const shouldEnter = !!entering && !reducedMotion;
+  const winnerFeedbackActive = !!winnerPulse && !reducedMotion;
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
   const disabledReason = targetSelection?.disabledReason ?? null;
@@ -586,9 +605,16 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
       initial={shouldEnter ? ENTRY_INITIAL : false}
       animate={{
         ...ENTRY_ANIMATE,
+        x: winnerFeedbackActive ? cardWinnerPulse.x : 0,
         opacity: targetSelection?.disabledReason ? 0.35 : 1,
       }}
-      transition={shouldEnter ? cardEntry : { duration: 0 }}
+      transition={
+        winnerFeedbackActive
+          ? cardWinnerPulse.transition
+          : shouldEnter
+            ? cardEntry
+            : { duration: 0 }
+      }
       onClick={
         targetSelection && !targetSelection.disabledReason
           ? onTargetToggle

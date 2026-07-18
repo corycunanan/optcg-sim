@@ -149,6 +149,41 @@ const board = {
         times: [0, 0.35, 1] as number[],
       },
     },
+    /** Combat-victory pulse (OPT-283). A green one-shot ring separates the
+     *  winner from the sustained amber battle pair; the horizontal keyframes
+     *  add a short recoil before the glow settles. */
+    winnerPulse: {
+      opacity: [0, 1, 0.85, 0] as number[],
+      scale: [0.98, 1.07, 1.02, 1] as number[],
+      x: [0, -5, 3, 0] as number[],
+      transition: {
+        duration: 0.56,
+        ease: "easeOut" as const,
+        times: [0, 0.25, 0.55, 1] as number[],
+      },
+    },
+    /** Accepted life [Trigger] feedback (OPT-283). The owning Life zone gets
+     *  a compact amber pulse after the optional Trigger is confirmed. */
+    lifeTriggerPulse: {
+      opacity: [0, 1, 0] as number[],
+      scale: [0.98, 1.05, 1] as number[],
+      transition: {
+        duration: 0.56,
+        ease: "easeOut" as const,
+        times: [0, 0.3, 1] as number[],
+      },
+    },
+    /** Life-damage impact (OPT-283). Red flash + asymmetric shake reads as a
+     *  hit rather than the celebratory amber Trigger pulse. */
+    lifeDamageImpact: {
+      x: [0, -6, 5, -3, 0] as number[],
+      opacity: [1, 0.65, 1, 0.8, 1] as number[],
+      transition: {
+        duration: 0.42,
+        ease: "easeOut" as const,
+        times: [0, 0.2, 0.45, 0.7, 1] as number[],
+      },
+    },
     /** Server rejection: three short horizontal oscillations while the card
      *  flashes into the shared disabled treatment, then recovers. */
     reject: {
@@ -285,6 +320,9 @@ export const cardAttackerPulse = board.card.attackerPulse;
 export const cardBlockerHighlight = board.card.blockerHighlight;
 export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
+export const cardWinnerPulse = board.card.winnerPulse;
+export const lifeTriggerPulse = board.card.lifeTriggerPulse;
+export const lifeDamageImpact = board.card.lifeDamageImpact;
 export const cardReject = board.card.reject;
 export const cardRejectReduced = board.card.rejectReduced;
 export const cardFizzle = board.card.fizzle;
