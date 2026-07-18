@@ -77,7 +77,7 @@
  *     Per-stop alpha is intentionally low (0.18-0.22).
  *   - No saturate/contrast amplification — leaves the printed art's own
  *     colors intact.
- *   - Shine peaks at 0.55 of --active and glare at 0.7, so even at full
+ *   - Shine peaks at 0.55 of --active and glare at 0.79, so even at full
  *     hover the artwork reads cleanly through both layers.
  */
 
@@ -104,21 +104,19 @@
     transparent 55%
   );
   mix-blend-mode: overlay;
-  opacity: calc(var(--active) * 0.7);
+  opacity: calc(var(--active) * 0.79);
 }
 
-/* -------- premium tier mask --------
+/* -------- text-safe premium mask --------
  *
  * OPTCG rules text sits over the illustration instead of in a fixed white
- * panel. Premium spectra therefore taper through the lower third rather than
- * using a brittle card-type clip path. Glare follows the same fade so the
- * printed rules remain readable at peak hover.
+ * panel. Prism and rainbow taper through the lower third; cosmos stays
+ * unmasked so its star fields cover the full card.
  */
 
 .holo-card:is(
     [data-effect="prism-holo"],
-    [data-effect="rainbow-holo"],
-    [data-effect="cosmos-holo"]
+    [data-effect="rainbow-holo"]
   )
   :is(.holo-card__shine, .holo-card__glare) {
   -webkit-mask-image: linear-gradient(
@@ -157,10 +155,10 @@
 /* -------- prism-holo --------
  *
  * Super Rare / Promo — classic foil sheet.
- *   - Base: an opaque spectrum sweep striated by two-pixel scanlines.
- *   - ::before: two irregular foil-bar fields pan in opposite directions.
- *   - ::after: a high-contrast luminosity spot makes the foil follow the cursor.
- *   - Glare: a restrained white-hot bloom adds the final specular edge.
+ *   - Base: a restrained spectrum sweep striated by two-pixel scanlines.
+ *   - ::before: faint foil-bar fields pan in opposite directions.
+ *   - ::after: a soft luminosity spot follows the cursor.
+ *   - Glare: a dim bloom adds the final specular edge.
  */
 
 .holo-card[data-effect="prism-holo"] .holo-card__shine {
@@ -200,8 +198,8 @@
     calc(var(--background-x) + var(--background-x) - 50%)
       calc(var(--background-y) + var(--background-y) - 50%);
   mix-blend-mode: color-dodge;
-  filter: brightness(1.08) contrast(1.25) saturate(1.3);
-  opacity: calc(var(--active) * 0.84);
+  filter: brightness(0.62) contrast(1.25) saturate(0.75);
+  opacity: calc(var(--active) * 0.66);
 }
 
 .holo-card[data-effect="prism-holo"] .holo-card__shine::before {
@@ -233,7 +231,7 @@
     calc(var(--background-x) + var(--background-x) - 50%) center;
   mix-blend-mode: hard-light;
   filter: brightness(1.18) contrast(1.25);
-  opacity: 0.66;
+  opacity: 0.09;
 }
 
 .holo-card[data-effect="prism-holo"] .holo-card__shine::after {
@@ -245,7 +243,7 @@
   );
   mix-blend-mode: luminosity;
   filter: brightness(1.02) contrast(3.2) saturate(1.15);
-  opacity: 0.5;
+  opacity: 0.24;
 }
 
 .holo-card[data-effect="prism-holo"] .holo-card__glare {
@@ -255,8 +253,8 @@
     transparent 34%
   );
   mix-blend-mode: overlay;
-  filter: brightness(1.05) contrast(1.5);
-  opacity: calc(var(--active) * 0.24);
+  filter: brightness(0.75) contrast(1.5);
+  opacity: calc(var(--active) * 0.19);
 }
 
 /* -------- rainbow-holo --------
@@ -265,7 +263,7 @@
  *   - Base: broad diagonal bands held in the midtones by a dark ramp.
  *   - ::before: fine diagonal ridges give the color field a foil texture.
  *   - ::after: a counter-moving dodge field blooms as the pointer travels.
- *   - Glare: pointer-following hard light, capped below the text-safe fade.
+ *   - Glare: pointer-following soft light, capped below the text-safe fade.
  */
 
 .holo-card[data-effect="rainbow-holo"] .holo-card__shine {
@@ -297,7 +295,7 @@
       calc(20% + var(--pointer-from-top) * 60%),
     center;
   mix-blend-mode: overlay;
-  filter: brightness(1.06) contrast(1.35) saturate(1.4);
+  filter: brightness(0.76) contrast(1.35) saturate(1.4);
   opacity: calc(var(--active) * 0.82);
 }
 
@@ -334,8 +332,8 @@
     calc(var(--background-x) + var(--background-x) - 50%)
     calc(var(--background-y) + var(--background-y) - 50%);
   mix-blend-mode: color-dodge;
-  filter: brightness(calc(0.92 + var(--pointer-from-center) * 0.2))
-    contrast(2.1) saturate(1.4);
+  filter: brightness(calc(1.01 + var(--pointer-from-center) * 0.2))
+    contrast(2.1) saturate(2.2);
   opacity: 0.68;
 }
 
@@ -346,8 +344,8 @@
     var(--holo-foil-mid) 22%,
     var(--holo-foil-black) 68%
   );
-  mix-blend-mode: hard-light;
-  filter: brightness(1.02) contrast(1.7);
+  mix-blend-mode: soft-light;
+  filter: brightness(1.02) contrast(1.25);
   opacity: calc(
     var(--active) * (0.1 + var(--pointer-from-center) * 0.18)
   );
@@ -356,15 +354,15 @@
 /* -------- cosmos-holo --------
  *
  * Leader — deep-space galaxy foil.
- *   - Base: indigo space and a low-brightness rainbow nebula under dodge.
- *   - ::before / ::after: two hard-stop star fields drift at different depths.
- *   - Glare: an amplified soft spotlight blooms as the pointer moves off-axis.
+ *   - Base: a compact rainbow nebula crosses a muted indigo field.
+ *   - ::before / ::after: bright star fields drift at different depths.
+ *   - Glare: a low-contrast luminosity spot follows the pointer.
  */
 
 .holo-card[data-effect="cosmos-holo"] .holo-card__shine {
   background-image:
     linear-gradient(
-      124deg,
+      166deg,
       var(--holo-foil-black) 0 12%,
       var(--holo-spectrum-5) 22%,
       var(--holo-spectrum-4) 34%,
@@ -374,23 +372,23 @@
       var(--holo-foil-black) 90% 100%
     ),
     linear-gradient(
-      150deg,
+      22deg,
       var(--holo-space-deep) 0%,
       var(--holo-space-blue) 48%,
       var(--holo-foil-black) 100%
     );
   background-blend-mode: soft-light;
   background-size:
-    340% 340%,
+    160% 160%,
     100% 100%;
   background-position:
     calc(var(--background-x) + var(--background-x) - 50%)
       calc(var(--background-y) + var(--background-y) - 50%),
     center;
   mix-blend-mode: color-dodge;
-  filter: brightness(calc(1 + var(--pointer-from-center) * 0.15))
-    contrast(1.65) saturate(1.35);
-  opacity: calc(var(--active) * 0.84);
+  filter: brightness(calc(0.96 + var(--pointer-from-center) * 0.26))
+    contrast(1.2) saturate(1.1);
+  opacity: calc(var(--active) * 0.61);
 }
 
 .holo-card[data-effect="cosmos-holo"] .holo-card__shine::before {
@@ -407,12 +405,12 @@
     radial-gradient(circle at 48% 69%, var(--holo-star-gold) 0 0.3%, transparent 0.8%),
     radial-gradient(circle at 71% 88%, var(--holo-star-white) 0 0.4%, transparent 1%),
     radial-gradient(circle at 89% 72%, var(--holo-star-cyan) 0 0.3%, transparent 0.85%);
-  background-size: 126% 126%;
+  background-size: 156% 156%;
   background-position:
-    calc(50% + (var(--background-x) - 50%) * 0.45)
-    calc(50% + (var(--background-y) - 50%) * 0.45);
+    calc(50% + (var(--background-x) - 50%) * 1.11)
+    calc(50% + (var(--background-y) - 50%) * 1.11);
   mix-blend-mode: screen;
-  filter: brightness(1.35) contrast(2.2);
+  filter: brightness(2) contrast(1.5);
   opacity: 0.95;
 }
 
@@ -430,12 +428,12 @@
     radial-gradient(circle at 68% 65%, var(--holo-star-white) 0 0.3%, transparent 0.85%),
     radial-gradient(circle at 79% 81%, var(--holo-star-gold) 0 0.2%, transparent 0.7%),
     radial-gradient(circle at 96% 58%, var(--holo-star-white) 0 0.25%, transparent 0.75%);
-  background-size: 148% 148%;
+  background-size: 152% 152%;
   background-position:
-    calc(50% + (var(--pointer-x) - 50%) * 0.3)
-    calc(50% + (var(--pointer-y) - 50%) * 0.3);
+    calc(50% + (var(--pointer-x) - 50%) * 1)
+    calc(50% + (var(--pointer-y) - 50%) * 1);
   mix-blend-mode: screen;
-  filter: brightness(1.22) contrast(2.25);
+  filter: brightness(2.07) contrast(1.65);
   opacity: 0.8;
 }
 
@@ -446,10 +444,10 @@
     var(--holo-space-blue) 26%,
     var(--holo-foil-black) 72%
   );
-  mix-blend-mode: overlay;
-  filter: brightness(1.02) contrast(1.8) saturate(1.15);
+  mix-blend-mode: luminosity;
+  filter: brightness(1.02) contrast(0.8) saturate(0.4);
   opacity: calc(
-    var(--active) * (0.08 + var(--pointer-from-center) * 0.16)
+    var(--active) * (0.19 + var(--pointer-from-center) * 0.08)
   );
 }
 
