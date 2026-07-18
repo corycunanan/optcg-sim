@@ -23,7 +23,7 @@ interface UseCardTiltOptions {
  */
 export function useCardTilt({
   enabled = true,
-  maxTiltDeg = 9,
+  maxTiltDeg = 15,
 }: UseCardTiltOptions = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
