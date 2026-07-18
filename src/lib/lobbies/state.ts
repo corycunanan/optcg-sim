@@ -24,6 +24,8 @@ export interface LobbyRoomDeck {
 
 export interface LobbyRoomState {
   id: string;
+  /** Monotonic Lobby.revision used for snapshot ordering when available. */
+  version?: number;
   status: LobbyRoomStatus;
   joinCode: string;
   format: string;

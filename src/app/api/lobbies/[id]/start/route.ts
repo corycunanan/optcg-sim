@@ -6,6 +6,7 @@
  */
 
 import { after, NextRequest } from "next/server";
+import type { LobbyStatus } from "@prisma/client";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -100,7 +101,7 @@ export async function POST(
           id: lobby.id,
           status: lobby.status,
         },
-        data: { status: "IN_GAME" },
+        data: { status: "IN_GAME", revision: { increment: 1 } },
       });
 
       if (statusLock.count !== 1) {
@@ -171,13 +172,11 @@ export async function POST(
       );
     } catch (error) {
       console.error("[lobbies:start] worker init request failed", error);
-      await prisma.$transaction([
-        prisma.gameSession.delete({ where: { id: startResult.gameSession.id } }),
-        prisma.lobby.update({
-          where: { id: lobby.id },
-          data: { status: lobby.status },
-        }),
-      ]).catch((e) => console.error("[lobbies:start] rollback failed", e));
+      await rollbackFailedStart(
+        lobby.id,
+        startResult.gameSession.id,
+        lobby.status,
+      );
       return apiError("Failed to initialize game server", 502);
     }
 
@@ -187,13 +186,11 @@ export async function POST(
         `[lobbies:start] worker init failed with status ${workerRes.status}`,
         workerErr,
       );
-      await prisma.$transaction([
-        prisma.gameSession.delete({ where: { id: startResult.gameSession.id } }),
-        prisma.lobby.update({
-          where: { id: lobby.id },
-          data: { status: lobby.status },
-        }),
-      ]).catch((e) => console.error("[lobbies:start] rollback failed", e));
+      await rollbackFailedStart(
+        lobby.id,
+        startResult.gameSession.id,
+        lobby.status,
+      );
       return apiError("Failed to initialize game server", 502);
     }
 
@@ -223,6 +220,36 @@ export async function POST(
     console.error("[lobbies:start] failed", error);
     return apiError("Failed to start lobby", 500);
   }
+}
+
+async function rollbackFailedStart(
+  lobbyId: string,
+  gameSessionId: string,
+  previousStatus: LobbyStatus,
+): Promise<void> {
+  try {
+    await prisma.$transaction([
+      prisma.gameSession.delete({ where: { id: gameSessionId } }),
+      prisma.lobby.update({
+        where: { id: lobbyId },
+        data: {
+          status: previousStatus,
+          revision: { increment: 1 },
+        },
+      }),
+    ]);
+  } catch (error) {
+    console.error("[lobbies:start] rollback failed", error);
+    return;
+  }
+
+  after(async () => {
+    const state = await buildLobbyRoomState(lobbyId);
+    if (!state) return;
+    // Both players may have observed the transient IN_GAME snapshot through
+    // reconciliation, so the restored pre-game state must reach both seats.
+    await notifyLobby(state);
+  });
 }
 
 function validateStartPrerequisites(lobby: {

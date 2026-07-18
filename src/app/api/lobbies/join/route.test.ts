@@ -126,7 +126,7 @@ describe("POST /api/lobbies/join", () => {
         mode: "PVP",
         guest: { is: null },
       },
-      data: { status: "READY" },
+      data: { status: "READY", revision: { increment: 1 } },
     });
     expect(transactionMock).toHaveBeenCalledOnce();
   });

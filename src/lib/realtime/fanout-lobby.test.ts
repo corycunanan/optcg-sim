@@ -10,6 +10,7 @@ const baseDeps = {
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
     id: "lobby-1",
+    version: 1,
     status: "WAITING",
     joinCode: "ABCD",
     format: "Standard",

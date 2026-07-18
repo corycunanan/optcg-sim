@@ -45,7 +45,11 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
           guest: { is: { userId } },
           gameSession: { is: null },
         },
-        data: { status: "WAITING", hostReady: false },
+        data: {
+          status: "WAITING",
+          hostReady: false,
+          revision: { increment: 1 },
+        },
       });
 
       if (lobbyUpdate.count !== 1) {

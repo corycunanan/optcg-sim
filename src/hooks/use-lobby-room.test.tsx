@@ -74,6 +74,7 @@ import { useLobbyRoom } from "@/hooks/use-lobby-room";
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
     id: "lobby-1",
+    version: 1,
     status: "WAITING",
     joinCode: "ABCD",
     format: "Standard",
@@ -121,7 +122,11 @@ describe("useLobbyRoom subscribe behavior", () => {
   it("updates the lobby state when the event matches the current lobbyId", () => {
     useLobbyRoom("lobby-1", lobbyState());
 
-    const updated = lobbyState({ format: "Eternal", hostReady: true });
+    const updated = lobbyState({
+      version: 2,
+      format: "Eternal",
+      hostReady: true,
+    });
     mocks.subscribeHandler?.({ type: "lobby:state_changed", lobby: updated });
 
     // setterCalls[0] is the lobby setter (declaration order, see mock).
@@ -166,15 +171,6 @@ describe("useLobbyRoom subscribe behavior", () => {
     // error, mutating, starting). The push handler must reset it to null so
     // a stale "Lobby unavailable" doesn't linger after the room recovers.
     expect(mocks.setterCalls[2]).toContain(null);
-  });
-
-  it("does not install a recurring reconciliation interval", () => {
-    const setIntervalSpy = vi.spyOn(global, "setInterval");
-
-    useLobbyRoom("lobby-1", lobbyState());
-
-    expect(setIntervalSpy).not.toHaveBeenCalled();
-    setIntervalSpy.mockRestore();
   });
 
   it("refreshes once when the tab becomes visible", async () => {

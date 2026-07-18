@@ -5,6 +5,7 @@ import { lobbyRoomRecovery } from "./lobby-room-recovery";
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
     id: "lobby-1",
+    version: 1,
     status: "READY",
     joinCode: "ABCD",
     format: "Standard",

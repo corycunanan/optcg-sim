@@ -58,6 +58,10 @@ describe("POST /api/lobbies", () => {
     expect(res.status).toBe(201);
     expect(body).toEqual({ data: { lobbyId: "lobby-1", joinCode: "ABCD" } });
     expect(deckFindFirstMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { hostUserId: "user-1", status: "WAITING" },
+      data: { status: "CLOSED", revision: { increment: 1 } },
+    });
     expect(lobbyCreateMock).toHaveBeenCalledWith({
       data: {
         hostUserId: "user-1",

@@ -324,6 +324,7 @@ model Lobby {
   mode       LobbyMode   @default(PVP)
   status     LobbyStatus @default(WAITING)
   hostReady  Boolean     @default(false) @map("host_ready")
+  revision   Int         @default(0)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 

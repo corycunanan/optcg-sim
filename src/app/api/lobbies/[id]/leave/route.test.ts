@@ -115,7 +115,11 @@ describe("POST /api/lobbies/[id]/leave", () => {
         guest: { is: { userId: "guest-user" } },
         gameSession: { is: null },
       },
-      data: { status: "WAITING", hostReady: false },
+      data: {
+        status: "WAITING",
+        hostReady: false,
+        revision: { increment: 1 },
+      },
     });
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1", userId: "guest-user" },
