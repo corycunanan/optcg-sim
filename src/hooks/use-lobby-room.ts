@@ -20,7 +20,6 @@ export type { LobbyRoomDeck, LobbyRoomMode, LobbyRoomState, LobbyRoomStatus };
 export const LOBBY_RECONCILIATION_INTERVAL_MS = 10_000;
 export const LOBBY_RECONCILIATION_MAX_ATTEMPTS = 6;
 export const LOBBY_REFRESH_TIMEOUT_MS = 9_000;
-export const LOBBY_IN_GAME_CONFIRM_DELAY_MS = 250;
 
 type SnapshotSource = "event" | "refresh";
 
@@ -42,11 +41,12 @@ export function useLobbyRoom(
   const [closing, setClosing] = useState(false);
   const cancelledRef = useRef(false);
   const refreshInFlightRef = useRef(false);
+  const queuedRefreshRef = useRef(false);
   const latestVersionRef = useRef<{
     lobbyId: string;
     version: number;
   } | null>(
-    initialLobby
+    initialLobby?.version !== undefined
       ? { lobbyId: initialLobby.id, version: initialLobby.version }
       : null
   );
@@ -56,80 +56,83 @@ export function useLobbyRoom(
   const applySnapshot = useCallback(
     (snapshot: LobbyRoomState, source: SnapshotSource) => {
       if (snapshot.id !== lobbyId) return false;
+      // A GET can observe the transient row written before worker startup.
+      // Only the success-only realtime event may publish IN_GAME to routing.
+      if (source === "refresh" && snapshot.status === "IN_GAME") return false;
 
-      const current = latestVersionRef.current;
-      if (current?.lobbyId === lobbyId) {
-        const isStale =
-          source === "event"
-            ? snapshot.version <= current.version
-            : snapshot.version < current.version;
-        if (isStale) return false;
+      if (snapshot.version !== undefined) {
+        const current = latestVersionRef.current;
+        if (current?.lobbyId === lobbyId) {
+          const isStale =
+            source === "event"
+              ? snapshot.version <= current.version
+              : snapshot.version < current.version;
+          if (isStale) return false;
+        }
+
+        latestVersionRef.current = {
+          lobbyId: snapshot.id,
+          version: snapshot.version,
+        };
       }
 
-      latestVersionRef.current = {
-        lobbyId: snapshot.id,
-        version: snapshot.version,
-      };
       setLobby(snapshot);
       return true;
     },
     [lobbyId]
   );
 
-  const launchRefresh = useCallback((): RefreshLaunch => {
-    if (refreshInFlightRef.current) {
-      return { launched: false, promise: Promise.resolve(null) };
-    }
-
-    refreshInFlightRef.current = true;
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      LOBBY_REFRESH_TIMEOUT_MS
-    );
-
-    const promise = (async () => {
-      try {
-        let json = await apiGet(
-          `/api/lobbies/${lobbyId}`,
-          LobbyRoomResponseSchema,
-          { signal: controller.signal }
-        );
-
-        // Start persists IN_GAME before worker initialization. A GET can see
-        // that transient row, so non-event delivery confirms it before the
-        // snapshot reaches routing code. Successful realtime start events are
-        // already emitted only after worker initialization and remain instant.
-        if (json.data.status === "IN_GAME") {
-          await new Promise((resolve) =>
-            setTimeout(resolve, LOBBY_IN_GAME_CONFIRM_DELAY_MS)
-          );
-          json = await apiGet(
-            `/api/lobbies/${lobbyId}`,
-            LobbyRoomResponseSchema,
-            { signal: controller.signal }
-          );
-        }
-
-        if (cancelledRef.current) return null;
-        applySnapshot(json.data, "refresh");
-        setError(null);
-        return json.data;
-      } catch {
-        if (!cancelledRef.current) setError("Lobby unavailable");
-        return null;
-      } finally {
-        clearTimeout(timeout);
-        refreshInFlightRef.current = false;
-        if (!cancelledRef.current) setLoading(false);
+  const launchRefresh = useCallback(
+    (queueIfBusy = false): RefreshLaunch => {
+      if (refreshInFlightRef.current) {
+        if (queueIfBusy) queuedRefreshRef.current = true;
+        return { launched: false, promise: Promise.resolve(null) };
       }
-    })();
 
-    return { launched: true, promise };
-  }, [applySnapshot, lobbyId]);
+      refreshInFlightRef.current = true;
+      const promise = (async () => {
+        let latestSnapshot: LobbyRoomState | null = null;
+        try {
+          do {
+            queuedRefreshRef.current = false;
+            const controller = new AbortController();
+            const timeout = setTimeout(
+              () => controller.abort(),
+              LOBBY_REFRESH_TIMEOUT_MS
+            );
+
+            try {
+              const json = await apiGet(
+                `/api/lobbies/${lobbyId}`,
+                LobbyRoomResponseSchema,
+                { signal: controller.signal }
+              );
+              latestSnapshot = json.data;
+              if (cancelledRef.current) return null;
+              applySnapshot(json.data, "refresh");
+              setError(null);
+            } catch {
+              latestSnapshot = null;
+              if (!cancelledRef.current) setError("Lobby unavailable");
+            } finally {
+              clearTimeout(timeout);
+            }
+          } while (queuedRefreshRef.current && !cancelledRef.current);
+
+          return latestSnapshot;
+        } finally {
+          refreshInFlightRef.current = false;
+          if (!cancelledRef.current) setLoading(false);
+        }
+      })();
+
+      return { launched: true, promise };
+    },
+    [applySnapshot, lobbyId]
+  );
 
   const refresh = useCallback(
-    () => launchRefresh().promise,
+    () => launchRefresh(true).promise,
     [launchRefresh]
   );
 
@@ -138,6 +141,7 @@ export function useLobbyRoom(
     void refresh();
     return () => {
       cancelledRef.current = true;
+      queuedRefreshRef.current = false;
     };
   }, [refresh]);
 
