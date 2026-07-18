@@ -4,6 +4,7 @@ import { useReducedMotion } from "motion/react";
 import type { GameEvent } from "@shared/game-types";
 import {
   useTransientEventPulse,
+  type TransientEventPulses,
   type TransientEventKeySelector,
 } from "./use-transient-event-pulse";
 
@@ -24,7 +25,9 @@ const selectDamagedLifeOwner: TransientEventKeySelector<0 | 1> = (event) => {
 };
 
 /** Impact feedback for the life zone struck by non-lethal battle damage. */
-export function useLifeDamagePulse(eventLog: GameEvent[]): Set<0 | 1> {
+export function useLifeDamagePulse(
+  eventLog: GameEvent[]
+): TransientEventPulses<0 | 1> {
   const reducedMotion = useReducedMotion();
 
   return useTransientEventPulse(

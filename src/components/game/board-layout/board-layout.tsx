@@ -213,7 +213,7 @@ function BoardLayoutInner({
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
   const winnerPulseIds = useCombatVictoryPulse(eventLog);
   const triggerPulsePlayerIndexes = useTriggerActivatedPulse(eventLog);
-  const lifeDamagePlayerIndexes = useLifeDamagePulse(eventLog);
+  const lifeDamagePulseNonces = useLifeDamagePulse(eventLog);
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
   const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
   const opponentIndex = myIndex === null ? null : myIndex === 0 ? 1 : 0;
@@ -221,10 +221,10 @@ function BoardLayoutInner({
     myIndex !== null && triggerPulsePlayerIndexes.has(myIndex);
   const opponentLifeTriggerPulse =
     opponentIndex !== null && triggerPulsePlayerIndexes.has(opponentIndex);
-  const playerLifeDamagePulse =
-    myIndex !== null && lifeDamagePlayerIndexes.has(myIndex);
-  const opponentLifeDamagePulse =
-    opponentIndex !== null && lifeDamagePlayerIndexes.has(opponentIndex);
+  const playerLifeDamagePulseNonce =
+    myIndex === null ? undefined : lifeDamagePulseNonces.get(myIndex);
+  const opponentLifeDamagePulseNonce =
+    opponentIndex === null ? undefined : lifeDamagePulseNonces.get(opponentIndex);
 
   // While a DON token is flying onto a target card, the displayed count is
   // held back by the number of in-flight tokens so the counter doesn't
@@ -425,7 +425,7 @@ function BoardLayoutInner({
             counterPulseIds={counterPulseIds}
             winnerPulseIds={winnerPulseIds}
             lifeTriggerPulse={opponentLifeTriggerPulse}
-            lifeDamagePulse={opponentLifeDamagePulse}
+            lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
             pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
@@ -509,7 +509,7 @@ function BoardLayoutInner({
             counterPulseIds={counterPulseIds}
             winnerPulseIds={winnerPulseIds}
             lifeTriggerPulse={playerLifeTriggerPulse}
-            lifeDamagePulse={playerLifeDamagePulse}
+            lifeDamagePulseNonce={playerLifeDamagePulseNonce}
             pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
             onTargetToggle={modalRouting.targetSelection.toggle}

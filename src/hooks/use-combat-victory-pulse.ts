@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useReducedMotion } from "motion/react";
 import type { GameEvent } from "@shared/game-types";
 import {
@@ -16,10 +17,12 @@ const selectCombatVictor: TransientEventKeySelector<string> = (event) =>
 export function useCombatVictoryPulse(eventLog: GameEvent[]): Set<string> {
   const reducedMotion = useReducedMotion();
 
-  return useTransientEventPulse(
+  const pulses = useTransientEventPulse(
     eventLog,
     COMBAT_VICTORY_PULSE_DURATION_MS,
     selectCombatVictor,
     !!reducedMotion
   );
+
+  return useMemo(() => new Set(pulses.keys()), [pulses]);
 }

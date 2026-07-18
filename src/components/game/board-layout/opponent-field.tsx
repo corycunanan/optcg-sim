@@ -42,7 +42,7 @@ interface OpponentFieldProps {
   counterPulseIds?: Set<string>;
   winnerPulseIds?: Set<string>;
   lifeTriggerPulse?: boolean;
-  lifeDamagePulse?: boolean;
+  lifeDamagePulseNonce?: number;
   /** Signed offsets merged into displayed DON count per target card
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
@@ -70,7 +70,7 @@ export function OpponentField({
   counterPulseIds,
   winnerPulseIds,
   lifeTriggerPulse,
-  lifeDamagePulse,
+  lifeDamagePulseNonce,
   donCountAdjustments,
   pileArrivingCounts,
   targetSelectionById,
@@ -276,7 +276,7 @@ export function OpponentField({
         sleeveUrl={opp?.sleeveUrl}
         arrivingCount={pileArrivingCounts?.get("o-life")}
         triggerPulse={lifeTriggerPulse}
-        damagePulse={lifeDamagePulse}
+        damagePulseNonce={lifeDamagePulseNonce}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

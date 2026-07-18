@@ -35,12 +35,23 @@ let renderer: ReactTestRenderer | null = null;
 
 function Probe({ eventLog }: { eventLog: GameEvent[] }) {
   const activePlayers = useLifeDamagePulse(eventLog);
-  return <output>{Array.from(activePlayers).join(",")}</output>;
+  return (
+    <output>
+      {Array.from(activePlayers, ([key, nonce]) => `${key}:${nonce}`).join(",")}
+    </output>
+  );
 }
 
-function readActivePlayers(): Set<number> {
+function readActivePlayers(): Map<number, number> {
   const value = renderer?.root.findByType("output").children.join("") ?? "";
-  return new Set(value ? value.split(",").map(Number) : []);
+  return new Map(
+    value
+      ? value.split(",").map((entry) => {
+          const [key, nonce] = entry.split(":").map(Number);
+          return [key, nonce] as const;
+        })
+      : []
+  );
 }
 
 async function render(eventLog: GameEvent[]) {
@@ -66,7 +77,23 @@ describe("useLifeDamagePulse", () => {
   it("pulses the life owner opposite the battle attacker", async () => {
     await render([]);
     await render([damageEvent(1, 0)]);
-    expect(readActivePlayers()).toEqual(new Set([1]));
+    expect(readActivePlayers()).toEqual(new Map([[1, 1]]));
+
+    act(() => {
+      vi.advanceTimersByTime(LIFE_DAMAGE_PULSE_DURATION_MS);
+    });
+    expect(readActivePlayers().size).toBe(0);
+  });
+
+  it("emits two observable pulses for Double Attack damage in one update", async () => {
+    await render([]);
+    await render([damageEvent(1, 0), damageEvent(2, 0)]);
+    expect(readActivePlayers()).toEqual(new Map([[1, 1]]));
+
+    act(() => {
+      vi.advanceTimersByTime(LIFE_DAMAGE_PULSE_DURATION_MS);
+    });
+    expect(readActivePlayers()).toEqual(new Map([[1, 2]]));
 
     act(() => {
       vi.advanceTimersByTime(LIFE_DAMAGE_PULSE_DURATION_MS);

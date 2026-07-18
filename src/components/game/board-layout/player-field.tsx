@@ -54,7 +54,7 @@ interface PlayerFieldProps {
   counterPulseIds?: Set<string>;
   winnerPulseIds?: Set<string>;
   lifeTriggerPulse?: boolean;
-  lifeDamagePulse?: boolean;
+  lifeDamagePulseNonce?: number;
   /** Active arrivals keyed by pile zone (`p-deck`, `p-trash`, `p-life`). */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
@@ -84,7 +84,7 @@ export function PlayerField({
   counterPulseIds,
   winnerPulseIds,
   lifeTriggerPulse,
-  lifeDamagePulse,
+  lifeDamagePulseNonce,
   pileArrivingCounts,
   targetSelectionById,
   onTargetToggle,
@@ -124,7 +124,7 @@ export function PlayerField({
         sleeveUrl={me?.sleeveUrl}
         arrivingCount={pileArrivingCounts?.get("p-life")}
         triggerPulse={lifeTriggerPulse}
-        damagePulse={lifeDamagePulse}
+        damagePulseNonce={lifeDamagePulseNonce}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
       />
 

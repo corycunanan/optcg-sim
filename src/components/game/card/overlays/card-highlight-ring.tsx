@@ -24,7 +24,8 @@ import type { HighlightRingColor } from "../types";
  *              linked; kept as a separate color so future divergence
  *              doesn't require retrofitting consumers)
  *   counter  → amber flash (OPT-273 counter pulse, one-shot fade)
- *   winner   → green pulse + recoil (OPT-283 combat victory, one-shot)
+ *   winner   → green pulse (OPT-283 combat victory, one-shot; the field-card
+ *              wrapper owns the card recoil so the art and ring move together)
  *   usable-effect → gold static (ambient server-computed effect availability)
  *   invalid  → no ring (opacity dim lives in the state preset instead)
  */
@@ -58,11 +59,10 @@ export function CardHighlightRing({
           "shadow-[0_0_18px_var(--gb-signal-selected)]",
           className,
         )}
-        initial={{ opacity: 0, scale: 1, x: 0 }}
+        initial={{ opacity: 0, scale: 1 }}
         animate={{
           opacity: cardWinnerPulse.opacity,
           scale: cardWinnerPulse.scale,
-          x: cardWinnerPulse.x,
         }}
         transition={cardWinnerPulse.transition}
       />

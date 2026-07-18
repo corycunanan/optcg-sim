@@ -27,7 +27,7 @@ let renderer: ReactTestRenderer | null = null;
 
 function renderLifeZone(props: {
   triggerPulse?: boolean;
-  damagePulse?: boolean;
+  damagePulseNonce?: number;
 }) {
   act(() => {
     renderer = create(
@@ -66,7 +66,7 @@ describe("LifeZone battle feedback", () => {
   });
 
   it("renders a distinct red shake/flash for life damage", () => {
-    const root = renderLifeZone({ damagePulse: true });
+    const root = renderLifeZone({ damagePulseNonce: 1 });
     const container = root.findAllByType("div")[0];
 
     expect(container.props.className).toContain("ring-gb-accent-red");
@@ -76,7 +76,10 @@ describe("LifeZone battle feedback", () => {
 
   it("suppresses both effects for reduced motion", () => {
     motionState.reduced = true;
-    const root = renderLifeZone({ triggerPulse: true, damagePulse: true });
+    const root = renderLifeZone({
+      triggerPulse: true,
+      damagePulseNonce: 1,
+    });
     const classes = root
       .findAllByType("div")
       .map((node) => String(node.props.className))

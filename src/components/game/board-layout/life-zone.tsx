@@ -20,7 +20,7 @@ export const LifeZone = React.memo(function LifeZone({
   sleeveUrl,
   arrivingCount = 0,
   triggerPulse = false,
-  damagePulse = false,
+  damagePulseNonce,
 }: {
   life: LifeCard[];
   cardDb: CardDb;
@@ -29,7 +29,7 @@ export const LifeZone = React.memo(function LifeZone({
   sleeveUrl?: string | null;
   arrivingCount?: number;
   triggerPulse?: boolean;
-  damagePulse?: boolean;
+  damagePulseNonce?: number;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -46,10 +46,12 @@ export const LifeZone = React.memo(function LifeZone({
   const count = visibleLife.length;
   const topCard = visibleLife[0];
   const triggerFeedbackActive = triggerPulse && !reducedMotion;
-  const damageFeedbackActive = damagePulse && !reducedMotion;
+  const damageFeedbackActive =
+    damagePulseNonce !== undefined && !reducedMotion;
 
   return (
     <motion.div
+      key={`damage:${damageFeedbackActive ? damagePulseNonce : 0}`}
       ref={ref}
       style={{
         ...style,

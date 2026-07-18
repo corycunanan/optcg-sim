@@ -8,7 +8,12 @@ import { cn } from "@/lib/utils";
 import { canPlayCardInZone } from "@/lib/game/client-legality";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
-import { cardEntry, cardReject, cardRejectReduced } from "@/lib/motion";
+import {
+  cardEntry,
+  cardReject,
+  cardRejectReduced,
+  cardWinnerPulse,
+} from "@/lib/motion";
 import { Card } from "../card";
 import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
@@ -298,20 +303,23 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // flagged this card as newly-arrived. `isDragging` opacity still wins
   // (composes via `animate` overriding scale/opacity post-mount).
   const shouldEnter = !!entering && !reducedMotion;
+  const winnerFeedbackActive = !!winnerPulse && !reducedMotion;
   const initialTarget = shouldEnter ? ENTRY_INITIAL : false;
   const rejectionAnimation = reducedMotion ? cardRejectReduced : cardReject;
   const animateTarget = rejectionSequence
     ? { scale: 1, ...rejectionAnimation }
     : {
         scale: 1,
-        x: 0,
+        x: winnerFeedbackActive ? cardWinnerPulse.x : 0,
         opacity: isDragging ? 0.3 : targetSelection?.disabledReason ? 0.35 : 1,
       };
   const wrapperTransition = rejectionSequence
     ? rejectionAnimation.transition
-    : shouldEnter
-      ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
-      : { duration: 0.15, ease: "easeOut" as const };
+    : winnerFeedbackActive
+      ? cardWinnerPulse.transition
+      : shouldEnter
+        ? { scale: cardEntry, opacity: { duration: 0.2, ease: "easeOut" as const } }
+        : { duration: 0.15, ease: "easeOut" as const };
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -571,6 +579,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
               : undefined;
 
   const shouldEnter = !!entering && !reducedMotion;
+  const winnerFeedbackActive = !!winnerPulse && !reducedMotion;
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
   const disabledReason = targetSelection?.disabledReason ?? null;
@@ -596,9 +605,16 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
       initial={shouldEnter ? ENTRY_INITIAL : false}
       animate={{
         ...ENTRY_ANIMATE,
+        x: winnerFeedbackActive ? cardWinnerPulse.x : 0,
         opacity: targetSelection?.disabledReason ? 0.35 : 1,
       }}
-      transition={shouldEnter ? cardEntry : { duration: 0 }}
+      transition={
+        winnerFeedbackActive
+          ? cardWinnerPulse.transition
+          : shouldEnter
+            ? cardEntry
+            : { duration: 0 }
+      }
       onClick={
         targetSelection && !targetSelection.disabledReason
           ? onTargetToggle

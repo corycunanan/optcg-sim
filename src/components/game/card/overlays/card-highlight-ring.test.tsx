@@ -1,6 +1,7 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { cardWinnerPulse } from "@/lib/motion";
 import {
   CardHighlightRing,
   resolveCardHighlightRingColor,
@@ -72,6 +73,18 @@ describe("CardHighlightRing winner feedback", () => {
     expect(className).toContain("ring-4");
     expect(className).toContain("ring-gb-signal-selected");
     expect(className).not.toContain("ring-gb-signal-battle");
+  });
+
+  it("keeps recoil off the ring overlay while retaining its pulse", () => {
+    motionState.reduced = false;
+    const ring = renderRing("winner", false);
+    const props = ring?.root.findByType("div").props;
+    if (!props) throw new Error("Winner ring did not render");
+
+    expect(props.initial).not.toHaveProperty("x");
+    expect(props.animate).not.toHaveProperty("x");
+    expect(props.animate.opacity).toEqual(cardWinnerPulse.opacity);
+    expect(props.animate.scale).toEqual(cardWinnerPulse.scale);
   });
 
   it("renders no winner effect for reduced motion", () => {
