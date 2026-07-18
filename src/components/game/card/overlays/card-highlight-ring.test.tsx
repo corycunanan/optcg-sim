@@ -6,9 +6,11 @@ import {
   resolveCardHighlightRingColor,
 } from "./card-highlight-ring";
 
+const motionState = vi.hoisted(() => ({ reduced: true }));
+
 vi.mock("motion/react", () => ({
   motion: { div: "div" },
-  useReducedMotion: () => true,
+  useReducedMotion: () => motionState.reduced,
 }));
 
 let renderer: ReactTestRenderer | null = null;
@@ -56,6 +58,25 @@ describe("CardHighlightRing usable-effect precedence", () => {
 
   it("renders no ring when the server sent no usable availability", () => {
     const ring = renderRing(undefined, false);
+
+    expect(ring?.toJSON()).toBeNull();
+  });
+});
+
+describe("CardHighlightRing winner feedback", () => {
+  it("uses a green board-floor ring distinct from amber battle rings", () => {
+    motionState.reduced = false;
+    const ring = renderRing("winner", false);
+    const className = ring?.root.findByType("div").props.className;
+
+    expect(className).toContain("ring-4");
+    expect(className).toContain("ring-gb-signal-selected");
+    expect(className).not.toContain("ring-gb-signal-battle");
+  });
+
+  it("renders no winner effect for reduced motion", () => {
+    motionState.reduced = true;
+    const ring = renderRing("winner", false);
 
     expect(ring?.toJSON()).toBeNull();
   });

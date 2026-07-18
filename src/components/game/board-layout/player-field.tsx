@@ -52,6 +52,9 @@ interface PlayerFieldProps {
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
+  winnerPulseIds?: Set<string>;
+  lifeTriggerPulse?: boolean;
+  lifeDamagePulse?: boolean;
   /** Active arrivals keyed by pile zone (`p-deck`, `p-trash`, `p-life`). */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
@@ -79,6 +82,9 @@ export function PlayerField({
   attackerInstanceId,
   defenderInstanceId,
   counterPulseIds,
+  winnerPulseIds,
+  lifeTriggerPulse,
+  lifeDamagePulse,
   pileArrivingCounts,
   targetSelectionById,
   onTargetToggle,
@@ -117,6 +123,8 @@ export function PlayerField({
         zoneKey="p-life"
         sleeveUrl={me?.sleeveUrl}
         arrivingCount={pileArrivingCounts?.get("p-life")}
+        triggerPulse={lifeTriggerPulse}
+        damagePulse={lifeDamagePulse}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
       />
 
@@ -153,6 +161,7 @@ export function PlayerField({
             selected={selectedBlockerId === char.instanceId}
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
+            winnerPulse={winnerPulseIds?.has(char.instanceId)}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             canActivateMain={canActivateMain}
             oncePerTurnUsed={oncePerTurnUsed}
@@ -203,6 +212,7 @@ export function PlayerField({
           canAttack={canInteract && me.leader.state === "ACTIVE"}
           isAttacker={attackerInstanceId === me.leader.instanceId}
           isDefender={defenderInstanceId === me.leader.instanceId}
+          winnerPulse={winnerPulseIds?.has(me.leader.instanceId)}
           counterTarget={
             characterCounterDragActive && defenderInstanceId === me.leader.instanceId
           }

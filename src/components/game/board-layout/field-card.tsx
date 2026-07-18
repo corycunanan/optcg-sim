@@ -48,6 +48,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   selected,
   isAttacker,
   isDefender,
+  winnerPulse,
   counterTarget,
   counterDragActive,
   eventDropTarget,
@@ -82,6 +83,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
    *  Moves with the battle: leader at declare-attack, then the blocker once
    *  block is declared. Drives the amber pulse ring (OPT-274). */
   isDefender?: boolean;
+  /** One-shot COMBAT_VICTORY feedback. Wins ring precedence while active. */
+  winnerPulse?: boolean;
   /** Current battle defender while a Character counter is being dragged. */
   counterTarget?: boolean;
   /** A Character-counter drag is in progress. Board-full replacement is never
@@ -263,7 +266,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // Ring consolidation (OPT-273): formerly consumer className `ring-2 ring-gb-accent-*`.
   // Now routed through the primitive's highlightRing overlay so ring semantics
   // live in one place and can compose with motion presets. Precedence (top
-  // wins): counter flash (transient) > attacker (current aggressor) > defender
+  // wins): combat winner (transient) > counter flash (transient) > attacker
+  // (current aggressor) > defender
   // (OPT-274 — current battle target, same amber pulse as attacker) > selected
   // (user-chosen blocker or effect target) > eligible candidate > ambient
   // usable-effect availability.
@@ -272,17 +276,19 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const selectionControl = !!blockerSelectable || !!targetSelection;
   const disabledReason = targetSelection?.disabledReason ?? null;
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
-  const activeHighlightRing = counterPulse
-    ? ("counter" as const)
-    : isAttacker
-      ? ("attacker" as const)
-      : isDefender
-        ? ("defender" as const)
-        : selectionSelected
-          ? ("selected" as const)
-          : selectionEligible
-            ? ("eligible" as const)
-            : undefined;
+  const activeHighlightRing = winnerPulse
+    ? ("winner" as const)
+    : counterPulse
+      ? ("counter" as const)
+      : isAttacker
+        ? ("attacker" as const)
+        : isDefender
+          ? ("defender" as const)
+          : selectionSelected
+            ? ("selected" as const)
+            : selectionEligible
+              ? ("eligible" as const)
+              : undefined;
   const highlightRing = resolveCardHighlightRingColor(
     activeHighlightRing,
     hasUsableEffect(card.instanceId),
@@ -482,6 +488,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   attackTargetEligible,
   isAttacker,
   isDefender,
+  winnerPulse,
   counterPulse,
   targetSelection,
   onTargetToggle,
@@ -499,6 +506,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   /** See `PlayerFieldCard.isDefender` — identical semantics on the opposing
    *  side. */
   isDefender?: boolean;
+  winnerPulse?: boolean;
   counterPulse?: boolean;
   targetSelection?: TargetCardSelectionState;
   onTargetToggle?: () => void;
@@ -548,17 +556,19 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   const cardState: "attacking" | "rest" | "active" = isAttacker
     ? "attacking"
     : baseState;
-  const highlightRing = counterPulse
-    ? ("counter" as const)
-    : isAttacker
-      ? ("attacker" as const)
-      : isDefender
-        ? ("defender" as const)
-        : targetSelection?.selected
-          ? ("selected" as const)
-          : targetSelection?.eligible
-            ? ("eligible" as const)
-            : undefined;
+  const highlightRing = winnerPulse
+    ? ("winner" as const)
+    : counterPulse
+      ? ("counter" as const)
+      : isAttacker
+        ? ("attacker" as const)
+        : isDefender
+          ? ("defender" as const)
+          : targetSelection?.selected
+            ? ("selected" as const)
+            : targetSelection?.eligible
+              ? ("eligible" as const)
+              : undefined;
 
   const shouldEnter = !!entering && !reducedMotion;
   const donCount = card.attachedDon.length + (donCountAdjust ?? 0);

@@ -2,7 +2,11 @@
 
 import React from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { cardAttackerPulse, cardCounterPulse } from "@/lib/motion";
+import {
+  cardAttackerPulse,
+  cardCounterPulse,
+  cardWinnerPulse,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { HighlightRingColor } from "../types";
 
@@ -20,6 +24,7 @@ import type { HighlightRingColor } from "../types";
  *              linked; kept as a separate color so future divergence
  *              doesn't require retrofitting consumers)
  *   counter  → amber flash (OPT-273 counter pulse, one-shot fade)
+ *   winner   → green pulse + recoil (OPT-283 combat victory, one-shot)
  *   usable-effect → gold static (ambient server-computed effect availability)
  *   invalid  → no ring (opacity dim lives in the state preset instead)
  */
@@ -40,6 +45,29 @@ export function CardHighlightRing({
   const reducedMotion = useReducedMotion();
 
   if (!color || color === "invalid") return null;
+
+  if (color === "winner") {
+    if (reducedMotion) return null;
+
+    return (
+      <motion.div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-0 z-10 rounded",
+          "ring-4 ring-gb-signal-selected",
+          "shadow-[0_0_18px_var(--gb-signal-selected)]",
+          className,
+        )}
+        initial={{ opacity: 0, scale: 1, x: 0 }}
+        animate={{
+          opacity: cardWinnerPulse.opacity,
+          scale: cardWinnerPulse.scale,
+          x: cardWinnerPulse.x,
+        }}
+        transition={cardWinnerPulse.transition}
+      />
+    );
+  }
 
   if (color === "attacker" || color === "defender") {
     return (
