@@ -60,6 +60,7 @@ export function getCostLabel(cost: Cost): string {
   const amount = cost.type !== "CHOICE" && typeof cost.amount === "number" ? cost.amount : 1;
   switch (cost.type) {
     case "TRASH_FROM_HAND": return `Choose ${amount} card(s) from hand to trash as cost`;
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": return `Choose 1 [${cost.card_name ?? "named card"}] from hand or stage to trash as cost`;
     case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;
     case "RETURN_OWN_CHARACTER_TO_HAND": return `Choose ${amount} character(s) to return to hand as cost`;
     case "PLACE_OWN_CHARACTER_TO_DECK": return `Choose ${amount} character(s) to place on deck as cost`;
@@ -86,6 +87,7 @@ export function deriveBranchLabel(branch: Cost[]): string {
 export function getCostCtaLabel(cost: Cost): string {
   switch (cost.type) {
     case "TRASH_FROM_HAND":
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "TRASH_OWN_CHARACTER":
     case "TRASH_FROM_LIFE": return "Trash";
     case "KO_OWN_CHARACTER": return "KO";

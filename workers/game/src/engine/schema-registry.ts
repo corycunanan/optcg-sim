@@ -338,6 +338,13 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     }
   }
 
+  if (
+    cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" &&
+    (typeof cost.card_name !== "string" || cost.card_name.trim().length === 0)
+  ) {
+    errors.push(`${prefix}: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE requires a non-empty 'card_name'`);
+  }
+
   return errors;
 }
 

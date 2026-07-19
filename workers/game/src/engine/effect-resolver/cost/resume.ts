@@ -19,6 +19,11 @@ export function applyCostSelection(
   const selectedSet = new Set(selectedIds);
 
   switch (cost.type) {
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {
+      const moved = transitionCards(state, selectedIds, "TRASH", { position: "TOP" });
+      return { state: moved.state, events: [] };
+    }
+
     case "TRASH_FROM_HAND": {
       const toTrash = p.hand.filter((c) => selectedSet.has(c.instanceId));
       const moved = transitionCards(state, toTrash.map((c) => c.instanceId), "TRASH", { position: "TOP" });

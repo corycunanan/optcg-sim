@@ -39,6 +39,10 @@ describe("OPT-193 exhaustive cost narrowing", () => {
     { cost: { type: "TRASH_SELF" }, needsSelection: false },
     { cost: { type: "TRASH_FROM_HAND" }, needsSelection: true },
     {
+      cost: { type: "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", card_name: "The Ark Noah" },
+      needsSelection: true,
+    },
+    {
       cost: { type: "TRASH_FROM_LIFE", position: "TOP_OR_BOTTOM" },
       needsSelection: true,
     },

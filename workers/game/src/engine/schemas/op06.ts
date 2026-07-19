@@ -1134,60 +1134,38 @@ export const OP06_033_VANDER_DECKEN_IX: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       flags: { optional: true },
+      costs: [
+        {
+          type: "CHOICE",
+          options: [
+            [
+              {
+                type: "TRASH_FROM_HAND",
+                amount: 1,
+                filter: { traits: ["Fish-Man"] },
+              },
+            ],
+            [
+              {
+                type: "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
+                card_name: "The Ark Noah",
+              },
+            ],
+          ],
+          labels: [
+            "Trash 1 {Fish-Man} type card from hand",
+            "Trash 1 [The Ark Noah] from hand or field",
+          ],
+        },
+      ],
       actions: [
         {
-          type: "PLAYER_CHOICE",
-          params: {
-            options: [
-              [
-                {
-                  type: "TRASH_FROM_HAND",
-                  params: { amount: 1 },
-                  target: {
-                    type: "CARD_IN_HAND",
-                    controller: "SELF",
-                    count: { exact: 1 },
-                    filter: { traits: ["Fish-Man"] },
-                  },
-                },
-                {
-                  type: "KO",
-                  target: {
-                    type: "CHARACTER",
-                    controller: "OPPONENT",
-                    count: { up_to: 1 },
-                    filter: { is_rested: true },
-                  },
-                  chain: "THEN",
-                },
-              ],
-              [
-                {
-                  type: "TRASH_CARD",
-                  target: {
-                    type: "LEADER_OR_CHARACTER",
-                    controller: "SELF",
-                    count: { exact: 1 },
-                    filter: { name: "The Ark Noah" },
-                    source_zone: ["HAND", "FIELD"],
-                  },
-                },
-                {
-                  type: "KO",
-                  target: {
-                    type: "CHARACTER",
-                    controller: "OPPONENT",
-                    count: { up_to: 1 },
-                    filter: { is_rested: true },
-                  },
-                  chain: "THEN",
-                },
-              ],
-            ],
-            labels: [
-              "Trash 1 {Fish-Man} type card from hand",
-              "Trash 1 [The Ark Noah] from hand or field",
-            ],
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { is_rested: true },
           },
         },
       ],
