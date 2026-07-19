@@ -10,8 +10,18 @@ import bcrypt from "bcryptjs";
 import { RegisterSchema } from "@/lib/validators/auth";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { authLimiter } from "@/lib/rate-limit";
+import {
+  authUnavailableResponse,
+  hasAuthSecret,
+  logAuthConfigurationDegraded,
+} from "@/lib/auth-configuration";
 
 export async function POST(request: NextRequest) {
+  if (!hasAuthSecret()) {
+    logAuthConfigurationDegraded("mutation-guard");
+    return authUnavailableResponse();
+  }
+
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   const { limited } = await authLimiter.check(`register:${ip}`);
   if (limited) {

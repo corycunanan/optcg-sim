@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "@/lib/api-client";
 import { CsrfTokenResponseSchema } from "@/lib/validators/auth";
+import { ApiError } from "@/lib/api-client";
+import { AuthUnavailableAlert } from "./auth-unavailable-alert";
 
 /**
  * Google sign-in button using direct form POST to the NextAuth route handler.
@@ -16,15 +18,64 @@ import { CsrfTokenResponseSchema } from "@/lib/validators/auth";
  */
 export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
   const [csrfToken, setCsrfToken] = useState<string>("");
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     apiGet("/api/auth/csrf", CsrfTokenResponseSchema)
       .then((data) => setCsrfToken(data.csrfToken))
-      .catch(console.error);
+      .catch((error) => {
+        if (error instanceof ApiError && error.status === 503) {
+          setUnavailable(true);
+          return;
+        }
+        console.error(error);
+      });
   }, []);
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUnavailable(false);
+
+    try {
+      const response = await fetch("/api/auth/signin/google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Auth-Return-Redirect": "1",
+        },
+        body: new URLSearchParams({ csrfToken, callbackUrl }),
+      });
+
+      if (response.status === 503) {
+        setUnavailable(true);
+        return;
+      }
+
+      const data: unknown = await response.json().catch(() => null);
+      if (
+        response.ok &&
+        typeof data === "object" &&
+        data !== null &&
+        "url" in data &&
+        typeof data.url === "string"
+      ) {
+        window.location.href = data.url;
+        return;
+      }
+
+      setUnavailable(true);
+    } catch {
+      setUnavailable(true);
+    }
+  }
+
   return (
-    <form action="/api/auth/signin/google" method="POST">
+    <form onSubmit={handleSubmit}>
+      {unavailable && (
+        <div className="mb-4">
+          <AuthUnavailableAlert />
+        </div>
+      )}
       <input type="hidden" name="csrfToken" value={csrfToken} />
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
       <button

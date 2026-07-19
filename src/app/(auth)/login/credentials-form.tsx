@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { RegisterResponseSchema } from "@/lib/validators/auth";
+import { AuthUnavailableAlert } from "./auth-unavailable-alert";
 
 type Mode = "signin" | "signup";
 
@@ -45,11 +46,15 @@ export function CredentialsForm({
         callbackUrl,
         redirect: false,
       });
-      if (result?.error) {
+      if (result?.status === 503) {
+        setError("auth-unavailable");
+      } else if (result?.error) {
         setError("Invalid email or password.");
       } else if (result?.url) {
         window.location.href = result.url;
       }
+    } catch {
+      setError("auth-unavailable");
     } finally {
       setLoading(false);
     }
@@ -78,15 +83,21 @@ export function CredentialsForm({
         callbackUrl,
         redirect: false,
       });
-      if (result?.url) {
+      if (result?.status === 503) {
+        setError("auth-unavailable");
+      } else if (result?.url) {
         window.location.href = result.url;
       }
     } catch (error) {
       if (error instanceof ApiError) {
-        setError(error.message || "Registration failed.");
+        setError(
+          error.status === 503
+            ? "auth-unavailable"
+            : error.message || "Registration failed."
+        );
         return;
       }
-      throw error;
+      setError("auth-unavailable");
     } finally {
       setLoading(false);
     }
@@ -122,11 +133,15 @@ export function CredentialsForm({
         </button>
       </div>
 
-      {error && (
+      {error === "auth-unavailable" ? (
+        <div className="mb-4">
+          <AuthUnavailableAlert />
+        </div>
+      ) : error ? (
         <div className="border-error bg-error-soft text-error mb-4 rounded-md border px-4 py-3 text-sm">
           {error}
         </div>
-      )}
+      ) : null}
       {success && (
         <div className="border-success bg-success-soft text-success mb-4 rounded-md border px-4 py-3 text-sm">
           {success}

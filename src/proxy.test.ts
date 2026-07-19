@@ -2,17 +2,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextAuthRequest } from "next-auth";
 import { NextRequest } from "next/server";
 
-const rateLimitMock = vi.fn();
+const mocks = vi.hoisted(() => ({
+  hasAuthSecret: true,
+  logAuthConfigurationDegraded: vi.fn(),
+  rateLimit: vi.fn(),
+}));
+vi.mock("@/lib/auth-configuration", () => ({
+  logAuthConfigurationDegraded: mocks.logAuthConfigurationDegraded,
+}));
 
 vi.mock("@/auth", () => ({
   auth: (handler: unknown) => handler,
+  hasAuthSecret: () => mocks.hasAuthSecret,
 }));
 vi.mock("@/lib/cards/public-rate-limit", () => ({
-  consumePublicCardBrowseRateLimit: rateLimitMock,
+  consumePublicCardBrowseRateLimit: mocks.rateLimit,
   PUBLIC_CARD_BROWSE_RATE_LIMIT_HEADER: "x-optcg-card-browse-rate-limit",
 }));
 
-const { config, handleProxyRequest } = await import("./proxy");
+const { config, default: proxy, handleProxyRequest } = await import("./proxy");
 
 function createRequest(path: string) {
   const request = new NextRequest(`https://example.com${path}`, {
@@ -23,8 +31,26 @@ function createRequest(path: string) {
 }
 
 beforeEach(() => {
-  rateLimitMock.mockReset();
-  rateLimitMock.mockResolvedValue({ limited: false, remaining: 59 });
+  mocks.hasAuthSecret = true;
+  mocks.rateLimit.mockReset();
+  mocks.logAuthConfigurationDegraded.mockReset();
+  mocks.rateLimit.mockResolvedValue({ limited: false, remaining: 59 });
+});
+
+describe("missing Auth.js secret", () => {
+  it("fails closed instead of trusting Auth.js configuration-error JSON", async () => {
+    mocks.hasAuthSecret = false;
+    const request = createRequest("/admin");
+    request.auth = { message: "server configuration" } as never;
+
+    const response = await proxy(request, {} as never);
+
+    expect(response?.status).toBe(302);
+    expect(response?.headers.get("location")).toBe(
+      "https://example.com/login?callbackUrl=%2Fadmin"
+    );
+    expect(mocks.logAuthConfigurationDegraded).toHaveBeenCalledWith("proxy");
+  });
 });
 
 describe("public card browse proxy rate limiting", () => {
@@ -35,13 +61,13 @@ describe("public card browse proxy rate limiting", () => {
   it.each(["/cards", "/sets"])(
     "returns 429 with retry guidance for a limited %s request",
     async (path) => {
-      rateLimitMock.mockResolvedValue({ limited: true, remaining: 0 });
+      mocks.rateLimit.mockResolvedValue({ limited: true, remaining: 0 });
 
       const response = await handleProxyRequest(createRequest(path));
 
       expect(response?.status).toBe(429);
       expect(response?.headers.get("Retry-After")).toBe("60");
-      expect(rateLimitMock).toHaveBeenCalledOnce();
+      expect(mocks.rateLimit).toHaveBeenCalledOnce();
     }
   );
 
@@ -54,6 +80,6 @@ describe("public card browse proxy rate limiting", () => {
         "x-middleware-request-x-optcg-card-browse-rate-limit"
       )
     ).toBe("allowed");
-    expect(rateLimitMock).toHaveBeenCalledOnce();
+    expect(mocks.rateLimit).toHaveBeenCalledOnce();
   });
 });

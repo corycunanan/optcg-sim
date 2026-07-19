@@ -1,8 +1,9 @@
-import { auth } from "@/auth";
+import { auth, hasAuthSecret } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CredentialsForm } from "./credentials-form";
 import { GoogleSignInButton } from "./google-sign-in-button";
+import { AuthUnavailableAlert } from "./auth-unavailable-alert";
 
 export default async function LoginPage({
   searchParams,
@@ -10,6 +11,7 @@ export default async function LoginPage({
   searchParams: Promise<{ callbackUrl?: string; mode?: string }>;
 }) {
   const session = await auth();
+  const authAvailable = hasAuthSecret();
   const { callbackUrl, mode } = await searchParams;
 
   if (session) {
@@ -33,19 +35,25 @@ export default async function LoginPage({
 
         {/* Sign in card */}
         <div className="border-border bg-card rounded border p-6">
-          <CredentialsForm
-            callbackUrl={callbackUrl || "/decks"}
-            initialMode={mode === "signup" ? "signup" : "signin"}
-          />
+          {authAvailable ? (
+            <>
+              <CredentialsForm
+                callbackUrl={callbackUrl || "/decks"}
+                initialMode={mode === "signup" ? "signup" : "signin"}
+              />
 
-          {/* Divider */}
-          <div className="my-5 flex items-center gap-3">
-            <div className="border-border flex-1 border-t" />
-            <span className="text-content-tertiary text-xs">or</span>
-            <div className="border-border flex-1 border-t" />
-          </div>
+              {/* Divider */}
+              <div className="my-5 flex items-center gap-3">
+                <div className="border-border flex-1 border-t" />
+                <span className="text-content-tertiary text-xs">or</span>
+                <div className="border-border flex-1 border-t" />
+              </div>
 
-          <GoogleSignInButton callbackUrl={callbackUrl || "/decks"} />
+              <GoogleSignInButton callbackUrl={callbackUrl || "/decks"} />
+            </>
+          ) : (
+            <AuthUnavailableAlert />
+          )}
 
           <p className="text-content-tertiary mt-4 text-center text-xs">
             By signing in, you agree to our terms of use
