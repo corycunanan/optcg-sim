@@ -29,6 +29,14 @@ alwaysApply: true
 
 **T-3-3.** Shared test utilities (card catalog, state builders) go in `helpers.ts`.
 
+**T-3-4.** Follow these current examples when choosing test scope and setup:
+
+- Unit: `src/lib/utils.test.ts`
+- Hook: `src/hooks/use-async-operation.test.ts`
+- Component: `src/components/cards/card-browser.test.tsx`
+- API route: `src/app/api/lobbies/route.test.ts`
+- Worker engine: `workers/game/src/__tests__/pipeline.test.ts`
+
 ### T-4. Test Quality
 
 **T-4-1.** Tests must assert specific outcomes, not just "no error thrown."
