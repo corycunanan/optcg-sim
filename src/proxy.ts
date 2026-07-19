@@ -7,7 +7,7 @@
  * Runs on the Node.js runtime (the only runtime supported by proxy)
  * because @/auth imports PrismaAdapter/bcryptjs, which are not Edge-compatible.
  */
-import { auth } from "@/auth";
+import { auth, hasAuthSecret } from "@/auth";
 import {
   consumePublicCardBrowseRateLimit,
   PUBLIC_CARD_BROWSE_RATE_LIMIT_HEADER,
@@ -53,7 +53,19 @@ export async function handleProxyRequest(req: NextAuthRequest) {
   }
 }
 
-export default auth(handleProxyRequest);
+const authenticatedProxy = auth(handleProxyRequest);
+
+export default function proxy(
+  req: NextAuthRequest,
+  event: Parameters<typeof authenticatedProxy>[1]
+) {
+  if (!hasAuthSecret()) {
+    req.auth = null;
+    return handleProxyRequest(req);
+  }
+
+  return authenticatedProxy(req, event);
+}
 
 export const config = {
   matcher: ["/admin/:path*", "/onboarding", "/cards", "/sets"],
