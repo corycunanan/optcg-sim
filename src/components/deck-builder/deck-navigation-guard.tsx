@@ -9,11 +9,13 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type Dispatch,
   type MouseEvent,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,10 +26,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  deserializeDeckBuilderState,
+  serializeDeckBuilderState,
+  type DeckBuilderAction,
+  type DeckBuilderState,
+} from "@/lib/deck-builder/state";
 
 interface DirtyDeckEditor {
   isDirty: boolean;
   name: string;
+  clearSnapshot: () => void;
+  snapshotDirtyState: () => void;
 }
 
 interface DeckNavigationDestination {
@@ -56,6 +66,12 @@ interface DeckNavigationGuardContextValue {
 
 const DeckNavigationGuardContext =
   createContext<DeckNavigationGuardContextValue | null>(null);
+
+const DECK_SNAPSHOT_PREFIX = "optcg:deck-builder:snapshot:";
+
+export function deckSnapshotStorageKey(deckId: string | null) {
+  return `${DECK_SNAPSHOT_PREFIX}${deckId ?? "new"}`;
+}
 
 export function useDeckNavigationGuard() {
   const context = useContext(DeckNavigationGuardContext);
@@ -99,10 +115,23 @@ export function DeckNavigationGuardProvider({
     const navigation = window.navigation as unknown as DeckNavigation;
     const handleNavigate = (event: Event) => {
       const navigateEvent = event as DeckNavigateEvent;
+      if (navigateEvent.navigationType !== "traverse") {
+        return;
+      }
+
+      if (!navigateEvent.cancelable || !navigateEvent.canIntercept) {
+        // The HTML anti-history-trapping rule makes an immediate second Back
+        // non-cancelable. The platform must navigate, so preserve the dirty
+        // deck for restoration and release the now-obsolete guard cleanly.
+        editor.snapshotDirtyState();
+        setPendingLeave(null);
+        allowedTraversalKey.current = null;
+        navigation.removeEventListener("navigate", handleNavigate);
+        setEditorState(null);
+        return;
+      }
+
       if (
-        navigateEvent.navigationType !== "traverse" ||
-        !navigateEvent.cancelable ||
-        !navigateEvent.canIntercept ||
         new URL(navigateEvent.destination.url).origin !== window.location.origin
       ) {
         return;
@@ -116,12 +145,29 @@ export function DeckNavigationGuardProvider({
 
       const blocked = requestLeave(() => {
         allowedTraversalKey.current = destinationKey;
-        const { finished } = navigation.traverseTo(destinationKey);
-        void finished.catch(() => {
-          if (allowedTraversalKey.current === destinationKey) {
-            allowedTraversalKey.current = null;
+        let traversal;
+        try {
+          traversal = navigation.traverseTo(destinationKey);
+        } catch {
+          allowedTraversalKey.current = null;
+          toast.error(
+            "Couldn't complete navigation. You're still on this deck."
+          );
+          return;
+        }
+
+        void Promise.allSettled([traversal.committed, traversal.finished]).then(
+          (results) => {
+            if (results.some((result) => result.status === "rejected")) {
+              toast.error(
+                "Couldn't complete navigation. You're still on this deck."
+              );
+            }
+            if (allowedTraversalKey.current === destinationKey) {
+              allowedTraversalKey.current = null;
+            }
           }
-        });
+        );
       });
 
       if (blocked) navigateEvent.preventDefault();
@@ -132,7 +178,7 @@ export function DeckNavigationGuardProvider({
       allowedTraversalKey.current = null;
       navigation.removeEventListener("navigate", handleNavigate);
     };
-  }, [editor?.isDirty, requestLeave]);
+  }, [editor, requestLeave]);
 
   const context = useMemo(
     () => ({ requestLeave, requestNavigation, setEditorState }),
@@ -142,6 +188,7 @@ export function DeckNavigationGuardProvider({
   const confirmLeave = () => {
     if (!pendingLeave) return;
     const proceed = pendingLeave;
+    editor?.clearSnapshot();
     setPendingLeave(null);
     proceed();
   };
@@ -175,12 +222,110 @@ export function DeckNavigationGuardProvider({
   );
 }
 
-export function useRegisterDeckNavigationGuard(isDirty: boolean, name: string) {
+interface DeckNavigationRecovery {
+  deckId: string | null;
+  dispatch: Dispatch<DeckBuilderAction>;
+  state: DeckBuilderState;
+}
+
+export function useRegisterDeckNavigationGuard(
+  isDirty: boolean,
+  name: string,
+  recovery?: DeckNavigationRecovery
+) {
   const { setEditorState } = useDeckNavigationGuard();
+  const deckId = recovery?.deckId ?? null;
+  const dispatch = recovery?.dispatch;
+  const state = recovery?.state;
+  const storageKey = deckSnapshotStorageKey(deckId);
+  const attemptedRestoreKey = useRef<string | null>(null);
+  const wasDirty = useRef(isDirty);
+
+  const clearSnapshot = useCallback(() => {
+    try {
+      window.sessionStorage.removeItem(storageKey);
+    } catch {
+      // Storage can be unavailable in hardened/private browser contexts.
+    }
+  }, [storageKey]);
+
+  const snapshotDirtyState = useCallback(() => {
+    if (!state?.isDirty) return;
+    try {
+      window.sessionStorage.setItem(
+        storageKey,
+        serializeDeckBuilderState(state)
+      );
+    } catch {
+      // Best effort only: the traversal cannot be canceled by platform rule.
+    }
+  }, [state, storageKey]);
 
   useEffect(() => {
-    setEditorState({ isDirty, name });
-  }, [isDirty, name, setEditorState]);
+    setEditorState({
+      isDirty,
+      name,
+      clearSnapshot,
+      snapshotDirtyState,
+    });
+  }, [clearSnapshot, isDirty, name, setEditorState, snapshotDirtyState]);
+
+  useEffect(() => {
+    if (
+      !state ||
+      !dispatch ||
+      attemptedRestoreKey.current === storageKey ||
+      state.id !== deckId ||
+      state.isDirty
+    ) {
+      return;
+    }
+    attemptedRestoreKey.current = storageKey;
+
+    let serialized: string | null = null;
+    try {
+      serialized = window.sessionStorage.getItem(storageKey);
+    } catch {
+      return;
+    }
+    if (!serialized) return;
+
+    const snapshot = deserializeDeckBuilderState(serialized);
+    if (!snapshot || snapshot.id !== deckId) {
+      clearSnapshot();
+      return;
+    }
+
+    const baseline = state;
+    dispatch({ type: "RESTORE_SNAPSHOT", state: snapshot });
+    toast.info("Restored unsaved changes", {
+      action: {
+        label: "Discard",
+        onClick: () => {
+          clearSnapshot();
+          dispatch({
+            type: "LOAD_DECK",
+            state: {
+              id: baseline.id,
+              name: baseline.name,
+              format: baseline.format,
+              leader: baseline.leader,
+              cards: baseline.cards,
+              sleeveUrl: baseline.sleeveUrl,
+              donArtUrl: baseline.donArtUrl,
+              testOrder: baseline.testOrder,
+              lastSavedAt: baseline.lastSavedAt,
+            },
+          });
+        },
+      },
+    });
+  }, [clearSnapshot, deckId, dispatch, state, storageKey]);
+
+  useEffect(() => {
+    if (wasDirty.current && !isDirty) clearSnapshot();
+    wasDirty.current = isDirty;
+  }, [clearSnapshot, isDirty]);
 
   useEffect(
     () => () => {

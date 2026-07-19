@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   subscribe: vi.fn(() => vi.fn()),
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
   session: { user: { id: "user-1" } } as {
     user: { id: string };
   } | null,
@@ -45,7 +47,7 @@ vi.mock("@/components/social/user-avatar", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn() },
+  toast: { error: mocks.toastError, info: mocks.toastInfo },
 }));
 
 vi.mock("@/components/ui/navigation-menu", () => ({
@@ -118,6 +120,7 @@ vi.mock("@/components/ui/alert-dialog", async () => {
 });
 
 import {
+  deckSnapshotStorageKey,
   DeckNavigationGuardLink,
   DeckNavigationGuardProvider,
   useRegisterDeckNavigationGuard,
@@ -127,6 +130,7 @@ import { LobbyInviteToasts } from "@/components/lobbies/lobby-invite-toast";
 import {
   createInitialState,
   deckBuilderReducer,
+  serializeDeckBuilderState,
 } from "@/lib/deck-builder/state";
 
 let renderer: ReactTestRenderer | null = null;
@@ -139,13 +143,14 @@ interface MockNavigateEvent extends Event {
 
 class MockNavigation extends EventTarget {
   completedTraversal: MockNavigateEvent | null = null;
+  traversal = () => ({
+    committed: Promise.resolve() as Promise<unknown>,
+    finished: Promise.resolve() as Promise<unknown>,
+  });
   traverseTo = vi.fn((key: string) => {
     this.completedTraversal = navigateEvent({ key });
     this.dispatchEvent(this.completedTraversal);
-    return {
-      committed: Promise.resolve(),
-      finished: Promise.resolve(),
-    };
+    return this.traversal();
   });
 }
 
@@ -220,6 +225,39 @@ function SaveRevisionHarness() {
   );
 }
 
+function SnapshotHarness() {
+  const [state, dispatch] = useReducer(deckBuilderReducer, undefined, () => ({
+    ...createInitialState(),
+    id: "deck-1",
+    name: "Saved deck",
+  }));
+  useRegisterDeckNavigationGuard(state.isDirty, state.name, {
+    state,
+    dispatch,
+    deckId: "deck-1",
+  });
+
+  return (
+    <>
+      <span>{state.name}</span>
+      <button
+        onClick={() => dispatch({ type: "SET_NAME", name: "Unsaved snapshot" })}
+      >
+        Edit deck
+      </button>
+      <button onClick={() => dispatch({ type: "SAVE_START" })}>
+        Start snapshot save
+      </button>
+      <button onClick={() => dispatch({ type: "SAVE_SUCCESS", id: "deck-1" })}>
+        Finish snapshot save
+      </button>
+      <DeckNavigationGuardLink href="/decks">
+        Leave snapshot
+      </DeckNavigationGuardLink>
+    </>
+  );
+}
+
 async function renderGuard(children: React.ReactNode, isDirty = true) {
   await act(async () => {
     renderer = create(
@@ -229,6 +267,32 @@ async function renderGuard(children: React.ReactNode, isDirty = true) {
       </DeckNavigationGuardProvider>
     );
   });
+}
+
+async function renderSnapshotHarness() {
+  await act(async () => {
+    renderer = create(
+      <DeckNavigationGuardProvider>
+        <SnapshotHarness />
+      </DeckNavigationGuardProvider>
+    );
+  });
+}
+
+function seedSnapshot() {
+  const clean = {
+    ...createInitialState(),
+    id: "deck-1",
+    name: "Saved deck",
+  };
+  const dirty = deckBuilderReducer(clean, {
+    type: "SET_NAME",
+    name: "Unsaved snapshot",
+  });
+  window.sessionStorage.setItem(
+    deckSnapshotStorageKey("deck-1"),
+    serializeDeckBuilderState(dirty)
+  );
 }
 
 function clickEvent(overrides: Partial<MouseEvent<HTMLAnchorElement>> = {}) {
@@ -252,11 +316,14 @@ function button(label: string) {
 }
 
 beforeEach(() => {
+  const sessionValues = new Map<string, string>();
   mocks.pathname = "/decks/deck-1";
   mocks.push.mockReset();
   mocks.apiGet.mockReset();
   mocks.apiPost.mockReset();
   mocks.subscribe.mockClear();
+  mocks.toastError.mockReset();
+  mocks.toastInfo.mockReset();
   mocks.session = { user: { id: "user-1" } };
   mocks.apiGet.mockResolvedValue({
     data: [
@@ -291,7 +358,19 @@ beforeEach(() => {
       href: "http://localhost:3000/decks/deck-1",
       origin: "http://localhost:3000",
     },
-  } as Window);
+    sessionStorage: {
+      clear: () => {
+        sessionValues.clear();
+      },
+      getItem: (key: string) => sessionValues.get(key) ?? null,
+      removeItem: (key: string) => {
+        sessionValues.delete(key);
+      },
+      setItem: (key: string, value: string) => {
+        sessionValues.set(key, value);
+      },
+    },
+  } as unknown as Window);
 });
 
 afterEach(async () => {
@@ -330,6 +409,111 @@ describe("deck builder navigation guard", () => {
     expect(navigation.traverseTo).toHaveBeenCalledOnce();
     expect(navigation.traverseTo).toHaveBeenCalledWith("back-entry");
     expect(navigation.completedTraversal?.defaultPrevented).toBe(false);
+  });
+
+  it("snapshots a dirty deck and closes the dialog when a second traversal cannot be canceled", async () => {
+    const navigation = installNavigationApi();
+    await renderSnapshotHarness();
+    await act(async () => button("Edit deck")?.props.onClick());
+
+    await act(async () => {
+      navigation.dispatchEvent(navigateEvent({ key: "first-back" }));
+    });
+    expect(button("Stay")).toBeDefined();
+
+    await act(async () => {
+      navigation.dispatchEvent(
+        navigateEvent({ cancelable: false, key: "second-back" })
+      );
+    });
+
+    expect(button("Stay")).toBeUndefined();
+    const snapshot = window.sessionStorage.getItem(
+      deckSnapshotStorageKey("deck-1")
+    );
+    expect(snapshot).toContain("Unsaved snapshot");
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    await renderSnapshotHarness();
+
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+  });
+
+  it("restores a matching snapshot and offers to discard the recovered changes", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness();
+
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+
+    const restoreToast = mocks.toastInfo.mock.calls.at(-1)?.[1] as {
+      action: { onClick: () => void };
+    };
+    await act(async () => restoreToast.action.onClick());
+
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+  });
+
+  it("clears a restored snapshot after save or confirmed discard", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness();
+    await act(async () => button("Start snapshot save")?.props.onClick());
+    await act(async () => button("Finish snapshot save")?.props.onClick());
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    seedSnapshot();
+    await renderSnapshotHarness();
+    await act(async () =>
+      renderer!.root.findByType("a").props.onClick(clickEvent())
+    );
+    await act(async () => button("Discard & Leave")?.props.onClick());
+
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+  });
+
+  it("handles both rejected traversal promises when the destination was disposed", async () => {
+    const navigation = installNavigationApi();
+    navigation.traversal = () => ({
+      committed: Promise.reject(new Error("disposed")),
+      finished: Promise.reject(new Error("disposed")),
+    });
+    await renderGuard(null);
+
+    await act(async () => {
+      navigation.dispatchEvent(navigateEvent({ key: "disposed-entry" }));
+    });
+    await act(async () => button("Discard & Leave")?.props.onClick());
+    await act(async () => Promise.resolve());
+
+    expect(button("Stay")).toBeUndefined();
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+
+    const retry = navigateEvent({ key: "disposed-entry" });
+    await act(async () => {
+      navigation.dispatchEvent(retry);
+    });
+    expect(retry.defaultPrevented).toBe(true);
   });
 
   it("keeps the URL and history state unchanged when traversal is canceled", async () => {

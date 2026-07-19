@@ -56,7 +56,11 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
     string | null
   >(null);
 
-  useRegisterDeckNavigationGuard(state.isDirty, state.name);
+  useRegisterDeckNavigationGuard(state.isDirty, state.name, {
+    state,
+    dispatch,
+    deckId,
+  });
 
   // Load existing deck
   useEffect(() => {
