@@ -2,6 +2,7 @@
 import type { Cost } from "../../effect-types.js";
 import type { CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
+import { trashStage } from "../card-mutations.js";
 
 export interface AppliedCostSelection {
   state: GameState;
@@ -20,6 +21,15 @@ export function applyCostSelection(
 
   switch (cost.type) {
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {
+      const selectedStage = p.stage && selectedSet.has(p.stage.instanceId)
+        ? p.stage
+        : null;
+      if (selectedStage) {
+        const trashed = trashStage(state, selectedStage.instanceId, "cost");
+        return trashed
+          ? { state: trashed.state, events: trashed.events }
+          : { state, events: [] };
+      }
       const moved = transitionCards(state, selectedIds, "TRASH", { position: "TOP" });
       return { state: moved.state, events: [] };
     }

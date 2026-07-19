@@ -292,6 +292,70 @@ describe("OPT-510: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", () => {
     }
   });
 
+  it("fires a field-removal watcher when the named stage pays the cost", () => {
+    const cardDb = createTestCardDb();
+    const stageData = cardDb.get(CARDS.STAGE.id)!;
+    cardDb.set(CARDS.STAGE.id, { ...stageData, name: "The Ark Noah" });
+    const watcherBlock: EffectBlock = {
+      id: "ark_noah_left_field_watcher",
+      category: "auto",
+      trigger: {
+        event: "CHARACTER_REMOVED_FROM_FIELD",
+        filter: {
+          controller: "SELF",
+          target_filter: { card_type: "STAGE", name: "The Ark Noah" },
+        },
+      },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    };
+    const costBlock: EffectBlock = {
+      id: "pay_ark_noah",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{
+        type: "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
+        card_name: "The Ark Noah",
+      }],
+      actions: [],
+    };
+    let state = withPlayer(makeState(cardDb), 0, {
+      hand: [],
+      stage: makeStageCard(CARDS.STAGE.id, "ark"),
+    });
+    const leaderId = state.players[0].leader.instanceId;
+    state = {
+      ...state,
+      triggerRegistry: [...state.triggerRegistry, {
+        id: "ark-noah-watcher-trigger",
+        sourceCardInstanceId: leaderId,
+        effectBlockId: watcherBlock.id,
+        trigger: watcherBlock.trigger,
+        effectBlock: watcherBlock,
+        zone: "FIELD",
+        controller: 0,
+      } as never],
+    };
+
+    const prompted = payCostsWithSelection(
+      state,
+      costBlock.costs!,
+      0,
+      0,
+      cardDb,
+      leaderId,
+      costBlock,
+      resolverExecutionServices,
+    );
+    const resumed = resumeFromStack(
+      prompted.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["stage-ark"] } as GameAction,
+      cardDb,
+    );
+
+    expect(resumed.events.some((event) => event.type === "CARD_DRAWN")).toBe(true);
+    expect(resumed.state.players[0].hand).toHaveLength(1);
+  });
+
   it("accepts the primitive only with a non-empty card_name", () => {
     expect(validateCost(namedHandOrStageCost(), "root", false)).toEqual([]);
     expect(validateCost(
@@ -404,6 +468,34 @@ describe("OPT-510: OP06-033 printed two-branch cost", () => {
     ]).toContain(unchosenArkId);
     expect(resolved.state.players[0].trash.some((card) => card.cardId === CARDS.STAGE.id)).toBe(true);
     expect(resolved.state.players[1].characters[0]).toBeNull();
+  });
+
+  it("emits the canonical identity-bearing event when Ark Noah is paid from stage", () => {
+    const { state, cardDb } = op06033State({ arkOnStage: true });
+    const paymentPrompt = acceptEffect(state, cardDb);
+    const koPrompt = select(paymentPrompt.state, ["stage-ark"], cardDb);
+    const trashed = koPrompt.events.find((event) => event.type === "CARD_TRASHED");
+    if (!trashed?.payload) throw new Error("Expected Ark Noah stage-trash event");
+
+    expect(trashed.payload).toEqual(expect.objectContaining({
+      cardInstanceId: "stage-ark",
+      cardId: CARDS.STAGE.id,
+      reason: "cost",
+    }));
+    expect(trashed.payload).toEqual(expect.objectContaining({
+      newCardInstanceId: expect.any(String),
+    }));
+    expect(trashed.payload.newCardInstanceId).not.toBe("stage-ark");
+    expect(koPrompt.events.filter((event) => event.type === "CARD_TRASHED")).toHaveLength(1);
+  });
+
+  it("keeps the hand-side Ark Noah payment event count-only", () => {
+    const { state, cardDb } = op06033State({ arkInHand: true });
+    const paymentPrompt = acceptEffect(state, cardDb);
+    const koPrompt = select(paymentPrompt.state, ["hand-ark"], cardDb);
+    const trashed = koPrompt.events.find((event) => event.type === "CARD_TRASHED");
+
+    expect(trashed?.payload).toEqual({ count: 1, reason: "cost", from: "HAND" });
   });
 
   it("auto-selects the only payable printed branch and blocks when neither is payable", () => {
