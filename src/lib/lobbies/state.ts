@@ -11,7 +11,10 @@ export type LobbyRoomPregameMode =
   | "PRIORITY_ROLL"
   | "HOST_FIRST"
   | "GUEST_FIRST"
-  | "RANDOM_FIXED";
+  | "RANDOM_FIXED"
+  | "SIDE_A_FIRST"
+  | "SIDE_B_FIRST"
+  | "SOLITAIRE_RANDOM";
 export type LobbyRoomStatus =
   | "WAITING"
   | "READY"

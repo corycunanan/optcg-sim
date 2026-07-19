@@ -135,7 +135,11 @@ export function LobbyRoomShell({
       setPendingSolitaire(true);
       return;
     }
-    await runPatch({ mode });
+    await runPatch({
+      mode,
+      pregameMode:
+        mode === "SOLITAIRE" ? "SOLITAIRE_RANDOM" : "PRIORITY_ROLL",
+    });
   };
 
   const runPatch = async (
@@ -303,6 +307,7 @@ export function LobbyRoomShell({
           </div>
 
           <PregameSettings
+            mode={lobby.mode}
             value={lobby.pregameMode}
             editable={canEditPregame}
             disabled={mutating || starting}
@@ -417,9 +422,13 @@ export function LobbyRoomShell({
               <AlertDialogCancel disabled={mutating}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  void runPatch({ mode: "SOLITAIRE" }, { force: true }).then(
-                    () => setPendingSolitaire(false)
-                  );
+                  void runPatch(
+                    {
+                      mode: "SOLITAIRE",
+                      pregameMode: "SOLITAIRE_RANDOM",
+                    },
+                    { force: true }
+                  ).then(() => setPendingSolitaire(false));
                 }}
                 disabled={mutating}
               >

@@ -24,6 +24,7 @@ import {
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
+import { resolvePregameMode } from "@shared/game-init";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -95,6 +96,15 @@ export async function POST(
       seatConfig.player2DeckOwnerId,
     );
 
+    const pregameMode = resolvePregameMode(
+      lobby.mode,
+      lobby.pregameMode,
+      false,
+    );
+    if (pregameMode === null) {
+      throw new Error("Stored lobby pregame mode normalization failed");
+    }
+
     const startResult = await prisma.$transaction(async (tx) => {
       const statusLock = await tx.lobby.updateMany({
         where: {
@@ -122,7 +132,7 @@ export async function POST(
           player2DeckId: seatConfig.player2DeckId,
           format: lobby.format,
           mode: lobby.mode,
-          pregameMode: lobby.pregameMode,
+          pregameMode,
           status: "IN_PROGRESS",
         },
         select: { id: true },
@@ -148,7 +158,7 @@ export async function POST(
       gameId: startResult.gameSession.id,
       format: lobby.format,
       mode: lobby.mode,
-      pregameMode: lobby.pregameMode,
+      pregameMode,
       player1: {
         userId: seatConfig.player1Id,
         leader: player1PlayableDeck.leader,

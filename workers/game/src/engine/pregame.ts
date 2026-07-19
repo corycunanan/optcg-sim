@@ -54,9 +54,13 @@ export function startPregame(
   let current = state;
   let fixedFirstPlayerIndex: 0 | 1 | null = null;
 
-  if (mode === "HOST_FIRST") fixedFirstPlayerIndex = 0;
-  if (mode === "GUEST_FIRST") fixedFirstPlayerIndex = 1;
-  if (mode === "RANDOM_FIXED") {
+  if (mode === "HOST_FIRST" || mode === "SIDE_A_FIRST") {
+    fixedFirstPlayerIndex = 0;
+  }
+  if (mode === "GUEST_FIRST" || mode === "SIDE_B_FIRST") {
+    fixedFirstPlayerIndex = 1;
+  }
+  if (mode === "RANDOM_FIXED" || mode === "SOLITAIRE_RANDOM") {
     const random = takeEngineRandom(current);
     current = random.state;
     fixedFirstPlayerIndex = random.value < 0.5 ? 0 : 1;
@@ -279,8 +283,9 @@ function advanceStartOfGameEffects(
     ...(pregame.startOfGameEffectsResolved ?? [false, false]),
   ] as [boolean, boolean];
   // §5-2-1-5-1: the priority decider resolves first even when they chose to
-  // play second. Fixed modes assign the configured/coin-flipped first player
-  // the priority-decider role because no roll occurs.
+  // play second. Roll-skipping modes, including Solitaire, assign the
+  // configured/coin-flipped first player the priority-decider role because no
+  // roll occurs.
   const priorityDecider =
     pregame.priorityDeciderIndex ?? pregame.firstPlayerIndex;
   const order: [0 | 1, 0 | 1] = [

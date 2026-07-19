@@ -83,6 +83,8 @@ describe("OPT-366 pregame flow", () => {
     it.each([
       ["HOST_FIRST", 0],
       ["GUEST_FIRST", 1],
+      ["SIDE_A_FIRST", 0],
+      ["SIDE_B_FIRST", 1],
     ] as const)(
       "%s skips both priority phases and fixes player %i first",
       (mode, expectedFirstPlayer) => {
@@ -102,6 +104,9 @@ describe("OPT-366 pregame flow", () => {
         expect(completed.pendingPrompt?.respondingPlayer).toBe(expectedFirstPlayer);
         completed = applyChoice(completed, "KEEP").state;
         completed = drain(completed, cardDb, []).state;
+        expect(completed.pendingPrompt?.respondingPlayer).toBe(
+          expectedFirstPlayer === 0 ? 1 : 0,
+        );
         completed = applyChoice(completed, "KEEP").state;
         completed = drain(completed, cardDb, []).state;
         expect(completed.pregame).toBeNull();
@@ -128,6 +133,38 @@ describe("OPT-366 pregame flow", () => {
       const next = drain(state, cardDb, []).state;
       expect(next.pregame?.phase).toBe("MULLIGAN_DECISIONS");
       expect(next.pendingPrompt?.respondingPlayer).toBe(expectedFirstPlayer);
+    });
+
+    it("SOLITAIRE_RANDOM persists one private coin flip across hibernation", () => {
+      const payload = createTestPayload();
+      payload.mode = "SOLITAIRE";
+      payload.pregameMode = "SOLITAIRE_RANDOM";
+      const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
+      const random = takeEngineRandom(prepared);
+      const expectedFirstPlayer = random.value < 0.5 ? 0 : 1;
+      const started = startPregame(prepared, "SOLITAIRE_RANDOM");
+
+      expect(started.pregame?.phase).toBe("START_OF_GAME_FX");
+      expect(started.pregame?.priorityRolls).toBeNull();
+      expect(started.pregame?.priorityDeciderIndex).toBe(expectedFirstPlayer);
+      expect(started.pregame?.firstPlayerIndex).toBe(expectedFirstPlayer);
+      expect(started.turn.activePlayerIndex).toBe(expectedFirstPlayer);
+      expect(started.executionContext.rngState).toBe(
+        random.state.executionContext.rngState,
+      );
+      expect(
+        started.eventLog.some(
+          (event) => event.type === "PREGAME_PRIORITY_ROLLED",
+        ),
+      ).toBe(false);
+
+      const restored = JSON.parse(JSON.stringify(started)) as GameState;
+      const resumed = drain(restored, cardDb, []).state;
+      expect(resumed.pregame?.firstPlayerIndex).toBe(expectedFirstPlayer);
+      expect(resumed.turn.activePlayerIndex).toBe(expectedFirstPlayer);
+      expect(resumed.pendingPrompt?.respondingPlayer).toBe(
+        expectedFirstPlayer,
+      );
     });
   });
 

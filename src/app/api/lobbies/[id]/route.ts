@@ -21,16 +21,13 @@ import { viewerIsEvicted } from "@/lib/lobbies/state";
 import { isActiveLobbyConflict } from "@/lib/lobbies/unique-constraints";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
+import { resolvePregameMode, type PregameMode } from "@shared/game-init";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 type PatchLobbyData = {
   mode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
-  pregameMode?:
-    | "PRIORITY_ROLL"
-    | "HOST_FIRST"
-    | "GUEST_FIRST"
-    | "RANDOM_FIXED";
+  pregameMode?: PregameMode;
   format?: string;
   hostDeckId?: string | null;
   hostReady?: boolean;
@@ -104,15 +101,24 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     return apiError("Forbidden", 403);
   }
 
-  if (parsed.mode === "PVCOMPUTER") {
+  const targetMode = parsed.mode ?? lobby.mode;
+  if (targetMode === "PVCOMPUTER") {
     return apiError("PVComputer mode is not yet implemented", 501);
   }
-
-  const targetMode = parsed.mode ?? lobby.mode;
+  const requestedPregameMode = parsed.pregameMode ?? lobby.pregameMode;
+  const targetPregameMode = resolvePregameMode(
+    targetMode,
+    requestedPregameMode,
+    parsed.pregameMode !== undefined
+  );
+  if (targetPregameMode === null) {
+    return apiError(
+      `pregameMode ${requestedPregameMode} is not valid for ${targetMode} lobbies`,
+      400,
+      { code: "INVALID_PREGAME_MODE" }
+    );
+  }
   if (parsed.guestDeckId !== undefined) {
-    if (targetMode === "PVCOMPUTER") {
-      return apiError("PVComputer mode is not yet implemented", 501);
-    }
     if (targetMode === "SOLITAIRE" && !isHost) {
       return apiError(
         "guestDeckId can only be changed by the host in Solitaire mode",
@@ -189,8 +195,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const lobbyData: PatchLobbyData = {};
   if (parsed.mode !== undefined) lobbyData.mode = parsed.mode;
-  if (parsed.pregameMode !== undefined) {
-    lobbyData.pregameMode = parsed.pregameMode;
+  if (
+    parsed.pregameMode !== undefined ||
+    targetPregameMode !== lobby.pregameMode
+  ) {
+    lobbyData.pregameMode = targetPregameMode;
   }
   if (parsed.format !== undefined) lobbyData.format = parsed.format;
   if (parsed.hostDeckId !== undefined) lobbyData.hostDeckId = parsed.hostDeckId;

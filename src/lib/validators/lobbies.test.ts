@@ -47,6 +47,9 @@ describe("pregame mode validation", () => {
     "HOST_FIRST",
     "GUEST_FIRST",
     "RANDOM_FIXED",
+    "SIDE_A_FIRST",
+    "SIDE_B_FIRST",
+    "SOLITAIRE_RANDOM",
   ] as const)("accepts %s in lobby snapshots and PATCH bodies", (pregameMode) => {
     expect(PregameModeSchema.parse(pregameMode)).toBe(pregameMode);
     expect(PatchLobbySchema.parse({ pregameMode })).toEqual({ pregameMode });
@@ -61,8 +64,8 @@ describe("pregame mode validation", () => {
     );
   });
 
-  it("rejects future solitaire values until OPT-368 adds them", () => {
-    expect(PatchLobbySchema.safeParse({ pregameMode: "SIDE_A_FIRST" }).success)
+  it("rejects unknown future values", () => {
+    expect(PatchLobbySchema.safeParse({ pregameMode: "FUTURE_MODE" }).success)
       .toBe(false);
   });
 });

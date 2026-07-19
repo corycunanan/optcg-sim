@@ -1,7 +1,10 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import type { LobbyRoomPregameMode } from "@/lib/lobbies/state";
+import type {
+  LobbyRoomMode,
+  LobbyRoomPregameMode,
+} from "@/lib/lobbies/state";
 import { cn } from "@/lib/utils";
 
 export const PREGAME_MODE_OPTIONS: ReadonlyArray<{
@@ -40,17 +43,53 @@ export const PREGAME_MODE_OPTIONS: ReadonlyArray<{
   },
 ];
 
+export const SOLITAIRE_PREGAME_MODE_OPTIONS: ReadonlyArray<{
+  value: LobbyRoomPregameMode;
+  label: string;
+  summary: string;
+  explanation: string;
+}> = [
+  {
+    value: "SIDE_A_FIRST",
+    label: "Side A",
+    summary: "Side A takes the first turn.",
+    explanation:
+      "Side A also resolves its start-of-game Leader effect first.",
+  },
+  {
+    value: "SIDE_B_FIRST",
+    label: "Side B",
+    summary: "Side B takes the first turn.",
+    explanation:
+      "Side B also resolves its start-of-game Leader effect first.",
+  },
+  {
+    value: "SOLITAIRE_RANDOM",
+    label: "Random",
+    summary: "Choose the first side privately when the game starts.",
+    explanation:
+      "The server flips a private coin. There is no dice result or turn-order prompt.",
+  },
+];
+
 export function PregameSettings({
+  mode = "PVP",
   value,
   editable,
   disabled = false,
   onChange,
 }: {
+  mode?: LobbyRoomMode;
   value: LobbyRoomPregameMode;
   editable: boolean;
   disabled?: boolean;
   onChange: (value: LobbyRoomPregameMode) => void;
 }) {
+  const solitaire = mode === "SOLITAIRE";
+  const options = solitaire
+    ? SOLITAIRE_PREGAME_MODE_OPTIONS
+    : PREGAME_MODE_OPTIONS;
+
   return (
     <section
       className="border-border bg-surface-1 rounded-lg border p-5"
@@ -62,10 +101,12 @@ export function PregameSettings({
             id="pregame-settings-title"
             className="text-text-primary text-lg font-semibold"
           >
-            Pre-game
+            {solitaire ? "Side to go first" : "Pre-game"}
           </h2>
           <p className="text-text-secondary mt-1 text-sm">
-            Choose how the first player is decided before setup begins.
+            {solitaire
+              ? "Skip the priority roll and choose which side leads the test."
+              : "Choose how the first player is decided before setup begins."}
           </p>
         </div>
         {!editable && (
@@ -77,8 +118,10 @@ export function PregameSettings({
       </div>
 
       <fieldset className="border-border divide-border mt-5 divide-y rounded-md border">
-        <legend className="sr-only">Pre-game flow</legend>
-        {PREGAME_MODE_OPTIONS.map((option) => {
+        <legend className="sr-only">
+          {solitaire ? "Side to go first" : "Pre-game flow"}
+        </legend>
+        {options.map((option) => {
           const selected = option.value === value;
           return (
             <label

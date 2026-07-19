@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { CardData, Env, GameAction, GameInitPayload, GameState } from "../types.js";
+import type {
+  CardData,
+  Env,
+  GameAction,
+  GameInitPayload,
+  GameState,
+  PregameMode,
+} from "../types.js";
 import { GameSession } from "../GameSession.js";
 import { advancePregame, resumePregameFromPrompt, startPregame } from "../engine/pregame.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
@@ -65,12 +72,21 @@ function withImu(
 function buildState(
   imuPlayers: readonly [boolean, boolean],
   maryPlayers: readonly [boolean, boolean],
+  pregameMode: PregameMode = "PRIORITY_ROLL",
 ): { state: GameState; cardDb: Map<string, CardData> } {
   const payload = createTestPayload();
+  if (
+    pregameMode === "SIDE_A_FIRST" ||
+    pregameMode === "SIDE_B_FIRST" ||
+    pregameMode === "SOLITAIRE_RANDOM"
+  ) {
+    payload.mode = "SOLITAIRE";
+  }
+  payload.pregameMode = pregameMode;
   if (imuPlayers[0]) payload.player1 = withImu(payload.player1, maryPlayers[0]);
   if (imuPlayers[1]) payload.player2 = withImu(payload.player2, maryPlayers[1]);
   const { state, cardDb } = prepareDecksAndLeaders(payload);
-  return { state: startPregame(state), cardDb };
+  return { state: startPregame(state, pregameMode), cardDb };
 }
 
 function chooseFirstPlayer(
@@ -205,6 +221,54 @@ describe("OPT-476 start-of-game effects", () => {
     expect(secondPrompt.players[0].hand).toHaveLength(0);
     expect(secondPrompt.players[1].hand).toHaveLength(0);
   });
+
+  it("fires a one-sided Solitaire Imu after the configured first side", () => {
+    const { state, cardDb } = buildState(
+      [false, true],
+      [false, true],
+      "SIDE_A_FIRST",
+    );
+    const prompted = advancePregame(state, cardDb, []).state;
+
+    expect(prompted.pregame?.firstPlayerIndex).toBe(0);
+    expect(prompted.pregame?.priorityDeciderIndex).toBe(0);
+    expect(prompted.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(prompted.pregame?.startOfGameEffectsResolved).toEqual([true, true]);
+  });
+
+  it.each([
+    ["SIDE_A_FIRST", 0],
+    ["SIDE_B_FIRST", 1],
+  ] as const)(
+    "resolves both Solitaire Imu Leaders in %s order",
+    (pregameMode, firstPlayerIndex) => {
+      const { state, cardDb } = buildState(
+        [true, true],
+        [true, true],
+        pregameMode,
+      );
+      const firstPrompt = advancePregame(state, cardDb, []).state;
+
+      expect(firstPrompt.pregame?.firstPlayerIndex).toBe(firstPlayerIndex);
+      expect(firstPrompt.pregame?.priorityDeciderIndex).toBe(firstPlayerIndex);
+      expect(firstPrompt.pendingPrompt?.respondingPlayer).toBe(
+        firstPlayerIndex,
+      );
+      expect(firstPrompt.pregame?.startOfGameEffectsResolved).toEqual(
+        firstPlayerIndex === 0 ? [true, false] : [false, true],
+      );
+
+      const firstDone = answerSearch(firstPrompt, cardDb, false);
+      const secondPrompt = advancePregame(firstDone, cardDb, []).state;
+      expect(secondPrompt.pendingPrompt?.respondingPlayer).toBe(
+        firstPlayerIndex === 0 ? 1 : 0,
+      );
+      expect(secondPrompt.pregame?.startOfGameEffectsResolved).toEqual([
+        true,
+        true,
+      ]);
+    },
+  );
 
   it("handles a zero-match search, shuffles, and advances without prompting", () => {
     const { state, cardDb } = buildState([true, false], [false, false]);

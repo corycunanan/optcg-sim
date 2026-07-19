@@ -6,6 +6,9 @@ export const PregameModeSchema = z.enum([
   "HOST_FIRST",
   "GUEST_FIRST",
   "RANDOM_FIXED",
+  "SIDE_A_FIRST",
+  "SIDE_B_FIRST",
+  "SOLITAIRE_RANDOM",
 ]);
 export const LobbyStatusSchema = z.enum([
   "WAITING",

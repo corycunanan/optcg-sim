@@ -8,7 +8,51 @@ export type PregameMode =
   | "PRIORITY_ROLL"
   | "HOST_FIRST"
   | "GUEST_FIRST"
-  | "RANDOM_FIXED";
+  | "RANDOM_FIXED"
+  | "SIDE_A_FIRST"
+  | "SIDE_B_FIRST"
+  | "SOLITAIRE_RANDOM";
+
+type ActiveLobbyMode = Exclude<LobbyMode, "PVCOMPUTER">;
+
+const PVP_PREGAME_MODES: readonly PregameMode[] = [
+  "PRIORITY_ROLL",
+  "HOST_FIRST",
+  "GUEST_FIRST",
+  "RANDOM_FIXED",
+];
+
+const SOLITAIRE_PREGAME_MODES: readonly PregameMode[] = [
+  "SIDE_A_FIRST",
+  "SIDE_B_FIRST",
+  "SOLITAIRE_RANDOM",
+];
+
+/**
+ * Resolve a pre-game mode at a server boundary.
+ *
+ * Stored or omitted values are rollout input and normalize to the target
+ * lobby's default. Explicit cross-mode input is rejected, except for the
+ * legacy Solitaire + PRIORITY_ROLL pairing, whose closest meaning is a
+ * private server-side selection with no roll ceremony.
+ */
+export function resolvePregameMode(
+  mode: ActiveLobbyMode,
+  pregameMode: PregameMode | undefined,
+  explicit: boolean
+): PregameMode | null {
+  if (mode === "PVP") {
+    if (pregameMode === undefined) return "PRIORITY_ROLL";
+    if (PVP_PREGAME_MODES.includes(pregameMode)) return pregameMode;
+    return explicit ? null : "PRIORITY_ROLL";
+  }
+
+  if (pregameMode === undefined || pregameMode === "PRIORITY_ROLL") {
+    return "SOLITAIRE_RANDOM";
+  }
+  if (SOLITAIRE_PREGAME_MODES.includes(pregameMode)) return pregameMode;
+  return explicit ? null : "SOLITAIRE_RANDOM";
+}
 
 export interface DeckCardData<TCardData = CardData> {
   cardId: string;

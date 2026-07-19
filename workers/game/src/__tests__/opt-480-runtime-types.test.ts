@@ -61,7 +61,7 @@ describe("OPT-480 runtime type boundaries", () => {
   it("rejects unknown persisted pregame modes", () => {
     const malformed = {
       ...storedFixture(),
-      pregameMode: "SIDE_A_FIRST",
+      pregameMode: "FUTURE_MODE",
     };
 
     expect(() => parseStoredSession(malformed)).toThrow(

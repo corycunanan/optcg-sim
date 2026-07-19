@@ -239,6 +239,7 @@ describe("POST /api/lobbies/[id]/start", () => {
   it("starts a Solitaire lobby with the host occupying both seats", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
       mode: "SOLITAIRE",
+      pregameMode: "SIDE_A_FIRST",
       status: "READY",
       guest: {
         userId: "host-user",
@@ -259,12 +260,41 @@ describe("POST /api/lobbies/[id]/start", () => {
         player1DeckId: "host-deck",
         player2DeckId: "side-b-deck",
         mode: "SOLITAIRE",
+        pregameMode: "SIDE_A_FIRST",
       }),
     }));
     expect(buildGameInitPayloadMock).toHaveBeenCalledWith(expect.objectContaining({
       mode: "SOLITAIRE",
+      pregameMode: "SIDE_A_FIRST",
       player1: expect.objectContaining({ userId: "host-user" }),
       player2: expect.objectContaining({ userId: "host-user" }),
+    }));
+  });
+
+  it("normalizes a stale Solitaire priority-roll pairing before snapshotting", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
+      mode: "SOLITAIRE",
+      pregameMode: "PRIORITY_ROLL",
+      status: "READY",
+      guest: {
+        userId: "host-user",
+        deckId: "side-b-deck",
+        guestReady: false,
+      },
+    }));
+
+    const res = await POST(buildRequest(), params);
+
+    expect(res.status).toBe(200);
+    expect(gameSessionCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
+      }),
+    }));
+    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(expect.objectContaining({
+      mode: "SOLITAIRE",
+      pregameMode: "SOLITAIRE_RANDOM",
     }));
   });
 
