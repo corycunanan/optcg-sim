@@ -37,6 +37,42 @@ afterEach(async () => {
 });
 
 describe("CardBrowser filters", () => {
+  it("preserves the implicit default set when another filter changes", async () => {
+    await act(async () => {
+      renderer = create(
+        <CardBrowser
+          initialCards={[]}
+          total={0}
+          page={1}
+          totalPages={0}
+          sets={[{ setLabel: "OP15", setName: "Example Set", packId: "OP15" }]}
+          currentFilters={{
+            q: "",
+            color: "",
+            type: "",
+            set: "OP15-EB04",
+            block: "",
+            originOnly: "",
+          }}
+          routePath="/cards"
+        />
+      );
+    });
+
+    await act(async () =>
+      renderer!.root
+        .findByProps({ "aria-controls": "card-filters" })
+        .props.onClick()
+    );
+    const redFilter = renderer!.root
+      .findAllByType("button")
+      .find((candidate) => candidate.props.children === "Red");
+
+    await act(async () => redFilter!.props.onClick());
+
+    expect(mocks.push).toHaveBeenCalledWith("/cards?set=OP15-EB04&color=Red");
+  });
+
   it("toggles the existing filter panel and supports the All Sets view", async () => {
     await act(async () => {
       renderer = create(

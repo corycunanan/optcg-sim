@@ -101,6 +101,10 @@ export function CardBrowser({
     (updates: Record<string, string>) => {
       const params = new URLSearchParams(searchParams.toString());
 
+      if (!("set" in updates) && !params.has("set") && currentFilters.set) {
+        params.set("set", currentFilters.set);
+      }
+
       for (const [key, value] of Object.entries(updates)) {
         if (value) {
           params.set(key, value);
@@ -116,7 +120,7 @@ export function CardBrowser({
 
       router.push(`${routePath}?${params.toString()}`);
     },
-    [routePath, router, searchParams]
+    [currentFilters.set, routePath, router, searchParams]
   );
 
   const handleSearch = useCallback(
