@@ -25,7 +25,7 @@ export function DeckBuilderValidation({ results, totalCards }: DeckBuilderValida
         variant={deckFull ? "success" : "secondary"}
         className={cn(
           "self-start px-3 py-1 text-sm font-bold tabular-nums",
-          deckFull && "border-transparent bg-success text-content-inverse"
+          deckFull && "border-transparent bg-success text-navy-900"
         )}
       >
         {totalCards}/50

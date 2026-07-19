@@ -105,32 +105,32 @@ One Piece Trading Card Game players — competitive and casual — who want to b
 ### Brand Personality
 **Adventurous. Warm. Confident.**
 
-The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and alive. It should feel like the official OPTCG website but purpose-built for play: clean, welcoming, unmistakably One Piece. Card art is spectacular and deserves a bright, uncluttered stage.
+The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and alive. It should feel like the official OPTCG website but purpose-built for play: clean, welcoming, unmistakably One Piece. Card art is spectacular and deserves a focused, uncluttered navy stage.
 
 Emotional goals: delight when browsing cards, focus when building decks, immersion during gameplay.
 
 ### References
-- **[Official OPTCG Website](https://en.onepiece-cardgame.com/)** — bright white surfaces, deep navy navigation, gold accents, generous whitespace, card art as hero. This is the primary reference.
+- **[Official OPTCG Website](https://en.onepiece-cardgame.com/)** — deep navy structure, gold accents, generous whitespace, and card art as hero. This is the primary brand reference, adapted to a dark-only product surface.
 - **[Riftbound (League of Legends TCG)](https://riftbound.leagueoflegends.com/)** — blade section architecture, ornamental CTA buttons, carousel with progress bar, responsive spacing variables, dramatic serif display typography, backdrop overlays. Key structural reference for layout and component patterns.
 - **[MTG Arena](https://magic.wizards.com/en/mtgarena)** — spacing discipline, fluid typography, purposeful motion, CSS variable system.
 - **[Branding Guidelines](docs/design/BRANDING-GUIDELINES.md)** — comprehensive design brief for M5 UI Overhaul. Defines all token values, typography, motion language, component patterns, and game board theming architecture. Source of truth for implementation.
 
 ### Aesthetic Direction
-- **Visual tone:** Clean and bright, with purposeful dark moments for the game board. Not dark/moody/gamer — that's not what One Piece is.
-- **Primary theme:** Light mode. Dark surfaces reserved for the game board where immersion matters most.
+- **Visual tone:** Clean, warm, and confident on deep navy. Dark never means gloomy, cold, low-contrast, or gamer-neon.
+- **Primary theme:** Dark-only. The main app uses a navy-900 page foundation with progressively lighter navy elevations; the game board remains a separate, darker themed context.
 - **Color palette:**
-  - Warm white (`oklch(98% 0.005 75)`) and off-white for surfaces
-  - Deep navy (`oklch(22% 0.04 245)`) — **primary accent AND structure**: buttons, active states, navigation, highlights
-  - Warm gold (`oklch(72% 0.14 75)`) — secondary accent for premium/treasure moments
-  - One Piece red (`oklch(55% 0.20 25)`) for emphasis, energy, and destructive actions only
+  - Deep navy (`oklch(22% 0.04 245)`) — the page background and structural foundation, with lighter navy elevation steps for panels and controls
+  - Warm white (`oklch(96% 0.008 75)`) — primary text, with warm secondary and tertiary steps for hierarchy
+  - Warm gold (`oklch(78% 0.14 75)`) — primary interaction, visible focus, and premium/treasure moments
+  - One Piece red (`oklch(74% 0.20 25)`) for emphasis, energy, and destructive actions only
   - Six TCG card colors (Red, Blue, Green, Purple, Black, Yellow) remain functional identifiers only
 - **Typography:**
   - **Display/headings:** DM Serif Display (Google Fonts) — high-contrast display serif for page titles, section headers. Uppercase. Italic variant for featured callouts and pull-quotes.
   - **Body:** Geist Sans — all body text, labels, UI elements.
   - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. See `docs/design/BRANDING-GUIDELINES.md` for full scale.
 - **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible.
-- **Card presentation:** Warm white or light surfaces let art breathe. Single, clean hover state — no stacking of lift + shadow + blur.
-- **Anti-references:** NOT dark/teal/moody. NOT gamer-neon. NOT generic SaaS dashboard. NOT over-decorated with gradients and backdrop blurs.
+- **Card presentation:** Restrained elevated navy surfaces let art breathe. Single, clean hover state — no stacking of lift + shadow + blur.
+- **Anti-references:** NOT gloomy, low-contrast, cold gray, or gamer-neon. NOT generic SaaS dashboard. NOT over-decorated with gradients and backdrop blurs.
 
 ### Styling Rules (enforced)
 
@@ -149,8 +149,8 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 
 ### Design Principles
 
-1. **Card art is the hero** — Clean, bright surfaces amplify artwork. UI chrome minimizes and recedes.
-2. **One Piece warmth** — Bright, energetic, inviting. Color and whitespace create warmth, not decoration or gradients.
+1. **Card art is the hero** — Restrained navy surfaces amplify artwork. UI chrome minimizes and recedes.
+2. **One Piece warmth** — Warm whites, gold, red, and whitespace keep the dark foundation energetic and inviting without decorative gradients.
 3. **Tight system, loose expression** — Every spacing, type, and color decision traces back to a token. Within that system, layouts can be expressive.
 4. **Motion earns its place** — Transitions communicate state. One clear animation per interaction, not stacked effects.
 5. **Progressive clarity** — Simple at rest, detailed on interaction. Dense information (stats, filters) is scannable through hierarchy, not visual noise.

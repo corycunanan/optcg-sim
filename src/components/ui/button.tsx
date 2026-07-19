@@ -10,18 +10,18 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-navy-900 text-content-inverse border border-navy-900 hover:bg-navy-800 hover:border-navy-800",
+          "bg-gold-500 text-navy-900 border border-gold-500 hover:bg-gold-400 hover:border-gold-400",
         secondary:
           "bg-surface-1 text-content-primary border border-border hover:bg-surface-2 hover:border-border-strong",
         outline:
-          "bg-transparent text-navy-900 border border-navy-900 hover:bg-navy-100",
+          "bg-transparent text-gold-500 border border-gold-500 hover:bg-surface-2 hover:text-gold-400 hover:border-gold-400",
         ghost:
           "bg-transparent text-content-secondary border border-transparent hover:bg-surface-2 hover:text-content-primary",
         destructive:
-          "bg-red-600 text-content-inverse border border-red-600 hover:bg-red-500 hover:border-red-500",
+          "bg-red-600 text-navy-900 border border-red-600 hover:bg-red-500 hover:border-red-500",
         gold:
           "bg-gold-500 text-navy-900 border border-gold-500 hover:bg-gold-400 hover:border-gold-400",
-        link: "text-navy-900 underline-offset-4 hover:underline",
+        link: "text-gold-500 underline-offset-4 hover:text-gold-400 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",

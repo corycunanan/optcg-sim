@@ -45,7 +45,7 @@ export default async function SetsPage() {
                 className="flex items-center justify-between rounded-lg border border-border bg-surface-1 p-4 transition-all hover:-translate-y-px hover:shadow-md"
               >
                 <div>
-                  <span className="font-mono text-sm font-bold text-navy-900">
+                  <span className="font-mono text-sm font-bold text-content-primary">
                     {s.setLabel}
                   </span>
                   <p className="mt-1 text-xs text-content-tertiary">

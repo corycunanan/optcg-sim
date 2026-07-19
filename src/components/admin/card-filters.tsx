@@ -149,14 +149,14 @@ export function CardFilters({
             className={cn(
               "flex items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-all",
               originOnly
-                ? "border-navy-900 bg-navy-100 text-navy-900"
+                ? "border-gold-500 bg-navy-100 text-content-primary"
                 : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
             )}
           >
             <span
               className={cn(
                 "inline-block h-3 w-3 rounded-sm border transition-colors",
-                originOnly ? "border-navy-900 bg-navy-900" : "border-content-tertiary bg-transparent",
+                originOnly ? "border-gold-500 bg-gold-500" : "border-content-tertiary bg-transparent",
               )}
             />
             Origin only

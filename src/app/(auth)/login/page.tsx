@@ -23,7 +23,7 @@ export default async function LoginPage({
         <div className="mb-10 text-center">
           <Link href="/">
             <h1 className="font-display text-content-primary text-5xl leading-none font-bold tracking-tight">
-              OPTCG <span className="text-navy-900">Simulator</span>
+              OPTCG <span className="text-gold-500">Simulator</span>
             </h1>
           </Link>
           <p className="text-content-tertiary mt-2 text-sm">
