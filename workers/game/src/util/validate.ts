@@ -7,6 +7,7 @@
  */
 
 import { ClientMessageSchema } from "../../../../shared/validators/client-message.js";
+import { resolvePregameMode } from "../../../../shared/game-init.js";
 import type {
   CardData,
   GameInitPayload,
@@ -234,25 +235,20 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
   if (!isLobbyMode(obj.mode)) {
     throw new Error("GameInitPayload.mode must be a valid lobby mode");
   }
-  const pregameMode = obj.pregameMode ?? "PRIORITY_ROLL";
-  if (!isPregameMode(pregameMode)) {
+  const explicitPregameMode = obj.pregameMode !== undefined;
+  if (explicitPregameMode && !isPregameMode(obj.pregameMode)) {
     throw new Error("GameInitPayload.pregameMode must be a valid pregame mode");
   }
-  const pvpPregameMode =
-    pregameMode === "PRIORITY_ROLL" ||
-    pregameMode === "HOST_FIRST" ||
-    pregameMode === "GUEST_FIRST" ||
-    pregameMode === "RANDOM_FIXED";
-  const solitairePregameMode =
-    pregameMode === "SIDE_A_FIRST" ||
-    pregameMode === "SIDE_B_FIRST" ||
-    pregameMode === "SOLITAIRE_RANDOM";
-  if (
-    (obj.mode === "PVP" && !pvpPregameMode) ||
-    (obj.mode === "SOLITAIRE" && !solitairePregameMode)
-  ) {
+  const requestedPregameMode = explicitPregameMode
+    ? (obj.pregameMode as GameInitPayload["pregameMode"])
+    : undefined;
+  const pregameMode =
+    obj.mode === "PVCOMPUTER"
+      ? (requestedPregameMode ?? "PRIORITY_ROLL")
+      : resolvePregameMode(obj.mode, requestedPregameMode, explicitPregameMode);
+  if (pregameMode === null) {
     throw new Error(
-      `GameInitPayload.pregameMode ${pregameMode} is not valid for ${obj.mode} mode`,
+      `GameInitPayload.pregameMode ${requestedPregameMode} is not valid for ${obj.mode} mode`,
     );
   }
   if (obj.testPriorityRolls != null) {

@@ -271,6 +271,33 @@ describe("POST /api/lobbies/[id]/start", () => {
     }));
   });
 
+  it("normalizes a stale Solitaire priority-roll pairing before snapshotting", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
+      mode: "SOLITAIRE",
+      pregameMode: "PRIORITY_ROLL",
+      status: "READY",
+      guest: {
+        userId: "host-user",
+        deckId: "side-b-deck",
+        guestReady: false,
+      },
+    }));
+
+    const res = await POST(buildRequest(), params);
+
+    expect(res.status).toBe(200);
+    expect(gameSessionCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
+      }),
+    }));
+    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(expect.objectContaining({
+      mode: "SOLITAIRE",
+      pregameMode: "SOLITAIRE_RANDOM",
+    }));
+  });
+
   it("rejects non-host callers", async () => {
     authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
 

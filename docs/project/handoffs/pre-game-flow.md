@@ -19,11 +19,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 1 | OPT-366 | Pre-game flow: priority decision (2d6) + hand-redraw mulligan + setup restructure | 5 | — | In Review | [#222](https://github.com/corycunanan/optcg-sim/pull/222) | Foundation — unblocks all the rest |
 | 2 | OPT-365 | Wire START_OF_GAME_EFFECT processing for OP13-079 Imu (Mary Geoise stage play) | 2 | OPT-366 | Backlog | — | Drops into the START_OF_GAME_FX phase the FSM already exposes |
 | 3 | OPT-367 | Lobby settings: host-configurable pre-game flow (turn order + priority roll opt-out) | 3 | OPT-366 | In Review | [#380](https://github.com/corycunanan/optcg-sim/pull/380) | Adds host overrides, game-session snapshotting, and worker FSM routing |
-| 4 | OPT-368 | Solitaire-mode pre-game UX: streamline priority decision when one user controls both sides | 2 | OPT-366 | Backlog | — | Solitaire UX polish; mechanics already work |
+| 4 | OPT-368 | Solitaire-mode pre-game UX: streamline priority decision when one user controls both sides | 2 | OPT-366 | In Review | [#382](https://github.com/corycunanan/optcg-sim/pull/382) | Solitaire UX polish; mechanics already work |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-368 after OPT-367 merges; extend the pre-game modes for solitaire without changing the two-player meanings.
+**Next up:** OPT-365 after OPT-366 merges; OPT-368 is in review in PR #382.
 
 ---
 
@@ -51,5 +51,5 @@ Append new entries at the bottom. Each entry is written *by* the agent who just 
 
 - **Primer:** Added `PregameMode` with `PRIORITY_ROLL`, `HOST_FIRST`, `GUEST_FIRST`, and `RANDOM_FIXED`. The host edits it in the lobby, Start snapshots it onto `game_sessions`, and `GameInitPayload` plus `StoredSession` carry it through the worker and Durable Object hibernation.
 - **Read first:** `prisma/schema.prisma`, `shared/game-init.ts`, `src/lib/validators/lobbies.ts`, `src/components/lobbies/pregame-settings.tsx`, `workers/game/src/engine/pregame.ts`, and `workers/game/src/session/persistence.ts`. The migration is `prisma/migrations/20260719090000_add_pregame_mode/migration.sql`.
-- **Gotchas:** Extend every Prisma/shared/Zod/runtime/persistence allowlist when adding `SIDE_A_FIRST`, `SIDE_B_FIRST`, and `SOLITAIRE_RANDOM`, and add a new SQL migration that extends the PostgreSQL enum. Keep legacy payload/session reads defaulting to `PRIORITY_ROLL` for rolling-deploy safety.
+- **Gotchas:** Extend every Prisma/shared/Zod/runtime/persistence allowlist when adding `SIDE_A_FIRST`, `SIDE_B_FIRST`, and `SOLITAIRE_RANDOM`, and add a new SQL migration that extends the PostgreSQL enum. Legacy init payloads must use mode-aware defaults, and legacy `SOLITAIRE` + `PRIORITY_ROLL` pairings normalize to `SOLITAIRE_RANDOM`.
 - **Ordering invariant:** §5-2-1-5-1 uses `priorityDeciderIndex` for start-of-game effects. Roll-skipping modes assign their configured or privately coin-flipped first player as the priority decider; OPT-368's solitaire fixed/random modes must preserve that rule and must not emit a public roll or first/second prompt.

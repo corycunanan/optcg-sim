@@ -26,9 +26,26 @@ describe("OPT-498 deterministic setup validation", () => {
       expect(validateGameInitPayload(payload).pregameMode).toBe(pregameMode);
     }
 
-    const legacy = createTestPayload() as unknown as Record<string, unknown>;
-    delete legacy.pregameMode;
-    expect(validateGameInitPayload(legacy).pregameMode).toBe("PRIORITY_ROLL");
+    const legacyPvp = createTestPayload() as unknown as Record<string, unknown>;
+    delete legacyPvp.pregameMode;
+    expect(validateGameInitPayload(legacyPvp).pregameMode).toBe("PRIORITY_ROLL");
+
+    const legacySolitaire = createTestPayload() as unknown as Record<
+      string,
+      unknown
+    >;
+    legacySolitaire.mode = "SOLITAIRE";
+    delete legacySolitaire.pregameMode;
+    expect(validateGameInitPayload(legacySolitaire).pregameMode).toBe(
+      "SOLITAIRE_RANDOM",
+    );
+
+    const mixedRolloutSolitaire = createTestPayload();
+    mixedRolloutSolitaire.mode = "SOLITAIRE";
+    mixedRolloutSolitaire.pregameMode = "PRIORITY_ROLL";
+    expect(validateGameInitPayload(mixedRolloutSolitaire).pregameMode).toBe(
+      "SOLITAIRE_RANDOM",
+    );
   });
 
   it("rejects unknown pregame modes at the worker boundary", () => {

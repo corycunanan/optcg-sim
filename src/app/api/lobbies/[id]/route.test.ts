@@ -239,6 +239,69 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("normalizes explicit legacy PRIORITY_ROLL input for Solitaire", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ mode: "SOLITAIRE", pregameMode: "PRIORITY_ROLL" })
+    );
+
+    const res = await PATCH(
+      buildRequest({ pregameMode: "PRIORITY_ROLL" }),
+      params
+    );
+
+    expect(res.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "SOLITAIRE" },
+      data: {
+        pregameMode: "SOLITAIRE_RANDOM",
+        hostReady: false,
+        revision: { increment: 1 },
+      },
+    });
+  });
+
+  it("normalizes the stored PVP mode when switching to Solitaire", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({ guest: null }));
+
+    const res = await PATCH(buildRequest({ mode: "SOLITAIRE" }), params);
+
+    expect(res.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "PVP" },
+      data: {
+        mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
+        hostReady: false,
+        status: "READY",
+        revision: { increment: 1 },
+      },
+    });
+  });
+
+  it("normalizes the stored Solitaire mode when switching to PVP", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        pregameMode: "SIDE_A_FIRST",
+        guest: null,
+      })
+    );
+
+    const res = await PATCH(buildRequest({ mode: "PVP" }), params);
+
+    expect(res.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "SOLITAIRE" },
+      data: {
+        mode: "PVP",
+        pregameMode: "PRIORITY_ROLL",
+        hostReady: false,
+        status: "WAITING",
+        revision: { increment: 1 },
+      },
+    });
+  });
+
   it.each(["IN_GAME", "CLOSED"])(
     "rejects a pre-game flow change when the lobby is %s",
     async (status) => {
