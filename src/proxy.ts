@@ -8,6 +8,7 @@
  * because @/auth imports PrismaAdapter/bcryptjs, which are not Edge-compatible.
  */
 import { auth, hasAuthSecret } from "@/auth";
+import { logAuthConfigurationDegraded } from "@/lib/auth-configuration";
 import {
   consumePublicCardBrowseRateLimit,
   PUBLIC_CARD_BROWSE_RATE_LIMIT_HEADER,
@@ -60,6 +61,7 @@ export default function proxy(
   event: Parameters<typeof authenticatedProxy>[1]
 ) {
   if (!hasAuthSecret()) {
+    logAuthConfigurationDegraded("proxy");
     req.auth = null;
     return handleProxyRequest(req);
   }

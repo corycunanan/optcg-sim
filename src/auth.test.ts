@@ -56,8 +56,21 @@ describe("Auth.js server configuration", () => {
   });
 
   it("treats a missing secret as signed out for server components", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    await expect(auth()).resolves.toBeNull();
     await expect(auth()).resolves.toBeNull();
     expect(mocks.auth).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "[AUTH_CONFIG] AUTH_SECRET missing — auth degraded to signed-out (site=session-read)"
+      )
+    );
+
+    consoleError.mockRestore();
   });
 
   it("returns a signed-out client session when the secret is missing", async () => {
@@ -71,6 +84,9 @@ describe("Auth.js server configuration", () => {
   });
 
   it("returns a service error for auth actions when the secret is missing", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     const response = await handlers.POST(
       new NextRequest("https://preview.vercel.app/api/auth/signin/google", {
         method: "POST",
@@ -82,6 +98,11 @@ describe("Auth.js server configuration", () => {
       message: "Authentication is temporarily unavailable.",
     });
     expect(mocks.post).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("site=mutation-guard")
+    );
+
+    consoleError.mockRestore();
   });
 
   it("delegates to Auth.js when a secret is configured", async () => {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CredentialsForm } from "./credentials-form";
 import { GoogleSignInButton } from "./google-sign-in-button";
+import { AuthUnavailableAlert } from "./auth-unavailable-alert";
 
 export default async function LoginPage({
   searchParams,
@@ -51,13 +52,7 @@ export default async function LoginPage({
               <GoogleSignInButton callbackUrl={callbackUrl || "/decks"} />
             </>
           ) : (
-            <div
-              role="alert"
-              className="border-error bg-error-soft text-error rounded-md border px-4 py-3 text-sm"
-            >
-              Sign-in is temporarily unavailable because this deployment is
-              missing its authentication configuration.
-            </div>
+            <AuthUnavailableAlert />
           )}
 
           <p className="text-content-tertiary mt-4 text-center text-xs">

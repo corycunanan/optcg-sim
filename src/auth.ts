@@ -11,11 +11,14 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
+import {
+  authUnavailableResponse,
+  hasAuthSecret,
+  logAuthConfigurationDegraded,
+} from "@/lib/auth-configuration";
 import bcrypt from "bcryptjs";
 
-export function hasAuthSecret() {
-  return Boolean(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET);
-}
+export { hasAuthSecret } from "@/lib/auth-configuration";
 
 export const authConfig = {
   adapter: PrismaAdapter(prisma),
@@ -99,13 +102,12 @@ function missingSecretResponse(request: AuthRequest) {
   // SessionProvider polls this endpoint. Returning a signed-out session keeps
   // a missing Preview-scope secret from causing a client-side error loop.
   if (request.method === "GET" && action === "session") {
+    logAuthConfigurationDegraded("session-read");
     return Response.json(null);
   }
 
-  return Response.json(
-    { message: "Authentication is temporarily unavailable." },
-    { status: 503 }
-  );
+  logAuthConfigurationDegraded("mutation-guard");
+  return authUnavailableResponse();
 }
 
 export const handlers = {
@@ -126,6 +128,7 @@ export const auth = ((...args: unknown[]) => {
   // value. Treat only the known missing-secret state as signed out so server
   // components redirect to /login instead of bouncing between protected pages.
   if (args.length === 0 && !hasAuthSecret()) {
+    logAuthConfigurationDegraded("session-read");
     return Promise.resolve(null);
   }
 

@@ -4,7 +4,11 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   hasAuthSecret: true,
+  logAuthConfigurationDegraded: vi.fn(),
   rateLimit: vi.fn(),
+}));
+vi.mock("@/lib/auth-configuration", () => ({
+  logAuthConfigurationDegraded: mocks.logAuthConfigurationDegraded,
 }));
 
 vi.mock("@/auth", () => ({
@@ -29,6 +33,7 @@ function createRequest(path: string) {
 beforeEach(() => {
   mocks.hasAuthSecret = true;
   mocks.rateLimit.mockReset();
+  mocks.logAuthConfigurationDegraded.mockReset();
   mocks.rateLimit.mockResolvedValue({ limited: false, remaining: 59 });
 });
 
@@ -44,6 +49,7 @@ describe("missing Auth.js secret", () => {
     expect(response?.headers.get("location")).toBe(
       "https://example.com/login?callbackUrl=%2Fadmin"
     );
+    expect(mocks.logAuthConfigurationDegraded).toHaveBeenCalledWith("proxy");
   });
 });
 
