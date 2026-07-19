@@ -30,6 +30,7 @@ import { DroppableTrashZone } from "./trash-zone";
 import { ZoneRef } from "./zone-ref";
 import { cn } from "@/lib/utils";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
+import type { PowerModPulse } from "@/hooks/use-power-modified-pulse";
 
 interface OpponentFieldProps {
   opp: PlayerState | null;
@@ -41,8 +42,12 @@ interface OpponentFieldProps {
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
   winnerPulseIds?: Set<string>;
+  powerModPulses?: ReadonlyMap<string, PowerModPulse>;
+  effectsNegatedPulses?: ReadonlyMap<string, string>;
+  attackRedirectedPulses?: ReadonlyMap<string, number>;
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
+  lifeScriedPulseNonce?: number;
   /** Signed offsets merged into displayed DON count per target card
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
@@ -69,8 +74,12 @@ export function OpponentField({
   defenderInstanceId,
   counterPulseIds,
   winnerPulseIds,
+  powerModPulses,
+  effectsNegatedPulses,
+  attackRedirectedPulses,
   lifeTriggerPulse,
   lifeDamagePulseNonce,
+  lifeScriedPulseNonce,
   donCountAdjustments,
   pileArrivingCounts,
   targetSelectionById,
@@ -213,6 +222,9 @@ export function OpponentField({
           isAttacker={attackerInstanceId === opp.leader.instanceId}
           isDefender={defenderInstanceId === opp.leader.instanceId}
           winnerPulse={winnerPulseIds?.has(opp.leader.instanceId)}
+          powerMod={powerModPulses?.get(opp.leader.instanceId)}
+          effectsNegatedPulseNonce={effectsNegatedPulses?.get(opp.leader.instanceId)}
+          attackRedirectedPulseNonce={attackRedirectedPulses?.get(opp.leader.instanceId)}
           counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
           targetSelection={targetSelectionById?.get(opp.leader.instanceId)}
           onTargetToggle={() => onTargetToggle?.(opp.leader.instanceId)}
@@ -250,6 +262,9 @@ export function OpponentField({
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             winnerPulse={winnerPulseIds?.has(char.instanceId)}
+            powerMod={powerModPulses?.get(char.instanceId)}
+            effectsNegatedPulseNonce={effectsNegatedPulses?.get(char.instanceId)}
+            attackRedirectedPulseNonce={attackRedirectedPulses?.get(char.instanceId)}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             targetSelection={targetSelectionById?.get(char.instanceId)}
             onTargetToggle={() => onTargetToggle?.(char.instanceId)}
@@ -277,6 +292,7 @@ export function OpponentField({
         arrivingCount={pileArrivingCounts?.get("o-life")}
         triggerPulse={lifeTriggerPulse}
         damagePulseNonce={lifeDamagePulseNonce}
+        scryPulseNonce={lifeScriedPulseNonce}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

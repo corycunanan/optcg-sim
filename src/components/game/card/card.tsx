@@ -2,11 +2,17 @@
 
 import React from "react";
 import {
+  AnimatePresence,
   motion,
   useMotionValue,
   useReducedMotion,
   useSpring,
 } from "motion/react";
+import {
+  donBadgeExit,
+  floatingPowerMod,
+  powerModifiedFlash,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { CardTooltip } from "../use-card-tooltip";
 import { CardBack } from "./card-back";
@@ -171,6 +177,13 @@ export const Card = React.memo(function Card({
       ? motionConfig.animate.rotate
       : 0;
   const counterRotate = -cardRotate;
+  const powerMod = overlays?.powerMod;
+  const powerModTone =
+    powerMod?.kind === "absolute"
+      ? "absolute"
+      : (powerMod?.value ?? 0) >= 0
+        ? "positive"
+        : "negative";
 
   const cardElement = (
     <PerspectiveContainer
@@ -237,8 +250,29 @@ export const Card = React.memo(function Card({
 
             {/* Highlight ring follows the card outline, so it sits inside the
                 rotating layer without any counter-rotation. */}
+            {powerMod && !reducedMotion && (
+              <motion.div
+                key={`power-flash:${powerMod.nonce ?? powerMod.value}`}
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute inset-0 z-10 rounded",
+                  powerModTone === "absolute"
+                    ? "bg-gb-accent-blue/30"
+                    : powerModTone === "positive"
+                      ? "bg-gb-accent-green/30"
+                      : "bg-gb-accent-red/30",
+                )}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: powerModifiedFlash.opacity }}
+                transition={powerModifiedFlash.transition}
+              />
+            )}
+
             {overlays?.highlightRing && (
-              <CardHighlightRing color={overlays.highlightRing} />
+              <CardHighlightRing
+                key={`${overlays.highlightRing}:${overlays.highlightRingNonce ?? 0}`}
+                color={overlays.highlightRing}
+              />
             )}
 
             {/* Count badge: rides with the card face, counter-rotated so its
@@ -269,19 +303,58 @@ export const Card = React.memo(function Card({
           and (H-W)/2. Keyed off the rotation angle — not the state label —
           so new 90°-rotated states (e.g. `attacking` from OPT-273) inherit
           the offset without a switch update. */}
-      {overlays?.donCount != null && (
-        <motion.div
-          className="absolute z-10"
-          initial={false}
-          animate={{
-            right: cardRotate === 90 ? (width - height) / 2 + 4 : 4,
-            bottom: cardRotate === 90 ? (height - width) / 2 + 4 : 4,
-          }}
-          transition={motionConfig.transition}
-        >
-          <CardDonBadge count={overlays.donCount} />
-        </motion.div>
-      )}
+      <AnimatePresence initial={false}>
+        {overlays?.donCount != null && overlays.donCount > 0 && (
+          <motion.div
+            key="don-badge"
+            className="absolute z-10"
+            initial={false}
+            animate={{
+              right: cardRotate === 90 ? (width - height) / 2 + 4 : 4,
+              bottom: cardRotate === 90 ? (height - width) / 2 + 4 : 4,
+            }}
+            exit={
+              reducedMotion
+                ? { opacity: 0, transition: { duration: 0 } }
+                : donBadgeExit
+            }
+            transition={motionConfig.transition}
+          >
+            <CardDonBadge count={overlays.donCount} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Keep the static centering transform off the animated child: Motion's
+          y/scale transform would otherwise replace Tailwind's translate. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-full"
+      >
+        <AnimatePresence initial={false}>
+          {powerMod && !reducedMotion && (
+            <motion.div
+              key={`power-pill:${powerMod.nonce ?? powerMod.value}`}
+              className={cn(
+                "rounded-full px-2 py-1 text-base font-bold",
+                powerModTone === "absolute"
+                  ? "bg-gb-accent-blue text-gb-text-bright"
+                  : powerModTone === "positive"
+                    ? "bg-gb-accent-green text-gb-board-dark"
+                    : "bg-gb-accent-red text-gb-text-bright",
+              )}
+              initial={floatingPowerMod.initial}
+              animate={floatingPowerMod.animate}
+              exit={{ opacity: 0 }}
+              transition={floatingPowerMod.transition}
+            >
+              {powerMod.kind === "absolute"
+                ? `→ ${powerMod.value}`
+                : `${powerMod.value > 0 ? "+" : ""}${powerMod.value}`}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {overlays?.effectAction && (
         <motion.div

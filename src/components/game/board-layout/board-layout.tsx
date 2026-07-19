@@ -44,6 +44,10 @@ import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useCombatVictoryPulse } from "@/hooks/use-combat-victory-pulse";
 import { useTriggerActivatedPulse } from "@/hooks/use-trigger-activated-pulse";
 import { useLifeDamagePulse } from "@/hooks/use-life-damage-pulse";
+import { usePowerModifiedPulse } from "@/hooks/use-power-modified-pulse";
+import { useEffectsNegatedPulse } from "@/hooks/use-effects-negated-pulse";
+import { useAttackRedirectedPulse } from "@/hooks/use-attack-redirected-pulse";
+import { useLifeScriedPulse } from "@/hooks/use-life-scried-pulse";
 import { useHandAnimationState } from "@/hooks/use-hand-animation-state";
 import type {
   AcceptedGameUpdate,
@@ -214,6 +218,10 @@ function BoardLayoutInner({
   const winnerPulseIds = useCombatVictoryPulse(eventLog);
   const triggerPulsePlayerIndexes = useTriggerActivatedPulse(eventLog);
   const lifeDamagePulseNonces = useLifeDamagePulse(eventLog);
+  const powerModPulses = usePowerModifiedPulse(eventLog);
+  const effectsNegatedPulses = useEffectsNegatedPulse(eventLog);
+  const attackRedirectedPulses = useAttackRedirectedPulse(eventLog);
+  const lifeScriedPulses = useLifeScriedPulse(eventLog);
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
   const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
   const opponentIndex = myIndex === null ? null : myIndex === 0 ? 1 : 0;
@@ -225,6 +233,10 @@ function BoardLayoutInner({
     myIndex === null ? undefined : lifeDamagePulseNonces.get(myIndex);
   const opponentLifeDamagePulseNonce =
     opponentIndex === null ? undefined : lifeDamagePulseNonces.get(opponentIndex);
+  const playerLifeScriedPulseNonce =
+    myIndex === null ? undefined : lifeScriedPulses.get(myIndex);
+  const opponentLifeScriedPulseNonce =
+    opponentIndex === null ? undefined : lifeScriedPulses.get(opponentIndex);
 
   // While a DON token is flying onto a target card, the displayed count is
   // held back by the number of in-flight tokens so the counter doesn't
@@ -424,8 +436,12 @@ function BoardLayoutInner({
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             winnerPulseIds={winnerPulseIds}
+            powerModPulses={powerModPulses}
+            effectsNegatedPulses={effectsNegatedPulses}
+            attackRedirectedPulses={attackRedirectedPulses}
             lifeTriggerPulse={opponentLifeTriggerPulse}
             lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
+            lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
             donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
             pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
@@ -508,8 +524,12 @@ function BoardLayoutInner({
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             winnerPulseIds={winnerPulseIds}
+            powerModPulses={powerModPulses}
+            effectsNegatedPulses={effectsNegatedPulses}
+            attackRedirectedPulses={attackRedirectedPulses}
             lifeTriggerPulse={playerLifeTriggerPulse}
             lifeDamagePulseNonce={playerLifeDamagePulseNonce}
+            lifeScriedPulseNonce={playerLifeScriedPulseNonce}
             pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
             onTargetToggle={modalRouting.targetSelection.toggle}

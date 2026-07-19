@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardInstance } from "@shared/game-types";
 import { cardWinnerPulse } from "@/lib/motion";
+import type { CardOverlays } from "../card";
 import { OpponentFieldCard } from "./field-card";
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
@@ -39,7 +40,15 @@ vi.mock("@/components/ui", () => ({
 }));
 
 vi.mock("../card", () => ({
-  Card: () => <div data-testid="card" />,
+  Card: ({ overlays }: { overlays?: CardOverlays }) => (
+    <div
+      data-testid="card"
+      data-highlight-ring={overlays?.highlightRing}
+      data-highlight-nonce={overlays?.highlightRingNonce}
+      data-power-kind={overlays?.powerMod?.kind}
+      data-power-value={overlays?.powerMod?.value}
+    />
+  ),
 }));
 
 vi.mock("../card-action-menu", () => ({
@@ -67,7 +76,21 @@ const card: CardInstance = {
 
 let renderer: ReactTestRenderer | null = null;
 
-function renderOpponent() {
+function renderOpponent(
+  feedback: {
+    winnerPulse?: boolean;
+    attackRedirectedPulseNonce?: number;
+    effectsNegatedPulseNonce?: string;
+    counterPulse?: boolean;
+    isAttacker?: boolean;
+    isDefender?: boolean;
+    powerMod?: {
+      kind: "delta" | "absolute";
+      value: number;
+      nonce: number;
+    };
+  } = { winnerPulse: true },
+) {
   act(() => {
     const element = (
       <OpponentFieldCard
@@ -75,7 +98,7 @@ function renderOpponent() {
         cardDb={{}}
         activeDragType={null}
         attackTargetEligible={false}
-        winnerPulse
+        {...feedback}
         style={{ position: "absolute", left: 0, top: 0 }}
       />
     );
@@ -90,6 +113,49 @@ function renderOpponent() {
 
 beforeEach(() => {
   motionState.reduced = false;
+});
+
+describe("OpponentFieldCard indicator precedence", () => {
+  it("keeps winner above redirected, negated, and sustained battle rings", () => {
+    renderOpponent({
+      winnerPulse: true,
+      attackRedirectedPulseNonce: 3,
+      effectsNegatedPulseNonce: "negated:2",
+      isAttacker: true,
+      isDefender: true,
+    });
+    const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
+
+    expect(renderedCard?.props["data-highlight-ring"]).toBe("winner");
+    expect(renderedCard?.props["data-highlight-nonce"]).toBeUndefined();
+  });
+
+  it("places redirected above negated and threads power overlays", () => {
+    renderOpponent({
+      attackRedirectedPulseNonce: 3,
+      effectsNegatedPulseNonce: "negated:2",
+      powerMod: { kind: "delta", value: -2000, nonce: 1 },
+    });
+    const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
+
+    expect(renderedCard?.props["data-highlight-ring"]).toBe("redirected");
+    expect(renderedCard?.props["data-highlight-nonce"]).toBe(3);
+    expect(renderedCard?.props["data-power-kind"]).toBe("delta");
+    expect(renderedCard?.props["data-power-value"]).toBe(-2000);
+  });
+
+  it("places negated above counter, attacker, and defender", () => {
+    renderOpponent({
+      effectsNegatedPulseNonce: "negated:2",
+      counterPulse: true,
+      isAttacker: true,
+      isDefender: true,
+    });
+    const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
+
+    expect(renderedCard?.props["data-highlight-ring"]).toBe("negated");
+    expect(renderedCard?.props["data-highlight-nonce"]).toBe("negated:2");
+  });
 });
 
 afterEach(() => {

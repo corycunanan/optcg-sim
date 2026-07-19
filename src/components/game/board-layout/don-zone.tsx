@@ -16,11 +16,17 @@ const DON_CARD_H = 70;
 const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
 const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
+export const DON_ENTRY_STAGGER_SECONDS = 0.05;
 
 // DON entry pop on turn-start (OPT-121). New tokens scale + fade in; existing
 // tokens skip the pop via `initial={false}`. Same shape as field-card entry
 // so the cue reads consistently across the board.
-const ENTRY_INITIAL = { scale: 0.9, opacity: 0 } as const;
+const ENTRY_INITIAL = { scale: 0.9, opacity: 0, y: 4 } as const;
+const ENTRY_ANIMATE = { scale: 1, opacity: 1, y: 0 } as const;
+
+function entryTransition(index: number) {
+  return { ...cardEntry, delay: index * DON_ENTRY_STAGGER_SECONDS };
+}
 
 export const DonCard = React.memo(function DonCard({
   rested,
@@ -45,6 +51,7 @@ function DraggableDonCard({
   donArtUrl,
   motionDelay,
   entering,
+  entryIndex,
 }: {
   don: DonInstance;
   index: number;
@@ -55,6 +62,7 @@ function DraggableDonCard({
    *  that weren't in the previous render — typically the freshly-added DON
    *  at turn start. */
   entering?: boolean;
+  entryIndex: number;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `don-${don.instanceId}`,
@@ -68,9 +76,10 @@ function DraggableDonCard({
       {...attributes}
       {...listeners}
       aria-label="Drag active DON"
+      data-don-instance-id={don.instanceId}
       initial={entering ? ENTRY_INITIAL : false}
-      animate={{ scale: 1, opacity: isDragging ? 0.3 : 1 }}
-      transition={entering ? cardEntry : undefined}
+      animate={{ ...ENTRY_ANIMATE, opacity: isDragging ? 0.3 : 1 }}
+      transition={entering ? entryTransition(entryIndex) : undefined}
       style={{
         marginLeft: index > 0 ? -DON_ACTIVE_OVERLAP : 0,
         zIndex: index,
@@ -130,6 +139,9 @@ export const DonZone = React.memo(function DonZone({
 
   const activeDon = allDon.filter((d) => d.state === "ACTIVE");
   const restedDon = allDon.filter((d) => d.state === "RESTED");
+  const entryIndexById = new Map(
+    allDon.map((don, index) => [don.instanceId, index]),
+  );
 
   return (
     <div
@@ -163,16 +175,22 @@ export const DonZone = React.memo(function DonZone({
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
                     entering={entering}
+                    entryIndex={entryIndexById.get(don.instanceId) ?? i}
                   />
                 );
               }
               return (
                 <motion.div
                   key={don.instanceId}
+                  data-don-instance-id={don.instanceId}
                   layout
                   initial={entering ? ENTRY_INITIAL : false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={entering ? cardEntry : undefined}
+                  animate={ENTRY_ANIMATE}
+                  transition={
+                    entering
+                      ? entryTransition(entryIndexById.get(don.instanceId) ?? i)
+                      : undefined
+                  }
                   style={{
                     marginLeft: i > 0 ? -DON_ACTIVE_OVERLAP : 0,
                     zIndex: i,
@@ -197,10 +215,15 @@ export const DonZone = React.memo(function DonZone({
                 return (
                   <motion.div
                     key={don.instanceId}
+                    data-don-instance-id={don.instanceId}
                     layout
                     initial={entering ? ENTRY_INITIAL : false}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={entering ? cardEntry : undefined}
+                    animate={ENTRY_ANIMATE}
+                    transition={
+                      entering
+                        ? entryTransition(entryIndexById.get(don.instanceId) ?? i)
+                        : undefined
+                    }
                     className="flex items-center justify-center shrink-0"
                     style={{
                       width: DON_CARD_H,

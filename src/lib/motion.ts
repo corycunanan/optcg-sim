@@ -162,6 +162,66 @@ const board = {
         times: [0, 0.25, 0.55, 1] as number[],
       },
     },
+    /** Attached-DON badge exit (OPT-284). The count pill stays upright outside
+     *  the rotating card layer, then scales down slightly as it fades. */
+    donBadgeExit: {
+      opacity: 0,
+      scale: 0.9,
+      transition: { duration: 0.15, ease: "easeIn" as const },
+    },
+    /** Floating POWER_MODIFIED feedback (OPT-284). The pill rises above the
+     *  card while fading on the same clock as the transient event hook. */
+    floatingPowerMod: {
+      initial: { opacity: 0, y: 4, scale: 0.9 },
+      animate: {
+        opacity: [0, 1, 1, 0] as number[],
+        y: [4, -4, -8, -12] as number[],
+        scale: [0.9, 1.05, 1, 1] as number[],
+      },
+      transition: {
+        duration: 0.76,
+        ease: "easeOut" as const,
+        times: [0, 0.18, 0.68, 1] as number[],
+      },
+    },
+    /** Subtle color wash across the card art alongside the floating power
+     *  feedback. This composes with the single semantic highlight ring. */
+    powerModifiedFlash: {
+      opacity: [0, 0.3, 0] as number[],
+      transition: {
+        duration: 0.48,
+        ease: "easeOut" as const,
+        times: [0, 0.3, 1] as number[],
+      },
+    },
+    /** EFFECTS_NEGATED feedback (OPT-284). A restrained, desaturated ring
+     *  contracts onto the card before dimming away. */
+    negatedRing: {
+      opacity: [0, 0.8, 0.55, 0] as number[],
+      scale: [1.04, 1, 1, 1.02] as number[],
+      transition: {
+        duration: 0.64,
+        ease: "easeOut" as const,
+        times: [0, 0.25, 0.7, 1] as number[],
+      },
+    },
+    /** ATTACK_REDIRECTED feedback (OPT-284). clipPath reveals the amber ring
+     *  from left to right so the new defender reads as a swept-in target. */
+    redirectedSweep: {
+      opacity: [0, 1, 1, 0] as number[],
+      scale: [1, 1.04, 1.02, 1] as number[],
+      clipPath: [
+        "inset(0 100% 0 0)",
+        "inset(0 0% 0 0)",
+        "inset(0 0% 0 0)",
+        "inset(0 0 0 100%)",
+      ] as string[],
+      transition: {
+        duration: 0.56,
+        ease: "easeOut" as const,
+        times: [0, 0.35, 0.72, 1] as number[],
+      },
+    },
     /** Accepted life [Trigger] feedback (OPT-283). The owning Life zone gets
      *  a compact amber pulse after the optional Trigger is confirmed. */
     lifeTriggerPulse: {
@@ -171,6 +231,17 @@ const board = {
         duration: 0.56,
         ease: "easeOut" as const,
         times: [0, 0.3, 1] as number[],
+      },
+    },
+    /** LIFE_SCRIED feedback (OPT-284). A cool inspection flash shares the
+     *  Life-zone overlay shape without borrowing the Trigger's amber tone. */
+    lifeScriedFlash: {
+      opacity: [0, 0.8, 0] as number[],
+      scale: [0.99, 1.03, 1] as number[],
+      transition: {
+        duration: 0.56,
+        ease: "easeOut" as const,
+        times: [0, 0.32, 1] as number[],
       },
     },
     /** Life-damage impact (OPT-283). Red flash + asymmetric shake reads as a
@@ -321,7 +392,13 @@ export const cardBlockerHighlight = board.card.blockerHighlight;
 export const cardKO = board.card.ko;
 export const cardCounterPulse = board.card.counterPulse;
 export const cardWinnerPulse = board.card.winnerPulse;
+export const donBadgeExit = board.card.donBadgeExit;
+export const floatingPowerMod = board.card.floatingPowerMod;
+export const powerModifiedFlash = board.card.powerModifiedFlash;
+export const negatedRing = board.card.negatedRing;
+export const redirectedSweep = board.card.redirectedSweep;
 export const lifeTriggerPulse = board.card.lifeTriggerPulse;
+export const lifeScriedFlash = board.card.lifeScriedFlash;
 export const lifeDamageImpact = board.card.lifeDamageImpact;
 export const cardReject = board.card.reject;
 export const cardRejectReduced = board.card.rejectReduced;

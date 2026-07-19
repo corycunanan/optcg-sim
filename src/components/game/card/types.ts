@@ -46,6 +46,8 @@ export type HighlightRingColor =
   | "defender"
   | "counter"
   | "winner"
+  | "negated"
+  | "redirected"
   | "usable-effect";
 
 export interface CardOverlays {
@@ -57,6 +59,14 @@ export interface CardOverlays {
   effectAction?: CardActionBadgeState;
   /** Highlight ring color — selection / valid / invalid target feedback. */
   highlightRing?: HighlightRingColor;
+  /** Restarts transient ring motion when the same semantic color fires again. */
+  highlightRingNonce?: string | number;
+  /** Transient POWER_MODIFIED delta or absolute replacement above the card. */
+  powerMod?: {
+    kind: "delta" | "absolute";
+    value: number;
+    nonce?: number;
+  };
   /** Optional label rendered on empty/face-down placeholders. */
   label?: string;
 }

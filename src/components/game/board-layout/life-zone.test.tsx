@@ -28,6 +28,7 @@ let renderer: ReactTestRenderer | null = null;
 function renderLifeZone(props: {
   triggerPulse?: boolean;
   damagePulseNonce?: number;
+  scryPulseNonce?: number;
 }) {
   act(() => {
     renderer = create(
@@ -74,11 +75,49 @@ describe("LifeZone battle feedback", () => {
     expect(container.props.animate.opacity).toEqual(lifeDamageImpact.opacity);
   });
 
-  it("suppresses both effects for reduced motion", () => {
+  it("renders a cool blue inspection pulse for LIFE_SCRIED", () => {
+    const root = renderLifeZone({ scryPulseNonce: 1 });
+    const ring = root
+      .findAllByType("div")
+      .find((node) => String(node.props.className).includes("ring-gb-accent-blue"));
+
+    expect(ring).toBeDefined();
+    expect(ring?.props.className).not.toContain("ring-gb-accent-amber");
+  });
+
+  it("gives Trigger precedence over scry in an ST07-016-style collision", () => {
+    const root = renderLifeZone({ triggerPulse: true, scryPulseNonce: 1 });
+    const classes = root
+      .findAllByType("div")
+      .map((node) => String(node.props.className))
+      .join(" ");
+
+    expect(classes).toContain("ring-gb-accent-amber");
+    expect(classes).not.toContain("ring-gb-accent-blue");
+  });
+
+  it("gives damage precedence over Trigger and scry feedback", () => {
+    const root = renderLifeZone({
+      triggerPulse: true,
+      damagePulseNonce: 1,
+      scryPulseNonce: 1,
+    });
+    const classes = root
+      .findAllByType("div")
+      .map((node) => String(node.props.className))
+      .join(" ");
+
+    expect(classes).toContain("ring-gb-accent-red");
+    expect(classes).not.toContain("ring-gb-accent-amber");
+    expect(classes).not.toContain("ring-gb-accent-blue");
+  });
+
+  it("suppresses all zone effects for reduced motion", () => {
     motionState.reduced = true;
     const root = renderLifeZone({
       triggerPulse: true,
       damagePulseNonce: 1,
+      scryPulseNonce: 1,
     });
     const classes = root
       .findAllByType("div")
@@ -87,5 +126,6 @@ describe("LifeZone battle feedback", () => {
 
     expect(classes).not.toContain("ring-gb-accent-amber");
     expect(classes).not.toContain("ring-gb-accent-red");
+    expect(classes).not.toContain("ring-gb-accent-blue");
   });
 });
