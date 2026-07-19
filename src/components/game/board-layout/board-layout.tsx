@@ -44,7 +44,10 @@ import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useCombatVictoryPulse } from "@/hooks/use-combat-victory-pulse";
 import { useTriggerActivatedPulse } from "@/hooks/use-trigger-activated-pulse";
 import { useLifeDamagePulse } from "@/hooks/use-life-damage-pulse";
-import { usePowerModifiedPulse } from "@/hooks/use-power-modified-pulse";
+import {
+  usePowerModifiedPulse,
+  type PowerModPulse,
+} from "@/hooks/use-power-modified-pulse";
 import { useEffectsNegatedPulse } from "@/hooks/use-effects-negated-pulse";
 import { useAttackRedirectedPulse } from "@/hooks/use-attack-redirected-pulse";
 import { useLifeScriedPulse } from "@/hooks/use-life-scried-pulse";
@@ -60,6 +63,16 @@ import { useBoardDragState } from "./use-board-drag-state";
 import { BoardDragOverlay } from "./board-drag-overlay";
 import { useBoardModalRouting } from "./use-board-modal-routing";
 import { useRedistributionState } from "./use-redistribution-state";
+
+// Transient pulse hooks intentionally produce no pulses under reduced motion,
+// but their empty collections can be recreated on a parent render. Reuse one
+// bundle so those no-op values do not pierce the field memo boundaries.
+const EMPTY_FIELD_PULSE_PROPS = {
+  winnerPulseIds: new Set<string>(),
+  powerModPulses: new Map<string, PowerModPulse>(),
+  effectsNegatedPulses: new Map<string, string>(),
+  attackRedirectedPulses: new Map<string, number>(),
+};
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -222,6 +235,24 @@ function BoardLayoutInner({
   const effectsNegatedPulses = useEffectsNegatedPulse(eventLog);
   const attackRedirectedPulses = useAttackRedirectedPulse(eventLog);
   const lifeScriedPulses = useLifeScriedPulse(eventLog);
+  const fieldPulseProps = useMemo(
+    () =>
+      reducedMotion
+        ? EMPTY_FIELD_PULSE_PROPS
+        : {
+            winnerPulseIds,
+            powerModPulses,
+            effectsNegatedPulses,
+            attackRedirectedPulses,
+          },
+    [
+      attackRedirectedPulses,
+      effectsNegatedPulses,
+      powerModPulses,
+      reducedMotion,
+      winnerPulseIds,
+    ],
+  );
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
   const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
   const opponentIndex = myIndex === null ? null : myIndex === 0 ? 1 : 0;
@@ -435,10 +466,10 @@ function BoardLayoutInner({
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
-            winnerPulseIds={winnerPulseIds}
-            powerModPulses={powerModPulses}
-            effectsNegatedPulses={effectsNegatedPulses}
-            attackRedirectedPulses={attackRedirectedPulses}
+            winnerPulseIds={fieldPulseProps.winnerPulseIds}
+            powerModPulses={fieldPulseProps.powerModPulses}
+            effectsNegatedPulses={fieldPulseProps.effectsNegatedPulses}
+            attackRedirectedPulses={fieldPulseProps.attackRedirectedPulses}
             lifeTriggerPulse={opponentLifeTriggerPulse}
             lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
             lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
@@ -523,10 +554,10 @@ function BoardLayoutInner({
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
-            winnerPulseIds={winnerPulseIds}
-            powerModPulses={powerModPulses}
-            effectsNegatedPulses={effectsNegatedPulses}
-            attackRedirectedPulses={attackRedirectedPulses}
+            winnerPulseIds={fieldPulseProps.winnerPulseIds}
+            powerModPulses={fieldPulseProps.powerModPulses}
+            effectsNegatedPulses={fieldPulseProps.effectsNegatedPulses}
+            attackRedirectedPulses={fieldPulseProps.attackRedirectedPulses}
             lifeTriggerPulse={playerLifeTriggerPulse}
             lifeDamagePulseNonce={playerLifeDamagePulseNonce}
             lifeScriedPulseNonce={playerLifeScriedPulseNonce}
