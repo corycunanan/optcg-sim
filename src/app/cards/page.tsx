@@ -1,4 +1,5 @@
-import { AdminCardBrowser } from "@/components/admin/admin-card-browser";
+import type { Metadata } from "next";
+import { CardBrowser } from "@/components/cards/card-browser";
 import { CardBrowserShell } from "@/components/cards/card-browser-shell";
 import {
   getCardBrowserData,
@@ -7,7 +8,13 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminCardsPage({
+export const metadata: Metadata = {
+  title: "Card Database — OPTCG Simulator",
+  description:
+    "Browse One Piece Trading Card Game cards by set, color, type, and block.",
+};
+
+export default async function CardsPage({
   searchParams,
 }: {
   searchParams: Promise<CardBrowserSearchParams>;
@@ -16,7 +23,7 @@ export default async function AdminCardsPage({
 
   return (
     <CardBrowserShell>
-      <AdminCardBrowser {...browserData} />
+      <CardBrowser {...browserData} routePath="/cards" />
     </CardBrowserShell>
   );
 }
