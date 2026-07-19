@@ -37,6 +37,14 @@ function announcementText(root: ReactTestRenderer["root"]): string {
     .children.join("");
 }
 
+function srOnlySpanText(root: ReactTestRenderer["root"]): string[] {
+  return root
+    .findAll(
+      (node) => node.type === "span" && node.props.className === "sr-only"
+    )
+    .map((node) => node.children.join(""));
+}
+
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
@@ -52,14 +60,12 @@ describe("BoardNavbar accessibility", () => {
     expect(
       root.findByProps({ role: "group", "aria-label": "Turn and phase status" })
     ).toBeDefined();
-    expect(root.findByProps({ "aria-label": "Turn 3" })).toBeDefined();
-    expect(root.findByProps({ "aria-label": "Your Turn" })).toBeDefined();
-    expect(
-      root.findByProps({ "aria-label": "Current phase: MAIN" })
-    ).toBeDefined();
-    expect(
-      root.findByProps({ "aria-label": "You are Player 1" })
-    ).toBeDefined();
+    expect(srOnlySpanText(root)).toEqual([
+      "Turn 3",
+      "Your Turn",
+      "Current phase: MAIN",
+      "You are Player 1",
+    ]);
 
     const connection = root.findByProps({
       role: "status",
@@ -94,7 +100,7 @@ describe("BoardNavbar accessibility", () => {
     expect(announcementText(root)).toBe("Turn 4. Opponent's turn. DRAW");
   });
 
-  it("announces response state and labels the interaction-mode badges", () => {
+  it("labels interaction-mode badges without announcing a response when no prompt exists", () => {
     let root = renderNavbar({ interactionMode: "spectator" });
     expect(
       root.findByProps({
@@ -110,8 +116,6 @@ describe("BoardNavbar accessibility", () => {
         "aria-label": "Response mode: respond to the current prompt",
       })
     ).toBeDefined();
-    expect(announcementText(root)).toBe(
-      "Turn 3. Your turn. MAIN. Response required"
-    );
+    expect(announcementText(root)).toBe("Turn 3. Your turn. MAIN");
   });
 });

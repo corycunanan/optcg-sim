@@ -21,16 +21,11 @@ export function getBoardStatusAnnouncement({
   turnNumber,
   isMyTurn,
   phaseLabel,
-  interactionMode,
-}: Pick<
-  BoardNavbarProps,
-  "turnNumber" | "isMyTurn" | "phaseLabel" | "interactionMode"
->): string {
+}: Pick<BoardNavbarProps, "turnNumber" | "isMyTurn" | "phaseLabel">): string {
   return [
     turnNumber === null ? "Turn unavailable" : `Turn ${turnNumber}`,
     isMyTurn ? "Your turn" : "Opponent's turn",
     phaseLabel,
-    interactionMode === "responseOnly" ? "Response required" : null,
   ]
     .filter(Boolean)
     .join(". ");
@@ -58,7 +53,6 @@ export function BoardNavbar({
     turnNumber,
     isMyTurn,
     phaseLabel,
-    interactionMode,
   });
 
   return (
@@ -76,13 +70,11 @@ export function BoardNavbar({
         role="group"
         aria-label="Turn and phase status"
       >
-        <span
-          className="text-gb-text-bright text-xs font-bold"
-          aria-label={
-            turnNumber === null ? "Turn unavailable" : `Turn ${turnNumber}`
-          }
-        >
-          Turn {turnNumber ?? "\u2014"}
+        <span className="text-gb-text-bright text-xs font-bold">
+          <span className="sr-only">
+            {turnNumber === null ? "Turn unavailable" : `Turn ${turnNumber}`}
+          </span>
+          <span aria-hidden="true">Turn {turnNumber ?? "\u2014"}</span>
         </span>
         <div
           aria-hidden="true"
@@ -92,19 +84,17 @@ export function BoardNavbar({
           )}
         />
         <span
-          aria-label={turnLabel}
           className={cn(
             "text-xs font-bold",
             isMyTurn ? "text-gb-accent-green" : "text-gb-text-dim"
           )}
         >
-          {turnLabel}
+          <span className="sr-only">{turnLabel}</span>
+          <span aria-hidden="true">{turnLabel}</span>
         </span>
-        <span
-          aria-label={`Current phase: ${phaseLabel}`}
-          className="text-gb-accent-blue text-xs font-bold"
-        >
-          {phaseLabel}
+        <span className="text-gb-accent-blue text-xs font-bold">
+          <span className="sr-only">Current phase: {phaseLabel}</span>
+          <span aria-hidden="true">{phaseLabel}</span>
         </span>
       </div>
 
@@ -134,11 +124,9 @@ export function BoardNavbar({
           </span>
         )}
         {playerIndex !== null && (
-          <span
-            className="text-gb-text-dim text-xs"
-            aria-label={`You are Player ${playerIndex + 1}`}
-          >
-            P{playerIndex + 1}
+          <span className="text-gb-text-dim text-xs">
+            <span className="sr-only">You are Player {playerIndex + 1}</span>
+            <span aria-hidden="true">P{playerIndex + 1}</span>
           </span>
         )}
         <div
