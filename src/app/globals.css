@@ -447,7 +447,7 @@ textarea:focus-visible,
 .admin-card-color-button[aria-pressed="true"][data-color="yellow"] {
   background-color: var(--card-yellow);
   border-color: var(--card-yellow);
-  color: var(--text-primary);
+  color: var(--navy-900);
 }
 
 /* ─── Card Utilities ────────────────────────────────────────── */

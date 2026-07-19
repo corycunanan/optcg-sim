@@ -93,7 +93,7 @@ Dark-only, warm, and alive. Navy provides the page foundation and elevation hier
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--navy-900` | `oklch(22% 0.040 245)` | Page base, deepest navy                           |
-| `--navy-800` | `oklch(30% 0.04 245)` | Headings, hover states on navy elements |
+| `--navy-800` | `oklch(30% 0.04 245)` | Active and hover surfaces |
 | `--navy-700` | `oklch(42% 0.03 245)`  | Borders on dark surfaces                          |
 | `--navy-500` | `oklch(58% 0.04 245)`  | Subdued/secondary elements and data visualization |
 | `--navy-200` | `oklch(34% 0.035 245)` | Stronger soft navy surface                        |

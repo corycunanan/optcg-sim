@@ -27,7 +27,7 @@ export default async function Home() {
           <br />
           TCG Simulator
         </h1>
-        <p className="mt-6 text-lg text-background">
+        <p className="mt-6 text-lg text-content-secondary">
           Deck builder, simulator, and playground
         </p>
       </div>
