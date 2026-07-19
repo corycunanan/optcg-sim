@@ -29,11 +29,13 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   data,
   cardId,
   card,
+  attachedDonCount,
   notice,
 }: {
   data: CardData | null;
   cardId: string | undefined;
   card?: CardInstance | null;
+  attachedDonCount?: number;
   notice?: string;
 }) {
   const activeEffects = useActiveEffects();
@@ -41,7 +43,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
 
   if (!data) return <span className="text-gb-text-muted text-xs">Unknown card</span>;
   const isFieldCard = data.type === "Leader" || data.type === "Character";
-  const donCount = card?.attachedDon.length ?? 0;
+  const donCount = attachedDonCount ?? card?.attachedDon.length ?? 0;
   const basePower = data.power ?? 0;
   const instanceId = card?.instanceId ?? "";
 
@@ -100,6 +102,9 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
             value={effectivePower.toLocaleString()}
             modified={powerMod}
           />
+          {donCount > 0 && (
+            <TooltipStat label="Attached DON" value={donCount} />
+          )}
           {data.type !== "Leader" && (
             <TooltipStat
               label="Counter"

@@ -382,6 +382,7 @@ export const Card = React.memo(function Card({
       data={cardData}
       cardId={resolvedCardId}
       card={data?.card}
+      attachedDonCount={overlays?.donCount}
       notice={interaction?.tooltipNotice}
     >
       {cardElement}

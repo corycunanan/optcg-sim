@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import type {
   CardDb,
   GameAction,
@@ -12,9 +13,11 @@ import { PlayerChoiceModal } from "../player-choice-modal";
 import { OptionalEffectModal } from "../optional-effect-modal";
 import { RevealTriggerModal } from "../reveal-trigger-modal";
 import { GameDeckPreviewModal } from "../deck-preview-modal";
+import { LifePreviewModal } from "../life-preview-modal";
 import { TrashPreviewModal } from "../trash-preview-modal";
 import { RedistributeDonOverlay, type RedistributeTransfer } from "../redistribute-don-overlay";
 import { selectTargetPromptKey } from "@/lib/game/target-selection";
+import type { ZonePreview } from "./use-board-modal-routing";
 
 interface BoardModalsProps {
   activePrompt: PromptOptions | null;
@@ -23,10 +26,7 @@ interface BoardModalsProps {
   onHide: () => void;
   cardDb: CardDb;
   onAction: (action: GameAction) => void;
-  zonePreview:
-    | { type: "deck"; owner: "me" | "opp" }
-    | { type: "trash"; owner: "me" | "opp" }
-    | null;
+  zonePreview: ZonePreview | null;
   onCloseZonePreview: () => void;
   me: PlayerState | null;
   opp: PlayerState | null;
@@ -50,6 +50,13 @@ export function BoardModals({
   onRedistributeUndo,
   selectTargetInPlace = false,
 }: BoardModalsProps) {
+  const handleZonePreviewOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) onCloseZonePreview();
+    },
+    [onCloseZonePreview],
+  );
+
   return (
     <>
       {/* ── Interruption Modals ─────────────────────────────────────── */}
@@ -145,10 +152,11 @@ export function BoardModals({
       {zonePreview?.type === "deck" && (
         <GameDeckPreviewModal
           deckList={zonePreview.owner === "me" ? (me?.deckList ?? []) : (opp?.deckList ?? [])}
+          remainingCount={zonePreview.owner === "me" ? (me?.deck.length ?? 0) : (opp?.deck.length ?? 0)}
           cardDb={cardDb}
-          title={zonePreview.owner === "me" ? "Your Deck" : "Opponent\u2019s Deck"}
+          title={zonePreview.owner === "me" ? "Your Decklist" : "Opponent\u2019s Decklist"}
           open
-          onOpenChange={(open) => { if (!open) onCloseZonePreview(); }}
+          onOpenChange={handleZonePreviewOpenChange}
         />
       )}
       {zonePreview?.type === "trash" && (
@@ -157,7 +165,16 @@ export function BoardModals({
           cardDb={cardDb}
           title={zonePreview.owner === "me" ? "Your Trash" : "Opponent\u2019s Trash"}
           open
-          onOpenChange={(open) => { if (!open) onCloseZonePreview(); }}
+          onOpenChange={handleZonePreviewOpenChange}
+        />
+      )}
+      {zonePreview?.type === "life" && (
+        <LifePreviewModal
+          life={zonePreview.owner === "me" ? (me?.life ?? []) : (opp?.life ?? [])}
+          cardDb={cardDb}
+          title={zonePreview.owner === "me" ? "Your Life" : "Opponent\u2019s Life"}
+          open
+          onOpenChange={handleZonePreviewOpenChange}
         />
       )}
     </>

@@ -61,6 +61,7 @@ import { useBoardDragState } from "./use-board-drag-state";
 import { BoardDragOverlay } from "./board-drag-overlay";
 import { useBoardModalRouting } from "./use-board-modal-routing";
 import { useRedistributionState } from "./use-redistribution-state";
+import { mergeDonCountAdjustments } from "./don-count-adjustments";
 
 // Transient pulse hooks intentionally produce no pulses under reduced motion,
 // but their empty collections can be recreated on a parent render. Reuse one
@@ -288,17 +289,10 @@ function BoardLayoutInner({
   }, [cardAnimations]);
 
   const mergedDonCountAdjustments = useMemo(() => {
-    if (!inFlightDonAdjustByCard && !redistribution.donCountAdjustments) return undefined;
-    const out = new Map<string, number>();
-    if (redistribution.donCountAdjustments) {
-      for (const [k, v] of redistribution.donCountAdjustments) out.set(k, v);
-    }
-    if (inFlightDonAdjustByCard) {
-      for (const [k, v] of inFlightDonAdjustByCard) {
-        out.set(k, (out.get(k) ?? 0) + v);
-      }
-    }
-    return out.size > 0 ? out : undefined;
+    return mergeDonCountAdjustments(
+      redistribution.donCountAdjustments,
+      inFlightDonAdjustByCard,
+    );
   }, [redistribution.donCountAdjustments, inFlightDonAdjustByCard]);
 
   const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
@@ -414,7 +408,7 @@ function BoardLayoutInner({
             lifeTriggerPulse={opponentLifeTriggerPulse}
             lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
             lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
-            donCountAdjustments={inFlightDonAdjustByCard ?? undefined}
+            donCountAdjustments={mergedDonCountAdjustments}
             pileArrivingCounts={pileArrivingCounts}
             targetSelectionById={modalRouting.targetSelection.model?.byId}
             onTargetToggle={modalRouting.targetSelection.toggle}
