@@ -25,7 +25,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 7 | OPT-421 | Keyboard + ARIA for all core game actions | — | OPT-419, OPT-420 | In Review | [#306](https://github.com/corycunanan/optcg-sim/pull/306) | Keyboard drag, selection, prompt, and signifier equivalence |
 | 8 | OPT-464 | Spotlight surface: public reveal overlay for Events, effect reveals, and triggers | — | OPT-416, OPT-419 | Done | [#302](https://github.com/corycunanan/optcg-sim/pull/302) | Completes Event presentation and public reveals |
 | 9 | OPT-465 | Transform-class zone transitions + pile receipt: fizzle, pile pop, floating +N delta | — | OPT-464 | Done | [#304](https://github.com/corycunanan/optcg-sim/pull/304) | Travel remains unchanged; consumed cards fizzle and stacked zones acknowledge arrivals |
-| 10 | OPT-422 | Inspection parity, small state edges, and dead interaction code | — | OPT-421 | Backlog | — | Final cleanup and parity pass |
+| 10 | OPT-422 | Inspection parity, small state edges, and dead interaction code | — | OPT-421 | In Review | [#379](https://github.com/corycunanan/optcg-sim/pull/379) | Final cleanup and parity pass |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 

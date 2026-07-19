@@ -33,7 +33,7 @@ export function TrashPreviewModal({
         showCloseButton={false}
         className="bg-gb-surface border-gb-border-strong text-gb-text flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
       >
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gb-border space-y-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gb-border space-y-2">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-sm font-bold text-gb-text-bright">
               {title}
@@ -44,7 +44,16 @@ export function TrashPreviewModal({
             >
               {trash.length} {trash.length === 1 ? "card" : "cards"}
             </Badge>
+            <Badge
+              variant="outline"
+              className="border-gb-border-strong text-gb-text-dim"
+            >
+              Browse only
+            </Badge>
           </div>
+          <p className="text-xs text-gb-text-dim">
+            Cards in this preview are not selectable.
+          </p>
         </DialogHeader>
 
         <TooltipProvider delayDuration={0} disableHoverableContent>

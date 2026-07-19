@@ -142,31 +142,11 @@ const PromptOptions = z.discriminatedUnion("promptType", [
     timeoutMs: FiniteNumber,
   }),
   z.strictObject({
-    promptType: z.literal("SELECT_COUNTER_TARGET"),
-    validTargets: StringArray,
-    optional: z.boolean().optional(),
-    timeoutMs: FiniteNumber.optional(),
-  }),
-  z.strictObject({
-    promptType: z.literal("SELECT_ATTACK_TARGET"),
-    validTargets: StringArray,
-    optional: z.boolean().optional(),
-    timeoutMs: FiniteNumber.optional(),
-  }),
-  z.strictObject({
     promptType: z.literal("REVEAL_TRIGGER"),
     cards: z.array(CardInstance),
     effectDescription: z.string(),
     optional: z.boolean(),
     timeoutMs: FiniteNumber,
-  }),
-  z.strictObject({
-    promptType: z.literal("SELECT_CARD_TO_TRASH"),
-    cards: z.array(CardInstance),
-    validTargets: StringArray,
-    countMin: NonNegativeInteger,
-    countMax: NonNegativeInteger,
-    effectDescription: z.string().optional(),
   }),
   z.strictObject({
     promptType: z.literal("ARRANGE_TOP_CARDS"),

@@ -6,6 +6,10 @@ import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import type { DragPayload } from "./constants";
 import { OpponentField } from "./opponent-field";
 import { PlayerField } from "./player-field";
+import {
+  InteractionModeProvider,
+  type InteractionMode,
+} from "./interaction-mode";
 
 vi.mock("@/hooks/use-field-arrivals", () => ({
   useFieldArrivals: vi.fn(() => new Set<string>()),
@@ -122,7 +126,11 @@ const handDrag = {
   },
 } as DragPayload;
 
-function PlayerHarness() {
+function PlayerHarness({
+  interactionMode = "full",
+}: {
+  interactionMode?: InteractionMode;
+}) {
   const [, setUnrelatedState] = useState(0);
   const [activeDrag, setActiveDrag] = useState<DragPayload | null>(null);
   const [selectedBlockerId, setSelectedBlockerId] = useState<string | null>(
@@ -139,21 +147,23 @@ function PlayerHarness() {
         data-testid="player-drag"
         onClick={() => setActiveDrag(handDrag)}
       />
-      <PlayerField
-        me={player}
-        cardDb={cardDb}
-        activeDragType={activeDrag?.type ?? null}
-        activeDrag={activeDrag}
-        refreshWave={false}
-        canInteract={false}
-        canActivateMain={false}
-        canDragCounter={false}
-        inBlockStep
-        selectedBlockerId={selectedBlockerId}
-        setSelectedBlockerId={setSelectedBlockerId}
-        onAction={onAction}
-        onPreviewZone={onPlayerPreview}
-      />
+      <InteractionModeProvider value={interactionMode}>
+        <PlayerField
+          me={player}
+          cardDb={cardDb}
+          activeDragType={activeDrag?.type ?? null}
+          activeDrag={activeDrag}
+          refreshWave={false}
+          canInteract={false}
+          canActivateMain={false}
+          canDragCounter={false}
+          inBlockStep
+          selectedBlockerId={selectedBlockerId}
+          setSelectedBlockerId={setSelectedBlockerId}
+          onAction={onAction}
+          onPreviewZone={onPlayerPreview}
+        />
+      </InteractionModeProvider>
     </>
   );
 }
@@ -231,5 +241,34 @@ describe("field memo boundaries", () => {
         "data-testid": "field-card-blocker-1",
       }).props["data-selected"],
     ).toBe("true");
+  });
+
+  it("wires blocker selection in response-only mode", () => {
+    const mounted = renderHarness(
+      <PlayerHarness interactionMode="responseOnly" />,
+    );
+    const blockerControl = mounted.root.findByProps({
+      "data-testid": "field-card-blocker-1",
+    });
+
+    expect(blockerControl.props.onClick).toBeTypeOf("function");
+    act(() => blockerControl.props.onClick());
+    expect(
+      mounted.root.findByProps({
+        "data-testid": "field-card-blocker-1",
+      }).props["data-selected"],
+    ).toBe("true");
+  });
+
+  it("does not wire blocker selection in spectator mode", () => {
+    const mounted = renderHarness(
+      <PlayerHarness interactionMode="spectator" />,
+    );
+    const blockerControl = mounted.root.findByProps({
+      "data-testid": "field-card-blocker-1",
+    });
+
+    expect(blockerControl.props.onClick).toBeUndefined();
+    expect(blockerControl.props["data-selected"]).toBe("false");
   });
 });

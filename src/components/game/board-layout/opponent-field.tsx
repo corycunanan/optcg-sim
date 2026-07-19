@@ -37,7 +37,7 @@ interface OpponentFieldProps {
   cardDb: CardDb;
   activeDragType: string | null;
   refreshWave: boolean;
-  onPreviewZone: (preview: { type: "deck" | "trash"; owner: "opp" }) => void;
+  onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "opp" }) => void;
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
@@ -91,6 +91,10 @@ function OpponentFieldComponent({
   const stageSelection = stage
     ? targetSelectionById?.get(stage.instanceId)
     : undefined;
+  const handlePreviewLife = useCallback(
+    () => onPreviewZone({ type: "life", owner: "opp" }),
+    [onPreviewZone],
+  );
   const handleStageKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (
@@ -293,6 +297,7 @@ function OpponentFieldComponent({
         triggerPulse={lifeTriggerPulse}
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}
+        onInspect={opp ? handlePreviewLife : undefined}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

@@ -27,6 +27,7 @@ export const LifeZone = React.memo(function LifeZone({
   triggerPulse = false,
   damagePulseNonce,
   scryPulseNonce,
+  onInspect,
 }: {
   life: LifeCard[];
   cardDb: CardDb;
@@ -37,6 +38,7 @@ export const LifeZone = React.memo(function LifeZone({
   triggerPulse?: boolean;
   damagePulseNonce?: number;
   scryPulseNonce?: number;
+  onInspect?: () => void;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -63,17 +65,29 @@ export const LifeZone = React.memo(function LifeZone({
       : scryFeedbackActive
         ? "scried"
         : null;
+  const zoneLabel = getBoardZoneLabel(
+    zoneKey,
+    "life",
+    `${count} ${count === 1 ? "card" : "cards"}`,
+  );
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!onInspect || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      onInspect();
+    },
+    [onInspect],
+  );
 
   return (
     <motion.div
       key={`damage:${zoneFeedback === "damage" ? damagePulseNonce : 0}`}
       ref={ref}
-      role="group"
-      aria-label={getBoardZoneLabel(
-        zoneKey,
-        "life",
-        `${count} ${count === 1 ? "card" : "cards"}`,
-      )}
+      role={onInspect ? "button" : "group"}
+      tabIndex={onInspect ? 0 : undefined}
+      aria-label={onInspect ? `${zoneLabel}. Inspect life` : zoneLabel}
+      onClick={onInspect}
+      onKeyDown={handleKeyDown}
       style={{
         ...style,
         width: CARD_SIZES.field.width,
@@ -93,7 +107,9 @@ export const LifeZone = React.memo(function LifeZone({
           : { duration: 0 }
       }
       className={cn(
-        "relative rounded",
+        "relative rounded focus-visible:outline-none",
+        onInspect &&
+          "cursor-pointer focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
         zoneFeedback === "damage" &&
           "ring-4 ring-gb-accent-red shadow-[0_0_18px_var(--gb-accent-red)]",
       )}

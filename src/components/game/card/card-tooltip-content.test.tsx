@@ -68,6 +68,7 @@ interface RenderOptions {
   cardInstance?: CardInstance | null;
   effectAvailability?: Record<string, EffectAvailability[]>;
   withProvider?: boolean;
+  attachedDonCount?: number;
 }
 
 function renderTooltip({
@@ -75,12 +76,14 @@ function renderTooltip({
   cardInstance = card,
   effectAvailability,
   withProvider = true,
+  attachedDonCount,
 }: RenderOptions = {}) {
   const tooltip = (
     <CardTooltipContent
       data={cardData}
       cardId={cardData.id}
       card={cardInstance}
+      attachedDonCount={attachedDonCount}
     />
   );
 
@@ -226,5 +229,32 @@ describe("CardTooltipContent effect availability", () => {
     expect(effectBody).toContain("[Activate: Main] Rest this card. \t");
     expect(effectBody).toContain("Trailing paragraph.  ");
     expect(effectBody).toContain("cost unavailable");
+  });
+});
+
+describe("CardTooltipContent attached DON detail", () => {
+  it("shows the attached DON count for an expanded field-card tooltip", () => {
+    const markup = renderTooltip({
+      cardInstance: {
+        ...card,
+        attachedDon: [
+          { instanceId: "don-1", state: "ACTIVE", attachedTo: card.instanceId },
+          { instanceId: "don-2", state: "RESTED", attachedTo: card.instanceId },
+        ],
+      },
+    });
+
+    expect(markup).toContain("Attached DON");
+    expect(markup).toContain(">2</span>");
+  });
+
+  it("uses the displayed preview count while DON redistribution is pending", () => {
+    const markup = renderTooltip({
+      cardInstance: card,
+      attachedDonCount: 1,
+    });
+
+    expect(markup).toContain("Attached DON");
+    expect(markup).toContain(">1</span>");
   });
 });

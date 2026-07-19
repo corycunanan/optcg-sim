@@ -29,6 +29,7 @@ function renderLifeZone(props: {
   triggerPulse?: boolean;
   damagePulseNonce?: number;
   scryPulseNonce?: number;
+  onInspect?: () => void;
 }) {
   act(() => {
     renderer = create(
@@ -64,6 +65,26 @@ describe("LifeZone battle feedback", () => {
         "aria-label": "Your life area, 0 cards",
       }),
     ).toBeDefined();
+  });
+
+  it("exposes an accessible inspection action when preview is available", () => {
+    const onInspect = vi.fn();
+    const root = renderLifeZone({ onInspect });
+    const control = root.findByProps({
+      role: "button",
+      "aria-label": "Your life area, 0 cards. Inspect life",
+    });
+
+    act(() => control.props.onClick());
+    expect(onInspect).toHaveBeenCalledTimes(1);
+
+    act(() =>
+      control.props.onKeyDown({
+        key: "Enter",
+        preventDefault: vi.fn(),
+      }),
+    );
+    expect(onInspect).toHaveBeenCalledTimes(2);
   });
 
   it("renders an amber Trigger pulse on the zone container", () => {

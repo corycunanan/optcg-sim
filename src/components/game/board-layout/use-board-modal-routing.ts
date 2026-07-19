@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type {
   CardDb,
   GameAction,
@@ -11,7 +11,8 @@ import { useInPlaceTargetSelection } from "./use-in-place-target-selection";
 
 export type ZonePreview =
   | { type: "deck"; owner: "me" | "opp" }
-  | { type: "trash"; owner: "me" | "opp" };
+  | { type: "trash"; owner: "me" | "opp" }
+  | { type: "life"; owner: "me" | "opp" };
 
 interface UseBoardModalRoutingOptions {
   activePrompt: PromptOptions | null;
@@ -43,6 +44,12 @@ export function useBoardModalRouting({
   const promptType = prompt?.promptType ?? null;
   const [hiddenPromptType, setHiddenPromptType] = useState<string | null>(null);
   const [zonePreview, setZonePreview] = useState<ZonePreview | null>(null);
+  const hidePrompt = useCallback(
+    () => setHiddenPromptType(promptType),
+    [promptType],
+  );
+  const showPrompt = useCallback(() => setHiddenPromptType(null), []);
+  const closeZonePreview = useCallback(() => setZonePreview(null), []);
   const targetSelection = useInPlaceTargetSelection({
     prompt: prompt?.promptType === "SELECT_TARGET" ? prompt : null,
     me,
@@ -54,11 +61,11 @@ export function useBoardModalRouting({
   return {
     prompt,
     isPromptHidden: hiddenPromptType === promptType,
-    hidePrompt: () => setHiddenPromptType(promptType),
-    showPrompt: () => setHiddenPromptType(null),
+    hidePrompt,
+    showPrompt,
     zonePreview,
     openZonePreview: setZonePreview,
-    closeZonePreview: () => setZonePreview(null),
+    closeZonePreview,
     targetSelection,
     targetSelectionActive: !!targetSelection.prompt,
   };

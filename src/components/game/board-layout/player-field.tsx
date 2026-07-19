@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
@@ -32,6 +32,7 @@ import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 import type { PowerModPulse } from "@/hooks/use-power-modified-pulse";
+import { useInteractionMode } from "./interaction-mode";
 
 interface PlayerFieldProps {
   me: PlayerState | null;
@@ -47,7 +48,7 @@ interface PlayerFieldProps {
   selectedBlockerId: string | null;
   setSelectedBlockerId: (id: string | null) => void;
   onAction: (action: GameAction) => void;
-  onPreviewZone: (preview: { type: "deck" | "trash"; owner: "me" }) => void;
+  onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "me" }) => void;
   redistributeSourceIds?: Set<string>;
   pendingTransferDonIdsByCard?: Map<string, Set<string>>;
   donCountAdjustments?: Map<string, number>;
@@ -99,6 +100,11 @@ function PlayerFieldComponent({
   targetSelectionById,
   onTargetToggle,
 }: PlayerFieldProps) {
+  const interactionMode = useInteractionMode();
+  const handlePreviewLife = useCallback(
+    () => onPreviewZone({ type: "life", owner: "me" }),
+    [onPreviewZone],
+  );
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
   // instanceIds and seeds empty on the first render.
@@ -136,6 +142,7 @@ function PlayerFieldComponent({
         triggerPulse={lifeTriggerPulse}
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}
+        onInspect={me ? handlePreviewLife : undefined}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
       />
 
@@ -158,7 +165,11 @@ function PlayerFieldComponent({
           );
         }
         const charData = cardDb[char.cardId];
-        const isBlockerEligible = inBlockStep && char.state === "ACTIVE" && !!charData?.keywords?.blocker;
+        const isBlockerEligible =
+          interactionMode !== "spectator" &&
+          inBlockStep &&
+          char.state === "ACTIVE" &&
+          !!charData?.keywords?.blocker;
         return (
           <PlayerFieldCard
             key={`plr-c${i}`}

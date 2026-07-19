@@ -19,6 +19,7 @@ import { CardTooltipContent } from "./card/card-tooltip-content";
 
 interface GameDeckPreviewModalProps {
   deckList: DeckListEntry[];
+  remainingCount: number;
   cardDb: CardDb;
   title: string;
   open: boolean;
@@ -56,6 +57,7 @@ function groupDeck(deckList: DeckListEntry[], cardDb: CardDb): CardGroup[] {
 
 export function GameDeckPreviewModal({
   deckList,
+  remainingCount,
   cardDb,
   title,
   open,
@@ -82,7 +84,10 @@ export function GameDeckPreviewModal({
                 {title}
               </h3>
               <p className="mt-1 text-sm text-gb-text-dim">
-                {totalCards} cards
+                {totalCards} registered
+              </p>
+              <p className="text-sm text-gb-text-dim">
+                {remainingCount} remaining in deck
               </p>
             </div>
 

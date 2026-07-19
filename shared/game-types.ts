@@ -672,10 +672,7 @@ export type PromptType = PromptOptions["promptType"];
 
 export type PromptOptions =
   | SelectBlockerPrompt
-  | SelectCounterTargetPrompt
-  | SelectAttackTargetPrompt
   | RevealTriggerPrompt
-  | SelectCardToTrashPrompt
   | ArrangeTopCardsPrompt
   | SelectTargetPrompt
   | RedistributeDonPrompt
@@ -689,35 +686,12 @@ export interface SelectBlockerPrompt {
   timeoutMs: number;
 }
 
-export interface SelectCounterTargetPrompt {
-  promptType: "SELECT_COUNTER_TARGET";
-  validTargets: string[];
-  optional?: boolean;
-  timeoutMs?: number;
-}
-
-export interface SelectAttackTargetPrompt {
-  promptType: "SELECT_ATTACK_TARGET";
-  validTargets: string[];
-  optional?: boolean;
-  timeoutMs?: number;
-}
-
 export interface RevealTriggerPrompt {
   promptType: "REVEAL_TRIGGER";
   cards: CardInstance[];
   effectDescription: string;
   optional: boolean;
   timeoutMs: number;
-}
-
-export interface SelectCardToTrashPrompt {
-  promptType: "SELECT_CARD_TO_TRASH";
-  cards: CardInstance[];
-  validTargets: string[];
-  countMin: number;
-  countMax: number;
-  effectDescription?: string;
 }
 
 export interface ArrangeTopCardsPrompt {
