@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
   type MouseEvent,
@@ -27,6 +28,24 @@ import {
 interface DirtyDeckEditor {
   isDirty: boolean;
   name: string;
+}
+
+interface DeckNavigationDestination {
+  key: string;
+  url: string;
+}
+
+interface DeckNavigateEvent extends Event {
+  canIntercept: boolean;
+  destination: DeckNavigationDestination;
+  navigationType: "push" | "reload" | "replace" | "traverse";
+}
+
+interface DeckNavigation extends EventTarget {
+  traverseTo: (key: string) => {
+    committed: Promise<unknown>;
+    finished: Promise<unknown>;
+  };
 }
 
 interface DeckNavigationGuardContextValue {
@@ -56,6 +75,7 @@ export function DeckNavigationGuardProvider({
   const router = useRouter();
   const [editor, setEditorState] = useState<DirtyDeckEditor | null>(null);
   const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
+  const allowedTraversalKey = useRef<string | null>(null);
 
   const requestLeave = useCallback(
     (proceed: () => void) => {
@@ -72,6 +92,47 @@ export function DeckNavigationGuardProvider({
     },
     [requestLeave, router]
   );
+
+  useEffect(() => {
+    if (!editor?.isDirty || !("navigation" in window)) return;
+
+    const navigation = window.navigation as unknown as DeckNavigation;
+    const handleNavigate = (event: Event) => {
+      const navigateEvent = event as DeckNavigateEvent;
+      if (
+        navigateEvent.navigationType !== "traverse" ||
+        !navigateEvent.cancelable ||
+        !navigateEvent.canIntercept ||
+        new URL(navigateEvent.destination.url).origin !== window.location.origin
+      ) {
+        return;
+      }
+
+      const destinationKey = navigateEvent.destination.key;
+      if (allowedTraversalKey.current === destinationKey) {
+        allowedTraversalKey.current = null;
+        return;
+      }
+
+      const blocked = requestLeave(() => {
+        allowedTraversalKey.current = destinationKey;
+        const { finished } = navigation.traverseTo(destinationKey);
+        void finished.catch(() => {
+          if (allowedTraversalKey.current === destinationKey) {
+            allowedTraversalKey.current = null;
+          }
+        });
+      });
+
+      if (blocked) navigateEvent.preventDefault();
+    };
+
+    navigation.addEventListener("navigate", handleNavigate);
+    return () => {
+      allowedTraversalKey.current = null;
+      navigation.removeEventListener("navigate", handleNavigate);
+    };
+  }, [editor?.isDirty, requestLeave]);
 
   const context = useMemo(
     () => ({ requestLeave, requestNavigation, setEditorState }),

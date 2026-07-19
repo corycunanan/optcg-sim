@@ -131,6 +131,53 @@ import {
 
 let renderer: ReactTestRenderer | null = null;
 
+interface MockNavigateEvent extends Event {
+  canIntercept: boolean;
+  destination: { key: string; url: string };
+  navigationType: "push" | "reload" | "replace" | "traverse";
+}
+
+class MockNavigation extends EventTarget {
+  completedTraversal: MockNavigateEvent | null = null;
+  traverseTo = vi.fn((key: string) => {
+    this.completedTraversal = navigateEvent({ key });
+    this.dispatchEvent(this.completedTraversal);
+    return {
+      committed: Promise.resolve(),
+      finished: Promise.resolve(),
+    };
+  });
+}
+
+function navigateEvent({
+  canIntercept = true,
+  cancelable = true,
+  key = "destination-key",
+  navigationType = "traverse",
+  url = "http://localhost:3000/decks",
+}: {
+  canIntercept?: boolean;
+  cancelable?: boolean;
+  key?: string;
+  navigationType?: MockNavigateEvent["navigationType"];
+  url?: string;
+} = {}) {
+  return Object.assign(new Event("navigate", { cancelable }), {
+    canIntercept,
+    destination: { key, url },
+    navigationType,
+  }) as MockNavigateEvent;
+}
+
+function installNavigationApi() {
+  const navigation = new MockNavigation();
+  Object.defineProperty(window, "navigation", {
+    configurable: true,
+    value: navigation,
+  });
+  return navigation;
+}
+
 function EditorRegistration({
   isDirty,
   name = "Straw Hat Deck",
@@ -238,16 +285,133 @@ beforeEach(() => {
   mocks.apiPost.mockResolvedValue({ data: {} });
   renderer = null;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("window", {
+    history: { state: null },
+    location: {
+      href: "http://localhost:3000/decks/deck-1",
+      origin: "http://localhost:3000",
+    },
+  } as Window);
 });
 
 afterEach(async () => {
   if (renderer) {
     await act(async () => renderer?.unmount());
   }
+  Reflect.deleteProperty(window, "navigation");
   vi.unstubAllGlobals();
 });
 
 describe("deck builder navigation guard", () => {
+  it("blocks a cancelable same-origin traversal while the editor is dirty", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+    const event = navigateEvent();
+
+    await act(async () => {
+      navigation.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(navigation.traverseTo).not.toHaveBeenCalled();
+    expect(button("Stay")).toBeDefined();
+  });
+
+  it("re-performs the blocked traversal after discard is confirmed", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+    const event = navigateEvent({ key: "back-entry" });
+
+    await act(async () => {
+      navigation.dispatchEvent(event);
+    });
+    await act(async () => button("Discard & Leave")?.props.onClick());
+
+    expect(navigation.traverseTo).toHaveBeenCalledOnce();
+    expect(navigation.traverseTo).toHaveBeenCalledWith("back-entry");
+    expect(navigation.completedTraversal?.defaultPrevented).toBe(false);
+  });
+
+  it("keeps the URL and history state unchanged when traversal is canceled", async () => {
+    const navigation = installNavigationApi();
+    const originalUrl = window.location.href;
+    const originalState = window.history.state;
+    await renderGuard(null);
+
+    await act(async () => {
+      navigation.dispatchEvent(navigateEvent());
+    });
+    await act(async () => button("Stay")?.props.onClick());
+
+    expect(navigation.traverseTo).not.toHaveBeenCalled();
+    expect(window.location.href).toBe(originalUrl);
+    expect(window.history.state).toBe(originalState);
+  });
+
+  it("passes traversals through when the editor is clean", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null, false);
+    const event = navigateEvent();
+
+    await act(async () => {
+      navigation.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(button("Stay")).toBeUndefined();
+  });
+
+  it("removes the traversal guard when dirty state clears or the editor unmounts", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+
+    await act(async () => {
+      renderer?.update(
+        <DeckNavigationGuardProvider>
+          <EditorRegistration isDirty={false} />
+        </DeckNavigationGuardProvider>
+      );
+    });
+    const afterSave = navigateEvent({ key: "after-save" });
+    navigation.dispatchEvent(afterSave);
+    expect(afterSave.defaultPrevented).toBe(false);
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    const afterUnmount = navigateEvent({ key: "after-unmount" });
+    navigation.dispatchEvent(afterUnmount);
+    expect(afterUnmount.defaultPrevented).toBe(false);
+  });
+
+  it("ignores non-traversal and non-interceptable navigation events", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+    const events = [
+      navigateEvent({ navigationType: "push" }),
+      navigateEvent({ cancelable: false }),
+      navigateEvent({ canIntercept: false }),
+      navigateEvent({ url: "https://example.com/decks" }),
+    ];
+
+    for (const event of events) navigation.dispatchEvent(event);
+
+    expect(events.every((event) => !event.defaultPrevented)).toBe(true);
+    expect(button("Stay")).toBeUndefined();
+  });
+
+  it("keeps OPT-490 behavior when the Navigation API is unavailable", async () => {
+    expect("navigation" in window).toBe(false);
+    await renderGuard(
+      <DeckNavigationGuardLink href="/decks">Back</DeckNavigationGuardLink>
+    );
+    const event = clickEvent();
+
+    await act(async () => renderer!.root.findByType("a").props.onClick(event));
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(button("Stay")).toBeDefined();
+  });
+
   it("guards every global Navbar destination while the editor is dirty", async () => {
     await renderGuard(<Navbar />);
 
