@@ -59,7 +59,7 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
             variant="secondary"
             size="icon"
             aria-label={`More actions for ${deckName}`}
-            className="absolute top-2 right-2 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:data-[state=open]:opacity-100"
+            className="absolute top-2 right-2 size-12 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:data-[state=open]:opacity-100"
           >
             <EllipsisVertical />
           </Button>
@@ -68,6 +68,7 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
           <DropdownMenuGroup>
             <DropdownMenuItem
               variant="destructive"
+              className="min-h-12 min-w-12"
               onSelect={() => setConfirmationOpen(true)}
             >
               <Trash2 />

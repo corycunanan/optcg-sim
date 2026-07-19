@@ -33,14 +33,21 @@ vi.mock("@/components/ui/dropdown-menu", () => {
     DropdownMenuTrigger: Wrapper,
     DropdownMenuItem: ({
       children,
+      className,
       onSelect,
       variant,
     }: {
       children: ReactNode;
+      className?: string;
       onSelect?: () => void;
       variant?: string;
     }) => (
-      <button type="button" data-variant={variant} onClick={onSelect}>
+      <button
+        type="button"
+        className={className}
+        data-variant={variant}
+        onClick={onSelect}
+      >
         {children}
       </button>
     ),
@@ -120,7 +127,7 @@ afterEach(() => {
 });
 
 describe("DeckDeleteButton", () => {
-  it("keeps its touch-visible menu trigger keyboard reachable with a focus reveal", async () => {
+  it("renders 48px menu touch targets and keeps the trigger keyboard reachable", async () => {
     await renderDeleteButton();
 
     const trigger = renderer!.root
@@ -133,8 +140,13 @@ describe("DeckDeleteButton", () => {
     expect(trigger).toBeDefined();
     expect(trigger?.props.type).toBe("button");
     expect(trigger?.props.tabIndex).not.toBe(-1);
+    expect(trigger?.props.className).toContain("size-12");
     expect(trigger?.props.className).toContain("opacity-100");
     expect(trigger?.props.className).toContain("focus-visible:opacity-100");
+
+    const deleteItem = buttonWithText("Delete deck");
+    expect(deleteItem?.props.className).toContain("min-h-12");
+    expect(deleteItem?.props.className).toContain("min-w-12");
   });
 
   it("surfaces a toast when deleting the deck fails", async () => {

@@ -109,7 +109,7 @@ export default async function DecksPage() {
                   )}
 
                   <div className="relative p-4">
-                    <h3 className="pr-12 text-base font-bold text-content-primary">
+                    <h3 className="pr-16 text-base font-bold text-content-primary">
                       {deck.name}
                     </h3>
                     <p className="mt-1 text-xs text-content-tertiary">
