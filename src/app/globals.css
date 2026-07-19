@@ -37,7 +37,9 @@
   --red-500: oklch(80% 0.18 25); /* hover on red */
   --red-100: oklch(30% 0.06 25); /* soft red surface */
 
-  /* ── Text ── */
+  /* ── Text ──
+     Real-content chrome text passes WCAG AA on the current dark elevations.
+     --text-tertiary ≈4.7:1 on --surface-3 (worst case), ≈7.8:1 on --surface-base. */
   --text-primary: oklch(96% 0.008 75); /* warm white body and headings */
   --text-secondary: oklch(82% 0.01 75); /* secondary labels */
   --text-tertiary: oklch(75% 0.008 75); /* placeholder, hint text */
@@ -49,7 +51,8 @@
   --border-strong: oklch(52% 0.035 245);
   --border-focus: var(--gold-500);
 
-  /* ── Semantic ── */
+  /* ── Semantic ──
+     --warning ≈7.4:1 on --surface-1 and ≈6.5:1 on --warning-soft. */
   --success: oklch(74% 0.16 155);
   --success-soft: oklch(30% 0.06 155);
   --warning: oklch(78% 0.14 80);

@@ -11,6 +11,7 @@ import {
   PageHeaderActions,
 } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
+import { DeckColorIndicators } from "./deck-color-indicators";
 
 export const metadata = {
   title: "My Decks — OPTCG Simulator",
@@ -90,47 +91,41 @@ export default async function DecksPage() {
             if (leader) leader.color.forEach((c) => colors.add(c));
 
             return (
-              <Link
-                key={deck.id}
-                href={`/decks/${deck.id}`}
-                className="group relative overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-md"
-              >
-                {leader && (
-                  <div className="relative h-36 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={leader.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover object-top opacity-60 transition-transform duration-300 group-hover:scale-[1.05]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-surface-1 to-transparent" />
-                  </div>
-                )}
-
-                <div className="relative p-4">
-                  <h3 className="text-base font-bold text-content-primary">{deck.name}</h3>
-                  <p className="mt-1 text-xs text-content-tertiary">
-                    {leader?.name || "No leader"} · {totalCards}/50 cards
-                  </p>
-
-                  <div className="mt-2 flex items-center gap-2">
-                    {Array.from(colors).map((c) => (
-                      <span
-                        key={c}
-                        className="inline-block h-3 w-3 rounded-full"
-                        style={{ background: `var(--card-${c.toLowerCase()})` }}
-                        title={c}
+              <article key={deck.id} className="group relative">
+                <Link
+                  href={`/decks/${deck.id}`}
+                  className="block overflow-hidden rounded border border-border bg-surface-1 transition-all duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-md"
+                >
+                  {leader && (
+                    <div className="relative h-36 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={leader.imageUrl}
+                        alt=""
+                        className="h-full w-full object-cover object-top opacity-60 transition-transform duration-300 group-hover:scale-[1.05]"
                       />
-                    ))}
-                    <div className="ml-auto flex items-center gap-2">
-                      <DeckDeleteButton deckId={deck.id} deckName={deck.name} />
-                      <span className="text-xs text-content-tertiary">
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface-1 to-transparent" />
+                    </div>
+                  )}
+
+                  <div className="relative p-4">
+                    <h3 className="pr-16 text-base font-bold text-content-primary">
+                      {deck.name}
+                    </h3>
+                    <p className="mt-1 text-xs text-content-tertiary">
+                      {leader?.name || "No leader"} · {totalCards}/50 cards
+                    </p>
+
+                    <div className="mt-2 flex items-end gap-2">
+                      <DeckColorIndicators colors={Array.from(colors)} />
+                      <span className="ml-auto shrink-0 text-xs text-content-tertiary">
                         {deck.updatedAt.toLocaleDateString()}
                       </span>
                     </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                <DeckDeleteButton deckId={deck.id} deckName={deck.name} />
+              </article>
             );
           })}
         </div>
