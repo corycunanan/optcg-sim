@@ -6,7 +6,11 @@ vi.mock("@/lib/rate-limit", () => ({
   searchLimiter: { check: rateLimitMock },
 }));
 
-const { checkPublicCardBrowseRateLimit } = await import("./public-rate-limit");
+const {
+  checkPublicCardBrowseRateLimit,
+  consumePublicCardBrowseRateLimit,
+  PUBLIC_CARD_BROWSE_RATE_LIMIT_HEADER,
+} = await import("./public-rate-limit");
 
 beforeEach(() => {
   rateLimitMock.mockReset();
@@ -28,5 +32,27 @@ describe("checkPublicCardBrowseRateLimit", () => {
     await checkPublicCardBrowseRateLimit(new Headers());
 
     expect(rateLimitMock).toHaveBeenCalledWith("card-search:unknown");
+  });
+
+  it("does not charge again when proxy already allowed the request", async () => {
+    const requestHeaders = new Headers({
+      [PUBLIC_CARD_BROWSE_RATE_LIMIT_HEADER]: "allowed",
+    });
+
+    const result = await checkPublicCardBrowseRateLimit(requestHeaders);
+
+    expect(result).toEqual({ limited: false, remaining: null });
+    expect(rateLimitMock).not.toHaveBeenCalled();
+  });
+
+  it("does not trust the proxy marker when consuming the request token", async () => {
+    const requestHeaders = new Headers({
+      [PUBLIC_CARD_BROWSE_RATE_LIMIT_HEADER]: "allowed",
+      "x-forwarded-for": "203.0.113.10",
+    });
+
+    await consumePublicCardBrowseRateLimit(requestHeaders);
+
+    expect(rateLimitMock).toHaveBeenCalledWith("card-search:203.0.113.10");
   });
 });
