@@ -2,6 +2,7 @@
  * Next.js 16 proxy — route protection.
  * Protects /admin and /onboarding — redirects unauthenticated users to /login.
  * Also redirects authenticated users without a username to /onboarding.
+ * Public card browsing at /cards and /sets is intentionally outside the matcher.
  *
  * Runs on the Node.js runtime (the only runtime supported by proxy)
  * because @/auth imports PrismaAdapter/bcryptjs, which are not Edge-compatible.

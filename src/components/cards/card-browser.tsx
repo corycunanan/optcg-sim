@@ -3,11 +3,13 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CardDetailModal } from "@/components/cards/card-detail-modal";
+import {
+  CardDetailModal,
+  type CardDetail,
+} from "@/components/cards/card-detail-modal";
 import { isSubstringSearchQueryTooShort } from "@/lib/search-query";
 import { CardGrid } from "./card-grid";
 import { Pagination } from "./pagination";
@@ -19,7 +21,7 @@ import {
   PageHeaderActions,
 } from "@/components/ui/page-header";
 
-interface CardBrowserProps {
+export interface CardBrowserProps {
   initialCards: CardWithRelations[];
   total: number;
   page: number;
@@ -33,6 +35,8 @@ interface CardBrowserProps {
     block: string;
     originOnly: string;
   };
+  routePath: string;
+  renderDetailActions?: (card: CardDetail | null) => React.ReactNode;
 }
 
 export interface CardWithRelations {
@@ -64,6 +68,8 @@ export function CardBrowser({
   totalPages,
   sets,
   currentFilters,
+  routePath,
+  renderDetailActions,
 }: CardBrowserProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -106,9 +112,9 @@ export function CardBrowser({
         params.delete("page");
       }
 
-      router.push(`/admin/cards?${params.toString()}`);
+      router.push(`${routePath}?${params.toString()}`);
     },
-    [router, searchParams],
+    [routePath, router, searchParams]
   );
 
   const handleSearch = useCallback(
@@ -117,7 +123,7 @@ export function CardBrowser({
       if (isSubstringSearchQueryTooShort(search)) return;
       updateFilters({ q: search });
     },
-    [search, updateFilters],
+    [search, updateFilters]
   );
 
   const hasFilters =
@@ -139,8 +145,11 @@ export function CardBrowser({
             Showing {initialCards.length} of {total.toLocaleString()} cards
             {currentFilters.q && (
               <span>
-                {" "}matching &ldquo;
-                <strong className="text-content-inverse">{currentFilters.q}</strong>
+                {" "}
+                matching &ldquo;
+                <strong className="text-content-inverse">
+                  {currentFilters.q}
+                </strong>
                 &rdquo;
               </span>
             )}
@@ -172,7 +181,10 @@ export function CardBrowser({
                 Search
               </Button>
             </div>
-            <p id="card-search-help" className="text-content-tertiary mt-2 text-xs">
+            <p
+              id="card-search-help"
+              className="text-content-tertiary mt-2 text-xs"
+            >
               {searchTooShort
                 ? "Enter at least 3 characters to search by name."
                 : "Search by at least 3 characters, or leave blank to browse."}
@@ -190,7 +202,9 @@ export function CardBrowser({
             <Pagination
               page={page}
               totalPages={totalPages}
-              onPageChange={(newPage) => updateFilters({ page: String(newPage) })}
+              onPageChange={(newPage) =>
+                updateFilters({ page: String(newPage) })
+              }
             />
           </div>
         )}
@@ -198,7 +212,7 @@ export function CardBrowser({
 
       {/* Card detail modal */}
       {modalCardId && (
-        <AdminCardDetailModal
+        <BrowserCardDetailModal
           cardId={modalCardId}
           cardIds={cardIds}
           page={page}
@@ -213,15 +227,14 @@ export function CardBrowser({
             updateFilters({ page: String(page + 1) });
           }}
           onClose={() => setModalCardId(null)}
+          renderActions={renderDetailActions}
         />
       )}
     </div>
   );
 }
 
-/* ── Admin wrapper — adds prev/next navigation + edit link ─────────── */
-
-function AdminCardDetailModal({
+function BrowserCardDetailModal({
   cardId,
   cardIds,
   page,
@@ -230,6 +243,7 @@ function AdminCardDetailModal({
   onPrevPage,
   onNextPage,
   onClose,
+  renderActions,
 }: {
   cardId: string;
   cardIds: string[];
@@ -239,6 +253,7 @@ function AdminCardDetailModal({
   onPrevPage: () => void;
   onNextPage: () => void;
   onClose: () => void;
+  renderActions?: (card: CardDetail | null) => React.ReactNode;
 }) {
   const currentIndex = cardIds.indexOf(cardId);
   const isFirstPage = page === 1;
@@ -298,13 +313,7 @@ function AdminCardDetailModal({
               <ChevronRight data-icon="inline-end" />
             </Button>
           </div>
-          {card && (
-            <Button asChild>
-              <Link href={`/admin/cards/${card.id}/edit`}>
-                Edit Card
-              </Link>
-            </Button>
-          )}
+          {renderActions?.(card)}
         </>
       )}
     />

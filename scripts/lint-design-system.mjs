@@ -88,7 +88,7 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
     "src/app/admin/cards/[id]/page.tsx": ["borderLeft"],
     "src/app/admin/cards/new/page.tsx": ["background", "borderColor", "color"],
     "src/app/decks/page.tsx": ["background"],
-    "src/components/admin/card-filters.tsx": [
+    "src/components/cards/card-filters.tsx": [
       "background",
       "borderColor",
       "color",
@@ -99,7 +99,6 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
       "opacity",
     ],
     // Fixed map-art treatments.
-    "src/app/admin/cards/page.tsx": ["backgroundImage", "filter"],
     "src/app/page.tsx": ["backgroundImage", "filter"],
     // Runtime board, drag, and animation state.
     "src/components/game/arrange-top-cards-modal.tsx": [
