@@ -9,10 +9,10 @@ alwaysApply: true
 
 **N-2. Symbols.** React components, classes, exported types/interfaces, and Zod schemas use PascalCase. Hooks begin with `use`. Functions, properties, and variables use camelCase. Module constants use descriptive UPPER_SNAKE_CASE when they are true constants.
 
-**N-3. Tests and stories.** Tests use `*.test.ts(x)`. App tests are colocated; worker engine tests live in `workers/game/src/__tests__/`. Stories use `*.stories.tsx` in the feature's existing `__stories__/` convention.
+**N-3. Tests and stories.** Tests use `*.test.ts(x)`. Colocate new component, hook, and route tests with their source. Existing cross-cutting and integration suites live in `src/__tests__/`; check there before creating new coverage. Worker engine tests live in `workers/game/src/__tests__/`. Stories use `*.stories.tsx` in the feature's existing `__stories__/` convention.
 
 **N-4. APIs.** Resource path segments are plural and kebab-case unless an existing domain contract says otherwise. Dynamic parameters use brackets. Route handler exports are uppercase HTTP verbs.
 
 **N-5. Data.** Prisma models/enums use PascalCase and fields use camelCase; retain explicit `@map`/`@@map` database names. Migration directories use the existing timestamped snake-case form.
 
-**N-6. Cards and engine.** Effect schema filenames are lowercase set IDs (`op16.ts`, `st30.ts`); canonical card IDs and discriminated-union values remain uppercase.
+**N-6. Cards and engine.** Effect schema filenames are lowercase set IDs (`op16.ts`, `st30.ts`), and canonical card IDs remain uppercase. Canonical uppercase discriminants apply specifically to `GameAction["type"]` values and effect action types. Wire transport message types use lowercase colon-namespaced values such as `game:action`, `game:state`, and `action:rejected`; preserve both conventions rather than converting one to the other.

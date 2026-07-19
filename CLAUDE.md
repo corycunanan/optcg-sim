@@ -119,7 +119,7 @@ Client code should use `apiGet`/`apiPost`/`apiPut`/`apiPatch`/`apiDelete` from `
 
 - API routes log unexpected errors with a stable, route-scoped prefix, then return a non-sensitive `apiError(..., 500)`. Translate expected Prisma errors and domain conflicts to their established status instead of leaking database details. `src/app/api/messages/[userId]/route.ts` and the lobby routes are current references for race handling.
 - `parseBody()` plus `isErrorResponse()` in `src/lib/validators/helpers.ts` is the standard JSON/Zod boundary. Do not trust request or response JSON via a type assertion.
-- Client API failures are `ApiError` instances carrying `message` and `status`. Branch on `instanceof ApiError` only where status changes recovery (for example `404`, `409`, `410`, `429`, or auth `503`); otherwise show its message with a concise fallback for unknown failures.
+- Client API failures are `ApiError` instances carrying `message` and `status`. Use `instanceof ApiError` for typed message/status access; branch on `.status` only when recovery differs (for example `404`, `409`, `410`, `429`, or auth `503`). Otherwise show its message with a concise fallback for unknown failures.
 - User-triggered feedback uses Sonner (`toast.success`, `toast.error`, `toast.info`). Keep one toast per outcome and avoid toasting expected background polling/reconciliation failures. See `src/components/lobbies/lobby-room-shell.tsx` and `src/components/social/chat-widget.tsx`.
 - Missing auth-secret degradation is deliberate. `src/lib/auth-configuration.ts` emits throttled `[AUTH_CONFIG]` errors by site. Session reads degrade to signed out, while auth mutations/register return the dedicated `503` body. Do not replace this with generic exception logging or expose secret values.
 
@@ -135,10 +135,10 @@ Auth.js configuration lives in `src/auth.ts`; `auth()` is the server session pri
 
 - Files and directories are predominantly lowercase kebab-case: `deck-builder-shell.tsx`, `use-game-session.ts`, and `effect-resolver/`. Next.js reserved files remain `page.tsx`, `layout.tsx`, `route.ts`, and dynamic segments use brackets. Preserve established legacy names such as `src/components/home/CardColumns.tsx`; do not rename them incidentally.
 - React components, classes, exported types/interfaces, and Zod schemas use PascalCase. Hooks begin with `use`. Functions and local variables use camelCase. True module constants use UPPER_SNAKE_CASE; component-adjacent timing/config constants may follow the existing descriptive uppercase form.
-- Tests are `*.test.ts` or `*.test.tsx`. App tests are colocated with their source; worker engine tests live in `workers/game/src/__tests__/`. Storybook stories use `*.stories.tsx` under `__stories__/` where that feature already uses stories.
+- Tests are `*.test.ts` or `*.test.tsx`. Colocate new component, hook, and route tests with their source. Existing cross-cutting and integration suites live in `src/__tests__/`; check there before creating new coverage. Worker engine tests live in `workers/game/src/__tests__/`. Storybook stories use `*.stories.tsx` under `__stories__/` where that feature already uses stories.
 - API directories describe plural resources in kebab-case and dynamic parameters in brackets. Route handlers export uppercase HTTP verbs.
 - Prisma models/enums use PascalCase and fields use camelCase; database mappings in `prisma/schema.prisma` retain the established table/column mapping. Migration directories use timestamped snake-case descriptions, matching the existing history.
-- Card effect schema files use lowercase set IDs (`op16.ts`, `st30.ts`); card IDs and engine discriminants use their canonical uppercase forms.
+- Card effect schema files use lowercase set IDs (`op16.ts`, `st30.ts`), and card IDs use their canonical uppercase forms. Canonical uppercase discriminants apply specifically to `GameAction["type"]` values and effect action types. Wire transport message types use lowercase colon-namespaced values such as `game:action`, `game:state`, and `action:rejected`; preserve both conventions rather than converting one to the other.
 
 ## Verification Commands
 
