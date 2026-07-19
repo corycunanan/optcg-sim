@@ -211,6 +211,7 @@ describe("OPT-479 GameSession collaborator contracts", () => {
       state: prompted,
       cardDb,
       mode: "SOLITAIRE",
+      pregameMode: "GUEST_FIRST",
       testPriorityRolls: [6, 1],
       undoHistory: [state],
     });

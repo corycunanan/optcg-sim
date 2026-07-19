@@ -12,8 +12,8 @@
  * with the player's response. The DO calls `advancePregame` after init and
  * after each prompt response until `pregame === null` (FSM finished).
  *
- * START_OF_GAME_FX resolves authored Leader rule modifications in first-player
- * order. Prompt/effect-stack state lives on GameState so Durable Object
+ * START_OF_GAME_FX resolves authored Leader rule modifications in priority-
+ * decider order. Prompt/effect-stack state lives on GameState so Durable Object
  * hibernation cannot skip or repeat a partially resolved setup effect.
  */
 
@@ -23,6 +23,7 @@ import type {
   GameState,
   PendingPromptState,
   PendingGameEvent,
+  PregameMode,
 } from "../types.js";
 import type {
   PlayerChoicePrompt,
@@ -46,16 +47,50 @@ export interface PregameStepResult {
  * Initialize the pregame state machine. Called by GameSession.handleInit
  * immediately after `prepareDecksAndLeaders`.
  */
-export function startPregame(state: GameState): GameState {
+export function startPregame(
+  state: GameState,
+  mode: PregameMode = "PRIORITY_ROLL",
+): GameState {
+  let current = state;
+  let fixedFirstPlayerIndex: 0 | 1 | null = null;
+
+  if (mode === "HOST_FIRST") fixedFirstPlayerIndex = 0;
+  if (mode === "GUEST_FIRST") fixedFirstPlayerIndex = 1;
+  if (mode === "RANDOM_FIXED") {
+    const random = takeEngineRandom(current);
+    current = random.state;
+    fixedFirstPlayerIndex = random.value < 0.5 ? 0 : 1;
+  }
+
   const pregame: PregameState = {
-    phase: "PRIORITY_ROLLING",
+    phase:
+      fixedFirstPlayerIndex === null ? "PRIORITY_ROLLING" : "START_OF_GAME_FX",
     priorityRolls: null,
-    priorityDeciderIndex: null,
-    firstPlayerIndex: null,
+    priorityDeciderIndex: fixedFirstPlayerIndex,
+    firstPlayerIndex: fixedFirstPlayerIndex,
     mulliganDecisions: [null, null],
     startOfGameEffectsResolved: [false, false],
   };
-  return { ...state, pregame };
+
+  if (fixedFirstPlayerIndex === null) return { ...current, pregame };
+
+  return emitPendingEvent(
+    {
+      ...current,
+      pregame,
+      turn: {
+        ...current.turn,
+        activePlayerIndex: fixedFirstPlayerIndex,
+        firstPlayerIndex: fixedFirstPlayerIndex,
+      },
+    },
+    {
+      type: "PREGAME_FIRST_PLAYER_DECIDED",
+      playerIndex: fixedFirstPlayerIndex,
+      payload: { firstPlayerIndex: fixedFirstPlayerIndex },
+    },
+    fixedFirstPlayerIndex,
+  );
 }
 
 /**
@@ -243,8 +278,15 @@ function advanceStartOfGameEffects(
   const resolved = [
     ...(pregame.startOfGameEffectsResolved ?? [false, false]),
   ] as [boolean, boolean];
-  const first = pregame.firstPlayerIndex;
-  const order: [0 | 1, 0 | 1] = [first, first === 0 ? 1 : 0];
+  // §5-2-1-5-1: the priority decider resolves first even when they chose to
+  // play second. Fixed modes assign the configured/coin-flipped first player
+  // the priority-decider role because no roll occurs.
+  const priorityDecider =
+    pregame.priorityDeciderIndex ?? pregame.firstPlayerIndex;
+  const order: [0 | 1, 0 | 1] = [
+    priorityDecider,
+    priorityDecider === 0 ? 1 : 0,
+  ];
   const controller = order.find((playerIndex) => !resolved[playerIndex]);
   if (controller === undefined) {
     return { ...state, pregame: { ...pregame, phase: "HAND_DEAL", startOfGameEffectsResolved: resolved } };

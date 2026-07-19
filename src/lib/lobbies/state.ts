@@ -7,6 +7,11 @@
  */
 
 export type LobbyRoomMode = "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+export type LobbyRoomPregameMode =
+  | "PRIORITY_ROLL"
+  | "HOST_FIRST"
+  | "GUEST_FIRST"
+  | "RANDOM_FIXED";
 export type LobbyRoomStatus =
   | "WAITING"
   | "READY"
@@ -30,6 +35,7 @@ export interface LobbyRoomState {
   joinCode: string;
   format: string;
   mode: LobbyRoomMode;
+  pregameMode: LobbyRoomPregameMode;
   hostReady: boolean;
   hostUserId: string;
   host: {

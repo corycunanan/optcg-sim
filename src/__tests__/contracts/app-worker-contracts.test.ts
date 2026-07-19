@@ -75,6 +75,7 @@ describe("app ↔ worker contracts", () => {
       gameId: "game-contract-1",
       format: "Standard",
       mode: "SOLITAIRE",
+      pregameMode: "RANDOM_FIXED",
       player1: {
         userId: "host-user",
         leader: hostLeader,
@@ -95,6 +96,7 @@ describe("app ↔ worker contracts", () => {
       gameId: "game-contract-1",
       format: "Standard",
       mode: "SOLITAIRE",
+      pregameMode: "RANDOM_FIXED",
       player1: {
         userId: "host-user",
         sleeveUrl: "https://example.test/sleeve.png",

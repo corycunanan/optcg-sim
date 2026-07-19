@@ -103,6 +103,7 @@ export function createTestPayload(): GameInitPayload {
     player2: makePlayerInit("user-p2"),
     format: "standard",
     mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
   };
 }
 

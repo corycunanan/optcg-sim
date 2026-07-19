@@ -55,6 +55,18 @@ describe("OPT-480 runtime type boundaries", () => {
 
     expect(parsed.state.id).toBe(stored.state.id);
     expect(parsed.cardDb[CARDS.LEADER.id]?.id).toBe(CARDS.LEADER.id);
+    expect(parsed.pregameMode).toBe("PRIORITY_ROLL");
+  });
+
+  it("rejects unknown persisted pregame modes", () => {
+    const malformed = {
+      ...storedFixture(),
+      pregameMode: "SIDE_A_FIRST",
+    };
+
+    expect(() => parseStoredSession(malformed)).toThrow(
+      "Stored session pregameMode is invalid"
+    );
   });
 
   it.each([

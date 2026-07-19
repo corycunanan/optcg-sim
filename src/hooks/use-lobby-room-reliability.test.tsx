@@ -63,6 +63,7 @@ function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
     joinCode: "ABCD",
     format: "Standard",
     mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
     hostReady: false,
     hostUserId: "host-user",
     host: { username: "hosty", name: null, image: null },

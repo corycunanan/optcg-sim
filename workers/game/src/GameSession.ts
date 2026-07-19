@@ -14,6 +14,7 @@ import type {
   GameInitPayload,
   GameState,
   LobbyMode,
+  PregameMode,
   ServerMessage,
   PendingPromptState,
 } from "./types.js";
@@ -85,6 +86,7 @@ export class GameSession implements DurableObject {
   // In-memory cache (rebuilt from storage on wake)
   private gameState: GameState | null = null;
   private gameMode: LobbyMode = "PVP";
+  private pregameMode: PregameMode = "PRIORITY_ROLL";
   private cardDb: Map<string, CardData> | null = null;
   private undoHistory: GameState[] = [];
   /** OPT-366: deterministic priority-roll sequence (test-only). */
@@ -162,12 +164,13 @@ export class GameSession implements DurableObject {
 
     this.cardDb = cardDb;
     this.gameMode = payload.mode;
+    this.pregameMode = payload.pregameMode;
     this.testPriorityRolls = payload.testPriorityRolls ?? null;
 
-    // OPT-366: enter the pregame state machine — priority decision (2d6),
-    // first-or-second prompt, start-of-game effects (OPT-365), hand deal,
-    // mulligan decisions, life placement — before the first player's REFRESH.
-    const initial = startPregame(prepared);
+    // Enter the configured pregame state machine — optional priority decision,
+    // start-of-game effects, hand deal, mulligan decisions, life placement —
+    // before the first player's REFRESH.
+    const initial = startPregame(prepared, this.pregameMode);
     this.gameState = this.drainPregame(initial);
 
     // Persist to DO storage so state survives hibernation
@@ -802,6 +805,7 @@ export class GameSession implements DurableObject {
       state: this.gameState,
       cardDb: this.cardDb,
       mode: this.gameMode,
+      pregameMode: this.pregameMode,
       testPriorityRolls: this.testPriorityRolls,
       undoHistory: this.undoHistory,
     });
@@ -814,6 +818,7 @@ export class GameSession implements DurableObject {
     this.gameState = snapshot.state;
     this.cardDb = snapshot.cardDb;
     this.gameMode = snapshot.mode;
+    this.pregameMode = snapshot.pregameMode;
     this.testPriorityRolls = snapshot.testPriorityRolls;
     this.undoHistory = snapshot.undoHistory;
     return true;

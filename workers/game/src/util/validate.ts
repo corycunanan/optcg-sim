@@ -41,6 +41,15 @@ function isLobbyMode(v: unknown): v is GameInitPayload["mode"] {
   return v === "PVP" || v === "SOLITAIRE" || v === "PVCOMPUTER";
 }
 
+function isPregameMode(v: unknown): v is GameInitPayload["pregameMode"] {
+  return (
+    v === "PRIORITY_ROLL" ||
+    v === "HOST_FIRST" ||
+    v === "GUEST_FIRST" ||
+    v === "RANDOM_FIXED"
+  );
+}
+
 function isNullableNumber(v: unknown): v is number | null {
   return v === null || (typeof v === "number" && Number.isFinite(v));
 }
@@ -222,6 +231,10 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
   if (!isLobbyMode(obj.mode)) {
     throw new Error("GameInitPayload.mode must be a valid lobby mode");
   }
+  const pregameMode = obj.pregameMode ?? "PRIORITY_ROLL";
+  if (!isPregameMode(pregameMode)) {
+    throw new Error("GameInitPayload.pregameMode must be a valid pregame mode");
+  }
   if (obj.testPriorityRolls != null) {
     if (
       !Array.isArray(obj.testPriorityRolls) ||
@@ -239,6 +252,7 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
     player2,
     format: obj.format,
     mode: obj.mode,
+    pregameMode,
   };
   if (obj.testPriorityRolls !== undefined) {
     payload.testPriorityRolls = obj.testPriorityRolls as number[] | null;

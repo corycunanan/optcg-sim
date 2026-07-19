@@ -6,7 +6,11 @@
 
 import { prisma } from "@/lib/db";
 import type { LobbyRoomDeck, LobbyRoomState } from "./state";
-import { LobbyModeSchema, LobbyStatusSchema } from "@/lib/validators/lobbies";
+import {
+  LobbyModeSchema,
+  LobbyStatusSchema,
+  PregameModeSchema,
+} from "@/lib/validators/lobbies";
 
 export async function buildLobbyRoomState(
   lobbyId: string
@@ -20,6 +24,7 @@ export async function buildLobbyRoomState(
       joinCode: true,
       format: true,
       mode: true,
+      pregameMode: true,
       hostReady: true,
       hostUserId: true,
       host: { select: { username: true, name: true, image: true } },
@@ -96,6 +101,7 @@ export async function buildLobbyRoomState(
     joinCode: lobby.joinCode,
     format: lobby.format,
     mode: LobbyModeSchema.parse(lobby.mode),
+    pregameMode: PregameModeSchema.parse(lobby.pregameMode),
     hostReady: lobby.hostReady,
     hostUserId: lobby.hostUserId,
     host: lobby.host,

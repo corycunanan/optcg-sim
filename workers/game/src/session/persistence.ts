@@ -3,6 +3,7 @@ import type {
   GameEventType,
   GameState,
   LobbyMode,
+  PregameMode,
 } from "../types.js";
 import { ALL_GAME_EVENT_TYPES } from "../../../../shared/game-types.js";
 import { ALL_ACTION_TYPES } from "../engine/effect-types.js";
@@ -72,6 +73,7 @@ export interface SessionSnapshot {
   state: GameState;
   cardDb: Map<string, CardData>;
   mode: LobbyMode;
+  pregameMode: PregameMode;
   testPriorityRolls: number[] | null;
   undoHistory: GameState[];
 }
@@ -83,6 +85,7 @@ export interface StoredSession {
   /** Legacy OPT-366 field retained for structured-clone compatibility. */
   mulliganDone?: [boolean, boolean];
   mode?: LobbyMode;
+  pregameMode?: PregameMode;
   testPriorityRolls?: number[] | null;
   undoHistory: GameState[];
   historySummary: EventHistorySummary;
@@ -92,6 +95,7 @@ interface PersistedSession {
   formatVersion: 2;
   state: GameState;
   mode: LobbyMode;
+  pregameMode: PregameMode;
   testPriorityRolls: number[] | null;
   historySummary: EventHistorySummary;
 }
@@ -152,6 +156,7 @@ export class SessionRepository {
       formatVersion: SESSION_STORAGE_FORMAT_VERSION,
       state: compacted.state,
       mode: snapshot.mode,
+      pregameMode: snapshot.pregameMode,
       testPriorityRolls: snapshot.testPriorityRolls,
       historySummary: compacted.historySummary,
     };
@@ -252,6 +257,7 @@ export class SessionRepository {
       state: compacted.state,
       cardDb: new Map(Object.entries(stored.cardDb)),
       mode: stored.mode ?? "PVP",
+      pregameMode: stored.pregameMode ?? "PRIORITY_ROLL",
       testPriorityRolls: stored.testPriorityRolls ?? null,
       undoHistory: compacted.undoHistory,
     };
@@ -648,6 +654,15 @@ export function parseStoredSession(
   if (mode !== "PVP" && mode !== "SOLITAIRE" && mode !== "PVCOMPUTER") {
     throw new Error("Stored session mode is invalid");
   }
+  const pregameMode = raw.pregameMode ?? "PRIORITY_ROLL";
+  if (
+    pregameMode !== "PRIORITY_ROLL" &&
+    pregameMode !== "HOST_FIRST" &&
+    pregameMode !== "GUEST_FIRST" &&
+    pregameMode !== "RANDOM_FIXED"
+  ) {
+    throw new Error("Stored session pregameMode is invalid");
+  }
   const testPriorityRolls = raw.testPriorityRolls ?? null;
   if (!isPriorityRollSequence(testPriorityRolls)) {
     throw new Error("Stored session testPriorityRolls is invalid");
@@ -660,6 +675,7 @@ export function parseStoredSession(
     state: parseStoredGameState(raw.state),
     cardDb,
     mode,
+    pregameMode,
     testPriorityRolls,
     undoHistory: undoHistoryRaw.map(parseStoredGameState),
     historySummary: parseEventHistorySummary(raw.historySummary),

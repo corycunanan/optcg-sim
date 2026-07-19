@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
-import type { Env, GameState, LobbyMode } from "../types.js";
+import type {
+  Env,
+  GameState,
+  LobbyMode,
+  PregameMode,
+} from "../types.js";
 import {
   SESSION_CARD_DB_STORAGE_KEY,
   SESSION_STORAGE_FORMAT_VERSION,
@@ -60,6 +65,7 @@ type TestGameSession = {
   gameState: GameState | null;
   cardDb: Map<string, unknown> | null;
   gameMode: LobbyMode;
+  pregameMode: PregameMode;
   testPriorityRolls: number[] | null;
   undoHistory: GameState[];
   loadFromStorage(): Promise<boolean>;
@@ -77,7 +83,7 @@ function gameSession(storage: SessionStorage): TestGameSession {
 }
 
 describe("OPT-379 split session persistence", () => {
-  it("persists and restores state, cardDb, and undo history under separate keys", async () => {
+  it("persists and restores state, cardDb, pregame mode, and undo history under separate keys", async () => {
     const storage = new MemoryStorage();
     const repo = repository(storage);
     const { state, cardDb } = setupGame();
@@ -85,6 +91,7 @@ describe("OPT-379 split session persistence", () => {
       state,
       cardDb,
       mode: "PVP",
+      pregameMode: "RANDOM_FIXED",
       testPriorityRolls: null,
       undoHistory: [checkpoint(state, 99)],
     });
@@ -92,6 +99,7 @@ describe("OPT-379 split session persistence", () => {
     expect(storage.data.get(SESSION_STORAGE_KEY)).toMatchObject({
       formatVersion: SESSION_STORAGE_FORMAT_VERSION,
       state: saved.state,
+      pregameMode: "RANDOM_FIXED",
     });
     expect(storage.data.get(SESSION_STORAGE_KEY)).not.toHaveProperty("cardDb");
     expect(storage.data.get(SESSION_STORAGE_KEY)).not.toHaveProperty(
@@ -134,6 +142,7 @@ describe("OPT-379 split session persistence", () => {
       state,
       cardDb,
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory: [checkpoint(state, 99)],
     });
@@ -168,6 +177,7 @@ describe("OPT-379 split session persistence", () => {
       state,
       cardDb: Object.fromEntries(cardDb),
       mode: "SOLITAIRE",
+      pregameMode: "HOST_FIRST",
       testPriorityRolls: [6, 1],
       undoHistory: [legacyUndo],
     });
@@ -178,6 +188,7 @@ describe("OPT-379 split session persistence", () => {
     expect(session.gameState).toEqual(state);
     expect(session.cardDb).toEqual(cardDb);
     expect(session.gameMode).toBe("SOLITAIRE");
+    expect(session.pregameMode).toBe("HOST_FIRST");
     expect(session.testPriorityRolls).toEqual([6, 1]);
     expect(session.undoHistory).toEqual([legacyUndo]);
 
@@ -200,6 +211,7 @@ describe("OPT-379 split session persistence", () => {
       state,
       cardDb,
       mode: "SOLITAIRE",
+      pregameMode: "HOST_FIRST",
       testPriorityRolls: [6, 1],
       undoHistory: [legacyUndo],
     });
@@ -214,6 +226,7 @@ describe("OPT-379 split session persistence", () => {
       formatVersion: 2,
       state,
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory,
     });
@@ -243,6 +256,7 @@ describe("OPT-379 split session persistence", () => {
         state,
         cardDb,
         mode: "PVP",
+        pregameMode: "PRIORITY_ROLL",
         testPriorityRolls: null,
         undoHistory: [
           {

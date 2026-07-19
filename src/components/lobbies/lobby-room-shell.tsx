@@ -40,6 +40,7 @@ import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 import { HostCloseAction, runHostClose } from "./host-close-action";
 import { lobbyRoomRecovery } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
+import { PregameSettings } from "./pregame-settings";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
 
 interface DeckOption extends LobbyRoomDeck {
@@ -101,6 +102,9 @@ export function LobbyRoomShell({
 
   const isHost = lobby?.hostUserId === currentUserId;
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
+  const canEditPregame = Boolean(
+    isHost && (lobby?.status === "WAITING" || lobby?.status === "READY")
+  );
   const realGuestPresent =
     Boolean(lobby?.guest) && lobby?.guest?.user.id !== lobby?.hostUserId;
   const guestName = lobby?.guest
@@ -254,7 +258,7 @@ export function LobbyRoomShell({
             {isHost && (
               <Button
                 onClick={handleStart}
-                disabled={!canStart || starting || closing}
+                disabled={!canStart || mutating || starting || closing}
               >
                 {starting ? (
                   <Loader2 data-icon="inline-start" className="animate-spin" />
@@ -297,6 +301,13 @@ export function LobbyRoomShell({
                 : "The host controls mode and starts the game."}
             </p>
           </div>
+
+          <PregameSettings
+            value={lobby.pregameMode}
+            editable={canEditPregame}
+            disabled={mutating || starting}
+            onChange={(pregameMode) => runPatch({ pregameMode })}
+          />
 
           {deckLoadError && (
             <div className="border-error/30 bg-card text-error rounded-lg border p-4 text-sm">

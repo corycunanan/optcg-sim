@@ -48,6 +48,7 @@ function stubPayload(): GameInitPayload {
     gameId: "engine-portability-smoke",
     format: "standard",
     mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
     player1: {
       userId: "u1",
       leader: { cardId: leader.id, quantity: 1, cardData: leader },
