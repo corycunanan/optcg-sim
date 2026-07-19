@@ -67,6 +67,7 @@ function renderZone(currentPlayer: PlayerState, enableDrag = false) {
       <DonZone
         player={currentPlayer}
         enableDrag={enableDrag}
+        zoneKey="p-don"
         style={{ position: "absolute", left: 0, top: 0 }}
       />
     );
@@ -144,5 +145,25 @@ describe("DonZone entry stagger", () => {
     expect(
       findDonWrapper(root, "active-2").props["data-mount-delay"],
     ).toBeUndefined();
+  });
+});
+
+describe("DonZone accessibility", () => {
+  it("labels the zone counts and the state of draggable DON", () => {
+    const root = renderZone(
+      player(don("active-1", "ACTIVE"), don("rested-1", "RESTED")),
+      true,
+    );
+
+    expect(
+      root.findByProps({
+        role: "group",
+        "aria-label": "Your DON!! area, 1 active, 1 rested",
+      }),
+    ).toBeDefined();
+
+    const activeDon = findDonWrapper(root, "active-1");
+    expect(activeDon.props.role).toBe("button");
+    expect(activeDon.props["aria-label"]).toBe("Active DON!!, draggable");
   });
 });

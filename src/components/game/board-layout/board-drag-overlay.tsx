@@ -30,6 +30,7 @@ export function BoardDragOverlay({
     <DragOverlay dropAnimation={null}>
       {activeDrag && (
         <motion.div
+          aria-hidden="true"
           style={{
             // The overlay escapes the board transform. Recreate perspective
             // here so velocity tilt reads as depth rather than skew.

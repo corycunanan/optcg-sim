@@ -9,6 +9,7 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { cardEntry } from "@/lib/motion";
 import { Card } from "../card";
+import { getBoardZoneLabel } from "./accessibility";
 import { type ActiveDonDrag } from "./constants";
 
 const DON_CARD_W = 50;
@@ -75,7 +76,8 @@ function DraggableDonCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      aria-label="Drag active DON"
+      role="button"
+      aria-label={isDragging ? "Active DON!!, dragging" : "Active DON!!, draggable"}
       data-don-instance-id={don.instanceId}
       initial={entering ? ENTRY_INITIAL : false}
       animate={{ ...ENTRY_ANIMATE, opacity: isDragging ? 0.3 : 1 }}
@@ -146,6 +148,12 @@ export const DonZone = React.memo(function DonZone({
   return (
     <div
       ref={donRef}
+      role="group"
+      aria-label={getBoardZoneLabel(
+        zoneKey,
+        "DON!!",
+        `${activeDon.length} active, ${restedDon.length} rested`,
+      )}
       className={cn(
         "absolute flex items-center overflow-hidden rounded-md border border-gb-border-strong/30",
         !hasAny && "justify-center",
