@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ChevronDown, X, Check } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,8 +43,12 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
   const selectedSetsRef = useRef(selectedSets);
 
   // Keep refs in sync
-  useEffect(() => { draftRef.current = draft; }, [draft]);
-  useEffect(() => { selectedSetsRef.current = selectedSets; }, [selectedSets]);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+  useEffect(() => {
+    selectedSetsRef.current = selectedSets;
+  }, [selectedSets]);
 
   // Sync draft when selectedSets changes from outside (e.g., "Clear all filters")
   const selectedSetsKey = selectedSets.join(",");
@@ -56,16 +60,21 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
   }, [selectedSetsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Commit draft → call onChange only if something actually changed
-  const commit = useCallback((next: string[]) => {
-    if (next.join(",") !== selectedSetsRef.current.join(",")) {
-      onChange(next);
-    }
-  }, [onChange]);
+  const commit = useCallback(
+    (next: string[]) => {
+      if (next.join(",") !== selectedSetsRef.current.join(",")) {
+        onChange(next);
+      }
+    },
+    [onChange]
+  );
 
   // Toggle in draft only — no onChange, no navigation
   const toggleDraft = (label: string) => {
     setDraft((prev) => {
-      const next = prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label];
+      const next = prev.includes(label)
+        ? prev.filter((s) => s !== label)
+        : [...prev, label];
       draftRef.current = next;
       return next;
     });
@@ -101,14 +110,14 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
           role="button"
           tabIndex={0}
           className={cn(
-            "flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border bg-secondary px-3 py-1 text-left text-sm transition-colors",
+            "bg-surface-2 flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border px-3 py-1 text-left text-sm transition-colors",
             open
-              ? "border-border-focus ring-2 ring-border-focus/20"
-              : "border-border hover:border-border-strong",
+              ? "border-border-focus ring-border-focus/20 ring-2"
+              : "border-border hover:border-border-strong"
           )}
         >
           {draft.length === 0 ? (
-            <span className="py-1 text-content-tertiary">All Sets</span>
+            <span className="text-content-tertiary py-1">All Sets</span>
           ) : (
             draft.map((label) => (
               <Badge key={label} variant="default" className="gap-1">
@@ -131,18 +140,26 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
                 type="button"
                 tabIndex={-1}
                 onClick={clearAll}
-                className="rounded p-1 text-content-tertiary transition-colors hover:text-content-secondary"
+                className="text-content-tertiary hover:text-content-secondary rounded p-1 transition-colors"
                 title="Clear selection"
               >
                 <X className="size-3" />
               </button>
             )}
-            <ChevronDown className={cn("size-3 text-content-tertiary transition-transform", open && "rotate-180")} />
+            <ChevronDown
+              className={cn(
+                "text-content-tertiary size-3 transition-transform",
+                open && "rotate-180"
+              )}
+            />
           </span>
         </div>
       </PopoverTrigger>
 
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder="Search sets..." />
           <CommandList className="max-h-64">
@@ -161,8 +178,12 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
                       checked={selected}
                       className="pointer-events-none"
                     />
-                    <span className="shrink-0 font-mono text-xs font-bold">{s.setLabel}</span>
-                    <span className="truncate text-xs text-content-secondary">{s.setName}</span>
+                    <span className="shrink-0 font-mono text-xs font-bold">
+                      {s.setLabel}
+                    </span>
+                    <span className="text-content-secondary truncate text-xs">
+                      {s.setName}
+                    </span>
                   </CommandItem>
                 );
               })}
@@ -170,11 +191,8 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
           </CommandList>
 
           {/* Footer: Apply */}
-          <div className="border-t border-border px-2 py-2">
-            <Button
-              className="w-full"
-              onClick={() => handleOpenChange(false)}
-            >
+          <div className="border-border border-t px-2 py-2">
+            <Button className="w-full" onClick={() => handleOpenChange(false)}>
               {draft.length === 0
                 ? "Show All Sets"
                 : `Apply ${draft.length} Set${draft.length > 1 ? "s" : ""}`}

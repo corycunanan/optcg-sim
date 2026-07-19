@@ -154,4 +154,34 @@ describe("useGameWs prompt identity", () => {
       sequence: 2,
     });
   });
+
+  it("preserves the unchanged player reference across a one-player update", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+    const gameStateSetter = mocks.stateSetters[0];
+    const previousState = {
+      status: "IN_PROGRESS",
+      pendingPrompt: null,
+      players: [
+        { playerId: "player-0", hand: [{ instanceId: "card-0" }] },
+        { playerId: "player-1", hand: [{ instanceId: "card-1" }] },
+      ],
+    } as unknown as GameState;
+    const nextState = {
+      ...previousState,
+      players: [
+        { playerId: "player-0", hand: [] },
+        { playerId: "player-1", hand: [{ instanceId: "card-1" }] },
+      ],
+    } as unknown as GameState;
+
+    mocks.onMessage?.({ type: "game:update", state: nextState });
+
+    const installState = gameStateSetter.mock.calls[0]?.[0] as (
+      previous: GameState,
+    ) => GameState;
+    const installedState = installState(previousState);
+    expect(installedState.players[0]).toBe(nextState.players[0]);
+    expect(installedState.players[1]).toBe(previousState.players[1]);
+    expect(installedState.players[1]).not.toBe(nextState.players[1]);
+  });
 });

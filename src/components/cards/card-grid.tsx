@@ -23,10 +23,10 @@ function CardGridItem({
     <button
       type="button"
       onClick={() => onCardClick(card.id)}
-      className="group relative overflow-hidden rounded-lg bg-card text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+      className="group bg-surface-1 relative overflow-hidden rounded-lg text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
     >
       {/* Card image */}
-      <div className="relative aspect-card w-full overflow-hidden">
+      <div className="aspect-card relative w-full overflow-hidden">
         {!loaded && <Skeleton className="absolute inset-0 rounded-none" />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -38,13 +38,13 @@ function CardGridItem({
         />
         {/* Variant badge */}
         {loaded && card._count.artVariants > 0 && (
-          <Badge className="absolute right-2 top-2 backdrop-blur-sm">
+          <Badge className="absolute top-2 right-2 backdrop-blur-sm">
             +{card._count.artVariants} art
           </Badge>
         )}
         {/* Ban badge */}
         {loaded && card.banStatus !== "LEGAL" && (
-          <Badge variant="error" className="absolute left-2 top-2 font-bold">
+          <Badge variant="error" className="absolute top-2 left-2 font-bold">
             {card.banStatus}
           </Badge>
         )}
@@ -62,7 +62,7 @@ function CardGridItem({
 export function CardGrid({ cards, onCardClick }: CardGridProps) {
   if (cards.length === 0) {
     return (
-      <div className="py-16 text-center text-sm text-content-tertiary">
+      <div className="text-content-tertiary py-16 text-center text-sm">
         No cards found. Try adjusting your filters.
       </div>
     );
@@ -81,7 +81,7 @@ export function CardGridSkeleton({ count = 20 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="overflow-hidden rounded-lg bg-card">
+        <div key={i} className="bg-surface-1 overflow-hidden rounded-lg">
           <Skeleton className="aspect-card w-full rounded-none" />
         </div>
       ))}

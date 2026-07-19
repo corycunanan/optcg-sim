@@ -47,6 +47,7 @@ export function DropOverlay({
 
   return (
     <div
+      aria-hidden="true"
       className={cn(
         "absolute inset-0 z-0 rounded-md transition-colors",
         hovered ? hoveredColorMap[color] : colorMap[color],

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
@@ -66,7 +67,7 @@ interface PlayerFieldProps {
   onTargetToggle?: (instanceId: string) => void;
 }
 
-export function PlayerField({
+function PlayerFieldComponent({
   me,
   cardDb,
   activeDragType,
@@ -309,3 +310,6 @@ export function PlayerField({
     </>
   );
 }
+
+export const PlayerField = memo(PlayerFieldComponent);
+PlayerField.displayName = "PlayerField";

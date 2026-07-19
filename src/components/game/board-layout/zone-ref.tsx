@@ -1,15 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, type HTMLAttributes } from "react";
 import { useZonePosition } from "@/contexts/zone-position-context";
 
 /** Registers a DOM element as a zone position anchor. */
-export function ZoneRef({ zoneKey, children, style, className }: {
+export function ZoneRef({ zoneKey, children, ...props }: {
   zoneKey: string;
   children: React.ReactNode;
-  style?: React.CSSProperties;
-  className?: string;
-}) {
+} & HTMLAttributes<HTMLDivElement>) {
   const zonePos = useZonePosition();
   const ref = useCallback(
     (node: HTMLDivElement | null) => {
@@ -18,5 +16,5 @@ export function ZoneRef({ zoneKey, children, style, className }: {
     },
     [zoneKey, zonePos],
   );
-  return <div ref={ref} style={style} className={className}>{children}</div>;
+  return <div ref={ref} {...props}>{children}</div>;
 }

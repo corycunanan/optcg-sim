@@ -36,7 +36,7 @@ import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
 import { PregameOverlay } from "./pregame/pregame-overlay";
-import type { PromptOptions } from "@shared/game-types";
+import type { GameAction, PromptOptions } from "@shared/game-types";
 import type { SolitairePerspective } from "@/hooks/use-solitaire-session";
 
 export interface LiveGameShellProps {
@@ -118,6 +118,8 @@ interface GameSessionViewProps {
 
 function GameSessionView({ session, solitaire }: GameSessionViewProps) {
   const { game, opponent, navigation, endState } = session;
+  const { sendAction } = game;
+  const { handleBackToLobbies } = navigation;
   const [devPrompt, setDevPrompt] = useState<PromptOptions | null>(null);
   const [fadeVisible, setFadeVisible] = useState(false);
   const [turnBanner, setTurnBanner] = useState<string | null>(null);
@@ -197,6 +199,25 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     manualFlipPendingRef.current = true;
     runFade(solitaire.onFlipPerspective);
   };
+
+  const handleAction = useCallback(
+    (action: GameAction) => {
+      if (
+        action.type === "ARRANGE_TOP_CARDS" ||
+        action.type === "PLAYER_CHOICE" ||
+        action.type === "REVEAL_TRIGGER" ||
+        action.type === "PASS"
+      ) {
+        setDevPrompt(null);
+      }
+      sendAction(action);
+    },
+    [sendAction]
+  );
+
+  const handleLeave = useCallback(() => {
+    void handleBackToLobbies();
+  }, [handleBackToLobbies]);
 
   if (navigation.remoteGameNotFound) {
     return (
@@ -342,20 +363,8 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
   };
 
   const dispatch: BoardDispatch = {
-    onAction: (action) => {
-      if (
-        action.type === "ARRANGE_TOP_CARDS" ||
-        action.type === "PLAYER_CHOICE" ||
-        action.type === "REVEAL_TRIGGER" ||
-        action.type === "PASS"
-      ) {
-        setDevPrompt(null);
-      }
-      game.sendAction(action);
-    },
-    onLeave: () => {
-      void navigation.handleBackToLobbies();
-    },
+    onAction: handleAction,
+    onLeave: handleLeave,
   };
 
   return (

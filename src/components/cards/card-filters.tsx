@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { ALL_CARD_SETS_FILTER } from "@/lib/cards/browser-params";
 import { SetFilter } from "./set-filter";
 
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
@@ -8,13 +9,40 @@ const TYPES = ["Leader", "Character", "Event", "Stage"];
 const BLOCKS = [1, 2, 3, 4];
 
 // CSS variable tokens for tcg colors — dynamic and can't be expressed with static Tailwind
-const COLOR_ACTIVE: Record<string, { bg: string; text: string; border: string }> = {
-  Red:    { bg: "var(--card-red)",    text: "var(--text-inverse)", border: "var(--card-red)" },
-  Blue:   { bg: "var(--card-blue)",   text: "var(--text-inverse)", border: "var(--card-blue)" },
-  Green:  { bg: "var(--card-green)",  text: "var(--text-inverse)", border: "var(--card-green)" },
-  Purple: { bg: "var(--card-purple)", text: "var(--text-inverse)", border: "var(--card-purple)" },
-  Black:  { bg: "var(--card-black)",  text: "var(--text-inverse)", border: "var(--card-black)" },
-  Yellow: { bg: "var(--card-yellow)", text: "var(--navy-900)", border: "var(--card-yellow)" },
+const COLOR_ACTIVE: Record<
+  string,
+  { bg: string; text: string; border: string }
+> = {
+  Red: {
+    bg: "var(--card-red)",
+    text: "var(--text-inverse)",
+    border: "var(--card-red)",
+  },
+  Blue: {
+    bg: "var(--card-blue)",
+    text: "var(--text-inverse)",
+    border: "var(--card-blue)",
+  },
+  Green: {
+    bg: "var(--card-green)",
+    text: "var(--text-inverse)",
+    border: "var(--card-green)",
+  },
+  Purple: {
+    bg: "var(--card-purple)",
+    text: "var(--text-inverse)",
+    border: "var(--card-purple)",
+  },
+  Black: {
+    bg: "var(--card-black)",
+    text: "var(--text-inverse)",
+    border: "var(--card-black)",
+  },
+  Yellow: {
+    bg: "var(--card-yellow)",
+    text: "var(--navy-900)",
+    border: "var(--card-yellow)",
+  },
 };
 
 interface CardFiltersProps {
@@ -38,9 +66,7 @@ export function CardFilters({
   const activeColors = currentFilters.color
     ? currentFilters.color.split(",")
     : [];
-  const activeTypes = currentFilters.type
-    ? currentFilters.type.split(",")
-    : [];
+  const activeTypes = currentFilters.type ? currentFilters.type.split(",") : [];
   const activeBlocks = currentFilters.block
     ? currentFilters.block.split(",").map(Number)
     : [];
@@ -49,7 +75,7 @@ export function CardFilters({
   function toggleFilter(
     filterKey: string,
     value: string,
-    activeValues: string[],
+    activeValues: string[]
   ) {
     const newValues = activeValues.includes(value)
       ? activeValues.filter((v) => v !== value)
@@ -62,7 +88,7 @@ export function CardFilters({
       {/* Row 1: Color, Type, Block, Reprints */}
       <div className="flex flex-wrap items-end gap-6">
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <label className="text-content-tertiary mb-2 block text-xs font-semibold tracking-widest uppercase">
             Color
           </label>
           <div className="flex flex-wrap gap-2">
@@ -75,11 +101,16 @@ export function CardFilters({
                   onClick={() => toggleFilter("color", c, activeColors)}
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
-                    !active && "border-border bg-secondary text-content-tertiary hover:bg-muted",
+                    !active &&
+                      "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
                   )}
                   style={
                     active
-                      ? { background: colorStyle.bg, color: colorStyle.text, borderColor: colorStyle.border }
+                      ? {
+                          background: colorStyle.bg,
+                          color: colorStyle.text,
+                          borderColor: colorStyle.border,
+                        }
                       : undefined
                   }
                 >
@@ -91,7 +122,7 @@ export function CardFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <label className="text-content-tertiary mb-2 block text-xs font-semibold tracking-widest uppercase">
             Type
           </label>
           <div className="flex gap-2">
@@ -105,7 +136,7 @@ export function CardFilters({
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-secondary text-content-tertiary hover:bg-muted",
+                      : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
                   )}
                 >
                   {t}
@@ -116,7 +147,7 @@ export function CardFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <label className="text-content-tertiary mb-2 block text-xs font-semibold tracking-widest uppercase">
             Block
           </label>
           <div className="flex gap-2">
@@ -125,12 +156,14 @@ export function CardFilters({
               return (
                 <button
                   key={b}
-                  onClick={() => toggleFilter("block", String(b), activeBlocks.map(String))}
+                  onClick={() =>
+                    toggleFilter("block", String(b), activeBlocks.map(String))
+                  }
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-secondary text-content-tertiary hover:bg-muted",
+                      : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
                   )}
                 >
                   {b}
@@ -141,22 +174,26 @@ export function CardFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <label className="text-content-tertiary mb-2 block text-xs font-semibold tracking-widest uppercase">
             Reprints
           </label>
           <button
-            onClick={() => onFilterChange({ originOnly: originOnly ? "" : "true" })}
+            onClick={() =>
+              onFilterChange({ originOnly: originOnly ? "" : "true" })
+            }
             className={cn(
               "flex items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-all",
               originOnly
                 ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-secondary text-content-tertiary hover:bg-muted",
+                : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
             )}
           >
             <span
               className={cn(
                 "inline-block h-3 w-3 rounded-sm border transition-colors",
-                originOnly ? "border-gold-500 bg-gold-500" : "border-content-tertiary bg-transparent",
+                originOnly
+                  ? "border-gold-500 bg-gold-500"
+                  : "border-content-tertiary bg-transparent"
               )}
             />
             Origin only
@@ -166,13 +203,17 @@ export function CardFilters({
 
       {/* Row 2: Set */}
       <div>
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+        <label className="text-content-tertiary mb-2 block text-xs font-semibold tracking-widest uppercase">
           Set
         </label>
         <SetFilter
           sets={sets}
           selectedSets={currentFilters.set ? currentFilters.set.split(",") : []}
-          onChange={(labels) => onFilterChange({ set: labels.join(",") })}
+          onChange={(labels) =>
+            onFilterChange({
+              set: labels.length > 0 ? labels.join(",") : ALL_CARD_SETS_FILTER,
+            })
+          }
         />
       </div>
     </div>

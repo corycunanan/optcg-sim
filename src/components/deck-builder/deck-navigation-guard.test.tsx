@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   subscribe: vi.fn(() => vi.fn()),
+  session: { user: { id: "user-1" } } as {
+    user: { id: string };
+  } | null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -22,7 +25,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: { user: { id: "user-1" } } }),
+  useSession: () => ({ data: mocks.session }),
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -207,6 +210,7 @@ beforeEach(() => {
   mocks.apiGet.mockReset();
   mocks.apiPost.mockReset();
   mocks.subscribe.mockClear();
+  mocks.session = { user: { id: "user-1" } };
   mocks.apiGet.mockResolvedValue({
     data: [
       {
@@ -251,8 +255,8 @@ describe("deck builder navigation guard", () => {
     expect(links.map((link) => link.props.href)).toEqual([
       "/",
       "/",
-      "/admin/cards",
-      "/admin/sets",
+      "/cards",
+      "/sets",
       "/lobbies",
       "/sandbox",
       "/decks",
@@ -272,6 +276,19 @@ describe("deck builder navigation guard", () => {
         renderer!.root.findAllByProps({ role: "alertdialog" })
       ).toHaveLength(0);
     }
+  });
+
+  it("keeps public card navigation visible without a session", async () => {
+    mocks.session = null;
+    await renderGuard(<Navbar />, false);
+
+    const links = renderer!.root.findAllByType("a");
+    expect(links.map((link) => link.props.href)).toEqual([
+      "/",
+      "/",
+      "/cards",
+      "/sets",
+    ]);
   });
 
   it("keeps dirty editor state on cancel and navigates only after confirmation", async () => {

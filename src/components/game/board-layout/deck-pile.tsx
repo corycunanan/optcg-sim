@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import type { CardDb } from "@shared/game-types";
 import { Card } from "../card";
+import { getBoardZoneLabel } from "./accessibility";
 import { PileReceipt } from "./pile-receipt";
 import { ZoneRef } from "./zone-ref";
 
@@ -26,7 +27,16 @@ export function DeckPile({
   const visibleCount = Math.max(0, count - arrivingCount);
 
   return (
-    <ZoneRef zoneKey={zoneKey} style={style}>
+    <ZoneRef
+      zoneKey={zoneKey}
+      style={style}
+      role="group"
+      aria-label={getBoardZoneLabel(
+        zoneKey,
+        "deck",
+        `${visibleCount} ${visibleCount === 1 ? "card" : "cards"}`,
+      )}
+    >
       <PileReceipt visibleCount={visibleCount}>
         <Card
           variant="trash"

@@ -13,10 +13,8 @@ import type {
 } from "@shared/game-types";
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { useReducedMotion } from "motion/react";
-import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui";
 import {
-  NAVBAR_H,
   HAND_CARD_H,
   FIELD_W,
   BOARD_CONTENT_H,
@@ -29,7 +27,7 @@ import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
 import { MidZone } from "./mid-zone";
 import { CardAnimationLayer } from "./card-animation-layer";
-import { NavMenu } from "./nav-menu";
+import { BoardNavbar } from "./board-navbar";
 import { OpponentField } from "./opponent-field";
 import { PlayerField } from "./player-field";
 import { ZonePositionProvider, useZonePosition } from "@/contexts/zone-position-context";
@@ -44,7 +42,10 @@ import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useCombatVictoryPulse } from "@/hooks/use-combat-victory-pulse";
 import { useTriggerActivatedPulse } from "@/hooks/use-trigger-activated-pulse";
 import { useLifeDamagePulse } from "@/hooks/use-life-damage-pulse";
-import { usePowerModifiedPulse } from "@/hooks/use-power-modified-pulse";
+import {
+  usePowerModifiedPulse,
+  type PowerModPulse,
+} from "@/hooks/use-power-modified-pulse";
 import { useEffectsNegatedPulse } from "@/hooks/use-effects-negated-pulse";
 import { useAttackRedirectedPulse } from "@/hooks/use-attack-redirected-pulse";
 import { useLifeScriedPulse } from "@/hooks/use-life-scried-pulse";
@@ -60,6 +61,16 @@ import { useBoardDragState } from "./use-board-drag-state";
 import { BoardDragOverlay } from "./board-drag-overlay";
 import { useBoardModalRouting } from "./use-board-modal-routing";
 import { useRedistributionState } from "./use-redistribution-state";
+
+// Transient pulse hooks intentionally produce no pulses under reduced motion,
+// but their empty collections can be recreated on a parent render. Reuse one
+// bundle so those no-op values do not pierce the field memo boundaries.
+const EMPTY_FIELD_PULSE_PROPS = {
+  winnerPulseIds: new Set<string>(),
+  powerModPulses: new Map<string, PowerModPulse>(),
+  effectsNegatedPulses: new Map<string, string>(),
+  attackRedirectedPulses: new Map<string, number>(),
+};
 
 export interface BoardLayoutProps {
   me: PlayerState | null;
@@ -195,15 +206,6 @@ function BoardLayoutInner({
 
   const reducedMotion = useReducedMotion();
 
-  /* ── Status indicator ──────────────────────────────────────────── */
-
-  const statusDot =
-    connectionStatus === "connected"
-      ? "bg-gb-accent-green"
-      : connectionStatus === "connecting"
-        ? "bg-gb-accent-amber"
-        : "bg-gb-accent-red";
-
   /* ── Card flight animations ──────────────────────────────────── */
 
   const { transitions: cardAnimations, removeTransition } = useCardTransitions(
@@ -222,6 +224,24 @@ function BoardLayoutInner({
   const effectsNegatedPulses = useEffectsNegatedPulse(eventLog);
   const attackRedirectedPulses = useAttackRedirectedPulse(eventLog);
   const lifeScriedPulses = useLifeScriedPulse(eventLog);
+  const fieldPulseProps = useMemo(
+    () =>
+      reducedMotion
+        ? EMPTY_FIELD_PULSE_PROPS
+        : {
+            winnerPulseIds,
+            powerModPulses,
+            effectsNegatedPulses,
+            attackRedirectedPulses,
+          },
+    [
+      attackRedirectedPulses,
+      effectsNegatedPulses,
+      powerModPulses,
+      reducedMotion,
+      winnerPulseIds,
+    ],
+  );
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
   const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
   const opponentIndex = myIndex === null ? null : myIndex === 0 ? 1 : 0;
@@ -310,6 +330,17 @@ function BoardLayoutInner({
     }
   }, [turn?.phase, reducedMotion]);
 
+  const phaseLabel =
+    battlePhase === "BLOCK_STEP"
+      ? bs.isDefender
+        ? "You are blocking"
+        : "Opponent is blocking"
+      : battlePhase === "COUNTER_STEP"
+        ? bs.isDefender
+          ? "You are countering"
+          : "Opponent is countering"
+        : bs.phase;
+
   return (
     <TooltipProvider delayDuration={0} disableHoverableContent>
     <DndContext
@@ -324,76 +355,17 @@ function BoardLayoutInner({
     >
     <div className="relative h-full w-full overflow-hidden bg-gb-board">
       {/* ── Navbar ──────────────────────────────────────────────────── */}
-      <nav
-        className="absolute inset-x-0 top-0 z-30 flex items-center px-4 bg-gb-navbar"
-        style={{ height: NAVBAR_H }}
-      >
-        <span className="text-xs font-bold tracking-widest text-gb-text-bright shrink-0">
-          OPTCG SIM
-        </span>
-
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <span className="text-xs text-gb-text-bright font-bold">
-            Turn {turn?.number ?? "—"}
-          </span>
-          <div
-            className={cn(
-              "w-2 h-2 rounded-full shrink-0",
-              isMyTurn ? "bg-gb-accent-green" : "bg-gb-accent-amber",
-            )}
-          />
-          <span
-            className={cn(
-              "text-xs font-bold",
-              isMyTurn ? "text-gb-accent-green" : "text-gb-text-dim",
-            )}
-          >
-            {isMyTurn ? "Your Turn" : "Opponent\u2019s Turn"}
-          </span>
-          <span className="text-xs text-gb-accent-blue font-bold">
-            {battlePhase === "BLOCK_STEP"
-              ? bs.isDefender ? "You are blocking" : "Opponent is blocking"
-              : battlePhase === "COUNTER_STEP"
-                ? bs.isDefender ? "You are countering" : "Opponent is countering"
-                : bs.phase}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {interactionMode === "spectator" && (
-            <span
-              data-testid="board-spectator-badge"
-              className="rounded px-2 py-1 text-xs font-bold tracking-widest uppercase bg-gb-accent-amber/20 text-gb-accent-amber border border-gb-accent-amber/40"
-            >
-              Watching
-            </span>
-          )}
-          {interactionMode === "responseOnly" && (
-            <span
-              data-testid="board-respond-badge"
-              className="rounded px-2 py-1 text-xs font-bold tracking-widest uppercase bg-gb-accent-blue/20 text-gb-accent-blue border border-gb-accent-blue/40"
-            >
-              Respond
-            </span>
-          )}
-          {myIndex !== null && (
-            <span className="text-xs text-gb-text-dim">
-              P{myIndex + 1}
-            </span>
-          )}
-          <div className="flex items-center gap-1">
-            <div className={cn("w-2 h-2 rounded-full", statusDot)} />
-            <span className="text-xs text-gb-text-dim">
-              {connectionStatus}
-            </span>
-          </div>
-          <NavMenu
-            onLeave={onLeave}
-            onConcede={() => onAction({ type: "CONCEDE" })}
-            matchClosed={matchClosed}
-          />
-        </div>
-      </nav>
+      <BoardNavbar
+        turnNumber={turn?.number ?? null}
+        isMyTurn={isMyTurn}
+        phaseLabel={phaseLabel}
+        interactionMode={interactionMode}
+        playerIndex={myIndex}
+        connectionStatus={connectionStatus}
+        onLeave={onLeave}
+        onConcede={() => onAction({ type: "CONCEDE" })}
+        matchClosed={matchClosed}
+      />
 
       {/* ── Opponent Hand Layer ─────────────────────────────────────── */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center">
@@ -435,10 +407,10 @@ function BoardLayoutInner({
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
-            winnerPulseIds={winnerPulseIds}
-            powerModPulses={powerModPulses}
-            effectsNegatedPulses={effectsNegatedPulses}
-            attackRedirectedPulses={attackRedirectedPulses}
+            winnerPulseIds={fieldPulseProps.winnerPulseIds}
+            powerModPulses={fieldPulseProps.powerModPulses}
+            effectsNegatedPulses={fieldPulseProps.effectsNegatedPulses}
+            attackRedirectedPulses={fieldPulseProps.attackRedirectedPulses}
             lifeTriggerPulse={opponentLifeTriggerPulse}
             lifeDamagePulseNonce={opponentLifeDamagePulseNonce}
             lifeScriedPulseNonce={opponentLifeScriedPulseNonce}
@@ -523,10 +495,10 @@ function BoardLayoutInner({
             attackerInstanceId={attackerInstanceId}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
-            winnerPulseIds={winnerPulseIds}
-            powerModPulses={powerModPulses}
-            effectsNegatedPulses={effectsNegatedPulses}
-            attackRedirectedPulses={attackRedirectedPulses}
+            winnerPulseIds={fieldPulseProps.winnerPulseIds}
+            powerModPulses={fieldPulseProps.powerModPulses}
+            effectsNegatedPulses={fieldPulseProps.effectsNegatedPulses}
+            attackRedirectedPulses={fieldPulseProps.attackRedirectedPulses}
             lifeTriggerPulse={playerLifeTriggerPulse}
             lifeDamagePulseNonce={playerLifeDamagePulseNonce}
             lifeScriedPulseNonce={playerLifeScriedPulseNonce}

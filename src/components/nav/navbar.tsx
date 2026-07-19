@@ -18,11 +18,13 @@ export function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  if (!session?.user) return null;
   if (pathname.startsWith("/game/")) return null;
 
   const cardsActive =
-    pathname.startsWith("/admin/cards") || pathname.startsWith("/admin/sets");
+    pathname.startsWith("/cards") ||
+    pathname.startsWith("/sets") ||
+    pathname.startsWith("/admin/cards") ||
+    pathname.startsWith("/admin/sets");
   const decksActive = pathname.startsWith("/decks");
   const playActive =
     pathname.startsWith("/lobbies") || pathname.startsWith("/game");
@@ -75,7 +77,7 @@ export function Navbar() {
                 <li>
                   <NavigationMenuLink asChild>
                     <DeckNavigationGuardLink
-                      href="/admin/cards"
+                      href="/cards"
                       className={linkStyles}
                     >
                       All Cards
@@ -85,7 +87,7 @@ export function Navbar() {
                 <li>
                   <NavigationMenuLink asChild>
                     <DeckNavigationGuardLink
-                      href="/admin/sets"
+                      href="/sets"
                       className={linkStyles}
                     >
                       Sets
@@ -96,67 +98,74 @@ export function Navbar() {
             </NavigationMenuContent>
           </NavigationMenuItem>
 
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild>
-              <DeckNavigationGuardLink
-                href="/lobbies"
-                className={cn(
-                  navigationMenuTriggerStyle(),
-                  triggerStyles,
-                  playActive && activeTriggerStyles
-                )}
-              >
-                Play
-              </DeckNavigationGuardLink>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
+          {session?.user && (
+            <>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <DeckNavigationGuardLink
+                    href="/lobbies"
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      triggerStyles,
+                      playActive && activeTriggerStyles
+                    )}
+                  >
+                    Play
+                  </DeckNavigationGuardLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
 
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild>
-              <DeckNavigationGuardLink
-                href="/sandbox"
-                className={cn(
-                  navigationMenuTriggerStyle(),
-                  triggerStyles,
-                  sandboxActive && activeTriggerStyles
-                )}
-              >
-                Sandbox
-              </DeckNavigationGuardLink>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <DeckNavigationGuardLink
+                    href="/sandbox"
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      triggerStyles,
+                      sandboxActive && activeTriggerStyles
+                    )}
+                  >
+                    Sandbox
+                  </DeckNavigationGuardLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
 
-          <NavigationMenuItem>
-            <NavigationMenuTrigger
-              className={cn(triggerStyles, decksActive && activeTriggerStyles)}
-            >
-              Decks
-            </NavigationMenuTrigger>
-            <NavigationMenuContent className="bg-surface-nav border border-content-inverse/10">
-              <ul className="flex w-48 flex-col gap-1 p-1">
-                <li>
-                  <NavigationMenuLink asChild>
-                    <DeckNavigationGuardLink
-                      href="/decks"
-                      className={linkStyles}
-                    >
-                      My Decks
-                    </DeckNavigationGuardLink>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <DeckNavigationGuardLink
-                      href="/decks/new"
-                      className={linkStyles}
-                    >
-                      + New Deck
-                    </DeckNavigationGuardLink>
-                  </NavigationMenuLink>
-                </li>
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger
+                  className={cn(
+                    triggerStyles,
+                    decksActive && activeTriggerStyles
+                  )}
+                >
+                  Decks
+                </NavigationMenuTrigger>
+                <NavigationMenuContent className="bg-surface-nav border border-content-inverse/10">
+                  <ul className="flex w-48 flex-col gap-1 p-1">
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <DeckNavigationGuardLink
+                          href="/decks"
+                          className={linkStyles}
+                        >
+                          My Decks
+                        </DeckNavigationGuardLink>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <DeckNavigationGuardLink
+                          href="/decks/new"
+                          className={linkStyles}
+                        >
+                          + New Deck
+                        </DeckNavigationGuardLink>
+                      </NavigationMenuLink>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </>
+          )}
         </NavigationMenuList>
       </NavigationMenu>
     </nav>

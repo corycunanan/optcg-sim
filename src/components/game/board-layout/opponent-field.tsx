@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId } from "react";
+import { memo, useCallback, useId } from "react";
 import type { CardDb, PlayerState } from "@shared/game-types";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isAttackTargetEligible } from "@/lib/game/client-legality";
@@ -64,7 +64,7 @@ export function getOpponentStageTabIndex(
   return selection ? 0 : -1;
 }
 
-export function OpponentField({
+function OpponentFieldComponent({
   opp,
   cardDb,
   activeDragType,
@@ -302,3 +302,6 @@ export function OpponentField({
     </>
   );
 }
+
+export const OpponentField = memo(OpponentFieldComponent);
+OpponentField.displayName = "OpponentField";

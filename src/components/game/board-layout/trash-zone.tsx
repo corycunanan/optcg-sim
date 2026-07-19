@@ -5,6 +5,7 @@ import type { CardDb, CardInstance } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { Card } from "../card";
 import { BOARD_CARD_W, BOARD_CARD_H } from "./constants";
+import { getBoardZoneLabel } from "./accessibility";
 import { PileReceipt } from "./pile-receipt";
 
 export const DroppableTrashZone = React.memo(function DroppableTrashZone({
@@ -42,6 +43,12 @@ export const DroppableTrashZone = React.memo(function DroppableTrashZone({
   return (
     <div
       ref={ref}
+      role="group"
+      aria-label={getBoardZoneLabel(
+        zoneKey,
+        "trash",
+        `${visibleTrash.length} ${visibleTrash.length === 1 ? "card" : "cards"}`,
+      )}
       className="relative flex items-center justify-center"
       style={{ ...style, width: BOARD_CARD_W, height: BOARD_CARD_H }}
     >
