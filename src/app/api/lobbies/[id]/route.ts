@@ -26,6 +26,11 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 type PatchLobbyData = {
   mode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+  pregameMode?:
+    | "PRIORITY_ROLL"
+    | "HOST_FIRST"
+    | "GUEST_FIRST"
+    | "RANDOM_FIXED";
   format?: string;
   hostDeckId?: string | null;
   hostReady?: boolean;
@@ -92,6 +97,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const hasHostControlledChange =
     parsed.mode !== undefined ||
+    parsed.pregameMode !== undefined ||
     parsed.format !== undefined ||
     parsed.hostDeckId !== undefined;
   if (hasHostControlledChange && !isHost) {
@@ -183,6 +189,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const lobbyData: PatchLobbyData = {};
   if (parsed.mode !== undefined) lobbyData.mode = parsed.mode;
+  if (parsed.pregameMode !== undefined) {
+    lobbyData.pregameMode = parsed.pregameMode;
+  }
   if (parsed.format !== undefined) lobbyData.format = parsed.format;
   if (parsed.hostDeckId !== undefined) lobbyData.hostDeckId = parsed.hostDeckId;
   if (hasHostControlledChange) lobbyData.hostReady = false;

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 export const LobbyModeSchema = z.enum(["PVP", "SOLITAIRE", "PVCOMPUTER"]);
+export const PregameModeSchema = z.enum([
+  "PRIORITY_ROLL",
+  "HOST_FIRST",
+  "GUEST_FIRST",
+  "RANDOM_FIXED",
+]);
 export const LobbyStatusSchema = z.enum([
   "WAITING",
   "READY",
@@ -31,6 +37,7 @@ export const LobbyRoomStateSchema = z.object({
   joinCode: z.string(),
   format: z.string(),
   mode: LobbyModeSchema,
+  pregameMode: PregameModeSchema.default("PRIORITY_ROLL"),
   hostReady: z.boolean(),
   hostUserId: z.string(),
   host: LobbyUserSchema.omit({ id: true }).nullable(),
@@ -76,6 +83,7 @@ export const UpdateLobbyDeckSchema = z.object({
 export const PatchLobbySchema = z
   .object({
     mode: LobbyModeSchema.optional(),
+    pregameMode: PregameModeSchema.optional(),
     format: z.string().min(1, "format is required").optional(),
     hostDeckId: z
       .string()

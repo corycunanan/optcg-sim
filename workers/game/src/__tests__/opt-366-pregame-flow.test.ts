@@ -12,17 +12,21 @@ import {
 import { prepareDecksAndLeaders } from "../engine/setup.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { isStartOfTurnAutoPhase } from "../engine/phases.js";
+import { takeEngineRandom } from "../engine/execution-context.js";
 import { createTestPayload, CARDS } from "./helpers.js";
-import type { GameAction, GameState } from "../types.js";
+import type { GameAction, GameState, PregameMode } from "../types.js";
 
-function buildPregameState(testRolls: number[] | null = null): {
+function buildPregameState(
+  testRolls: number[] | null = null,
+  mode: PregameMode = "PRIORITY_ROLL",
+): {
   state: GameState;
   cardDb: Map<string, import("../types.js").CardData>;
   testRolls: number[] | null;
 } {
   const payload = createTestPayload();
   const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
-  return { state: startPregame(prepared), cardDb, testRolls };
+  return { state: startPregame(prepared, mode), cardDb, testRolls };
 }
 
 /** Drive the FSM until it pauses for a prompt or finishes. */
@@ -72,6 +76,58 @@ describe("OPT-366 pregame flow", () => {
         expect(event.payload.rolls).toEqual([2, 5]);
         expect(event.payload.priorityDeciderIndex).toBe(1);
       }
+    });
+  });
+
+  describe("configured pregame modes", () => {
+    it.each([
+      ["HOST_FIRST", 0],
+      ["GUEST_FIRST", 1],
+    ] as const)(
+      "%s skips both priority phases and fixes player %i first",
+      (mode, expectedFirstPlayer) => {
+        const { state, cardDb } = buildPregameState(null, mode);
+
+        expect(state.pregame?.phase).toBe("START_OF_GAME_FX");
+        expect(state.pregame?.priorityRolls).toBeNull();
+        expect(state.pregame?.priorityDeciderIndex).toBe(expectedFirstPlayer);
+        expect(state.pregame?.firstPlayerIndex).toBe(expectedFirstPlayer);
+        expect(state.turn.activePlayerIndex).toBe(expectedFirstPlayer);
+        expect(state.pendingPrompt).toBeNull();
+        expect(state.eventLog.some((event) => event.type === "PREGAME_PRIORITY_ROLLED"))
+          .toBe(false);
+
+        let completed = drain(state, cardDb, []).state;
+        expect(completed.pregame?.phase).toBe("MULLIGAN_DECISIONS");
+        expect(completed.pendingPrompt?.respondingPlayer).toBe(expectedFirstPlayer);
+        completed = applyChoice(completed, "KEEP").state;
+        completed = drain(completed, cardDb, []).state;
+        completed = applyChoice(completed, "KEEP").state;
+        completed = drain(completed, cardDb, []).state;
+        expect(completed.pregame).toBeNull();
+        expect(completed.turn.activePlayerIndex).toBe(expectedFirstPlayer);
+        expect(completed.turn.firstPlayerIndex).toBe(expectedFirstPlayer);
+      },
+    );
+
+    it("RANDOM_FIXED uses one private coin flip without roll or choice phases", () => {
+      const payload = createTestPayload();
+      const { state: prepared, cardDb } = prepareDecksAndLeaders(payload);
+      const expectedFirstPlayer = takeEngineRandom(prepared).value < 0.5 ? 0 : 1;
+      const state = startPregame(prepared, "RANDOM_FIXED");
+
+      expect(state.pregame?.phase).toBe("START_OF_GAME_FX");
+      expect(state.pregame?.priorityRolls).toBeNull();
+      expect(state.pregame?.priorityDeciderIndex).toBe(expectedFirstPlayer);
+      expect(state.pregame?.firstPlayerIndex).toBe(expectedFirstPlayer);
+      expect(state.turn.activePlayerIndex).toBe(expectedFirstPlayer);
+      expect(state.pendingPrompt).toBeNull();
+      expect(state.eventLog.some((event) => event.type === "PREGAME_PRIORITY_ROLLED"))
+        .toBe(false);
+
+      const next = drain(state, cardDb, []).state;
+      expect(next.pregame?.phase).toBe("MULLIGAN_DECISIONS");
+      expect(next.pendingPrompt?.respondingPlayer).toBe(expectedFirstPlayer);
     });
   });
 

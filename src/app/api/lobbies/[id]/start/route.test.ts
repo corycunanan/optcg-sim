@@ -8,6 +8,7 @@ const buildGameInitPayloadMock = vi.fn((input: unknown) => ({
   ...(typeof input === "object" && input !== null ? input : {}),
   gameId: "game-1",
   mode: "PVP",
+  pregameMode: "PRIORITY_ROLL",
 }));
 const lobbyFindUniqueMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
@@ -117,8 +118,10 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
     hostDeckId: "host-deck",
     format: "Standard",
     mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
     status: "READY",
     hostReady: true,
+    revision: 7,
     guest: {
       userId: "guest-user",
       deckId: "guest-deck",
@@ -159,7 +162,11 @@ beforeEach(() => {
     deck: { id: "deck", cards: [] },
     leader: { id: "leader" },
   });
-  buildGameInitPayloadMock.mockReturnValue({ gameId: "game-1", mode: "PVP" });
+  buildGameInitPayloadMock.mockReturnValue({
+    gameId: "game-1",
+    mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
+  });
   lobbyFindUniqueMock.mockResolvedValue(baseLobby());
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   gameSessionCreateMock.mockResolvedValue({ id: "game-1" });
@@ -187,6 +194,9 @@ afterEach(() => {
 
 describe("POST /api/lobbies/[id]/start", () => {
   it("starts a ready PVP lobby and initializes the worker", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ pregameMode: "GUEST_FIRST" })
+    );
     const res = await POST(buildRequest(), params);
     const body = await res.json();
 
@@ -195,7 +205,7 @@ describe("POST /api/lobbies/[id]/start", () => {
     expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(1, "host-deck", "host-user");
     expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(2, "guest-deck", "guest-user");
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1", status: "READY" },
+      where: { id: "lobby-1", status: "READY", revision: 7 },
       data: { status: "IN_GAME", revision: { increment: 1 } },
     });
     expect(gameSessionCreateMock).toHaveBeenCalledWith({
@@ -207,6 +217,7 @@ describe("POST /api/lobbies/[id]/start", () => {
         player2DeckId: "guest-deck",
         format: "Standard",
         mode: "PVP",
+        pregameMode: "GUEST_FIRST",
         status: "IN_PROGRESS",
       },
       select: { id: true },
@@ -215,6 +226,7 @@ describe("POST /api/lobbies/[id]/start", () => {
       gameId: "game-1",
       format: "Standard",
       mode: "PVP",
+      pregameMode: "GUEST_FIRST",
       player1: expect.objectContaining({ userId: "host-user" }),
       player2: expect.objectContaining({ userId: "guest-user" }),
     }));

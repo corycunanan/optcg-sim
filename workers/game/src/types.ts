@@ -23,7 +23,7 @@ export type {
   EffectStackFrame as SharedEffectStackFrame,
   QueuedTrigger as SharedQueuedTrigger,
 } from "../../../shared/game-types.js";
-export type { LobbyMode } from "../../../shared/game-init.js";
+export type { LobbyMode, PregameMode } from "../../../shared/game-init.js";
 
 import type {
   CardData as SharedCardData,

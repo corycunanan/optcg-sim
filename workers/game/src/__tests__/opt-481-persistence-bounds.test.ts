@@ -157,6 +157,7 @@ describe("OPT-481 bounded session persistence", () => {
       state: longState,
       cardDb,
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory: [longState, longState, longState],
     });
@@ -217,6 +218,7 @@ describe("OPT-481 bounded session persistence", () => {
       state: legacyState,
       cardDb: Object.fromEntries(cardDb),
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       undoHistory: [legacyState, legacyState],
     });
 
@@ -252,6 +254,7 @@ describe("OPT-481 bounded session persistence", () => {
       state: malformedState,
       cardDb: Object.fromEntries(cardDb),
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory: [],
     });
@@ -267,6 +270,7 @@ describe("OPT-481 bounded session persistence", () => {
       state: { ...state, eventLog: turnEvents(1_000) },
       cardDb,
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory: [],
     });
@@ -318,6 +322,7 @@ describe("OPT-481 bounded session persistence", () => {
       state,
       cardDb,
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory: [],
     });
@@ -344,6 +349,7 @@ describe("OPT-481 bounded session persistence", () => {
       state,
       cardDb,
       mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
       testPriorityRolls: null,
       undoHistory: [],
     });
@@ -414,6 +420,7 @@ describe("OPT-481 bounded session persistence", () => {
         },
         cardDb,
         mode: "PVP",
+        pregameMode: "PRIORITY_ROLL",
         testPriorityRolls: null,
         undoHistory: [],
       });
@@ -432,6 +439,7 @@ describe("OPT-481 bounded session persistence", () => {
         },
         cardDb,
         mode: "PVP",
+        pregameMode: "PRIORITY_ROLL",
         testPriorityRolls: null,
         undoHistory: [],
       }),

@@ -100,6 +100,7 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
     hostDeckId: "host-deck",
     format: "Standard",
     mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
     status: "READY",
     hostReady: true,
     guest: {
@@ -170,6 +171,50 @@ beforeEach(() => {
 });
 
 describe("PATCH /api/lobbies/[id]", () => {
+  it("lets the host change pre-game flow and bumps the lobby revision", async () => {
+    const res = await PATCH(
+      buildRequest({ pregameMode: "GUEST_FIRST" }),
+      params
+    );
+
+    expect(res.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "PVP" },
+      data: {
+        pregameMode: "GUEST_FIRST",
+        hostReady: false,
+        revision: { increment: 1 },
+      },
+    });
+  });
+
+  it("rejects a guest pre-game flow change", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
+
+    const res = await PATCH(
+      buildRequest({ pregameMode: "GUEST_FIRST" }),
+      params
+    );
+
+    expect(res.status).toBe(403);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["IN_GAME", "CLOSED"])(
+    "rejects a pre-game flow change when the lobby is %s",
+    async (status) => {
+      lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({ status }));
+
+      const res = await PATCH(
+        buildRequest({ pregameMode: "RANDOM_FIXED" }),
+        params
+      );
+
+      expect(res.status).toBe(404);
+      expect(transactionMock).not.toHaveBeenCalled();
+    }
+  );
+
   it("blocks PVP to Solitaire while a real guest is present unless forced", async () => {
     const res = await PATCH(buildRequest({ mode: "SOLITAIRE" }), params);
     const body = await res.json();

@@ -1,5 +1,9 @@
 import type { Card } from "@prisma/client";
-import type { GameInitPayload, LobbyMode } from "@shared/game-init";
+import type {
+  GameInitPayload,
+  LobbyMode,
+  PregameMode,
+} from "@shared/game-init";
 import { toCardData } from "@/lib/game/card-data";
 
 type DeckCardWithCard = {
@@ -20,6 +24,7 @@ type BuildGameInitPayloadInput = {
   gameId: string;
   format: string;
   mode: LobbyMode;
+  pregameMode: PregameMode;
   player1: {
     userId: string;
     leader: Card;
@@ -86,6 +91,7 @@ export function buildGameInitPayload(
     gameId: input.gameId,
     format: input.format,
     mode: input.mode,
+    pregameMode: input.pregameMode,
     player1: buildPlayerInit(
       input.player1.userId,
       input.player1.leader,

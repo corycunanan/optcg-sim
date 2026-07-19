@@ -188,18 +188,19 @@ describe("OPT-476 start-of-game effects", () => {
     expect(declined.executionContext.rngState).not.toBe(rngStateBeforeShuffle);
   });
 
-  it("resolves both Leaders in first-player order", () => {
+  it("resolves both Leaders in priority-decider order", () => {
     const { state, cardDb } = buildState([true, true], [true, true]);
     const chosen = chooseFirstPlayer(state, cardDb, "SECOND");
     const firstPrompt = advancePregame(chosen, cardDb, []).state;
 
     expect(firstPrompt.pregame?.firstPlayerIndex).toBe(1);
-    expect(firstPrompt.pendingPrompt?.respondingPlayer).toBe(1);
-    expect(firstPrompt.pregame?.startOfGameEffectsResolved).toEqual([false, true]);
+    expect(firstPrompt.pregame?.priorityDeciderIndex).toBe(0);
+    expect(firstPrompt.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(firstPrompt.pregame?.startOfGameEffectsResolved).toEqual([true, false]);
 
     const firstDone = answerSearch(firstPrompt, cardDb, false);
     const secondPrompt = advancePregame(firstDone, cardDb, []).state;
-    expect(secondPrompt.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(secondPrompt.pendingPrompt?.respondingPlayer).toBe(1);
     expect(secondPrompt.pregame?.startOfGameEffectsResolved).toEqual([true, true]);
     expect(secondPrompt.players[0].hand).toHaveLength(0);
     expect(secondPrompt.players[1].hand).toHaveLength(0);

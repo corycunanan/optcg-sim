@@ -4,6 +4,34 @@ import { validateGameInitPayload } from "../util/validate.js";
 import { createTestPayload } from "./helpers.js";
 
 describe("OPT-498 deterministic setup validation", () => {
+  it("accepts every pregame mode and defaults legacy init payloads", () => {
+    for (const pregameMode of [
+      "PRIORITY_ROLL",
+      "HOST_FIRST",
+      "GUEST_FIRST",
+      "RANDOM_FIXED",
+    ] as const) {
+      const payload = createTestPayload();
+      payload.pregameMode = pregameMode;
+      expect(validateGameInitPayload(payload).pregameMode).toBe(pregameMode);
+    }
+
+    const legacy = createTestPayload() as unknown as Record<string, unknown>;
+    delete legacy.pregameMode;
+    expect(validateGameInitPayload(legacy).pregameMode).toBe("PRIORITY_ROLL");
+  });
+
+  it("rejects unknown pregame modes at the worker boundary", () => {
+    const payload = {
+      ...createTestPayload(),
+      pregameMode: "SIDE_A_FIRST",
+    };
+
+    expect(() => validateGameInitPayload(payload)).toThrow(
+      "GameInitPayload.pregameMode must be a valid pregame mode"
+    );
+  });
+
   it.each([
     ["life", "PlayerInitData.testOrder.life must contain exactly 5 cards"],
     ["hand", "PlayerInitData.testOrder.hand must contain exactly 5 cards"],

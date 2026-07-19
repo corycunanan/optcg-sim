@@ -100,6 +100,7 @@ export async function POST(
         where: {
           id: lobby.id,
           status: lobby.status,
+          revision: lobby.revision,
         },
         data: { status: "IN_GAME", revision: { increment: 1 } },
       });
@@ -121,6 +122,7 @@ export async function POST(
           player2DeckId: seatConfig.player2DeckId,
           format: lobby.format,
           mode: lobby.mode,
+          pregameMode: lobby.pregameMode,
           status: "IN_PROGRESS",
         },
         select: { id: true },
@@ -146,6 +148,7 @@ export async function POST(
       gameId: startResult.gameSession.id,
       format: lobby.format,
       mode: lobby.mode,
+      pregameMode: lobby.pregameMode,
       player1: {
         userId: seatConfig.player1Id,
         leader: player1PlayableDeck.leader,

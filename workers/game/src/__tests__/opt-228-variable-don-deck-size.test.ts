@@ -75,6 +75,7 @@ function makePayload(leader0: CardData, leader1: CardData): GameInitPayload {
     },
     format: "standard",
     mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
   };
 }
 

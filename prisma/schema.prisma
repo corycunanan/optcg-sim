@@ -262,6 +262,13 @@ enum LobbyMode {
   PVCOMPUTER
 }
 
+enum PregameMode {
+  PRIORITY_ROLL
+  HOST_FIRST
+  GUEST_FIRST
+  RANDOM_FIXED
+}
+
 model FriendRequest {
   id         String              @id @default(uuid())
   fromUserId String
@@ -322,6 +329,7 @@ model Lobby {
   joinCode   String      @unique @map("join_code")
   format     String      @default("Standard")
   mode       LobbyMode   @default(PVP)
+  pregameMode PregameMode @default(PRIORITY_ROLL) @map("pregame_mode")
   status     LobbyStatus @default(WAITING)
   hostReady  Boolean     @default(false) @map("host_ready")
   revision   Int         @default(0)
@@ -405,6 +413,7 @@ model GameSession {
   player2DeckId String
   format        String
   mode          LobbyMode       @default(PVP)
+  pregameMode   PregameMode     @default(PRIORITY_ROLL) @map("pregame_mode")
   status        GameStatus      @default(IN_PROGRESS)
   winnerId      String?
   winReason     String?
