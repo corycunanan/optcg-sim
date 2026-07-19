@@ -46,7 +46,10 @@ function isPregameMode(v: unknown): v is GameInitPayload["pregameMode"] {
     v === "PRIORITY_ROLL" ||
     v === "HOST_FIRST" ||
     v === "GUEST_FIRST" ||
-    v === "RANDOM_FIXED"
+    v === "RANDOM_FIXED" ||
+    v === "SIDE_A_FIRST" ||
+    v === "SIDE_B_FIRST" ||
+    v === "SOLITAIRE_RANDOM"
   );
 }
 
@@ -234,6 +237,23 @@ export function validateGameInitPayload(raw: unknown): GameInitPayload {
   const pregameMode = obj.pregameMode ?? "PRIORITY_ROLL";
   if (!isPregameMode(pregameMode)) {
     throw new Error("GameInitPayload.pregameMode must be a valid pregame mode");
+  }
+  const pvpPregameMode =
+    pregameMode === "PRIORITY_ROLL" ||
+    pregameMode === "HOST_FIRST" ||
+    pregameMode === "GUEST_FIRST" ||
+    pregameMode === "RANDOM_FIXED";
+  const solitairePregameMode =
+    pregameMode === "SIDE_A_FIRST" ||
+    pregameMode === "SIDE_B_FIRST" ||
+    pregameMode === "SOLITAIRE_RANDOM";
+  if (
+    (obj.mode === "PVP" && !pvpPregameMode) ||
+    (obj.mode === "SOLITAIRE" && !solitairePregameMode)
+  ) {
+    throw new Error(
+      `GameInitPayload.pregameMode ${pregameMode} is not valid for ${obj.mode} mode`,
+    );
   }
   if (obj.testPriorityRolls != null) {
     if (

@@ -17,6 +17,7 @@ import {
   parseStoredSession,
   type SessionStorage,
 } from "../session/persistence.js";
+import { startPregame } from "../engine/pregame.js";
 import { setupGame } from "./factories.js";
 
 class MemoryStorage implements SessionStorage {
@@ -83,6 +84,37 @@ function gameSession(storage: SessionStorage): TestGameSession {
 }
 
 describe("OPT-379 split session persistence", () => {
+  it("persists the Solitaire random first-side decision across hibernation", async () => {
+    const storage = new MemoryStorage();
+    const { state, cardDb } = setupGame();
+    const started = startPregame(state, "SOLITAIRE_RANDOM");
+    const saved = await repository(storage).save({
+      state: started,
+      cardDb,
+      mode: "SOLITAIRE",
+      pregameMode: "SOLITAIRE_RANDOM",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+
+    const restored = await repository(storage).load();
+    expect(restored?.pregameMode).toBe("SOLITAIRE_RANDOM");
+    expect(restored?.state.pregame?.firstPlayerIndex).toBe(
+      saved.state.pregame?.firstPlayerIndex,
+    );
+    expect(restored?.state.turn.activePlayerIndex).toBe(
+      saved.state.turn.activePlayerIndex,
+    );
+    expect(restored?.state.executionContext.rngState).toBe(
+      saved.state.executionContext.rngState,
+    );
+    expect(
+      restored?.state.eventLog.some(
+        (event) => event.type === "PREGAME_PRIORITY_ROLLED",
+      ),
+    ).toBe(false);
+  });
+
   it("persists and restores state, cardDb, pregame mode, and undo history under separate keys", async () => {
     const storage = new MemoryStorage();
     const repo = repository(storage);

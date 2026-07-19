@@ -30,7 +30,10 @@ type PatchLobbyData = {
     | "PRIORITY_ROLL"
     | "HOST_FIRST"
     | "GUEST_FIRST"
-    | "RANDOM_FIXED";
+    | "RANDOM_FIXED"
+    | "SIDE_A_FIRST"
+    | "SIDE_B_FIRST"
+    | "SOLITAIRE_RANDOM";
   format?: string;
   hostDeckId?: string | null;
   hostReady?: boolean;
@@ -109,6 +112,26 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const targetMode = parsed.mode ?? lobby.mode;
+  const targetPregameMode = parsed.pregameMode ?? lobby.pregameMode;
+  const pvpPregameMode =
+    targetPregameMode === "PRIORITY_ROLL" ||
+    targetPregameMode === "HOST_FIRST" ||
+    targetPregameMode === "GUEST_FIRST" ||
+    targetPregameMode === "RANDOM_FIXED";
+  const solitairePregameMode =
+    targetPregameMode === "SIDE_A_FIRST" ||
+    targetPregameMode === "SIDE_B_FIRST" ||
+    targetPregameMode === "SOLITAIRE_RANDOM";
+  if (
+    (targetMode === "PVP" && !pvpPregameMode) ||
+    (targetMode === "SOLITAIRE" && !solitairePregameMode)
+  ) {
+    return apiError(
+      `pregameMode ${targetPregameMode} is not valid for ${targetMode} lobbies`,
+      400,
+      { code: "INVALID_PREGAME_MODE" }
+    );
+  }
   if (parsed.guestDeckId !== undefined) {
     if (targetMode === "PVCOMPUTER") {
       return apiError("PVComputer mode is not yet implemented", 501);

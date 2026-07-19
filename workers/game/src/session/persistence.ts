@@ -659,7 +659,10 @@ export function parseStoredSession(
     pregameMode !== "PRIORITY_ROLL" &&
     pregameMode !== "HOST_FIRST" &&
     pregameMode !== "GUEST_FIRST" &&
-    pregameMode !== "RANDOM_FIXED"
+    pregameMode !== "RANDOM_FIXED" &&
+    pregameMode !== "SIDE_A_FIRST" &&
+    pregameMode !== "SIDE_B_FIRST" &&
+    pregameMode !== "SOLITAIRE_RANDOM"
   ) {
     throw new Error("Stored session pregameMode is invalid");
   }

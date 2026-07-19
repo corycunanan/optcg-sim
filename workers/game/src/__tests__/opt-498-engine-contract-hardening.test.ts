@@ -15,6 +15,16 @@ describe("OPT-498 deterministic setup validation", () => {
       payload.pregameMode = pregameMode;
       expect(validateGameInitPayload(payload).pregameMode).toBe(pregameMode);
     }
+    for (const pregameMode of [
+      "SIDE_A_FIRST",
+      "SIDE_B_FIRST",
+      "SOLITAIRE_RANDOM",
+    ] as const) {
+      const payload = createTestPayload();
+      payload.mode = "SOLITAIRE";
+      payload.pregameMode = pregameMode;
+      expect(validateGameInitPayload(payload).pregameMode).toBe(pregameMode);
+    }
 
     const legacy = createTestPayload() as unknown as Record<string, unknown>;
     delete legacy.pregameMode;
@@ -24,11 +34,26 @@ describe("OPT-498 deterministic setup validation", () => {
   it("rejects unknown pregame modes at the worker boundary", () => {
     const payload = {
       ...createTestPayload(),
-      pregameMode: "SIDE_A_FIRST",
+      pregameMode: "FUTURE_MODE",
     };
 
     expect(() => validateGameInitPayload(payload)).toThrow(
       "GameInitPayload.pregameMode must be a valid pregame mode"
+    );
+  });
+
+  it("rejects pregame modes that do not match the lobby mode", () => {
+    const pvp = createTestPayload();
+    pvp.pregameMode = "SIDE_A_FIRST";
+    expect(() => validateGameInitPayload(pvp)).toThrow(
+      "SIDE_A_FIRST is not valid for PVP mode",
+    );
+
+    const solitaire = createTestPayload();
+    solitaire.mode = "SOLITAIRE";
+    solitaire.pregameMode = "HOST_FIRST";
+    expect(() => validateGameInitPayload(solitaire)).toThrow(
+      "HOST_FIRST is not valid for SOLITAIRE mode",
     );
   });
 

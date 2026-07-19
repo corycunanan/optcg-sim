@@ -200,6 +200,45 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("accepts Solitaire pre-game modes only for Solitaire lobbies", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ mode: "SOLITAIRE", pregameMode: "SOLITAIRE_RANDOM" })
+    );
+
+    const accepted = await PATCH(
+      buildRequest({ pregameMode: "SIDE_A_FIRST" }),
+      params
+    );
+    expect(accepted.status).toBe(200);
+
+    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby());
+    const rejected = await PATCH(
+      buildRequest({ pregameMode: "SIDE_A_FIRST" }),
+      params
+    );
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toMatchObject({
+      code: "INVALID_PREGAME_MODE",
+    });
+  });
+
+  it("rejects PVP pre-game modes for Solitaire lobbies", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ mode: "SOLITAIRE", pregameMode: "SIDE_B_FIRST" })
+    );
+
+    const res = await PATCH(
+      buildRequest({ pregameMode: "RANDOM_FIXED" }),
+      params
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "INVALID_PREGAME_MODE",
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it.each(["IN_GAME", "CLOSED"])(
     "rejects a pre-game flow change when the lobby is %s",
     async (status) => {
@@ -216,7 +255,10 @@ describe("PATCH /api/lobbies/[id]", () => {
   );
 
   it("blocks PVP to Solitaire while a real guest is present unless forced", async () => {
-    const res = await PATCH(buildRequest({ mode: "SOLITAIRE" }), params);
+    const res = await PATCH(
+      buildRequest({ mode: "SOLITAIRE", pregameMode: "SOLITAIRE_RANDOM" }),
+      params
+    );
     const body = await res.json();
 
     expect(res.status).toBe(409);
@@ -231,7 +273,11 @@ describe("PATCH /api/lobbies/[id]", () => {
   it("force-switches PVP to Solitaire by ejecting the real guest and creating the host side B row", async () => {
     const res = await PATCH(
       buildRequest(
-        { mode: "SOLITAIRE", guestDeckId: "side-b-deck" },
+        {
+          mode: "SOLITAIRE",
+          pregameMode: "SOLITAIRE_RANDOM",
+          guestDeckId: "side-b-deck",
+        },
         "?force=true"
       ),
       params
@@ -259,6 +305,7 @@ describe("PATCH /api/lobbies/[id]", () => {
       where: { id: "lobby-1", status: "READY", mode: "PVP" },
       data: {
         mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
         hostReady: false,
         status: "READY",
         revision: { increment: 1 },
@@ -271,6 +318,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(
       baseLobby({
         mode: "SOLITAIRE",
+        pregameMode: "SIDE_B_FIRST",
         guest: {
           userId: "host-user",
           deckId: "side-b-deck",
@@ -280,7 +328,10 @@ describe("PATCH /api/lobbies/[id]", () => {
       })
     );
 
-    const res = await PATCH(buildRequest({ mode: "PVP" }), params);
+    const res = await PATCH(
+      buildRequest({ mode: "PVP", pregameMode: "PRIORITY_ROLL" }),
+      params
+    );
 
     expect(res.status).toBe(200);
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
@@ -290,6 +341,7 @@ describe("PATCH /api/lobbies/[id]", () => {
       where: { id: "lobby-1", status: "READY", mode: "SOLITAIRE" },
       data: {
         mode: "PVP",
+        pregameMode: "PRIORITY_ROLL",
         hostReady: false,
         status: "WAITING",
         revision: { increment: 1 },
@@ -301,6 +353,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(
       baseLobby({
         mode: "SOLITAIRE",
+        pregameMode: "SIDE_B_FIRST",
         guest: {
           userId: "host-user",
           deckId: "side-b-deck",
@@ -317,7 +370,10 @@ describe("PATCH /api/lobbies/[id]", () => {
       })
     );
 
-    const res = await PATCH(buildRequest({ mode: "PVP" }), params);
+    const res = await PATCH(
+      buildRequest({ mode: "PVP", pregameMode: "PRIORITY_ROLL" }),
+      params
+    );
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({
@@ -432,7 +488,11 @@ describe("PATCH /api/lobbies/[id]", () => {
 
     const res = await PATCH(
       buildRequest(
-        { mode: "SOLITAIRE", guestDeckId: "side-b-deck" },
+        {
+          mode: "SOLITAIRE",
+          pregameMode: "SOLITAIRE_RANDOM",
+          guestDeckId: "side-b-deck",
+        },
         "?force=true"
       ),
       params
@@ -471,7 +531,11 @@ describe("PATCH /api/lobbies/[id]", () => {
 
     const res = await PATCH(
       buildRequest(
-        { mode: "SOLITAIRE", guestDeckId: "side-b-deck" },
+        {
+          mode: "SOLITAIRE",
+          pregameMode: "SOLITAIRE_RANDOM",
+          guestDeckId: "side-b-deck",
+        },
         "?force=true"
       ),
       params
