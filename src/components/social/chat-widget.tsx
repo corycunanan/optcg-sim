@@ -439,7 +439,7 @@ export function ChatWidget({
                     </p>
                     {isMe && (
                       <div
-                        className="text-primary-foreground/60 mt-1 flex justify-end"
+                        className="text-primary-foreground mt-1 flex justify-end"
                         aria-label={msg.readAt ? "Read" : "Sent"}
                       >
                         {msg.readAt ? (

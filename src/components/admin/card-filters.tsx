@@ -14,7 +14,7 @@ const COLOR_ACTIVE: Record<string, { bg: string; text: string; border: string }>
   Green:  { bg: "var(--card-green)",  text: "var(--text-inverse)", border: "var(--card-green)" },
   Purple: { bg: "var(--card-purple)", text: "var(--text-inverse)", border: "var(--card-purple)" },
   Black:  { bg: "var(--card-black)",  text: "var(--text-inverse)", border: "var(--card-black)" },
-  Yellow: { bg: "var(--card-yellow)", text: "var(--text-primary)", border: "var(--card-yellow)" },
+  Yellow: { bg: "var(--card-yellow)", text: "var(--navy-900)", border: "var(--card-yellow)" },
 };
 
 interface CardFiltersProps {

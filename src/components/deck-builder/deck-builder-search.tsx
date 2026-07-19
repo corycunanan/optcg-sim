@@ -194,7 +194,7 @@ export function DeckBuilderSearch({
                     "rounded px-2 py-1 text-xs font-medium transition-all",
                     active
                       ? c === "Yellow"
-                        ? "text-content-primary"
+                        ? "text-navy-900"
                         : "text-content-inverse"
                       : "border-border bg-secondary text-content-tertiary hover:border-border-strong border"
                   )}
@@ -309,7 +309,7 @@ export function DeckBuilderSearch({
                   aria-label={`Inspect ${card.name}`}
                   onClick={() => setInspectCard(card)}
                   className={cn(
-                    "group bg-card relative overflow-hidden rounded border-0 text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                    "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
                     qtyInDeck > 0 ? "border-border-focus" : "border-border",
                     (!isLeaderColor || !isLeaderRestrictionAllowed) &&
                       "opacity-40"
