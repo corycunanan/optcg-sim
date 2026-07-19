@@ -48,6 +48,26 @@ export function computeCostTargets(
       : ids;
 
   switch (cost.type) {
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {
+      const candidates = [
+        ...player.hand,
+        ...(player.stage ? [player.stage] : []),
+      ].filter((card) => {
+        const data = cardDb.get(card.cardId);
+        if (!data || data.name !== cost.card_name) return false;
+        return !cost.filter || matchesFilter(
+          card,
+          cost.filter,
+          cardDb,
+          state,
+          undefined,
+          undefined,
+          controller,
+        );
+      });
+      return dropSelf(candidates.map((card) => card.instanceId));
+    }
+
     case "TRASH_FROM_HAND":
     case "PLACE_HAND_TO_DECK":
     case "PLACE_SELF_AND_HAND_TO_DECK":
@@ -147,6 +167,12 @@ export function getCostCards(
   const targetSet = new Set(validTargets);
 
   switch (cost.type) {
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
+      return [
+        ...player.hand.filter((c) => targetSet.has(c.instanceId)),
+        ...(player.stage && targetSet.has(player.stage.instanceId) ? [player.stage] : []),
+      ];
+
     case "TRASH_FROM_HAND":
     case "PLACE_HAND_TO_DECK":
     case "REVEAL_FROM_HAND":

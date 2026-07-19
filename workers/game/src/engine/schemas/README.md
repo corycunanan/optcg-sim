@@ -345,6 +345,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | Type | Card Text | Notes |
 |------|-----------|-------|
 | `TRASH_FROM_HAND` | "Trash N from hand" | Optional `filter: { traits: [...] }` |
+| `TRASH_NAMED_CARD_FROM_HAND_OR_STAGE` | "Trash 1 [Name] from hand or field" | Requires `card_name`; offers matching hand and Stage cards in one selection |
 | `REVEAL_FROM_HAND` | "Reveal N from hand" | With filter |
 | `PLAY_NAMED_CARD_FROM_HAND` | "Play [Name] from hand" | |
 

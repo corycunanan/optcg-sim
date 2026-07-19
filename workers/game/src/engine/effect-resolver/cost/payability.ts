@@ -14,6 +14,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "TRASH_FROM_LIFE":
       return cost.position === "TOP_OR_BOTTOM";
     case "TRASH_FROM_HAND":
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "KO_OWN_CHARACTER":
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
@@ -225,6 +226,7 @@ export function isCostPayable(
     }
 
     case "TRASH_FROM_HAND":
+    case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "PLACE_HAND_TO_DECK":
     case "REVEAL_FROM_HAND":
     case "REST_CARDS":

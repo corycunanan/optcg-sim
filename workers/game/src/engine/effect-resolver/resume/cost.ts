@@ -838,11 +838,14 @@ export function handleAwaitingCostSelection(
     const fieldExitCosts = new Set<Cost["type"]>([
       "KO_OWN_CHARACTER",
       "TRASH_OWN_CHARACTER",
+      "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
       "RETURN_OWN_CHARACTER_TO_HAND",
       "PLACE_OWN_CHARACTER_TO_DECK",
       "ADD_OWN_CHARACTER_TO_LIFE",
     ]);
-    if (fieldExitCosts.has(cost.type) && !topFrame.costReplacementChecked) {
+    const selectedStage = state.players[controller].stage?.instanceId === selected[0];
+    const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
+    if (fieldExitCosts.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.
@@ -924,6 +927,7 @@ export function handleAwaitingCostSelection(
     // Track selected card IDs as cost result refs based on cost type
     if (
       cost.type === "TRASH_FROM_HAND" ||
+      cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" ||
       cost.type === "TRASH_SELF" ||
       cost.type === "TRASH_OWN_CHARACTER"
     ) {
@@ -958,12 +962,15 @@ export function handleAwaitingCostSelection(
       });
     }
 
-    // Only trash payments publish CARD_TRASHED. Other selectable costs use
-    // this same resume branch (including ST13-001's Character-to-Life cost),
-    // so emitting it unconditionally fabricated a trash event for unrelated
-    // zone transitions.
+    // Only trash payments publish CARD_TRASHED. Stage-side named-card payment
+    // already emitted the canonical identity-bearing event via trashStage;
+    // hand-side payment retains the count-only bookkeeping event used by every
+    // other selectable hand trash. Other selectable costs use this same resume
+    // branch (including ST13-001's Character-to-Life cost), so emitting it
+    // unconditionally fabricated a trash event for unrelated zone transitions.
     if (
       cost.type === "TRASH_FROM_HAND" ||
+      (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage) ||
       cost.type === "TRASH_OWN_CHARACTER"
     ) {
       events.push({
@@ -972,7 +979,9 @@ export function handleAwaitingCostSelection(
         payload: {
           count: selected.length,
           reason: "cost",
-          from: cost.type === "TRASH_FROM_HAND" ? "HAND" : "CHARACTER",
+          from: cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE"
+            ? (selectedStage ? "STAGE" : "HAND")
+            : cost.type === "TRASH_FROM_HAND" ? "HAND" : "CHARACTER",
         },
       });
     }
