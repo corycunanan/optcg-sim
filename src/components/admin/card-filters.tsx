@@ -75,7 +75,7 @@ export function CardFilters({
                   onClick={() => toggleFilter("color", c, activeColors)}
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
-                    !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                    !active && "border-border bg-secondary text-content-tertiary hover:bg-muted",
                   )}
                   style={
                     active
@@ -104,8 +104,8 @@ export function CardFilters({
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
-                      ? "border-navy-900 bg-navy-900 text-content-inverse"
-                      : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-secondary text-content-tertiary hover:bg-muted",
                   )}
                 >
                   {t}
@@ -129,8 +129,8 @@ export function CardFilters({
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
-                      ? "border-navy-900 bg-navy-900 text-content-inverse"
-                      : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-secondary text-content-tertiary hover:bg-muted",
                   )}
                 >
                   {b}
@@ -149,8 +149,8 @@ export function CardFilters({
             className={cn(
               "flex items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-all",
               originOnly
-                ? "border-gold-500 bg-navy-100 text-content-primary"
-                : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-secondary text-content-tertiary hover:bg-muted",
             )}
           >
             <span

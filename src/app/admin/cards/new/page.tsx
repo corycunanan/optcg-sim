@@ -200,7 +200,7 @@ export default function NewCardPage() {
                   className={cn(
                     "rounded-md border px-3 py-1 text-xs font-medium transition-all",
                     !active &&
-                      "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
+                      "border-border bg-secondary text-content-tertiary hover:bg-muted"
                   )}
                   style={
                     active

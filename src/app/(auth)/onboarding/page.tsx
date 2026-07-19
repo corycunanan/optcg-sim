@@ -70,7 +70,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* Form card */}
-        <div className="border-border bg-surface-1 rounded border p-6">
+        <div className="border-border bg-card rounded border p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="border-error/20 bg-error-soft text-error rounded border p-3 text-sm font-medium">
@@ -101,7 +101,7 @@ export default function OnboardingPage() {
             <button
               type="submit"
               disabled={saving || !username.trim()}
-              className="bg-navy-900 text-content-inverse hover:bg-navy-800 w-full rounded px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-gold-400 w-full rounded px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98] disabled:opacity-50"
             >
               {saving ? "Setting up…" : "Set Username"}
             </button>

@@ -42,7 +42,7 @@ export default async function SetsPage() {
               <Link
                 key={s.packId}
                 href={`/admin/cards?set=${encodeURIComponent(s.setLabel)}`}
-                className="flex items-center justify-between rounded-lg border border-border bg-surface-1 p-4 transition-all hover:-translate-y-px hover:shadow-md"
+                className="flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-all hover:-translate-y-px hover:shadow-md"
               >
                 <div>
                   <span className="font-mono text-sm font-bold text-content-primary">

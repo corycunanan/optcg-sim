@@ -348,7 +348,7 @@ export function ChatWidget({
     >
       {/* Header */}
       <div
-        className="bg-navy-900 flex cursor-pointer items-center gap-2 rounded-t-lg px-3 py-2"
+        className="bg-surface-nav flex cursor-pointer items-center gap-2 rounded-t-lg px-3 py-2"
         onClick={() => setMinimized((v) => !v)}
       >
         <UserAvatar user={user} size="sm" variant="dark" />
@@ -389,7 +389,7 @@ export function ChatWidget({
       {!minimized && (
         <>
           {/* Messages */}
-          <div className="bg-surface-1 h-80 space-y-2 overflow-y-auto px-3 py-3">
+          <div className="bg-card h-80 space-y-2 overflow-y-auto px-3 py-3">
             {loading && (
               <p
                 className="text-content-tertiary py-6 text-center text-xs"
@@ -430,8 +430,8 @@ export function ChatWidget({
                     className={cn(
                       "max-w-[75%] rounded-lg px-3 py-2 text-xs",
                       isMe
-                        ? "bg-navy-900 text-content-inverse"
-                        : "bg-surface-2 text-content-primary"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-content-primary"
                     )}
                   >
                     <p className="break-words whitespace-pre-wrap">
@@ -439,7 +439,7 @@ export function ChatWidget({
                     </p>
                     {isMe && (
                       <div
-                        className="text-content-inverse/60 mt-1 flex justify-end"
+                        className="text-primary-foreground/60 mt-1 flex justify-end"
                         aria-label={msg.readAt ? "Read" : "Sent"}
                       >
                         {msg.readAt ? (
@@ -465,7 +465,7 @@ export function ChatWidget({
           {/* Input */}
           <form
             onSubmit={send_}
-            className="border-border bg-surface-1 flex gap-2 border-t px-3 py-2"
+            className="border-border bg-card flex gap-2 border-t px-3 py-2"
           >
             <Input
               ref={inputRef}
@@ -474,7 +474,7 @@ export function ChatWidget({
               onChange={handleBodyChange}
               disabled={sending}
               placeholder={`Message ${displayName}...`}
-              className="bg-surface-2 h-8 flex-1 text-xs"
+              className="bg-secondary h-8 flex-1 text-xs"
             />
             <Button type="submit" size="sm" disabled={!body.trim() || sending}>
               Send

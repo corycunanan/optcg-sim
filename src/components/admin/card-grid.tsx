@@ -23,7 +23,7 @@ function CardGridItem({
     <button
       type="button"
       onClick={() => onCardClick(card.id)}
-      className="group relative overflow-hidden rounded-lg bg-surface-1 text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+      className="group relative overflow-hidden rounded-lg bg-card text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
     >
       {/* Card image */}
       <div className="relative aspect-card w-full overflow-hidden">
@@ -81,7 +81,7 @@ export function CardGridSkeleton({ count = 20 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="overflow-hidden rounded-lg bg-surface-1">
+        <div key={i} className="overflow-hidden rounded-lg bg-card">
           <Skeleton className="aspect-card w-full rounded-none" />
         </div>
       ))}

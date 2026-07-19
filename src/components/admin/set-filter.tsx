@@ -101,9 +101,9 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
           role="button"
           tabIndex={0}
           className={cn(
-            "flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border bg-surface-2 px-3 py-1 text-left text-sm transition-colors",
+            "flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border bg-secondary px-3 py-1 text-left text-sm transition-colors",
             open
-              ? "border-border-focus ring-2 ring-navy-900/10"
+              ? "border-border-focus ring-2 ring-border-focus/20"
               : "border-border hover:border-border-strong",
           )}
         >

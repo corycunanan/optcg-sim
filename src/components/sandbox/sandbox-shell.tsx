@@ -37,10 +37,10 @@ export function SandboxShell({
       <div className="flex h-full flex-col overflow-hidden bg-gb-board">
         <PortalRoot />
 
-        <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-1 px-5 py-2">
+        <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-5 py-2">
           <Link
             href="/sandbox"
-            className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-content-secondary hover:bg-surface-2 hover:text-content-primary"
+            className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-content-secondary hover:bg-secondary hover:text-content-primary"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             <span>Back to Sandbox</span>
@@ -59,7 +59,7 @@ export function SandboxShell({
               <Board state={state} dispatch={dispatch} />
             </ScaledBoard>
           </div>
-          <aside className="hidden w-80 shrink-0 border-l border-border bg-surface-1 lg:block">
+          <aside className="hidden w-80 shrink-0 border-l border-border bg-card lg:block">
             <ScenarioInfoPanel scenario={scenario} hint={hint} />
           </aside>
         </div>

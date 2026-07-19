@@ -76,7 +76,7 @@ export default function SandboxHubPage() {
           </h2>
           <Link
             href="/sandbox/scaffold"
-            className="group border-border bg-surface-1 hover:border-border-strong block rounded-lg border p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            className="group border-border bg-card hover:border-border-strong block rounded-lg border p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -101,7 +101,7 @@ export default function SandboxHubPage() {
               </h2>
 
               {items.length === 0 ? (
-                <div className="border-border bg-surface-1 rounded-lg border border-dashed px-6 py-10 text-center">
+                <div className="border-border bg-card rounded-lg border border-dashed px-6 py-10 text-center">
                   <p className="text-content-tertiary text-sm">
                     No scenarios yet
                   </p>
@@ -125,7 +125,7 @@ function ScenarioTile({ scenario }: { scenario: Scenario }) {
   return (
     <Link
       href={`/sandbox/${scenario.id}`}
-      className="group border-border bg-surface-1 hover:border-border-strong flex h-full flex-col gap-3 rounded-lg border p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+      className="group border-border bg-card hover:border-border-strong flex h-full flex-col gap-3 rounded-lg border p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-content-primary text-sm font-bold">

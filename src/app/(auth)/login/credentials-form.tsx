@@ -95,14 +95,14 @@ export function CredentialsForm({
   return (
     <div>
       {/* Tab switcher */}
-      <div className="border-border bg-surface-2 mb-5 flex rounded-md border p-1">
+      <div className="border-border bg-secondary mb-5 flex rounded-md border p-1">
         <button
           type="button"
           onClick={() => switchMode("signin")}
           className={cn(
             "flex-1 rounded py-2 text-sm font-semibold transition-colors",
             mode === "signin"
-              ? "bg-surface-1 text-content-primary shadow-sm"
+              ? "bg-card text-content-primary shadow-sm"
               : "text-content-tertiary hover:text-content-secondary"
           )}
         >
@@ -114,7 +114,7 @@ export function CredentialsForm({
           className={cn(
             "flex-1 rounded py-2 text-sm font-semibold transition-colors",
             mode === "signup"
-              ? "bg-surface-1 text-content-primary shadow-sm"
+              ? "bg-card text-content-primary shadow-sm"
               : "text-content-tertiary hover:text-content-secondary"
           )}
         >

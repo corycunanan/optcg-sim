@@ -32,7 +32,7 @@ export default async function LoginPage({
         </div>
 
         {/* Sign in card */}
-        <div className="border-border bg-surface-1 rounded border p-6">
+        <div className="border-border bg-card rounded border p-6">
           <CredentialsForm
             callbackUrl={callbackUrl || "/decks"}
             initialMode={mode === "signup" ? "signup" : "signin"}

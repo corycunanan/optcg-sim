@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function DecksLoading() {
   return (
     <div
-      className="bg-surface-base flex-1 overflow-y-auto"
+      className="bg-background flex-1 overflow-y-auto"
       role="status"
       aria-busy="true"
       aria-label="Loading decks"
@@ -22,7 +22,7 @@ export default function DecksLoading() {
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={index}
-            className="border-border bg-surface-1 overflow-hidden rounded border"
+            className="border-border bg-card overflow-hidden rounded border"
             aria-hidden="true"
           >
             <Skeleton className="h-36 w-full rounded-none" />

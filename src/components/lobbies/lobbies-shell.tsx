@@ -91,9 +91,9 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
 
   if (activeGameLoading) {
     return (
-      <div className="bg-surface-base flex-1 overflow-y-auto">
-        <div className="text-text-secondary mx-auto flex max-w-xl items-center gap-2 px-6 py-10 text-sm">
-          <span className="bg-text-tertiary h-2 w-2 animate-pulse rounded-full" />
+      <div className="bg-background flex-1 overflow-y-auto">
+        <div className="text-content-secondary mx-auto flex max-w-xl items-center gap-2 px-6 py-10 text-sm">
+          <span className="bg-content-tertiary h-2 w-2 animate-pulse rounded-full" />
           Loading...
         </div>
       </div>
@@ -101,7 +101,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
   }
 
   return (
-    <div className="bg-surface-base flex-1 overflow-y-auto">
+    <div className="bg-background flex-1 overflow-y-auto">
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderTitle>Play</PageHeaderTitle>
@@ -126,11 +126,11 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
 
       <div className="mx-auto grid max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1fr_0.8fr]">
         {activeGameId ? (
-          <section className="border-gold-500/30 bg-gold-100 rounded-lg border p-6 md:col-span-2">
-            <p className="text-text-secondary text-xs font-semibold tracking-widest uppercase">
+          <section className="border-accent/30 bg-accent/10 rounded-lg border p-6 md:col-span-2">
+            <p className="text-content-secondary text-xs font-semibold tracking-widest uppercase">
               Game In Progress
             </p>
-            <p className="text-text-primary mt-2 text-sm">
+            <p className="text-content-primary mt-2 text-sm">
               You have an ongoing game that needs to be resolved before you can
               start a new lobby.
             </p>
@@ -171,13 +171,13 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
           </section>
         ) : (
           <>
-            <section className="border-border bg-surface-1 flex min-h-72 flex-col justify-between rounded-lg border p-6">
+            <section className="border-border bg-card flex min-h-72 flex-col justify-between rounded-lg border p-6">
               <div>
                 <Gamepad2 />
-                <h2 className="font-display text-text-primary mt-5 text-3xl uppercase">
+                <h2 className="font-display text-content-primary mt-5 text-3xl uppercase">
                   Room First
                 </h2>
-                <p className="text-text-secondary mt-3 max-w-xl text-sm leading-relaxed">
+                <p className="text-content-secondary mt-3 max-w-xl text-sm leading-relaxed">
                   Hi {user.name}. Create a pre-game room first, then pick decks
                   and ready up with the full table present.
                 </p>
@@ -199,8 +199,8 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
               )}
             </section>
 
-            <section className="border-border bg-surface-1 rounded-lg border p-6">
-              <p className="text-text-tertiary text-xs font-semibold tracking-widest uppercase">
+            <section className="border-border bg-card rounded-lg border p-6">
+              <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
                 Join by Code
               </p>
               <div className="mt-5 flex flex-col gap-4">

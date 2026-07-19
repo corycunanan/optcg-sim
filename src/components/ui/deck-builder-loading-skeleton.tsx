@@ -12,7 +12,7 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
       aria-label={label}
     >
       <div
-        className="border-border bg-surface-1 flex items-center gap-4 border-b px-4 py-3"
+        className="border-border bg-card flex items-center gap-4 border-b px-4 py-3"
         aria-hidden="true"
       >
         <Skeleton className="h-8 w-20" />
@@ -43,7 +43,7 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
           <Skeleton className="mx-3 mb-1 h-3 w-24" />
           <div className="grid flex-1 grid-cols-3 gap-2 overflow-hidden px-3 pb-3">
             {searchCards.map((_, index) => (
-              <div key={index} className="bg-surface-1 overflow-hidden rounded">
+              <div key={index} className="bg-card overflow-hidden rounded">
                 <Skeleton className="aspect-card w-full rounded-none" />
                 <div className="space-y-1 p-1">
                   <Skeleton className="h-3 w-4/5" />

@@ -40,7 +40,7 @@ export default async function AdminPage() {
 
       {/* Distribution */}
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-border bg-surface-1 p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             By Type
           </h2>
@@ -60,9 +60,9 @@ export default async function AdminPage() {
                       {t._count.toLocaleString()}
                     </span>
                   </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-surface-3">
+                  <div className="h-1 overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full bg-navy-900 transition-all"
+                      className="h-full rounded-full bg-primary transition-all"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -72,7 +72,7 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-surface-1 p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             By Block
           </h2>
@@ -92,7 +92,7 @@ export default async function AdminPage() {
                       {b._count.toLocaleString()}
                     </span>
                   </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-surface-3">
+                  <div className="h-1 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-gold-500 transition-all"
                       style={{ width: `${pct}%` }}
@@ -119,7 +119,7 @@ function StatBox({
 }) {
   const content = (
     <div
-      className={`rounded-lg border border-border bg-surface-1 p-5 transition-colors ${href ? "cursor-pointer hover:bg-surface-2" : ""}`}
+      className={`rounded-lg border border-border bg-card p-5 transition-colors ${href ? "cursor-pointer hover:bg-secondary" : ""}`}
     >
       <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {label}

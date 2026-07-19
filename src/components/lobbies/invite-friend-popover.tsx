@@ -104,17 +104,17 @@ export function InviteFriendPopover({ lobbyId }: Props) {
           />
           <div className="max-h-64 overflow-y-auto">
             {loading && (
-              <p className="text-text-tertiary px-2 py-3 text-xs">
+              <p className="text-content-tertiary px-2 py-3 text-xs">
                 Loading friends...
               </p>
             )}
             {!loading && friends.length === 0 && (
-              <p className="text-text-tertiary px-2 py-3 text-xs">
+              <p className="text-content-tertiary px-2 py-3 text-xs">
                 Add friends from the sidebar to invite them.
               </p>
             )}
             {!loading && friends.length > 0 && filtered.length === 0 && (
-              <p className="text-text-tertiary px-2 py-3 text-xs">
+              <p className="text-content-tertiary px-2 py-3 text-xs">
                 No friends match.
               </p>
             )}
@@ -129,7 +129,7 @@ export function InviteFriendPopover({ lobbyId }: Props) {
                   <UserAvatar user={user} size="sm" />
                   <span className="flex-1 truncate">{displayName(user)}</span>
                   {alreadyInvited ? (
-                    <span className="text-text-tertiary text-xs">Invited</span>
+                    <span className="text-content-tertiary text-xs">Invited</span>
                   ) : (
                     <Button
                       variant="ghost"
