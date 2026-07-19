@@ -7,6 +7,7 @@
 ## Architecture & Infrastructure
 
 - [Architecture Overview](./architecture/ARCHITECTURE.md) — system diagram, service boundaries, data flow, deployment topology
+- [Module Dependencies](./architecture/MODULE-DEPENDENCIES.md) — current import and runtime boundary DAG with integration seams
 - [Deployment](./architecture/DEPLOYMENT.md) — service map, Vercel + Cloudflare split, lobby→game handoff
 - [Tech Stack](./architecture/TECH-STACK.md) — all technologies, versions, and rationale for each choice
 - [Data Pipeline](./architecture/DATA-PIPELINE.md) — vegapull/punk-records evaluation, field mapping, art variant grouping, pipeline design
@@ -49,6 +50,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 ## Design
 
 - [Branding Guidelines](./design/BRANDING-GUIDELINES.md) — comprehensive design brief: tokens, typography, motion language, component patterns
+- [Semantic Tokens Guide](./design/TOKENS-GUIDE.md) — choosing the current CSS/Tailwind token family by UI role
 - [Design Audit](./design/DESIGN-AUDIT.md) — interface quality audit across accessibility, performance, and theming
 - [Design Critique](./design/DESIGN-CRITIQUE.md) — UX evaluation with actionable feedback
 - [Game Board Layout Reference](./design/GAME-BOARD-LAYOUT-REFERENCE.md) — wireframe proportions, zone geometry, and responsive scaling rules
@@ -79,4 +81,4 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ---
 
-_Last updated: 2026-04-08_
+_Last updated: 2026-07-19_
