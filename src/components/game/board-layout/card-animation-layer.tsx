@@ -222,7 +222,10 @@ export const CardAnimationLayer = React.memo(function CardAnimationLayer({
   // otherwise render in place — the current layout has no transformed
   // ancestor for this layer, so this preserves today's behavior.
   const layer = (
-    <div className="pointer-events-none fixed inset-0 z-[9999]">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-[9999]"
+    >
       <AnimatePresence>
         {readyTransitions.map((t) => (
           <FlyingCard

@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card } from "../card";
 import { CARD_SIZES } from "../card/sizes";
+import { getBoardZoneLabel } from "./accessibility";
 import { PileReceipt } from "./pile-receipt";
 
 const LIFE_STACK_OFFSET = 20;
@@ -67,6 +68,12 @@ export const LifeZone = React.memo(function LifeZone({
     <motion.div
       key={`damage:${zoneFeedback === "damage" ? damagePulseNonce : 0}`}
       ref={ref}
+      role="group"
+      aria-label={getBoardZoneLabel(
+        zoneKey,
+        "life",
+        `${count} ${count === 1 ? "card" : "cards"}`,
+      )}
       style={{
         ...style,
         width: CARD_SIZES.field.width,

@@ -35,6 +35,7 @@ function renderLifeZone(props: {
       <LifeZone
         life={[]}
         cardDb={{}}
+        zoneKey="p-life"
         style={{ position: "absolute", left: 0, top: 0 }}
         {...props}
       />
@@ -54,6 +55,17 @@ afterEach(() => {
 });
 
 describe("LifeZone battle feedback", () => {
+  it("exposes the life pile as a labeled group", () => {
+    const root = renderLifeZone({});
+
+    expect(
+      root.findByProps({
+        role: "group",
+        "aria-label": "Your life area, 0 cards",
+      }),
+    ).toBeDefined();
+  });
+
   it("renders an amber Trigger pulse on the zone container", () => {
     const root = renderLifeZone({ triggerPulse: true });
     const ring = root

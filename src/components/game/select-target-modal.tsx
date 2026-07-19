@@ -54,7 +54,17 @@ function TargetCard({
       type="button"
       ref={setRovingRef}
       tabIndex={rovingTabIndex}
-      aria-label={cardName}
+      aria-label={[
+        cardName,
+        card.state === "RESTED" ? "rested" : "active",
+        selection.selected
+          ? "selected"
+          : selection.eligible
+            ? "eligible for selection"
+            : null,
+      ]
+        .filter(Boolean)
+        .join(". ")}
       aria-pressed={selection.selected}
       aria-disabled={blocked}
       aria-describedby={blocked ? descriptionId : undefined}
@@ -80,7 +90,10 @@ function TargetCard({
         interaction={{ tooltipDisabled: blocked }}
       />
       {selection.selected && (
-        <div className="bg-gb-signal-selected absolute top-1 right-1 z-10 flex h-4 w-4 items-center justify-center rounded-full">
+        <div
+          aria-hidden="true"
+          className="bg-gb-signal-selected absolute top-1 right-1 z-10 flex h-4 w-4 items-center justify-center rounded-full"
+        >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path
               d="M2 5l2 2 4-4"
