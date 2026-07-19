@@ -8,7 +8,9 @@ function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("w-full bg-navy-900", className)}>
+    <div
+      className={cn("w-full border-b border-border-strong bg-navy-900", className)}
+    >
       <div className="mx-auto flex items-center justify-between gap-4 px-6 py-12">
         {children}
       </div>
@@ -29,7 +31,7 @@ function PageHeaderTitle({ children }: { children: React.ReactNode }) {
 }
 
 function PageHeaderDescription({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-navy-200">{children}</p>;
+  return <p className="text-sm text-content-secondary">{children}</p>;
 }
 
 function PageHeaderActions({ children }: { children: React.ReactNode }) {

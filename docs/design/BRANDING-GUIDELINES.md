@@ -16,22 +16,22 @@ The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and 
 
 | Context | Emotion | How |
 |---------|---------|-----|
-| Browsing cards | Delight | Card art as hero on warm white surfaces |
+| Browsing cards | Delight    | Card art as hero against controlled navy surfaces      |
 | Building decks | Focus | Clean workspace, minimal chrome, clear hierarchy |
 | Playing games | Immersion | Dark board, purposeful animation, responsive feedback |
 | Social/lobby | Connection | Warm tones, accessible entry points, friendly presence |
 
 ### Design Principles
 
-1. **Card art is the hero** — Clean, bright surfaces amplify artwork. UI chrome recedes.
-2. **One Piece warmth** — Bright, energetic, inviting. Color and whitespace create warmth, not decoration.
+1. **Card art is the hero** — Restrained navy surfaces amplify artwork. UI chrome recedes.
+2. **One Piece warmth** — Warm whites, gold, red, and generous spacing keep the dark foundation energetic and inviting.
 3. **Tight system, loose expression** — Every spacing, type, and color decision traces back to a token. Within that system, layouts can be expressive.
 4. **Motion earns its place** — Transitions communicate state changes. One clear animation per interaction.
 5. **Progressive clarity** — Simple at rest, detailed on interaction. Dense information is scannable through hierarchy, not visual noise.
 
 ### Anti-References (What We Are Not)
 
-- NOT dark/moody/gamer-neon
+- NOT gloomy, low-contrast, or gamer-neon
 - NOT generic SaaS dashboard
 - NOT over-decorated with gradients and backdrop blurs
 - NOT flat/sterile/cold
@@ -61,8 +61,8 @@ The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and 
 
 | Riftbound Pattern | Why We Skip |
 |---|---|
-| Dark page backgrounds (#293a4c, #013951) | We are light-mode primary; dark reserved for game board only |
-| Orange accent (#EF7D00) as primary | Our palette uses navy as primary accent, gold as secondary — orange has wrong emotional register for One Piece |
+| Cold, monochrome dark backgrounds (#293a4c, #013951) | Our dark foundation stays in the deep navy family and preserves warmth through warm-white text, gold, and red                |
+| Orange accent (#EF7D00) as primary                   | Our palette uses gold for primary interaction and navy for structure — orange has the wrong emotional register for One Piece |
 | "TT Norms Pro Compact" as body font | We already use Geist Sans, which is more contemporary and better optimized for UI |
 | Styled-components architecture | We use Tailwind CSS v4 with CSS tokens — no runtime CSS-in-JS |
 | `z-index: 200000` for modals | We use a sane z-index scale (see Section 8) |
@@ -74,64 +74,64 @@ The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and 
 
 ### Philosophy
 
-Warm, bright, and alive. Navy provides structure and authority. Gold marks premium moments. Red brings One Piece energy. Six TCG card colors remain purely functional.
+Dark-only, warm, and alive. Navy provides the page foundation and elevation hierarchy. Warm-white text preserves approachability, gold carries primary interaction and premium moments, and red brings One Piece energy. Six TCG card colors remain purely functional.
 
 ### Palette
 
-#### Core Palette (unchanged — validated in M2.5)
+#### Core Palette (dark-only foundation)
 
 | Token | Value | Role |
 |-------|-------|------|
-| `--surface-base` | `oklch(97% 0.006 75)` | Page background — warm white |
-| `--surface-1` | `oklch(95% 0.007 75)` | Cards, panels |
-| `--surface-2` | `oklch(93% 0.008 75)` | Elevated panels, input backgrounds |
-| `--surface-3` | `oklch(88% 0.010 75)` | Tags, dividers, inset areas |
-| `--surface-nav` | `oklch(20% 0.010 245)` | Global navbar — dark charcoal |
+| `--surface-base` | `oklch(22% 0.040 245)` | Page background — exact navy-900              |
+| `--surface-1`    | `oklch(27% 0.040 245)` | Cards, panels — first elevation               |
+| `--surface-2`    | `oklch(32% 0.040 245)` | Elevated panels, input backgrounds            |
+| `--surface-3`    | `oklch(37% 0.035 245)` | Tags, dividers, inset areas                   |
+| `--surface-nav`  | `oklch(18% 0.020 245)` | Global navbar — distinct navy-charcoal anchor |
 
-#### Navy (primary accent + structure)
+#### Navy (foundation + structure)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--navy-900` | `oklch(22% 0.04 245)` | Primary buttons, navbar, active states |
+| `--navy-900` | `oklch(22% 0.040 245)` | Page base, deepest navy                           |
 | `--navy-800` | `oklch(30% 0.04 245)` | Headings, hover states on navy elements |
-| `--navy-700` | `oklch(38% 0.03 245)` | Borders on dark surfaces |
-| `--navy-500` | `oklch(50% 0.04 245)` | Subdued/secondary elements |
-| `--navy-200` | `oklch(88% 0.02 245)` | Light navy tint for hover backgrounds |
-| `--navy-100` | `oklch(94% 0.015 245)` | Very light navy background (selected rows, active tabs) |
+| `--navy-700` | `oklch(42% 0.03 245)`  | Borders on dark surfaces                          |
+| `--navy-500` | `oklch(58% 0.04 245)`  | Subdued/secondary elements and data visualization |
+| `--navy-200` | `oklch(34% 0.035 245)` | Stronger soft navy surface                        |
+| `--navy-100` | `oklch(27% 0.030 245)` | Soft navy surface (selected rows, active tabs)    |
 
-#### Gold (secondary accent — treasure, premium)
+#### Gold (primary interaction + treasure, premium)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--gold-500` | `oklch(72% 0.14 75)` | Secondary CTAs, highlights, ornamental outlines |
-| `--gold-400` | `oklch(78% 0.12 75)` | Hover on gold elements |
-| `--gold-100` | `oklch(95% 0.04 75)` | Soft gold background for premium callouts |
+| `--gold-500` | `oklch(78% 0.14 75)` | Primary CTAs, highlights, focus rings, ornamental outlines |
+| `--gold-400` | `oklch(84% 0.12 75)` | Hover on gold elements                                     |
+| `--gold-100` | `oklch(30% 0.05 75)` | Soft gold surface for premium callouts                     |
 
 #### Red (energy, emphasis, destructive)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--red-600` | `oklch(55% 0.20 25)` | Emphasis, destructive actions, error states |
-| `--red-500` | `oklch(62% 0.18 25)` | Hover on red elements |
-| `--red-100` | `oklch(96% 0.04 25)` | Soft red background for error callouts |
+| `--red-600` | `oklch(74% 0.20 25)` | Emphasis, destructive actions, error states |
+| `--red-500` | `oklch(80% 0.18 25)` | Hover on red elements                       |
+| `--red-100` | `oklch(30% 0.06 25)` | Soft red surface for error callouts         |
 
 #### Text Hierarchy
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--text-primary` | `oklch(18% 0.02 245)` | Body text, headings — navy-tinted near-black |
-| `--text-secondary` | `oklch(45% 0.01 245)` | Secondary labels, metadata |
-| `--text-tertiary` | `oklch(62% 0.01 245)` | Placeholder, hint text |
-| `--text-disabled` | `oklch(74% 0.01 245)` | Disabled elements |
-| `--text-inverse` | `oklch(98% 0.005 75)` | White text on dark surfaces |
+| `--text-primary`   | `oklch(96% 0.008 75)` | Body text, headings — warm white          |
+| `--text-secondary` | `oklch(82% 0.010 75)` | Secondary labels, metadata                |
+| `--text-tertiary`  | `oklch(75% 0.008 75)` | Placeholder, hint text                    |
+| `--text-disabled`  | `oklch(66% 0.006 75)` | Disabled elements — intentionally subdued |
+| `--text-inverse`   | `oklch(98% 0.005 75)` | Brightest text on deepest navy surfaces   |
 
 #### Semantic Colors
 
 | Token | Value | Role |
 |-------|-------|------|
-| `--success` / `--success-soft` | `oklch(52% 0.16 155)` / `oklch(96% 0.04 155)` | Positive feedback |
-| `--warning` / `--warning-soft` | `oklch(68% 0.14 80)` / `oklch(96% 0.05 80)` | Cautionary states |
-| `--error` / `--error-soft` | `oklch(55% 0.20 25)` / `oklch(96% 0.04 25)` | Error states |
+| `--success` / `--success-soft` | `oklch(74% 0.16 155)` / `oklch(30% 0.06 155)` | Positive feedback |
+| `--warning` / `--warning-soft` | `oklch(78% 0.14 80)` / `oklch(31% 0.06 80)`   | Cautionary states |
+| `--error` / `--error-soft`     | `var(--red-600)` / `var(--red-100)`           | Error states      |
 
 #### TCG Card Colors (functional only)
 
@@ -157,8 +157,8 @@ These aliases will be added to `globals.css` for shadcn component compatibility:
   --card-foreground: var(--text-primary);
   --popover: var(--surface-1);
   --popover-foreground: var(--text-primary);
-  --primary: var(--navy-900);
-  --primary-foreground: var(--text-inverse);
+  --primary: var(--gold-500);
+  --primary-foreground: var(--navy-900);
   --secondary: var(--surface-2);
   --secondary-foreground: var(--text-primary);
   --muted: var(--surface-3);
@@ -166,10 +166,9 @@ These aliases will be added to `globals.css` for shadcn component compatibility:
   --accent: var(--gold-500);
   --accent-foreground: var(--navy-900);
   --destructive: var(--red-600);
-  --destructive-foreground: var(--text-inverse);
-  --border: var(--border);
+  --destructive-foreground: var(--navy-900);
   --input: var(--border);
-  --ring: var(--navy-900);
+  --ring: var(--border-focus);
   --radius: 0.5rem; /* 8px — our rounded-md default */
 }
 ```
@@ -180,11 +179,12 @@ All color pairings must meet WCAG AA (4.5:1 for normal text, 3:1 for large text)
 
 | Foreground | Background | Ratio | Status |
 |------------|------------|-------|--------|
-| `--text-primary` | `--surface-base` | ~15:1 | Pass |
-| `--text-secondary` | `--surface-base` | ~5.5:1 | Pass |
-| `--text-inverse` | `--navy-900` | ~14:1 | Pass |
-| `--gold-500` | `--navy-900` | ~7:1 | Pass |
-| `--navy-900` | `--surface-1` | ~12:1 | Pass |
+| `--text-primary`   | `--surface-base` | ~15.4:1 | Pass   |
+| `--text-secondary` | `--surface-3`    | ~5.9:1  | Pass   |
+| `--text-tertiary`  | `--surface-3`    | ~4.7:1  | Pass   |
+| `--gold-500`       | `--surface-base` | ~8.5:1  | Pass   |
+| `--navy-900`       | `--gold-500`     | ~8.5:1  | Pass   |
+| `--navy-900`       | `--red-600`      | ~6.3:1  | Pass   |
 
 ---
 
@@ -326,9 +326,9 @@ Three values only. No exceptions.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px oklch(18% 0.03 245 / 0.06), 0 1px 3px oklch(18% 0.03 245 / 0.10)` | Cards at rest, subtle lift |
-| `--shadow-md` | `0 4px 6px oklch(18% 0.03 245 / 0.07), 0 2px 4px oklch(18% 0.03 245 / 0.06)` | Hovered cards, dropdowns |
-| `--shadow-lg` | `0 10px 15px oklch(18% 0.03 245 / 0.10), 0 4px 6px oklch(18% 0.03 245 / 0.05)` | Modals, popovers |
+| `--shadow-sm` | `0 1px 2px oklch(5% 0.01 245 / 0.30), 0 1px 3px oklch(5% 0.01 245 / 0.20)`   | Cards at rest, subtle lift |
+| `--shadow-md` | `0 4px 6px oklch(5% 0.01 245 / 0.35), 0 2px 4px oklch(5% 0.01 245 / 0.24)`   | Hovered cards, dropdowns   |
+| `--shadow-lg` | `0 10px 15px oklch(5% 0.01 245 / 0.45), 0 4px 6px oklch(5% 0.01 245 / 0.28)` | Modals, popovers           |
 
 ### Elevation Hierarchy
 
@@ -354,18 +354,18 @@ Adapted from Riftbound's CTA system, mapped to our palette:
 
 | Variant | Background | Text | Border | Usage |
 |---------|------------|------|--------|-------|
-| **Primary** | `--navy-900` | `--text-inverse` | none | Main actions: "Save Deck", "Create Game", "Play" |
+| **Primary**     | `--gold-500`  | `--navy-900`       | none                        | Main actions: "Save Deck", "Create Game", "Play"     |
 | **Secondary** | `--surface-1` | `--text-primary` | `1px solid var(--border)` | Secondary actions: "Cancel", "Back" |
 | **Ghost** | transparent | `--text-secondary` | none | Tertiary actions, inline actions |
-| **Destructive** | `--red-600` | `--text-inverse` | none | Destructive: "Delete", "Concede" |
-| **Gold** | `--gold-500` | `--navy-900` | none | Premium/treasure moments: "Upgrade", special actions |
-| **Outline** | transparent | `--navy-900` | `1px solid var(--navy-900)` | Alternative secondary actions |
+| **Destructive** | `--red-600`   | `--navy-900`       | none                        | Destructive: "Delete", "Concede"                     |
+| **Gold**        | `--surface-1` | `--gold-500`       | `1px solid var(--gold-500)` | Premium/treasure moments: "Upgrade", special actions |
+| **Outline**     | transparent   | `--gold-500`       | `1px solid var(--gold-500)` | Alternative secondary actions                        |
 
 #### States
 
 ```
 Default  → Hover (lighten bg or shift color) → Active (darken slightly)
-         → Focus (2px solid --navy-900, 2px offset)
+         → Focus (2px solid --gold-500, 2px offset)
          → Disabled (opacity 0.5, cursor not-allowed)
          → Loading (spinner icon, disabled interaction)
 ```
@@ -410,7 +410,7 @@ All buttons: `transition: color 0.2s ease-out, background-color 0.2s ease-out, b
 └──────────────┘
 ```
 
-- Cards on warm white (`--surface-1`) surfaces — art breathes
+- Cards on restrained elevated navy (`--surface-1`) surfaces — art breathes
 - Single hover effect: subtle lift + scale. No stacking of lift + shadow + blur + glow.
 - Optional: thin gold border on hover for selected/highlighted cards
 
@@ -444,8 +444,8 @@ Dark surface, consistent across all pages:
 ┌──────────────────────────────────────────────────────────────┐
 │ [Logo]      Cards  Decks  Play  Social          [User Menu] │
 │                                                              │
-│ bg: var(--surface-nav) — oklch(20% 0.010 245)               │
-│ text: var(--text-inverse) — warm off-white                    │
+│ bg: var(--surface-nav) — oklch(18% 0.020 245)               │
+│ text: var(--text-primary) — warm off-white                    │
 │ active link: underline in --gold-500                          │
 │ height: 64px desktop, 56px mobile                             │
 │ z-index: 30                                                   │
@@ -461,7 +461,7 @@ Dark surface, consistent across all pages:
 ### Dialogs / Modals
 
 ```
-Overlay: var(--overlay) — oklch(18% 0.03 245 / 0.60)
+Overlay: var(--overlay) — oklch(5% 0.01 245 / 0.72)
 Panel:   var(--surface-1), rounded-lg (12px), shadow-lg
 Enter:   fade overlay 0.2s + scale panel from 0.95→1.0, 0.2s ease-out
 Exit:    fade out 0.15s (exit faster than enter)
@@ -524,7 +524,7 @@ Adapted from Riftbound's blade architecture:
 |---------|------------|------|-------|
 | **Default** | `--surface-base` | `--text-primary` | Most sections |
 | **Muted** | `--surface-2` | `--text-primary` | Alternating sections for visual rhythm |
-| **Navy** | `--navy-900` | `--text-inverse` | Hero sections, CTAs, featured content |
+| **Raised**      | `--surface-1`    | `--text-primary` | Hero sections and featured content                 |
 | **Gold accent** | `--surface-base` | `--text-primary` | Premium/feature showcases (gold border or divider) |
 
 ### Carousel (Riftbound-inspired)
@@ -547,8 +547,8 @@ Embla-based carousel for card galleries, deck showcases, set browsers:
 
 - Desktop: 3-up, Tablet: 2-up, Mobile: 1-up
 - Gap: `var(--content-gap)`
-- Progress bar: 2px rail in `--surface-3`, indicator in `--navy-900`
-- Arrow buttons: 32x32px, `--surface-2` background, `--navy-900` icon
+- Progress bar: 2px rail in `--surface-3`, indicator in `--gold-500`
+- Arrow buttons: 32x32px, `--surface-2` background, `--gold-500` icon
 - Swipe enabled on touch devices
 
 ---
@@ -658,7 +658,7 @@ import { useReducedMotion } from "motion/react";
 |-------------|----------|----------------|
 | Text contrast | 4.5:1 minimum | All token pairings pre-validated |
 | Large text contrast | 3:1 minimum | Display text on all surface variants |
-| Focus visible | 2px solid ring (chrome); **4px ring inside `<ScaledBoard>`** (OPT-346) | `--border-focus` (navy-900), 2px offset; in-board uses `ring-4` so the focus indicator renders ~2.4px at the 1280×640 floor scale |
+| Focus visible            | 2px solid ring (chrome); **4px ring inside `<ScaledBoard>`** (OPT-346) | `--border-focus` (gold-500), 2px offset; in-board uses `ring-4` so the focus indicator renders ~2.4px at the 1280×640 floor scale |
 | Touch targets | 44x44px minimum | All interactive elements |
 | Keyboard navigation | Full tab support | Logical tab order, visible focus |
 | Screen reader | Semantic HTML | ARIA labels, roles, live regions |
@@ -714,10 +714,10 @@ This means:
 
 | Property | Main App | Game Board (Dark) |
 |----------|----------|-------------------|
-| Background | Warm white | Near-black (`--gb-bg`) |
+| Background | Deep navy (`--surface-base`)   | Near-black (`--gb-bg`)                      |
 | Surfaces | `--surface-1/2/3` | `--gb-surface` / `--gb-surface-raised` |
-| Text | Navy-tinted dark | Off-white (`--gb-text`, `--gb-text-bright`) |
-| Cards | Shadow on white | Glow on dark |
+| Text       | Warm white (`--text-primary`)  | Off-white (`--gb-text`, `--gb-text-bright`) |
+| Cards      | Elevated navy surface + shadow | Glow on dark                                |
 | Motion | Subtle, functional | More pronounced, immersive |
 
 ### Future Theme Adaptability
@@ -757,9 +757,9 @@ Inside the scaled subtree only — anything that renders within `<ScaledBoard>` 
 
 ---
 
-## 14. Token Change Summary (Current → M5)
+## 14. Token Change Summary
 
-The current token system is **retained as-is**. The following are **additions** for M5:
+The token names and component API remain stable, while the main-app values now define a dark-only navy system. This lets existing consumers inherit the new direction while component-level cleanup proceeds separately.
 
 | Addition | Purpose |
 |----------|---------|
@@ -769,7 +769,7 @@ The current token system is **retained as-is**. The following are **additions** 
 | motion.dev preset module | `src/lib/motion.ts` — shared transitions, springs, variants |
 | Ornamental CTA class | `.btn-ornamental` for gold-outlined hero buttons |
 
-No existing tokens are renamed or removed. This is additive.
+No existing tokens are renamed or removed.
 
 ---
 
@@ -787,5 +787,5 @@ This branding guideline produces the following implementation artifacts:
 
 ---
 
-_Last updated: 2026-03-30_
-_Phase: M5 Phase 0 — Design Brief_
+_Last updated: 2026-07-18_
+_Phase: Dark-only foundation (OPT-507)_
