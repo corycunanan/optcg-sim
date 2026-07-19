@@ -1,7 +1,7 @@
 ---
 linear-project: Pre-Game Flow
 linear-project-url: https://linear.app/optcg-sim/project/pre-game-flow-6e2829b12a96
-last-updated: 2026-05-06
+last-updated: 2026-07-19
 ---
 
 # Pre-Game Flow — Handoff Doc
@@ -18,12 +18,12 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 |-------|--------|-------|----------|------------|--------|----|-------|
 | 1 | OPT-366 | Pre-game flow: priority decision (2d6) + hand-redraw mulligan + setup restructure | 5 | — | In Review | [#222](https://github.com/corycunanan/optcg-sim/pull/222) | Foundation — unblocks all the rest |
 | 2 | OPT-365 | Wire START_OF_GAME_EFFECT processing for OP13-079 Imu (Mary Geoise stage play) | 2 | OPT-366 | Backlog | — | Drops into the START_OF_GAME_FX phase the FSM already exposes |
-| 3 | OPT-367 | Lobby settings: host-configurable pre-game flow (turn order + priority roll opt-out) | 3 | OPT-366 | Backlog | — | Adds host overrides; pure surface work above the FSM |
+| 3 | OPT-367 | Lobby settings: host-configurable pre-game flow (turn order + priority roll opt-out) | 3 | OPT-366 | In Review | [#380](https://github.com/corycunanan/optcg-sim/pull/380) | Adds host overrides, game-session snapshotting, and worker FSM routing |
 | 4 | OPT-368 | Solitaire-mode pre-game UX: streamline priority decision when one user controls both sides | 2 | OPT-366 | Backlog | — | Solitaire UX polish; mechanics already work |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-365 once OPT-366 merges (highest priority, smallest estimate, foundation in place).
+**Next up:** OPT-368 after OPT-367 merges; extend the pre-game modes for solitaire without changing the two-player meanings.
 
 ---
 
@@ -45,3 +45,11 @@ Append new entries at the bottom. Each entry is written *by* the agent who just 
   - START_OF_GAME_EFFECT processing is a single-line passthrough (`pregame.ts` `START_OF_GAME_FX` case). OPT-365 fills in the §5-2-1-5-1 ordering (priority-decider's leader effects fire first, then opponent's) and the §5-2-1-5-2 reshuffle if a deck-touching effect fired.
   - The spec mentioned a dedicated `game:pregame_priority_rolled` server message; deferred — clients animate off the `pregame.priorityRolls` field flipping non-null in `game:state`. Add the dedicated message only if the diff-driven animation feels janky in real testing.
 - **Why this matters for OPT-365:** The FSM has a slot waiting at `pregame.phase === "START_OF_GAME_FX"`. After OPT-365 lands, that case stops being a passthrough and instead invokes the trigger pipeline for both leaders' `START_OF_GAME_EFFECT` rule_modifications in §5-2-1-5-1 order, then transitions to `HAND_DEAL`. Tests in `opt-366-pregame-flow.test.ts` ("hand dealing ordering") already lock in that hand is dealt **after** START_OF_GAME_FX — those tests will start exercising the real Imu effect once OPT-365 wires it up.
+
+### OPT-367 → OPT-368
+**From:** Codex session on 2026-07-19 · **Commit:** 0f494da · **PR:** [#380](https://github.com/corycunanan/optcg-sim/pull/380)
+
+- **Primer:** Added `PregameMode` with `PRIORITY_ROLL`, `HOST_FIRST`, `GUEST_FIRST`, and `RANDOM_FIXED`. The host edits it in the lobby, Start snapshots it onto `game_sessions`, and `GameInitPayload` plus `StoredSession` carry it through the worker and Durable Object hibernation.
+- **Read first:** `prisma/schema.prisma`, `shared/game-init.ts`, `src/lib/validators/lobbies.ts`, `src/components/lobbies/pregame-settings.tsx`, `workers/game/src/engine/pregame.ts`, and `workers/game/src/session/persistence.ts`. The migration is `prisma/migrations/20260719090000_add_pregame_mode/migration.sql`.
+- **Gotchas:** Extend every Prisma/shared/Zod/runtime/persistence allowlist when adding `SIDE_A_FIRST`, `SIDE_B_FIRST`, and `SOLITAIRE_RANDOM`, and add a new SQL migration that extends the PostgreSQL enum. Keep legacy payload/session reads defaulting to `PRIORITY_ROLL` for rolling-deploy safety.
+- **Ordering invariant:** §5-2-1-5-1 uses `priorityDeciderIndex` for start-of-game effects. Roll-skipping modes assign their configured or privately coin-flipped first player as the priority decider; OPT-368's solitaire fixed/random modes must preserve that rule and must not emit a public roll or first/second prompt.
