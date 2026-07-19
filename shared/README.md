@@ -24,6 +24,10 @@ Cloudflare game worker, and (for card parsing) the data pipeline.
   runtime-narrowed types, such as validated effect schemas and executable prompt
   continuation state. Worker types may refine shared wire shapes; they do not
   replace the serialized contract.
+- Put shared-module tests under `src/__tests__/` and name them `*.test.ts` or
+  `*.test.tsx`. The root `vitest.config.ts` only discovers
+  `src/**/*.test.ts(x)`, so a colocated test such as `shared/foo.test.ts` would
+  silently never run.
 - Put cross-runtime validation here. Keep API-only request/response validators in
   `src/lib/validators/`.
 

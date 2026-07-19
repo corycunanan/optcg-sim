@@ -28,9 +28,12 @@ flowchart TD
   UI --> HOOKS
   UI --> LIB
   UI --> TYPES
+  UI --> WORKER
+  UI --> PRISMA
   HOOKS --> LIB
   HOOKS --> TYPES
   LIB --> TYPES
+  LIB --> WORKER
 
   APP --> SHARED
   API --> SHARED
@@ -40,24 +43,42 @@ flowchart TD
   WORKER --> SHARED
   PIPELINE --> SHARED
 
+  APP --> PRISMA
   API --> PRISMA
   LIB --> PRISMA
   PIPELINE --> PRISMA
+  PIPELINE --> LIB
+  PIPELINE --> WORKER
   API --> EXTERNAL
   LIB --> EXTERNAL
   WORKER --> EXTERNAL
+  PIPELINE --> EXTERNAL
 ```
 
 ## Boundary notes
 
-- `shared/` is the only source boundary compiled directly by both application
-  and game worker. See [`shared/README.md`](../../shared/README.md).
+- `shared/` is the runtime-neutral contract boundary intentionally consumed by
+  both the application and game worker. It is not the only worker source the
+  application compiles: the root `@engine/*` alias points into
+  `workers/game/src/*`. See [`shared/README.md`](../../shared/README.md).
 - `workers/game/` owns authoritative game mutation and Durable Object state;
-  the app reaches it through `src/lib/game-worker/client.ts` and WebSocket hooks.
-- `src/lib/game/` contains app-side conversion, legality, targeting, token, and
-  finalization helpers. It does not import the worker engine.
-- `pipeline/transform.ts` imports shared card parsing; pipeline database stages
-  use Prisma independently of the Next.js application.
+  live games reach the deployed worker through `src/lib/game-worker/client.ts`
+  and WebSocket hooks. There are also deliberate source-level imports from the
+  app: `src/lib/game/card-data.ts` reuses the worker's narrowed `CardData` type
+  and runtime `parseCardData` validator, while sandbox library modules share
+  engine-only card/effect types. The sandbox UI additionally runs
+  `runPipeline` in the browser so playground scenarios exercise the real engine
+  without a Durable Object. These `LIB --> WORKER` and `UI --> WORKER` edges are
+  therefore type/data sharing plus sandbox execution, not the live game's
+  authoritative mutation path.
+- Server pages under `src/app/` and the server component
+  `src/components/cards/set-browser.tsx` import the Prisma singleton directly;
+  API handlers and library modules do so as well.
+- `pipeline/transform.ts` imports shared card parsing. Pipeline database stages
+  use Prisma independently of the Next.js application;
+  `pipeline/sync-effect-schemas.ts` also reads worker schemas and app deck
+  validation, and `pipeline/migrate-images.ts` fetches source images and calls
+  Cloudflare R2 directly through the S3 client.
 - `src/types/` is app-scoped. Worker-narrowed types remain in
   `workers/game/src/types.ts`.
 
