@@ -54,13 +54,13 @@ export function UserAvatar({
           "text-xs font-semibold",
           variant === "dark"
             ? "bg-navy-700 text-content-inverse"
-            : "bg-navy-900 text-content-inverse",
+            : "bg-secondary text-secondary-foreground",
         )}
       >
         {initials}
       </AvatarFallback>
       {isOnline && (
-        <AvatarBadge className="bg-success ring-navy-900" />
+        <AvatarBadge className="bg-success ring-background" />
       )}
     </Avatar>
   );

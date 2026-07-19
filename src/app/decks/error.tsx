@@ -18,7 +18,7 @@ export default function DecksError({
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <Card className="max-w-[400px] w-full text-center">
         <CardHeader>
-          <CardTitle className="text-xs font-semibold text-text-secondary tracking-widest">
+          <CardTitle className="text-xs font-semibold text-content-secondary tracking-widest">
             DECK BUILDER ERROR
           </CardTitle>
         </CardHeader>
@@ -26,12 +26,12 @@ export default function DecksError({
           <p className="text-xl font-extrabold text-red-600">
             Something went wrong
           </p>
-          <p className="text-sm text-text-secondary leading-relaxed">
+          <p className="text-sm text-content-secondary leading-relaxed">
             The deck builder encountered an unexpected error. Your saved decks
             are not affected.
           </p>
           {error.message && (
-            <p className="text-xs text-text-tertiary font-mono break-all">
+            <p className="text-xs text-content-tertiary font-mono break-all">
               {error.message}
             </p>
           )}

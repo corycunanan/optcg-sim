@@ -112,7 +112,7 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
           className={cn(
             "bg-surface-2 flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border px-3 py-1 text-left text-sm transition-colors",
             open
-              ? "border-border-focus ring-navy-900/10 ring-2"
+              ? "border-border-focus ring-border-focus/20 ring-2"
               : "border-border hover:border-border-strong"
           )}
         >

@@ -219,7 +219,7 @@ export function DeckBuilderList({
 
   if (!leader && cards.length === 0) {
     return (
-      <div className="border-border bg-surface-1 rounded border p-8 text-center">
+      <div className="border-border bg-card rounded border p-8 text-center">
         <p className="text-content-tertiary text-sm font-medium">
           No cards in deck yet
         </p>
@@ -273,7 +273,7 @@ export function DeckBuilderList({
                       <button
                         aria-label="Remove one"
                         onClick={() => onDecrement(group.cardId)}
-                        className="text-content-tertiary hover:bg-surface-2 hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors"
+                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors"
                       >
                         −
                       </button>
@@ -286,7 +286,7 @@ export function DeckBuilderList({
                         disabled={
                           group.count >= group.copyLimit || totalCards >= 50
                         }
-                        className="text-content-tertiary hover:bg-surface-2 hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors disabled:opacity-30"
+                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors disabled:opacity-30"
                       >
                         +
                       </button>
@@ -296,7 +296,7 @@ export function DeckBuilderList({
               </TooltipTrigger>
               <TooltipContent
                 side="top"
-                className="bg-surface-base border-border text-content-primary w-72 p-3"
+                className="bg-background border-border text-content-primary w-72 p-3"
               >
                 <CardTooltipBody group={group} />
               </TooltipContent>

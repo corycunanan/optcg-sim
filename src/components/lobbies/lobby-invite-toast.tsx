@@ -192,7 +192,7 @@ function InviteCard({
     <div
       role="alertdialog"
       aria-labelledby={`invite-${invite.id}-title`}
-      className="border-border bg-surface-1 pointer-events-auto rounded-lg border p-4 shadow-[var(--shadow-md)]"
+      className="border-border bg-card pointer-events-auto rounded-lg border p-4 shadow-[var(--shadow-md)]"
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
@@ -201,11 +201,11 @@ function InviteCard({
         <div className="min-w-0 flex-1">
           <p
             id={`invite-${invite.id}-title`}
-            className="text-text-primary truncate text-sm font-semibold"
+            className="text-content-primary truncate text-sm font-semibold"
           >
             {inviterName} invited you to a lobby
           </p>
-          <p className="text-text-secondary text-xs">
+          <p className="text-content-secondary text-xs">
             {invite.lobby.format} · {prettyMode(invite.lobby.mode)}
           </p>
         </div>
@@ -229,7 +229,7 @@ function InviteCard({
         </Button>
       </div>
       <div
-        className="bg-surface-2 mt-3 h-1 overflow-hidden rounded-full"
+        className="bg-secondary mt-3 h-1 overflow-hidden rounded-full"
         aria-label={`Expires in ${remainingSec} seconds`}
       >
         <div

@@ -150,12 +150,12 @@ export function CardEditForm({ card }: { card: Card }) {
       {/* Card ID + Origin Set (read-only) */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Card ID" hint="Read-only">
-          <div className="w-full rounded-md border border-border bg-surface-1 px-3 py-2 font-mono text-sm text-content-tertiary">
+          <div className="w-full rounded-md border border-border bg-card px-3 py-2 font-mono text-sm text-content-tertiary">
             {card.id}
           </div>
         </Field>
         <Field label="Origin Set" hint="Derived from ID">
-          <div className="w-full rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-content-tertiary">
+          <div className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-content-tertiary">
             {card.originSet}
           </div>
         </Field>
@@ -201,7 +201,7 @@ export function CardEditForm({ card }: { card: Card }) {
                 onClick={() => toggleColor(c)}
                 className={cn(
                   "admin-card-color-button rounded-md border px-3 py-1 text-xs font-medium transition-all",
-                  !active && "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3",
+                  !active && "border-border bg-secondary text-content-tertiary hover:bg-muted",
                 )}
               >
                 {c}

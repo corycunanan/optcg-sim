@@ -73,7 +73,7 @@ export default async function CardDetailPage({
         <div className="space-y-4">
           {/* Header */}
           <div
-            className="rounded-lg bg-surface-1 p-6"
+            className="rounded-lg bg-card p-6"
             style={{ borderLeft: `3px solid ${accentColor}` }}
           >
             <div className="flex items-start justify-between">
@@ -179,7 +179,7 @@ export default async function CardDetailPage({
                     key={cs.id}
                     className="flex items-center gap-2 text-sm"
                   >
-                    <span className="font-mono font-medium text-navy-900">
+                    <span className="font-mono font-medium text-content-primary">
                       {cs.setLabel}
                     </span>
                     <span className="text-content-tertiary">—</span>
@@ -218,7 +218,7 @@ export default async function CardDetailPage({
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-1 p-3 text-center">
+    <div className="rounded-lg border border-border bg-card p-3 text-center">
       <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {label}
       </div>
@@ -237,7 +237,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-1 p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {title}
       </h3>

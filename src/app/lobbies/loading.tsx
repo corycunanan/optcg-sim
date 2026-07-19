@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function LobbiesLoading() {
   return (
     <div
-      className="bg-surface-base flex-1 overflow-y-auto"
+      className="bg-background flex-1 overflow-y-auto"
       role="status"
       aria-busy="true"
       aria-label="Loading lobbies"
@@ -20,7 +20,7 @@ export default function LobbiesLoading() {
 
       <div className="mx-auto grid max-w-5xl gap-6 px-6 py-10 md:grid-cols-[1fr_0.8fr]">
         <section
-          className="border-border bg-surface-1 flex min-h-72 flex-col justify-between rounded-lg border p-6"
+          className="border-border bg-card flex min-h-72 flex-col justify-between rounded-lg border p-6"
           aria-hidden="true"
         >
           <div className="space-y-5">
@@ -35,7 +35,7 @@ export default function LobbiesLoading() {
         </section>
 
         <section
-          className="border-border bg-surface-1 min-h-72 rounded-lg border p-6"
+          className="border-border bg-card min-h-72 rounded-lg border p-6"
           aria-hidden="true"
         >
           <Skeleton className="h-3 w-28" />

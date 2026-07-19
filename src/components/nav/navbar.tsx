@@ -31,9 +31,9 @@ export function Navbar() {
   const sandboxActive = pathname.startsWith("/sandbox");
 
   const triggerStyles =
-    "bg-transparent text-content-inverse/70 hover:bg-white/10 hover:text-content-inverse focus:bg-white/10 focus:text-content-inverse data-popup-open:bg-white/10 data-popup-open:text-content-inverse data-popup-open:hover:bg-white/15 data-open:bg-white/10 data-open:text-content-inverse data-open:hover:bg-white/15";
+    "bg-transparent text-content-inverse/70 hover:bg-content-inverse/10 hover:text-content-inverse focus:bg-content-inverse/10 focus:text-content-inverse data-popup-open:bg-content-inverse/10 data-popup-open:text-content-inverse data-popup-open:hover:bg-content-inverse/15 data-open:bg-content-inverse/10 data-open:text-content-inverse data-open:hover:bg-content-inverse/15";
   const activeTriggerStyles =
-    "bg-white/10 text-content-inverse hover:bg-white/15";
+    "bg-content-inverse/10 text-content-inverse hover:bg-content-inverse/15";
 
   const linkStyles =
     "text-sm font-medium hover:bg-accent/10 focus:bg-accent/10 rounded-md px-3 py-2";
@@ -72,7 +72,7 @@ export function Navbar() {
             >
               Cards
             </NavigationMenuTrigger>
-            <NavigationMenuContent className="bg-surface-nav border border-white/10">
+            <NavigationMenuContent className="bg-surface-nav border border-content-inverse/10">
               <ul className="flex w-48 flex-col gap-1 p-1">
                 <li>
                   <NavigationMenuLink asChild>
@@ -139,7 +139,7 @@ export function Navbar() {
                 >
                   Decks
                 </NavigationMenuTrigger>
-                <NavigationMenuContent className="bg-surface-nav border border-white/10">
+                <NavigationMenuContent className="bg-surface-nav border border-content-inverse/10">
                   <ul className="flex w-48 flex-col gap-1 p-1">
                     <li>
                       <NavigationMenuLink asChild>

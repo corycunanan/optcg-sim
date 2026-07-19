@@ -194,9 +194,9 @@ export function DeckBuilderSearch({
                     "rounded px-2 py-1 text-xs font-medium transition-all",
                     active
                       ? c === "Yellow"
-                        ? "text-content-primary"
+                        ? "text-navy-900"
                         : "text-content-inverse"
-                      : "border-border bg-surface-2 text-content-tertiary hover:border-border-strong border"
+                      : "border-border bg-secondary text-content-tertiary hover:border-border-strong border"
                   )}
                   style={active ? { background: COLOR_BG[c] } : undefined}
                 >
@@ -211,7 +211,7 @@ export function DeckBuilderSearch({
             <select
               value={activeType}
               onChange={(e) => setActiveType(e.target.value)}
-              className="border-border bg-surface-1 text-content-secondary focus:border-border-focus rounded border px-2 py-1 text-xs focus:outline-none"
+              className="border-border bg-card text-content-secondary focus:border-border-focus rounded border px-2 py-1 text-xs focus:outline-none"
             >
               <option value="">All Types</option>
               {TYPES.map((t) => (
@@ -272,7 +272,7 @@ export function DeckBuilderSearch({
                 onClick={() =>
                   fetchCards(query, page, activeColors, activeType, costMin, costMax)
                 }
-                className="border-border text-content-secondary hover:bg-surface-2 hover:text-content-primary mt-4 rounded border px-3 py-1 text-xs font-medium transition-colors"
+                className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary mt-4 rounded border px-3 py-1 text-xs font-medium transition-colors"
               >
                 Retry
               </button>
@@ -309,8 +309,8 @@ export function DeckBuilderSearch({
                   aria-label={`Inspect ${card.name}`}
                   onClick={() => setInspectCard(card)}
                   className={cn(
-                    "group bg-surface-1 relative overflow-hidden rounded border-0 text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
-                    qtyInDeck > 0 ? "border-navy-900" : "border-border",
+                    "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                    qtyInDeck > 0 ? "border-border-focus" : "border-border",
                     (!isLeaderColor || !isLeaderRestrictionAllowed) &&
                       "opacity-40"
                   )}
@@ -324,7 +324,7 @@ export function DeckBuilderSearch({
                       loading="lazy"
                     />
                     {qtyInDeck > 0 && (
-                      <div className="bg-navy-900 text-content-inverse absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold">
+                      <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold">
                         {qtyInDeck}
                       </div>
                     )}
@@ -352,7 +352,7 @@ export function DeckBuilderSearch({
                 aria-label="Previous page"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="border-border text-content-secondary hover:bg-surface-2 flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
+                className="border-border text-content-secondary hover:bg-secondary flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
               >
                 ←
               </button>
@@ -363,7 +363,7 @@ export function DeckBuilderSearch({
                 aria-label="Next page"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="border-border text-content-secondary hover:bg-surface-2 flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
+                className="border-border text-content-secondary hover:bg-secondary flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
               >
                 →
               </button>

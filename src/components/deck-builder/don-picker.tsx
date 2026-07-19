@@ -21,9 +21,9 @@ export function DonPicker({ selectedUrl, onSelect }: DonPickerProps) {
           aria-pressed={selectedUrl === null}
           onClick={() => onSelect(null)}
           className={cn(
-            "bg-surface-1 text-content-secondary aspect-card focus-visible:ring-border-focus flex items-center justify-center overflow-hidden rounded-md border-2 text-xs font-bold uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+            "bg-card text-content-secondary aspect-card focus-visible:ring-border-focus flex items-center justify-center overflow-hidden rounded-md border-2 text-xs font-bold uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
             selectedUrl === null
-              ? "border-navy-900 ring-navy-900 ring-2"
+              ? "border-border-focus ring-border-focus ring-2"
               : "border-border hover:border-content-tertiary"
           )}
         >
@@ -39,7 +39,7 @@ export function DonPicker({ selectedUrl, onSelect }: DonPickerProps) {
             className={cn(
               "aspect-card focus-visible:ring-border-focus overflow-hidden rounded-md border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               selectedUrl === option.imageUrl
-                ? "border-navy-900 ring-navy-900 ring-2"
+                ? "border-border-focus ring-border-focus ring-2"
                 : "border-border hover:border-content-tertiary"
             )}
           >

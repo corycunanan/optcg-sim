@@ -168,7 +168,7 @@ export function TestOrderEditor({
       {testOrder && (
         <button
           onClick={() => onChangeTestOrder(null)}
-          className="rounded-md border border-border px-3 py-2 text-xs font-medium text-content-secondary transition-colors hover:bg-surface-2 hover:text-content-primary"
+          className="rounded-md border border-border px-3 py-2 text-xs font-medium text-content-secondary transition-colors hover:bg-secondary hover:text-content-primary"
         >
           Clear Test Order
         </button>
@@ -196,7 +196,7 @@ function SlotSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-content-primary"
+        className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-content-primary"
       >
         <option value="">— empty —</option>
         {options.map((opt) => {

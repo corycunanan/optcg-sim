@@ -67,7 +67,7 @@ export function ExportModal({ name, leader, cards, onClose }: ExportModalProps) 
             readOnly
             value={deckText}
             rows={Math.min(20, lines.length + 2)}
-            className="w-full resize-none rounded border border-border bg-surface-2 p-3 font-mono text-sm text-content-primary focus:outline-none"
+            className="w-full resize-none rounded border border-border bg-secondary p-3 font-mono text-sm text-content-primary focus:outline-none"
           />
         </DialogBody>
         <DialogFooter>

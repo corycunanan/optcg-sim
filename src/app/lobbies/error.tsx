@@ -18,7 +18,7 @@ export default function LobbiesError({
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <Card className="max-w-[400px] w-full text-center">
         <CardHeader>
-          <CardTitle className="text-xs font-semibold text-text-secondary tracking-widest">
+          <CardTitle className="text-xs font-semibold text-content-secondary tracking-widest">
             LOBBY ERROR
           </CardTitle>
         </CardHeader>
@@ -26,11 +26,11 @@ export default function LobbiesError({
           <p className="text-xl font-extrabold text-red-600">
             Something went wrong
           </p>
-          <p className="text-sm text-text-secondary leading-relaxed">
+          <p className="text-sm text-content-secondary leading-relaxed">
             The lobby page encountered an unexpected error. Please try again.
           </p>
           {error.message && (
-            <p className="text-xs text-text-tertiary font-mono break-all">
+            <p className="text-xs text-content-tertiary font-mono break-all">
               {error.message}
             </p>
           )}

@@ -52,7 +52,7 @@ export default async function DecksPage() {
   const leaderMap = new Map(leaders.map((l) => [l.id, l]));
 
   return (
-    <div className="bg-surface-base flex-1 overflow-y-auto">
+    <div className="bg-background flex-1 overflow-y-auto">
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderTitle>My Decks</PageHeaderTitle>
@@ -76,7 +76,7 @@ export default async function DecksPage() {
           </p>
           <Link
             href="/decks/new"
-            className="mt-6 inline-block rounded bg-navy-900 px-6 py-2 text-sm font-semibold text-content-inverse transition-colors hover:bg-navy-800"
+            className="mt-6 inline-block rounded bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-gold-400"
           >
             + New Deck
           </Link>

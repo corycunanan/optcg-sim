@@ -262,7 +262,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
 
         {/* Footer — provided by consumer */}
         {footerContent && (
-          <div className="flex shrink-0 items-center justify-between border-t border-border bg-surface-1 px-6 py-3">
+          <div className="flex shrink-0 items-center justify-between border-t border-border bg-card px-6 py-3">
             {footerContent}
           </div>
         )}

@@ -196,9 +196,9 @@ export function LobbyRoomShell({
 
   if (loading && !lobby) {
     return (
-      <div className="bg-surface-base flex-1 overflow-y-auto">
-        <div className="text-text-secondary mx-auto flex max-w-5xl items-center gap-2 px-6 py-10 text-sm">
-          <span className="bg-text-tertiary h-2 w-2 animate-pulse rounded-full" />
+      <div className="bg-background flex-1 overflow-y-auto">
+        <div className="text-content-secondary mx-auto flex max-w-5xl items-center gap-2 px-6 py-10 text-sm">
+          <span className="bg-content-tertiary h-2 w-2 animate-pulse rounded-full" />
           Loading lobby...
         </div>
       </div>
@@ -207,10 +207,10 @@ export function LobbyRoomShell({
 
   if (!lobby) {
     return (
-      <div className="bg-surface-base flex-1 overflow-y-auto">
+      <div className="bg-background flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 py-10">
-          <div className="border-border bg-surface-1 rounded-lg border p-6">
-            <p className="text-text-primary text-sm font-semibold">
+          <div className="border-border bg-card rounded-lg border p-6">
+            <p className="text-content-primary text-sm font-semibold">
               {error ?? "Lobby not found"}
             </p>
             <Button className="mt-4" onClick={() => router.push("/lobbies")}>
@@ -224,7 +224,7 @@ export function LobbyRoomShell({
 
   return (
     <TooltipProvider>
-      <div className="bg-surface-base flex-1 overflow-y-auto">
+      <div className="bg-background flex-1 overflow-y-auto">
         <PageHeader>
           <PageHeaderContent>
             <PageHeaderTitle>Lobby Room</PageHeaderTitle>
@@ -268,7 +268,7 @@ export function LobbyRoomShell({
         </PageHeader>
 
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-          <div className="border-border bg-surface-1 flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
+          <div className="border-border bg-card flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
             <Tabs value={lobby.mode} onValueChange={onModeChange}>
               <TabsList>
                 <TabsTrigger value="PVP" disabled={!isHost || mutating}>
@@ -291,7 +291,7 @@ export function LobbyRoomShell({
                 </Tooltip>
               </TabsList>
             </Tabs>
-            <p className="text-text-secondary max-w-xl text-sm">
+            <p className="text-content-secondary max-w-xl text-sm">
               {isHost
                 ? "You control lobby mode and the Start button."
                 : "The host controls mode and starts the game."}
@@ -299,7 +299,7 @@ export function LobbyRoomShell({
           </div>
 
           {deckLoadError && (
-            <div className="border-error/30 bg-surface-1 text-error rounded-lg border p-4 text-sm">
+            <div className="border-error/30 bg-card text-error rounded-lg border p-4 text-sm">
               {deckLoadError}
             </div>
           )}
@@ -321,7 +321,7 @@ export function LobbyRoomShell({
             />
 
             <div className="flex items-center justify-center">
-              <div className="border-border bg-surface-1 text-text-tertiary rounded-full border px-4 py-2 text-xs font-semibold uppercase">
+              <div className="border-border bg-card text-content-tertiary rounded-full border px-4 py-2 text-xs font-semibold uppercase">
                 {lobby.mode === "SOLITAIRE" ? "Solo Test" : "Versus"}
               </div>
             </div>
@@ -371,8 +371,8 @@ export function LobbyRoomShell({
           </div>
 
           {decks.length === 0 && (
-            <div className="border-border bg-surface-1 rounded-lg border p-5">
-              <p className="text-text-secondary text-sm">
+            <div className="border-border bg-card rounded-lg border p-5">
+              <p className="text-content-secondary text-sm">
                 You can sit in the room now, but you need a playable deck before
                 you can ready and start.
               </p>
@@ -387,7 +387,7 @@ export function LobbyRoomShell({
           )}
 
           {ownDeck && ownDeck.totalCards < 50 && (
-            <p className="text-text-tertiary text-xs">
+            <p className="text-content-tertiary text-xs">
               Deck legality is checked when Start is clicked, so unfinished
               decks can stay selected while players coordinate.
             </p>
@@ -460,13 +460,13 @@ function SeatPanel({
   onPreview: (deckId: string) => void;
 }) {
   return (
-    <section className="border-border bg-surface-1 flex min-h-[480px] flex-col gap-5 rounded-lg border p-5">
+    <section className="border-border bg-card flex min-h-[480px] flex-col gap-5 rounded-lg border p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-text-tertiary text-xs font-semibold tracking-widest uppercase">
+          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
             {label}
           </p>
-          <p className="text-text-primary mt-1 text-lg font-semibold">
+          <p className="text-content-primary mt-1 text-lg font-semibold">
             {playerName}
           </p>
         </div>
@@ -484,7 +484,7 @@ function SeatPanel({
         }}
         disabled={!deck}
         className={cn(
-          "bg-surface-2 flex min-h-72 items-center justify-center rounded-lg transition-transform",
+          "bg-secondary flex min-h-72 items-center justify-center rounded-lg transition-transform",
           deck && "hover:scale-[1.02]"
         )}
       >
@@ -495,7 +495,7 @@ function SeatPanel({
             className="h-72 rounded-lg object-contain shadow-[var(--shadow-md)]"
           />
         ) : (
-          <div className="text-text-tertiary flex flex-col items-center gap-3">
+          <div className="text-content-tertiary flex flex-col items-center gap-3">
             <UserRound />
             <span className="text-sm">No deck selected</span>
           </div>
@@ -517,7 +517,7 @@ function SeatPanel({
             </SelectContent>
           </Select>
         ) : (
-          <div className="border-border bg-surface-base text-text-secondary flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+          <div className="border-border bg-background text-content-secondary flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
             <Lock />
             {deck?.name ?? "Waiting for deck"}
           </div>
@@ -552,19 +552,19 @@ function InvitePanel({
   showInviteFriend: boolean;
 }) {
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border border-dashed p-5 text-center">
+    <section className="border-border-strong bg-card flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border border-dashed p-5 text-center">
       <div>
-        <p className="text-text-tertiary text-xs font-semibold tracking-widest uppercase">
+        <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
           Side B
         </p>
-        <p className="text-text-primary mt-2 text-lg font-semibold">
+        <p className="text-content-primary mt-2 text-lg font-semibold">
           Waiting for opponent
         </p>
-        <p className="text-text-secondary mt-2 text-sm">
+        <p className="text-content-secondary mt-2 text-sm">
           Share the room code when your opponent is ready.
         </p>
       </div>
-      <code className="border-border bg-surface-base text-text-primary rounded-md border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em]">
+      <code className="border-border bg-background text-content-primary rounded-md border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em]">
         {joinCode}
       </code>
       <div className="flex flex-wrap items-center justify-center gap-2">

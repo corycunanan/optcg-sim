@@ -153,11 +153,11 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
         <DialogBody className="space-y-3">
           <p className="text-content-tertiary text-xs">
             Paste your deck list below. Supports{" "}
-            <code className="bg-surface-3 rounded px-1">
+            <code className="bg-muted rounded px-1">
               4x OP01-004
             </code>{" "}
             or{" "}
-            <code className="bg-surface-3 rounded px-1">
+            <code className="bg-muted rounded px-1">
               4 Card Name (OP01-004)
             </code>{" "}
             formats, with optional section headers.
@@ -168,7 +168,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
             onChange={(e) => setText(e.target.value)}
             placeholder={`Leader\n1 Portgas.D.Ace (OP13-002)\n\nCharacter (40)\n4 Izo (ST22-002)\n4 Monkey.D.Garp (OP13-016)\n\n— or —\n\nLeader: OP01-001\n4x OP01-004\n3x OP01-010`}
             rows={10}
-            className="border-border bg-surface-2 text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:ring-navy-900/10 w-full resize-none rounded border p-3 font-mono text-sm focus:ring-2 focus:outline-none"
+            className="border-border bg-secondary text-content-primary placeholder:text-content-tertiary focus:border-border-focus focus:ring-border-focus/20 w-full resize-none rounded border p-3 font-mono text-sm focus:ring-2 focus:outline-none"
           />
 
           {errors.length > 0 && (
@@ -195,7 +195,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           )}
 
           {preview && (
-            <div className="border-border bg-surface-2 text-content-secondary rounded border p-3 text-xs">
+            <div className="border-border bg-secondary text-content-secondary rounded border p-3 text-xs">
               {preview.leader && (
                 <span>
                   Leader: <strong>{preview.leader.card.name}</strong> ·{" "}

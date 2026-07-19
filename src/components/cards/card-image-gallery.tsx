@@ -92,7 +92,7 @@ export function CardImageGallery({
                   className={cn(
                     "group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-md",
                     isSelected
-                      ? "ring-2 ring-navy-900"
+                      ? "ring-2 ring-border-focus"
                       : "border border-border",
                   )}
                 >
@@ -110,8 +110,8 @@ export function CardImageGallery({
                     className={cn(
                       "p-1 text-center text-xs font-medium",
                       isSelected
-                        ? "bg-navy-100 text-navy-900"
-                        : "bg-surface-1 text-content-tertiary",
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-content-tertiary",
                     )}
                   >
                     {art.label}

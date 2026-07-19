@@ -79,8 +79,8 @@ function CardListItem({ cardId }: { cardId: string }) {
   const card = SANDBOX_CARD_DB[cardId];
   if (!card) {
     return (
-      <li className="flex items-center gap-3 rounded-md border border-dashed border-border bg-surface-1 px-3 py-2">
-        <div className="h-12 w-9 shrink-0 rounded bg-surface-2" />
+      <li className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card px-3 py-2">
+        <div className="h-12 w-9 shrink-0 rounded bg-secondary" />
         <div className="min-w-0 text-xs text-content-tertiary">
           <div className="truncate font-medium">{cardId}</div>
           <div className="truncate text-content-disabled">Not in sandbox bundle</div>
@@ -89,8 +89,8 @@ function CardListItem({ cardId }: { cardId: string }) {
     );
   }
   return (
-    <li className="flex items-center gap-3 rounded-md border border-border bg-surface-1 px-3 py-2">
-      <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded bg-surface-2">
+    <li className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+      <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded bg-secondary">
         {card.imageUrl && (
           <Image
             src={card.imageUrl}

@@ -40,7 +40,7 @@ const COLOR_ACTIVE: Record<
   },
   Yellow: {
     bg: "var(--card-yellow)",
-    text: "var(--text-primary)",
+    text: "var(--navy-900)",
     border: "var(--card-yellow)",
   },
 };
@@ -135,7 +135,7 @@ export function CardFilters({
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
-                      ? "border-navy-900 bg-navy-900 text-content-inverse"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
                   )}
                 >
@@ -162,7 +162,7 @@ export function CardFilters({
                   className={cn(
                     "rounded border px-3 py-1 text-xs font-medium transition-all",
                     active
-                      ? "border-navy-900 bg-navy-900 text-content-inverse"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
                   )}
                 >
@@ -184,7 +184,7 @@ export function CardFilters({
             className={cn(
               "flex items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-all",
               originOnly
-                ? "border-gold-500 bg-navy-100 text-content-primary"
+                ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-surface-2 text-content-tertiary hover:bg-surface-3"
             )}
           >

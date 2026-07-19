@@ -18,13 +18,13 @@ interface DeckBuilderStatsChartsProps {
 export function DeckBuilderStatsCharts({ stats }: DeckBuilderStatsChartsProps) {
   return (
     <div className="space-y-4">
-      <div className="rounded border border-border bg-surface-1 p-4">
+      <div className="rounded border border-border bg-card p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
           Cost Curve
         </h3>
         <CostCurveChart costCurve={stats.costCurve} />
       </div>
-      <div className="rounded border border-border bg-surface-1 p-4">
+      <div className="rounded border border-border bg-card p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
           Colors
         </h3>
@@ -84,7 +84,7 @@ function ColorBreakdown({ breakdown, total }: { breakdown: Record<string, number
               style={{ background: COLOR_VAR[color] || "var(--border)" }}
             />
             <span className="w-12 text-xs font-medium text-content-secondary">{color}</span>
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{ width: `${pct}%`, background: COLOR_VAR[color] || "var(--border)" }}
