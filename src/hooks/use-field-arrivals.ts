@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 /**
  * Pure helper — returns the subset of `current` not present in `prev`.
@@ -23,8 +23,10 @@ export function computeFieldArrivals(
 /**
  * Track which card `instanceId`s are new vs. the previous render.
  *
- * The previous-id snapshot is updated after commit so React Compiler does not
- * see ref reads/writes during render.
+ * Arrivals are computed during render against the last committed snapshot so
+ * consumers can pass `initial` to a wrapper on the render where it mounts.
+ * The snapshot advances after commit, so later renders clear `arrivals`
+ * without replaying Motion's mount-only initial state.
  */
 export function useFieldArrivals(ids: Iterable<string>): Set<string> {
   const idList = [...ids];
@@ -33,21 +35,15 @@ export function useFieldArrivals(ids: Iterable<string>): Set<string> {
     () => new Set(key ? key.split("\u0000") : []),
     [key],
   );
-  const [state, update] = useReducer(
-    (
-      prev: { key: string; current: Set<string> | null; arrivals: Set<string> },
-      next: { key: string; current: Set<string> },
-    ) => ({
-      key: next.key,
-      current: next.current,
-      arrivals: computeFieldArrivals(prev.current, next.current),
-    }),
-    { key: "", current: null, arrivals: new Set<string>() },
-  );
+  const seenIdsRef = useRef<Set<string> | null>(null);
+  // Motion's mount-only `initial` prop requires this diff before commit. The
+  // ref is only a snapshot of the last committed IDs and advances in effect.
+  // eslint-disable-next-line react-hooks/refs
+  const arrivals = computeFieldArrivals(seenIdsRef.current, current);
 
   useEffect(() => {
-    update({ key, current });
-  }, [key, current]);
+    seenIdsRef.current = current;
+  }, [current]);
 
-  return state.key === key ? state.arrivals : new Set();
+  return arrivals;
 }

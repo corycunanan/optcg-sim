@@ -1,14 +1,36 @@
-import React from "react";
+import React, { useState } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DonInstance, PlayerState } from "@shared/game-types";
-import { cardEntry } from "@/lib/motion";
 import { DON_ENTRY_STAGGER_SECONDS, DonZone } from "./don-zone";
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
 
+function MotionDiv({
+  children,
+  initial,
+  transition,
+  ...props
+}: React.ComponentProps<"div"> & {
+  initial?: false | { y?: number };
+  transition?: { delay?: number };
+}) {
+  const [mountMotion] = useState(() => ({ initial, transition }));
+  return (
+    <div
+      {...props}
+      data-mount-initial-y={
+        mountMotion.initial === false ? undefined : mountMotion.initial?.y
+      }
+      data-mount-delay={mountMotion.transition?.delay}
+    >
+      {children}
+    </div>
+  );
+}
+
 vi.mock("motion/react", () => ({
-  motion: { div: "div" },
+  motion: { div: MotionDiv },
   useReducedMotion: () => motionState.reduced,
 }));
 
@@ -25,10 +47,6 @@ vi.mock("@/contexts/zone-position-context", () => ({
   useZonePosition: () => ({ register: vi.fn(), unregister: vi.fn() }),
 }));
 
-vi.mock("@/hooks/use-field-arrivals", () => ({
-  useFieldArrivals: (ids: Iterable<string>) => new Set(ids),
-}));
-
 vi.mock("../card", () => ({
   Card: () => <div data-testid="don-card" />,
 }));
@@ -37,28 +55,34 @@ function don(instanceId: string, state: DonInstance["state"]): DonInstance {
   return { instanceId, state, attachedTo: null };
 }
 
-const player = {
-  donCostArea: [
-    don("active-1", "ACTIVE"),
-    don("active-2", "ACTIVE"),
-    don("rested-1", "RESTED"),
-  ],
-} as PlayerState;
+function player(...donCostArea: DonInstance[]): PlayerState {
+  return { donCostArea } as PlayerState;
+}
 
 let renderer: ReactTestRenderer | null = null;
 
-function renderZone(enableDrag = false) {
+function renderZone(currentPlayer: PlayerState, enableDrag = false) {
   act(() => {
-    renderer = create(
+    const element = (
       <DonZone
-        player={player}
+        player={currentPlayer}
         enableDrag={enableDrag}
         style={{ position: "absolute", left: 0, top: 0 }}
       />
     );
+    if (renderer) renderer.update(element);
+    else renderer = create(element);
   });
   if (!renderer) throw new Error("DonZone renderer did not mount");
   return renderer.root;
+}
+
+function findDonWrapper(root: ReactTestRenderer["root"], instanceId: string) {
+  const wrapper = root
+    .findAllByType("div")
+    .find((node) => node.props["data-don-instance-id"] === instanceId);
+  if (!wrapper) throw new Error(`DON wrapper ${instanceId} was not rendered`);
+  return wrapper;
 }
 
 beforeEach(() => {
@@ -71,47 +95,54 @@ afterEach(() => {
 });
 
 describe("DonZone entry stagger", () => {
-  it("stagger-delays the existing entry pop while preserving motion.layout", () => {
-    const root = renderZone();
-    const entryWrappers = root
-      .findAllByType("div")
-      .filter((node) => node.props.initial?.y === 4);
-
-    expect(entryWrappers).toHaveLength(3);
-    expect(entryWrappers.map((node) => node.props.transition)).toEqual([
-      { ...cardEntry, delay: 0 },
-      { ...cardEntry, delay: DON_ENTRY_STAGGER_SECONDS },
-      { ...cardEntry, delay: DON_ENTRY_STAGGER_SECONDS * 2 },
-    ]);
-    expect(entryWrappers.every((node) => node.props.layout === true)).toBe(
-      true
+  it("stagger-treats only a newly-added DON while preserving motion.layout", () => {
+    renderZone(player(don("active-1", "ACTIVE"), don("rested-1", "RESTED")));
+    const root = renderZone(
+      player(
+        don("active-1", "ACTIVE"),
+        don("active-2", "ACTIVE"),
+        don("rested-1", "RESTED"),
+      ),
     );
+    const existingActive = findDonWrapper(root, "active-1");
+    const arrivingActive = findDonWrapper(root, "active-2");
+    const existingRested = findDonWrapper(root, "rested-1");
+
+    expect(existingActive.props["data-mount-initial-y"]).toBeUndefined();
+    expect(existingRested.props["data-mount-initial-y"]).toBeUndefined();
+    expect(arrivingActive.props["data-mount-initial-y"]).toBe(4);
+    expect(arrivingActive.props["data-mount-delay"]).toBe(
+      DON_ENTRY_STAGGER_SECONDS,
+    );
+    expect(arrivingActive.props.layout).toBe(true);
   });
 
-  it("applies the same stagger to draggable active DON", () => {
-    const root = renderZone(true);
-    const draggableWrappers = root
-      .findAllByType("div")
-      .filter((node) => node.props["aria-label"] === "Drag active DON");
+  it("applies the same mount-time stagger to newly-added draggable DON", () => {
+    renderZone(player(don("active-1", "ACTIVE")), true);
+    const root = renderZone(
+      player(don("active-1", "ACTIVE"), don("active-2", "ACTIVE")),
+      true,
+    );
 
     expect(
-      draggableWrappers.map((node) => node.props.transition?.delay)
-    ).toEqual([0, DON_ENTRY_STAGGER_SECONDS]);
+      findDonWrapper(root, "active-1").props["data-mount-initial-y"],
+    ).toBeUndefined();
+    expect(
+      findDonWrapper(root, "active-2").props["data-mount-delay"],
+    ).toBe(DON_ENTRY_STAGGER_SECONDS);
   });
 
   it("removes entry transforms and delays for reduced motion", () => {
+    renderZone(player(don("active-1", "ACTIVE")));
     motionState.reduced = true;
-    const root = renderZone();
-    const layoutWrappers = root
-      .findAllByType("div")
-      .filter((node) => node.props.layout === true);
-
-    expect(layoutWrappers).toHaveLength(3);
-    expect(layoutWrappers.every((node) => node.props.initial === false)).toBe(
-      true
+    const root = renderZone(
+      player(don("active-1", "ACTIVE"), don("active-2", "ACTIVE")),
     );
     expect(
-      layoutWrappers.every((node) => node.props.transition === undefined)
-    ).toBe(true);
+      findDonWrapper(root, "active-2").props["data-mount-initial-y"],
+    ).toBeUndefined();
+    expect(
+      findDonWrapper(root, "active-2").props["data-mount-delay"],
+    ).toBeUndefined();
   });
 });

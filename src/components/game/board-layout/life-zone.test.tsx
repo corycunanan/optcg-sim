@@ -85,6 +85,33 @@ describe("LifeZone battle feedback", () => {
     expect(ring?.props.className).not.toContain("ring-gb-accent-amber");
   });
 
+  it("gives Trigger precedence over scry in an ST07-016-style collision", () => {
+    const root = renderLifeZone({ triggerPulse: true, scryPulseNonce: 1 });
+    const classes = root
+      .findAllByType("div")
+      .map((node) => String(node.props.className))
+      .join(" ");
+
+    expect(classes).toContain("ring-gb-accent-amber");
+    expect(classes).not.toContain("ring-gb-accent-blue");
+  });
+
+  it("gives damage precedence over Trigger and scry feedback", () => {
+    const root = renderLifeZone({
+      triggerPulse: true,
+      damagePulseNonce: 1,
+      scryPulseNonce: 1,
+    });
+    const classes = root
+      .findAllByType("div")
+      .map((node) => String(node.props.className))
+      .join(" ");
+
+    expect(classes).toContain("ring-gb-accent-red");
+    expect(classes).not.toContain("ring-gb-accent-amber");
+    expect(classes).not.toContain("ring-gb-accent-blue");
+  });
+
   it("suppresses all zone effects for reduced motion", () => {
     motionState.reduced = true;
     const root = renderLifeZone({

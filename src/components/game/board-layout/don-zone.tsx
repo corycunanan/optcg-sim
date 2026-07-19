@@ -76,6 +76,7 @@ function DraggableDonCard({
       {...attributes}
       {...listeners}
       aria-label="Drag active DON"
+      data-don-instance-id={don.instanceId}
       initial={entering ? ENTRY_INITIAL : false}
       animate={{ ...ENTRY_ANIMATE, opacity: isDragging ? 0.3 : 1 }}
       transition={entering ? entryTransition(entryIndex) : undefined}
@@ -181,6 +182,7 @@ export const DonZone = React.memo(function DonZone({
               return (
                 <motion.div
                   key={don.instanceId}
+                  data-don-instance-id={don.instanceId}
                   layout
                   initial={entering ? ENTRY_INITIAL : false}
                   animate={ENTRY_ANIMATE}
@@ -213,6 +215,7 @@ export const DonZone = React.memo(function DonZone({
                 return (
                   <motion.div
                     key={don.instanceId}
+                    data-don-instance-id={don.instanceId}
                     layout
                     initial={entering ? ENTRY_INITIAL : false}
                     animate={ENTRY_ANIMATE}

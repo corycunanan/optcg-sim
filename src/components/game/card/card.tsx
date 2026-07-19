@@ -177,6 +177,13 @@ export const Card = React.memo(function Card({
       ? motionConfig.animate.rotate
       : 0;
   const counterRotate = -cardRotate;
+  const powerMod = overlays?.powerMod;
+  const powerModTone =
+    powerMod?.kind === "absolute"
+      ? "absolute"
+      : (powerMod?.value ?? 0) >= 0
+        ? "positive"
+        : "negative";
 
   const cardElement = (
     <PerspectiveContainer
@@ -243,15 +250,17 @@ export const Card = React.memo(function Card({
 
             {/* Highlight ring follows the card outline, so it sits inside the
                 rotating layer without any counter-rotation. */}
-            {overlays?.powerMod && !reducedMotion && (
+            {powerMod && !reducedMotion && (
               <motion.div
-                key={`power-flash:${overlays.powerMod.nonce ?? overlays.powerMod.delta}`}
+                key={`power-flash:${powerMod.nonce ?? powerMod.value}`}
                 aria-hidden
                 className={cn(
                   "pointer-events-none absolute inset-0 z-10 rounded",
-                  overlays.powerMod.delta >= 0
-                    ? "bg-gb-accent-green/30"
-                    : "bg-gb-accent-red/30",
+                  powerModTone === "absolute"
+                    ? "bg-gb-accent-blue/30"
+                    : powerModTone === "positive"
+                      ? "bg-gb-accent-green/30"
+                      : "bg-gb-accent-red/30",
                 )}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: powerModifiedFlash.opacity }}
@@ -316,27 +325,36 @@ export const Card = React.memo(function Card({
         )}
       </AnimatePresence>
 
-      <AnimatePresence initial={false}>
-        {overlays?.powerMod && !reducedMotion && (
-          <motion.div
-            key={`power-pill:${overlays.powerMod.nonce ?? overlays.powerMod.delta}`}
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-full rounded-full px-2 py-1 text-base font-bold",
-              overlays.powerMod.delta >= 0
-                ? "bg-gb-accent-green text-gb-board-dark"
-                : "bg-gb-accent-red text-gb-text-bright",
-            )}
-            initial={floatingPowerMod.initial}
-            animate={floatingPowerMod.animate}
-            exit={{ opacity: 0 }}
-            transition={floatingPowerMod.transition}
-          >
-            {overlays.powerMod.delta > 0 ? "+" : ""}
-            {overlays.powerMod.delta}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Keep the static centering transform off the animated child: Motion's
+          y/scale transform would otherwise replace Tailwind's translate. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-full"
+      >
+        <AnimatePresence initial={false}>
+          {powerMod && !reducedMotion && (
+            <motion.div
+              key={`power-pill:${powerMod.nonce ?? powerMod.value}`}
+              className={cn(
+                "rounded-full px-2 py-1 text-base font-bold",
+                powerModTone === "absolute"
+                  ? "bg-gb-accent-blue text-gb-text-bright"
+                  : powerModTone === "positive"
+                    ? "bg-gb-accent-green text-gb-board-dark"
+                    : "bg-gb-accent-red text-gb-text-bright",
+              )}
+              initial={floatingPowerMod.initial}
+              animate={floatingPowerMod.animate}
+              exit={{ opacity: 0 }}
+              transition={floatingPowerMod.transition}
+            >
+              {powerMod.kind === "absolute"
+                ? `→ ${powerMod.value}`
+                : `${powerMod.value > 0 ? "+" : ""}${powerMod.value}`}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {overlays?.effectAction && (
         <motion.div

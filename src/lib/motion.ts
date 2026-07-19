@@ -169,8 +169,8 @@ const board = {
       scale: 0.9,
       transition: { duration: 0.15, ease: "easeIn" as const },
     },
-    /** Floating POWER_MODIFIED delta (OPT-284). The pill rises above the card
-     *  while fading on the same clock as the transient event hook. */
+    /** Floating POWER_MODIFIED feedback (OPT-284). The pill rises above the
+     *  card while fading on the same clock as the transient event hook. */
     floatingPowerMod: {
       initial: { opacity: 0, y: 4, scale: 0.9 },
       animate: {
@@ -185,7 +185,7 @@ const board = {
       },
     },
     /** Subtle color wash across the card art alongside the floating power
-     *  delta. This composes with the single semantic highlight ring. */
+     *  feedback. This composes with the single semantic highlight ring. */
     powerModifiedFlash: {
       opacity: [0, 0.3, 0] as number[],
       transition: {

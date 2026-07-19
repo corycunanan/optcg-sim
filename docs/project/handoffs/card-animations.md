@@ -1,7 +1,7 @@
 ---
 linear-project: Card Animations
 linear-project-url: https://linear.app/optcg-sim/project/card-animations-da25976dfe30
-last-updated: 2026-04-24 (OPT-121 In Review — Tier 1 flight gaps + life/DON entry; Tier 2/3 split into OPT-283/OPT-284)
+last-updated: 2026-07-18 (OPT-284 In Review — indicator polish)
 ---
 
 # Card Animations — Handoff Doc
@@ -31,11 +31,11 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 13 | OPT-274 | Entry + hand re-fan micro-interactions | Medium | OPT-267, OPT-268, OPT-270 | Done (2026-04-24) | [#127](https://github.com/corycunanan/optcg-sim/pull/127) merged | Entry pop + DON-attach flights + hand-layout reflow + 60ms stagger; VQA pass tuned flights to straight-line/220ms tween + held trash top until landing + fixed KO origin + added defender amber pulse + DON-badge anchored to rotation angle |
 | 14 | OPT-121 | Card flight gaps: return-to-deck, life-to-trash, life-to-deck, life + DON entry | High | OPT-274 | In Review (2026-04-24) | TBD | Tier 1 of original OPT-121 (re-scoped) — flight-layer wiring + life/DON entry pops |
 | 15 | OPT-283 | Battle feedback: winner pulse + trigger-activated highlight | High | OPT-273 | In Review (2026-07-18) | [#371](https://github.com/corycunanan/optcg-sim/pull/371) | Tier 2 of original OPT-121 — `COMBAT_VICTORY` ring + life-zone pulse on `TRIGGER_ACTIVATED` |
-| 16 | OPT-284 | Indicator polish: DON detach exit, power mod, effects negated, attack redirected, life scried | High | OPT-274 | Backlog | — | Tier 3 of original OPT-121 — five transient indicators on overlay slots / new ring colors |
+| 16 | OPT-284 | Indicator polish: DON detach exit, power mod, effects negated, attack redirected, life scried | High | OPT-274 | In Review (2026-07-18) | [#372](https://github.com/corycunanan/optcg-sim/pull/372) | Tier 3 of original OPT-121 — five transient indicators on overlay slots / new ring colors |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-283 — battle-feedback indicators (Tier 2). The OPT-121 split happened mid-session because the original 12-item ticket was unwieldy; Tier 1 (flight gaps + entry pops) shipped on its own in OPT-121. Tier 2 is two indicators: a winner pulse on `COMBAT_VICTORY` and a life-zone pulse on `TRIGGER_ACTIVATED`. Then OPT-284 closes the project with five smaller indicator tweaks (Tier 3).
+**Next up:** No follow-up ticket — OPT-284 is the final item in the Action Plan.
 
 ---
 

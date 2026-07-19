@@ -63,9 +63,16 @@ vi.mock("./state-presets", () => ({
 
 let renderer: ReactTestRenderer | null = null;
 
-function renderCard(donCount?: number) {
+function renderCard(
+  donCount?: number,
+  powerMod?: {
+    kind: "delta" | "absolute";
+    value: number;
+    nonce?: number;
+  },
+) {
   act(() => {
-    const element = <Card variant="field" overlays={{ donCount }} />;
+    const element = <Card variant="field" overlays={{ donCount, powerMod }} />;
     if (renderer) renderer.update(element);
     else renderer = create(element);
   });
@@ -116,5 +123,30 @@ describe("Card attached-DON badge exit", () => {
       transition: { duration: 0 },
     });
     expect(badgeWrapper?.props.exit).not.toHaveProperty("scale");
+  });
+});
+
+describe("Card power-modified feedback", () => {
+  it("renders absolute replacement power distinctly from a signed delta", () => {
+    const root = renderCard(undefined, {
+      kind: "absolute",
+      value: 0,
+      nonce: 1,
+    });
+    const pill = root
+      .findAllByType("div")
+      .find((node) => node.children.join("") === "→ 0");
+    const positioner = root
+      .findAllByType("div")
+      .find((node) =>
+        String(node.props.className).includes("-translate-x-1/2"),
+      );
+
+    expect(pill?.props.className).toContain("bg-gb-accent-blue");
+    expect(pill?.props.className).not.toContain("bg-gb-accent-red");
+    expect(pill?.props.className).not.toContain("bg-gb-accent-green");
+    expect(pill?.props.className).not.toContain("-translate-x-1/2");
+    expect(positioner?.props.className).toContain("-translate-y-full");
+    expect(positioner?.findAllByType("div")).toContain(pill);
   });
 });

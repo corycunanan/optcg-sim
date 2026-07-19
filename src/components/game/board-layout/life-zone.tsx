@@ -55,10 +55,17 @@ export const LifeZone = React.memo(function LifeZone({
   const damageFeedbackActive =
     damagePulseNonce !== undefined && !reducedMotion;
   const scryFeedbackActive = scryPulseNonce !== undefined && !reducedMotion;
+  const zoneFeedback = damageFeedbackActive
+    ? "damage"
+    : triggerFeedbackActive
+      ? "trigger"
+      : scryFeedbackActive
+        ? "scried"
+        : null;
 
   return (
     <motion.div
-      key={`damage:${damageFeedbackActive ? damagePulseNonce : 0}`}
+      key={`damage:${zoneFeedback === "damage" ? damagePulseNonce : 0}`}
       ref={ref}
       style={{
         ...style,
@@ -66,7 +73,7 @@ export const LifeZone = React.memo(function LifeZone({
         height: CARD_SIZES.field.height,
       }}
       animate={
-        damageFeedbackActive
+        zoneFeedback === "damage"
           ? {
               x: lifeDamageImpact.x,
               opacity: lifeDamageImpact.opacity,
@@ -74,17 +81,17 @@ export const LifeZone = React.memo(function LifeZone({
           : { x: 0, opacity: 1 }
       }
       transition={
-        damageFeedbackActive
+        zoneFeedback === "damage"
           ? lifeDamageImpact.transition
           : { duration: 0 }
       }
       className={cn(
         "relative rounded",
-        damageFeedbackActive &&
+        zoneFeedback === "damage" &&
           "ring-4 ring-gb-accent-red shadow-[0_0_18px_var(--gb-accent-red)]",
       )}
     >
-      {triggerFeedbackActive && (
+      {zoneFeedback === "trigger" && (
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-20 rounded ring-4 ring-gb-accent-amber shadow-[0_0_18px_var(--gb-accent-amber)]"
@@ -97,7 +104,7 @@ export const LifeZone = React.memo(function LifeZone({
         />
       )}
 
-      {scryFeedbackActive && (
+      {zoneFeedback === "scried" && (
         <motion.div
           key={`scry:${scryPulseNonce}`}
           aria-hidden

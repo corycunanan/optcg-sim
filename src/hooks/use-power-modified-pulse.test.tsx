@@ -33,7 +33,10 @@ function Probe({ eventLog }: { eventLog: GameEvent[] }) {
   return <output>{JSON.stringify(Array.from(pulses.entries()))}</output>;
 }
 
-function readPulses(): Map<string, { delta: number; nonce: number }> {
+function readPulses(): Map<
+  string,
+  { kind: "delta" | "absolute"; value: number; nonce: number }
+> {
   const value = renderer?.root.findByType("output").children.join("") ?? "[]";
   return new Map(JSON.parse(value));
 }
@@ -63,15 +66,27 @@ describe("usePowerModifiedPulse", () => {
     const second = powerEvent(2, "card-1", { amount: -1000 });
     await render([]);
     await render([first]);
-    expect(readPulses().get("card-1")).toEqual({ delta: 2000, nonce: 1 });
+    expect(readPulses().get("card-1")).toEqual({
+      kind: "delta",
+      value: 2000,
+      nonce: 1,
+    });
 
     await render([first, second]);
-    expect(readPulses().get("card-1")).toEqual({ delta: 2000, nonce: 1 });
+    expect(readPulses().get("card-1")).toEqual({
+      kind: "delta",
+      value: 2000,
+      nonce: 1,
+    });
 
     act(() => {
       vi.advanceTimersByTime(POWER_MODIFIED_PULSE_DURATION_MS);
     });
-    expect(readPulses().get("card-1")).toEqual({ delta: -1000, nonce: 2 });
+    expect(readPulses().get("card-1")).toEqual({
+      kind: "delta",
+      value: -1000,
+      nonce: 2,
+    });
 
     act(() => {
       vi.advanceTimersByTime(POWER_MODIFIED_PULSE_DURATION_MS);
@@ -79,15 +94,32 @@ describe("usePowerModifiedPulse", () => {
     expect(readPulses().size).toBe(0);
   });
 
-  it("uses value payloads without replaying mounted history", async () => {
+  it("treats value payloads as absolute replacements, including zero", async () => {
     await render([powerEvent(5, "old-card", { value: 5000 })]);
     expect(readPulses().size).toBe(0);
 
+    const setToFiveThousand = powerEvent(6, "new-card", { value: 5000 });
+    const setToZero = powerEvent(7, "new-card", { value: 0 });
+    await render([powerEvent(5, "old-card", { value: 5000 }), setToFiveThousand]);
+    expect(readPulses().get("new-card")).toEqual({
+      kind: "absolute",
+      value: 5000,
+      nonce: 1,
+    });
+
     await render([
       powerEvent(5, "old-card", { value: 5000 }),
-      powerEvent(6, "new-card", { value: 7000 }),
+      setToFiveThousand,
+      setToZero,
     ]);
-    expect(readPulses().get("new-card")?.delta).toBe(7000);
+    act(() => {
+      vi.advanceTimersByTime(POWER_MODIFIED_PULSE_DURATION_MS);
+    });
+    expect(readPulses().get("new-card")).toEqual({
+      kind: "absolute",
+      value: 0,
+      nonce: 2,
+    });
   });
 
   it("short-circuits power feedback for reduced motion", async () => {

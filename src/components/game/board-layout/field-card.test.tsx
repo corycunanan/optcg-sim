@@ -45,7 +45,8 @@ vi.mock("../card", () => ({
       data-testid="card"
       data-highlight-ring={overlays?.highlightRing}
       data-highlight-nonce={overlays?.highlightRingNonce}
-      data-power-delta={overlays?.powerMod?.delta}
+      data-power-kind={overlays?.powerMod?.kind}
+      data-power-value={overlays?.powerMod?.value}
     />
   ),
 }));
@@ -83,7 +84,11 @@ function renderOpponent(
     counterPulse?: boolean;
     isAttacker?: boolean;
     isDefender?: boolean;
-    powerMod?: { delta: number; nonce: number };
+    powerMod?: {
+      kind: "delta" | "absolute";
+      value: number;
+      nonce: number;
+    };
   } = { winnerPulse: true },
 ) {
   act(() => {
@@ -129,13 +134,14 @@ describe("OpponentFieldCard indicator precedence", () => {
     renderOpponent({
       attackRedirectedPulseNonce: 3,
       effectsNegatedPulseNonce: "negated:2",
-      powerMod: { delta: -2000, nonce: 1 },
+      powerMod: { kind: "delta", value: -2000, nonce: 1 },
     });
     const renderedCard = renderer?.root.findByProps({ "data-testid": "card" });
 
     expect(renderedCard?.props["data-highlight-ring"]).toBe("redirected");
     expect(renderedCard?.props["data-highlight-nonce"]).toBe(3);
-    expect(renderedCard?.props["data-power-delta"]).toBe(-2000);
+    expect(renderedCard?.props["data-power-kind"]).toBe("delta");
+    expect(renderedCard?.props["data-power-value"]).toBe(-2000);
   });
 
   it("places negated above counter, attacker, and defender", () => {

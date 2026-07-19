@@ -11,18 +11,31 @@ import {
 export const POWER_MODIFIED_PULSE_DURATION_MS = 800;
 
 export interface PowerModPulse {
-  delta: number;
+  kind: "delta" | "absolute";
+  value: number;
   nonce: number;
 }
 
 const selectPowerTarget: TransientEventKeySelector<string> = (event) =>
   event.type === "POWER_MODIFIED" ? event.payload.targetInstanceId : null;
 
-function readPowerDelta(event: Extract<GameEvent, { type: "POWER_MODIFIED" }>) {
-  return event.payload.amount ?? event.payload.value ?? 0;
+function readPowerChange(
+  event: Extract<GameEvent, { type: "POWER_MODIFIED" }>,
+): Omit<PowerModPulse, "nonce"> | null {
+  // Engine MODIFY_POWER emitters send an additive `amount`. SET_POWER,
+  // SET_POWER_TO_ZERO, COPY_POWER, and SWAP_POWER emit an absolute `value`;
+  // the client has no reliable pre-event effective power snapshot from which
+  // to derive a true delta, so those events are labeled as replacements.
+  if (event.payload.amount !== undefined) {
+    return { kind: "delta", value: event.payload.amount };
+  }
+  if (event.payload.value !== undefined) {
+    return { kind: "absolute", value: event.payload.value };
+  }
+  return null;
 }
 
-/** Floating power deltas keyed by target card, with per-target restart nonces. */
+/** Floating power changes keyed by target card, with per-target restart nonces. */
 export function usePowerModifiedPulse(
   eventLog: GameEvent[]
 ): ReadonlyMap<string, PowerModPulse> {
@@ -37,8 +50,11 @@ export function usePowerModifiedPulse(
     !!reducedMotion
   );
 
-  const deltasByTarget = useMemo(() => {
-    const result = new Map<string, number[]>();
+  const changesByTarget = useMemo(() => {
+    const result = new Map<
+      string,
+      Array<Omit<PowerModPulse, "nonce"> | null>
+    >();
     for (const event of eventLog) {
       if (
         event.timestamp <= mountedAtTimestamp ||
@@ -47,9 +63,9 @@ export function usePowerModifiedPulse(
         continue;
       }
       const targetId = event.payload.targetInstanceId;
-      const deltas = result.get(targetId) ?? [];
-      deltas.push(readPowerDelta(event));
-      result.set(targetId, deltas);
+      const changes = result.get(targetId) ?? [];
+      changes.push(readPowerChange(event));
+      result.set(targetId, changes);
     }
     return result;
   }, [eventLog, mountedAtTimestamp]);
@@ -57,10 +73,12 @@ export function usePowerModifiedPulse(
   return useMemo(() => {
     const result = new Map<string, PowerModPulse>();
     for (const [targetId, nonce] of pulses) {
-      const deltas = deltasByTarget.get(targetId);
-      const delta = deltas?.[nonce - 1] ?? deltas?.at(-1) ?? 0;
-      result.set(targetId, { delta, nonce });
+      const changes = changesByTarget.get(targetId);
+      const indexedChange = changes?.[nonce - 1];
+      const change =
+        indexedChange === undefined ? changes?.at(-1) : indexedChange;
+      if (change) result.set(targetId, { ...change, nonce });
     }
     return result;
-  }, [deltasByTarget, pulses]);
+  }, [changesByTarget, pulses]);
 }

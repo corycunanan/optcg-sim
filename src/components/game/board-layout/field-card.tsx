@@ -94,7 +94,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isDefender?: boolean;
   /** One-shot COMBAT_VICTORY feedback. Wins ring precedence while active. */
   winnerPulse?: boolean;
-  /** Floating POWER_MODIFIED delta + keyed surface flash. */
+  /** Floating POWER_MODIFIED delta/absolute value + keyed surface flash. */
   powerMod?: PowerModPulse;
   /** EFFECTS_NEGATED desaturated-ring restart key. */
   effectsNegatedPulseNonce?: string;
