@@ -1,0 +1,21 @@
+---
+description: Keep API authentication, validation, response, rate-limit, and concurrency contracts consistent
+globs: "src/app/api/**/*.ts,src/lib/api-*.ts,src/lib/validators/**/*.ts"
+alwaysApply: false
+---
+
+## API Consistency
+
+**A-1. Response helpers.** Default to `requireAuth`/`requireAdmin`, `apiSuccess`, `apiList`, `apiAction`, and `apiError` from `src/lib/api-response.ts`. Their actual envelopes are the source of truth. Preserve intentional protocol exceptions (Auth.js, cron metrics, worker callbacks, and `204` responses).
+
+**A-2. Validation.** Parse JSON with `parseBody()` and return early when `isErrorResponse()` is true. Put request and consumed response schemas in `src/lib/validators/`; never cast untrusted JSON into a domain type.
+
+**A-3. Status.** Match the semantic status and nearby route precedent: `201` newly created, `400` validation, `401` unauthenticated, `403` unauthorized role, `404` missing, `409` state/uniqueness conflict, `410` expired, `422` understood but unplayable, `429` limited, `500` unexpected failure, `501` recognized but unimplemented, and `502`/`503` dependency/configuration unavailable.
+
+**A-4. Rate limits.** Use the route-appropriate limiter in `src/lib/rate-limit.ts` and preserve its identifier namespace. Reject with `429` before mutation. Add a route test for the limited path. Idempotent replay checks may deliberately precede rate limiting; `POST /api/messages/[userId]` is the reference.
+
+**A-5. Lobby writes.** Any write that changes the observable lobby snapshot increments `Lobby.revision` atomically, including cleanup or compensation after a failed start. Response/event `version` comes from `buildLobbyRoomState()` in `src/lib/lobbies/build-state.ts`. Follow the conditional-write and `409` recovery patterns in `src/app/api/lobbies/` and update their tests.
+
+**A-6. Idempotent sends.** Preserve `SendMessageSchema.idempotencyKey`, the `(fromUserId, toUserId, idempotencyKey)` database invariant, `200` replay/`201` create distinction, and single-shot fanout in `src/app/api/messages/[userId]/route.ts`.
+
+**A-7. Client boundary.** Use the typed methods in `src/lib/api-client.ts`. Supply a Zod response schema whenever the body is consumed; an unschematized call returns `unknown` by design.

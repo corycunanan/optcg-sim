@@ -1,0 +1,52 @@
+---
+description: Checklists for adding APIs, components, game actions/effects, card schemas, and migrations
+alwaysApply: true
+---
+
+## Common Change Checklists
+
+### New API endpoint
+
+- Place it at `src/app/api/<plural-domain>/route.ts` (or a bracketed resource child) and export the HTTP verb.
+- Choose the real guard: `requireAuth`, `requireAdmin`, a signed worker secret, cron bearer secret, or intentionally public. Proxy middleware does not authorize APIs.
+- Add Zod input/output schemas in `src/lib/validators/`; use `parseBody`/`isErrorResponse` and the helpers in `src/lib/api-response.ts`.
+- Add the correct limiter from `src/lib/rate-limit.ts`; test `429` for limited routes.
+- Handle expected Prisma/domain conflicts explicitly, log unexpected errors with a stable prefix, and add a colocated `route.test.ts` covering auth, validation, success, and failure.
+- If the route mutates lobby-visible state, atomically bump `Lobby.revision` and verify response/event `version` behavior.
+
+### New component or hook
+
+- Put reusable primitives in `src/components/ui/`; otherwise use the existing feature directory. Hooks go in `src/hooks/` unless narrowly feature-local.
+- Use a server component by default; add `"use client"` at the smallest interactive boundary.
+- Reuse existing primitives/tokens, `cn()` conditional classes, Sonner feedback, and `useAsyncOperation` where their contracts fit.
+- Add a colocated focused test and run `pnpm lint:design-system`; apply the scaled-board typography/focus floor to anything rendered in its transformed subtree.
+
+### New GameAction or engine behavior
+
+- Update the canonical `GameAction` union in `shared/game-types.ts` and every relevant dispatcher, permission/phase gate, transport, and client sender.
+- Update `GameActionSchema` in `shared/validators/client-message.ts`. OPT-410's `ActionSchemaAssertions` requires one exact Zod/type assertion per variant and an exhaustive key assertion; never bypass it with a cast.
+- Cite the governing comprehensive rule for non-obvious engine logic and update `docs/game-engine/RULES-TO-ENGINE-MAP.md` when implementation status changes.
+- Preserve immutable engine state and zone-transition helpers. Add unit/pipeline/session tests in `workers/game/src/__tests__/` at the layer that owns the behavior.
+- Run worker type-check, tests, and the root `pnpm schema:check` gate.
+
+### New or changed card effect schema
+
+- Read the canonical card text in `docs/cards/<set>.md`, `docs/game-engine/11-ENCODING-GUIDE.md`, `workers/game/src/engine/schemas/README.md`, and an adjacent schema using the same primitives. Do not infer missing text.
+- Edit the lowercase set file under `workers/game/src/engine/schemas/`; update engine primitives/types first if the effect is not expressible honestly.
+- Regenerate/check `workers/game/src/engine/authored-schemas.generated.ts` through the package scripts; do not hand-edit it.
+- From the repository root, run `node workers/game/src/engine/schemas/lint-schemas.sh`. A targeted file argument is interpreted relative to the current working directory, so pass a repository-relative path when running at root. Run `pnpm schema:check` before completion.
+- Add a focused regression that executes the behavior, not only a schema-shape assertion, when engine behavior changes.
+
+### Prisma migration
+
+- Update `prisma/schema.prisma` and commit the generated timestamped migration SQL together. Review the SQL; do not use `db push` as migration history.
+- Keep deploy order live-safe for old and new app versions. Prefer additive columns/types first; give new non-null fields a compatible database default when older servers may still insert rows.
+- Backfill deterministically before adding a uniqueness invariant. Preserve the database constraint as the concurrency authority and translate its losing race in application code.
+- Split PostgreSQL enum-value creation from statements that use the new value because the value cannot be used until the adding transaction commits. `20260719120000_add_solitaire_pregame_modes` and `20260719121000_backfill_solitaire_pregame_mode` are the current reference.
+- Check destructive drops and index replacements for production locking/data-loss risk and stage them separately when compatibility requires it.
+- Run `pnpm db:check-migration-drift` with `SHADOW_DATABASE_URL`, relevant DB concurrency scripts when applicable, and `pnpm verify`.
+
+### Final verification
+
+- Run focused tests while iterating, then `npx tsc --noEmit`, `npm run lint`, and `pnpm verify` from the repository root.
+- Worker-only type-check can run as `pnpm --dir workers/game type-check`.
