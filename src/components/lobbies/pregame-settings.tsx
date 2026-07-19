@@ -1,9 +1,8 @@
 "use client";
 
-import { CircleHelp, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import type { LobbyRoomPregameMode } from "@/lib/lobbies/state";
 import { cn } from "@/lib/utils";
-import { Tooltip } from "@/components/ui/tooltip";
 
 export const PREGAME_MODE_OPTIONS: ReadonlyArray<{
   value: LobbyRoomPregameMode;
@@ -100,23 +99,14 @@ export function PregameSettings({
                 className="accent-navy-900 mt-1 size-4 shrink-0"
               />
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="text-text-primary text-sm font-semibold">
-                    {option.label}
-                  </span>
-                  <Tooltip content={option.explanation} side="top">
-                    <span
-                      tabIndex={0}
-                      aria-label={`About ${option.label}`}
-                      onClick={(event) => event.preventDefault()}
-                      className="text-text-tertiary focus-visible:ring-border-focus rounded focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                      <CircleHelp aria-hidden="true" className="size-4" />
-                    </span>
-                  </Tooltip>
+                <span className="text-text-primary block text-sm font-semibold">
+                  {option.label}
                 </span>
                 <span className="text-text-secondary mt-1 block text-xs">
                   {option.summary}
+                </span>
+                <span className="text-text-tertiary mt-1 block text-xs">
+                  {option.explanation}
                 </span>
               </span>
             </label>

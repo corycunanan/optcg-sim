@@ -1,17 +1,17 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { PregameSettings } from "./pregame-settings";
+import {
+  PREGAME_MODE_OPTIONS,
+  PregameSettings,
+} from "./pregame-settings";
 
 function renderSettings(editable: boolean) {
   return renderToStaticMarkup(
-    <TooltipProvider>
-      <PregameSettings
-        value="HOST_FIRST"
-        editable={editable}
-        onChange={vi.fn()}
-      />
-    </TooltipProvider>,
+    <PregameSettings
+      value="HOST_FIRST"
+      editable={editable}
+      onChange={vi.fn()}
+    />,
   );
 }
 
@@ -20,7 +20,10 @@ describe("PregameSettings", () => {
     const markup = renderSettings(true);
 
     expect(markup.match(/type="radio"/g)).toHaveLength(4);
-    expect(markup.match(/aria-label="About /g)).toHaveLength(4);
+    for (const option of PREGAME_MODE_OPTIONS) {
+      expect(markup).toContain(option.summary);
+      expect(markup).toContain(option.explanation);
+    }
     expect(markup).toMatch(/checked="" value="HOST_FIRST"/);
     expect(markup).not.toContain("disabled=\"\"");
     expect(markup).not.toContain("Host controlled");
