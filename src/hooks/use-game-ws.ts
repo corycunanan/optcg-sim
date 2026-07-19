@@ -30,6 +30,34 @@ const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
   "PASS",
 ]);
 
+function preserveUnchangedPlayerReferences(
+  previousState: GameState | null,
+  nextState: GameState
+): GameState {
+  if (!previousState) return nextState;
+
+  // Both slices came from JSON WebSocket payloads, so equal serializations
+  // imply equal renderable contents. Serialize each slice once per update;
+  // differing key order can only cause a conservative missed reuse.
+  const previousPlayers = previousState.players.map((player) =>
+    JSON.stringify(player)
+  );
+  const nextPlayers = nextState.players.map((player) => JSON.stringify(player));
+  const players: GameState["players"] = [
+    previousPlayers[0] === nextPlayers[0]
+      ? previousState.players[0]
+      : nextState.players[0],
+    previousPlayers[1] === nextPlayers[1]
+      ? previousState.players[1]
+      : nextState.players[1],
+  ];
+
+  return players[0] === nextState.players[0] &&
+    players[1] === nextState.players[1]
+    ? nextState
+    : { ...nextState, players };
+}
+
 /**
  * useGameWs — manages the WebSocket connection to the Cloudflare game DO.
  *
@@ -99,7 +127,9 @@ export function useGameWs(
           action: msg.action,
           sequence: acceptedUpdateSequenceRef.current,
         });
-        setGameState(msg.state);
+        setGameState((previousState) =>
+          preserveUnchangedPlayerReferences(previousState, msg.state)
+        );
         setCanUndo(msg.canUndo ?? false);
         if (msg.state.pendingPrompt) {
           setActivePrompt(msg.state.pendingPrompt.options);
