@@ -221,10 +221,7 @@ describe("OPT-470 hidden-information visibility contract", () => {
   it("classifies every prompt as responding-player-only", () => {
     expect(PROMPT_VISIBILITY).toEqual({
       SELECT_BLOCKER: "RESPONDING_PLAYER",
-      SELECT_COUNTER_TARGET: "RESPONDING_PLAYER",
-      SELECT_ATTACK_TARGET: "RESPONDING_PLAYER",
       REVEAL_TRIGGER: "RESPONDING_PLAYER",
-      SELECT_CARD_TO_TRASH: "RESPONDING_PLAYER",
       ARRANGE_TOP_CARDS: "RESPONDING_PLAYER",
       SELECT_TARGET: "RESPONDING_PLAYER",
       REDISTRIBUTE_DON: "RESPONDING_PLAYER",

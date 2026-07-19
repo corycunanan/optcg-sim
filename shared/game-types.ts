@@ -672,10 +672,7 @@ export type PromptType = PromptOptions["promptType"];
 
 export type PromptOptions =
   | SelectBlockerPrompt
-  | SelectCounterTargetPrompt
-  | SelectAttackTargetPrompt
   | RevealTriggerPrompt
-  | SelectCardToTrashPrompt
   | ArrangeTopCardsPrompt
   | SelectTargetPrompt
   | RedistributeDonPrompt
@@ -689,44 +686,12 @@ export interface SelectBlockerPrompt {
   timeoutMs: number;
 }
 
-export interface SelectCounterTargetPrompt {
-  // TODO(OPT-422 follow-up): compatibility-only for persisted worker prompts;
-  // no current engine path constructs this variant. Retire it together with
-  // the worker persisted-state schema once old durable sessions cannot resume.
-  promptType: "SELECT_COUNTER_TARGET";
-  validTargets: string[];
-  optional?: boolean;
-  timeoutMs?: number;
-}
-
-export interface SelectAttackTargetPrompt {
-  // TODO(OPT-422 follow-up): compatibility-only for persisted worker prompts;
-  // no current engine path constructs this variant. Retire it together with
-  // the worker persisted-state schema once old durable sessions cannot resume.
-  promptType: "SELECT_ATTACK_TARGET";
-  validTargets: string[];
-  optional?: boolean;
-  timeoutMs?: number;
-}
-
 export interface RevealTriggerPrompt {
   promptType: "REVEAL_TRIGGER";
   cards: CardInstance[];
   effectDescription: string;
   optional: boolean;
   timeoutMs: number;
-}
-
-export interface SelectCardToTrashPrompt {
-  // TODO(OPT-422 follow-up): compatibility-only for persisted worker prompts;
-  // current trash choices use SELECT_TARGET. Retire this together with the
-  // worker persisted-state schema once old durable sessions cannot resume.
-  promptType: "SELECT_CARD_TO_TRASH";
-  cards: CardInstance[];
-  validTargets: string[];
-  countMin: number;
-  countMax: number;
-  effectDescription?: string;
 }
 
 export interface ArrangeTopCardsPrompt {

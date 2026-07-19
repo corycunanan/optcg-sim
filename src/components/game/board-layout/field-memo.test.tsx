@@ -243,6 +243,23 @@ describe("field memo boundaries", () => {
     ).toBe("true");
   });
 
+  it("wires blocker selection in response-only mode", () => {
+    const mounted = renderHarness(
+      <PlayerHarness interactionMode="responseOnly" />,
+    );
+    const blockerControl = mounted.root.findByProps({
+      "data-testid": "field-card-blocker-1",
+    });
+
+    expect(blockerControl.props.onClick).toBeTypeOf("function");
+    act(() => blockerControl.props.onClick());
+    expect(
+      mounted.root.findByProps({
+        "data-testid": "field-card-blocker-1",
+      }).props["data-selected"],
+    ).toBe("true");
+  });
+
   it("does not wire blocker selection in spectator mode", () => {
     const mounted = renderHarness(
       <PlayerHarness interactionMode="spectator" />,

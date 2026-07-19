@@ -166,7 +166,7 @@ function PlayerFieldComponent({
         }
         const charData = cardDb[char.cardId];
         const isBlockerEligible =
-          interactionMode === "full" &&
+          interactionMode !== "spectator" &&
           inBlockStep &&
           char.state === "ACTIVE" &&
           !!charData?.keywords?.blocker;
