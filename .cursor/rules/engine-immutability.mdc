@@ -37,6 +37,6 @@ return { ...state, players: newPlayers };
 
 ### E-4. Zone Transitions
 
-**E-4-1.** All card movement between zones must go through `moveCard()` in `state.ts`. Do not manually add/remove cards from zone arrays — `moveCard()` enforces §3-1-6 (new instanceId, strip attached DON!!, reset state).
+**E-4-1.** All card movement between zones must go through `moveCard()` in `zone-transition.ts`. Do not manually add/remove cards from zone arrays — `moveCard()` enforces §3-1-6 (new instanceId, strip attached DON!!, reset state). See `docs/game-engine/ZONE-TRANSITION-CONTRACT.md` for the current contract.
 
 **E-4-2.** The only exception is life card handling, which uses `removeTopLifeCard()` and `addToLife()` because `LifeCard` is a different type than `CardInstance`.

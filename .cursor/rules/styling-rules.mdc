@@ -1,0 +1,27 @@
+---
+description: Enforce the current design-token, spacing, typography, radius, and scaled-board floor
+globs: "src/**/*.tsx,src/app/globals.css"
+alwaysApply: false
+---
+
+## Styling Rules
+
+`CLAUDE.md` Design Context and `docs/design/BRANDING-GUIDELINES.md` are the human-readable sources. `scripts/lint-design-system.mjs` is the mechanical source of truth for enforced exceptions.
+
+**S-1. Inline styles.** Do not use inline styles for design properties. Use Tailwind utilities backed by tokens. Runtime geometry, coordinates, transforms, measured dimensions, and the script's exact file/property allowlists are the only current exceptions; add no broad exemption.
+
+**S-2. Colors.** Do not put raw hex or `oklch()` values in component classes. Define tokens in `src/app/globals.css` and reference them by name.
+
+**S-3. Type scale.** No arbitrary pixel font sizes. Use the 12/14/16/18/20/24/30/36/48 scale; `text-xs` (12px) is the normal minimum outside the scaled board.
+
+**S-4. Spacing.** Positive box, position/inset, and translate spacing uses only 1/2/3/4/5/6/8/10/12/16. Zero resets are allowed. `src/components/ui/` is the linter's vendored shadcn spacing exemption; app code has none.
+
+**S-5. Radius.** Use only `rounded`, `rounded-md`, `rounded-lg`, or `rounded-full` according to the component pattern.
+
+**S-6. State styling.** Do not mutate `element.style` or set styles in mouse handlers. Use CSS/Tailwind state variants such as `group-hover:` and `data-[state]:`.
+
+**S-7. Conditional classes.** Use `cn()` from `@/lib/utils`, never template/string concatenation for conditional Tailwind classes.
+
+**S-8. Scaled-board floor.** Inside `<ScaledBoard>` / `BoardLayout`'s transformed subtree, use at least `text-base` for labels/counters/badges, `text-lg` for body text, and `ring-4` focus. Portaled or outside-board chrome keeps the normal `text-xs`/`ring-2` floor. See Branding Guidelines section 13.
+
+**S-9. Mechanical checks.** `pnpm lint:design-system` scans `.tsx` files for arbitrary font sizes, raw colors, off-scale spacing, and disallowed inline design properties. Button `className` overrides are reported informationally. Do not edit the allowlists merely to make a new violation pass; document a narrow runtime/token-backed need if an exception is genuinely required.

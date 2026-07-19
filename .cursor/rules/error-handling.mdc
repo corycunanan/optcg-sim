@@ -1,0 +1,17 @@
+---
+description: Follow current server error, client ApiError, toast, and auth-degradation patterns
+globs: "src/**/*.ts,src/**/*.tsx"
+alwaysApply: false
+---
+
+## Error Handling
+
+**H-1. Server failures.** Log unexpected failures with a stable route/operation prefix and return a non-sensitive `apiError(..., 500)`. Convert known Prisma conflicts and expected domain failures to their established status. Do not expose stack traces, SQL, credentials, or dependency bodies.
+
+**H-2. Client failures.** `src/lib/api-client.ts` throws `ApiError(message, status)` for non-2xx responses. Use `instanceof ApiError` for typed message/status access; branch on `.status` only when recovery differs. Otherwise surface `error.message` with a concise fallback for unknown values.
+
+**H-3. User feedback.** Use Sonner's `toast.success`, `toast.error`, or `toast.info` for user-triggered outcomes. Emit one toast per outcome. Background polling/reconciliation should normally preserve existing state or connection status instead of generating repeated toasts. Current references: `src/components/lobbies/lobby-room-shell.tsx`, `src/components/social/chat-widget.tsx`.
+
+**H-4. Auth configuration degradation.** The missing-secret behavior in `src/auth.ts` and `src/lib/auth-configuration.ts` is a contract: session reads become signed out; auth mutations and registration return the dedicated `503`; logs use throttled `[AUTH_CONFIG]` entries keyed by site. Preserve this behavior and never log secret values.
+
+**H-5. Cleanup.** Use `finally` for timers/controllers/resources that must always be released. Do not swallow failures unless the operation is explicitly best-effort and has an established logging or reconciliation path.

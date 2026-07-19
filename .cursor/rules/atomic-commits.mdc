@@ -29,14 +29,15 @@ alwaysApply: true
 
 ### G-2. Commit Messages
 
-**G-2-1.** Follow the format: `<phase>: <concise description>`. Examples:
-- `M3.5: Fix blocker once-per-battle validation (§7-1-2-1)`
-- `M3.5: Add returnDonToDeck() and drawCards() utilities`
-- `M4: Effect parser — keyword auto-effects`
+**G-2-1.** For ticket work, use an imperative summary ending in the ticket ID: `<concise description> (OPT-XXX)`. Match the surrounding `git log`; milestone-prefixed commits are historical, not the current default.
+
+Examples:
+- `Guard client message schemas against action drift (OPT-410)`
+- `Harden preview auth configuration failures (OPT-509)`
 
 **G-2-2.** For larger changes, use a summary line + blank line + body.
 
-**G-2-3.** Reference the relevant rule number (e.g., `§7-1-4-1-1-1`) in the commit message when fixing a rules-compliance bug.
+**G-2-3.** Reference the relevant rule number (e.g., `§7-1-4-1-1-1`) in the commit body or summary when it materially explains a rules-compliance fix, while retaining the ticket suffix.
 
 ### G-3. Push Policy
 

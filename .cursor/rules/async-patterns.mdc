@@ -1,0 +1,19 @@
+---
+description: Keep async UI, cancellation, parallelism, and background work race-safe
+globs: "src/**/*.ts,src/**/*.tsx,workers/game/src/**/*.ts"
+alwaysApply: false
+---
+
+## Async Patterns
+
+**Y-1. UI operations.** Use `useAsyncOperation` from `src/hooks/use-async-operation.ts` when an interaction needs pending/success/error state and latest-request-wins protection. Check the returned `isCurrent` before applying navigation or other follow-up effects that stale completions must not trigger.
+
+**Y-2. Effects and polling.** Cancel or ignore stale work on cleanup. Follow the boolean cancellation patterns in `use-card-database.ts` / `use-remote-game-status.ts`, or use `AbortController` when the called API accepts a signal. Never update state after unmount.
+
+**Y-3. Parallelism.** Use `Promise.all` only when every operation must succeed. Use `Promise.allSettled` for independent best-effort fanout or cleanup. Do not serialize independent database reads or notifications without an ordering requirement.
+
+**Y-4. Background server work.** On Next.js request paths, use `after()` for post-response work that must survive response completion; `POST /api/messages/[userId]` is the current reference. A bare `void promise` is acceptable only for explicitly disposable work whose loss is safe and documented.
+
+**Y-5. Timeouts.** Pair `AbortController` timeouts with `clearTimeout` in `finally`. Worker network references are `src/lib/game-worker/client.ts` and `workers/game/src/session/result-callback.ts`.
+
+**Y-6. Races.** Back application checks with database constraints or conditional updates when concurrent requests can violate an invariant. Translate the losing race to an idempotent success or domain conflict, and test it.
