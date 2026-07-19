@@ -93,6 +93,7 @@ export type DeckBuilderAction =
   | { type: "SAVE_SUCCESS"; id: string }
   | { type: "SAVE_ERROR" }
   | { type: "MARK_CLEAN" }
+  | { type: "RESTORE_SNAPSHOT"; state: DeckBuilderState }
   | { type: "SET_SLEEVE"; sleeveUrl: string | null }
   | { type: "SET_DON_ART"; donArtUrl: string | null }
   | { type: "SET_TEST_ORDER"; testOrder: TestDeckOrder | null };
@@ -342,6 +343,15 @@ export function deckBuilderReducer(
     case "MARK_CLEAN":
       return { ...state, isDirty: false, saveRevision: null };
 
+    case "RESTORE_SNAPSHOT":
+      return {
+        ...action.state,
+        cards: new Map(action.state.cards),
+        isDirty: true,
+        isSaving: false,
+        saveRevision: null,
+      };
+
     case "SET_SLEEVE":
       return { ...state, sleeveUrl: action.sleeveUrl, ...markDirty(state) };
 
@@ -353,5 +363,59 @@ export function deckBuilderReducer(
 
     default:
       return state;
+  }
+}
+
+interface SerializedDeckBuilderState extends Omit<
+  DeckBuilderState,
+  "cards" | "lastSavedAt"
+> {
+  cards: [string, DeckCardEntry][];
+  lastSavedAt: string | null;
+}
+
+interface DeckBuilderSnapshot {
+  version: 1;
+  state: SerializedDeckBuilderState;
+}
+
+export function serializeDeckBuilderState(state: DeckBuilderState): string {
+  const serialized: SerializedDeckBuilderState = {
+    ...state,
+    cards: Array.from(state.cards.entries()),
+    lastSavedAt: state.lastSavedAt?.toISOString() ?? null,
+  };
+  return JSON.stringify({
+    version: 1,
+    state: serialized,
+  } satisfies DeckBuilderSnapshot);
+}
+
+export function deserializeDeckBuilderState(
+  serialized: string
+): DeckBuilderState | null {
+  try {
+    const snapshot = JSON.parse(serialized) as Partial<DeckBuilderSnapshot>;
+    if (snapshot.version !== 1 || !snapshot.state) return null;
+    const state = snapshot.state;
+    if (
+      !Array.isArray(state.cards) ||
+      typeof state.name !== "string" ||
+      typeof state.format !== "string" ||
+      typeof state.isDirty !== "boolean" ||
+      typeof state.editRevision !== "number"
+    ) {
+      return null;
+    }
+
+    return {
+      ...(state as SerializedDeckBuilderState),
+      cards: new Map(state.cards),
+      lastSavedAt: state.lastSavedAt ? new Date(state.lastSavedAt) : null,
+      isSaving: false,
+      saveRevision: null,
+    };
+  } catch {
+    return null;
   }
 }

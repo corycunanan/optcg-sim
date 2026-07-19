@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   subscribe: vi.fn(() => vi.fn()),
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
   session: { user: { id: "user-1" } } as {
     user: { id: string };
   } | null,
@@ -45,7 +47,7 @@ vi.mock("@/components/social/user-avatar", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn() },
+  toast: { error: mocks.toastError, info: mocks.toastInfo },
 }));
 
 vi.mock("@/components/ui/navigation-menu", () => ({
@@ -91,9 +93,24 @@ vi.mock("@/components/ui/alert-dialog", async () => {
     AlertDialogFooter: Wrapper,
     AlertDialogHeader: Wrapper,
     AlertDialogTitle: Wrapper,
-    AlertDialogCancel: ({ children }: { children: React.ReactNode }) => {
+    AlertDialogCancel: ({
+      children,
+      onClick,
+    }: {
+      children: React.ReactNode;
+      onClick?: () => void;
+    }) => {
       const onOpenChange = React.useContext(DialogContext);
-      return <button onClick={() => onOpenChange?.(false)}>{children}</button>;
+      return (
+        <button
+          onClick={() => {
+            onClick?.();
+            onOpenChange?.(false);
+          }}
+        >
+          {children}
+        </button>
+      );
     },
     AlertDialogAction: ({
       children,
@@ -118,6 +135,7 @@ vi.mock("@/components/ui/alert-dialog", async () => {
 });
 
 import {
+  deckSnapshotStorageKey,
   DeckNavigationGuardLink,
   DeckNavigationGuardProvider,
   useRegisterDeckNavigationGuard,
@@ -127,9 +145,58 @@ import { LobbyInviteToasts } from "@/components/lobbies/lobby-invite-toast";
 import {
   createInitialState,
   deckBuilderReducer,
+  serializeDeckBuilderState,
 } from "@/lib/deck-builder/state";
 
 let renderer: ReactTestRenderer | null = null;
+
+interface MockNavigateEvent extends Event {
+  canIntercept: boolean;
+  destination: { key: string; url: string };
+  navigationType: "push" | "reload" | "replace" | "traverse";
+}
+
+class MockNavigation extends EventTarget {
+  completedTraversal: MockNavigateEvent | null = null;
+  traversal = () => ({
+    committed: Promise.resolve() as Promise<unknown>,
+    finished: Promise.resolve() as Promise<unknown>,
+  });
+  traverseTo = vi.fn((key: string) => {
+    this.completedTraversal = navigateEvent({ key });
+    this.dispatchEvent(this.completedTraversal);
+    return this.traversal();
+  });
+}
+
+function navigateEvent({
+  canIntercept = true,
+  cancelable = true,
+  key = "destination-key",
+  navigationType = "traverse",
+  url = "http://localhost:3000/decks",
+}: {
+  canIntercept?: boolean;
+  cancelable?: boolean;
+  key?: string;
+  navigationType?: MockNavigateEvent["navigationType"];
+  url?: string;
+} = {}) {
+  return Object.assign(new Event("navigate", { cancelable }), {
+    canIntercept,
+    destination: { key, url },
+    navigationType,
+  }) as MockNavigateEvent;
+}
+
+function installNavigationApi() {
+  const navigation = new MockNavigation();
+  Object.defineProperty(window, "navigation", {
+    configurable: true,
+    value: navigation,
+  });
+  return navigation;
+}
 
 function EditorRegistration({
   isDirty,
@@ -173,6 +240,48 @@ function SaveRevisionHarness() {
   );
 }
 
+const SAVED_AT = new Date("2026-07-18T12:00:00.000Z");
+
+function SnapshotHarness({
+  deckId = "deck-1",
+  lastSavedAt = SAVED_AT,
+}: {
+  deckId?: string | null;
+  lastSavedAt?: Date | null;
+} = {}) {
+  const [state, dispatch] = useReducer(deckBuilderReducer, undefined, () => ({
+    ...createInitialState(),
+    id: deckId,
+    name: "Saved deck",
+    lastSavedAt,
+  }));
+  useRegisterDeckNavigationGuard(state.isDirty, state.name, {
+    state,
+    dispatch,
+    deckId,
+  });
+
+  return (
+    <>
+      <span>{state.name}</span>
+      <button
+        onClick={() => dispatch({ type: "SET_NAME", name: "Unsaved snapshot" })}
+      >
+        Edit deck
+      </button>
+      <button onClick={() => dispatch({ type: "SAVE_START" })}>
+        Start snapshot save
+      </button>
+      <button onClick={() => dispatch({ type: "SAVE_SUCCESS", id: "deck-1" })}>
+        Finish snapshot save
+      </button>
+      <DeckNavigationGuardLink href="/decks">
+        Leave snapshot
+      </DeckNavigationGuardLink>
+    </>
+  );
+}
+
 async function renderGuard(children: React.ReactNode, isDirty = true) {
   await act(async () => {
     renderer = create(
@@ -182,6 +291,41 @@ async function renderGuard(children: React.ReactNode, isDirty = true) {
       </DeckNavigationGuardProvider>
     );
   });
+}
+
+async function renderSnapshotHarness(
+  props: Parameters<typeof SnapshotHarness>[0] = {}
+) {
+  await act(async () => {
+    renderer = create(
+      <DeckNavigationGuardProvider>
+        <SnapshotHarness {...props} />
+      </DeckNavigationGuardProvider>
+    );
+  });
+}
+
+function seedSnapshot({
+  deckId = "deck-1",
+  lastSavedAt = SAVED_AT,
+}: {
+  deckId?: string | null;
+  lastSavedAt?: Date | null;
+} = {}) {
+  const clean = {
+    ...createInitialState(),
+    id: deckId,
+    name: "Saved deck",
+    lastSavedAt,
+  };
+  const dirty = deckBuilderReducer(clean, {
+    type: "SET_NAME",
+    name: "Unsaved snapshot",
+  });
+  window.sessionStorage.setItem(
+    deckSnapshotStorageKey(deckId),
+    serializeDeckBuilderState(dirty)
+  );
 }
 
 function clickEvent(overrides: Partial<MouseEvent<HTMLAnchorElement>> = {}) {
@@ -205,11 +349,14 @@ function button(label: string) {
 }
 
 beforeEach(() => {
+  const sessionValues = new Map<string, string>();
   mocks.pathname = "/decks/deck-1";
   mocks.push.mockReset();
   mocks.apiGet.mockReset();
   mocks.apiPost.mockReset();
   mocks.subscribe.mockClear();
+  mocks.toastError.mockReset();
+  mocks.toastInfo.mockReset();
   mocks.session = { user: { id: "user-1" } };
   mocks.apiGet.mockResolvedValue({
     data: [
@@ -238,16 +385,303 @@ beforeEach(() => {
   mocks.apiPost.mockResolvedValue({ data: {} });
   renderer = null;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("window", {
+    history: { state: null },
+    location: {
+      href: "http://localhost:3000/decks/deck-1",
+      origin: "http://localhost:3000",
+    },
+    sessionStorage: {
+      clear: () => {
+        sessionValues.clear();
+      },
+      getItem: (key: string) => sessionValues.get(key) ?? null,
+      removeItem: (key: string) => {
+        sessionValues.delete(key);
+      },
+      setItem: (key: string, value: string) => {
+        sessionValues.set(key, value);
+      },
+    },
+  } as unknown as Window);
 });
 
 afterEach(async () => {
   if (renderer) {
     await act(async () => renderer?.unmount());
   }
+  Reflect.deleteProperty(window, "navigation");
   vi.unstubAllGlobals();
 });
 
 describe("deck builder navigation guard", () => {
+  it("blocks a cancelable same-origin traversal while the editor is dirty", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+    const event = navigateEvent();
+
+    await act(async () => {
+      navigation.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(navigation.traverseTo).not.toHaveBeenCalled();
+    expect(button("Stay")).toBeDefined();
+  });
+
+  it("re-performs the blocked traversal after discard is confirmed", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+    const event = navigateEvent({ key: "back-entry" });
+
+    await act(async () => {
+      navigation.dispatchEvent(event);
+    });
+    await act(async () => button("Discard & Leave")?.props.onClick());
+
+    expect(navigation.traverseTo).toHaveBeenCalledOnce();
+    expect(navigation.traverseTo).toHaveBeenCalledWith("back-entry");
+    expect(navigation.completedTraversal?.defaultPrevented).toBe(false);
+  });
+
+  it("snapshots a dirty deck and closes the dialog when a second traversal cannot be canceled", async () => {
+    const navigation = installNavigationApi();
+    await renderSnapshotHarness();
+    await act(async () => button("Edit deck")?.props.onClick());
+
+    await act(async () => {
+      navigation.dispatchEvent(navigateEvent({ key: "first-back" }));
+    });
+    expect(button("Stay")).toBeDefined();
+
+    await act(async () => {
+      navigation.dispatchEvent(
+        navigateEvent({ cancelable: false, key: "second-back" })
+      );
+    });
+
+    expect(button("Stay")).toBeUndefined();
+    const snapshot = window.sessionStorage.getItem(
+      deckSnapshotStorageKey("deck-1")
+    );
+    expect(snapshot).toContain("Unsaved snapshot");
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    await renderSnapshotHarness();
+
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+  });
+
+  it("restores a matching snapshot and offers to discard the recovered changes", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness();
+
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+
+    const restoreToast = mocks.toastInfo.mock.calls.at(-1)?.[1] as {
+      action: { onClick: () => void };
+    };
+    await act(async () => restoreToast.action.onClick());
+
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+  });
+
+  it("keeps a newer saved deck intact and discards the stale snapshot", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness({
+      lastSavedAt: new Date("2026-07-18T13:00:00.000Z"),
+    });
+
+    expect(button("Keep newer saved version")).toBeDefined();
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    expect(mocks.toastInfo).not.toHaveBeenCalled();
+
+    await act(async () => button("Keep newer saved version")?.props.onClick());
+
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+  });
+
+  it("restores a stale snapshot only after explicit confirmation", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness({
+      lastSavedAt: new Date("2026-07-18T13:00:00.000Z"),
+    });
+
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    await act(async () => button("Restore unsaved changes")?.props.onClick());
+
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).not.toBeNull();
+  });
+
+  it("auto-restores a new-deck snapshot without a server version", async () => {
+    seedSnapshot({ deckId: null, lastSavedAt: null });
+    await renderSnapshotHarness({ deckId: null, lastSavedAt: null });
+
+    expect(button("Keep newer saved version")).toBeUndefined();
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+  });
+
+  it("clears a restored snapshot after save or confirmed discard", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness();
+    await act(async () => button("Start snapshot save")?.props.onClick());
+    await act(async () => button("Finish snapshot save")?.props.onClick());
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    seedSnapshot();
+    await renderSnapshotHarness();
+    await act(async () =>
+      renderer!.root.findByType("a").props.onClick(clickEvent())
+    );
+    await act(async () => button("Discard & Leave")?.props.onClick());
+
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+  });
+
+  it("handles both rejected traversal promises when the destination was disposed", async () => {
+    const navigation = installNavigationApi();
+    navigation.traversal = () => ({
+      committed: Promise.reject(new Error("disposed")),
+      finished: Promise.reject(new Error("disposed")),
+    });
+    await renderGuard(null);
+
+    await act(async () => {
+      navigation.dispatchEvent(navigateEvent({ key: "disposed-entry" }));
+    });
+    await act(async () => button("Discard & Leave")?.props.onClick());
+    await act(async () => Promise.resolve());
+
+    expect(button("Stay")).toBeUndefined();
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+
+    const retry = navigateEvent({ key: "disposed-entry" });
+    await act(async () => {
+      navigation.dispatchEvent(retry);
+    });
+    expect(retry.defaultPrevented).toBe(true);
+  });
+
+  it("keeps the URL and history state unchanged when traversal is canceled", async () => {
+    const navigation = installNavigationApi();
+    const originalUrl = window.location.href;
+    const originalState = window.history.state;
+    await renderGuard(null);
+
+    await act(async () => {
+      navigation.dispatchEvent(navigateEvent());
+    });
+    await act(async () => button("Stay")?.props.onClick());
+
+    expect(navigation.traverseTo).not.toHaveBeenCalled();
+    expect(window.location.href).toBe(originalUrl);
+    expect(window.history.state).toBe(originalState);
+  });
+
+  it("passes traversals through when the editor is clean", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null, false);
+    const event = navigateEvent();
+
+    await act(async () => {
+      navigation.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(button("Stay")).toBeUndefined();
+  });
+
+  it("removes the traversal guard when dirty state clears or the editor unmounts", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+
+    await act(async () => {
+      renderer?.update(
+        <DeckNavigationGuardProvider>
+          <EditorRegistration isDirty={false} />
+        </DeckNavigationGuardProvider>
+      );
+    });
+    const afterSave = navigateEvent({ key: "after-save" });
+    navigation.dispatchEvent(afterSave);
+    expect(afterSave.defaultPrevented).toBe(false);
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    const afterUnmount = navigateEvent({ key: "after-unmount" });
+    navigation.dispatchEvent(afterUnmount);
+    expect(afterUnmount.defaultPrevented).toBe(false);
+  });
+
+  it("ignores non-traversal and non-interceptable navigation events", async () => {
+    const navigation = installNavigationApi();
+    await renderGuard(null);
+    const events = [
+      navigateEvent({ navigationType: "push" }),
+      navigateEvent({ cancelable: false }),
+      navigateEvent({ canIntercept: false }),
+      navigateEvent({ url: "https://example.com/decks" }),
+    ];
+
+    for (const event of events) navigation.dispatchEvent(event);
+
+    expect(events.every((event) => !event.defaultPrevented)).toBe(true);
+    expect(button("Stay")).toBeUndefined();
+  });
+
+  it("keeps OPT-490 behavior when the Navigation API is unavailable", async () => {
+    expect("navigation" in window).toBe(false);
+    await renderGuard(
+      <DeckNavigationGuardLink href="/decks">Back</DeckNavigationGuardLink>
+    );
+    const event = clickEvent();
+
+    await act(async () => renderer!.root.findByType("a").props.onClick(event));
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(button("Stay")).toBeDefined();
+  });
+
   it("guards every global Navbar destination while the editor is dirty", async () => {
     await renderGuard(<Navbar />);
 
