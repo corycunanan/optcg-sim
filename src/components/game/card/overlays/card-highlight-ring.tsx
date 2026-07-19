@@ -6,6 +6,8 @@ import {
   cardAttackerPulse,
   cardCounterPulse,
   cardWinnerPulse,
+  negatedRing,
+  redirectedSweep,
 } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { HighlightRingColor } from "../types";
@@ -26,6 +28,8 @@ import type { HighlightRingColor } from "../types";
  *   counter  → amber flash (OPT-273 counter pulse, one-shot fade)
  *   winner   → green pulse (OPT-283 combat victory, one-shot; the field-card
  *              wrapper owns the card recoil so the art and ring move together)
+ *   redirected → amber left-to-right sweep (OPT-284, one-shot)
+ *   negated  → desaturated gray contraction (OPT-284, one-shot)
  *   usable-effect → gold static (ambient server-computed effect availability)
  *   invalid  → no ring (opacity dim lives in the state preset instead)
  */
@@ -65,6 +69,51 @@ export function CardHighlightRing({
           scale: cardWinnerPulse.scale,
         }}
         transition={cardWinnerPulse.transition}
+      />
+    );
+  }
+
+  if (color === "redirected") {
+    if (reducedMotion) return null;
+
+    return (
+      <motion.div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-0 z-10 rounded",
+          "ring-4 ring-gb-signal-battle",
+          "shadow-[0_0_18px_var(--gb-signal-battle)]",
+          className,
+        )}
+        initial={{ opacity: 0, scale: 1, clipPath: "inset(0 100% 0 0)" }}
+        animate={{
+          opacity: redirectedSweep.opacity,
+          scale: redirectedSweep.scale,
+          clipPath: redirectedSweep.clipPath,
+        }}
+        transition={redirectedSweep.transition}
+      />
+    );
+  }
+
+  if (color === "negated") {
+    if (reducedMotion) return null;
+
+    return (
+      <motion.div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-0 z-10 rounded",
+          "ring-4 ring-gb-signal-disabled/70",
+          "shadow-[0_0_12px_var(--gb-signal-disabled)]",
+          className,
+        )}
+        initial={{ opacity: 0, scale: 1.04 }}
+        animate={{
+          opacity: negatedRing.opacity,
+          scale: negatedRing.scale,
+        }}
+        transition={negatedRing.transition}
       />
     );
   }

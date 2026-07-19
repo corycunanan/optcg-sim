@@ -28,6 +28,7 @@ import {
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 import { useEffectAvailability } from "@/contexts/effect-availability-context";
 import { resolveCardHighlightRingColor } from "../card/overlays/card-highlight-ring";
+import type { PowerModPulse } from "@/hooks/use-power-modified-pulse";
 
 /** Initial transform for the summon-entry pop (OPT-274). Field card mounts
  *  with these values and animates to `{ scale: 1, opacity: 1 }` on its first
@@ -54,6 +55,9 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isAttacker,
   isDefender,
   winnerPulse,
+  powerMod,
+  effectsNegatedPulseNonce,
+  attackRedirectedPulseNonce,
   counterTarget,
   counterDragActive,
   eventDropTarget,
@@ -90,6 +94,12 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   isDefender?: boolean;
   /** One-shot COMBAT_VICTORY feedback. Wins ring precedence while active. */
   winnerPulse?: boolean;
+  /** Floating POWER_MODIFIED delta + keyed surface flash. */
+  powerMod?: PowerModPulse;
+  /** EFFECTS_NEGATED desaturated-ring restart key. */
+  effectsNegatedPulseNonce?: string;
+  /** ATTACK_REDIRECTED amber-sweep restart nonce. */
+  attackRedirectedPulseNonce?: number;
   /** Current battle defender while a Character counter is being dragged. */
   counterTarget?: boolean;
   /** A Character-counter drag is in progress. Board-full replacement is never
@@ -271,8 +281,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // Ring consolidation (OPT-273): formerly consumer className `ring-2 ring-gb-accent-*`.
   // Now routed through the primitive's highlightRing overlay so ring semantics
   // live in one place and can compose with motion presets. Precedence (top
-  // wins): combat winner (transient) > counter flash (transient) > attacker
-  // (current aggressor) > defender
+  // wins): combat winner > attack redirected > effects negated > counter flash
+  // (all transient) > attacker (current aggressor) > defender
   // (OPT-274 — current battle target, same amber pulse as attacker) > selected
   // (user-chosen blocker or effect target) > eligible candidate > ambient
   // usable-effect availability.
@@ -283,17 +293,27 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
   const activeHighlightRing = winnerPulse
     ? ("winner" as const)
-    : counterPulse
-      ? ("counter" as const)
-      : isAttacker
-        ? ("attacker" as const)
-        : isDefender
-          ? ("defender" as const)
-          : selectionSelected
-            ? ("selected" as const)
-            : selectionEligible
-              ? ("eligible" as const)
-              : undefined;
+    : attackRedirectedPulseNonce !== undefined
+      ? ("redirected" as const)
+      : effectsNegatedPulseNonce !== undefined
+        ? ("negated" as const)
+        : counterPulse
+          ? ("counter" as const)
+          : isAttacker
+            ? ("attacker" as const)
+            : isDefender
+              ? ("defender" as const)
+              : selectionSelected
+                ? ("selected" as const)
+                : selectionEligible
+                  ? ("eligible" as const)
+                  : undefined;
+  const highlightRingNonce =
+    activeHighlightRing === "redirected"
+      ? attackRedirectedPulseNonce
+      : activeHighlightRing === "negated"
+        ? effectsNegatedPulseNonce
+        : undefined;
   const highlightRing = resolveCardHighlightRingColor(
     activeHighlightRing,
     hasUsableEffect(card.instanceId),
@@ -442,7 +462,13 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
             data={{ card, cardDb }}
             variant="field"
             state={cardState}
-            overlays={{ donCount, highlightRing, effectAction }}
+            overlays={{
+              donCount,
+              highlightRing,
+              highlightRingNonce,
+              powerMod,
+              effectAction,
+            }}
             interaction={{
               tooltipNotice: targetSelection?.disabledReason ?? undefined,
             }}
@@ -497,6 +523,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
   isAttacker,
   isDefender,
   winnerPulse,
+  powerMod,
+  effectsNegatedPulseNonce,
+  attackRedirectedPulseNonce,
   counterPulse,
   targetSelection,
   onTargetToggle,
@@ -515,6 +544,9 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
    *  side. */
   isDefender?: boolean;
   winnerPulse?: boolean;
+  powerMod?: PowerModPulse;
+  effectsNegatedPulseNonce?: string;
+  attackRedirectedPulseNonce?: number;
   counterPulse?: boolean;
   targetSelection?: TargetCardSelectionState;
   onTargetToggle?: () => void;
@@ -566,17 +598,27 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
     : baseState;
   const highlightRing = winnerPulse
     ? ("winner" as const)
-    : counterPulse
-      ? ("counter" as const)
-      : isAttacker
-        ? ("attacker" as const)
-        : isDefender
-          ? ("defender" as const)
-          : targetSelection?.selected
-            ? ("selected" as const)
-            : targetSelection?.eligible
-              ? ("eligible" as const)
-              : undefined;
+    : attackRedirectedPulseNonce !== undefined
+      ? ("redirected" as const)
+      : effectsNegatedPulseNonce !== undefined
+        ? ("negated" as const)
+        : counterPulse
+          ? ("counter" as const)
+          : isAttacker
+            ? ("attacker" as const)
+            : isDefender
+              ? ("defender" as const)
+              : targetSelection?.selected
+                ? ("selected" as const)
+                : targetSelection?.eligible
+                  ? ("eligible" as const)
+                  : undefined;
+  const highlightRingNonce =
+    highlightRing === "redirected"
+      ? attackRedirectedPulseNonce
+      : highlightRing === "negated"
+        ? effectsNegatedPulseNonce
+        : undefined;
 
   const shouldEnter = !!entering && !reducedMotion;
   const winnerFeedbackActive = !!winnerPulse && !reducedMotion;
@@ -655,7 +697,7 @@ export const OpponentFieldCard = React.memo(function OpponentFieldCard({
         data={{ card, cardDb }}
         variant="field"
         state={cardState}
-        overlays={{ donCount, highlightRing }}
+        overlays={{ donCount, highlightRing, highlightRingNonce, powerMod }}
         interaction={{
           tooltipNotice: targetSelection?.disabledReason ?? undefined,
         }}

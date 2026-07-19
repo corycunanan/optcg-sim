@@ -30,6 +30,7 @@ import { DroppableCharSlot, DroppableOwnField, DroppableStageZone } from "./drop
 import { PlayerFieldCard } from "./field-card";
 import { DroppableTrashZone } from "./trash-zone";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
+import type { PowerModPulse } from "@/hooks/use-power-modified-pulse";
 
 interface PlayerFieldProps {
   me: PlayerState | null;
@@ -53,8 +54,12 @@ interface PlayerFieldProps {
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
   winnerPulseIds?: Set<string>;
+  powerModPulses?: ReadonlyMap<string, PowerModPulse>;
+  effectsNegatedPulses?: ReadonlyMap<string, string>;
+  attackRedirectedPulses?: ReadonlyMap<string, number>;
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
+  lifeScriedPulseNonce?: number;
   /** Active arrivals keyed by pile zone (`p-deck`, `p-trash`, `p-life`). */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
@@ -83,8 +88,12 @@ export function PlayerField({
   defenderInstanceId,
   counterPulseIds,
   winnerPulseIds,
+  powerModPulses,
+  effectsNegatedPulses,
+  attackRedirectedPulses,
   lifeTriggerPulse,
   lifeDamagePulseNonce,
+  lifeScriedPulseNonce,
   pileArrivingCounts,
   targetSelectionById,
   onTargetToggle,
@@ -125,6 +134,7 @@ export function PlayerField({
         arrivingCount={pileArrivingCounts?.get("p-life")}
         triggerPulse={lifeTriggerPulse}
         damagePulseNonce={lifeDamagePulseNonce}
+        scryPulseNonce={lifeScriedPulseNonce}
         style={{ position: "absolute", left: sideCardOffsetX, top: playerTop }}
       />
 
@@ -162,6 +172,9 @@ export function PlayerField({
             isAttacker={attackerInstanceId === char.instanceId}
             isDefender={defenderInstanceId === char.instanceId}
             winnerPulse={winnerPulseIds?.has(char.instanceId)}
+            powerMod={powerModPulses?.get(char.instanceId)}
+            effectsNegatedPulseNonce={effectsNegatedPulses?.get(char.instanceId)}
+            attackRedirectedPulseNonce={attackRedirectedPulses?.get(char.instanceId)}
             counterPulse={counterPulseIds?.has(char.instanceId)}
             canActivateMain={canActivateMain}
             oncePerTurnUsed={oncePerTurnUsed}
@@ -213,6 +226,9 @@ export function PlayerField({
           isAttacker={attackerInstanceId === me.leader.instanceId}
           isDefender={defenderInstanceId === me.leader.instanceId}
           winnerPulse={winnerPulseIds?.has(me.leader.instanceId)}
+          powerMod={powerModPulses?.get(me.leader.instanceId)}
+          effectsNegatedPulseNonce={effectsNegatedPulses?.get(me.leader.instanceId)}
+          attackRedirectedPulseNonce={attackRedirectedPulses?.get(me.leader.instanceId)}
           counterTarget={
             characterCounterDragActive && defenderInstanceId === me.leader.instanceId
           }

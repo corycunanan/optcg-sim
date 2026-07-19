@@ -4,7 +4,11 @@ import React, { useCallback } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, LifeCard } from "@shared/game-types";
 import { useZonePosition } from "@/contexts/zone-position-context";
-import { lifeDamageImpact, lifeTriggerPulse } from "@/lib/motion";
+import {
+  lifeDamageImpact,
+  lifeScriedFlash,
+  lifeTriggerPulse,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { Card } from "../card";
 import { CARD_SIZES } from "../card/sizes";
@@ -21,6 +25,7 @@ export const LifeZone = React.memo(function LifeZone({
   arrivingCount = 0,
   triggerPulse = false,
   damagePulseNonce,
+  scryPulseNonce,
 }: {
   life: LifeCard[];
   cardDb: CardDb;
@@ -30,6 +35,7 @@ export const LifeZone = React.memo(function LifeZone({
   arrivingCount?: number;
   triggerPulse?: boolean;
   damagePulseNonce?: number;
+  scryPulseNonce?: number;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -48,6 +54,7 @@ export const LifeZone = React.memo(function LifeZone({
   const triggerFeedbackActive = triggerPulse && !reducedMotion;
   const damageFeedbackActive =
     damagePulseNonce !== undefined && !reducedMotion;
+  const scryFeedbackActive = scryPulseNonce !== undefined && !reducedMotion;
 
   return (
     <motion.div
@@ -87,6 +94,20 @@ export const LifeZone = React.memo(function LifeZone({
             scale: lifeTriggerPulse.scale,
           }}
           transition={lifeTriggerPulse.transition}
+        />
+      )}
+
+      {scryFeedbackActive && (
+        <motion.div
+          key={`scry:${scryPulseNonce}`}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-20 rounded ring-4 ring-gb-accent-blue shadow-[0_0_16px_var(--gb-accent-blue)]"
+          initial={{ opacity: 0, scale: 1 }}
+          animate={{
+            opacity: lifeScriedFlash.opacity,
+            scale: lifeScriedFlash.scale,
+          }}
+          transition={lifeScriedFlash.transition}
         />
       )}
 

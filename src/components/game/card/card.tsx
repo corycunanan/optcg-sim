@@ -2,11 +2,17 @@
 
 import React from "react";
 import {
+  AnimatePresence,
   motion,
   useMotionValue,
   useReducedMotion,
   useSpring,
 } from "motion/react";
+import {
+  donBadgeExit,
+  floatingPowerMod,
+  powerModifiedFlash,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { CardTooltip } from "../use-card-tooltip";
 import { CardBack } from "./card-back";
@@ -237,8 +243,27 @@ export const Card = React.memo(function Card({
 
             {/* Highlight ring follows the card outline, so it sits inside the
                 rotating layer without any counter-rotation. */}
+            {overlays?.powerMod && !reducedMotion && (
+              <motion.div
+                key={`power-flash:${overlays.powerMod.nonce ?? overlays.powerMod.delta}`}
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute inset-0 z-10 rounded",
+                  overlays.powerMod.delta >= 0
+                    ? "bg-gb-accent-green/30"
+                    : "bg-gb-accent-red/30",
+                )}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: powerModifiedFlash.opacity }}
+                transition={powerModifiedFlash.transition}
+              />
+            )}
+
             {overlays?.highlightRing && (
-              <CardHighlightRing color={overlays.highlightRing} />
+              <CardHighlightRing
+                key={`${overlays.highlightRing}:${overlays.highlightRingNonce ?? 0}`}
+                color={overlays.highlightRing}
+              />
             )}
 
             {/* Count badge: rides with the card face, counter-rotated so its
@@ -269,19 +294,49 @@ export const Card = React.memo(function Card({
           and (H-W)/2. Keyed off the rotation angle — not the state label —
           so new 90°-rotated states (e.g. `attacking` from OPT-273) inherit
           the offset without a switch update. */}
-      {overlays?.donCount != null && (
-        <motion.div
-          className="absolute z-10"
-          initial={false}
-          animate={{
-            right: cardRotate === 90 ? (width - height) / 2 + 4 : 4,
-            bottom: cardRotate === 90 ? (height - width) / 2 + 4 : 4,
-          }}
-          transition={motionConfig.transition}
-        >
-          <CardDonBadge count={overlays.donCount} />
-        </motion.div>
-      )}
+      <AnimatePresence initial={false}>
+        {overlays?.donCount != null && overlays.donCount > 0 && (
+          <motion.div
+            key="don-badge"
+            className="absolute z-10"
+            initial={false}
+            animate={{
+              right: cardRotate === 90 ? (width - height) / 2 + 4 : 4,
+              bottom: cardRotate === 90 ? (height - width) / 2 + 4 : 4,
+            }}
+            exit={
+              reducedMotion
+                ? { opacity: 0, transition: { duration: 0 } }
+                : donBadgeExit
+            }
+            transition={motionConfig.transition}
+          >
+            <CardDonBadge count={overlays.donCount} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {overlays?.powerMod && !reducedMotion && (
+          <motion.div
+            key={`power-pill:${overlays.powerMod.nonce ?? overlays.powerMod.delta}`}
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-full rounded-full px-2 py-1 text-base font-bold",
+              overlays.powerMod.delta >= 0
+                ? "bg-gb-accent-green text-gb-board-dark"
+                : "bg-gb-accent-red text-gb-text-bright",
+            )}
+            initial={floatingPowerMod.initial}
+            animate={floatingPowerMod.animate}
+            exit={{ opacity: 0 }}
+            transition={floatingPowerMod.transition}
+          >
+            {overlays.powerMod.delta > 0 ? "+" : ""}
+            {overlays.powerMod.delta}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {overlays?.effectAction && (
         <motion.div

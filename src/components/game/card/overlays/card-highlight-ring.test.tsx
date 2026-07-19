@@ -1,7 +1,11 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cardWinnerPulse } from "@/lib/motion";
+import {
+  cardWinnerPulse,
+  negatedRing,
+  redirectedSweep,
+} from "@/lib/motion";
 import {
   CardHighlightRing,
   resolveCardHighlightRingColor,
@@ -26,11 +30,13 @@ function renderRing(
   hasUsableEffect: boolean
 ) {
   act(() => {
-    renderer = create(
+    const element = (
       <CardHighlightRing
         color={resolveCardHighlightRingColor(activeRing, hasUsableEffect)}
       />
     );
+    if (renderer) renderer.update(element);
+    else renderer = create(element);
   });
 
   return renderer;
@@ -92,5 +98,35 @@ describe("CardHighlightRing winner feedback", () => {
     const ring = renderRing("winner", false);
 
     expect(ring?.toJSON()).toBeNull();
+  });
+});
+
+describe("CardHighlightRing indicator feedback", () => {
+  it("renders a desaturated animated ring for effects negation", () => {
+    motionState.reduced = false;
+    const ring = renderRing("negated", false);
+    const props = ring?.root.findByType("div").props;
+    if (!props) throw new Error("Negated ring did not render");
+
+    expect(props.className).toContain("ring-gb-signal-disabled/70");
+    expect(props.animate.opacity).toEqual(negatedRing.opacity);
+    expect(props.animate.scale).toEqual(negatedRing.scale);
+  });
+
+  it("renders an amber left-to-right sweep for attack redirection", () => {
+    motionState.reduced = false;
+    const ring = renderRing("redirected", false);
+    const props = ring?.root.findByType("div").props;
+    if (!props) throw new Error("Redirected ring did not render");
+
+    expect(props.className).toContain("ring-gb-signal-battle");
+    expect(props.animate.clipPath).toEqual(redirectedSweep.clipPath);
+  });
+
+  it("suppresses both transient indicators for reduced motion", () => {
+    motionState.reduced = true;
+
+    expect(renderRing("negated", false)?.toJSON()).toBeNull();
+    expect(renderRing("redirected", false)?.toJSON()).toBeNull();
   });
 });
