@@ -61,7 +61,14 @@ interface DeckNavigation extends EventTarget {
 interface DeckNavigationGuardContextValue {
   requestNavigation: (href: string) => boolean;
   requestLeave: (proceed: () => void) => boolean;
+  requestSnapshotRecovery: (recovery: SnapshotRecoveryChoice) => void;
   setEditorState: (editor: DirtyDeckEditor | null) => void;
+}
+
+interface SnapshotRecoveryChoice {
+  name: string;
+  keepNewerSavedVersion: () => void;
+  restoreUnsavedChanges: () => void;
 }
 
 const DeckNavigationGuardContext =
@@ -91,7 +98,16 @@ export function DeckNavigationGuardProvider({
   const router = useRouter();
   const [editor, setEditorState] = useState<DirtyDeckEditor | null>(null);
   const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
+  const [pendingSnapshotRecovery, setPendingSnapshotRecovery] =
+    useState<SnapshotRecoveryChoice | null>(null);
   const allowedTraversalKey = useRef<string | null>(null);
+
+  const requestSnapshotRecovery = useCallback(
+    (recovery: SnapshotRecoveryChoice) => {
+      setPendingSnapshotRecovery(recovery);
+    },
+    []
+  );
 
   const requestLeave = useCallback(
     (proceed: () => void) => {
@@ -181,8 +197,13 @@ export function DeckNavigationGuardProvider({
   }, [editor, requestLeave]);
 
   const context = useMemo(
-    () => ({ requestLeave, requestNavigation, setEditorState }),
-    [requestLeave, requestNavigation]
+    () => ({
+      requestLeave,
+      requestNavigation,
+      requestSnapshotRecovery,
+      setEditorState,
+    }),
+    [requestLeave, requestNavigation, requestSnapshotRecovery]
   );
 
   const confirmLeave = () => {
@@ -218,6 +239,36 @@ export function DeckNavigationGuardProvider({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog
+        open={pendingSnapshotRecovery !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingSnapshotRecovery(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Newer saved version exists</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{pendingSnapshotRecovery?.name}&rdquo; was saved elsewhere
+              after these unsaved changes were captured. Choose which version to
+              keep editing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              autoFocus
+              onClick={() => pendingSnapshotRecovery?.keepNewerSavedVersion()}
+            >
+              Keep newer saved version
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => pendingSnapshotRecovery?.restoreUnsavedChanges()}
+            >
+              Restore unsaved changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DeckNavigationGuardContext.Provider>
   );
 }
@@ -233,7 +284,7 @@ export function useRegisterDeckNavigationGuard(
   name: string,
   recovery?: DeckNavigationRecovery
 ) {
-  const { setEditorState } = useDeckNavigationGuard();
+  const { requestSnapshotRecovery, setEditorState } = useDeckNavigationGuard();
   const deckId = recovery?.deckId ?? null;
   const dispatch = recovery?.dispatch;
   const state = recovery?.state;
@@ -297,30 +348,57 @@ export function useRegisterDeckNavigationGuard(
     }
 
     const baseline = state;
-    dispatch({ type: "RESTORE_SNAPSHOT", state: snapshot });
-    toast.info("Restored unsaved changes", {
-      action: {
-        label: "Discard",
-        onClick: () => {
-          clearSnapshot();
-          dispatch({
-            type: "LOAD_DECK",
-            state: {
-              id: baseline.id,
-              name: baseline.name,
-              format: baseline.format,
-              leader: baseline.leader,
-              cards: baseline.cards,
-              sleeveUrl: baseline.sleeveUrl,
-              donArtUrl: baseline.donArtUrl,
-              testOrder: baseline.testOrder,
-              lastSavedAt: baseline.lastSavedAt,
-            },
-          });
+    const restoreSnapshot = () => {
+      dispatch({ type: "RESTORE_SNAPSHOT", state: snapshot });
+      toast.info("Restored unsaved changes", {
+        action: {
+          label: "Discard",
+          onClick: () => {
+            clearSnapshot();
+            dispatch({
+              type: "LOAD_DECK",
+              state: {
+                id: baseline.id,
+                name: baseline.name,
+                format: baseline.format,
+                leader: baseline.leader,
+                cards: baseline.cards,
+                sleeveUrl: baseline.sleeveUrl,
+                donArtUrl: baseline.donArtUrl,
+                testOrder: baseline.testOrder,
+                lastSavedAt: baseline.lastSavedAt,
+              },
+            });
+          },
         },
-      },
-    });
-  }, [clearSnapshot, deckId, dispatch, state, storageKey]);
+      });
+    };
+
+    const snapshotSavedAt = snapshot.lastSavedAt?.getTime();
+    const serverSavedAt = baseline.lastSavedAt?.getTime();
+    if (
+      deckId !== null &&
+      serverSavedAt !== undefined &&
+      snapshotSavedAt !== undefined &&
+      serverSavedAt > snapshotSavedAt
+    ) {
+      requestSnapshotRecovery({
+        name: baseline.name,
+        keepNewerSavedVersion: clearSnapshot,
+        restoreUnsavedChanges: restoreSnapshot,
+      });
+      return;
+    }
+
+    restoreSnapshot();
+  }, [
+    clearSnapshot,
+    deckId,
+    dispatch,
+    requestSnapshotRecovery,
+    state,
+    storageKey,
+  ]);
 
   useEffect(() => {
     if (wasDirty.current && !isDirty) clearSnapshot();

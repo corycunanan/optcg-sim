@@ -93,9 +93,24 @@ vi.mock("@/components/ui/alert-dialog", async () => {
     AlertDialogFooter: Wrapper,
     AlertDialogHeader: Wrapper,
     AlertDialogTitle: Wrapper,
-    AlertDialogCancel: ({ children }: { children: React.ReactNode }) => {
+    AlertDialogCancel: ({
+      children,
+      onClick,
+    }: {
+      children: React.ReactNode;
+      onClick?: () => void;
+    }) => {
       const onOpenChange = React.useContext(DialogContext);
-      return <button onClick={() => onOpenChange?.(false)}>{children}</button>;
+      return (
+        <button
+          onClick={() => {
+            onClick?.();
+            onOpenChange?.(false);
+          }}
+        >
+          {children}
+        </button>
+      );
     },
     AlertDialogAction: ({
       children,
@@ -225,16 +240,25 @@ function SaveRevisionHarness() {
   );
 }
 
-function SnapshotHarness() {
+const SAVED_AT = new Date("2026-07-18T12:00:00.000Z");
+
+function SnapshotHarness({
+  deckId = "deck-1",
+  lastSavedAt = SAVED_AT,
+}: {
+  deckId?: string | null;
+  lastSavedAt?: Date | null;
+} = {}) {
   const [state, dispatch] = useReducer(deckBuilderReducer, undefined, () => ({
     ...createInitialState(),
-    id: "deck-1",
+    id: deckId,
     name: "Saved deck",
+    lastSavedAt,
   }));
   useRegisterDeckNavigationGuard(state.isDirty, state.name, {
     state,
     dispatch,
-    deckId: "deck-1",
+    deckId,
   });
 
   return (
@@ -269,28 +293,37 @@ async function renderGuard(children: React.ReactNode, isDirty = true) {
   });
 }
 
-async function renderSnapshotHarness() {
+async function renderSnapshotHarness(
+  props: Parameters<typeof SnapshotHarness>[0] = {}
+) {
   await act(async () => {
     renderer = create(
       <DeckNavigationGuardProvider>
-        <SnapshotHarness />
+        <SnapshotHarness {...props} />
       </DeckNavigationGuardProvider>
     );
   });
 }
 
-function seedSnapshot() {
+function seedSnapshot({
+  deckId = "deck-1",
+  lastSavedAt = SAVED_AT,
+}: {
+  deckId?: string | null;
+  lastSavedAt?: Date | null;
+} = {}) {
   const clean = {
     ...createInitialState(),
-    id: "deck-1",
+    id: deckId,
     name: "Saved deck",
+    lastSavedAt,
   };
   const dirty = deckBuilderReducer(clean, {
     type: "SET_NAME",
     name: "Unsaved snapshot",
   });
   window.sessionStorage.setItem(
-    deckSnapshotStorageKey("deck-1"),
+    deckSnapshotStorageKey(deckId),
     serializeDeckBuilderState(dirty)
   );
 }
@@ -467,6 +500,59 @@ describe("deck builder navigation guard", () => {
     expect(
       window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
     ).toBeNull();
+  });
+
+  it("keeps a newer saved deck intact and discards the stale snapshot", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness({
+      lastSavedAt: new Date("2026-07-18T13:00:00.000Z"),
+    });
+
+    expect(button("Keep newer saved version")).toBeDefined();
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    expect(mocks.toastInfo).not.toHaveBeenCalled();
+
+    await act(async () => button("Keep newer saved version")?.props.onClick());
+
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).toBeNull();
+  });
+
+  it("restores a stale snapshot only after explicit confirmation", async () => {
+    seedSnapshot();
+    await renderSnapshotHarness({
+      lastSavedAt: new Date("2026-07-18T13:00:00.000Z"),
+    });
+
+    expect(renderer!.root.findByType("span").props.children).toBe("Saved deck");
+    await act(async () => button("Restore unsaved changes")?.props.onClick());
+
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
+    expect(
+      window.sessionStorage.getItem(deckSnapshotStorageKey("deck-1"))
+    ).not.toBeNull();
+  });
+
+  it("auto-restores a new-deck snapshot without a server version", async () => {
+    seedSnapshot({ deckId: null, lastSavedAt: null });
+    await renderSnapshotHarness({ deckId: null, lastSavedAt: null });
+
+    expect(button("Keep newer saved version")).toBeUndefined();
+    expect(renderer!.root.findByType("span").props.children).toBe(
+      "Unsaved snapshot"
+    );
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Restored unsaved changes",
+      expect.objectContaining({ action: expect.any(Object) })
+    );
   });
 
   it("clears a restored snapshot after save or confirmed discard", async () => {
