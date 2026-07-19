@@ -12,6 +12,7 @@ import {
 } from "@/components/cards/card-detail-modal";
 import { isSubstringSearchQueryTooShort } from "@/lib/search-query";
 import { CardGrid } from "./card-grid";
+import { CardFilters } from "./card-filters";
 import { Pagination } from "./pagination";
 import {
   PageHeader,
@@ -74,6 +75,7 @@ export function CardBrowser({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(currentFilters.q);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [modalCardId, setModalCardId] = useState<string | null>(null);
   const pendingEdgeRef = useRef<"first" | "last" | null>(null);
 
@@ -126,13 +128,6 @@ export function CardBrowser({
     [search, updateFilters]
   );
 
-  const hasFilters =
-    currentFilters.q ||
-    currentFilters.color ||
-    currentFilters.type ||
-    currentFilters.set ||
-    currentFilters.block ||
-    currentFilters.originOnly;
   const searchTooShort = isSubstringSearchQueryTooShort(search);
 
   return (
@@ -156,7 +151,12 @@ export function CardBrowser({
           </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
-          <Button>
+          <Button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            aria-controls="card-filters"
+          >
             <Filter data-icon="inline-start" />
             Filter
           </Button>
@@ -165,6 +165,16 @@ export function CardBrowser({
 
       {/* Scrollable content area */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {filtersOpen && (
+          <div id="card-filters" className="border-border border-b px-6 py-6">
+            <CardFilters
+              sets={sets}
+              currentFilters={currentFilters}
+              onFilterChange={updateFilters}
+            />
+          </div>
+        )}
+
         {/* Search bar */}
         <div className="px-6 py-6">
           <form onSubmit={handleSearch}>

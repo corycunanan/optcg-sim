@@ -4,6 +4,12 @@ import {
   isSubstringSearchQueryTooShort,
   normalizeSubstringSearchQuery,
 } from "@/lib/search-query";
+import {
+  ALL_CARD_SETS_FILTER,
+  clampCardBrowserPage,
+  parseCardBrowserPage,
+} from "@/lib/cards/browser-params";
+import { CARD_BROWSER_SELECT } from "@/lib/cards/card-select";
 import type { CardBrowserProps } from "@/components/cards/card-browser";
 
 export type CardBrowserSearchParams = Record<
@@ -33,20 +39,19 @@ export async function getCardBrowserData(
   const q = isSubstringSearchQueryTooShort(rawQuery) ? "" : rawQuery;
   const color = firstParam(params.color);
   const type = firstParam(params.type);
-  const set = firstParam(params.set);
+  const rawSet = firstParam(params.set);
+  const browseAllSets = rawSet === ALL_CARD_SETS_FILTER;
+  const set = browseAllSets ? "" : rawSet;
   const block = firstParam(params.block);
   const originOnly = firstParam(params.originOnly);
-  const page = parseInt(firstParam(params.page) || "1");
+  const requestedPage = parseCardBrowserPage(firstParam(params.page) || "1");
   const limit = 20;
 
-  const sets = await prisma.cardSet.findMany({
-    distinct: ["setLabel"],
-    select: { setLabel: true, setName: true, packId: true },
-    orderBy: { packId: "asc" },
-  });
-
-  const hasAnyFilter = q || color || type || set || block || originOnly;
-  const effectiveSet = set || (!hasAnyFilter ? "OP15-EB04" : "");
+  const hasAnyFilter =
+    browseAllSets || q || color || type || set || block || originOnly;
+  const effectiveSet = browseAllSets
+    ? ""
+    : set || (!hasAnyFilter ? "OP15-EB04" : "");
   const where: Prisma.CardWhereInput = {};
 
   if (q) {
@@ -81,25 +86,32 @@ export async function getCardBrowserData(
     where.blockNumber = { in: block.split(",").map(Number) };
   }
 
-  const [initialCards, total] = await Promise.all([
-    prisma.card.findMany({
-      where,
-      orderBy: { id: "asc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        _count: { select: { artVariants: true } },
-        cardSets: { where: { isOrigin: true }, take: 1 },
-      },
+  const [sets, total] = await Promise.all([
+    prisma.cardSet.findMany({
+      distinct: ["setLabel"],
+      select: { setLabel: true, setName: true, packId: true },
+      orderBy: { packId: "asc" },
     }),
     prisma.card.count({ where }),
   ]);
+  const { page, totalPages } = clampCardBrowserPage(
+    requestedPage,
+    total,
+    limit
+  );
+  const initialCards = await prisma.card.findMany({
+    where,
+    orderBy: { id: "asc" },
+    skip: (page - 1) * limit,
+    take: limit,
+    select: CARD_BROWSER_SELECT,
+  });
 
   return {
     initialCards,
     total,
     page,
-    totalPages: Math.ceil(total / limit),
+    totalPages,
     sets,
     currentFilters: {
       q,

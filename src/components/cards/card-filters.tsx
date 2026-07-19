@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { ALL_CARD_SETS_FILTER } from "@/lib/cards/browser-params";
 import { SetFilter } from "./set-filter";
 
 const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
@@ -208,7 +209,11 @@ export function CardFilters({
         <SetFilter
           sets={sets}
           selectedSets={currentFilters.set ? currentFilters.set.split(",") : []}
-          onChange={(labels) => onFilterChange({ set: labels.join(",") })}
+          onChange={(labels) =>
+            onFilterChange({
+              set: labels.length > 0 ? labels.join(",") : ALL_CARD_SETS_FILTER,
+            })
+          }
         />
       </div>
     </div>
