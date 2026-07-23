@@ -43,6 +43,18 @@ BEGIN
 END
 $$;
 
+DO $$
+BEGIN
+  IF (
+    SELECT COUNT(*)
+    FROM "_opt518_initial_backfill_window"
+  ) <> 1 THEN
+    RAISE EXCEPTION
+      'OPT-518 reconciliation: expected exactly one backfill window row';
+  END IF;
+END
+$$;
+
 -- Two protected live lobbies for one user cannot be reconciled without
 -- choosing a game to abandon. Count both explicitly IN_GAME lobbies and
 -- CLOSED lobbies that the initial backfill may have damaged, then abort.
