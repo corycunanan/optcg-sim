@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono, DM_Serif_Display } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -7,6 +8,11 @@ import { SocialShell } from "@/components/social/social-shell";
 import { UserChannelProvider } from "@/components/realtime/user-channel-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DeckNavigationGuardProvider } from "@/components/deck-builder/deck-navigation-guard";
+import {
+  THEME_COOKIE_NAME,
+  resolveThemeName,
+  themeDataAttribute,
+} from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,13 +39,16 @@ export const metadata: Metadata = {
     "One Piece Trading Card Game simulator — deck builder, game engine, and card database.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const theme = resolveThemeName(cookieStore.get(THEME_COOKIE_NAME)?.value);
+
   return (
-    <html lang="en">
+    <html lang="en" data-theme={themeDataAttribute(theme)}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${dmSerifDisplay.variable} antialiased`}
       >
