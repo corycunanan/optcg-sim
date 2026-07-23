@@ -61,6 +61,18 @@
       "minimum": 4.5
     },
     {
+      "name": "gold-text/page",
+      "foreground": "--accent-text",
+      "background": "--surface-page",
+      "minimum": 4.5
+    },
+    {
+      "name": "gold-text/inset",
+      "foreground": "--accent-text",
+      "background": "--surface-inset",
+      "minimum": 4.5
+    },
+    {
       "name": "gold-foreground/gold-fill",
       "foreground": "--accent-fg",
       "background": "--accent",
