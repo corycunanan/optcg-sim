@@ -40,7 +40,7 @@ const COLOR_ACTIVE: Record<
   },
   Yellow: {
     bg: "var(--card-yellow)",
-    text: "var(--navy-900)",
+    text: "var(--accent-fg)",
     border: "var(--card-yellow)",
   },
 };

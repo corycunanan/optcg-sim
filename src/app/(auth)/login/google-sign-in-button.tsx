@@ -83,8 +83,8 @@ export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
         disabled={!csrfToken}
         className="flex w-full items-center justify-center gap-3 rounded px-4 py-3 text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-50"
         style={{
-          background: "var(--surface-2)",
-          border: "1px solid var(--border)",
+          background: "var(--surface-raised)",
+          border: "1px solid var(--border-subtle)",
           color: "var(--text-primary)",
         }}
       >

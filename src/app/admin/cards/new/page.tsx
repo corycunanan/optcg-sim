@@ -208,7 +208,7 @@ export default function NewCardPage() {
                           background: `var(--card-${c.toLowerCase()})`,
                           color:
                             c === "Yellow"
-                              ? "var(--navy-900)"
+                              ? "var(--accent-fg)"
                               : "var(--text-inverse)",
                           borderColor: `var(--card-${c.toLowerCase()})`,
                         }
