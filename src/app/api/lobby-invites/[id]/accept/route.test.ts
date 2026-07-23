@@ -10,6 +10,7 @@ const lobbyFindUniqueMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const userUpdateManyMock = vi.fn();
+const userFindUniqueMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
@@ -99,6 +100,7 @@ beforeEach(() => {
   lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
   userUpdateManyMock.mockReset();
+  userFindUniqueMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
@@ -112,6 +114,14 @@ beforeEach(() => {
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   lobbyGuestCreateMock.mockResolvedValue(undefined);
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindUniqueMock.mockResolvedValue({
+    activeLobbyId: "live-lobby",
+    activeLobby: {
+      status: "READY",
+      hostUserId: "another-host",
+      guest: { userId: RECIPIENT_ID },
+    },
+  });
   cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
   notifyLobbyMock.mockResolvedValue(undefined);
   buildLobbyRoomStateMock.mockResolvedValue({
@@ -149,7 +159,10 @@ beforeEach(() => {
       lobbyGuest: {
         create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
       },
-      user: { updateMany: (...args: unknown[]) => userUpdateManyMock(...args) },
+      user: {
+        updateMany: (...args: unknown[]) => userUpdateManyMock(...args),
+        findUnique: (...args: unknown[]) => userFindUniqueMock(...args),
+      },
     });
   });
 });

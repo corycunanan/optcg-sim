@@ -12,14 +12,51 @@ export async function claimActiveLobby(
   userId: string,
   lobbyId: string,
 ) {
-  const claimed = await tx.user.updateMany({
-    where: { id: userId, activeLobbyId: null },
-    data: { activeLobbyId: lobbyId },
+  const claim = () =>
+    tx.user.updateMany({
+      where: { id: userId, activeLobbyId: null },
+      data: { activeLobbyId: lobbyId },
+    });
+
+  const claimed = await claim();
+  if (claimed.count === 1) return;
+
+  const current = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      activeLobbyId: true,
+      activeLobby: {
+        select: {
+          status: true,
+          hostUserId: true,
+          guest: { select: { userId: true } },
+        },
+      },
+    },
   });
 
-  if (claimed.count !== 1) {
-    throw new ActiveLobbyConflictError();
+  const pointedLobby = current?.activeLobby;
+  const pointerIsStale =
+    current?.activeLobbyId !== null &&
+    current?.activeLobbyId !== undefined &&
+    (!pointedLobby ||
+      pointedLobby.status === "CLOSED" ||
+      (pointedLobby.hostUserId !== userId &&
+        pointedLobby.guest?.userId !== userId));
+
+  if (pointerIsStale && current?.activeLobbyId) {
+    const cleared = await tx.user.updateMany({
+      where: { id: userId, activeLobbyId: current.activeLobbyId },
+      data: { activeLobbyId: null },
+    });
+
+    if (cleared.count === 1) {
+      const retried = await claim();
+      if (retried.count === 1) return;
+    }
   }
+
+  throw new ActiveLobbyConflictError();
 }
 
 export async function releaseActiveLobby(

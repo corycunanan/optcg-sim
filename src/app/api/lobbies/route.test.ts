@@ -7,6 +7,7 @@ const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyUpdateManyMock = vi.fn();
 const lobbyCreateMock = vi.fn();
 const userUpdateManyMock = vi.fn();
+const userFindUniqueMock = vi.fn();
 const deckFindFirstMock = vi.fn();
 const transactionMock = vi.fn();
 
@@ -45,6 +46,7 @@ beforeEach(() => {
   lobbyUpdateManyMock.mockReset();
   lobbyCreateMock.mockReset();
   userUpdateManyMock.mockReset();
+  userFindUniqueMock.mockReset();
   deckFindFirstMock.mockReset();
   transactionMock.mockReset();
 
@@ -53,10 +55,21 @@ beforeEach(() => {
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
   lobbyCreateMock.mockResolvedValue({ id: "lobby-1", joinCode: "ABCD" });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindUniqueMock.mockResolvedValue({
+    activeLobbyId: "live-lobby",
+    activeLobby: {
+      status: "WAITING",
+      hostUserId: "user-1",
+      guest: null,
+    },
+  });
   transactionMock.mockImplementation(async (operation) =>
     operation({
       lobby: { create: lobbyCreateMock },
-      user: { updateMany: userUpdateManyMock },
+      user: {
+        updateMany: userUpdateManyMock,
+        findUnique: userFindUniqueMock,
+      },
     }),
   );
 });
