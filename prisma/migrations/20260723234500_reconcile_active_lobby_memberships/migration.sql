@@ -6,34 +6,6 @@
 -- window with an IN_PROGRESS game is eligible for repair. Existing IN_GAME
 -- lobbies always rank first; repair candidates rank next by game start time.
 
--- Two lobbies that are still explicitly IN_GAME for one user cannot be
--- reconciled without choosing a game to abandon. Abort instead.
-DO $$
-BEGIN
-  IF EXISTS (
-    WITH in_game_memberships AS (
-      SELECT lobby."hostUserId" AS user_id, lobby."id" AS lobby_id
-      FROM "lobbies" AS lobby
-      WHERE lobby."status" = 'IN_GAME'
-
-      UNION
-
-      SELECT guest."userId" AS user_id, lobby."id" AS lobby_id
-      FROM "lobby_guests" AS guest
-      JOIN "lobbies" AS lobby ON lobby."id" = guest."lobbyId"
-      WHERE lobby."status" = 'IN_GAME'
-    )
-    SELECT user_id
-    FROM in_game_memberships
-    GROUP BY user_id
-    HAVING COUNT(DISTINCT lobby_id) > 1
-  ) THEN
-    RAISE EXCEPTION
-      'OPT-518 reconciliation requires manual resolution: a user belongs to multiple IN_GAME lobbies';
-  END IF;
-END
-$$;
-
 -- Prisma's shadow-database drift check does not expose its internal
 -- _prisma_migrations table. Use the exact recorded window during a normal
 -- deploy and a conservative sequential-deploy window in the shadow database.
@@ -67,6 +39,50 @@ BEGIN
       CURRENT_TIMESTAMP - INTERVAL '1 hour',
       CURRENT_TIMESTAMP
     );
+  END IF;
+END
+$$;
+
+-- Two protected live lobbies for one user cannot be reconciled without
+-- choosing a game to abandon. Count both explicitly IN_GAME lobbies and
+-- CLOSED lobbies that the initial backfill may have damaged, then abort.
+DO $$
+BEGIN
+  IF EXISTS (
+    WITH protected_live_lobbies AS (
+      SELECT lobby."id", lobby."hostUserId"
+      FROM "lobbies" AS lobby
+      CROSS JOIN "_opt518_initial_backfill_window" AS initial_backfill
+      WHERE lobby."status" = 'IN_GAME'
+         OR (
+           lobby."status" = 'CLOSED'
+           AND lobby."updatedAt" BETWEEN
+             initial_backfill."started_at" AND initial_backfill."finished_at"
+           AND EXISTS (
+             SELECT 1
+             FROM "game_sessions" AS game
+             WHERE game."lobbyId" = lobby."id"
+               AND game."status" = 'IN_PROGRESS'
+           )
+         )
+    ),
+    protected_live_memberships AS (
+      SELECT lobby."hostUserId" AS user_id, lobby."id" AS lobby_id
+      FROM protected_live_lobbies AS lobby
+
+      UNION
+
+      SELECT guest."userId" AS user_id, lobby."id" AS lobby_id
+      FROM "lobby_guests" AS guest
+      JOIN protected_live_lobbies AS lobby ON lobby."id" = guest."lobbyId"
+    )
+    SELECT user_id
+    FROM protected_live_memberships
+    GROUP BY user_id
+    HAVING COUNT(DISTINCT lobby_id) > 1
+  ) THEN
+    RAISE EXCEPTION
+      'OPT-518 reconciliation requires manual resolution: a user belongs to multiple protected live lobbies';
   END IF;
 END
 $$;
@@ -152,21 +168,21 @@ conflicting_lobbies AS (
   FROM ranked_memberships
   WHERE row_number > 1
 ),
-live_candidates AS (
-  SELECT DISTINCT lobby_id
-  FROM candidate_memberships
-  WHERE is_live_candidate
+repair_candidates AS (
+  SELECT id AS lobby_id
+  FROM candidate_lobbies
+  WHERE was_closed_by_initial_backfill
 )
 SELECT
   lobby."id" AS lobby_id,
   conflicting.lobby_id IS NOT NULL AS should_close,
-  live_candidate.lobby_id IS NOT NULL
+  repair_candidate.lobby_id IS NOT NULL
     AND conflicting.lobby_id IS NULL AS should_restore_live
 FROM candidate_lobbies AS lobby
 LEFT JOIN conflicting_lobbies AS conflicting
   ON conflicting.lobby_id = lobby."id"
-LEFT JOIN live_candidates AS live_candidate
-  ON live_candidate.lobby_id = lobby."id";
+LEFT JOIN repair_candidates AS repair_candidate
+  ON repair_candidate.lobby_id = lobby."id";
 
 UPDATE "lobbies" AS lobby
 SET
