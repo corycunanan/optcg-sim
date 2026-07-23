@@ -27,11 +27,6 @@ const erode = localFont({
       weight: "300 700",
       style: "normal",
     },
-    {
-      path: "./fonts/Erode-VariableItalic.woff2",
-      weight: "300 700",
-      style: "italic",
-    },
   ],
   variable: "--font-erode",
   display: "swap",

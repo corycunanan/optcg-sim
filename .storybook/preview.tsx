@@ -1,5 +1,6 @@
 import type { Preview, Decorator } from "@storybook/nextjs-vite";
-import { Geist, Geist_Mono, DM_Serif_Display } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "../src/app/globals.css";
 
 const geistSans = Geist({
@@ -12,17 +13,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const dmSerifDisplay = DM_Serif_Display({
-  variable: "--font-dm-serif-display",
-  subsets: ["latin"],
-  weight: ["400"],
-  style: ["normal", "italic"],
+const erode = localFont({
+  src: [
+    {
+      path: "../src/app/fonts/Erode-Variable.woff2",
+      weight: "300 700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-erode",
   display: "swap",
 });
 
 const withFonts: Decorator = (Story) => (
   <div
-    className={`${geistSans.variable} ${geistMono.variable} ${dmSerifDisplay.variable} antialiased font-sans text-content-primary`}
+    className={`${geistSans.variable} ${geistMono.variable} ${erode.variable} antialiased font-sans text-content-primary`}
   >
     <Story />
   </div>
