@@ -9,6 +9,8 @@ const inviteUpdateManyMock = vi.fn();
 const lobbyFindUniqueMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
+const userUpdateManyMock = vi.fn();
+const userFindUniqueMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
@@ -97,6 +99,8 @@ beforeEach(() => {
   lobbyFindUniqueMock.mockReset();
   lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
+  userUpdateManyMock.mockReset();
+  userFindUniqueMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
@@ -109,6 +113,15 @@ beforeEach(() => {
   lobbyFindUniqueMock.mockResolvedValue(openLobby);
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   lobbyGuestCreateMock.mockResolvedValue(undefined);
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindUniqueMock.mockResolvedValue({
+    activeLobbyId: "live-lobby",
+    activeLobby: {
+      status: "READY",
+      hostUserId: "another-host",
+      guest: { userId: RECIPIENT_ID },
+    },
+  });
   cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
   notifyLobbyMock.mockResolvedValue(undefined);
   buildLobbyRoomStateMock.mockResolvedValue({
@@ -146,6 +159,10 @@ beforeEach(() => {
       lobbyGuest: {
         create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
       },
+      user: {
+        updateMany: (...args: unknown[]) => userUpdateManyMock(...args),
+        findUnique: (...args: unknown[]) => userFindUniqueMock(...args),
+      },
     });
   });
 });
@@ -170,6 +187,10 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     });
     expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
       data: { lobbyId: LOBBY_ID, userId: RECIPIENT_ID },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: RECIPIENT_ID, activeLobbyId: null },
+      data: { activeLobbyId: LOBBY_ID },
     });
 
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
@@ -250,6 +271,20 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(409);
+  });
+
+  it("returns 409 when the recipient already belongs to an active lobby", async () => {
+    userUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "An active lobby already exists",
+      code: "ACTIVE_LOBBY_EXISTS",
+    });
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
   });
 
   it("returns 409 when the lobby is no longer WAITING (pre-write read)", async () => {

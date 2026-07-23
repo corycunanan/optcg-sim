@@ -18,10 +18,10 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { viewerIsEvicted } from "@/lib/lobbies/state";
-import { isActiveLobbyConflict } from "@/lib/lobbies/unique-constraints";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 import { resolvePregameMode, type PregameMode } from "@shared/game-init";
+import { releaseActiveLobby } from "@/lib/lobbies/active-membership";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -52,7 +52,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       ? { ...state, status: "EVICTED" as const }
       : state,
     200,
-    { "Cache-Control": "no-store" }
+    { "Cache-Control": "no-store" },
   );
 }
 
@@ -109,26 +109,26 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const targetPregameMode = resolvePregameMode(
     targetMode,
     requestedPregameMode,
-    parsed.pregameMode !== undefined
+    parsed.pregameMode !== undefined,
   );
   if (targetPregameMode === null) {
     return apiError(
       `pregameMode ${requestedPregameMode} is not valid for ${targetMode} lobbies`,
       400,
-      { code: "INVALID_PREGAME_MODE" }
+      { code: "INVALID_PREGAME_MODE" },
     );
   }
   if (parsed.guestDeckId !== undefined) {
     if (targetMode === "SOLITAIRE" && !isHost) {
       return apiError(
         "guestDeckId can only be changed by the host in Solitaire mode",
-        403
+        403,
       );
     }
     if (targetMode === "PVP" && !isGuest) {
       return apiError(
         "guestDeckId can only be changed by the guest in PVP mode",
-        403
+        403,
       );
     }
   }
@@ -141,7 +141,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       if (hasHostControlledChange) {
         return apiError(
           "Ready cannot be set while changing host-controlled settings",
-          400
+          400,
         );
       }
       if (!lobby.hostDeckId) {
@@ -215,99 +215,93 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     lobbyData.hostReady = false;
   }
 
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      // Lock the exact active snapshot that authorized this PATCH. If close
-      // has already committed CLOSED (or another mutation changed lifecycle
-      // state), no guest-seat write below is allowed to run.
-      const guarded = await tx.lobby.updateMany({
-        where: { id, status: lobby.status, mode: lobby.mode },
-        data: {
-          ...(Object.keys(lobbyData).length > 0
-            ? lobbyData
-            : { status: lobby.status }),
-          revision: { increment: 1 },
-        },
-      });
-
-      if (guarded.count !== 1) {
-        const current = await tx.lobby.findUnique({
-          where: { id },
-          select: { status: true },
-        });
-        return {
-          failure:
-            !current || current.status === "CLOSED"
-              ? ("NOT_FOUND" as const)
-              : ("CONFLICT" as const),
-        };
-      }
-
-      if (switchingToSolitaire) {
-        await tx.lobbyGuest.deleteMany({ where: { lobbyId: id } });
-        await tx.lobbyGuest.upsert({
-          where: { lobbyId: id },
-          create: {
-            lobbyId: id,
-            userId: lobby.hostUserId,
-            deckId: parsed.guestDeckId ?? null,
-            guestReady: false,
-          },
-          update: {
-            userId: lobby.hostUserId,
-            deckId: parsed.guestDeckId ?? null,
-            guestReady: false,
-          },
-        });
-      } else if (lobby.mode === "SOLITAIRE" && targetMode === "PVP") {
-        await tx.lobbyGuest.deleteMany({
-          where: { lobbyId: id, userId: lobby.hostUserId },
-        });
-      } else if (targetMode === "SOLITAIRE" && isHost && !lobby.guest) {
-        await tx.lobbyGuest.upsert({
-          where: { lobbyId: id },
-          create: {
-            lobbyId: id,
-            userId: lobby.hostUserId,
-            deckId: parsed.guestDeckId ?? null,
-            guestReady: false,
-          },
-          update: {
-            userId: lobby.hostUserId,
-            deckId: parsed.guestDeckId ?? null,
-            guestReady: false,
-          },
-        });
-      } else if (parsed.guestDeckId !== undefined) {
-        await tx.lobbyGuest.update({
-          where: { lobbyId: id },
-          data: { deckId: parsed.guestDeckId, guestReady: false },
-        });
-      } else if (parsed.ready !== undefined && !isHost) {
-        await tx.lobbyGuest.update({
-          where: { lobbyId: id },
-          data: { guestReady: parsed.ready },
-        });
-      }
-
-      return { failure: null };
+  const result = await prisma.$transaction(async (tx) => {
+    // Lock the exact active snapshot that authorized this PATCH. If close
+    // has already committed CLOSED (or another mutation changed lifecycle
+    // state), no guest-seat write below is allowed to run.
+    const guarded = await tx.lobby.updateMany({
+      where: { id, status: lobby.status, mode: lobby.mode },
+      data: {
+        ...(Object.keys(lobbyData).length > 0
+          ? lobbyData
+          : { status: lobby.status }),
+        revision: { increment: 1 },
+      },
     });
 
-    if (result.failure === "NOT_FOUND") {
-      return apiError("Lobby not found or already closed", 404);
+    if (guarded.count !== 1) {
+      const current = await tx.lobby.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+      return {
+        failure:
+          !current || current.status === "CLOSED"
+            ? ("NOT_FOUND" as const)
+            : ("CONFLICT" as const),
+      };
     }
-    if (result.failure === "CONFLICT") {
-      return apiError("Lobby state changed before the update completed", 409, {
-        code: "LOBBY_STATE_CHANGED",
+
+    if (switchingToSolitaire) {
+      await tx.lobbyGuest.deleteMany({ where: { lobbyId: id } });
+      if (realGuest) {
+        await releaseActiveLobby(tx, realGuest.userId, id);
+      }
+      await tx.lobbyGuest.upsert({
+        where: { lobbyId: id },
+        create: {
+          lobbyId: id,
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+        update: {
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+      });
+    } else if (lobby.mode === "SOLITAIRE" && targetMode === "PVP") {
+      await tx.lobbyGuest.deleteMany({
+        where: { lobbyId: id, userId: lobby.hostUserId },
+      });
+    } else if (targetMode === "SOLITAIRE" && isHost && !lobby.guest) {
+      await tx.lobbyGuest.upsert({
+        where: { lobbyId: id },
+        create: {
+          lobbyId: id,
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+        update: {
+          userId: lobby.hostUserId,
+          deckId: parsed.guestDeckId ?? null,
+          guestReady: false,
+        },
+      });
+    } else if (parsed.guestDeckId !== undefined) {
+      await tx.lobbyGuest.update({
+        where: { lobbyId: id },
+        data: { deckId: parsed.guestDeckId, guestReady: false },
+      });
+    } else if (parsed.ready !== undefined && !isHost) {
+      await tx.lobbyGuest.update({
+        where: { lobbyId: id },
+        data: { guestReady: parsed.ready },
       });
     }
-  } catch (error) {
-    if (isActiveLobbyConflict(error)) {
-      return apiError("An active lobby already exists", 409, {
-        code: "ACTIVE_LOBBY_EXISTS",
-      });
-    }
-    throw error;
+
+    return { failure: null };
+  });
+
+  if (result.failure === "NOT_FOUND") {
+    return apiError("Lobby not found or already closed", 404);
+  }
+  if (result.failure === "CONFLICT") {
+    return apiError("Lobby state changed before the update completed", 409, {
+      code: "LOBBY_STATE_CHANGED",
+    });
   }
 
   // Capture the ejected guest (if any) so the post-transaction fanout can
@@ -355,12 +349,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: userId,
           mode: "PVP",
           status: { in: ["WAITING", "READY"] },
-          gameSession: { is: null },
         },
         data: { status: "CLOSED", revision: { increment: 1 } },
       });
 
-      if (closed.count === 1) return { failure: null };
+      if (closed.count === 1) {
+        await tx.user.updateMany({
+          where: { activeLobbyId: id },
+          data: { activeLobbyId: null },
+        });
+        return { failure: null };
+      }
 
       const lobby = await tx.lobby.findUnique({
         where: { id },
@@ -368,15 +367,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: true,
           mode: true,
           status: true,
-          gameSession: { select: { id: true } },
         },
       });
 
       let failure: CloseFailure;
       if (!lobby || lobby.status === "CLOSED") failure = "NOT_FOUND";
       else if (lobby.hostUserId !== userId) failure = "FORBIDDEN";
-      else if (lobby.status === "IN_GAME" || lobby.gameSession)
-        failure = "ALREADY_STARTED";
+      else if (lobby.status === "IN_GAME") failure = "ALREADY_STARTED";
       else failure = "NOT_PVP";
 
       return { failure };

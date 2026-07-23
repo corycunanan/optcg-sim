@@ -40,6 +40,7 @@ model User {
   isAdmin       Boolean   @default(false) @map("is_admin")
   theme         String    @default("default")
   lastSeen      DateTime? @map("last_seen")
+  activeLobbyId String?   @map("active_lobby_id")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -56,6 +57,7 @@ model User {
   receivedMessages  Message[]       @relation("ReceivedMessages")
   hostedLobbies     Lobby[]         @relation("HostedLobbies")
   lobbyGuests       LobbyGuest[]
+  activeLobby       Lobby?          @relation("ActiveLobbyMembers", fields: [activeLobbyId], references: [id], onDelete: SetNull)
   sentLobbyInvites      LobbyInvite[] @relation("SentLobbyInvites")
   receivedLobbyInvites  LobbyInvite[] @relation("ReceivedLobbyInvites")
 
@@ -64,6 +66,7 @@ model User {
   gamesAsPlayer2    GameSession[]   @relation("GamesAsPlayer2")
 
   @@index([username(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_username_trgm_idx")
+  @@index([activeLobbyId])
   @@map("users")
 }
 
@@ -340,12 +343,16 @@ model Lobby {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
-  host        User         @relation("HostedLobbies", fields: [hostUserId], references: [id])
-  hostDeck    Deck?        @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
-  guest       LobbyGuest?
-  gameSession GameSession?
-  invites     LobbyInvite[]
+  host          User          @relation("HostedLobbies", fields: [hostUserId], references: [id])
+  hostDeck      Deck?         @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
+  guest         LobbyGuest?
+  gameSessions  GameSession[]
+  activeMembers User[]        @relation("ActiveLobbyMembers")
+  invites       LobbyInvite[]
 
+  // `User.activeLobbyId` is the active-membership invariant: lobby create,
+  // join, leave, and close transactions must claim/release that pointer.
+  // CLOSED lobbies have no active members; historical GameSessions remain.
   @@index([status, updatedAt, id])
   @@map("lobbies")
 }
@@ -410,7 +417,7 @@ enum GameEndReasonCode {
 
 model GameSession {
   id            String          @id @default(uuid())
-  lobbyId       String          @unique
+  lobbyId       String
   player1Id     String
   player2Id     String
   player1DeckId String
@@ -431,6 +438,7 @@ model GameSession {
 
   @@index([player1Id])
   @@index([player2Id])
+  @@index([lobbyId])
   @@index([status])
   @@map("game_sessions")
 }

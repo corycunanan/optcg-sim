@@ -15,6 +15,10 @@ import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
+import {
+  ActiveLobbyConflictError,
+  claimActiveLobby,
+} from "@/lib/lobbies/active-membership";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth();
@@ -64,6 +68,8 @@ export async function POST(request: NextRequest) {
       });
       if (acquired.count !== 1) return { kind: "not_found" as const };
 
+      await claimActiveLobby(tx, userId, lobby.id);
+
       // Enter the room only. Deck slots are mutable in the lobby room; deck
       // legality belongs to POST /api/lobbies/[id]/start.
       await tx.lobbyGuest.create({
@@ -84,7 +90,7 @@ export async function POST(request: NextRequest) {
       case "computer":
         return apiError(
           "This lobby is in computer mode and cannot be joined",
-          409
+          409,
         );
     }
 
@@ -100,6 +106,11 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess({ lobbyId: joinedLobbyId });
   } catch (error) {
+    if (error instanceof ActiveLobbyConflictError) {
+      return apiError("An active lobby already exists", 409, {
+        code: "ACTIVE_LOBBY_EXISTS",
+      });
+    }
     console.error("[lobbies:join] failed", error);
     return apiError("Failed to join lobby", 500);
   }

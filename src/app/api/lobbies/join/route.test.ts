@@ -6,6 +6,8 @@ const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindFirstMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
+const userUpdateManyMock = vi.fn();
+const userFindUniqueMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
@@ -72,6 +74,8 @@ beforeEach(() => {
   lobbyFindFirstMock.mockReset();
   lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
+  userUpdateManyMock.mockReset();
+  userFindUniqueMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
@@ -90,6 +94,15 @@ beforeEach(() => {
   });
   lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindUniqueMock.mockResolvedValue({
+    activeLobbyId: "live-lobby",
+    activeLobby: {
+      status: "READY",
+      hostUserId: "another-host",
+      guest: { userId: "guest-user" },
+    },
+  });
   transactionMock.mockImplementation(async (operation) => {
     if (typeof operation !== "function") return operation;
     return operation({
@@ -98,6 +111,10 @@ beforeEach(() => {
         updateMany: lobbyUpdateManyMock,
       },
       lobbyGuest: { create: lobbyGuestCreateMock },
+      user: {
+        updateMany: userUpdateManyMock,
+        findUnique: userFindUniqueMock,
+      },
     });
   });
   buildLobbyRoomStateMock.mockResolvedValue({
@@ -129,6 +146,10 @@ describe("POST /api/lobbies/join", () => {
       data: { status: "READY", revision: { increment: 1 } },
     });
     expect(transactionMock).toHaveBeenCalledOnce();
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "guest-user", activeLobbyId: null },
+      data: { activeLobbyId: "lobby-1" },
+    });
   });
 
   it("keeps a provided guest deck as mutable room state", async () => {
@@ -209,7 +230,7 @@ describe("POST /api/lobbies/join", () => {
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     expect(notifyLobbyMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lobby-1" }),
-      { actorUserId: "guest-user" }
+      { actorUserId: "guest-user" },
     );
   });
 
@@ -233,5 +254,18 @@ describe("POST /api/lobbies/join", () => {
     expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
     expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
     expect(notifyLobbyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a second active-lobby membership", async () => {
+    userUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const res = await POST(buildRequest());
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "An active lobby already exists",
+      code: "ACTIVE_LOBBY_EXISTS",
+    });
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
   });
 });

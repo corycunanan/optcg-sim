@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
@@ -11,6 +10,7 @@ const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
 const lobbyGuestUpdateMock = vi.fn();
 const lobbyGuestUpsertMock = vi.fn();
+const userUpdateManyMock = vi.fn();
 const deckFindFirstMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
@@ -123,6 +123,7 @@ beforeEach(() => {
   lobbyGuestDeleteManyMock.mockReset();
   lobbyGuestUpdateMock.mockReset();
   lobbyGuestUpsertMock.mockReset();
+  userUpdateManyMock.mockReset();
   deckFindFirstMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
@@ -143,6 +144,7 @@ beforeEach(() => {
   lobbyGuestDeleteManyMock.mockReturnValue({ query: "delete-guests" });
   lobbyGuestUpdateMock.mockReturnValue({ query: "update-guest" });
   lobbyGuestUpsertMock.mockReturnValue({ query: "upsert-guest" });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
   transactionMock.mockImplementation(async (operation) => {
     if (typeof operation !== "function") return [];
@@ -156,6 +158,7 @@ beforeEach(() => {
         update: lobbyGuestUpdateMock,
         upsert: lobbyGuestUpsertMock,
       },
+      user: { updateMany: userUpdateManyMock },
     });
   });
   buildLobbyRoomStateMock.mockResolvedValue({
@@ -174,7 +177,7 @@ describe("PATCH /api/lobbies/[id]", () => {
   it("lets the host change pre-game flow and bumps the lobby revision", async () => {
     const res = await PATCH(
       buildRequest({ pregameMode: "GUEST_FIRST" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(200);
@@ -193,7 +196,7 @@ describe("PATCH /api/lobbies/[id]", () => {
 
     const res = await PATCH(
       buildRequest({ pregameMode: "GUEST_FIRST" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(403);
@@ -202,19 +205,19 @@ describe("PATCH /api/lobbies/[id]", () => {
 
   it("accepts Solitaire pre-game modes only for Solitaire lobbies", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({ mode: "SOLITAIRE", pregameMode: "SOLITAIRE_RANDOM" })
+      baseLobby({ mode: "SOLITAIRE", pregameMode: "SOLITAIRE_RANDOM" }),
     );
 
     const accepted = await PATCH(
       buildRequest({ pregameMode: "SIDE_A_FIRST" }),
-      params
+      params,
     );
     expect(accepted.status).toBe(200);
 
     lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby());
     const rejected = await PATCH(
       buildRequest({ pregameMode: "SIDE_A_FIRST" }),
-      params
+      params,
     );
     expect(rejected.status).toBe(400);
     expect(await rejected.json()).toMatchObject({
@@ -224,12 +227,12 @@ describe("PATCH /api/lobbies/[id]", () => {
 
   it("rejects PVP pre-game modes for Solitaire lobbies", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({ mode: "SOLITAIRE", pregameMode: "SIDE_B_FIRST" })
+      baseLobby({ mode: "SOLITAIRE", pregameMode: "SIDE_B_FIRST" }),
     );
 
     const res = await PATCH(
       buildRequest({ pregameMode: "RANDOM_FIXED" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(400);
@@ -241,12 +244,12 @@ describe("PATCH /api/lobbies/[id]", () => {
 
   it("normalizes explicit legacy PRIORITY_ROLL input for Solitaire", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({ mode: "SOLITAIRE", pregameMode: "PRIORITY_ROLL" })
+      baseLobby({ mode: "SOLITAIRE", pregameMode: "PRIORITY_ROLL" }),
     );
 
     const res = await PATCH(
       buildRequest({ pregameMode: "PRIORITY_ROLL" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(200);
@@ -284,7 +287,7 @@ describe("PATCH /api/lobbies/[id]", () => {
         mode: "SOLITAIRE",
         pregameMode: "SIDE_A_FIRST",
         guest: null,
-      })
+      }),
     );
 
     const res = await PATCH(buildRequest({ mode: "PVP" }), params);
@@ -309,18 +312,18 @@ describe("PATCH /api/lobbies/[id]", () => {
 
       const res = await PATCH(
         buildRequest({ pregameMode: "RANDOM_FIXED" }),
-        params
+        params,
       );
 
       expect(res.status).toBe(404);
       expect(transactionMock).not.toHaveBeenCalled();
-    }
+    },
   );
 
   it("blocks PVP to Solitaire while a real guest is present unless forced", async () => {
     const res = await PATCH(
       buildRequest({ mode: "SOLITAIRE", pregameMode: "SOLITAIRE_RANDOM" }),
-      params
+      params,
     );
     const body = await res.json();
 
@@ -341,14 +344,18 @@ describe("PATCH /api/lobbies/[id]", () => {
           pregameMode: "SOLITAIRE_RANDOM",
           guestDeckId: "side-b-deck",
         },
-        "?force=true"
+        "?force=true",
       ),
-      params
+      params,
     );
 
     expect(res.status).toBe(200);
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1" },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "guest-user", activeLobbyId: "lobby-1" },
+      data: { activeLobbyId: null },
     });
     expect(lobbyGuestUpsertMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1" },
@@ -388,12 +395,12 @@ describe("PATCH /api/lobbies/[id]", () => {
           guestReady: false,
           user: { id: "host-user", username: "hosty", name: "Host Player" },
         },
-      })
+      }),
     );
 
     const res = await PATCH(
       buildRequest({ mode: "PVP", pregameMode: "PRIORITY_ROLL" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(200);
@@ -412,47 +419,12 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
   });
 
-  it("returns a stable conflict when switching Solitaire back to PVP would create a second WAITING lobby", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({
-        mode: "SOLITAIRE",
-        pregameMode: "SIDE_B_FIRST",
-        guest: {
-          userId: "host-user",
-          deckId: "side-b-deck",
-          guestReady: false,
-          user: { id: "host-user", username: "hosty", name: "Host Player" },
-        },
-      })
-    );
-    transactionMock.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-        code: "P2002",
-        clientVersion: "test",
-        meta: { target: "lobbies_waiting_host_unique" },
-      })
-    );
-
-    const res = await PATCH(
-      buildRequest({ mode: "PVP", pregameMode: "PRIORITY_ROLL" }),
-      params
-    );
-
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      error: "An active lobby already exists",
-      code: "ACTIVE_LOBBY_EXISTS",
-    });
-    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
-    expect(notifyLobbyMock).not.toHaveBeenCalled();
-  });
-
   it("lets the PVP guest change only their deck and clears guestReady", async () => {
     authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
 
     const res = await PATCH(
       buildRequest({ guestDeckId: "new-guest-deck" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(200);
@@ -475,7 +447,7 @@ describe("PATCH /api/lobbies/[id]", () => {
   it("rejects host attempts to mutate the PVP guest deck slot", async () => {
     const res = await PATCH(
       buildRequest({ guestDeckId: "new-guest-deck" }),
-      params
+      params,
     );
 
     expect(res.status).toBe(403);
@@ -533,7 +505,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     expect(notifyLobbyMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lobby-1" }),
-      { actorUserId: "guest-user" }
+      { actorUserId: "guest-user" },
     );
     // No eject in this scenario, so the EVICTED single-user notify is silent.
     expect(notifyUserMock).not.toHaveBeenCalled();
@@ -556,9 +528,9 @@ describe("PATCH /api/lobbies/[id]", () => {
           pregameMode: "SOLITAIRE_RANDOM",
           guestDeckId: "side-b-deck",
         },
-        "?force=true"
+        "?force=true",
       ),
-      params
+      params,
     );
     await flushAfter();
 
@@ -566,7 +538,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     expect(notifyLobbyMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lobby-1" }),
-      { actorUserId: "host-user" }
+      { actorUserId: "host-user" },
     );
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledWith("guest-user", {
@@ -599,9 +571,9 @@ describe("PATCH /api/lobbies/[id]", () => {
           pregameMode: "SOLITAIRE_RANDOM",
           guestDeckId: "side-b-deck",
         },
-        "?force=true"
+        "?force=true",
       ),
-      params
+      params,
     );
     await flushAfter();
 
@@ -619,7 +591,7 @@ describe("DELETE /api/lobbies/[id]", () => {
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
     await flushAfter();
 
@@ -630,9 +602,12 @@ describe("DELETE /api/lobbies/[id]", () => {
         hostUserId: "host-user",
         mode: "PVP",
         status: { in: ["WAITING", "READY"] },
-        gameSession: { is: null },
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { activeLobbyId: "lobby-1" },
+      data: { activeLobbyId: null },
     });
     expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith("lobby-1");
     expect(notifyUserMock).not.toHaveBeenCalled();
@@ -652,7 +627,7 @@ describe("DELETE /api/lobbies/[id]", () => {
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
     await flushAfter();
 
@@ -670,7 +645,7 @@ describe("DELETE /api/lobbies/[id]", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     cancelPendingLobbyInvitesMock.mockRejectedValueOnce(
-      new Error("realtime unavailable")
+      new Error("realtime unavailable"),
     );
     buildLobbyRoomStateMock.mockResolvedValueOnce({
       id: "lobby-1",
@@ -685,7 +660,7 @@ describe("DELETE /api/lobbies/[id]", () => {
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
     await flushAfter();
 
@@ -696,7 +671,7 @@ describe("DELETE /api/lobbies/[id]", () => {
     });
     expect(consoleError).toHaveBeenCalledWith(
       "[lobbies:close] invite cancellation failed",
-      expect.any(Error)
+      expect.any(Error),
     );
     consoleError.mockRestore();
   });
@@ -710,7 +685,7 @@ describe("DELETE /api/lobbies/[id]", () => {
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
     await flushAfter();
 
@@ -725,14 +700,14 @@ describe("DELETE /api/lobbies/[id]", () => {
       baseLobby({
         status: "IN_GAME",
         gameSession: { id: "game-1" },
-      })
+      }),
     );
 
     const res = await DELETE(
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
     await flushAfter();
 
@@ -748,14 +723,14 @@ describe("DELETE /api/lobbies/[id]", () => {
   it("excludes Solitaire lobbies from the host close flow", async () => {
     lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({ mode: "SOLITAIRE", gameSession: null })
+      baseLobby({ mode: "SOLITAIRE", gameSession: null }),
     );
 
     const res = await DELETE(
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
 
     expect(res.status).toBe(409);
@@ -773,7 +748,7 @@ describe("DELETE /api/lobbies/[id]", () => {
       new NextRequest("http://localhost/api/lobbies/lobby-1", {
         method: "DELETE",
       }),
-      params
+      params,
     );
     await flushAfter();
 
