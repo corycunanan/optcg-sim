@@ -59,7 +59,7 @@ describe("GET /api/cron/lobby-retention", () => {
 
       expect(response.status).toBe(401);
       expect(lobbyCountMock).not.toHaveBeenCalled();
-    }
+    },
   );
 
   it("fails closed when CRON_SECRET is not configured", async () => {
@@ -92,7 +92,7 @@ describe("GET /api/cron/lobby-retention", () => {
     expect(lobbyFindManyMock).not.toHaveBeenCalled();
     expect(lobbyDeleteManyMock).not.toHaveBeenCalled();
     expect(infoSpy).toHaveBeenCalledWith(
-      JSON.stringify({ event: "lobby_retention_sweep", ...body })
+      JSON.stringify({ event: "lobby_retention_sweep", ...body }),
     );
     infoSpy.mockRestore();
   });
@@ -123,7 +123,7 @@ describe("GET /api/cron/lobby-retention", () => {
     const eligibleWhere = {
       status: "CLOSED",
       updatedAt: { lt: CUTOFF },
-      gameSession: { is: null },
+      gameSessions: { none: {} },
     };
     expect(lobbyCountMock).toHaveBeenCalledWith({ where: eligibleWhere });
     expect(lobbyFindManyMock).toHaveBeenCalledWith({
@@ -165,7 +165,7 @@ describe("GET /api/cron/lobby-retention", () => {
     lobbyCountMock.mockResolvedValueOnce(3);
     lobbyFindManyMock.mockResolvedValueOnce([{ id: "old-orphan" }]);
     lobbyDeleteManyMock.mockRejectedValueOnce(
-      new Error("database unavailable")
+      new Error("database unavailable"),
     );
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 

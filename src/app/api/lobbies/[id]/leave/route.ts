@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
+import { releaseActiveLobby } from "@/lib/lobbies/active-membership";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,6 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
           status: "READY",
           mode: "PVP",
           guest: { is: { userId } },
-          gameSession: { is: null },
         },
         data: {
           status: "WAITING",
@@ -59,14 +59,12 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
             status: true,
             mode: true,
             guest: { select: { userId: true } },
-            gameSession: { select: { id: true } },
           },
         });
 
         let failure: LeaveFailure;
         if (!lobby || lobby.status === "CLOSED") failure = "NOT_FOUND";
-        else if (lobby.status === "IN_GAME" || lobby.gameSession)
-          failure = "ALREADY_STARTED";
+        else if (lobby.status === "IN_GAME") failure = "ALREADY_STARTED";
         else if (lobby.mode !== "PVP") failure = "NOT_PVP";
         else if (!lobby.guest) failure = "ALREADY_LEFT";
         else failure = "FORBIDDEN";
@@ -82,6 +80,8 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
         // unexpectedly between the guarded update and deletion.
         throw new GuestSeatChangedError();
       }
+
+      await releaseActiveLobby(tx, userId, id);
 
       return { failure: null };
     });

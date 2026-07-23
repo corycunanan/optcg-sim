@@ -6,6 +6,7 @@ const rateLimitMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyFindUniqueMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
+const userUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
@@ -71,6 +72,7 @@ beforeEach(() => {
   lobbyUpdateManyMock.mockReset();
   lobbyFindUniqueMock.mockReset();
   lobbyGuestDeleteManyMock.mockReset();
+  userUpdateManyMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
@@ -80,6 +82,7 @@ beforeEach(() => {
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   lobbyFindUniqueMock.mockResolvedValue(lobbySnapshot());
   lobbyGuestDeleteManyMock.mockResolvedValue({ count: 1 });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
   transactionMock.mockImplementation(
     async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
@@ -88,7 +91,8 @@ beforeEach(() => {
           findUnique: lobbyFindUniqueMock,
         },
         lobbyGuest: { deleteMany: lobbyGuestDeleteManyMock },
-      })
+        user: { updateMany: userUpdateManyMock },
+      }),
   );
   buildLobbyRoomStateMock.mockResolvedValue({
     id: "lobby-1",
@@ -113,7 +117,6 @@ describe("POST /api/lobbies/[id]/leave", () => {
         status: "READY",
         mode: "PVP",
         guest: { is: { userId: "guest-user" } },
-        gameSession: { is: null },
       },
       data: {
         status: "WAITING",
@@ -123,6 +126,10 @@ describe("POST /api/lobbies/[id]/leave", () => {
     });
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1", userId: "guest-user" },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "guest-user", activeLobbyId: "lobby-1" },
+      data: { activeLobbyId: null },
     });
   });
 
@@ -134,14 +141,14 @@ describe("POST /api/lobbies/[id]/leave", () => {
     expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("lobby-1");
     expect(notifyLobbyMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lobby-1", status: "WAITING" }),
-      { actorUserId: "guest-user" }
+      { actorUserId: "guest-user" },
     );
   });
 
   it("rejects a repeated leave after the seat is already gone", async () => {
     lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      lobbySnapshot({ status: "WAITING", guest: null })
+      lobbySnapshot({ status: "WAITING", guest: null }),
     );
 
     const response = await POST(request, params);
@@ -169,7 +176,7 @@ describe("POST /api/lobbies/[id]/leave", () => {
     authMock.mockResolvedValueOnce({ user: { id: "former-guest" } });
     lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      lobbySnapshot({ guest: { userId: "new-guest" } })
+      lobbySnapshot({ guest: { userId: "new-guest" } }),
     );
 
     const response = await POST(request, params);
@@ -185,7 +192,7 @@ describe("POST /api/lobbies/[id]/leave", () => {
       lobbySnapshot({
         status: "IN_GAME",
         gameSession: { id: "game-1" },
-      })
+      }),
     );
 
     const response = await POST(request, params);

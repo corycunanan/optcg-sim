@@ -43,13 +43,13 @@ export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   const dryRun = dryRunParam === "true";
   const cutoffDate = new Date(
-    startedAt - LOBBY_RETENTION_DAYS * 24 * 60 * 60 * 1000
+    startedAt - LOBBY_RETENTION_DAYS * 24 * 60 * 60 * 1000,
   );
   const cutoff = cutoffDate.toISOString();
   const eligibleWhere = {
     status: "CLOSED" as const,
     updatedAt: { lt: cutoffDate },
-    gameSession: { is: null },
+    gameSessions: { none: {} },
   };
 
   let eligible = 0;
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
         durationMs: Date.now() - startedAt,
       };
       console.info(
-        JSON.stringify({ event: "lobby_retention_sweep", ...metrics })
+        JSON.stringify({ event: "lobby_retention_sweep", ...metrics }),
       );
       return NextResponse.json(metrics);
     }
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       durationMs: Date.now() - startedAt,
     };
     console.info(
-      JSON.stringify({ event: "lobby_retention_sweep", ...metrics })
+      JSON.stringify({ event: "lobby_retention_sweep", ...metrics }),
     );
     return NextResponse.json(metrics);
   } catch (error) {
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
         event: "lobby_retention_sweep_failed",
         ...metrics,
         error: error instanceof Error ? error.message : String(error),
-      })
+      }),
     );
     return NextResponse.json(metrics, { status: 500 });
   }

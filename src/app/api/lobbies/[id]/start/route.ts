@@ -37,10 +37,7 @@ type StartSeatConfig = {
   player2DeckOwnerId: string;
 };
 
-export async function POST(
-  _request: NextRequest,
-  { params }: RouteContext,
-) {
+export async function POST(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
@@ -56,7 +53,11 @@ export async function POST(
       where: { id },
       include: {
         guest: true,
-        gameSession: { select: { id: true } },
+        gameSessions: {
+          orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: { id: true },
+        },
       },
     });
 
@@ -71,7 +72,7 @@ export async function POST(
     if (lobby.status === "IN_GAME") {
       return apiError("Lobby already started", 409, {
         code: "ALREADY_STARTED",
-        gameId: lobby.gameSession?.id ?? null,
+        gameId: lobby.gameSessions[0]?.id ?? null,
       });
     }
 
@@ -116,8 +117,9 @@ export async function POST(
       });
 
       if (statusLock.count !== 1) {
-        const existing = await tx.gameSession.findUnique({
+        const existing = await tx.gameSession.findFirst({
           where: { lobbyId: lobby.id },
+          orderBy: [{ startedAt: "desc" }, { id: "desc" }],
           select: { id: true },
         });
         return { gameSession: existing, created: false };
@@ -290,7 +292,12 @@ function validateStartPrerequisites(lobby: {
     if (!lobby.hostReady) missing.push("hostReady");
     if (!lobby.guest?.guestReady) missing.push("guestReady");
 
-    if (missing.length > 0 || !lobby.guest || !lobby.hostDeckId || !lobby.guest.deckId) {
+    if (
+      missing.length > 0 ||
+      !lobby.guest ||
+      !lobby.hostDeckId ||
+      !lobby.guest.deckId
+    ) {
       return apiError("Lobby is not ready to start", 409, {
         code: "LOBBY_NOT_READY",
         details: { missing },
@@ -314,7 +321,12 @@ function validateStartPrerequisites(lobby: {
   if (!lobby.guest?.deckId) missing.push("guestDeckId");
   if (!lobby.hostReady) missing.push("hostReady");
 
-  if (missing.length > 0 || !lobby.guest || !lobby.hostDeckId || !lobby.guest.deckId) {
+  if (
+    missing.length > 0 ||
+    !lobby.guest ||
+    !lobby.hostDeckId ||
+    !lobby.guest.deckId
+  ) {
     return apiError("Lobby is not ready to start", 409, {
       code: "LOBBY_NOT_READY",
       details: { missing },

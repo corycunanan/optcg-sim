@@ -14,7 +14,7 @@ const lobbyFindUniqueMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyUpdateMock = vi.fn();
 const gameSessionCreateMock = vi.fn();
-const gameSessionFindUniqueMock = vi.fn();
+const gameSessionFindFirstMock = vi.fn();
 const gameSessionDeleteMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
@@ -70,7 +70,7 @@ vi.mock("@/lib/db", () => ({
     },
     gameSession: {
       create: (...args: unknown[]) => gameSessionCreateMock(...args),
-      findUnique: (...args: unknown[]) => gameSessionFindUniqueMock(...args),
+      findFirst: (...args: unknown[]) => gameSessionFindFirstMock(...args),
       delete: (...args: unknown[]) => gameSessionDeleteMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
@@ -127,7 +127,7 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
       deckId: "guest-deck",
       guestReady: true,
     },
-    gameSession: null,
+    gameSessions: [],
     ...overrides,
   };
 }
@@ -143,7 +143,7 @@ beforeEach(() => {
   lobbyUpdateManyMock.mockReset();
   lobbyUpdateMock.mockReset();
   gameSessionCreateMock.mockReset();
-  gameSessionFindUniqueMock.mockReset();
+  gameSessionFindFirstMock.mockReset();
   gameSessionDeleteMock.mockReset();
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
@@ -170,7 +170,7 @@ beforeEach(() => {
   lobbyFindUniqueMock.mockResolvedValue(baseLobby());
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
   gameSessionCreateMock.mockResolvedValue({ id: "game-1" });
-  gameSessionFindUniqueMock.mockResolvedValue({ id: "game-1" });
+  gameSessionFindFirstMock.mockResolvedValue({ id: "game-1" });
   gameSessionDeleteMock.mockReturnValue({ query: "delete-game" });
   lobbyUpdateMock.mockReturnValue({ query: "update-lobby" });
   transactionMock.mockImplementation(async (arg) => {
@@ -179,13 +179,16 @@ beforeEach(() => {
         lobby: { updateMany: lobbyUpdateManyMock },
         gameSession: {
           create: gameSessionCreateMock,
-          findUnique: gameSessionFindUniqueMock,
+          findFirst: gameSessionFindFirstMock,
         },
       });
     }
     return [];
   });
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("ok", { status: 200 })),
+  );
 });
 
 afterEach(() => {
@@ -195,15 +198,23 @@ afterEach(() => {
 describe("POST /api/lobbies/[id]/start", () => {
   it("starts a ready PVP lobby and initializes the worker", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({ pregameMode: "GUEST_FIRST" })
+      baseLobby({ pregameMode: "GUEST_FIRST" }),
     );
     const res = await POST(buildRequest(), params);
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ data: { gameId: "game-1" } });
-    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(1, "host-deck", "host-user");
-    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(2, "guest-deck", "guest-user");
+    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(
+      1,
+      "host-deck",
+      "host-user",
+    );
+    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(
+      2,
+      "guest-deck",
+      "guest-user",
+    );
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "lobby-1", status: "READY", revision: 7 },
       data: { status: "IN_GAME", revision: { increment: 1 } },
@@ -222,14 +233,16 @@ describe("POST /api/lobbies/[id]/start", () => {
       },
       select: { id: true },
     });
-    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(expect.objectContaining({
-      gameId: "game-1",
-      format: "Standard",
-      mode: "PVP",
-      pregameMode: "GUEST_FIRST",
-      player1: expect.objectContaining({ userId: "host-user" }),
-      player2: expect.objectContaining({ userId: "guest-user" }),
-    }));
+    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gameId: "game-1",
+        format: "Standard",
+        mode: "PVP",
+        pregameMode: "GUEST_FIRST",
+        player1: expect.objectContaining({ userId: "host-user" }),
+        player2: expect.objectContaining({ userId: "guest-user" }),
+      }),
+    );
     expect(fetch).toHaveBeenCalledWith(
       "https://worker.example.test/game/game-1/init",
       expect.objectContaining({ method: "POST" }),
@@ -237,65 +250,85 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("starts a Solitaire lobby with the host occupying both seats", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
-      mode: "SOLITAIRE",
-      pregameMode: "SIDE_A_FIRST",
-      status: "READY",
-      guest: {
-        userId: "host-user",
-        deckId: "side-b-deck",
-        guestReady: false,
-      },
-    }));
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        pregameMode: "SIDE_A_FIRST",
+        status: "READY",
+        guest: {
+          userId: "host-user",
+          deckId: "side-b-deck",
+          guestReady: false,
+        },
+      }),
+    );
 
     const res = await POST(buildRequest(), params);
 
     expect(res.status).toBe(200);
-    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(1, "host-deck", "host-user");
-    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(2, "side-b-deck", "host-user");
-    expect(gameSessionCreateMock).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        player1Id: "host-user",
-        player2Id: "host-user",
-        player1DeckId: "host-deck",
-        player2DeckId: "side-b-deck",
+    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(
+      1,
+      "host-deck",
+      "host-user",
+    );
+    expect(requirePlayableDeckMock).toHaveBeenNthCalledWith(
+      2,
+      "side-b-deck",
+      "host-user",
+    );
+    expect(gameSessionCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          player1Id: "host-user",
+          player2Id: "host-user",
+          player1DeckId: "host-deck",
+          player2DeckId: "side-b-deck",
+          mode: "SOLITAIRE",
+          pregameMode: "SIDE_A_FIRST",
+        }),
+      }),
+    );
+    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
         mode: "SOLITAIRE",
         pregameMode: "SIDE_A_FIRST",
+        player1: expect.objectContaining({ userId: "host-user" }),
+        player2: expect.objectContaining({ userId: "host-user" }),
       }),
-    }));
-    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(expect.objectContaining({
-      mode: "SOLITAIRE",
-      pregameMode: "SIDE_A_FIRST",
-      player1: expect.objectContaining({ userId: "host-user" }),
-      player2: expect.objectContaining({ userId: "host-user" }),
-    }));
+    );
   });
 
   it("normalizes a stale Solitaire priority-roll pairing before snapshotting", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
-      mode: "SOLITAIRE",
-      pregameMode: "PRIORITY_ROLL",
-      status: "READY",
-      guest: {
-        userId: "host-user",
-        deckId: "side-b-deck",
-        guestReady: false,
-      },
-    }));
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        pregameMode: "PRIORITY_ROLL",
+        status: "READY",
+        guest: {
+          userId: "host-user",
+          deckId: "side-b-deck",
+          guestReady: false,
+        },
+      }),
+    );
 
     const res = await POST(buildRequest(), params);
 
     expect(res.status).toBe(200);
-    expect(gameSessionCreateMock).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
+    expect(gameSessionCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          mode: "SOLITAIRE",
+          pregameMode: "SOLITAIRE_RANDOM",
+        }),
+      }),
+    );
+    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
         mode: "SOLITAIRE",
         pregameMode: "SOLITAIRE_RANDOM",
       }),
-    }));
-    expect(buildGameInitPayloadMock).toHaveBeenCalledWith(expect.objectContaining({
-      mode: "SOLITAIRE",
-      pregameMode: "SOLITAIRE_RANDOM",
-    }));
+    );
   });
 
   it("rejects non-host callers", async () => {
@@ -308,14 +341,16 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("rejects missing ready prerequisites with structured details", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
-      hostReady: false,
-      guest: {
-        userId: "guest-user",
-        deckId: "guest-deck",
-        guestReady: false,
-      },
-    }));
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        hostReady: false,
+        guest: {
+          userId: "guest-user",
+          deckId: "guest-deck",
+          guestReady: false,
+        },
+      }),
+    );
 
     const res = await POST(buildRequest(), params);
     const body = await res.json();
@@ -345,10 +380,12 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("returns ALREADY_STARTED with the existing game id after a successful start", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({
-      status: "IN_GAME",
-      gameSession: { id: "game-existing" },
-    }));
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        status: "IN_GAME",
+        gameSessions: [{ id: "game-existing" }],
+      }),
+    );
 
     const res = await POST(buildRequest(), params);
     const body = await res.json();
@@ -363,8 +400,13 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("rolls back GameSession and lobby status when worker init fails", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 500 })),
+    );
 
     const res = await POST(buildRequest(), params);
 
@@ -377,7 +419,9 @@ describe("POST /api/lobbies/[id]/start", () => {
       { query: "delete-game" },
       { query: "update-lobby" },
     ]);
-    expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+    expect(gameSessionDeleteMock).toHaveBeenCalledWith({
+      where: { id: "game-1" },
+    });
     expect(lobbyUpdateMock).toHaveBeenCalledWith({
       where: { id: "lobby-1" },
       data: { status: "READY", revision: { increment: 1 } },
@@ -385,10 +429,15 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("rolls back GameSession and lobby status when worker init cannot connect", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      throw new TypeError("fetch failed");
-    }));
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
 
     const res = await POST(buildRequest(), params);
 
@@ -401,7 +450,9 @@ describe("POST /api/lobbies/[id]/start", () => {
       { query: "delete-game" },
       { query: "update-lobby" },
     ]);
-    expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+    expect(gameSessionDeleteMock).toHaveBeenCalledWith({
+      where: { id: "game-1" },
+    });
     expect(lobbyUpdateMock).toHaveBeenCalledWith({
       where: { id: "lobby-1" },
       data: { status: "READY", revision: { increment: 1 } },
@@ -411,20 +462,25 @@ describe("POST /api/lobbies/[id]/start", () => {
   it("rolls back GameSession and lobby status when worker init times out", async () => {
     vi.useFakeTimers();
     try {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
       let markFetchStarted: (() => void) | undefined;
       const fetchStarted = new Promise<void>((resolve) => {
         markFetchStarted = resolve;
       });
-      vi.stubGlobal("fetch", vi.fn(
-        (_url: string, init?: RequestInit) =>
-          new Promise<Response>((_resolve, reject) => {
-            markFetchStarted?.();
-            init?.signal?.addEventListener("abort", () => {
-              reject(new DOMException("aborted", "AbortError"));
-            });
-          }),
-      ));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          (_url: string, init?: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              markFetchStarted?.();
+              init?.signal?.addEventListener("abort", () => {
+                reject(new DOMException("aborted", "AbortError"));
+              });
+            }),
+        ),
+      );
 
       const pending = POST(buildRequest(), params);
       await fetchStarted;
@@ -440,7 +496,9 @@ describe("POST /api/lobbies/[id]/start", () => {
         { query: "delete-game" },
         { query: "update-lobby" },
       ]);
-      expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+      expect(gameSessionDeleteMock).toHaveBeenCalledWith({
+        where: { id: "game-1" },
+      });
       expect(lobbyUpdateMock).toHaveBeenCalledWith({
         where: { id: "lobby-1" },
         data: { status: "READY", revision: { increment: 1 } },
@@ -453,13 +511,16 @@ describe("POST /api/lobbies/[id]/start", () => {
   it("rolls back when worker init returns error headers but stalls its body", async () => {
     vi.useFakeTimers();
     try {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
       let markFetchStarted: (() => void) | undefined;
       const fetchStarted = new Promise<void>((resolve) => {
         markFetchStarted = resolve;
       });
-      vi.stubGlobal("fetch", vi.fn(
-        async (_url: string, init?: RequestInit) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_url: string, init?: RequestInit) => {
           markFetchStarted?.();
           return new Response(
             new ReadableStream({
@@ -471,8 +532,8 @@ describe("POST /api/lobbies/[id]/start", () => {
             }),
             { status: 500 },
           );
-        },
-      ));
+        }),
+      );
 
       const pending = POST(buildRequest(), params);
       await fetchStarted;
@@ -488,7 +549,9 @@ describe("POST /api/lobbies/[id]/start", () => {
         { query: "delete-game" },
         { query: "update-lobby" },
       ]);
-      expect(gameSessionDeleteMock).toHaveBeenCalledWith({ where: { id: "game-1" } });
+      expect(gameSessionDeleteMock).toHaveBeenCalledWith({
+        where: { id: "game-1" },
+      });
       expect(lobbyUpdateMock).toHaveBeenCalledWith({
         where: { id: "lobby-1" },
         data: { status: "READY", revision: { increment: 1 } },
@@ -499,7 +562,9 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("preserves the 503 response when worker configuration is missing", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     vi.stubEnv("GAME_WORKER_URL", "");
 
     const res = await POST(buildRequest(), params);
@@ -514,7 +579,9 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("rejects PVComputer start attempts until implemented", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(baseLobby({ mode: "PVCOMPUTER" }));
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ mode: "PVCOMPUTER" }),
+    );
 
     const res = await POST(buildRequest(), params);
 
@@ -536,8 +603,13 @@ describe("POST /api/lobbies/[id]/start", () => {
   });
 
   it("fans out the restored lobby state after worker init rollback", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 500 })),
+    );
     buildLobbyRoomStateMock.mockResolvedValueOnce({
       id: "lobby-1",
       status: "READY",

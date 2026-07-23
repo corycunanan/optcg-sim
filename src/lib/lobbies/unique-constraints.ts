@@ -4,10 +4,6 @@ export function isJoinCodeCollision(error: unknown) {
   return hasUniqueTarget(error, "join_code", "joinCode");
 }
 
-export function isActiveLobbyConflict(error: unknown) {
-  return hasUniqueTarget(error, "hostUserId", "lobbies_waiting_host_unique");
-}
-
 function hasUniqueTarget(error: unknown, ...targets: string[]) {
   if (
     !(error instanceof Prisma.PrismaClientKnownRequestError) ||

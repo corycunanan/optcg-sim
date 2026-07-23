@@ -7,10 +7,11 @@ import { NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { generateLobbyCode } from "@/lib/lobbies";
+import { isJoinCodeCollision } from "@/lib/lobbies/unique-constraints";
 import {
-  isActiveLobbyConflict,
-  isJoinCodeCollision,
-} from "@/lib/lobbies/unique-constraints";
+  ActiveLobbyConflictError,
+  claimActiveLobby,
+} from "@/lib/lobbies/active-membership";
 import { CreateLobbySchema } from "@/lib/validators/lobbies";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
@@ -38,31 +39,29 @@ export async function POST(request: NextRequest) {
       if (!deck) return apiError("Deck not found", 404);
     }
 
-    // Close any existing WAITING lobby by this host
-    await prisma.lobby.updateMany({
-      where: { hostUserId: userId, status: "WAITING" },
-      data: { status: "CLOSED", revision: { increment: 1 } },
-    });
-
     let lobby = null;
     let attempts = 0;
     while (!lobby && attempts < 5) {
       attempts += 1;
       try {
-        lobby = await prisma.lobby.create({
-          data: {
-            hostUserId: userId,
-            hostDeckId: deckId ?? null,
-            format: format || "Standard",
-            mode: "PVP",
-            joinCode: generateLobbyCode(),
-          },
+        lobby = await prisma.$transaction(async (tx) => {
+          const created = await tx.lobby.create({
+            data: {
+              hostUserId: userId,
+              hostDeckId: deckId ?? null,
+              format: format || "Standard",
+              mode: "PVP",
+              joinCode: generateLobbyCode(),
+            },
+          });
+          await claimActiveLobby(tx, userId, created.id);
+          return created;
         });
       } catch (error) {
         if (isJoinCodeCollision(error)) {
           continue;
         }
-        if (isActiveLobbyConflict(error)) {
+        if (error instanceof ActiveLobbyConflictError) {
           return apiError("An active lobby already exists", 409, {
             code: "ACTIVE_LOBBY_EXISTS",
           });

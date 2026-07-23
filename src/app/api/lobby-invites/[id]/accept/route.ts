@@ -23,6 +23,10 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
+import {
+  ActiveLobbyConflictError,
+  claimActiveLobby,
+} from "@/lib/lobbies/active-membership";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -35,6 +39,8 @@ type AcceptOutcome =
   | { kind: "mode" }
   | { kind: "started" }
   | { kind: "occupied" };
+
+class GuestSeatOccupiedError extends Error {}
 
 export async function POST(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
@@ -49,83 +55,98 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
   const { id: inviteId } = await params;
   const now = Date.now();
 
-  const result = await prisma.$transaction<AcceptOutcome>(async (tx) => {
-    const invite = await tx.lobbyInvite.findUnique({
-      where: { id: inviteId },
-      select: {
-        id: true,
-        lobbyId: true,
-        toUserId: true,
-        status: true,
-        expiresAt: true,
-      },
-    });
-    if (!invite) return { kind: "not_found" };
-    if (invite.toUserId !== userId) return { kind: "forbidden" };
-    if (invite.status !== "PENDING") return { kind: "gone" };
-    if (invite.expiresAt.getTime() <= now) {
-      // Roll the row to EXPIRED inside the same tx so a follow-up
-      // /pending fetch doesn't keep handing this invite back.
-      await tx.lobbyInvite.updateMany({
-        where: { id: invite.id, status: "PENDING" },
-        data: { status: "EXPIRED" },
+  let result: AcceptOutcome;
+  try {
+    result = await prisma.$transaction<AcceptOutcome>(async (tx) => {
+      const invite = await tx.lobbyInvite.findUnique({
+        where: { id: inviteId },
+        select: {
+          id: true,
+          lobbyId: true,
+          toUserId: true,
+          status: true,
+          expiresAt: true,
+        },
       });
-      return { kind: "gone" };
-    }
+      if (!invite) return { kind: "not_found" };
+      if (invite.toUserId !== userId) return { kind: "forbidden" };
+      if (invite.status !== "PENDING") return { kind: "gone" };
+      if (invite.expiresAt.getTime() <= now) {
+        // Roll the row to EXPIRED inside the same tx so a follow-up
+        // /pending fetch doesn't keep handing this invite back.
+        await tx.lobbyInvite.updateMany({
+          where: { id: invite.id, status: "PENDING" },
+          data: { status: "EXPIRED" },
+        });
+        return { kind: "gone" };
+      }
 
-    const lobby = await tx.lobby.findUnique({
-      where: { id: invite.lobbyId },
-      select: {
-        id: true,
-        hostUserId: true,
-        mode: true,
-        status: true,
-        guest: { select: { userId: true } },
-      },
-    });
-    if (!lobby) return { kind: "not_found" };
-    if (lobby.hostUserId === userId) return { kind: "self" };
-    if (lobby.mode !== "PVP") return { kind: "mode" };
-    if (lobby.status !== "WAITING") return { kind: "started" };
-    if (lobby.guest && lobby.guest.userId !== lobby.hostUserId) {
-      return { kind: "occupied" };
-    }
-
-    // Conditional flip on the invite. If a concurrent decline / cancel /
-    // sibling-accept-cleanup landed between the read above and this write,
-    // count is 0 and we return 410 without mutating the lobby.
-    const inviteUpdate = await tx.lobbyInvite.updateMany({
-      where: { id: invite.id, status: "PENDING" },
-      data: { status: "ACCEPTED" },
-    });
-    if (inviteUpdate.count !== 1) return { kind: "gone" };
-
-    // Conditional flip on the lobby. If a concurrent start / close moved
-    // the lobby off WAITING, count is 0 and we return 409.
-    const lobbyUpdate = await tx.lobby.updateMany({
-      where: { id: lobby.id, status: "WAITING" },
-      data: { status: "READY", revision: { increment: 1 } },
-    });
-    if (lobbyUpdate.count !== 1) return { kind: "started" };
-
-    // LobbyGuest.lobbyId is `@unique` — a concurrent join races us here
-    // and one side gets P2002. Translate to 409.
-    try {
-      await tx.lobbyGuest.create({
-        data: { lobbyId: lobby.id, userId },
+      const lobby = await tx.lobby.findUnique({
+        where: { id: invite.lobbyId },
+        select: {
+          id: true,
+          hostUserId: true,
+          mode: true,
+          status: true,
+          guest: { select: { userId: true } },
+        },
       });
-    } catch (err) {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === "P2002"
-      ) {
+      if (!lobby) return { kind: "not_found" };
+      if (lobby.hostUserId === userId) return { kind: "self" };
+      if (lobby.mode !== "PVP") return { kind: "mode" };
+      if (lobby.status !== "WAITING") return { kind: "started" };
+      if (lobby.guest && lobby.guest.userId !== lobby.hostUserId) {
         return { kind: "occupied" };
       }
-      throw err;
-    }
 
-    return { kind: "ok", lobbyId: lobby.id };
-  });
+      // Conditional flip on the invite. If a concurrent decline / cancel /
+      // sibling-accept-cleanup landed between the read above and this write,
+      // count is 0 and we return 410 without mutating the lobby.
+      const inviteUpdate = await tx.lobbyInvite.updateMany({
+        where: { id: invite.id, status: "PENDING" },
+        data: { status: "ACCEPTED" },
+      });
+      if (inviteUpdate.count !== 1) return { kind: "gone" };
+
+      // Conditional flip on the lobby. If a concurrent start / close moved
+      // the lobby off WAITING, count is 0 and we return 409.
+      const lobbyUpdate = await tx.lobby.updateMany({
+        where: { id: lobby.id, status: "WAITING" },
+        data: { status: "READY", revision: { increment: 1 } },
+      });
+      if (lobbyUpdate.count !== 1) return { kind: "started" };
+
+      await claimActiveLobby(tx, userId, lobby.id);
+
+      // LobbyGuest.lobbyId is `@unique` — a concurrent join races us here
+      // and one side gets P2002. Translate to 409.
+      try {
+        await tx.lobbyGuest.create({
+          data: { lobbyId: lobby.id, userId },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          throw new GuestSeatOccupiedError();
+        }
+        throw err;
+      }
+
+      return { kind: "ok", lobbyId: lobby.id };
+    });
+  } catch (error) {
+    if (error instanceof ActiveLobbyConflictError) {
+      return apiError("An active lobby already exists", 409, {
+        code: "ACTIVE_LOBBY_EXISTS",
+      });
+    }
+    if (error instanceof GuestSeatOccupiedError) {
+      return apiError("Lobby already has a guest", 409);
+    }
+    throw error;
+  }
 
   switch (result.kind) {
     case "ok": {

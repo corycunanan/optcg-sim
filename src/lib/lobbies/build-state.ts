@@ -13,7 +13,7 @@ import {
 } from "@/lib/validators/lobbies";
 
 export async function buildLobbyRoomState(
-  lobbyId: string
+  lobbyId: string,
 ): Promise<LobbyRoomState | null> {
   const lobby = await prisma.lobby.findUnique({
     where: { id: lobbyId },
@@ -47,7 +47,11 @@ export async function buildLobbyRoomState(
           },
         },
       },
-      gameSession: { select: { id: true } },
+      gameSessions: {
+        orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+        take: 1,
+        select: { id: true },
+      },
     },
   });
 
@@ -113,6 +117,6 @@ export async function buildLobbyRoomState(
           deck: guestDeck,
         }
       : null,
-    gameId: lobby.gameSession?.id ?? null,
+    gameId: lobby.gameSessions[0]?.id ?? null,
   };
 }

@@ -6,7 +6,9 @@ const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyUpdateManyMock = vi.fn();
 const lobbyCreateMock = vi.fn();
+const userUpdateManyMock = vi.fn();
 const deckFindFirstMock = vi.fn();
+const transactionMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
@@ -18,6 +20,7 @@ vi.mock("@/lib/db", () => ({
     deck: {
       findFirst: (...args: unknown[]) => deckFindFirstMock(...args),
     },
+    $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -27,7 +30,7 @@ vi.mock("@/lib/rate-limit", () => ({
 const { POST } = await import("./route");
 
 function buildRequest(
-  body: unknown = { deckId: "deck-1", format: "Standard" }
+  body: unknown = { deckId: "deck-1", format: "Standard" },
 ) {
   return new NextRequest("http://localhost/api/lobbies", {
     method: "POST",
@@ -41,13 +44,21 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   lobbyUpdateManyMock.mockReset();
   lobbyCreateMock.mockReset();
+  userUpdateManyMock.mockReset();
   deckFindFirstMock.mockReset();
+  transactionMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-1" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
-  lobbyUpdateManyMock.mockResolvedValue({ count: 0 });
   lobbyCreateMock.mockResolvedValue({ id: "lobby-1", joinCode: "ABCD" });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
+  transactionMock.mockImplementation(async (operation) =>
+    operation({
+      lobby: { create: lobbyCreateMock },
+      user: { updateMany: userUpdateManyMock },
+    }),
+  );
 });
 
 describe("POST /api/lobbies", () => {
@@ -58,10 +69,7 @@ describe("POST /api/lobbies", () => {
     expect(res.status).toBe(201);
     expect(body).toEqual({ data: { lobbyId: "lobby-1", joinCode: "ABCD" } });
     expect(deckFindFirstMock).not.toHaveBeenCalled();
-    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
-      where: { hostUserId: "user-1", status: "WAITING" },
-      data: { status: "CLOSED", revision: { increment: 1 } },
-    });
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
     expect(lobbyCreateMock).toHaveBeenCalledWith({
       data: {
         hostUserId: "user-1",
@@ -70,6 +78,10 @@ describe("POST /api/lobbies", () => {
         mode: "PVP",
         joinCode: expect.any(String),
       },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "user-1", activeLobbyId: null },
+      data: { activeLobbyId: "lobby-1" },
     });
   });
 
@@ -102,7 +114,7 @@ describe("POST /api/lobbies", () => {
           code: "P2002",
           clientVersion: "test",
           meta: { target: ["join_code"] },
-        })
+        }),
       )
       .mockResolvedValueOnce({ id: "lobby-2", joinCode: "EFGH" });
 
@@ -116,13 +128,7 @@ describe("POST /api/lobbies", () => {
   });
 
   it("returns a stable conflict when another create wins the active-lobby race", async () => {
-    lobbyCreateMock.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-        code: "P2002",
-        clientVersion: "test",
-        meta: { target: "lobbies_waiting_host_unique" },
-      })
-    );
+    userUpdateManyMock.mockResolvedValueOnce({ count: 0 });
 
     const res = await POST(buildRequest({ format: "Standard" }));
 
