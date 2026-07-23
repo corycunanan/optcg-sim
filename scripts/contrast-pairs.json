@@ -1,0 +1,106 @@
+{
+  "pairings": [
+    {
+      "name": "primary/page",
+      "foreground": "--text-primary",
+      "background": "--surface-page",
+      "minimum": 4.5
+    },
+    {
+      "name": "primary/panel",
+      "foreground": "--text-primary",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
+      "name": "primary/inset",
+      "foreground": "--text-primary",
+      "background": "--surface-inset",
+      "minimum": 4.5
+    },
+    {
+      "name": "secondary/page",
+      "foreground": "--text-secondary",
+      "background": "--surface-page",
+      "minimum": 4.5
+    },
+    {
+      "name": "secondary/panel",
+      "foreground": "--text-secondary",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
+      "name": "secondary/inset",
+      "foreground": "--text-secondary",
+      "background": "--surface-inset",
+      "minimum": 4.5
+    },
+    {
+      "name": "tertiary/page",
+      "foreground": "--text-tertiary",
+      "background": "--surface-page",
+      "minimum": 4.5
+    },
+    {
+      "name": "tertiary/panel",
+      "foreground": "--text-tertiary",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
+      "name": "tertiary/inset",
+      "foreground": "--text-tertiary",
+      "background": "--surface-inset",
+      "minimum": 4.5
+    },
+    {
+      "name": "gold-text/panel",
+      "foreground": "--accent-text",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
+      "name": "gold-foreground/gold-fill",
+      "foreground": "--accent-fg",
+      "background": "--accent",
+      "minimum": 4.5
+    },
+    {
+      "name": "success/success-soft",
+      "foreground": "--success",
+      "background": "--success-soft",
+      "minimum": 4.5
+    },
+    {
+      "name": "warning/warning-soft",
+      "foreground": "--warning",
+      "background": "--warning-soft",
+      "minimum": 4.5
+    },
+    {
+      "name": "destructive/destructive-soft",
+      "foreground": "--destructive",
+      "background": "--destructive-soft",
+      "minimum": 4.5
+    },
+    {
+      "name": "focus-ring/page",
+      "foreground": "--border-focus",
+      "background": "--surface-page",
+      "minimum": 3
+    },
+    {
+      "name": "focus-ring/panel",
+      "foreground": "--border-focus",
+      "background": "--surface-panel",
+      "minimum": 3
+    },
+    {
+      "name": "focus-ring/inset",
+      "foreground": "--border-focus",
+      "background": "--surface-inset",
+      "minimum": 3
+    }
+  ]
+}
