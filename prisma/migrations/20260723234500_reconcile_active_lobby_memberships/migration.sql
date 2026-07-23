@@ -34,16 +34,47 @@ BEGIN
 END
 $$;
 
+-- Prisma's shadow-database drift check does not expose its internal
+-- _prisma_migrations table. Use the exact recorded window during a normal
+-- deploy and a conservative sequential-deploy window in the shadow database.
+CREATE TEMP TABLE "_opt518_initial_backfill_window" (
+  "started_at" TIMESTAMPTZ NOT NULL,
+  "finished_at" TIMESTAMPTZ NOT NULL
+) ON COMMIT DROP;
+
+DO $$
+BEGIN
+  IF to_regclass('_prisma_migrations') IS NOT NULL THEN
+    EXECUTE $query$
+      INSERT INTO "_opt518_initial_backfill_window" (
+        "started_at",
+        "finished_at"
+      )
+      SELECT "started_at", "finished_at"
+      FROM "_prisma_migrations"
+      WHERE "migration_name" =
+        '20260723223000_multi_game_lobbies_active_membership'
+        AND "rolled_back_at" IS NULL
+        AND "finished_at" IS NOT NULL
+      ORDER BY "finished_at" DESC
+      LIMIT 1
+    $query$;
+  ELSE
+    INSERT INTO "_opt518_initial_backfill_window" (
+      "started_at",
+      "finished_at"
+    ) VALUES (
+      CURRENT_TIMESTAMP - INTERVAL '1 hour',
+      CURRENT_TIMESTAMP
+    );
+  END IF;
+END
+$$;
+
 CREATE TEMP TABLE "_opt518_lobby_reconciliation" ON COMMIT DROP AS
 WITH initial_backfill AS (
   SELECT "started_at", "finished_at"
-  FROM "_prisma_migrations"
-  WHERE "migration_name" =
-    '20260723223000_multi_game_lobbies_active_membership'
-    AND "rolled_back_at" IS NULL
-    AND "finished_at" IS NOT NULL
-  ORDER BY "finished_at" DESC
-  LIMIT 1
+  FROM "_opt518_initial_backfill_window"
 ),
 candidate_lobbies AS (
   SELECT
