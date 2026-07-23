@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isThemeName, type ThemeName } from "@/lib/theme";
 
 export const SetUsernameSchema = z.object({
   username: z
@@ -18,4 +19,12 @@ export const SetUsernameSchema = z.object({
 
 export const SetUsernameResponseSchema = z.object({
   data: z.object({ username: z.string() }),
+});
+
+export const SetThemeSchema = z.object({
+  theme: z.custom<ThemeName>(isThemeName, "Theme is not registered"),
+});
+
+export const ThemeResponseSchema = z.object({
+  data: z.object({ theme: SetThemeSchema.shape.theme }),
 });
