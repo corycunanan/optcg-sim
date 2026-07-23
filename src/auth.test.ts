@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   get: vi.fn(),
   post: vi.fn(),
+  findUnique: vi.fn(),
 }));
 
 vi.mock("next-auth", () => ({
@@ -24,7 +25,9 @@ vi.mock("next-auth/providers/credentials", () => ({
   default: vi.fn(() => ({})),
 }));
 vi.mock("@auth/prisma-adapter", () => ({ PrismaAdapter: vi.fn(() => ({})) }));
-vi.mock("@/lib/db", () => ({ prisma: {} }));
+vi.mock("@/lib/db", () => ({
+  prisma: { user: { findUnique: mocks.findUnique } },
+}));
 vi.mock("bcryptjs", () => ({ default: { compare: vi.fn() } }));
 
 import { auth, authConfig, handlers, hasAuthSecret } from "@/auth";
@@ -37,6 +40,7 @@ describe("Auth.js server configuration", () => {
     mocks.auth.mockReset();
     mocks.get.mockReset();
     mocks.post.mockReset();
+    mocks.findUnique.mockReset();
     delete process.env.AUTH_SECRET;
     delete process.env.NEXTAUTH_SECRET;
   });
@@ -117,5 +121,30 @@ describe("Auth.js server configuration", () => {
       new NextRequest("https://preview.vercel.app/api/auth/session")
     );
     await expect(response.json()).resolves.toEqual(session);
+  });
+
+  it("refreshes the authoritative theme in the existing JWT DB lookup", async () => {
+    mocks.findUnique.mockResolvedValue({
+      isAdmin: false,
+      theme: "default",
+    });
+    const jwtCallback = authConfig.callbacks?.jwt as unknown as (args: {
+      token: Record<string, unknown>;
+      user?: Record<string, unknown>;
+    }) => Promise<Record<string, unknown>>;
+    const sessionCallback = authConfig.callbacks?.session as unknown as (args: {
+      session: { user: Record<string, unknown> };
+      token: Record<string, unknown>;
+    }) => Promise<{ user: Record<string, unknown> }>;
+
+    const token = await jwtCallback({ token: { sub: "user-1" } });
+    const session = await sessionCallback({ session: { user: {} }, token });
+
+    expect(mocks.findUnique).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      select: { isAdmin: true, theme: true },
+    });
+    expect(token.theme).toBe("default");
+    expect(session.user.theme).toBe("default");
   });
 });

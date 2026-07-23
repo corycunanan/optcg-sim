@@ -16,6 +16,7 @@ import {
   hasAuthSecret,
   logAuthConfigurationDegraded,
 } from "@/lib/auth-configuration";
+import { resolveThemeName, type ThemeName } from "@/lib/theme";
 import bcrypt from "bcryptjs";
 
 export { hasAuthSecret } from "@/lib/auth-configuration";
@@ -65,16 +66,19 @@ export const authConfig = {
         // token.sub is set to user.id automatically
         token.username = user.username ?? null;
         token.isAdmin = user.isAdmin ?? false;
+        token.theme = resolveThemeName(user.theme);
         return token;
       }
-      // Refresh isAdmin from DB on token rotation so admin flips take effect
-      // without requiring re-login. Skipped when we have no user id yet.
+      // Refresh user settings from DB on token rotation so cross-device
+      // changes take effect without requiring re-login. This expands the
+      // existing isAdmin lookup rather than adding another per-request query.
       if (token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { isAdmin: true },
+          select: { isAdmin: true, theme: true },
         });
         token.isAdmin = dbUser?.isAdmin ?? false;
+        token.theme = resolveThemeName(dbUser?.theme);
       }
       return token;
     },
@@ -83,6 +87,7 @@ export const authConfig = {
       session.user.username =
         typeof token.username === "string" ? token.username : null;
       session.user.isAdmin = Boolean(token.isAdmin);
+      session.user.theme = resolveThemeName(token.theme);
       return session;
     },
   },
@@ -142,6 +147,7 @@ declare module "next-auth" {
   interface User {
     username?: string | null;
     isAdmin?: boolean;
+    theme?: string | null;
   }
 
   interface Session {
@@ -152,6 +158,7 @@ declare module "next-auth" {
       image?: string | null;
       username?: string | null;
       isAdmin: boolean;
+      theme: ThemeName;
     };
   }
 }

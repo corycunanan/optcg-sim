@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, type NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import {
@@ -60,6 +61,12 @@ export async function PUT(request: NextRequest) {
 
     return mirrorThemeCookie(apiSuccess({ theme }), theme);
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return apiError("User not found", 404);
+    }
     console.error("[user:set-theme] failed", error);
     return apiError("Failed to set theme", 500);
   }

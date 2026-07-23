@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_THEME, THEME_COOKIE_NAME } from "@/lib/theme";
 
@@ -79,6 +80,23 @@ describe("/api/user/theme", () => {
 
     expect(response.status).toBe(400);
     expect(updateMock).not.toHaveBeenCalled();
+    expect(response.cookies.get(THEME_COOKIE_NAME)).toBeUndefined();
+  });
+
+  it("returns 404 when the authenticated user row no longer exists", async () => {
+    updateMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Record not found", {
+        code: "P2025",
+        clientVersion: "6.19.2",
+      })
+    );
+
+    const response = await PUT(buildRequest({ theme: DEFAULT_THEME }));
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "User not found",
+    });
     expect(response.cookies.get(THEME_COOKIE_NAME)).toBeUndefined();
   });
 });

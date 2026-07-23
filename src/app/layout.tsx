@@ -8,6 +8,7 @@ import { SocialShell } from "@/components/social/social-shell";
 import { UserChannelProvider } from "@/components/realtime/user-channel-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DeckNavigationGuardProvider } from "@/components/deck-builder/deck-navigation-guard";
+import { ThemeReconciler } from "@/components/theme/theme-reconciler";
 import {
   THEME_COOKIE_NAME,
   resolveThemeName,
@@ -53,6 +54,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${dmSerifDisplay.variable} antialiased`}
       >
         <SessionProvider>
+          <ThemeReconciler />
           <UserChannelProvider>
             <DeckNavigationGuardProvider>
               <SidebarProvider>
