@@ -3,22 +3,30 @@
 @import "shadcn/tailwind.css";
 
 /* ─── OPTCG Simulator Design Tokens ─────────────────────────────
-   Palette: deep navy surfaces · warm white text
-            warm gold primary accent · One Piece red for emphasis
-   References: en.onepiece-cardgame.com · magic.wizards.com/en/mtgarena
+   Two-layer theming contract:
+   1. Primitives own every raw themeable value. Future themes use an
+      html[data-theme="..."] selector to override primitives only.
+      The default theme lives in :root and needs no data-theme attribute.
+   2. Semantic tokens describe UI roles, point to primitives, and never
+      change inside a theme selector. Components and Tailwind colors must
+      consume semantic tokens, never primitives directly.
+
+   The TCG card, holofoil, and game-board feature-palette tokens are
+   intentionally non-themable. They are direct feature contracts, not
+   theme primitives, and must never be overridden by data-theme selectors.
    ─────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ── Surfaces (dark-only navy elevation scale) ── */
-  --surface-base: oklch(22% 0.04 245); /* page background — navy-900 */
-  --surface-1: oklch(27% 0.04 245); /* cards, panels */
-  --surface-2: oklch(32% 0.04 245); /* elevated panels */
-  --surface-3: oklch(37% 0.035 245); /* tags, dividers, inset areas */
+  /* ── Primitive layer: default theme raw values ── */
 
-  /* ── Nav background (navy-charcoal, distinct from content elevation) ── */
-  --surface-nav: oklch(18% 0.02 245); /* global navbar */
+  /* Elevation steps */
+  --elevation-page: oklch(22% 0.04 245); /* page background — navy-900 */
+  --elevation-panel: oklch(27% 0.04 245); /* cards, panels */
+  --elevation-raised: oklch(32% 0.04 245); /* elevated panels */
+  --elevation-inset: oklch(37% 0.035 245); /* tags, dividers, inset areas */
+  --elevation-nav: oklch(18% 0.02 245); /* global navbar */
 
-  /* ── Navy (foundation + structure) ── */
+  /* Navy ramp */
   --navy-900: oklch(22% 0.04 245); /* page base, deepest navy */
   --navy-800: oklch(30% 0.04 245); /* active and hover surfaces */
   --navy-700: oklch(42% 0.03 245); /* borders on dark surfaces */
@@ -26,61 +34,124 @@
   --navy-200: oklch(34% 0.035 245); /* stronger soft navy surface */
   --navy-100: oklch(27% 0.03 245); /* soft navy surface */
 
-  /* ── Gold (primary interaction + treasure, premium moments) ── */
+  /* Gold ramp */
   --gold-600: oklch(70% 0.14 75); /* pressed gold, text accents */
   --gold-500: oklch(78% 0.14 75); /* primary CTAs, highlights, focus */
   --gold-400: oklch(84% 0.12 75); /* hover on gold */
   --gold-100: oklch(30% 0.05 75); /* soft gold surface */
 
-  /* ── Red (energy, emphasis, destructive actions) ── */
+  /* Red ramp */
   --red-600: oklch(74% 0.2 25); /* emphasis, destructive */
   --red-500: oklch(80% 0.18 25); /* hover on red */
   --red-100: oklch(30% 0.06 25); /* soft red surface */
 
-  /* ── Text ──
-     Real-content chrome text passes WCAG AA on the current dark elevations.
-     --text-tertiary ≈4.7:1 on --surface-3 (worst case), ≈7.8:1 on --surface-base. */
-  --text-primary: oklch(96% 0.008 75); /* warm white body and headings */
-  --text-secondary: oklch(82% 0.01 75); /* secondary labels */
-  --text-tertiary: oklch(75% 0.008 75); /* placeholder, hint text */
-  --text-disabled: oklch(66% 0.006 75); /* intentionally subdued */
-  --text-inverse: oklch(98% 0.005 75); /* brightest text on deepest navy */
+  /* Neutral text steps */
+  --neutral-98: oklch(98% 0.005 75); /* brightest text on deepest navy */
+  --neutral-96: oklch(96% 0.008 75); /* warm white body and headings */
+  --neutral-82: oklch(82% 0.01 75); /* secondary labels */
+  --neutral-75: oklch(75% 0.008 75); /* placeholder, hint text */
+  --neutral-66: oklch(66% 0.006 75); /* intentionally subdued */
 
-  /* ── Borders ── */
-  --border: oklch(42% 0.03 245);
-  --border-strong: oklch(52% 0.035 245);
+  /* Border steps */
+  --border-step-subtle: oklch(42% 0.03 245);
+  --border-step-strong: oklch(52% 0.035 245);
+
+  /* State ramps */
+  --green-600: oklch(74% 0.16 155);
+  --green-100: oklch(30% 0.06 155);
+  --amber-600: oklch(78% 0.14 80);
+  --amber-100: oklch(31% 0.06 80);
+
+  /* Overlay values */
+  --overlay-strong-value: oklch(5% 0.01 245 / 0.72);
+  --overlay-light-value: oklch(10% 0.015 245 / 0.48);
+
+  /* Shadow values */
+  --shadow-elevation-sm:
+    0 1px 2px oklch(5% 0.01 245 / 0.3), 0 1px 3px oklch(5% 0.01 245 / 0.2);
+  --shadow-elevation-md:
+    0 4px 6px oklch(5% 0.01 245 / 0.35), 0 2px 4px oklch(5% 0.01 245 / 0.24);
+  --shadow-elevation-lg:
+    0 10px 15px oklch(5% 0.01 245 / 0.45), 0 4px 6px oklch(5% 0.01 245 / 0.28);
+
+  /* ── Semantic layer: stable component-facing roles ── */
+
+  /* Surfaces */
+  --surface-page: var(--elevation-page);
+  --surface-panel: var(--elevation-panel);
+  --surface-overlay: var(--elevation-panel);
+  --surface-raised: var(--elevation-raised);
+  --surface-inset: var(--elevation-inset);
+  --surface-nav: var(--elevation-nav);
+  --surface-interactive: var(--navy-800);
+  --surface-soft-strong: var(--navy-200);
+  --surface-soft: var(--navy-100);
+  --surface-subdued: var(--navy-500);
+
+  /* Text
+     Real-content chrome text passes WCAG AA on the current dark elevations.
+     --text-tertiary ≈4.7:1 on --surface-inset (worst case), ≈7.8:1 on --surface-page. */
+  --text-primary: var(--neutral-96);
+  --text-secondary: var(--neutral-82);
+  --text-tertiary: var(--neutral-75);
+  --text-disabled: var(--neutral-66);
+  --text-inverse: var(--neutral-98);
+
+  /* Borders */
+  --border-subtle: var(--border-step-subtle);
+  --border-strong: var(--border-step-strong);
   --border-focus: var(--gold-500);
 
-  /* ── Semantic ──
-     --warning ≈7.4:1 on --surface-1 and ≈6.5:1 on --warning-soft. */
-  --success: oklch(74% 0.16 155);
-  --success-soft: oklch(30% 0.06 155);
-  --warning: oklch(78% 0.14 80);
-  --warning-soft: oklch(31% 0.06 80);
+  /* Accent */
+  --accent: var(--gold-500);
+  --accent-hover: var(--gold-400);
+  --accent-pressed: var(--gold-600);
+  --accent-soft: var(--gold-100);
+  --accent-fg: var(--navy-900);
+
+  /* States
+     --warning ≈7.4:1 on --surface-panel and ≈6.5:1 on --warning-soft. */
+  --success: var(--green-600);
+  --success-soft: var(--green-100);
+  --warning: var(--amber-600);
+  --warning-soft: var(--amber-100);
+  --destructive: var(--red-600);
+  --destructive-hover: var(--red-500);
+  --destructive-soft: var(--red-100);
+  --destructive-fg: var(--navy-900);
   --error: var(--red-600);
   --error-soft: var(--red-100);
 
-  /* ── Overlays ── */
-  --overlay: oklch(5% 0.01 245 / 0.72);
-  --overlay-light: oklch(10% 0.015 245 / 0.48);
+  /* Overlays */
+  --overlay: var(--overlay-strong-value);
+  --overlay-light: var(--overlay-light-value);
 
-  /* ── Shadows ── */
-  --shadow-sm:
-    0 1px 2px oklch(5% 0.01 245 / 0.3), 0 1px 3px oklch(5% 0.01 245 / 0.2);
-  --shadow-md:
-    0 4px 6px oklch(5% 0.01 245 / 0.35), 0 2px 4px oklch(5% 0.01 245 / 0.24);
-  --shadow-lg:
-    0 10px 15px oklch(5% 0.01 245 / 0.45), 0 4px 6px oklch(5% 0.01 245 / 0.28);
+  /* Shadows */
+  --shadow-sm: var(--shadow-elevation-sm);
+  --shadow-md: var(--shadow-elevation-md);
+  --shadow-lg: var(--shadow-elevation-lg);
 
-  /* ── TCG Card Colors (functional — filter pills, card badges) ── */
+  /* Chart roles */
+  --chart-1: var(--gold-500);
+  --chart-2: var(--red-600);
+  --chart-3: var(--green-600);
+  --chart-4: var(--navy-500);
+  --chart-5: var(--amber-600);
+  --chart-bar-fill: var(--navy-900);
+
+  /* ── Non-themable feature palettes ── */
+
+  /* TCG Card Colors (functional — filter pills, card badges) */
   --card-red:    oklch(55% 0.20 25);
   --card-blue:   oklch(50% 0.18 250);
   --card-green:  oklch(52% 0.18 150);
   --card-purple: oklch(48% 0.18 300);
   --card-black:  oklch(28% 0.01 245);
   --card-yellow: oklch(78% 0.18 90);
+  --card-yellow-fg: oklch(22% 0.04 245);
+  --card-accent-fallback: oklch(22% 0.04 245);
 
-  /* ── Holofoil spectrum (card inspection lighting) ── */
+  /* Holofoil spectrum (card inspection lighting) */
   --holo-red:         oklch(76% 0.12 25);
   --holo-gold:        oklch(84% 0.12 80);
   --holo-green:       oklch(80% 0.10 155);
@@ -107,7 +178,7 @@
   --holo-star-gold:   oklch(88% 0.10 85);
   --holo-star-cyan:   oklch(86% 0.08 210);
 
-  /* ── Game Board (dark testing environment) ──
+  /* Game Board (dark testing environment)
      All text tokens pass WCAG AA (4.5:1) against --gb-surface (9%).
      --gb-text-dim ≈5.2:1, --gb-text-muted ≈6.3:1, --gb-text-subtle ≈7.5:1 */
   --gb-bg:              oklch(5%   0.005 245);  /* page background */
@@ -142,40 +213,31 @@
   /* ── shadcn/ui compatibility aliases ──
      Maps our existing tokens to shadcn's expected variable names.
      See docs/design/BRANDING-GUIDELINES.md Section 3 for rationale. */
-  --background: var(--surface-base);
+  --background: var(--surface-page);
   --foreground: var(--text-primary);
-  --card: var(--surface-1);
+  --card: var(--surface-panel);
   --card-foreground: var(--text-primary);
-  --popover: var(--surface-1);
+  --popover: var(--surface-overlay);
   --popover-foreground: var(--text-primary);
-  --primary: var(--gold-500);
-  --primary-foreground: var(--navy-900);
-  --secondary: var(--surface-2);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
+  --secondary: var(--surface-raised);
   --secondary-foreground: var(--text-primary);
-  --muted: var(--surface-3);
+  --muted: var(--surface-inset);
   --muted-foreground: var(--text-secondary);
-  --accent: var(--gold-500);
-  --accent-foreground: var(--navy-900);
-  --destructive: var(--red-600);
-  --destructive-foreground: var(--navy-900);
-  --input: var(--border);
+  --accent-foreground: var(--accent-fg);
+  --destructive-foreground: var(--destructive-fg);
+  --input: var(--border-subtle);
   --ring: var(--border-focus);
-
-  /* ── shadcn chart colors (mapped to our palette) ── */
-  --chart-1: var(--gold-500);
-  --chart-2: var(--red-600);
-  --chart-3: var(--success);
-  --chart-4: var(--navy-500);
-  --chart-5: var(--warning);
 
   /* ── shadcn sidebar (mapped to our nav tokens) ── */
   --sidebar: var(--surface-nav);
   --sidebar-foreground: var(--text-primary);
-  --sidebar-primary: var(--gold-500);
-  --sidebar-primary-foreground: var(--navy-900);
-  --sidebar-accent: var(--surface-2);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-fg);
+  --sidebar-accent: var(--surface-raised);
   --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: var(--navy-700);
+  --sidebar-border: var(--border-subtle);
   --sidebar-ring: var(--border-focus);
 }
 
@@ -192,29 +254,27 @@
 
   /* Surfaces */
   --color-surface-nav:  var(--surface-nav);
-  --color-surface-base: var(--surface-base);
-  --color-surface-1:    var(--surface-1);
-  --color-surface-2:    var(--surface-2);
-  --color-surface-3:    var(--surface-3);
+  --color-surface-base: var(--surface-page);
+  --color-surface-1:    var(--surface-panel);
+  --color-surface-2:    var(--surface-raised);
+  --color-surface-3:    var(--surface-inset);
 
-  /* Navy */
-  --color-navy-900: var(--navy-900);
-  --color-navy-800: var(--navy-800);
-  --color-navy-700: var(--navy-700);
-  --color-navy-500: var(--navy-500);
-  --color-navy-200: var(--navy-200);
-  --color-navy-100: var(--navy-100);
+  /* Legacy utility names routed through semantic roles */
+  --color-navy-900: var(--accent-fg);
+  --color-navy-800: var(--surface-interactive);
+  --color-navy-700: var(--border-subtle);
+  --color-navy-500: var(--surface-subdued);
+  --color-navy-200: var(--surface-soft-strong);
+  --color-navy-100: var(--surface-soft);
 
-  /* Gold */
-  --color-gold-600: var(--gold-600);
-  --color-gold-500: var(--gold-500);
-  --color-gold-400: var(--gold-400);
-  --color-gold-100: var(--gold-100);
+  --color-gold-600: var(--accent-pressed);
+  --color-gold-500: var(--accent);
+  --color-gold-400: var(--accent-hover);
+  --color-gold-100: var(--accent-soft);
 
-  /* Red */
-  --color-red-600: var(--red-600);
-  --color-red-500: var(--red-500);
-  --color-red-100: var(--red-100);
+  --color-red-600: var(--destructive);
+  --color-red-500: var(--destructive-hover);
+  --color-red-100: var(--destructive-soft);
 
   /* Text — use as text-content-primary etc to avoid conflicts */
   --color-content-primary:   var(--text-primary);
@@ -224,7 +284,7 @@
   --color-content-inverse:   var(--text-inverse);
 
   /* Borders */
-  --color-border:        var(--border);
+  --color-border:        var(--border-subtle);
   --color-border-strong: var(--border-strong);
   --color-border-focus:  var(--border-focus);
 
@@ -378,7 +438,7 @@ html {
 
 body {
   overflow: hidden;
-  background: var(--surface-base);
+  background: var(--surface-page);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
@@ -390,14 +450,14 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--surface-2);
+  background: var(--surface-raised);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--navy-500);
+  background: var(--surface-subdued);
 }
 
 /* ─── Focus Visible ──────────────────────────────────────────── */
@@ -450,7 +510,7 @@ textarea:focus-visible,
 .admin-card-color-button[aria-pressed="true"][data-color="yellow"] {
   background-color: var(--card-yellow);
   border-color: var(--card-yellow);
-  color: var(--navy-900);
+  color: var(--card-yellow-fg);
 }
 
 /* ─── Card Utilities ────────────────────────────────────────── */

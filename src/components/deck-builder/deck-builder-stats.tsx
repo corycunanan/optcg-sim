@@ -52,7 +52,8 @@ function CostCurveChart({ costCurve }: { costCurve: Record<number, number> }) {
               className="w-full rounded-t transition-all duration-300"
               style={{
                 height,
-                background: count > 0 ? "var(--navy-900)" : "var(--surface-3)",
+                background:
+                  count > 0 ? "var(--chart-bar-fill)" : "var(--surface-inset)",
                 opacity: count > 0 ? 1 : 0.4,
               }}
             />
@@ -81,13 +82,16 @@ function ColorBreakdown({ breakdown, total }: { breakdown: Record<string, number
           <div key={color} className="flex items-center gap-2">
             <span
               className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ background: COLOR_VAR[color] || "var(--border)" }}
+              style={{ background: COLOR_VAR[color] || "var(--border-subtle)" }}
             />
             <span className="w-12 text-xs font-medium text-content-secondary">{color}</span>
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${pct}%`, background: COLOR_VAR[color] || "var(--border)" }}
+                style={{
+                  width: `${pct}%`,
+                  background: COLOR_VAR[color] || "var(--border-subtle)",
+                }}
               />
             </div>
             <span className="w-6 text-right text-xs font-bold tabular-nums text-content-secondary">
