@@ -174,7 +174,7 @@ export function LobbiesShell({ user }: LobbiesShellProps) {
             <section className="border-border bg-card flex min-h-72 flex-col justify-between rounded-lg border p-6">
               <div>
                 <Gamepad2 />
-                <h2 className="font-display text-content-primary mt-5 text-3xl uppercase">
+                <h2 className="mt-5 font-display text-3xl text-content-primary">
                   Room First
                 </h2>
                 <p className="text-content-secondary mt-3 max-w-xl text-sm leading-relaxed">

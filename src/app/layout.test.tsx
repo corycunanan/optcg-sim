@@ -20,9 +20,12 @@ vi.mock("next/font/google", () => {
   return {
     Geist: font,
     Geist_Mono: font,
-    DM_Serif_Display: font,
   };
 });
+
+vi.mock("next/font/local", () => ({
+  default: () => ({ variable: "test-display-font" }),
+}));
 
 vi.mock("@/lib/theme", () => ({
   THEME_COOKIE_NAME: "optcg-theme",

@@ -19,14 +19,23 @@
 :root {
   /* ── Primitive layer: default theme raw values ── */
 
-  /* Elevation steps */
-  --elevation-page: oklch(22% 0.04 245); /* page background — navy-900 */
-  --elevation-panel: oklch(27% 0.04 245); /* cards, panels */
-  --elevation-raised: oklch(32% 0.04 245); /* elevated panels */
-  --elevation-inset: oklch(37% 0.035 245); /* tags, dividers, inset areas */
-  --elevation-nav: oklch(18% 0.02 245); /* global navbar */
+  /* Desaturated elevation steps */
+  --elevation-page: oklch(14% 0.004 260); /* page background */
+  --elevation-panel: oklch(24% 0.004 260); /* cards, dialogs, menus */
+  --elevation-raised: oklch(28% 0.004 260); /* elevated and hover surfaces */
+  --elevation-inset: oklch(18% 0.004 260); /* inputs and recessed areas */
+  --elevation-nav: oklch(12% 0.004 260); /* global navbar */
 
-  /* Navy ramp */
+  /* Desaturated surface steps */
+  --surface-step-interactive: oklch(30% 0.004 260);
+  --surface-step-soft-strong: oklch(28% 0.004 260);
+  --surface-step-soft: oklch(21% 0.004 260);
+  --surface-step-subdued: oklch(46% 0.004 260);
+  --surface-step-ink: oklch(14% 0.004 260);
+
+  /* Preserved warm navy ramp
+     These values are intentionally retained for a future preset. The default
+     semantic layer below does not reference them. */
   --navy-900: oklch(22% 0.04 245); /* page base, deepest navy */
   --navy-800: oklch(30% 0.04 245); /* active and hover surfaces */
   --navy-700: oklch(42% 0.03 245); /* borders on dark surfaces */
@@ -35,44 +44,47 @@
   --navy-100: oklch(27% 0.03 245); /* soft navy surface */
 
   /* Gold ramp */
-  --gold-600: oklch(70% 0.14 75); /* pressed gold, text accents */
-  --gold-500: oklch(78% 0.14 75); /* primary CTAs, highlights, focus */
-  --gold-400: oklch(84% 0.12 75); /* hover on gold */
-  --gold-100: oklch(30% 0.05 75); /* soft gold surface */
+  --gold-700: oklch(68% 0.14 75); /* pressed gold fill */
+  --gold-600: oklch(78% 0.12 75); /* text and link accents */
+  --gold-500: oklch(72% 0.14 75); /* primary CTA fills, highlights, focus */
+  --gold-400: oklch(82% 0.1 75); /* hover on gold */
+  --gold-100: oklch(28% 0.035 75); /* soft gold surface */
 
   /* Red ramp */
-  --red-600: oklch(74% 0.2 25); /* emphasis, destructive */
-  --red-500: oklch(80% 0.18 25); /* hover on red */
-  --red-100: oklch(30% 0.06 25); /* soft red surface */
+  --red-600: oklch(70% 0.17 25); /* emphasis, destructive */
+  --red-500: oklch(76% 0.15 25); /* hover on red */
+  --red-100: oklch(28% 0.045 25); /* soft red surface */
 
-  /* Neutral text steps */
-  --neutral-98: oklch(98% 0.005 75); /* brightest text on deepest navy */
-  --neutral-96: oklch(96% 0.008 75); /* warm white body and headings */
-  --neutral-82: oklch(82% 0.01 75); /* secondary labels */
-  --neutral-75: oklch(75% 0.008 75); /* placeholder, hint text */
-  --neutral-66: oklch(66% 0.006 75); /* intentionally subdued */
+  /* Text steps */
+  --text-step-primary: #f4f6fb;
+  --text-step-secondary: rgba(255, 255, 255, 0.72);
+  --text-step-tertiary: rgba(255, 255, 255, 0.58);
+  --text-step-disabled: rgba(255, 255, 255, 0.42);
+  --text-step-inverse: #ffffff;
 
   /* Border steps */
-  --border-step-subtle: oklch(42% 0.03 245);
-  --border-step-strong: oklch(52% 0.035 245);
+  --border-step-subtle: rgba(255, 255, 255, 0.1);
+  --border-step-default: rgba(255, 255, 255, 0.14);
+  --border-step-emphasis: rgba(255, 255, 255, 0.16);
+  --border-step-strong: rgba(255, 255, 255, 0.18);
 
   /* State ramps */
-  --green-600: oklch(74% 0.16 155);
-  --green-100: oklch(30% 0.06 155);
-  --amber-600: oklch(78% 0.14 80);
-  --amber-100: oklch(31% 0.06 80);
+  --green-600: oklch(70% 0.15 150);
+  --green-100: oklch(27% 0.04 150);
+  --amber-600: oklch(80% 0.13 85);
+  --amber-100: oklch(28% 0.04 85);
 
   /* Overlay values */
-  --overlay-strong-value: oklch(5% 0.01 245 / 0.72);
-  --overlay-light-value: oklch(10% 0.015 245 / 0.48);
+  --overlay-strong-value: oklch(5% 0.004 260 / 0.76);
+  --overlay-light-value: oklch(8% 0.004 260 / 0.52);
 
   /* Shadow values */
   --shadow-elevation-sm:
-    0 1px 2px oklch(5% 0.01 245 / 0.3), 0 1px 3px oklch(5% 0.01 245 / 0.2);
+    0 1px 2px oklch(5% 0.004 260 / 0.32), 0 1px 3px oklch(5% 0.004 260 / 0.22);
   --shadow-elevation-md:
-    0 4px 6px oklch(5% 0.01 245 / 0.35), 0 2px 4px oklch(5% 0.01 245 / 0.24);
+    0 4px 6px oklch(5% 0.004 260 / 0.38), 0 2px 4px oklch(5% 0.004 260 / 0.26);
   --shadow-elevation-lg:
-    0 10px 15px oklch(5% 0.01 245 / 0.45), 0 4px 6px oklch(5% 0.01 245 / 0.28);
+    0 10px 15px oklch(5% 0.004 260 / 0.48), 0 4px 6px oklch(5% 0.004 260 / 0.3);
 
   /* ── Semantic layer: stable component-facing roles ── */
 
@@ -83,19 +95,19 @@
   --surface-raised: var(--elevation-raised);
   --surface-inset: var(--elevation-inset);
   --surface-nav: var(--elevation-nav);
-  --surface-interactive: var(--navy-800);
-  --surface-soft-strong: var(--navy-200);
-  --surface-soft: var(--navy-100);
-  --surface-subdued: var(--navy-500);
+  --surface-interactive: var(--surface-step-interactive);
+  --surface-soft-strong: var(--surface-step-soft-strong);
+  --surface-soft: var(--surface-step-soft);
+  --surface-subdued: var(--surface-step-subdued);
 
   /* Text
-     Real-content chrome text passes WCAG AA on the current dark elevations.
-     --text-tertiary ≈4.7:1 on --surface-inset (worst case), ≈7.8:1 on --surface-page. */
-  --text-primary: var(--neutral-96);
-  --text-secondary: var(--neutral-82);
-  --text-tertiary: var(--neutral-75);
-  --text-disabled: var(--neutral-66);
-  --text-inverse: var(--neutral-98);
+     Real-content chrome text passes WCAG AA on page, panel, and inset elevations.
+     Alpha text steps are evaluated after compositing over each surface. */
+  --text-primary: var(--text-step-primary);
+  --text-secondary: var(--text-step-secondary);
+  --text-tertiary: var(--text-step-tertiary);
+  --text-disabled: var(--text-step-disabled);
+  --text-inverse: var(--text-step-inverse);
 
   /* Borders */
   --border-subtle: var(--border-step-subtle);
@@ -105,12 +117,12 @@
   /* Accent */
   --accent: var(--gold-500);
   --accent-hover: var(--gold-400);
-  --accent-pressed: var(--gold-600);
+  --accent-pressed: var(--gold-700);
+  --accent-text: var(--gold-600);
   --accent-soft: var(--gold-100);
-  --accent-fg: var(--navy-900);
+  --accent-fg: var(--surface-step-ink);
 
-  /* States
-     --warning ≈7.4:1 on --surface-panel and ≈6.5:1 on --warning-soft. */
+  /* States */
   --success: var(--green-600);
   --success-soft: var(--green-100);
   --warning: var(--amber-600);
@@ -118,7 +130,7 @@
   --destructive: var(--red-600);
   --destructive-hover: var(--red-500);
   --destructive-soft: var(--red-100);
-  --destructive-fg: var(--navy-900);
+  --destructive-fg: var(--surface-step-ink);
   --error: var(--red-600);
   --error-soft: var(--red-100);
 
@@ -135,9 +147,9 @@
   --chart-1: var(--gold-500);
   --chart-2: var(--red-600);
   --chart-3: var(--green-600);
-  --chart-4: var(--navy-500);
+  --chart-4: var(--surface-step-subdued);
   --chart-5: var(--amber-600);
-  --chart-bar-fill: var(--navy-900);
+  --chart-bar-fill: var(--surface-step-ink);
 
   /* ── Non-themable feature palettes ── */
 
@@ -250,7 +262,7 @@
   /* Fonts */
   --font-sans:    var(--font-geist-sans);
   --font-mono:    var(--font-geist-mono);
-  --font-display: var(--font-dm-serif-display);
+  --font-display: var(--font-erode);
 
   /* Surfaces */
   --color-surface-nav:  var(--surface-nav);
@@ -267,7 +279,7 @@
   --color-navy-200: var(--surface-soft-strong);
   --color-navy-100: var(--surface-soft);
 
-  --color-gold-600: var(--accent-pressed);
+  --color-gold-600: var(--accent-text);
   --color-gold-500: var(--accent);
   --color-gold-400: var(--accent-hover);
   --color-gold-100: var(--accent-soft);
@@ -420,13 +432,13 @@
 }
 
 /* ─── Display Font Treatment ─────────────────────────────────── */
-/* All display headings are italic + uppercase by default.
-   See docs/design/BRANDING-GUIDELINES.md Section 4. */
+/* Display headings use Erode Semibold in sentence/title case. */
 
 .font-display {
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  font-weight: 600;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* ─── Base Styles ────────────────────────────────────────────── */

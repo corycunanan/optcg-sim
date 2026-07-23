@@ -39,7 +39,7 @@ export default async function CardEditPage({
         <span className="text-content-primary">Edit</span>
       </div>
 
-      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
+      <h1 className="mb-8 font-display text-3xl text-content-primary">
         Edit: {card.name}
         <span className="ml-2 text-lg font-normal text-content-tertiary">
           ({card.id})
