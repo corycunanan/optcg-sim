@@ -26,7 +26,7 @@ export default async function AdminPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8">
-      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight text-content-primary">
+      <h1 className="mb-8 font-display text-3xl text-content-primary">
         Dashboard
       </h1>
 

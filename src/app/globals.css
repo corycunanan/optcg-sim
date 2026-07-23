@@ -250,7 +250,7 @@
   /* Fonts */
   --font-sans:    var(--font-geist-sans);
   --font-mono:    var(--font-geist-mono);
-  --font-display: var(--font-dm-serif-display);
+  --font-display: var(--font-erode);
 
   /* Surfaces */
   --color-surface-nav:  var(--surface-nav);
@@ -420,13 +420,13 @@
 }
 
 /* ─── Display Font Treatment ─────────────────────────────────── */
-/* All display headings are italic + uppercase by default.
-   See docs/design/BRANDING-GUIDELINES.md Section 4. */
+/* Display headings use Erode Semibold in sentence/title case. */
 
 .font-display {
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  font-weight: 600;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* ─── Base Styles ────────────────────────────────────────────── */

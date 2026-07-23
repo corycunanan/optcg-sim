@@ -24,7 +24,7 @@ function PageHeaderContent({ children }: { children: React.ReactNode }) {
 
 function PageHeaderTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="font-display text-3xl font-bold tracking-tight text-content-inverse">
+    <h1 className="font-display text-3xl text-content-inverse">
       {children}
     </h1>
   );

@@ -31,19 +31,19 @@ export function Navbar() {
   const sandboxActive = pathname.startsWith("/sandbox");
 
   const triggerStyles =
-    "bg-transparent text-content-inverse/70 hover:bg-content-inverse/10 hover:text-content-inverse focus:bg-content-inverse/10 focus:text-content-inverse data-popup-open:bg-content-inverse/10 data-popup-open:text-content-inverse data-popup-open:hover:bg-content-inverse/15 data-open:bg-content-inverse/10 data-open:text-content-inverse data-open:hover:bg-content-inverse/15";
+    "bg-transparent text-base font-bold uppercase tracking-[0.04em] text-content-inverse/70 hover:bg-content-inverse/10 hover:text-content-inverse focus:bg-content-inverse/10 focus:text-content-inverse data-popup-open:bg-content-inverse/10 data-popup-open:text-content-inverse data-popup-open:hover:bg-content-inverse/15 data-open:bg-content-inverse/10 data-open:text-content-inverse data-open:hover:bg-content-inverse/15";
   const activeTriggerStyles =
     "bg-content-inverse/10 text-content-inverse hover:bg-content-inverse/15";
 
   const linkStyles =
-    "text-sm font-medium hover:bg-accent/10 focus:bg-accent/10 rounded-md px-3 py-2";
+    "rounded-md px-3 py-2 text-base font-bold uppercase tracking-[0.04em] hover:bg-accent/10 focus:bg-accent/10";
 
   return (
     <nav className="bg-surface-nav sticky top-0 z-40 flex h-16 shrink-0 items-center gap-8 border-b border-black/20 px-6">
       {/* Logo */}
       <DeckNavigationGuardLink
         href="/"
-        className="font-display text-content-inverse shrink-0 text-lg font-bold tracking-tight"
+        className="font-display shrink-0 text-lg text-content-inverse"
       >
         OPTCG
       </DeckNavigationGuardLink>
