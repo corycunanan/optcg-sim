@@ -139,7 +139,7 @@ export function SpotlightOverlay({
               <span className="text-gb-accent-amber text-base font-bold tracking-widest uppercase">
                 {copy.eyebrow}
               </span>
-              <DialogTitle className="font-display text-gb-text-bright text-3xl uppercase">
+              <DialogTitle className="font-display text-3xl text-gb-text-bright">
                 {copy.title}
               </DialogTitle>
             </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, DM_Serif_Display } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { SessionProvider } from "next-auth/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Navbar } from "@/components/nav/navbar";
@@ -19,11 +20,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const dmSerifDisplay = DM_Serif_Display({
-  variable: "--font-dm-serif-display",
-  subsets: ["latin"],
-  weight: ["400"],
-  style: ["normal", "italic"],
+const erode = localFont({
+  src: [
+    {
+      path: "./fonts/Erode-Variable.woff2",
+      weight: "300 700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-erode",
   display: "swap",
 });
 
@@ -41,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${dmSerifDisplay.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${erode.variable} antialiased`}
       >
         <SessionProvider>
           <UserChannelProvider>

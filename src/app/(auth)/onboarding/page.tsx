@@ -61,7 +61,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="font-display text-content-primary text-4xl leading-tight font-bold tracking-tight">
+          <h1 className="font-display text-4xl leading-tight text-content-primary">
             Welcome aboard!
           </h1>
           <p className="text-content-tertiary mt-2 text-sm">

@@ -71,7 +71,7 @@ export default function SandboxHubPage() {
 
       <div className="mx-auto w-full max-w-5xl space-y-12 px-6 py-8">
         <section>
-          <h2 className="font-display text-content-primary mb-4 text-xl font-bold tracking-tight">
+          <h2 className="mb-4 font-display text-xl text-content-primary">
             Layout Reference
           </h2>
           <Link
@@ -96,7 +96,7 @@ export default function SandboxHubPage() {
           const items = grouped[cat];
           return (
             <section key={cat}>
-              <h2 className="font-display text-content-primary mb-4 text-xl font-bold tracking-tight">
+              <h2 className="mb-4 font-display text-xl text-content-primary">
                 {CATEGORY_LABELS[cat]}
               </h2>
 
