@@ -44,7 +44,7 @@ export default async function CardDetailPage({
   if (!card) notFound();
 
   const primaryColor = card.color[0] || "Black";
-  const accentColor = COLOR_ACCENT[primaryColor] || "var(--accent-fg)";
+  const accentColor = COLOR_ACCENT[primaryColor] || "var(--card-accent-fallback)";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8">

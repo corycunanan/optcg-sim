@@ -53,7 +53,7 @@ function CostCurveChart({ costCurve }: { costCurve: Record<number, number> }) {
               style={{
                 height,
                 background:
-                  count > 0 ? "var(--accent-fg)" : "var(--surface-inset)",
+                  count > 0 ? "var(--chart-bar-fill)" : "var(--surface-inset)",
                 opacity: count > 0 ? 1 : 0.4,
               }}
             />

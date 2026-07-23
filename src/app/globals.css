@@ -11,8 +11,9 @@
       change inside a theme selector. Components and Tailwind colors must
       consume semantic tokens, never primitives directly.
 
-   The six TCG card colors, holofoil palette, and game-board context are
-   functional feature palettes. They are intentionally non-themable.
+   The TCG card, holofoil, and game-board feature-palette tokens are
+   intentionally non-themable. They are direct feature contracts, not
+   theme primitives, and must never be overridden by data-theme selectors.
    ─────────────────────────────────────────────────────────────── */
 
 :root {
@@ -136,6 +137,7 @@
   --chart-3: var(--green-600);
   --chart-4: var(--navy-500);
   --chart-5: var(--amber-600);
+  --chart-bar-fill: var(--navy-900);
 
   /* ── Non-themable feature palettes ── */
 
@@ -146,6 +148,8 @@
   --card-purple: oklch(48% 0.18 300);
   --card-black:  oklch(28% 0.01 245);
   --card-yellow: oklch(78% 0.18 90);
+  --card-yellow-fg: oklch(22% 0.04 245);
+  --card-accent-fallback: oklch(22% 0.04 245);
 
   /* Holofoil spectrum (card inspection lighting) */
   --holo-red:         oklch(76% 0.12 25);
@@ -506,7 +510,7 @@ textarea:focus-visible,
 .admin-card-color-button[aria-pressed="true"][data-color="yellow"] {
   background-color: var(--card-yellow);
   border-color: var(--card-yellow);
-  color: var(--accent-fg);
+  color: var(--card-yellow-fg);
 }
 
 /* ─── Card Utilities ────────────────────────────────────────── */
