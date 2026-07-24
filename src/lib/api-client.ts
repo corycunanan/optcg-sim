@@ -13,7 +13,8 @@ import type { ZodType } from "zod";
 export class ApiError extends Error {
   constructor(
     message: string,
-    public status: number
+    public status: number,
+    public body: Record<string, unknown> = {}
   ) {
     super(message);
     this.name = "ApiError";
@@ -59,7 +60,7 @@ async function request<T>(
     const error = isRecord(json) ? json.error : undefined;
     const message =
       typeof error === "string" ? error : `Request failed (${res.status})`;
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, isRecord(json) ? json : {});
   }
 
   if (schema) {

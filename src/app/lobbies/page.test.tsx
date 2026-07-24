@@ -92,6 +92,22 @@ describe("/lobbies code resolver", () => {
     );
   });
 
+  it("keeps a code link non-destructive until the host confirms in the dialog", async () => {
+    joinLobbyByCodeMock.mockResolvedValue({
+      kind: "confirmation_required",
+      currentLobbyId: "personal-lobby",
+      targetCode: "ABC123",
+      guestName: "Nami",
+      hasPendingInvite: false,
+    });
+
+    await expect(
+      LobbiesPage({ searchParams: Promise.resolve({ code: "ABC123" }) })
+    ).rejects.toThrow("redirect:/lobbies/personal-lobby?joinCode=ABC123");
+
+    expect(publishLobbyJoinMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["invalid_code", "Invalid%20lobby%20code"],
     ["not_found", "Lobby%20not%20found%20or%20already%20started"],

@@ -32,11 +32,23 @@ export async function POST(request: NextRequest) {
     if (isErrorResponse(parsed)) return parsed;
     const result = await joinLobbyByCode({ userId, ...parsed });
 
+    if (result.kind === "confirmation_required") {
+      return apiError("Switching parties requires confirmation", 409, {
+        code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+        details: {
+          currentLobbyId: result.currentLobbyId,
+          targetCode: result.targetCode,
+          guestName: result.guestName,
+          hasPendingInvite: result.hasPendingInvite,
+        },
+      });
+    }
+
     if (result.kind !== "joined") {
       const status =
         result.kind === "invalid_code"
           ? 400
-          : result.kind === "not_found"
+          : result.kind === "not_found" || result.kind === "invite_not_found"
             ? 404
             : 409;
       return apiError(lobbyJoinFailureMessage(result.kind), status, {

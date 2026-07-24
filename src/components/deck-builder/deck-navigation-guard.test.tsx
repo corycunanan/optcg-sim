@@ -7,7 +7,14 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   apiGet: vi.fn(),
   apiPost: vi.fn(),
-  subscribe: vi.fn(() => vi.fn()),
+  subscribe:
+    vi.fn<
+      (
+        type: string,
+        handler: (event: Record<string, unknown>) => void
+      ) => () => void
+    >(),
+  subscribers: new Map<string, (event: Record<string, unknown>) => void>(),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
 }));
@@ -25,7 +32,14 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/api-client", () => ({
   ApiError: class ApiError extends Error {
-    status = 500;
+    constructor(
+      message: string,
+      public status = 500,
+      public body: Record<string, unknown> = {}
+    ) {
+      super(message);
+      this.name = "ApiError";
+    }
   },
   apiGet: mocks.apiGet,
   apiPost: mocks.apiPost,
@@ -92,13 +106,13 @@ vi.mock("@/components/ui/alert-dialog", async () => {
       onClick,
     }: {
       children: React.ReactNode;
-      onClick?: () => void;
+      onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
     }) => {
       const onOpenChange = React.useContext(DialogContext);
       return (
         <button
-          onClick={() => {
-            onClick?.();
+          onClick={(event) => {
+            onClick?.(event);
             onOpenChange?.(false);
           }}
         >
@@ -111,13 +125,13 @@ vi.mock("@/components/ui/alert-dialog", async () => {
       onClick,
     }: {
       children: React.ReactNode;
-      onClick?: () => void;
+      onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
     }) => {
       const onOpenChange = React.useContext(DialogContext);
       return (
         <button
-          onClick={() => {
-            onClick?.();
+          onClick={(event) => {
+            onClick?.(event);
             onOpenChange?.(false);
           }}
         >
@@ -136,6 +150,7 @@ import {
 } from "./deck-navigation-guard";
 import { Navbar } from "@/components/nav/navbar";
 import { LobbyInviteToasts } from "@/components/lobbies/lobby-invite-toast";
+import { ApiError } from "@/lib/api-client";
 import {
   createInitialState,
   deckBuilderReducer,
@@ -348,7 +363,16 @@ beforeEach(() => {
   mocks.push.mockReset();
   mocks.apiGet.mockReset();
   mocks.apiPost.mockReset();
-  mocks.subscribe.mockClear();
+  mocks.subscribers.clear();
+  mocks.subscribe.mockReset();
+  mocks.subscribe.mockImplementation(
+    (type: string, handler: (event: Record<string, unknown>) => void) => {
+      mocks.subscribers.set(type, handler);
+      return () => {
+        mocks.subscribers.delete(type);
+      };
+    }
+  );
   mocks.toastError.mockReset();
   mocks.toastInfo.mockReset();
   mocks.apiGet.mockResolvedValue({
@@ -822,9 +846,76 @@ describe("deck builder navigation guard", () => {
 
     expect(mocks.apiPost).toHaveBeenCalledOnce();
     expect(mocks.apiPost).toHaveBeenCalledWith(
-      "/api/lobby-invites/invite-1/accept"
+      "/api/lobby-invites/invite-1/accept",
+      {}
     );
     expect(mocks.push).toHaveBeenCalledWith("/lobbies/lobby-1");
+  });
+
+  it("uses the party-switch confirmation before accepting a hosted invite", async () => {
+    mocks.apiPost
+      .mockRejectedValueOnce(
+        new ApiError("Switching parties requires confirmation", 409, {
+          code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+          details: {
+            currentLobbyId: "current-lobby",
+            targetCode: "ABC123",
+            guestName: "Nami",
+            hasPendingInvite: false,
+          },
+        })
+      )
+      .mockResolvedValueOnce({ data: { lobbyId: "lobby-1" } });
+    await renderGuard(<LobbyInviteToasts />, false);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => button("Join")?.props.onClick());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(button("Disband & join")).toBeDefined();
+    expect(JSON.stringify(renderer?.toJSON())).toContain("Nami");
+
+    await act(async () =>
+      button("Disband & join")?.props.onClick({ preventDefault: vi.fn() })
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiPost).toHaveBeenNthCalledWith(
+      2,
+      "/api/lobby-invites/invite-1/accept",
+      { confirmDisbandLobbyId: "current-lobby" }
+    );
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies/lobby-1");
+  });
+
+  it("explains a party disband and resolves the ex-guest to Play", async () => {
+    await renderGuard(<LobbyInviteToasts />, false);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      mocks.subscribers.get("lobby:party_disbanded")?.({
+        type: "lobby:party_disbanded",
+        lobbyId: "current-lobby",
+        hostName: "Luffy",
+      });
+    });
+
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "Luffy disbanded the party. You've been returned to your own lobby."
+    );
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
   });
 
   it("still prompts after an edit made while a save request was pending", async () => {

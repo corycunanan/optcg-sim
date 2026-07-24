@@ -82,7 +82,8 @@ export type RealtimeServerEvent =
    * or started the game). Sent to the recipient so a still-visible toast
    * auto-dismisses.
    */
-  | { type: "lobby:invite_canceled"; inviteId: string };
+  | { type: "lobby:invite_canceled"; inviteId: string }
+  | { type: "lobby:party_disbanded"; lobbyId: string; hostName: string };
 
 /**
  * Client → server vocabulary. Routed by `UserChannel.webSocketMessage` on

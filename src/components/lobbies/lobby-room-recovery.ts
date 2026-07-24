@@ -25,7 +25,7 @@ export function lobbyRoomRecovery(
   if (lobby.status === "CLOSED") {
     return {
       route: "/lobbies",
-      message: "The host closed the lobby",
+      message: "You're no longer in this party",
     };
   }
   return null;
