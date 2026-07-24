@@ -68,7 +68,7 @@ function buildRequest() {
   return {
     request: new NextRequest(
       `http://localhost/api/lobby-invites/${INVITE_ID}/accept`,
-      { method: "POST" },
+      { method: "POST" }
     ),
     params: Promise.resolve({ id: INVITE_ID }),
   };
@@ -228,6 +228,9 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(410);
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Invite has expired",
+    });
     expect(inviteUpdateManyMock).toHaveBeenCalledWith({
       where: { id: INVITE_ID, status: "PENDING" },
       data: { status: "EXPIRED" },
@@ -265,7 +268,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
       new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
         code: "P2002",
         clientVersion: "test",
-      }),
+      })
     );
     const { request, params } = buildRequest();
 

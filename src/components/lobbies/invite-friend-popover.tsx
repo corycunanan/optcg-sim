@@ -28,9 +28,10 @@ interface FriendEntry {
 
 interface Props {
   lobbyId: string;
+  onInviteSent?: () => void;
 }
 
-export function InviteFriendPopover({ lobbyId }: Props) {
+export function InviteFriendPopover({ lobbyId, onInviteSent }: Props) {
   const [open, setOpen] = useState(false);
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,6 +77,7 @@ export function InviteFriendPopover({ lobbyId }: Props) {
     try {
       await apiPost(`/api/lobbies/${lobbyId}/invite`, { toUserId: user.id });
       setInvited((prev) => new Set(prev).add(user.id));
+      onInviteSent?.();
       toast.success(`Invited ${displayName(user)}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Invite failed");
@@ -129,7 +131,9 @@ export function InviteFriendPopover({ lobbyId }: Props) {
                   <UserAvatar user={user} size="sm" />
                   <span className="flex-1 truncate">{displayName(user)}</span>
                   {alreadyInvited ? (
-                    <span className="text-content-tertiary text-xs">Invited</span>
+                    <span className="text-content-tertiary text-xs">
+                      Invited
+                    </span>
                   ) : (
                     <Button
                       variant="ghost"

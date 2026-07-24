@@ -47,6 +47,26 @@ export async function buildLobbyRoomState(
           },
         },
       },
+      invites: {
+        where: {
+          status: "PENDING",
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+        take: 1,
+        select: {
+          id: true,
+          expiresAt: true,
+          toUser: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+      },
       gameSessions: {
         orderBy: [{ startedAt: "desc" }, { id: "desc" }],
         take: 1,
@@ -115,6 +135,13 @@ export async function buildLobbyRoomState(
           guestReady: lobby.guest.guestReady,
           user: lobby.guest.user,
           deck: guestDeck,
+        }
+      : null,
+    pendingInvite: lobby.invites[0]
+      ? {
+          id: lobby.invites[0].id,
+          expiresAt: lobby.invites[0].expiresAt.toISOString(),
+          user: lobby.invites[0].toUser,
         }
       : null,
     gameId: lobby.gameSessions[0]?.id ?? null,

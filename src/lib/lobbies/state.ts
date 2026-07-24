@@ -57,6 +57,16 @@ export interface LobbyRoomState {
     };
     deck: LobbyRoomDeck | null;
   } | null;
+  pendingInvite?: {
+    id: string;
+    expiresAt: string;
+    user: {
+      id: string;
+      username: string | null;
+      name: string | null;
+      image: string | null;
+    };
+  } | null;
   gameId: string | null;
   gameStatus?: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
 }

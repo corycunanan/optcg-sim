@@ -35,6 +35,7 @@ type AcceptOutcome =
   | { kind: "not_found" }
   | { kind: "forbidden" }
   | { kind: "gone" }
+  | { kind: "expired" }
   | { kind: "self" }
   | { kind: "mode" }
   | { kind: "started" }
@@ -78,7 +79,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
           where: { id: invite.id, status: "PENDING" },
           data: { status: "EXPIRED" },
         });
-        return { kind: "gone" };
+        return { kind: "expired" };
       }
 
       const lobby = await tx.lobby.findUnique({
@@ -173,6 +174,8 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       return apiError("Forbidden", 403);
     case "gone":
       return apiError("Invite is no longer active", 410);
+    case "expired":
+      return apiError("Invite has expired", 410);
     case "self":
       return apiError("You cannot accept an invite to your own lobby", 409);
     case "mode":
