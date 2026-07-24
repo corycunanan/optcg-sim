@@ -1,6 +1,6 @@
 # OPTCG Simulator — Branding Guidelines
 
-> Design system foundation for M5 UI Overhaul. This document defines the visual language, token values, component patterns, and motion standards that will be implemented via shadcn/ui + motion.dev. It serves as the single source of truth for all design decisions.
+> Shipped design-system reference for the M5 UI Overhaul. This document records the visual language, theming architecture, component patterns, and motion standards implemented with shadcn/ui + motion.dev. Token declarations in `src/app/globals.css` are the source of truth when this guide and the implementation differ.
 
 ---
 
@@ -49,7 +49,7 @@ The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and 
 |---|---|---|
 | **Blade/section architecture** — full-width sections with `max-width: 1920px` content containers and responsive spacer variables | Adopt the section + constrained content model with our own width tiers | Gives pages a cinematic structure; card art can bleed to full width while text stays readable |
 | **Button ornamental outline** — `outline: 1px solid; outline-offset: 3px` on primary/secondary CTAs | Apply to hero CTAs only (not utility buttons) using gold outline | Premium feel for key actions without visual noise on everyday UI |
-| **Dramatic display serif** — "Beaufort for LOL" at 900 weight, uppercase, for headlines | DM Serif Display (400 + italic), uppercase — high-contrast serif for the same dramatic gravitas | Same energy: bold, commanding, epic. Serif adds warmth and adventure that a condensed sans lacks. |
+| **Dramatic display serif** — "Beaufort for LOL" at 900 weight, uppercase, for headlines | Erode variable (600 display treatment), uppercase — expressive serif structure with confident contrast | Same energy: bold, commanding, epic. Erode adds warmth and adventure with a consistent upright treatment. |
 | **Carousel with progress bar** — Embla-based, 3-up/2-up/1-up responsive, thin progress indicator + arrow buttons | Adopt for card gallery, set browser, deck showcase sections | Proven TCG card browsing pattern with smooth touch interaction |
 | **Card hover scale** — `transform: scale(1.1)` on image within card, 0.3s ease-in-out | Adopt at `scale(1.03)` — more subtle, befitting our warmer aesthetic | Communicates interactivity without aggressive zoom |
 | **Backdrop pattern** — background media + stacked overlay layers for readability | Adopt for hero sections (home page, set showcase) | Allows hero imagery while maintaining text legibility |
@@ -74,64 +74,85 @@ The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and 
 
 ### Philosophy
 
-Dark-only, warm, and alive. Navy provides the page foundation and elevation hierarchy. Warm-white text preserves approachability, gold carries primary interaction and premium moments, and red brings One Piece energy. Six TCG card colors remain purely functional.
+Dark-only, warm, and alive. The shipped default retains the warm navy foundation and original bright-gold CTA ramp. Near-white and white-alpha text preserve hierarchy, gold carries primary interaction and premium moments, and red brings One Piece energy. Components consume semantic roles; raw palette primitives are implementation inputs, not component APIs.
 
 ### Palette
 
-#### Core Palette (dark-only foundation)
+#### Semantic surfaces (component-facing)
 
 | Token | Value | Role |
 |-------|-------|------|
-| `--surface-base` | `oklch(22% 0.040 245)` | Page background — exact navy-900              |
-| `--surface-1`    | `oklch(27% 0.040 245)` | Cards, panels — first elevation               |
-| `--surface-2`    | `oklch(32% 0.040 245)` | Elevated panels, input backgrounds            |
-| `--surface-3`    | `oklch(37% 0.035 245)` | Tags, dividers, inset areas                   |
-| `--surface-nav`  | `oklch(18% 0.020 245)` | Global navbar — distinct navy-charcoal anchor |
+| `--surface-page` | `oklch(22% 0.04 245)` | Page background |
+| `--surface-panel` | `oklch(27% 0.04 245)` | Cards, dialogs, and menus |
+| `--surface-overlay` | `oklch(27% 0.04 245)` | Popovers and overlay panels |
+| `--surface-raised` | `oklch(32% 0.04 245)` | Elevated and hover surfaces |
+| `--surface-inset` | `oklch(37% 0.035 245)` | Inputs and recessed areas |
+| `--surface-nav` | `oklch(18% 0.02 245)` | Global navbar |
+| `--surface-interactive` | `oklch(30% 0.04 245)` | Active and hover controls |
+| `--surface-soft-strong` | `oklch(34% 0.035 245)` | Strong soft surface |
+| `--surface-soft` | `oklch(27% 0.03 245)` | Selected rows and active tabs |
+| `--surface-subdued` | `oklch(58% 0.04 245)` | Subdued elements and data visualization |
 
-#### Navy (foundation + structure)
+#### Default-theme primitives (theme authors only)
+
+| Token | Value | Semantic role |
+|-------|-------|-------|
+| `--elevation-page` | `oklch(22% 0.04 245)` | `--surface-page` |
+| `--elevation-panel` | `oklch(27% 0.04 245)` | `--surface-panel`, `--surface-overlay` |
+| `--elevation-raised` | `oklch(32% 0.04 245)` | `--surface-raised` |
+| `--elevation-inset` | `oklch(37% 0.035 245)` | `--surface-inset` |
+| `--elevation-nav` | `oklch(18% 0.02 245)` | `--surface-nav` |
+
+#### Gold semantics (interaction + treasure)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--navy-900` | `oklch(22% 0.040 245)` | Page base, deepest navy                           |
-| `--navy-800` | `oklch(30% 0.04 245)` | Active and hover surfaces |
-| `--navy-700` | `oklch(42% 0.03 245)`  | Borders on dark surfaces                          |
-| `--navy-500` | `oklch(58% 0.04 245)`  | Subdued/secondary elements and data visualization |
-| `--navy-200` | `oklch(34% 0.035 245)` | Stronger soft navy surface                        |
-| `--navy-100` | `oklch(27% 0.030 245)` | Soft navy surface (selected rows, active tabs)    |
+| `--accent` / `--border-focus` | `oklch(78% 0.14 75)` | Primary CTA fills, highlights, and focus rings |
+| `--accent-hover` | `oklch(84% 0.12 75)` | Hover on gold fills |
+| `--accent-pressed` | `oklch(70% 0.14 75)` | Pressed gold fill |
+| `--accent-text` | `oklch(78% 0.12 75)` | Gold text and links; distinct from the fill color |
+| `--accent-soft` | `oklch(30% 0.05 75)` | Premium callout surface |
+| `--accent-fg` | `oklch(22% 0.04 245)` | Foreground on gold and destructive fills |
+| `--accent-border` | `oklch(45% 0.06 75)` | Reserved decorative border for navbar/social refreshes (OPT-534/OPT-535) |
 
-#### Gold (primary interaction + treasure, premium)
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--gold-500` | `oklch(78% 0.14 75)` | Primary CTAs, highlights, focus rings, ornamental outlines |
-| `--gold-400` | `oklch(84% 0.12 75)` | Hover on gold elements                                     |
-| `--gold-100` | `oklch(30% 0.05 75)` | Soft gold surface for premium callouts                     |
+`--accent-border` is decorative only. Its contrast against `--surface-nav` is approximately 2.5:1, so it must not carry text, focus, control-boundary, or other accessibility-critical meaning.
 
 #### Red (energy, emphasis, destructive)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--red-600` | `oklch(74% 0.20 25)` | Emphasis, destructive actions, error states |
-| `--red-500` | `oklch(80% 0.18 25)` | Hover on red elements                       |
-| `--red-100` | `oklch(30% 0.06 25)` | Soft red surface for error callouts         |
+| `--destructive` / `--error` | `oklch(70% 0.17 25)` | Emphasis, destructive actions, and errors |
+| `--destructive-hover` | `oklch(76% 0.15 25)` | Hover on destructive fills |
+| `--destructive-soft` / `--error-soft` | `oklch(28% 0.045 25)` | Destructive and error callout surface |
+| `--destructive-fg` | `oklch(22% 0.04 245)` | Foreground on destructive fills |
 
 #### Text Hierarchy
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--text-primary`   | `oklch(96% 0.008 75)` | Body text, headings — warm white          |
-| `--text-secondary` | `oklch(82% 0.010 75)` | Secondary labels, metadata                |
-| `--text-tertiary`  | `oklch(75% 0.008 75)` | Placeholder, hint text                    |
-| `--text-disabled`  | `oklch(66% 0.006 75)` | Disabled elements — intentionally subdued |
-| `--text-inverse`   | `oklch(98% 0.005 75)` | Brightest text on deepest navy surfaces   |
+| `--text-primary` | `#f4f6fb` | Body text and headings |
+| `--text-secondary` | `rgba(255, 255, 255, 0.72)` | Secondary labels and metadata |
+| `--text-tertiary` | `rgba(255, 255, 255, 0.58)` | Placeholder and hint text |
+| `--text-disabled` | `rgba(255, 255, 255, 0.42)` | Disabled content |
+| `--text-inverse` | `#ffffff` | Brightest/inverse text |
+
+#### Borders
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--border-subtle` | `rgba(255, 255, 255, 0.10)` | Default component separation and shadcn input borders |
+| `--border-strong` | `rgba(255, 255, 255, 0.18)` | Emphasized boundaries |
+| `--border-focus` | `oklch(78% 0.14 75)` | Accessible focus indication |
+
+The primitive border steps are white alpha values at 0.10, 0.14, 0.16, and 0.18. Components use the semantic border roles above, not those primitive steps.
 
 #### Semantic Colors
 
 | Token | Value | Role |
 |-------|-------|------|
-| `--success` / `--success-soft` | `oklch(74% 0.16 155)` / `oklch(30% 0.06 155)` | Positive feedback |
-| `--warning` / `--warning-soft` | `oklch(78% 0.14 80)` / `oklch(31% 0.06 80)`   | Cautionary states |
-| `--error` / `--error-soft`     | `var(--red-600)` / `var(--red-100)`           | Error states      |
+| `--success` / `--success-soft` | `oklch(70% 0.15 150)` / `oklch(27% 0.04 150)` | Positive feedback |
+| `--warning` / `--warning-soft` | `oklch(80% 0.13 85)` / `oklch(28% 0.04 85)` | Cautionary states |
+| `--error` / `--error-soft` | `oklch(70% 0.17 25)` / `oklch(28% 0.045 25)` | Error states |
 
 #### TCG Card Colors (functional only)
 
@@ -144,32 +165,34 @@ Dark-only, warm, and alive. Navy provides the page foundation and elevation hier
 | Black | `--card-black` | `oklch(28% 0.01 245)` |
 | Yellow | `--card-yellow` | `oklch(78% 0.18 90)` |
 
+`--card-yellow-fg` (`oklch(22% 0.04 245)`) and `--card-accent-fallback` (`oklch(22% 0.04 245)`) complete this functional palette.
+
+#### Preset-ready desaturated primitives
+
+The redesign artifact's low-chroma surfaces remain in `globals.css` as unused `--desaturated-*` primitives. They are preserved for a future registered preset and are not referenced by the default semantic layer. Their elevation values are page `oklch(14% 0.004 260)`, panel `oklch(24% 0.004 260)`, raised `oklch(28% 0.004 260)`, inset `oklch(18% 0.004 260)`, and nav `oklch(12% 0.004 260)`; matching interactive/soft/subdued/ink steps are declared alongside them. Do not consume these primitives from components.
+
 ### shadcn CSS Variable Mapping
 
-These aliases will be added to `globals.css` for shadcn component compatibility:
+These shipped aliases map shadcn roles to the semantic layer:
 
 ```css
 :root {
-  /* shadcn required variables — mapped to our existing tokens */
-  --background: var(--surface-base);
+  --background: var(--surface-page);
   --foreground: var(--text-primary);
-  --card: var(--surface-1);
+  --card: var(--surface-panel);
   --card-foreground: var(--text-primary);
-  --popover: var(--surface-1);
+  --popover: var(--surface-overlay);
   --popover-foreground: var(--text-primary);
-  --primary: var(--gold-500);
-  --primary-foreground: var(--navy-900);
-  --secondary: var(--surface-2);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-fg);
+  --secondary: var(--surface-raised);
   --secondary-foreground: var(--text-primary);
-  --muted: var(--surface-3);
+  --muted: var(--surface-inset);
   --muted-foreground: var(--text-secondary);
-  --accent: var(--gold-500);
-  --accent-foreground: var(--navy-900);
-  --destructive: var(--red-600);
-  --destructive-foreground: var(--navy-900);
-  --input: var(--border);
+  --accent-foreground: var(--accent-fg);
+  --destructive-foreground: var(--destructive-fg);
+  --input: var(--border-subtle);
   --ring: var(--border-focus);
-  --radius: 0.5rem; /* 8px — our rounded-md default */
 }
 ```
 
@@ -179,12 +202,35 @@ All color pairings must meet WCAG AA (4.5:1 for normal text, 3:1 for large text)
 
 | Foreground | Background | Ratio | Status |
 |------------|------------|-------|--------|
-| `--text-primary`   | `--surface-base` | ~15.4:1 | Pass   |
-| `--text-secondary` | `--surface-3`    | ~5.9:1  | Pass   |
-| `--text-tertiary`  | `--surface-3`    | ~4.7:1  | Pass   |
-| `--gold-500`       | `--surface-base` | ~8.5:1  | Pass   |
-| `--navy-900`       | `--gold-500`     | ~8.5:1  | Pass   |
-| `--navy-900`       | `--red-600`      | ~6.3:1  | Pass   |
+| `--text-primary` | page / panel / inset surfaces | 15.98 / 13.89 / 9.60 | Pass |
+| `--text-secondary` | page / panel / inset surfaces | 9.36 / 8.44 / 6.29 | Pass |
+| `--text-tertiary` | page / panel / inset surfaces | 6.49 / 6.00 / 4.71 | Pass |
+| `--accent-text` | page / panel / inset surfaces | 8.50 / 7.39 / 5.11 | Pass |
+| `--accent-fg` | `--accent` | 8.47 | Pass |
+| `--success` / `--warning` / `--destructive` | Matching soft surface | 5.91 / 7.77 / 5.15 | Pass |
+| `--border-focus` | page / panel / inset surfaces | 8.47 / 7.36 / 5.09 | Pass (3:1 minimum) |
+
+Ratios are the output of `pnpm run check:contrast` against the 19-pair manifest in `scripts/contrast-pairs.json`; alpha foregrounds are composited over each opaque surface before measurement.
+
+---
+
+## Theming
+
+### Two-layer contract
+
+1. **Primitive layer:** `:root` owns every raw themeable value for the default theme. A non-default preset uses `html[data-theme="<name>"]` and overrides primitives only.
+2. **Semantic layer:** stable roles such as `--surface-page`, `--surface-panel`, `--border-subtle`, `--accent`, and `--accent-fg` point to primitives. Components and Tailwind mappings consume these semantic roles; theme selectors never redefine them.
+3. **Default rendering:** `default` is the `:root` palette and produces no `data-theme` attribute on `<html>`.
+
+`THEME_REGISTRY` currently contains only `default`. Adding a non-default theme requires both a registry entry (`src/lib/theme.ts`) and a matching `html[data-theme="..."]` primitive override block in `globals.css`. Each registered theme must pass `pnpm run check:contrast`. When a new semantic foreground/background combination is introduced, add it to `scripts/contrast-pairs.json`; `pnpm lint` runs the contrast gate in CI.
+
+### Preference and SSR plumbing
+
+The user's registered theme is stored in the database. The `optcg-theme` cookie mirrors it for SSR (`httpOnly`, `SameSite=Lax`, one-year maximum age, secure in production). The root layout resolves the cookie and stamps non-default themes on `<html>` before paint. After authentication, `ThemeReconciler` compares the session-backed database preference with the rendered theme, refreshes the cookie through `/api/user/theme` when needed, and reloads once so the next SSR response is authoritative.
+
+### Non-themable feature palettes
+
+Theme selectors must not override the six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, the complete `--holo-*` holofoil palette, or the game-board `--gb-*` context. These are direct feature contracts with independent accessibility and visual requirements.
 
 ---
 
@@ -194,14 +240,14 @@ All color pairings must meet WCAG AA (4.5:1 for normal text, 3:1 for large text)
 
 | Role | Font | Weights / Styles | Usage |
 |------|------|------------------|-------|
-| **Display** | DM Serif Display | 400, 400 italic | Page titles, section headers, hero text. Uppercase. Italic for featured callouts and pull-quotes. |
+| **Display** | Erode variable (self-hosted WOFF2) | 300–700 available; 600 treatment | Page titles, section headers, and hero text. Normal style, uppercase, `0.025em` letter spacing. |
 | **Body** | Geist Sans | 400, 500, 600 | All body text, labels, UI elements, navigation |
 | **Mono** | Geist Mono | 400 | Code, card IDs, technical data |
 
 ### Why These Fonts
 
-- **DM Serif Display** is a high-contrast display serif designed specifically for large headline sizes — the same role Riftbound's "Beaufort for LOL" plays. It's bold by default (single 400 weight that reads as bold), dramatic in uppercase, and has a striking italic variant for featured moments and pull-quotes. The serif character adds gravitas and warmth that a condensed sans cannot match, grounding the brand in something more epic and adventurous.
-- **Geist Sans** is a modern geometric sans with excellent screen rendering. The contrast between a dramatic serif display and a clean geometric body creates visual tension — the same energy Riftbound achieves with Beaufort + TT Norms Pro Compact.
+- **Erode** is self-hosted from `src/app/fonts/Erode-Variable.woff2` through `next/font/local`, exposed as `--font-erode`, and loaded with `font-display: swap`. The variable file provides weights 300–700 without a Google Fonts request. The shared `.font-display` treatment fixes headings at 600, normal style, uppercase, and `0.025em` letter spacing.
+- **Geist Sans** is a modern geometric sans with excellent screen rendering. The contrast between Erode's expressive serif forms and a clean geometric body creates the dramatic but usable hierarchy.
 
 ### Type Scale
 
@@ -209,10 +255,10 @@ Strict scale — no custom `text-[Xpx]` values in components.
 
 | Token | Size | Line Height | Weight | Usage |
 |-------|------|-------------|--------|-------|
-| `display-xl` | 48px | 1.1 | DM Serif Display 400 | Hero headlines only |
-| `display-lg` | 36px | 1.15 | DM Serif Display 400 | Page titles |
-| `display-md` | 30px | 1.2 | DM Serif Display 400 | Section titles |
-| `display-sm` | 24px | 1.25 | DM Serif Display 400 | Sub-section titles |
+| `display-xl` | 48px | 1.1 | Erode 600 | Hero headlines only |
+| `display-lg` | 36px | 1.15 | Erode 600 | Page titles |
+| `display-md` | 30px | 1.2 | Erode 600 | Section titles |
+| `display-sm` | 24px | 1.25 | Erode 600 | Sub-section titles |
 | `heading` | 20px | 1.3 | Geist 600 | Card titles, panel headers |
 | `body-lg` | 18px | 1.6 | Geist 400 | Featured body text |
 | `body` | 16px | 1.5 | Geist 400 | Default body text |
@@ -237,8 +283,8 @@ Following Riftbound's 3-breakpoint responsive reduction:
 
 ### Typography Rules
 
-1. Display fonts are **always uppercase** with `tracking-wider` (0.05em)
-2. Display italic is reserved for **featured callouts, pull-quotes, and hero subtitles** — never for regular section headers
+1. `.font-display` is always Erode 600, normal style, uppercase, with `0.025em` letter spacing. Featured callouts and pull-quotes use the same upright treatment.
+2. Navbar links use Erode 700, uppercase, `0.04em` letter spacing, and 16px (`text-base`) per the locked direction. The Erode family application ships with the OPT-534 navbar refresh; the current navbar remains an interim Geist Sans rendering.
 3. Body text max line-length: 65-75 characters (`max-w-prose` or `max-w-[65ch]`)
 4. Minimum font size: 12px (`text-xs`). Never use `text-[10px]` or `text-[11px]`.
    - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside any element rendered within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body / paragraph text. Chrome (navbar, modals, tooltips, popovers, side panels) keeps the 12px floor unchanged. See §13 for the full inside-board override set.
@@ -326,9 +372,9 @@ Three values only. No exceptions.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px oklch(5% 0.01 245 / 0.30), 0 1px 3px oklch(5% 0.01 245 / 0.20)`   | Cards at rest, subtle lift |
-| `--shadow-md` | `0 4px 6px oklch(5% 0.01 245 / 0.35), 0 2px 4px oklch(5% 0.01 245 / 0.24)`   | Hovered cards, dropdowns   |
-| `--shadow-lg` | `0 10px 15px oklch(5% 0.01 245 / 0.45), 0 4px 6px oklch(5% 0.01 245 / 0.28)` | Modals, popovers           |
+| `--shadow-sm` | `0 1px 2px oklch(5% 0.004 260 / 0.32), 0 1px 3px oklch(5% 0.004 260 / 0.22)` | Cards at rest, subtle lift |
+| `--shadow-md` | `0 4px 6px oklch(5% 0.004 260 / 0.38), 0 2px 4px oklch(5% 0.004 260 / 0.26)` | Hovered cards, dropdowns |
+| `--shadow-lg` | `0 10px 15px oklch(5% 0.004 260 / 0.48), 0 4px 6px oklch(5% 0.004 260 / 0.30)` | Modals, popovers |
 
 ### Elevation Hierarchy
 
@@ -354,18 +400,18 @@ Adapted from Riftbound's CTA system, mapped to our palette:
 
 | Variant | Background | Text | Border | Usage |
 |---------|------------|------|--------|-------|
-| **Primary**     | `--gold-500`  | `--navy-900`       | none                        | Main actions: "Save Deck", "Create Game", "Play"     |
-| **Secondary** | `--surface-1` | `--text-primary` | `1px solid var(--border)` | Secondary actions: "Cancel", "Back" |
+| **Primary** | `--accent` | `--accent-fg` | none | Main actions: "Save Deck", "Create Game", "Play" |
+| **Secondary** | `--surface-panel` | `--text-primary` | `1px solid var(--border-subtle)` | Secondary actions: "Cancel", "Back" |
 | **Ghost** | transparent | `--text-secondary` | none | Tertiary actions, inline actions |
-| **Destructive** | `--red-600`   | `--navy-900`       | none                        | Destructive: "Delete", "Concede"                     |
-| **Gold**        | `--surface-1` | `--gold-500`       | `1px solid var(--gold-500)` | Premium/treasure moments: "Upgrade", special actions |
-| **Outline**     | transparent   | `--gold-500`       | `1px solid var(--gold-500)` | Alternative secondary actions                        |
+| **Destructive** | `--destructive` | `--destructive-fg` | none | Destructive: "Delete", "Concede" |
+| **Gold** | `--accent` | `--accent-fg` | `1px solid var(--accent)` | Premium/treasure moments: "Upgrade", special actions |
+| **Outline** | transparent | `--accent-text` | `1px solid var(--accent)` | Alternative secondary actions |
 
 #### States
 
 ```
 Default  → Hover (lighten bg or shift color) → Active (darken slightly)
-         → Focus (2px solid --gold-500, 2px offset)
+         → Focus (2px solid --border-focus, 2px offset)
          → Disabled (opacity 0.5, cursor not-allowed)
          → Loading (spinner icon, disabled interaction)
 ```
@@ -384,11 +430,12 @@ For hero sections and important CTAs only:
 
 ```css
 .btn-ornamental {
-  outline: 1px solid var(--gold-500);
+  --btn-ornamental-color: var(--accent);
+  outline: 1px solid var(--btn-ornamental-color);
   outline-offset: 3px;
 }
 .btn-ornamental:hover {
-  outline-color: var(--gold-400);
+  --btn-ornamental-color: var(--accent-hover);
 }
 ```
 
@@ -410,7 +457,7 @@ All buttons: `transition: color 0.2s ease-out, background-color 0.2s ease-out, b
 └──────────────┘
 ```
 
-- Cards on restrained elevated navy (`--surface-1`) surfaces — art breathes
+- Cards on restrained elevated navy (`--surface-panel`) surfaces — art breathes
 - Single hover effect: subtle lift + scale. No stacking of lift + shadow + blur + glow.
 - Optional: thin gold border on hover for selected/highlighted cards
 
@@ -431,7 +478,7 @@ Adapted from Riftbound's article card pattern:
 │ explains the content...             │
 └─────────────────────────────────────┘
   border-radius: rounded-lg (12px)
-  background: var(--surface-1)
+  background: var(--surface-panel)
   shadow: var(--shadow-sm)
   hover: var(--shadow-md)
 ```
@@ -445,24 +492,23 @@ Dark surface, consistent across all pages:
 │ [Logo]      Cards  Decks  Play  Social          [User Menu] │
 │                                                              │
 │ bg: var(--surface-nav) — oklch(18% 0.020 245)               │
-│ text: var(--text-primary) — warm off-white                    │
-│ active link: underline in --gold-500                          │
-│ height: 64px desktop, 56px mobile                             │
-│ z-index: 30                                                   │
+│ text: var(--text-inverse)                                     │
+│ active link: --text-inverse on a white-alpha surface          │
+│ height: 64px                                                  │
+│ z-index: 40                                                   │
 │ position: sticky top-0                                        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- Nav items: Geist Sans 14px/500, uppercase, `tracking-wide`
-- Hover: `color: var(--gold-400)`, transition 0.2s
-- Active: `color: var(--gold-500)` + 2px underline offset 4px
-- Mobile: hamburger menu → sheet sliding from right
+- Canonical nav-link treatment: Erode 16px/700, uppercase, `0.04em` letter spacing. The family application ships with OPT-534; the current navbar remains an interim Geist Sans rendering.
+- Resting: `--text-inverse` at 70% alpha; hover/focus: `--text-inverse` on a 10% white-alpha surface
+- Active: `--text-inverse` on a 10% white-alpha surface; hover raises the surface to 15%
 
 ### Dialogs / Modals
 
 ```
-Overlay: var(--overlay) — oklch(5% 0.01 245 / 0.72)
-Panel:   var(--surface-1), rounded-lg (12px), shadow-lg
+Overlay: var(--overlay) — oklch(5% 0.004 260 / 0.76)
+Panel:   var(--surface-panel), rounded-lg (12px), shadow-lg
 Enter:   fade overlay 0.2s + scale panel from 0.95→1.0, 0.2s ease-out
 Exit:    fade out 0.15s (exit faster than enter)
 Close:   X button top-right, keyboard Escape
@@ -506,7 +552,7 @@ Adapted from Riftbound's blade architecture:
 │                                                                              │
 │  ┌───────────────────── max-w: 1280px (centered) ──────────────────────┐    │
 │  │                                                                      │    │
-│  │  Section Title (Barlow Condensed, uppercase)                         │    │
+│  │  Section Title (Erode 600, uppercase)                                │    │
 │  │  ─────────────────────────────────────────────────                   │    │
 │  │                                                                      │    │
 │  │  [ Content Grid / Carousel / Feature Cards ]                         │    │
@@ -522,10 +568,10 @@ Adapted from Riftbound's blade architecture:
 
 | Variant | Background | Text | Usage |
 |---------|------------|------|-------|
-| **Default** | `--surface-base` | `--text-primary` | Most sections |
-| **Muted** | `--surface-2` | `--text-primary` | Alternating sections for visual rhythm |
-| **Raised**      | `--surface-1`    | `--text-primary` | Hero sections and featured content                 |
-| **Gold accent** | `--surface-base` | `--text-primary` | Premium/feature showcases (gold border or divider) |
+| **Default** | `--surface-page` | `--text-primary` | Most sections |
+| **Muted** | `--surface-raised` | `--text-primary` | Alternating sections for visual rhythm |
+| **Raised** | `--surface-panel` | `--text-primary` | Hero sections and featured content |
+| **Gold accent** | `--surface-page` | `--text-primary` | Premium/feature showcases (`--accent-border` decoration only) |
 
 ### Carousel (Riftbound-inspired)
 
@@ -547,8 +593,8 @@ Embla-based carousel for card galleries, deck showcases, set browsers:
 
 - Desktop: 3-up, Tablet: 2-up, Mobile: 1-up
 - Gap: `var(--content-gap)`
-- Progress bar: 2px rail in `--surface-3`, indicator in `--gold-500`
-- Arrow buttons: 32x32px, `--surface-2` background, `--gold-500` icon
+- Progress bar: 2px rail in `--surface-inset`, indicator in `--accent`
+- Arrow buttons: 32x32px, `--surface-raised` background, `--accent-text` icon
 - Swipe enabled on touch devices
 
 ---
@@ -658,7 +704,7 @@ import { useReducedMotion } from "motion/react";
 |-------------|----------|----------------|
 | Text contrast | 4.5:1 minimum | All token pairings pre-validated |
 | Large text contrast | 3:1 minimum | Display text on all surface variants |
-| Focus visible            | 2px solid ring (chrome); **4px ring inside `<ScaledBoard>`** (OPT-346) | `--border-focus` (gold-500), 2px offset; in-board uses `ring-4` so the focus indicator renders ~2.4px at the 1280×640 floor scale |
+| Focus visible            | 2px solid ring (chrome); **4px ring inside `<ScaledBoard>`** (OPT-346) | `--border-focus`, 2px offset; in-board uses `ring-4` so the focus indicator renders ~2.4px at the 1280×640 floor scale |
 | Touch targets | 44x44px minimum | All interactive elements |
 | Keyboard navigation | Full tab support | Logical tab order, visible focus |
 | Screen reader | Semantic HTML | ARIA labels, roles, live regions |
@@ -687,7 +733,7 @@ xl:  1280px  (wide desktop)
 ### Responsive Behavior
 
 - **Mobile-first**: Base styles target mobile, scale up with `sm:`, `lg:`, `xl:`
-- **Navigation**: Sticky top bar on all sizes; hamburger → sheet on mobile
+- **Navigation**: Sticky top bar on all sizes
 - **Card grids**: 1-col mobile, 2-col tablet, 3-4 col desktop
 - **Section padding**: Responsive variables reduce at each breakpoint
 - **Type scale**: Responsive reduction per the typography table
@@ -695,9 +741,9 @@ xl:  1280px  (wide desktop)
 
 ---
 
-## 13. Game Board (Themeable Context)
+## 13. Game Board (Independent Visual Context)
 
-The game board is a self-contained visual context with its own token layer, isolated from the main app. All game board tokens are prefixed `--gb-*` and documented in `globals.css`.
+The game board is a self-contained visual context with its own token layer, isolated from the main-app theme registry. All game board tokens are prefixed `--gb-*` and documented in `globals.css`; global `html[data-theme]` blocks must not override them.
 
 ### Design Philosophy
 
@@ -708,14 +754,14 @@ This means:
 1. **UI chrome never depends on a specific background color.** Controls, labels, and overlays must use semi-transparent surfaces or adaptive tokens — not hardcoded dark-on-light or light-on-dark assumptions.
 2. **Card zones and interactive regions use their own surface tokens** (`--gb-surface`, `--gb-surface-raised`) rather than relying on the board background for contrast.
 3. **Text always sits on a controlled surface**, never directly on the board backdrop. Every text element must have a backing panel, scrim, or surface — even if it's subtle.
-4. **The `--gb-*` token set is the theming API.** Future themes swap these token values; components should never reference raw colors. A theme is just a different set of `--gb-*` values.
+4. **The `--gb-*` token set is the board-context customization API.** Future board-specific work can swap these values independently; components should never reference raw colors. It is not part of the global `THEME_REGISTRY` contract.
 
 ### Current Default Theme (Dark)
 
 | Property | Main App | Game Board (Dark) |
 |----------|----------|-------------------|
-| Background | Deep navy (`--surface-base`)   | Near-black (`--gb-bg`)                      |
-| Surfaces | `--surface-1/2/3` | `--gb-surface` / `--gb-surface-raised` |
+| Background | Deep navy (`--surface-page`) | Near-black (`--gb-bg`) |
+| Surfaces | `--surface-panel` / `--surface-raised` / `--surface-inset` | `--gb-surface` / `--gb-surface-raised` |
 | Text       | Warm white (`--text-primary`)  | Off-white (`--gb-text`, `--gb-text-bright`) |
 | Cards      | Elevated navy surface + shadow | Glow on dark                                |
 | Motion | Subtle, functional | More pronounced, immersive |
@@ -733,7 +779,7 @@ When building game board components, follow these rules to ensure theme portabil
 | Overlays | Use `--gb-surface` with controlled opacity for scrims | Use hardcoded `rgba(0,0,0,...)` |
 | Icons/accents | Use `--gb-accent-*` tokens | Hardcode accent colors that only work on dark |
 
-This ensures that swapping the `--gb-*` token set (e.g., a light beach theme, a Wano-themed board) will produce a coherent result without component-level changes.
+This keeps future board-specific customization (for example, a light beach or Wano board) coherent without coupling it to main-app presets or component-level changes.
 
 ### Inside-Board Floor Overrides (Responsive Game Board, OPT-346)
 
@@ -757,19 +803,24 @@ Inside the scaled subtree only — anything that renders within `<ScaledBoard>` 
 
 ---
 
-## 14. Token Change Summary
+## 14. Shipped Theming Foundation
 
-The token names and component API remain stable, while the main-app values now define a dark-only navy system. This lets existing consumers inherit the new direction while component-level cleanup proceeds separately.
+The theming foundation shipped across OPT-512 through OPT-516. The semantic component API is stable while registered presets can replace primitives without component changes.
 
-| Addition | Purpose |
-|----------|---------|
-| shadcn CSS variable aliases | Map existing tokens to shadcn's expected variable names |
-| Responsive spacing variables | `--section-pad-y/x`, `--content-gap` with breakpoint scaling |
-| Display type scale tokens | Formalize `display-xl` through `caption` in CSS |
-| motion.dev preset module | `src/lib/motion.ts` — shared transitions, springs, variants |
-| Ornamental CTA class | `.btn-ornamental` for gold-outlined hero buttons |
+| Shipped work | Result |
+|--------------|--------|
+| OPT-512 | Primitive/semantic token split and explicit non-themable feature palettes |
+| OPT-513 + OPT-536 | Default warm navy/original gold retained after VQA; desaturated primitives preserved for a future preset; text, border, and reserved border-gold values finalized |
+| OPT-514 | Self-hosted Erode variable display face and the restored uppercase treatment |
+| OPT-515 | Registry, DB preference, SSR cookie stamping, and session reconciliation |
+| OPT-516 | 19-pair per-theme WCAG AA gate chained into `pnpm lint` |
 
-No existing tokens are renamed or removed.
+### Decision traceability
+
+- Design-source artifact: <https://claude.ai/code/artifact/e2e8f04c-9554-42e9-82d0-29fc3d459b58>
+- 2026-07-23: initial direction established the Erode and desaturated redesign exploration.
+- 2026-07-24: VQA restored the warm navy foundation, original bright-gold CTA ramp, and uppercase display treatment. The desaturated surface family remained only as preset-ready primitives.
+- `src/app/globals.css` is the source of truth for token names and values; `src/lib/theme.ts` is the source of truth for registered themes and cookie options.
 
 ---
 
@@ -779,13 +830,14 @@ This branding guideline produces the following implementation artifacts:
 
 | File | Content | Phase |
 |------|---------|-------|
-| `docs/design/BRANDING-GUIDELINES.md` | This document (you're reading it) | Phase 0 |
-| `src/app/globals.css` | Updated with shadcn aliases + responsive spacing vars + type scale | Phase 1 |
-| `src/lib/motion.ts` | motion.dev presets, transitions, variants, springs | Phase 1 |
-| `components.json` | shadcn configuration pointing to our token system | Phase 1 |
-| `CLAUDE.md` (Design Context section) | Updated to reference this guideline | Phase 0 |
+| `docs/design/BRANDING-GUIDELINES.md` | Human-readable shipped design and theming contract | Documentation |
+| `src/app/globals.css` | Authoritative primitive, semantic, feature, Tailwind, and shadcn token mappings | Runtime |
+| `src/lib/theme.ts` | Theme registry, validation, default behavior, and cookie contract | Runtime |
+| `src/app/layout.tsx` | Self-hosted fonts and SSR theme stamping | Runtime |
+| `scripts/check-token-contrast.mjs` + `scripts/contrast-pairs.json` | Per-theme WCAG AA gate and 19-pair manifest | CI |
+| `CLAUDE.md` (Design Context section) | Condensed implementation guidance | Documentation |
 
 ---
 
-_Last updated: 2026-07-18_
-_Phase: Dark-only foundation (OPT-507)_
+_Last updated: 2026-07-24_
+_Phase: Redesign theming foundation shipped (OPT-517)_
