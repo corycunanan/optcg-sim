@@ -77,7 +77,8 @@ export type RealtimeServerEvent =
    * or started the game). Sent to the recipient so a still-visible toast
    * auto-dismisses.
    */
-  | { type: "lobby:invite_canceled"; inviteId: string };
+  | { type: "lobby:invite_canceled"; inviteId: string }
+  | { type: "lobby:party_disbanded"; hostName: string };
 
 /**
  * Client → server vocabulary. Routed by `UserChannel.webSocketMessage` on
@@ -86,8 +87,11 @@ export type RealtimeServerEvent =
  *   2. Validate + handle in `workers/game/src/UserChannel.ts`.
  *   3. Emit from a hook/component via `useUserChannelEvents().send(event)`.
  */
-export type RealtimeClientEvent =
-  | { type: "chat:typing"; toUserId: string; until: number };
+export type RealtimeClientEvent = {
+  type: "chat:typing";
+  toUserId: string;
+  until: number;
+};
 
 export interface SerializedMessage {
   id: string;

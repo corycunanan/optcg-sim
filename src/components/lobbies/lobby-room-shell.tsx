@@ -40,6 +40,7 @@ import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 import { HostCloseAction, runHostClose } from "./host-close-action";
 import { lobbyRoomRecovery, rejoinGameId } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
+import { JoinPartyDialog } from "./join-party-dialog";
 import { PregameSettings } from "./pregame-settings";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
 
@@ -53,12 +54,14 @@ interface LobbyRoomShellProps {
   lobbyId: string;
   currentUserId: string;
   joinError?: string;
+  initialJoinCode?: string;
 }
 
 export function LobbyRoomShell({
   lobbyId,
   currentUserId,
   joinError,
+  initialJoinCode,
 }: LobbyRoomShellProps) {
   const router = useRouter();
   const {
@@ -260,6 +263,10 @@ export function LobbyRoomShell({
               </Button>
             ) : (
               <>
+                <JoinPartyDialog
+                  disabled={mutating || starting || closing}
+                  initialCode={initialJoinCode}
+                />
                 <GuestLeaveAction
                   isGuest={Boolean(isGuest)}
                   leaving={leaving}

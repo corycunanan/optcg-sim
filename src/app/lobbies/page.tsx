@@ -14,15 +14,14 @@ interface LobbiesPageProps {
   searchParams?: Promise<{ code?: string | string[] }>;
 }
 
-export default async function LobbiesPage({
-  searchParams,
-}: LobbiesPageProps) {
+export default async function LobbiesPage({ searchParams }: LobbiesPageProps) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const codeParam = (await searchParams)?.code;
   const code = Array.isArray(codeParam) ? codeParam[0] : codeParam;
   let joinError: string | null = null;
+  let pendingJoinCode: string | null = null;
 
   if (code) {
     const joinResult = await joinLobbyByCode({
@@ -33,12 +32,18 @@ export default async function LobbiesPage({
       after(() => publishLobbyJoin(joinResult, session.user.id));
       redirect(`/lobbies/${joinResult.lobbyId}`);
     }
-    joinError = lobbyJoinFailureMessage(joinResult.kind);
+    if (joinResult.kind === "confirmation_required") {
+      pendingJoinCode = joinResult.targetCode;
+    } else {
+      joinError = lobbyJoinFailureMessage(joinResult.kind);
+    }
   }
 
   const resolution = await resolveCanonicalLobby(session.user.id);
-  const errorQuery = joinError
-    ? `?joinError=${encodeURIComponent(joinError)}`
-    : "";
-  redirect(`/lobbies/${resolution.lobbyId}${errorQuery}`);
+  const query = [
+    joinError ? `joinError=${encodeURIComponent(joinError)}` : null,
+    pendingJoinCode ? `joinCode=${encodeURIComponent(pendingJoinCode)}` : null,
+  ].filter(Boolean);
+  const suffix = query.length > 0 ? `?${query.join("&")}` : "";
+  redirect(`/lobbies/${resolution.lobbyId}${suffix}`);
 }

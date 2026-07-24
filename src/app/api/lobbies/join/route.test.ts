@@ -2,28 +2,26 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
-const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
+const rateLimitMock = vi.fn();
 const gameFindFirstMock = vi.fn();
 const lobbyFindFirstMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
-const userUpdateManyMock = vi.fn();
+const lobbyGuestDeleteManyMock = vi.fn();
 const userFindUniqueMock = vi.fn();
+const userUpdateManyMock = vi.fn();
+const inviteFindManyMock = vi.fn();
+const inviteUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
-const cancelPendingLobbyInvitesMock = vi.fn();
+const notifyUserMock = vi.fn();
 
-// Track `after()` callbacks so tests can deterministically flush them before
-// asserting on fanout side effects.
-const afterCalls = vi.hoisted(() => ({
-  pending: [] as Promise<void>[],
-}));
+const afterCalls = vi.hoisted(() => ({ pending: [] as Promise<void>[] }));
 
-async function flushAfter(): Promise<void> {
+async function flushAfter() {
   while (afterCalls.pending.length) {
-    const batch = afterCalls.pending.splice(0);
-    await Promise.all(batch);
+    await Promise.all(afterCalls.pending.splice(0));
   }
 }
 
@@ -31,13 +29,15 @@ vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
   return {
     ...actual,
-    after: (cb: () => void | Promise<void>) => {
-      afterCalls.pending.push(Promise.resolve().then(cb));
+    after: (callback: () => void | Promise<void>) => {
+      afterCalls.pending.push(Promise.resolve().then(callback));
     },
   };
 });
-
 vi.mock("@/auth", () => ({ auth: authMock }));
+vi.mock("@/lib/rate-limit", () => ({
+  apiLimiter: { check: rateLimitMock },
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     gameSession: {
@@ -49,12 +49,18 @@ vi.mock("@/lib/db", () => ({
     },
     lobbyGuest: {
       create: (...args: unknown[]) => lobbyGuestCreateMock(...args),
+      deleteMany: (...args: unknown[]) => lobbyGuestDeleteManyMock(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => userFindUniqueMock(...args),
+      updateMany: (...args: unknown[]) => userUpdateManyMock(...args),
+    },
+    lobbyInvite: {
+      findMany: (...args: unknown[]) => inviteFindManyMock(...args),
+      updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
-}));
-vi.mock("@/lib/rate-limit", () => ({
-  apiLimiter: { check: rateLimitMock },
 }));
 vi.mock("@/lib/lobbies/build-state", () => ({
   buildLobbyRoomState: (...args: unknown[]) => buildLobbyRoomStateMock(...args),
@@ -62,14 +68,22 @@ vi.mock("@/lib/lobbies/build-state", () => ({
 vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
-vi.mock("@/lib/lobbies/cancel-invites", () => ({
-  cancelPendingLobbyInvites: (...args: unknown[]) =>
-    cancelPendingLobbyInvitesMock(...args),
+vi.mock("@/lib/realtime/fan-out", () => ({
+  notifyUser: (...args: unknown[]) => notifyUserMock(...args),
 }));
 
 const { POST } = await import("./route");
 
-function buildRequest(body: unknown = { code: "ABCD", deckId: "guest-deck" }) {
+const targetLobby = {
+  id: "target-lobby",
+  joinCode: "ABC123",
+  status: "WAITING",
+  hostUserId: "target-host",
+  mode: "PVP",
+  guest: null,
+};
+
+function request(body: unknown = { code: "ABC123" }) {
   return new NextRequest("http://localhost/api/lobbies/join", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -78,347 +92,326 @@ function buildRequest(body: unknown = { code: "ABCD", deckId: "guest-deck" }) {
 }
 
 beforeEach(() => {
-  authMock.mockReset();
-  rateLimitMock.mockReset();
-  gameFindFirstMock.mockReset();
-  lobbyFindFirstMock.mockReset();
-  lobbyUpdateManyMock.mockReset();
-  lobbyGuestCreateMock.mockReset();
-  userUpdateManyMock.mockReset();
-  userFindUniqueMock.mockReset();
-  transactionMock.mockReset();
-  buildLobbyRoomStateMock.mockReset();
-  notifyLobbyMock.mockReset();
-  cancelPendingLobbyInvitesMock.mockReset();
-
-  authMock.mockResolvedValue({ user: { id: "guest-user" } });
-  rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
+  for (const mock of [
+    authMock,
+    rateLimitMock,
+    gameFindFirstMock,
+    lobbyFindFirstMock,
+    lobbyUpdateManyMock,
+    lobbyGuestCreateMock,
+    lobbyGuestDeleteManyMock,
+    userFindUniqueMock,
+    userUpdateManyMock,
+    inviteFindManyMock,
+    inviteUpdateManyMock,
+    transactionMock,
+    buildLobbyRoomStateMock,
+    notifyLobbyMock,
+    notifyUserMock,
+  ]) {
+    mock.mockReset();
+  }
+  authMock.mockResolvedValue({ user: { id: "joiner" } });
+  rateLimitMock.mockResolvedValue({ limited: false });
   gameFindFirstMock.mockResolvedValue(null);
-  lobbyFindFirstMock.mockResolvedValue({
-    id: "lobby-1",
-    joinCode: "ABCD",
-    status: "WAITING",
-    hostUserId: "host-user",
-    hostDeckId: "host-deck",
-    format: "Standard",
-    mode: "PVP",
-    guest: null,
-  });
-  lobbyGuestCreateMock.mockReturnValue({ query: "create-guest" });
+  lobbyFindFirstMock.mockResolvedValue(targetLobby);
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
-  userUpdateManyMock.mockResolvedValue({ count: 1 });
+  lobbyGuestCreateMock.mockResolvedValue(undefined);
+  lobbyGuestDeleteManyMock.mockResolvedValue({ count: 1 });
   userFindUniqueMock.mockResolvedValue({
-    activeLobbyId: "live-lobby",
-    activeLobby: {
-      status: "READY",
-      hostUserId: "another-host",
-      guest: { userId: "guest-user" },
-    },
+    activeLobbyId: null,
+    activeLobby: null,
   });
-  transactionMock.mockImplementation(async (operation) => {
-    if (typeof operation !== "function") return operation;
-    return operation({
-      lobby: {
-        findFirst: lobbyFindFirstMock,
-        updateMany: lobbyUpdateManyMock,
-      },
-      lobbyGuest: { create: lobbyGuestCreateMock },
-      user: {
-        updateMany: userUpdateManyMock,
-        findUnique: userFindUniqueMock,
-      },
-    });
-  });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
+  inviteFindManyMock.mockResolvedValue([]);
+  inviteUpdateManyMock.mockResolvedValue({ count: 1 });
   buildLobbyRoomStateMock.mockResolvedValue({
-    id: "lobby-1",
+    id: "target-lobby",
+    hostUserId: "target-host",
     status: "READY",
-    hostUserId: "host-user",
   });
   notifyLobbyMock.mockResolvedValue(undefined);
-  cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
+  notifyUserMock.mockResolvedValue(undefined);
+  transactionMock.mockImplementation(async (operation) =>
+    operation({
+      lobby: { findFirst: lobbyFindFirstMock, updateMany: lobbyUpdateManyMock },
+      lobbyGuest: {
+        create: lobbyGuestCreateMock,
+        deleteMany: lobbyGuestDeleteManyMock,
+      },
+      user: { findUnique: userFindUniqueMock, updateMany: userUpdateManyMock },
+      lobbyInvite: {
+        findMany: inviteFindManyMock,
+        updateMany: inviteUpdateManyMock,
+      },
+    })
+  );
   afterCalls.pending.length = 0;
 });
 
 describe("POST /api/lobbies/join", () => {
-  it("enters the lobby room without requiring a deck or starting a game", async () => {
-    const res = await POST(buildRequest({ code: "ABCD" }));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body).toEqual({ data: { lobbyId: "lobby-1" } });
-    expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
-      data: { lobbyId: "lobby-1", userId: "guest-user", deckId: undefined },
-    });
-    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
-      where: {
-        id: "lobby-1",
-        status: "WAITING",
-        mode: "PVP",
-        guest: { is: null },
-      },
-      data: { status: "READY", revision: { increment: 1 } },
-    });
-    expect(transactionMock).toHaveBeenCalledOnce();
-    expect(userUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "guest-user", activeLobbyId: null },
-      data: { activeLobbyId: "lobby-1" },
-    });
-  });
-
-  it("keeps a provided guest deck as mutable room state", async () => {
-    const res = await POST(buildRequest());
-
-    expect(res.status).toBe(200);
-    expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
-      data: { lobbyId: "lobby-1", userId: "guest-user", deckId: "guest-deck" },
-    });
-  });
-
-  it("allows entering the room when the host has not selected a deck yet", async () => {
-    lobbyFindFirstMock.mockResolvedValueOnce({
-      id: "lobby-1",
-      joinCode: "ABCD",
-      status: "WAITING",
-      hostUserId: "host-user",
-      hostDeckId: null,
-      format: "Standard",
-      mode: "PVP",
-      guest: null,
-    });
-
-    const res = await POST(buildRequest());
-
-    expect(res.status).toBe(200);
-    expect(transactionMock).toHaveBeenCalledOnce();
-  });
-
-  it("rejects joins for solitaire lobbies", async () => {
-    lobbyFindFirstMock.mockResolvedValueOnce({
-      id: "lobby-1",
-      joinCode: "ABCD",
-      status: "WAITING",
-      hostUserId: "host-user",
-      hostDeckId: null,
-      format: "Standard",
-      mode: "SOLITAIRE",
-      guest: null,
-    });
-
-    const res = await POST(buildRequest());
-    const body = await res.json();
-
-    expect(res.status).toBe(409);
-    expect(body).toEqual({
-      error: "This lobby is in solo mode and cannot be joined",
-    });
-    expect(transactionMock).toHaveBeenCalledOnce();
-    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects joins when a lobby already has a guest", async () => {
-    lobbyFindFirstMock.mockResolvedValueOnce({
-      id: "lobby-1",
-      joinCode: "ABCD",
-      status: "WAITING",
-      hostUserId: "host-user",
-      hostDeckId: "host-deck",
-      format: "Standard",
-      mode: "PVP",
-      guest: { userId: "someone" },
-    });
-
-    const res = await POST(buildRequest());
-
-    expect(res.status).toBe(409);
-    expect(transactionMock).toHaveBeenCalledOnce();
-    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
-  });
-
-  it("fans out lobby:state_changed to the host (skipping the joining guest)", async () => {
-    const res = await POST(buildRequest());
+  it("joins instantly when the user has no current party", async () => {
+    const response = await POST(request());
     await flushAfter();
 
-    expect(res.status).toBe(200);
-    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("lobby-1");
-    expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      data: { lobbyId: "target-lobby" },
+    });
+    expect(lobbyGuestCreateMock).toHaveBeenCalledWith({
+      data: {
+        lobbyId: "target-lobby",
+        userId: "joiner",
+        deckId: undefined,
+      },
+    });
     expect(notifyLobbyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "lobby-1" }),
-      { actorUserId: "guest-user" }
+      expect.objectContaining({ id: "target-lobby" }),
+      { actorUserId: "joiner" }
     );
   });
 
-  it("does not fan out when the join is rejected", async () => {
-    lobbyFindFirstMock.mockResolvedValueOnce(null);
-
-    const res = await POST(buildRequest());
-    await flushAfter();
-
-    expect(res.status).toBe(404);
-    expect(notifyLobbyMock).not.toHaveBeenCalled();
-  });
-
-  it("does not create a seat when close wins after the WAITING read", async () => {
-    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
-
-    const res = await POST(buildRequest());
-    await flushAfter();
-
-    expect(res.status).toBe(404);
-    expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
-    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
-    expect(notifyLobbyMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects a second active-lobby membership", async () => {
-    userUpdateManyMock.mockResolvedValueOnce({ count: 0 });
-
-    const res = await POST(buildRequest());
-
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      error: "An active lobby already exists",
-      code: "ACTIVE_LOBBY_EXISTS",
-    });
-    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
-  });
-
-  it("silently replaces an empty personal lobby before joining", async () => {
-    userUpdateManyMock
-      .mockResolvedValueOnce({ count: 0 })
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 1 });
+  it("silently closes an empty personal lobby in the same transaction", async () => {
     userFindUniqueMock.mockResolvedValue({
       activeLobbyId: "personal-lobby",
       activeLobby: {
         id: "personal-lobby",
         status: "WAITING",
-        hostUserId: "guest-user",
+        hostUserId: "joiner",
+        host: { username: "Joiner", name: null },
         guest: null,
+        invites: [],
       },
     });
 
-    const res = await POST(buildRequest({ code: "ABCD" }));
-    await flushAfter();
+    const response = await POST(request());
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ data: { lobbyId: "lobby-1" } });
-    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+    expect(response.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenNthCalledWith(1, {
       where: {
         id: "personal-lobby",
-        hostUserId: "guest-user",
+        hostUserId: "joiner",
         status: { in: ["WAITING", "READY"] },
-        guest: { is: null },
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
     });
-    expect(userUpdateManyMock.mock.calls).toEqual([
-      [
-        {
-          where: { id: "guest-user", activeLobbyId: null },
-          data: { activeLobbyId: "lobby-1" },
-        },
-      ],
-      [
-        {
-          where: { id: "guest-user", activeLobbyId: "personal-lobby" },
-          data: { activeLobbyId: null },
-        },
-      ],
-      [
-        {
-          where: { id: "guest-user", activeLobbyId: null },
-          data: { activeLobbyId: "lobby-1" },
-        },
-      ],
-    ]);
-    expect(lobbyGuestCreateMock).toHaveBeenCalledOnce();
-    expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith(
-      "personal-lobby"
-    );
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { activeLobbyId: "personal-lobby" },
+      data: { activeLobbyId: null },
+    });
   });
 
-  it("keeps ACTIVE_LOBBY_EXISTS when the joiner hosts a guest", async () => {
-    userUpdateManyMock.mockResolvedValue({ count: 0 });
+  it("requires explicit confirmation before disbanding a hosted guest", async () => {
     userFindUniqueMock.mockResolvedValue({
-      activeLobbyId: "hosted-lobby",
+      activeLobbyId: "current-lobby",
       activeLobby: {
-        id: "hosted-lobby",
+        id: "current-lobby",
         status: "READY",
-        hostUserId: "guest-user",
-        guest: { userId: "seated-opponent" },
+        hostUserId: "joiner",
+        host: { username: "Joiner", name: null },
+        guest: {
+          userId: "ex-guest",
+          user: { username: "Nami", name: null },
+        },
+        invites: [],
       },
     });
 
-    const res = await POST(buildRequest({ code: "ABCD" }));
+    const response = await POST(request());
 
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      error: "An active lobby already exists",
-      code: "ACTIVE_LOBBY_EXISTS",
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Switching parties requires confirmation",
+      code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+      details: {
+        currentLobbyId: "current-lobby",
+        targetCode: "ABC123",
+        guestName: "Nami",
+        hasPendingInvite: false,
+      },
     });
-    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
-    expect(lobbyUpdateManyMock).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: "hosted-lobby" }),
-      })
-    );
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
   });
 
-  it("rejects an invalid code before opening a transaction", async () => {
-    const res = await POST(buildRequest({ code: "--" }));
-
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Invalid lobby code" });
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("blocks code admission for an active game even with a stale pointer", async () => {
-    gameFindFirstMock.mockResolvedValue({ lobbyId: "active-game-lobby" });
+  it("also requires confirmation when the host only has a pending invite", async () => {
     userFindUniqueMock.mockResolvedValue({
-      activeLobbyId: null,
-      activeLobby: null,
+      activeLobbyId: "current-lobby",
+      activeLobby: {
+        id: "current-lobby",
+        status: "WAITING",
+        hostUserId: "joiner",
+        host: { username: "Joiner", name: null },
+        guest: null,
+        invites: [{ id: "pending-invite" }],
+      },
     });
 
-    const res = await POST(buildRequest({ code: "ABCD" }));
+    const response = await POST(request());
+    const body = await response.json();
 
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("PARTY_SWITCH_CONFIRMATION_REQUIRED");
+    expect(body.details).toMatchObject({
+      guestName: null,
+      hasPendingInvite: true,
+    });
+  });
+
+  it("confirmed host switching disbands, clears both pointers, cancels invites, and explains to the ex-guest", async () => {
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "current-lobby",
+      activeLobby: {
+        id: "current-lobby",
+        status: "READY",
+        hostUserId: "joiner",
+        host: { username: "Luffy", name: null },
+        guest: {
+          userId: "ex-guest",
+          user: { username: "Nami", name: null },
+        },
+        invites: [{ id: "pending-invite" }],
+      },
+    });
+    inviteFindManyMock
+      .mockResolvedValueOnce([{ id: "pending-invite", toUserId: "invitee" }])
+      .mockResolvedValueOnce([]);
+
+    const response = await POST(
+      request({ code: "ABC123", confirmSwitch: true })
+    );
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
+      where: { lobbyId: "current-lobby" },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { activeLobbyId: "current-lobby" },
+      data: { activeLobbyId: null },
+    });
+    expect(inviteUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "pending-invite", status: "PENDING" },
+      data: { status: "CANCELED" },
+    });
+    expect(notifyUserMock).toHaveBeenCalledWith("ex-guest", {
+      type: "lobby:party_disbanded",
+      hostName: "Luffy",
+    });
+    expect(notifyUserMock).toHaveBeenCalledWith("invitee", {
+      type: "lobby:invite_canceled",
+      inviteId: "pending-invite",
+    });
+  });
+
+  it("lets a guest silently switch while returning the old host to WAITING", async () => {
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "old-lobby",
+      activeLobby: {
+        id: "old-lobby",
+        status: "READY",
+        hostUserId: "old-host",
+        host: { username: "Zoro", name: null },
+        guest: {
+          userId: "joiner",
+          user: { username: "Joiner", name: null },
+        },
+        invites: [],
+      },
+    });
+    buildLobbyRoomStateMock.mockImplementation(async (id: string) => ({
+      id,
+      hostUserId: id === "old-lobby" ? "old-host" : "target-host",
+      status: id === "old-lobby" ? "WAITING" : "READY",
+    }));
+
+    const response = await POST(request());
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: "old-lobby",
+        status: "READY",
+        mode: "PVP",
+        guest: { is: { userId: "joiner" } },
+      },
+      data: {
+        status: "WAITING",
+        hostReady: false,
+        revision: { increment: 1 },
+      },
+    });
+    expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
+      where: { lobbyId: "old-lobby", userId: "joiner" },
+    });
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith("old-lobby");
+  });
+
+  it.each([
+    ["closed", { status: "CLOSED" }, "This party has been closed"],
+    ["full", { guest: { userId: "someone-else" } }, "This party is full"],
+    ["in game", { status: "IN_GAME" }, "This party is already in a game"],
+    ["own code", { hostUserId: "joiner" }, "You're already in this party"],
+  ])(
+    "returns a clear error for a %s target",
+    async (_label, patch, message) => {
+      lobbyFindFirstMock.mockResolvedValue({ ...targetLobby, ...patch });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: message });
+      expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("returns 404 for an unknown code and 400 for malformed input", async () => {
+    lobbyFindFirstMock.mockResolvedValueOnce(null);
+    const missing = await POST(request());
+    const malformed = await POST(request({ code: "--" }));
+
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ error: "Party code not found" });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({
+      error: "Enter a valid 6-character party code",
+    });
+  });
+
+  it("fails gracefully when the target fills between confirmation and commit", async () => {
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "personal-lobby",
+      activeLobby: {
+        id: "personal-lobby",
+        status: "WAITING",
+        hostUserId: "joiner",
+        host: { username: "Joiner", name: null },
+        guest: null,
+        invites: [],
+      },
+    });
+    lobbyUpdateManyMock
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "This party is full" });
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledOnce();
+  });
+
+  it("blocks switching while the joiner has an active game", async () => {
+    gameFindFirstMock.mockResolvedValue({ lobbyId: "game-lobby" });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
       error: "Finish or leave your current game first",
       code: "ACTIVE_GAME_EXISTS",
     });
-    expect(gameFindFirstMock).toHaveBeenCalledWith({
-      where: {
-        status: "IN_PROGRESS",
-        OR: [{ player1Id: "guest-user" }, { player2Id: "guest-user" }],
-      },
-      select: { lobbyId: true },
-      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-    });
     expect(transactionMock).not.toHaveBeenCalled();
-    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
-  });
-
-  it("treats a current guest revisiting a READY lobby as success", async () => {
-    lobbyFindFirstMock.mockResolvedValue({
-      id: "lobby-1",
-      joinCode: "ABCD",
-      status: "READY",
-      hostUserId: "host-user",
-      hostDeckId: "host-deck",
-      format: "Standard",
-      mode: "PVP",
-      guest: { userId: "guest-user" },
-    });
-
-    const res = await POST(buildRequest({ code: "ABCD" }));
-    await flushAfter();
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ data: { lobbyId: "lobby-1" } });
-    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
-    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
-    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
-    expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 });
