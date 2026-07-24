@@ -32,7 +32,7 @@ describe("lobbyRoomRecovery", () => {
   it("gives a CLOSED guest an explicit outcome and lobby-browser route", () => {
     expect(lobbyRoomRecovery(lobbyState({ status: "CLOSED" }))).toEqual({
       route: "/lobbies",
-      message: "The host closed the lobby",
+      message: "You're no longer in this party",
     });
   });
 

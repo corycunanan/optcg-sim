@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { claimLobbyRecovery } from "@/lib/lobbies/recovery-once";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/social/user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
@@ -17,6 +18,11 @@ import {
   seedInvites,
   type InviteToastEntry,
 } from "./lobby-invite-toast-state";
+import {
+  PartySwitchConfirmation,
+  partySwitchDetailsFromError,
+  type PartySwitchDetails,
+} from "./party-switch-confirmation";
 
 const TICK_MS = 1000;
 const TOAST_DURATION_MS = 5 * 60 * 1000;
@@ -28,6 +34,10 @@ export function LobbyInviteToasts() {
   const [invites, setInvites] = useState<InviteToastEntry[]>(EMPTY_INVITES);
   const [now, setNow] = useState<number>(() => Date.now());
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingSwitch, setPendingSwitch] = useState<{
+    invite: InviteToastEntry;
+    details: PartySwitchDetails;
+  } | null>(null);
 
   // Reconciliation: surface anything PENDING that arrived while the recipient
   // was offline / a tab wasn't open.
@@ -56,12 +66,20 @@ export function LobbyInviteToasts() {
     const unsubCanceled = subscribe("lobby:invite_canceled", (event) => {
       setInvites((prev) => removeInvite(prev, event.inviteId));
     });
+    const unsubDisbanded = subscribe("lobby:party_disbanded", (event) => {
+      if (!claimLobbyRecovery(event.lobbyId)) return;
+      toast.info(
+        `${event.hostName} disbanded the party. You've been returned to your own lobby.`
+      );
+      router.push("/lobbies");
+    });
     return () => {
       unsubReceived();
       unsubDeclined();
       unsubCanceled();
+      unsubDisbanded();
     };
-  }, [subscribe]);
+  }, [router, subscribe]);
 
   // 1Hz tick drives both the countdown bar and the auto-expiry sweep.
   useEffect(() => {
@@ -75,11 +93,14 @@ export function LobbyInviteToasts() {
   }, [invites.length]);
 
   const acceptInvite = useCallback(
-    async (invite: InviteToastEntry) => {
+    async (invite: InviteToastEntry, confirmDisbandLobbyId?: string) => {
       setBusyId(invite.id);
       try {
-        await apiPost(`/api/lobby-invites/${invite.id}/accept`);
+        await apiPost(`/api/lobby-invites/${invite.id}/accept`, {
+          ...(confirmDisbandLobbyId ? { confirmDisbandLobbyId } : {}),
+        });
         setInvites((prev) => removeInvite(prev, invite.id));
+        setPendingSwitch(null);
         router.push(`/lobbies/${invite.lobbyId}`);
       } catch (err) {
         if (err instanceof ApiError && err.status === 410) {
@@ -88,6 +109,14 @@ export function LobbyInviteToasts() {
           setInvites((prev) => removeInvite(prev, invite.id));
           return;
         }
+        if (err instanceof ApiError) {
+          const details = partySwitchDetailsFromError(err.body);
+          if (details) {
+            setPendingSwitch({ invite, details });
+            return;
+          }
+        }
+        if (confirmDisbandLobbyId) setPendingSwitch(null);
         toast.error(
           err instanceof ApiError ? err.message : "Could not join lobby"
         );
@@ -138,25 +167,41 @@ export function LobbyInviteToasts() {
     setInvites((prev) => removeInvite(prev, inviteId));
   }, []);
 
-  if (invites.length === 0) return null;
+  if (invites.length === 0 && !pendingSwitch) return null;
 
   return (
-    <div
-      className="pointer-events-none fixed top-4 right-4 z-50 flex w-80 flex-col gap-2"
-      aria-live="polite"
-    >
-      {invites.map((invite) => (
-        <InviteCard
-          key={invite.id}
-          invite={invite}
-          now={now}
-          busy={busyId === invite.id}
-          onJoin={() => onJoin(invite)}
-          onDecline={() => void onDecline(invite)}
-          onDismiss={() => onDismiss(invite.id)}
-        />
-      ))}
-    </div>
+    <>
+      <div
+        className="pointer-events-none fixed top-4 right-4 z-50 flex w-80 flex-col gap-2"
+        aria-live="polite"
+      >
+        {invites.map((invite) => (
+          <InviteCard
+            key={invite.id}
+            invite={invite}
+            now={now}
+            busy={busyId === invite.id}
+            onJoin={() => onJoin(invite)}
+            onDecline={() => void onDecline(invite)}
+            onDismiss={() => onDismiss(invite.id)}
+          />
+        ))}
+      </div>
+      <PartySwitchConfirmation
+        open={Boolean(pendingSwitch)}
+        details={pendingSwitch?.details ?? null}
+        busy={Boolean(busyId)}
+        onStay={() => setPendingSwitch(null)}
+        onConfirm={() => {
+          if (pendingSwitch) {
+            void acceptInvite(
+              pendingSwitch.invite,
+              pendingSwitch.details.currentLobbyId
+            );
+          }
+        }}
+      />
+    </>
   );
 }
 

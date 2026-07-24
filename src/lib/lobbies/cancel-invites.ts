@@ -15,32 +15,69 @@
  * mutation's response.
  */
 
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notifyUser } from "@/lib/realtime/fan-out";
 
-export async function cancelPendingLobbyInvites(lobbyId: string): Promise<void> {
+export interface CanceledLobbyInvite {
+  id: string;
+  toUserId: string;
+}
+
+/**
+ * Cancel pending invites as part of a caller-owned transaction.
+ *
+ * Returning only rows that actually transitioned lets the caller defer
+ * realtime delivery until after commit without publishing phantom cancels.
+ */
+export async function cancelPendingLobbyInvitesInTransaction(
+  tx: Prisma.TransactionClient,
+  lobbyId: string
+): Promise<CanceledLobbyInvite[]> {
+  const pending = await tx.lobbyInvite.findMany({
+    where: { lobbyId, status: "PENDING" },
+    select: { id: true, toUserId: true },
+  });
+
+  const canceled: CanceledLobbyInvite[] = [];
+  for (const invite of pending) {
+    const updated = await tx.lobbyInvite.updateMany({
+      where: { id: invite.id, status: "PENDING" },
+      data: { status: "CANCELED" },
+    });
+    if (updated.count === 1) canceled.push(invite);
+  }
+  return canceled;
+}
+
+export async function publishCanceledLobbyInvites(
+  canceled: readonly CanceledLobbyInvite[]
+): Promise<void> {
+  await Promise.all(
+    canceled.map((invite) =>
+      notifyUser(invite.toUserId, {
+        type: "lobby:invite_canceled",
+        inviteId: invite.id,
+      })
+    )
+  );
+}
+
+export async function cancelPendingLobbyInvites(
+  lobbyId: string
+): Promise<void> {
   const pending = await prisma.lobbyInvite.findMany({
     where: { lobbyId, status: "PENDING" },
     select: { id: true, toUserId: true },
   });
 
-  if (pending.length === 0) return;
-
-  // Per-row conditional update: only fan `lobby:invite_canceled` for invites
-  // we actually transitioned PENDING → CANCELED. A row that flipped to
-  // ACCEPTED/DECLINED/EXPIRED between the findMany above and this update is
-  // already authoritatively resolved and doesn't need a phantom cancel push.
-  await Promise.all(
-    pending.map(async (invite) => {
-      const updated = await prisma.lobbyInvite.updateMany({
-        where: { id: invite.id, status: "PENDING" },
-        data: { status: "CANCELED" },
-      });
-      if (updated.count !== 1) return;
-      await notifyUser(invite.toUserId, {
-        type: "lobby:invite_canceled",
-        inviteId: invite.id,
-      });
-    }),
-  );
+  const canceled: CanceledLobbyInvite[] = [];
+  for (const invite of pending) {
+    const updated = await prisma.lobbyInvite.updateMany({
+      where: { id: invite.id, status: "PENDING" },
+      data: { status: "CANCELED" },
+    });
+    if (updated.count === 1) canceled.push(invite);
+  }
+  await publishCanceledLobbyInvites(canceled);
 }

@@ -123,9 +123,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     | { kind: "unavailable" };
   try {
     transactionResult = await retryTransactionOnce(prisma, async (tx) => {
-      // Revalidate the active lobby snapshot inside the same transaction as
-      // invite creation. If close commits CLOSED after the preflight read,
-      // this conditional update returns 0 and no invite can be created.
+      // Revalidate the active lobby snapshot and bump its observable revision
+      // inside the same transaction as invite creation. A confirmed party
+      // switch that captured the prior revision must re-prompt rather than
+      // silently canceling an invite created during its retry.
       const activeLobby = await tx.lobby.updateMany({
         where: {
           id: lobbyId,
