@@ -5,12 +5,17 @@ interface LobbyRoomRecovery {
   message: string | null;
 }
 
+export function rejoinGameId(lobby: LobbyRoomState) {
+  return lobby.status === "IN_GAME" &&
+    lobby.gameStatus === "IN_PROGRESS" &&
+    lobby.gameId
+    ? lobby.gameId
+    : null;
+}
+
 export function lobbyRoomRecovery(
   lobby: LobbyRoomState
 ): LobbyRoomRecovery | null {
-  if (lobby.status === "IN_GAME" && lobby.gameId) {
-    return { route: `/game/${lobby.gameId}`, message: null };
-  }
   if (lobby.status === "EVICTED") {
     return {
       route: "/lobbies",

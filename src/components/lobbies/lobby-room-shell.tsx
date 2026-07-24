@@ -38,7 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { DeckPreviewModal } from "./deck-preview-modal";
 import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 import { HostCloseAction, runHostClose } from "./host-close-action";
-import { lobbyRoomRecovery } from "./lobby-room-recovery";
+import { lobbyRoomRecovery, rejoinGameId } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
 import { PregameSettings } from "./pregame-settings";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
@@ -52,11 +52,13 @@ interface DeckOption extends LobbyRoomDeck {
 interface LobbyRoomShellProps {
   lobbyId: string;
   currentUserId: string;
+  joinError?: string;
 }
 
 export function LobbyRoomShell({
   lobbyId,
   currentUserId,
+  joinError,
 }: LobbyRoomShellProps) {
   const router = useRouter();
   const {
@@ -102,6 +104,8 @@ export function LobbyRoomShell({
 
   const isHost = lobby?.hostUserId === currentUserId;
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
+  const isInGame = lobby?.status === "IN_GAME";
+  const activeGameId = lobby ? rejoinGameId(lobby) : null;
   const canEditPregame = Boolean(
     isHost && (lobby?.status === "WAITING" || lobby?.status === "READY")
   );
@@ -137,8 +141,7 @@ export function LobbyRoomShell({
     }
     await runPatch({
       mode,
-      pregameMode:
-        mode === "SOLITAIRE" ? "SOLITAIRE_RANDOM" : "PRIORITY_ROLL",
+      pregameMode: mode === "SOLITAIRE" ? "SOLITAIRE_RANDOM" : "PRIORITY_ROLL",
     });
   };
 
@@ -237,52 +240,86 @@ export function LobbyRoomShell({
           <PageHeaderContent>
             <PageHeaderTitle>Lobby Room</PageHeaderTitle>
             <PageHeaderDescription>
-              Pick decks, ready up, then the host starts the game.
+              {activeGameId
+                ? "Your match is in progress. Rejoin when you are ready."
+                : isInGame
+                  ? "The match has ended. This room is waiting to reset."
+                  : "Pick decks, ready up, then the host starts the game."}
             </PageHeaderDescription>
           </PageHeaderContent>
           <PageHeaderActions>
             <Badge variant="secondary">{lobby.format}</Badge>
-            <GuestLeaveAction
-              isGuest={Boolean(isGuest)}
-              leaving={leaving}
-              disabled={mutating}
-              onLeave={() => void handleLeave()}
-            />
-            <HostCloseAction
-              canClose={Boolean(
-                isHost &&
-                lobby.mode === "PVP" &&
-                (lobby.status === "WAITING" || lobby.status === "READY")
-              )}
-              guestName={realGuestPresent ? guestName : null}
-              closing={closing}
-              disabled={mutating || starting}
-              onClose={() => void handleClose()}
-            />
-            {isHost && (
+            {activeGameId ? (
               <Button
-                onClick={handleStart}
-                disabled={!canStart || mutating || starting || closing}
+                variant="gold"
+                size="lg"
+                onClick={() => router.push(`/game/${activeGameId}`)}
               >
-                {starting ? (
-                  <Loader2 data-icon="inline-start" className="animate-spin" />
-                ) : (
-                  <Play data-icon="inline-start" />
-                )}
-                Start Game
+                <Play data-icon="inline-start" />
+                Rejoin Game
               </Button>
+            ) : (
+              <>
+                <GuestLeaveAction
+                  isGuest={Boolean(isGuest)}
+                  leaving={leaving}
+                  disabled={mutating}
+                  onLeave={() => void handleLeave()}
+                />
+                <HostCloseAction
+                  canClose={Boolean(
+                    isHost &&
+                    lobby.mode === "PVP" &&
+                    (lobby.status === "WAITING" || lobby.status === "READY")
+                  )}
+                  guestName={realGuestPresent ? guestName : null}
+                  closing={closing}
+                  disabled={mutating || starting}
+                  onClose={() => void handleClose()}
+                />
+                {isHost && (
+                  <Button
+                    onClick={handleStart}
+                    disabled={!canStart || mutating || starting || closing}
+                  >
+                    {starting ? (
+                      <Loader2
+                        data-icon="inline-start"
+                        className="animate-spin"
+                      />
+                    ) : (
+                      <Play data-icon="inline-start" />
+                    )}
+                    Start Game
+                  </Button>
+                )}
+              </>
             )}
           </PageHeaderActions>
         </PageHeader>
 
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+          {joinError && (
+            <div
+              className="border-error/30 bg-card text-error rounded-lg border p-4 text-sm"
+              role="alert"
+            >
+              {joinError}
+            </div>
+          )}
           <div className="border-border bg-card flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
             <Tabs value={lobby.mode} onValueChange={onModeChange}>
               <TabsList>
-                <TabsTrigger value="PVP" disabled={!isHost || mutating}>
+                <TabsTrigger
+                  value="PVP"
+                  disabled={!isHost || mutating || isInGame}
+                >
                   PVP
                 </TabsTrigger>
-                <TabsTrigger value="SOLITAIRE" disabled={!isHost || mutating}>
+                <TabsTrigger
+                  value="SOLITAIRE"
+                  disabled={!isHost || mutating || isInGame}
+                >
                   Solitaire
                 </TabsTrigger>
                 <Tooltip content="Coming soon">
@@ -320,14 +357,19 @@ export function LobbyRoomShell({
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_auto_1fr]">
+          <div
+            className={cn(
+              "grid gap-6 lg:grid-cols-[1fr_auto_1fr]",
+              isInGame && "pointer-events-none opacity-45"
+            )}
+          >
             <SeatPanel
               label="Side A"
               playerName={displayName(lobby.host, "Host")}
               deck={lobby.hostDeck}
               ready={lobby.hostReady}
-              editable={Boolean(isHost)}
-              readyEditable={Boolean(isHost)}
+              editable={Boolean(isHost && !isInGame)}
+              readyEditable={Boolean(isHost && !isInGame)}
               readyDisabled={!lobby.hostDeck || mutating}
               decks={decks}
               selectPlaceholder="Choose host deck"
@@ -349,8 +391,8 @@ export function LobbyRoomShell({
                   playerName={guestName}
                   deck={lobby.guest.deck}
                   ready={lobby.guest.guestReady}
-                  editable={Boolean(isGuest)}
-                  readyEditable={Boolean(isGuest)}
+                  editable={Boolean(isGuest && !isInGame)}
+                  readyEditable={Boolean(isGuest && !isInGame)}
                   readyDisabled={!lobby.guest.deck || mutating}
                   decks={decks}
                   selectPlaceholder="Choose guest deck"
@@ -374,7 +416,7 @@ export function LobbyRoomShell({
                 deck={lobby.guest?.deck ?? null}
                 ready={false}
                 showReady={false}
-                editable={Boolean(isHost)}
+                editable={Boolean(isHost && !isInGame)}
                 readyEditable={false}
                 readyDisabled
                 decks={decks}

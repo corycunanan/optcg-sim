@@ -409,8 +409,7 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     await mount(active);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(
-        LOBBY_RECONCILIATION_INTERVAL_MS *
-          LOBBY_RECONCILIATION_MAX_ATTEMPTS
+        LOBBY_RECONCILIATION_INTERVAL_MS * LOBBY_RECONCILIATION_MAX_ATTEMPTS
       );
     });
 
@@ -428,7 +427,7 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     );
   });
 
-  it("does not expose a polled IN_GAME snapshot for navigation", async () => {
+  it("reconciles a polled IN_GAME snapshot into the party room", async () => {
     const active = lobbyState({ version: 4, status: "READY" });
     const started = lobbyState({
       version: 5,
@@ -439,7 +438,7 @@ describe("useLobbyRoom degraded delivery recovery", () => {
 
     await mount(active);
 
-    expect(room().lobby).toEqual(active);
+    expect(room().lobby).toEqual(started);
     expect(mocks.apiGet).toHaveBeenCalledTimes(1);
   });
 
