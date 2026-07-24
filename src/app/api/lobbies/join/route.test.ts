@@ -11,6 +11,7 @@ const userFindUniqueMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
+const cancelPendingLobbyInvitesMock = vi.fn();
 
 // Track `after()` callbacks so tests can deterministically flush them before
 // asserting on fanout side effects.
@@ -57,6 +58,10 @@ vi.mock("@/lib/lobbies/build-state", () => ({
 vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
+vi.mock("@/lib/lobbies/cancel-invites", () => ({
+  cancelPendingLobbyInvites: (...args: unknown[]) =>
+    cancelPendingLobbyInvitesMock(...args),
+}));
 
 const { POST } = await import("./route");
 
@@ -79,6 +84,7 @@ beforeEach(() => {
   transactionMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
+  cancelPendingLobbyInvitesMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "guest-user" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
@@ -123,6 +129,7 @@ beforeEach(() => {
     hostUserId: "host-user",
   });
   notifyLobbyMock.mockResolvedValue(undefined);
+  cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
   afterCalls.pending.length = 0;
 });
 
@@ -230,7 +237,7 @@ describe("POST /api/lobbies/join", () => {
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     expect(notifyLobbyMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lobby-1" }),
-      { actorUserId: "guest-user" },
+      { actorUserId: "guest-user" }
     );
   });
 
@@ -267,5 +274,95 @@ describe("POST /api/lobbies/join", () => {
       code: "ACTIVE_LOBBY_EXISTS",
     });
     expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("silently replaces an empty personal lobby before joining", async () => {
+    userUpdateManyMock
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "personal-lobby",
+      activeLobby: {
+        id: "personal-lobby",
+        status: "WAITING",
+        hostUserId: "guest-user",
+        guest: null,
+      },
+    });
+
+    const res = await POST(buildRequest({ code: "ABCD" }));
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ data: { lobbyId: "lobby-1" } });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: "personal-lobby",
+        hostUserId: "guest-user",
+        status: { in: ["WAITING", "READY"] },
+        guest: { is: null },
+      },
+      data: { status: "CLOSED", revision: { increment: 1 } },
+    });
+    expect(userUpdateManyMock.mock.calls).toEqual([
+      [
+        {
+          where: { id: "guest-user", activeLobbyId: null },
+          data: { activeLobbyId: "lobby-1" },
+        },
+      ],
+      [
+        {
+          where: { id: "guest-user", activeLobbyId: "personal-lobby" },
+          data: { activeLobbyId: null },
+        },
+      ],
+      [
+        {
+          where: { id: "guest-user", activeLobbyId: null },
+          data: { activeLobbyId: "lobby-1" },
+        },
+      ],
+    ]);
+    expect(lobbyGuestCreateMock).toHaveBeenCalledOnce();
+    expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith(
+      "personal-lobby"
+    );
+  });
+
+  it("keeps ACTIVE_LOBBY_EXISTS when the joiner hosts a guest", async () => {
+    userUpdateManyMock.mockResolvedValue({ count: 0 });
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "hosted-lobby",
+      activeLobby: {
+        id: "hosted-lobby",
+        status: "READY",
+        hostUserId: "guest-user",
+        guest: { userId: "seated-opponent" },
+      },
+    });
+
+    const res = await POST(buildRequest({ code: "ABCD" }));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "An active lobby already exists",
+      code: "ACTIVE_LOBBY_EXISTS",
+    });
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "hosted-lobby" }),
+      })
+    );
+  });
+
+  it("rejects an invalid code before opening a transaction", async () => {
+    const res = await POST(buildRequest({ code: "--" }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid lobby code" });
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

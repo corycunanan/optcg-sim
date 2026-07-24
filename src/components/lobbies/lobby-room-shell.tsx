@@ -52,11 +52,13 @@ interface DeckOption extends LobbyRoomDeck {
 interface LobbyRoomShellProps {
   lobbyId: string;
   currentUserId: string;
+  joinError?: string;
 }
 
 export function LobbyRoomShell({
   lobbyId,
   currentUserId,
+  joinError,
 }: LobbyRoomShellProps) {
   const router = useRouter();
   const {
@@ -158,7 +160,7 @@ export function LobbyRoomShell({
 
   const copyInvite = async () => {
     if (!lobby) return;
-    const value = `${window.location.origin}/lobbies/${lobby.id}`;
+    const value = `${window.location.origin}/lobbies?code=${lobby.joinCode}`;
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
@@ -297,6 +299,14 @@ export function LobbyRoomShell({
         </PageHeader>
 
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+          {joinError && (
+            <div
+              className="border-error/30 bg-card text-error rounded-lg border p-4 text-sm"
+              role="alert"
+            >
+              {joinError}
+            </div>
+          )}
           <div className="border-border bg-card flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
             <Tabs value={lobby.mode} onValueChange={onModeChange}>
               <TabsList>
