@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LobbyRoomState } from "@/lib/lobbies/state";
 
 type LobbyEvent = { type: "lobby:state_changed"; lobby: LobbyRoomState };
+type GuestRemovedEvent = {
+  type: "lobby:guest_removed";
+  lobbyId: string;
+  hostName: string;
+};
 
 const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -13,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   setterCalls: [] as unknown[][],
   setterIndex: 0,
   subscribeHandler: null as ((event: LobbyEvent) => void) | null,
+  guestRemovedHandler: null as ((event: GuestRemovedEvent) => void) | null,
   subscribeUnsub: vi.fn(),
   effectCleanups: [] as Array<() => void>,
 }));
@@ -20,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 // Mock React's hooks to run synchronously and capture per-`useState` setter
 // calls in declaration order. The hook declares state in this order:
 //   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting, 5: leaving,
-//   6: closing
+//   6: closing, 7: kicking, 8: removedByHost
 // Tests assert on the lobby setter (index 0) and the error setter (index 2).
 vi.mock("react", async (importActual) => {
   const actual = await importActual<typeof import("react")>();
@@ -58,10 +64,15 @@ vi.mock("@/components/realtime/user-channel-provider", () => ({
   useUserChannelEvents: () => ({
     subscribe: <T extends string>(
       type: T,
-      handler: (event: LobbyEvent) => void
+      handler: (event: LobbyEvent | GuestRemovedEvent) => void
     ) => {
       if (type === "lobby:state_changed") {
-        mocks.subscribeHandler = handler;
+        mocks.subscribeHandler = handler as (event: LobbyEvent) => void;
+      }
+      if (type === "lobby:guest_removed") {
+        mocks.guestRemovedHandler = handler as (
+          event: GuestRemovedEvent
+        ) => void;
       }
       return mocks.subscribeUnsub;
     },
@@ -99,6 +110,7 @@ beforeEach(() => {
   mocks.removeEventListener.mockReset();
   mocks.subscribeUnsub.mockReset();
   mocks.subscribeHandler = null;
+  mocks.guestRemovedHandler = null;
   mocks.setterCalls = [];
   mocks.setterIndex = 0;
   mocks.effectCleanups = [];
@@ -157,7 +169,31 @@ describe("useLobbyRoom subscribe behavior", () => {
       cleanup();
     }
 
-    expect(mocks.subscribeUnsub).toHaveBeenCalledTimes(1);
+    expect(mocks.subscribeUnsub).toHaveBeenCalledTimes(2);
+  });
+
+  it("captures a directed removal event for the current lobby", () => {
+    useLobbyRoom("lobby-1", lobbyState());
+
+    mocks.guestRemovedHandler?.({
+      type: "lobby:guest_removed",
+      lobbyId: "lobby-1",
+      hostName: "strawhat",
+    });
+
+    expect(mocks.setterCalls[8]).toContain("strawhat");
+  });
+
+  it("ignores a directed removal event for another lobby", () => {
+    useLobbyRoom("lobby-1", lobbyState());
+
+    mocks.guestRemovedHandler?.({
+      type: "lobby:guest_removed",
+      lobbyId: "lobby-2",
+      hostName: "strawhat",
+    });
+
+    expect(mocks.setterCalls[8]).toEqual([]);
   });
 
   it("clears stale error state when a matching event arrives", () => {
@@ -215,6 +251,20 @@ describe("useLobbyRoom close behavior", () => {
 
     expect(mocks.apiDelete).toHaveBeenCalledWith(
       "/api/lobbies/lobby-1",
+      expect.anything()
+    );
+  });
+});
+
+describe("useLobbyRoom kick behavior", () => {
+  it("deletes the occupied guest through the host kick endpoint", async () => {
+    mocks.apiDelete.mockResolvedValueOnce({ success: true });
+    const room = useLobbyRoom("lobby-1", lobbyState());
+
+    await room.kickGuest();
+
+    expect(mocks.apiDelete).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/guest",
       expect.anything()
     );
   });

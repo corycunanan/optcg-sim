@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, Lock, Play, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ import { HostCloseAction, runHostClose } from "./host-close-action";
 import { lobbyRoomRecovery, rejoinGameId } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
 import { PregameSettings } from "./pregame-settings";
+import { KickPlayerAction } from "./kick-player-action";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
 
 interface DeckOption extends LobbyRoomDeck {
@@ -69,16 +70,20 @@ export function LobbyRoomShell({
     starting,
     leaving,
     closing,
+    kicking,
+    removedByHost,
     patchLobby,
     startLobby,
     leaveLobby,
     closeLobby,
+    kickGuest,
   } = useLobbyRoom(lobbyId);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
   const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
+  const recoveryHandledRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,13 +99,22 @@ export function LobbyRoomShell({
     };
   }, []);
 
+  const recovery = useMemo(() => {
+    if (removedByHost) {
+      return {
+        route: "/lobbies",
+        message: `You were removed from ${removedByHost}'s party`,
+      };
+    }
+    return lobby ? lobbyRoomRecovery(lobby) : null;
+  }, [lobby, removedByHost]);
+
   useEffect(() => {
-    if (!lobby) return;
-    const recovery = lobbyRoomRecovery(lobby);
-    if (!recovery) return;
+    if (!recovery || recoveryHandledRef.current) return;
+    recoveryHandledRef.current = true;
     if (recovery.message) toast.info(recovery.message);
     router.push(recovery.route);
-  }, [lobby, router]);
+  }, [recovery, router]);
 
   const isHost = lobby?.hostUserId === currentUserId;
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
@@ -204,6 +218,19 @@ export function LobbyRoomShell({
       returnToBrowser: () => router.push("/lobbies"),
     });
   };
+
+  const handleKick = async () => {
+    try {
+      await kickGuest();
+      toast.success(`${guestName} was removed from the party`);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not kick player"
+      );
+    }
+  };
+
+  if (recovery) return null;
 
   if (loading && !lobby) {
     return (
@@ -394,6 +421,16 @@ export function LobbyRoomShell({
                   editable={Boolean(isGuest && !isInGame)}
                   readyEditable={Boolean(isGuest && !isInGame)}
                   readyDisabled={!lobby.guest.deck || mutating}
+                  actions={
+                    isHost ? (
+                      <KickPlayerAction
+                        playerName={guestName}
+                        kicking={kicking}
+                        disabled={mutating || starting || isInGame}
+                        onKick={() => void handleKick()}
+                      />
+                    ) : null
+                  }
                   decks={decks}
                   selectPlaceholder="Choose guest deck"
                   onDeckChange={(deckId) => runPatch({ guestDeckId: deckId })}
@@ -506,6 +543,7 @@ function SeatPanel({
   onDeckChange,
   onReadyChange,
   onPreview,
+  actions,
 }: {
   label: string;
   playerName: string;
@@ -520,6 +558,7 @@ function SeatPanel({
   onDeckChange: (deckId: string) => void;
   onReadyChange: (ready: boolean) => void;
   onPreview: (deckId: string) => void;
+  actions?: ReactNode;
 }) {
   return (
     <section className="border-border bg-card flex min-h-[480px] flex-col gap-5 rounded-lg border p-5">
@@ -532,11 +571,14 @@ function SeatPanel({
             {playerName}
           </p>
         </div>
-        {showReady && (
-          <Badge variant={ready ? "default" : "secondary"}>
-            {ready ? "Ready" : "Not Ready"}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {showReady && (
+            <Badge variant={ready ? "default" : "secondary"}>
+              {ready ? "Ready" : "Not Ready"}
+            </Badge>
+          )}
+          {actions}
+        </div>
       </div>
 
       <button
@@ -620,7 +662,7 @@ function InvitePanel({
           Side B
         </p>
         <p className="text-content-primary mt-2 text-lg font-semibold">
-          Waiting for opponent
+          Open seat
         </p>
         <p className="text-content-secondary mt-2 text-sm">
           Share the room code when your opponent is ready.

@@ -22,6 +22,13 @@ function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
 }
 
 describe("lobbyRoomRecovery", () => {
+  it("uses neutral recovery copy when the viewer is no longer seated", () => {
+    expect(lobbyRoomRecovery(lobbyState({ status: "EVICTED" }))).toEqual({
+      route: "/lobbies",
+      message: "You're no longer in this party",
+    });
+  });
+
   it("gives a CLOSED guest an explicit outcome and lobby-browser route", () => {
     expect(lobbyRoomRecovery(lobbyState({ status: "CLOSED" }))).toEqual({
       route: "/lobbies",
