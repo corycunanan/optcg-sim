@@ -553,17 +553,17 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
 
           <SidebarGroup className="py-3">
             <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-              Invites {incoming.length > 0 && `(${incoming.length})`}
+              Requests {incoming.length > 0 && `(${incoming.length})`}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               {requestsLoadState === "loading" && incoming.length === 0 ? (
                 <p className="text-content-tertiary px-2 text-xs">
-                  Loading invites…
+                  Loading requests…
                 </p>
               ) : requestsLoadState === "error" &&
                 incoming.length === 0 ? null : incoming.length === 0 ? (
                 <p className="text-content-tertiary px-2 text-xs">
-                  No pending invites.
+                  No pending friend requests.
                 </p>
               ) : (
                 <SidebarMenu className="gap-1">
@@ -591,8 +591,8 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                           onClick={() =>
                             handleFriendRequest(request.id, "accept")
                           }
-                          title="Accept invite"
-                          aria-label="Accept invite"
+                          title="Accept friend request"
+                          aria-label="Accept friend request"
                           disabled={resolvingRequests.has(request.id)}
                           className="text-accent hover:text-accent size-8"
                         >
@@ -604,8 +604,8 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                           onClick={() =>
                             handleFriendRequest(request.id, "decline")
                           }
-                          title="Decline invite"
-                          aria-label="Decline invite"
+                          title="Decline friend request"
+                          aria-label="Decline friend request"
                           disabled={resolvingRequests.has(request.id)}
                           className="text-content-secondary hover:text-content-primary size-8"
                         >
