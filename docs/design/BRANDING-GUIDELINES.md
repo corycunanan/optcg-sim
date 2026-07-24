@@ -284,7 +284,7 @@ Following Riftbound's 3-breakpoint responsive reduction:
 ### Typography Rules
 
 1. `.font-display` is always Erode 600, normal style, uppercase, with `0.025em` letter spacing. Featured callouts and pull-quotes use the same upright treatment.
-2. Navbar links are a separate component-level treatment: Geist Sans 700, uppercase, `tracking-[0.04em]`, 16px (`text-base`).
+2. Navbar links use Erode 700, uppercase, `0.04em` letter spacing, and 16px (`text-base`) per the locked direction. The Erode family application ships with the OPT-534 navbar refresh; the current navbar remains an interim Geist Sans rendering.
 3. Body text max line-length: 65-75 characters (`max-w-prose` or `max-w-[65ch]`)
 4. Minimum font size: 12px (`text-xs`). Never use `text-[10px]` or `text-[11px]`.
    - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside any element rendered within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body / paragraph text. Chrome (navbar, modals, tooltips, popovers, side panels) keeps the 12px floor unchanged. See §13 for the full inside-board override set.
@@ -500,7 +500,7 @@ Dark surface, consistent across all pages:
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- Nav links: Geist Sans 16px/700, uppercase, `tracking-[0.04em]`
+- Canonical nav-link treatment: Erode 16px/700, uppercase, `0.04em` letter spacing. The family application ships with OPT-534; the current navbar remains an interim Geist Sans rendering.
 - Resting: `--text-inverse` at 70% alpha; hover/focus: `--text-inverse` on a 10% white-alpha surface
 - Active: `--text-inverse` on a 10% white-alpha surface; hover raises the surface to 15%
 

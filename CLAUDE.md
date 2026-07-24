@@ -189,7 +189,7 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
   - Desaturated `--desaturated-*` primitives are unused by the default semantic layer and reserved for a future preset
   - Six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, holofoil colors, and `--gb-*` game-board tokens are non-themable feature contracts
 - **Typography:**
-  - **Display/headings:** Erode variable (self-hosted WOFF2, weights 300–700 through `next/font/local`) — `.font-display` uses 600, normal style, uppercase, and `0.025em` letter spacing. Navbar links separately use Geist Sans 700, uppercase, 16px, and `tracking-[0.04em]`.
+  - **Display/headings:** Erode variable (self-hosted WOFF2, weights 300–700 through `next/font/local`) — `.font-display` uses 600, normal style, uppercase, and `0.025em` letter spacing. Per the locked direction, navbar links use Erode 700, uppercase, `0.04em` letter spacing, and 16px; the family application ships with the OPT-534 navbar refresh, while the current navbar remains an interim Geist Sans rendering.
   - **Body:** Geist Sans — all body text, labels, UI elements.
   - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. See `docs/design/BRANDING-GUIDELINES.md` for full scale.
 - **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible. Every registered theme must pass the 19-pair `pnpm run check:contrast` gate; new semantic foreground/background combinations must be added to `scripts/contrast-pairs.json`.
