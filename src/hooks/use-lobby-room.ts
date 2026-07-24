@@ -39,6 +39,8 @@ export function useLobbyRoom(
   const [starting, setStarting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [kicking, setKicking] = useState(false);
+  const [removedByHost, setRemovedByHost] = useState<string | null>(null);
   const cancelledRef = useRef(false);
   const refreshInFlightRef = useRef(false);
   const queuedRefreshRef = useRef(false);
@@ -154,6 +156,13 @@ export function useLobbyRoom(
   }, [applySnapshot, subscribe, lobbyId]);
 
   useEffect(() => {
+    return subscribe("lobby:guest_removed", (event) => {
+      if (event.lobbyId !== lobbyId) return;
+      setRemovedByHost(event.hostName);
+    });
+  }, [subscribe, lobbyId]);
+
+  useEffect(() => {
     const previousStatus = previousConnectionStatusRef.current;
     previousConnectionStatusRef.current = connectionStatus;
     if (connectionStatus === "connected" && previousStatus !== "connected") {
@@ -245,6 +254,19 @@ export function useLobbyRoom(
     }
   }, [lobbyId]);
 
+  const kickGuest = useCallback(async () => {
+    setKicking(true);
+    try {
+      await apiDelete(
+        `/api/lobbies/${lobbyId}/guest`,
+        LobbyActionResponseSchema
+      );
+      return await refresh();
+    } finally {
+      setKicking(false);
+    }
+  }, [lobbyId, refresh]);
+
   return {
     lobby,
     loading,
@@ -253,10 +275,13 @@ export function useLobbyRoom(
     starting,
     leaving,
     closing,
+    kicking,
+    removedByHost,
     refresh,
     patchLobby,
     startLobby,
     leaveLobby,
     closeLobby,
+    kickGuest,
   };
 }

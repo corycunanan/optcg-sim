@@ -32,6 +32,11 @@ export type RealtimeServerEvent =
   | { type: "friend:removed"; userId: string }
   | { type: "lobby:state_changed"; lobby: LobbyRoomState }
   | {
+      type: "lobby:guest_removed";
+      lobbyId: string;
+      hostName: string;
+    }
+  | {
       type: "game:status";
       gameId: string;
       status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
