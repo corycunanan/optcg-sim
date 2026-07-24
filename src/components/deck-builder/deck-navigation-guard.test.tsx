@@ -54,9 +54,10 @@ vi.mock("@/components/ui/navigation-menu", () => ({
   NavigationMenu: ({ children }: { children: React.ReactNode }) => children,
   NavigationMenuList: ({ children }: { children: React.ReactNode }) => children,
   NavigationMenuItem: ({ children }: { children: React.ReactNode }) => children,
-  NavigationMenuTrigger: ({ children }: { children: React.ReactNode }) => (
-    <button>{children}</button>
-  ),
+  NavigationMenuTrigger: ({
+    children,
+    ...props
+  }: React.ComponentProps<"button">) => <button {...props}>{children}</button>,
   NavigationMenuContent: ({ children }: { children: React.ReactNode }) =>
     children,
   NavigationMenuLink: ({ children }: { children: React.ReactNode }) => children,
@@ -688,11 +689,9 @@ describe("deck builder navigation guard", () => {
     const links = renderer!.root.findAllByType("a");
     expect(links.map((link) => link.props.href)).toEqual([
       "/",
-      "/",
       "/cards",
       "/sets",
       "/lobbies",
-      "/sandbox",
       "/decks",
       "/decks/new",
     ]);
@@ -712,18 +711,44 @@ describe("deck builder navigation guard", () => {
     }
   });
 
-  it("keeps public card navigation visible without a session", async () => {
+  it("keeps the complete navbar visible without a session", async () => {
     mocks.session = null;
     await renderGuard(<Navbar />, false);
 
     const links = renderer!.root.findAllByType("a");
     expect(links.map((link) => link.props.href)).toEqual([
       "/",
-      "/",
       "/cards",
       "/sets",
+      "/lobbies",
+      "/decks",
+      "/decks/new",
     ]);
   });
+
+  it.each([
+    ["/", "Home", "aria-current"],
+    ["/cards/OP01-001", "Cards", "data-active"],
+    ["/sets/OP01", "Cards", "data-active"],
+    ["/admin/cards/new", "Cards", "data-active"],
+    ["/admin/sets", "Cards", "data-active"],
+    ["/lobbies/lobby-1", "Play", "aria-current"],
+    ["/game", "Play", "aria-current"],
+    ["/decks/deck-1", "Decks", "data-active"],
+  ])(
+    "marks the matching nav item active for %s",
+    async (pathname, label, activeProp) => {
+      mocks.pathname = pathname;
+      await renderGuard(<Navbar />, false);
+
+      const item = [
+        ...renderer!.root.findAllByType("a"),
+        ...renderer!.root.findAllByType("button"),
+      ].find((candidate) => candidate.props.children === label);
+
+      expect(item?.props[activeProp]).toBeTruthy();
+    }
+  );
 
   it("keeps dirty editor state on cancel and navigates only after confirmation", async () => {
     await renderGuard(
