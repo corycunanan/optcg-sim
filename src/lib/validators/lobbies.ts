@@ -53,6 +53,7 @@ export const LobbyRoomStateSchema = z.object({
     })
     .nullable(),
   gameId: z.string().nullable(),
+  gameStatus: z.enum(["IN_PROGRESS", "FINISHED", "ABANDONED"]).optional(),
 });
 
 export const LobbyRoomResponseSchema = z.object({ data: LobbyRoomStateSchema });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LobbyRoomState } from "@/lib/lobbies/state";
-import { lobbyRoomRecovery } from "./lobby-room-recovery";
+import { lobbyRoomRecovery, rejoinGameId } from "./lobby-room-recovery";
 
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
@@ -29,10 +29,27 @@ describe("lobbyRoomRecovery", () => {
     });
   });
 
-  it("preserves game routing for a lobby that starts", () => {
+  it("keeps an in-progress game in the party room for explicit rejoin", () => {
+    const inGame = lobbyState({
+      status: "IN_GAME",
+      gameId: "game-1",
+      gameStatus: "IN_PROGRESS",
+    });
+
+    expect(lobbyRoomRecovery(inGame)).toBeNull();
+    expect(rejoinGameId(inGame)).toBe("game-1");
+  });
+
+  it("does not offer Rejoin for OPT-520's stale post-game lobby state", () => {
     expect(
-      lobbyRoomRecovery(lobbyState({ status: "IN_GAME", gameId: "game-1" }))
-    ).toEqual({ route: "/game/game-1", message: null });
+      rejoinGameId(
+        lobbyState({
+          status: "IN_GAME",
+          gameId: "game-1",
+          gameStatus: "FINISHED",
+        })
+      )
+    ).toBeNull();
   });
 
   it("does not recover an active pre-game room", () => {

@@ -58,6 +58,7 @@ export interface LobbyRoomState {
     deck: LobbyRoomDeck | null;
   } | null;
   gameId: string | null;
+  gameStatus?: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
 }
 
 /**
@@ -68,7 +69,7 @@ export interface LobbyRoomState {
  */
 export function viewerIsEvicted(
   lobby: Pick<LobbyRoomState, "status" | "hostUserId" | "guest">,
-  viewerUserId: string,
+  viewerUserId: string
 ): boolean {
   if (lobby.hostUserId === viewerUserId) return false;
   if (lobby.status !== "WAITING" && lobby.status !== "READY") return false;

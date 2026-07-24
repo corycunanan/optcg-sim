@@ -56,9 +56,6 @@ export function useLobbyRoom(
   const applySnapshot = useCallback(
     (snapshot: LobbyRoomState, source: SnapshotSource) => {
       if (snapshot.id !== lobbyId) return false;
-      // A GET can observe the transient row written before worker startup.
-      // Only the success-only realtime event may publish IN_GAME to routing.
-      if (source === "refresh" && snapshot.status === "IN_GAME") return false;
 
       if (snapshot.version !== undefined) {
         const current = latestVersionRef.current;
