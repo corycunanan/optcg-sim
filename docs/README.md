@@ -49,7 +49,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 
 ## Design
 
-- [Branding Guidelines](./design/BRANDING-GUIDELINES.md) — comprehensive design brief: tokens, typography, motion language, component patterns
+- [Branding Guidelines](./design/BRANDING-GUIDELINES.md) — shipped design and theming contract: semantic tokens, Erode typography, motion, and component patterns
 - [Semantic Tokens Guide](./design/TOKENS-GUIDE.md) — choosing the current CSS/Tailwind token family by UI role
 - [Design Audit](./design/DESIGN-AUDIT.md) — interface quality audit across accessibility, performance, and theming
 - [Design Critique](./design/DESIGN-CRITIQUE.md) — UX evaluation with actionable feedback

@@ -173,22 +173,26 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
 - **[Official OPTCG Website](https://en.onepiece-cardgame.com/)** — deep navy structure, gold accents, generous whitespace, and card art as hero. This is the primary brand reference, adapted to a dark-only product surface.
 - **[Riftbound (League of Legends TCG)](https://riftbound.leagueoflegends.com/)** — blade section architecture, ornamental CTA buttons, carousel with progress bar, responsive spacing variables, dramatic serif display typography, backdrop overlays. Key structural reference for layout and component patterns.
 - **[MTG Arena](https://magic.wizards.com/en/mtgarena)** — spacing discipline, fluid typography, purposeful motion, CSS variable system.
-- **[Branding Guidelines](docs/design/BRANDING-GUIDELINES.md)** — comprehensive design brief for M5 UI Overhaul. Defines all token values, typography, motion language, component patterns, and game board theming architecture. Source of truth for implementation.
+- **[Branding Guidelines](docs/design/BRANDING-GUIDELINES.md)** — shipped M5 design and theming contract: typography, palette roles, theme extension rules, motion, and component patterns. `src/app/globals.css` remains the source of truth for token names and values.
+- **[Redesign source artifact](https://claude.ai/code/artifact/e2e8f04c-9554-42e9-82d0-29fc3d459b58)** — initial direction dated 2026-07-23; VQA corrections on 2026-07-24 restored the warm navy/original gold default and uppercase display treatment while retaining the desaturated family only for a future preset.
 
 ### Aesthetic Direction
 - **Visual tone:** Clean, warm, and confident on deep navy. Dark never means gloomy, cold, low-contrast, or gamer-neon.
-- **Primary theme:** Dark-only. The main app uses a navy-900 page foundation with progressively lighter navy elevations; the game board remains a separate, darker themed context.
+- **Primary theme:** The default theme is the warm navy foundation in `:root` and renders without a `data-theme` attribute. Registered presets may override primitives only; the game board remains a separate, non-themable context. Follow the [Theming contract](docs/design/BRANDING-GUIDELINES.md#theming).
 - **Color palette:**
   - Deep navy (`oklch(22% 0.04 245)`) — the page background and structural foundation, with lighter navy elevation steps for panels and controls
-  - Warm white (`oklch(96% 0.008 75)`) — primary text, with warm secondary and tertiary steps for hierarchy
-  - Warm gold (`oklch(78% 0.14 75)`) — primary interaction, visible focus, and premium/treasure moments
-  - One Piece red (`oklch(74% 0.20 25)`) for emphasis, energy, and destructive actions only
-  - Six TCG card colors (Red, Blue, Green, Purple, Black, Yellow) remain functional identifiers only
+  - Near-white (`#f4f6fb`) — primary text, with white-alpha secondary (`0.72`), tertiary (`0.58`), and disabled (`0.42`) steps
+  - White-alpha borders (`0.10`, `0.14`, `0.16`, `0.18`) — primitive steps mapped to semantic border roles for components
+  - Warm gold (`oklch(78% 0.14 75)`) — primary fills and focus; text/links use `--accent-text` (`oklch(78% 0.12 75)`)
+  - Reserved border gold (`oklch(45% 0.06 75)`) — decorative navbar/social refresh work only; approximately 2.5:1 against nav and never accessibility-critical
+  - One Piece red (`oklch(70% 0.17 25)`) for emphasis, energy, and destructive actions only
+  - Desaturated `--desaturated-*` primitives are unused by the default semantic layer and reserved for a future preset
+  - Six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, holofoil colors, and `--gb-*` game-board tokens are non-themable feature contracts
 - **Typography:**
-  - **Display/headings:** DM Serif Display (Google Fonts) — high-contrast display serif for page titles, section headers. Uppercase. Italic variant for featured callouts and pull-quotes.
+  - **Display/headings:** Erode variable (self-hosted WOFF2, weights 300–700 through `next/font/local`) — `.font-display` uses 600, normal style, uppercase, and `0.025em` letter spacing. Navbar links separately use Geist Sans 700, uppercase, 16px, and `tracking-[0.04em]`.
   - **Body:** Geist Sans — all body text, labels, UI elements.
   - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. See `docs/design/BRANDING-GUIDELINES.md` for full scale.
-- **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible.
+- **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible. Every registered theme must pass the 19-pair `pnpm run check:contrast` gate; new semantic foreground/background combinations must be added to `scripts/contrast-pairs.json`.
 - **Card presentation:** Restrained elevated navy surfaces let art breathe. Single, clean hover state — no stacking of lift + shadow + blur.
 - **Anti-references:** NOT gloomy, low-contrast, cold gray, or gamer-neon. NOT generic SaaS dashboard. NOT over-decorated with gradients and backdrop blurs.
 
@@ -197,7 +201,7 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
 These rules exist to prevent "AI slop" — arbitrary decisions that look reasonable in isolation but break the system:
 
 1. **No inline `style={{}}` for design properties** — all colors, borders, and backgrounds go through Tailwind utilities backed by CSS tokens
-2. **No hardcoded oklch/hex values in component files** — define in `globals.css` tokens, reference by name
+2. **No hardcoded oklch/hex values in component files** — define themeable raw values as primitives in `globals.css`, map them to semantic roles, and consume only semantic roles from components; theme selectors override primitives only
 3. **No custom font sizes** — `text-[9px]`, `text-[10px]`, `text-[11px]` are banned. Use `text-xs` (12px) minimum
 4. **Spacing scale only** — only Tailwind steps 1/2/3/4/5/6/8/10/12/16. No `p-2.5`, `px-3 py-1.5`, etc.
 5. **Three border-radius values** — `rounded` (4px, badges), `rounded-md` (8px, inputs/buttons), `rounded-lg` (12px, panels/modals), `rounded-full` (pills). Nothing else.
