@@ -42,7 +42,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
 
-  const state = await buildLobbyRoomState(id);
+  const state = await buildLobbyRoomState(id, authResult.userId);
   if (!state) {
     return apiError("Lobby not found", 404);
   }

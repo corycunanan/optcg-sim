@@ -27,6 +27,10 @@ import {
   ActiveLobbyConflictError,
   claimActiveLobby,
 } from "@/lib/lobbies/active-membership";
+import {
+  isRetryableTransactionConflict,
+  retryTransactionOnce,
+} from "@/lib/lobbies/transaction-conflict";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -42,6 +46,7 @@ type AcceptOutcome =
   | { kind: "occupied" };
 
 class GuestSeatOccupiedError extends Error {}
+class InviteNoLongerActiveError extends Error {}
 
 export async function POST(_request: NextRequest, { params }: RouteContext) {
   const authResult = await requireAuth();
@@ -58,7 +63,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
 
   let result: AcceptOutcome;
   try {
-    result = await prisma.$transaction<AcceptOutcome>(async (tx) => {
+    result = await retryTransactionOnce<AcceptOutcome>(prisma, async (tx) => {
       const invite = await tx.lobbyInvite.findUnique({
         where: { id: inviteId },
         select: {
@@ -72,15 +77,6 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       if (!invite) return { kind: "not_found" };
       if (invite.toUserId !== userId) return { kind: "forbidden" };
       if (invite.status !== "PENDING") return { kind: "gone" };
-      if (invite.expiresAt.getTime() <= now) {
-        // Roll the row to EXPIRED inside the same tx so a follow-up
-        // /pending fetch doesn't keep handing this invite back.
-        await tx.lobbyInvite.updateMany({
-          where: { id: invite.id, status: "PENDING" },
-          data: { status: "EXPIRED" },
-        });
-        return { kind: "expired" };
-      }
 
       const lobby = await tx.lobby.findUnique({
         where: { id: invite.lobbyId },
@@ -100,22 +96,36 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
         return { kind: "occupied" };
       }
 
-      // Conditional flip on the invite. If a concurrent decline / cancel /
-      // sibling-accept-cleanup landed between the read above and this write,
-      // count is 0 and we return 410 without mutating the lobby.
-      const inviteUpdate = await tx.lobbyInvite.updateMany({
-        where: { id: invite.id, status: "PENDING" },
-        data: { status: "ACCEPTED" },
-      });
-      if (inviteUpdate.count !== 1) return { kind: "gone" };
+      if (invite.expiresAt.getTime() <= now) {
+        // Even expiry transitions take the lobby lock first, matching send
+        // and cancel. This prevents the invite→lobby / lobby→invite cycle.
+        const lobbyLock = await tx.lobby.updateMany({
+          where: { id: lobby.id, status: "WAITING" },
+          data: { status: "WAITING" },
+        });
+        if (lobbyLock.count !== 1) return { kind: "started" };
 
-      // Conditional flip on the lobby. If a concurrent start / close moved
-      // the lobby off WAITING, count is 0 and we return 409.
+        const expired = await tx.lobbyInvite.updateMany({
+          where: { id: invite.id, status: "PENDING" },
+          data: { status: "EXPIRED" },
+        });
+        if (expired.count !== 1) throw new InviteNoLongerActiveError();
+        return { kind: "expired" };
+      }
+
+      // Lock and transition the lobby before touching the invite. If the
+      // later conditional invite flip loses, throwing rolls this write back.
       const lobbyUpdate = await tx.lobby.updateMany({
         where: { id: lobby.id, status: "WAITING" },
         data: { status: "READY", revision: { increment: 1 } },
       });
       if (lobbyUpdate.count !== 1) return { kind: "started" };
+
+      const inviteUpdate = await tx.lobbyInvite.updateMany({
+        where: { id: invite.id, status: "PENDING" },
+        data: { status: "ACCEPTED" },
+      });
+      if (inviteUpdate.count !== 1) throw new InviteNoLongerActiveError();
 
       await claimActiveLobby(tx, userId, lobby.id);
 
@@ -138,6 +148,12 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       return { kind: "ok", lobbyId: lobby.id };
     });
   } catch (error) {
+    if (error instanceof InviteNoLongerActiveError) {
+      return apiError("Invite is no longer active", 410);
+    }
+    if (isRetryableTransactionConflict(error)) {
+      return apiError("Invite is no longer active", 410);
+    }
     if (error instanceof ActiveLobbyConflictError) {
       return apiError("An active lobby already exists", 409, {
         code: "ACTIVE_LOBBY_EXISTS",
@@ -159,7 +175,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
         // already ACCEPTED (not PENDING) so this sweep skips it.
         await cancelPendingLobbyInvites(acceptedLobbyId);
 
-        const state = await buildLobbyRoomState(acceptedLobbyId);
+        const state = await buildLobbyRoomState(acceptedLobbyId, userId);
         if (!state) return;
         // Same actor-skip semantics as `POST /api/lobbies/join` — the new
         // guest navigates from this route's response, the host learns from

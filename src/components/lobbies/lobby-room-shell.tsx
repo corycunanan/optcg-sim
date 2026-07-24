@@ -89,11 +89,7 @@ export function LobbyRoomShell({
   const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
-  const [inviteNow, setInviteNow] = useState(() => Date.now());
   const [cancelingInvite, setCancelingInvite] = useState(false);
-  const [expiredInviteName, setExpiredInviteName] = useState<string | null>(
-    null
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -130,38 +126,6 @@ export function LobbyRoomShell({
     ? displayName(lobby.guest.user, "Opponent")
     : "Opponent";
   const pendingInvite = lobby?.pendingInvite ?? null;
-  const pendingInviteName = pendingInvite
-    ? displayName(pendingInvite.user, "Friend")
-    : null;
-  const inviteTiming = pendingInvite
-    ? resolveInviteSeatTiming(pendingInvite.expiresAt, inviteNow)
-    : null;
-  const inviteRemaining =
-    inviteTiming?.kind === "invited" ? inviteTiming.remainingMs : 0;
-  const activeInvite =
-    pendingInvite && inviteTiming?.kind === "invited" ? pendingInvite : null;
-
-  useEffect(() => {
-    if (!pendingInvite) return;
-    setExpiredInviteName(null);
-    setInviteNow(Date.now());
-  }, [pendingInvite]);
-
-  useEffect(() => {
-    if (!pendingInvite) return;
-    const interval = setInterval(() => setInviteNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [pendingInvite]);
-
-  useEffect(() => {
-    if (
-      !pendingInvite ||
-      inviteTiming?.kind !== "expired" ||
-      !pendingInviteName
-    )
-      return;
-    setExpiredInviteName(pendingInviteName);
-  }, [inviteTiming?.kind, pendingInvite, pendingInviteName]);
 
   const ownDeck = decks.find((deck) => deck.id === lobby?.hostDeck?.id);
   const canStart = useMemo(() => {
@@ -257,7 +221,6 @@ export function LobbyRoomShell({
     setCancelingInvite(true);
     try {
       await apiDelete(`/api/lobbies/${lobbyId}/invite`);
-      setExpiredInviteName(null);
       await refresh();
       toast.success("Invite canceled");
     } catch (err) {
@@ -470,16 +433,14 @@ export function LobbyRoomShell({
                 />
               ) : (
                 <InvitePanel
+                  key={pendingInvite?.id ?? "open-seat"}
                   lobbyId={lobby.id}
                   joinCode={lobby.joinCode}
                   copied={copied}
                   onCopy={copyInvite}
                   showInviteFriend={isHost}
-                  pendingInvite={activeInvite}
-                  pendingInviteName={pendingInviteName}
-                  inviteRemaining={inviteRemaining}
+                  pendingInvite={pendingInvite}
                   cancelingInvite={cancelingInvite}
-                  expiredInviteName={expiredInviteName}
                   onInviteSent={() => void refresh()}
                   onCancelInvite={() => void handleCancelInvite()}
                 />
@@ -675,17 +636,14 @@ function SeatPanel({
   );
 }
 
-function InvitePanel({
+export function InvitePanel({
   lobbyId,
   joinCode,
   copied,
   onCopy,
   showInviteFriend,
   pendingInvite,
-  pendingInviteName,
-  inviteRemaining,
   cancelingInvite,
-  expiredInviteName,
   onInviteSent,
   onCancelInvite,
 }: {
@@ -695,14 +653,25 @@ function InvitePanel({
   onCopy: () => void;
   showInviteFriend: boolean;
   pendingInvite: NonNullable<LobbyRoomState["pendingInvite"]> | null;
-  pendingInviteName: string | null;
-  inviteRemaining: number;
   cancelingInvite: boolean;
-  expiredInviteName: string | null;
   onInviteSent: () => void;
   onCancelInvite: () => void;
 }) {
-  if (pendingInvite && pendingInviteName) {
+  const [now, setNow] = useState(() => Date.now());
+  const pendingInviteName = pendingInvite
+    ? displayName(pendingInvite.user, "Friend")
+    : null;
+  const timing = pendingInvite
+    ? resolveInviteSeatTiming(pendingInvite.expiresAt, now)
+    : null;
+
+  useEffect(() => {
+    if (!pendingInvite) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [pendingInvite]);
+
+  if (pendingInvite && pendingInviteName && timing?.kind === "invited") {
     return (
       <section className="border-border bg-card flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border p-5 text-center">
         <div className="ring-primary/30 animate-pulse rounded-full ring-2">
@@ -716,7 +685,7 @@ function InvitePanel({
             Invite sent to {pendingInviteName}
           </p>
           <p className="text-content-secondary mt-2 text-sm tabular-nums">
-            Expires in {formatInviteCountdown(inviteRemaining)}
+            Expires in {formatInviteCountdown(timing.remainingMs)}
           </p>
         </div>
         {showInviteFriend && (
@@ -742,8 +711,8 @@ function InvitePanel({
           Open seat
         </p>
         <p className="text-content-secondary mt-2 text-sm">
-          {expiredInviteName
-            ? `Invite to ${expiredInviteName} expired`
+          {pendingInvite && pendingInviteName && timing?.kind === "expired"
+            ? `Invite to ${pendingInviteName} expired`
             : "Share the room code when your opponent is ready."}
         </p>
       </div>

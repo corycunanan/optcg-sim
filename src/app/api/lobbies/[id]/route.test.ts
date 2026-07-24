@@ -81,7 +81,7 @@ vi.mock("@/lib/lobbies/cancel-invites", () => ({
     cancelPendingLobbyInvitesMock(...args),
 }));
 
-const { PATCH, DELETE } = await import("./route");
+const { GET, PATCH, DELETE } = await import("./route");
 
 function buildRequest(body: unknown, search = "") {
   return new NextRequest(`http://localhost/api/lobbies/lobby-1${search}`, {
@@ -171,6 +171,20 @@ beforeEach(() => {
   notifyUserMock.mockResolvedValue(undefined);
   cancelPendingLobbyInvitesMock.mockResolvedValue(undefined);
   afterCalls.pending.length = 0;
+});
+
+describe("GET /api/lobbies/[id]", () => {
+  it("builds the room snapshot for the authenticated viewer", async () => {
+    const request = new NextRequest("http://localhost/api/lobbies/lobby-1");
+
+    const res = await GET(request, params);
+
+    expect(res.status).toBe(200);
+    expect(buildLobbyRoomStateMock).toHaveBeenCalledWith(
+      "lobby-1",
+      "host-user",
+    );
+  });
 });
 
 describe("PATCH /api/lobbies/[id]", () => {

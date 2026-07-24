@@ -64,6 +64,13 @@ const HOST_ID = "user-host";
 const FRIEND_ID = "user-friend";
 const LOBBY_ID = "lobby-1";
 
+function transactionConflict() {
+  return new Prisma.PrismaClientKnownRequestError(
+    "Transaction failed due to a write conflict or a deadlock",
+    { code: "P2034", clientVersion: "test" }
+  );
+}
+
 function buildRequest(body: unknown = { toUserId: FRIEND_ID }) {
   return {
     request: new NextRequest(
@@ -196,15 +203,19 @@ describe("POST /api/lobbies/[id]/invite", () => {
     expect(expiresAt.getTime() - baseline).toBeGreaterThan(4 * 60 * 1000);
     expect(expiresAt.getTime() - baseline).toBeLessThan(6 * 60 * 1000);
 
-    expect(notifyUserMock).toHaveBeenCalledTimes(1);
-    const [target, event] = notifyUserMock.mock.calls[0] ?? [];
-    expect(target).toBe(FRIEND_ID);
-    expect(event).toMatchObject({
-      type: "lobby:invite_received",
-      invite: { id: "invite-1", toUserId: FRIEND_ID, fromUserId: HOST_ID },
-    });
     await vi.waitFor(() => {
-      expect(notifyLobbyMock).toHaveBeenCalledWith(roomState);
+      expect(notifyUserMock).toHaveBeenCalledWith(FRIEND_ID, {
+        type: "lobby:invite_received",
+        invite: expect.objectContaining({
+          id: "invite-1",
+          toUserId: FRIEND_ID,
+          fromUserId: HOST_ID,
+        }),
+      });
+      expect(notifyUserMock).toHaveBeenCalledWith(HOST_ID, {
+        type: "lobby:state_changed",
+        lobby: roomState,
+      });
     });
   });
 
@@ -267,6 +278,28 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(409);
+  });
+
+  it("retries one P2034 transaction conflict and then sends", async () => {
+    transactionMock.mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 409 when the send retry also hits P2034", async () => {
+    transactionMock
+      .mockRejectedValueOnce(transactionConflict())
+      .mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(409);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 
   it("rejects non-host callers (403)", async () => {
@@ -408,5 +441,34 @@ describe("DELETE /api/lobbies/[id]/invite", () => {
     expect(res.status).toBe(403);
     expect(inviteUpdateManyMock).not.toHaveBeenCalled();
     expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("retries one PostgreSQL deadlock and then cancels", async () => {
+    transactionMock.mockRejectedValueOnce(
+      Object.assign(new Error("deadlock detected"), { code: "40P01" })
+    );
+    inviteFindManyMock.mockResolvedValueOnce([
+      { id: "invite-1", toUserId: FRIEND_ID },
+    ]);
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 409 when the cancel retry also deadlocks", async () => {
+    const deadlock = () =>
+      Object.assign(new Error("deadlock detected"), { code: "40P01" });
+    transactionMock
+      .mockRejectedValueOnce(deadlock())
+      .mockRejectedValueOnce(deadlock());
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(409);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 });

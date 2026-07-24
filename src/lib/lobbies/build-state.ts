@@ -13,7 +13,8 @@ import {
 } from "@/lib/validators/lobbies";
 
 export async function buildLobbyRoomState(
-  lobbyId: string
+  lobbyId: string,
+  viewerUserId?: string
 ): Promise<LobbyRoomState | null> {
   const lobby = await prisma.lobby.findUnique({
     where: { id: lobbyId },
@@ -137,13 +138,17 @@ export async function buildLobbyRoomState(
           deck: guestDeck,
         }
       : null,
-    pendingInvite: lobby.invites[0]
-      ? {
-          id: lobby.invites[0].id,
-          expiresAt: lobby.invites[0].expiresAt.toISOString(),
-          user: lobby.invites[0].toUser,
-        }
-      : null,
+    // Invitee identity is host-only. Callers that do not represent a viewer
+    // get the safe default (no pending-invite payload), which prevents shared
+    // realtime snapshots from disclosing it to guests or arbitrary users.
+    pendingInvite:
+      lobby.hostUserId === viewerUserId && lobby.invites[0]
+        ? {
+            id: lobby.invites[0].id,
+            expiresAt: lobby.invites[0].expiresAt.toISOString(),
+            user: lobby.invites[0].toUser,
+          }
+        : null,
     gameId: lobby.gameSessions[0]?.id ?? null,
     gameStatus: lobby.gameSessions[0]?.status,
   };

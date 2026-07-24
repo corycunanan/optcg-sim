@@ -64,6 +64,13 @@ const HOST_ID = "user-host";
 const LOBBY_ID = "lobby-1";
 const INVITE_ID = "invite-1";
 
+function transactionConflict() {
+  return new Prisma.PrismaClientKnownRequestError(
+    "Transaction failed due to a write conflict or a deadlock",
+    { code: "P2034", clientVersion: "test" }
+  );
+}
+
 function buildRequest() {
   return {
     request: new NextRequest(
@@ -195,6 +202,9 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
 
     expect(notifyLobbyMock).toHaveBeenCalledTimes(1);
     expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith(LOBBY_ID);
+    expect(lobbyUpdateManyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      inviteUpdateManyMock.mock.invocationCallOrder[0]!
+    );
   });
 
   it("rejects non-recipient callers (403)", async () => {
@@ -248,8 +258,33 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(410);
-    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
     expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("retries one P2034 transaction conflict and then accepts", async () => {
+    transactionMock.mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 410 when the accept retry also hits P2034", async () => {
+    transactionMock
+      .mockRejectedValueOnce(transactionConflict())
+      .mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(410);
+    await expect(res.json()).resolves.toEqual({
+      error: "Invite is no longer active",
+    });
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 
   it("returns 409 when the lobby moved off WAITING during the tx", async () => {

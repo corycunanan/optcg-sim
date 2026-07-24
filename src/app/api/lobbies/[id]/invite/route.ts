@@ -29,8 +29,11 @@ import { socialLimiter } from "@/lib/rate-limit";
 import { SendLobbyInviteSchema } from "@/lib/validators/lobby-invites";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { notifyUser } from "@/lib/realtime/fan-out";
-import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import {
+  isRetryableTransactionConflict,
+  retryTransactionOnce,
+} from "@/lib/lobbies/transaction-conflict";
 import {
   serializeLobbyInviteForEvent,
   type LobbyInviteRow,
@@ -119,7 +122,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       }
     | { kind: "unavailable" };
   try {
-    transactionResult = await prisma.$transaction(async (tx) => {
+    transactionResult = await retryTransactionOnce(prisma, async (tx) => {
       // Revalidate the active lobby snapshot inside the same transaction as
       // invite creation. If close commits CLOSED after the preflight read,
       // this conditional update returns 0 and no invite can be created.
@@ -200,6 +203,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     ) {
       return apiError("Invite already pending for this user", 409);
     }
+    if (isRetryableTransactionConflict(err)) {
+      return apiError("Invite state changed concurrently. Try again.", 409);
+    }
     throw err;
   }
 
@@ -223,8 +229,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       }),
     ]);
 
-    const state = await buildLobbyRoomState(lobbyId);
-    if (state) await notifyLobby(state);
+    const state = await buildLobbyRoomState(lobbyId, userId);
+    if (state) {
+      await notifyUser(userId, { type: "lobby:state_changed", lobby: state });
+    }
   });
 
   return apiSuccess(serialized, 201);
@@ -244,62 +252,82 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
   const { id: lobbyId } = await params;
   const now = new Date();
-  const result = await prisma.$transaction(async (tx) => {
-    const lobby = await tx.lobby.findUnique({
-      where: { id: lobbyId },
-      select: { hostUserId: true, status: true },
+  let result:
+    | { kind: "not_found" }
+    | { kind: "forbidden" }
+    | { kind: "unavailable" }
+    | { kind: "gone" }
+    | {
+        kind: "canceled";
+        invites: Array<{ id: string; toUserId: string }>;
+      };
+  try {
+    result = await retryTransactionOnce(prisma, async (tx) => {
+      const lobby = await tx.lobby.findUnique({
+        where: { id: lobbyId },
+        select: { hostUserId: true, status: true },
+      });
+      if (!lobby) return { kind: "not_found" as const };
+      if (lobby.hostUserId !== userId) {
+        return { kind: "forbidden" as const };
+      }
+      if (lobby.status !== "WAITING" && lobby.status !== "READY") {
+        return { kind: "unavailable" as const };
+      }
+
+      // Lock the room using the same order as invite creation so a concurrent
+      // replacement cannot appear between the pending read and cancellation.
+      const activeLobby = await tx.lobby.updateMany({
+        where: {
+          id: lobbyId,
+          hostUserId: userId,
+          status: lobby.status,
+        },
+        data: { status: lobby.status },
+      });
+      if (activeLobby.count !== 1) {
+        return { kind: "unavailable" as const };
+      }
+
+      await tx.lobbyInvite.updateMany({
+        where: {
+          lobbyId,
+          status: "PENDING",
+          expiresAt: { lte: now },
+        },
+        data: { status: "EXPIRED" },
+      });
+
+      const pending = await tx.lobbyInvite.findMany({
+        where: {
+          lobbyId,
+          status: "PENDING",
+          expiresAt: { gt: now },
+        },
+        select: { id: true, toUserId: true },
+      });
+      if (pending.length === 0) return { kind: "gone" as const };
+
+      await tx.lobbyInvite.updateMany({
+        where: {
+          id: { in: pending.map((invite) => invite.id) },
+          status: "PENDING",
+        },
+        data: { status: "CANCELED" },
+      });
+      await tx.lobby.update({
+        where: { id: lobbyId },
+        data: { revision: { increment: 1 } },
+      });
+
+      return { kind: "canceled" as const, invites: pending };
     });
-    if (!lobby) return { kind: "not_found" as const };
-    if (lobby.hostUserId !== userId) return { kind: "forbidden" as const };
-    if (lobby.status !== "WAITING" && lobby.status !== "READY") {
-      return { kind: "unavailable" as const };
+  } catch (error) {
+    if (isRetryableTransactionConflict(error)) {
+      return apiError("Invite state changed concurrently. Try again.", 409);
     }
-
-    // Lock the room using the same order as invite creation so a concurrent
-    // replacement cannot appear between the pending read and cancellation.
-    const activeLobby = await tx.lobby.updateMany({
-      where: {
-        id: lobbyId,
-        hostUserId: userId,
-        status: lobby.status,
-      },
-      data: { status: lobby.status },
-    });
-    if (activeLobby.count !== 1) return { kind: "unavailable" as const };
-
-    await tx.lobbyInvite.updateMany({
-      where: {
-        lobbyId,
-        status: "PENDING",
-        expiresAt: { lte: now },
-      },
-      data: { status: "EXPIRED" },
-    });
-
-    const pending = await tx.lobbyInvite.findMany({
-      where: {
-        lobbyId,
-        status: "PENDING",
-        expiresAt: { gt: now },
-      },
-      select: { id: true, toUserId: true },
-    });
-    if (pending.length === 0) return { kind: "gone" as const };
-
-    await tx.lobbyInvite.updateMany({
-      where: {
-        id: { in: pending.map((invite) => invite.id) },
-        status: "PENDING",
-      },
-      data: { status: "CANCELED" },
-    });
-    await tx.lobby.update({
-      where: { id: lobbyId },
-      data: { revision: { increment: 1 } },
-    });
-
-    return { kind: "canceled" as const, invites: pending };
-  });
+    throw error;
+  }
 
   switch (result.kind) {
     case "not_found":
@@ -321,8 +349,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           )
         );
 
-        const state = await buildLobbyRoomState(lobbyId);
-        if (state) await notifyLobby(state);
+        const state = await buildLobbyRoomState(lobbyId, userId);
+        if (state) {
+          await notifyUser(userId, {
+            type: "lobby:state_changed",
+            lobby: state,
+          });
+        }
       });
       return apiAction();
   }
