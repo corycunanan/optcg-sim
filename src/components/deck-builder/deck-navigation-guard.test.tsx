@@ -907,6 +907,7 @@ describe("deck builder navigation guard", () => {
     await act(async () => {
       mocks.subscribers.get("lobby:party_disbanded")?.({
         type: "lobby:party_disbanded",
+        lobbyId: "current-lobby",
         hostName: "Luffy",
       });
     });

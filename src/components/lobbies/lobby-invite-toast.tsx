@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { claimLobbyRecovery } from "@/lib/lobbies/recovery-once";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/social/user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
@@ -66,6 +67,7 @@ export function LobbyInviteToasts() {
       setInvites((prev) => removeInvite(prev, event.inviteId));
     });
     const unsubDisbanded = subscribe("lobby:party_disbanded", (event) => {
+      if (!claimLobbyRecovery(event.lobbyId)) return;
       toast.info(
         `${event.hostName} disbanded the party. You've been returned to your own lobby.`
       );

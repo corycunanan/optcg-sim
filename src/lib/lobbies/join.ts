@@ -42,6 +42,7 @@ export interface PartySwitchConfirmation {
 
 interface DisbandedGuest {
   userId: string;
+  lobbyId: string;
   hostName: string;
 }
 
@@ -339,6 +340,7 @@ async function joinLobby({
           if (hostedGuest) {
             disbandedGuest = {
               userId: hostedGuest.userId,
+              lobbyId: currentLobby.id,
               hostName: displayName(currentLobby.host, "The host"),
             };
           }
@@ -501,6 +503,7 @@ export async function publishLobbyJoin(
     effects.push(
       notifyUser(disbandedGuest.userId, {
         type: "lobby:party_disbanded",
+        lobbyId: disbandedGuest.lobbyId,
         hostName: disbandedGuest.hostName,
       })
     );

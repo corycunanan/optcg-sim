@@ -154,7 +154,7 @@ describe("POST /api/lobbies/[id]/invite", () => {
         mode: "PVP",
         guest: { is: null },
       },
-      data: { status: "WAITING" },
+      data: { revision: { increment: 1 } },
     });
     const createCall = inviteCreateMock.mock.calls[0]?.[0];
     expect(createCall?.data).toMatchObject({

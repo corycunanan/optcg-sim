@@ -246,6 +246,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     });
     expect(notifyUserMock).toHaveBeenCalledWith("ex-guest", {
       type: "lobby:party_disbanded",
+      lobbyId: "hosted-lobby",
       hostName: "Robin",
     });
   });

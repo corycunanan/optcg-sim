@@ -83,7 +83,7 @@ export type RealtimeServerEvent =
    * auto-dismisses.
    */
   | { type: "lobby:invite_canceled"; inviteId: string }
-  | { type: "lobby:party_disbanded"; hostName: string };
+  | { type: "lobby:party_disbanded"; lobbyId: string; hostName: string };
 
 /**
  * Client → server vocabulary. Routed by `UserChannel.webSocketMessage` on

@@ -305,6 +305,7 @@ describe("POST /api/lobbies/join", () => {
     });
     expect(notifyUserMock).toHaveBeenCalledWith("ex-guest", {
       type: "lobby:party_disbanded",
+      lobbyId: "current-lobby",
       hostName: "Luffy",
     });
     expect(notifyUserMock).toHaveBeenCalledWith("invitee", {
@@ -477,6 +478,65 @@ describe("POST /api/lobbies/join", () => {
     expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
   });
 
+  it("re-prompts a confirmed retry when a concurrent invite bumps revision", async () => {
+    let concurrentInviteStatus = "PENDING";
+    const baseLobby = {
+      id: "current-lobby",
+      status: "WAITING",
+      hostUserId: "joiner",
+      host: { username: "Luffy", name: null },
+      guest: null,
+    };
+    userFindUniqueMock
+      .mockResolvedValueOnce({
+        activeLobbyId: "current-lobby",
+        activeLobby: {
+          ...baseLobby,
+          revision: 20,
+          invites: [{ id: "original-invite" }],
+        },
+      })
+      .mockResolvedValueOnce({
+        activeLobbyId: "current-lobby",
+        activeLobby: {
+          ...baseLobby,
+          revision: 21,
+          invites: [{ id: "concurrent-invite" }],
+        },
+      });
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    inviteUpdateManyMock.mockImplementation(() => {
+      concurrentInviteStatus = "CANCELED";
+      return { count: 1 };
+    });
+
+    const response = await POST(
+      request({
+        code: "ABC123",
+        confirmDisbandLobbyId: "current-lobby",
+      })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+      details: {
+        currentLobbyId: "current-lobby",
+        hasPendingInvite: true,
+      },
+    });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ revision: 20 }),
+      })
+    );
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
+    expect(concurrentInviteStatus).toBe("PENDING");
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+  });
+
   it("does not let a stale confirmation authorize a different hosted lobby", async () => {
     userFindUniqueMock.mockResolvedValue({
       activeLobbyId: "new-lobby",
@@ -501,6 +561,10 @@ describe("POST /api/lobbies/join", () => {
       details: { currentLobbyId: "new-lobby" },
     });
     expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
   });
 
   it("rolls back the old party when the target fills during commit", async () => {

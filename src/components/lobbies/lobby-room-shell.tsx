@@ -6,6 +6,7 @@ import { Check, Copy, Loader2, Lock, Play, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { claimLobbyRecovery } from "@/lib/lobbies/recovery-once";
 import { useLobbyRoom, type LobbyRoomDeck } from "@/hooks/use-lobby-room";
 import { Button } from "@/components/ui/button";
 import {
@@ -115,9 +116,10 @@ export function LobbyRoomShell({
   useEffect(() => {
     if (!recovery || recoveryHandledRef.current) return;
     recoveryHandledRef.current = true;
+    if (!claimLobbyRecovery(lobbyId)) return;
     if (recovery.message) toast.info(recovery.message);
     router.push(recovery.route);
-  }, [recovery, router]);
+  }, [lobbyId, recovery, router]);
 
   const isHost = lobby?.hostUserId === currentUserId;
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;

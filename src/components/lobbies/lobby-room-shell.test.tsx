@@ -55,6 +55,9 @@ vi.mock("@/components/realtime/user-channel-provider", () => ({
     },
   }),
 }));
+vi.mock("@/components/deck-builder/deck-navigation-guard", () => ({
+  useDeckNavigationGuard: () => ({ requestLeave: () => false }),
+}));
 
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children }: { children?: ReactNode }) => (
@@ -120,11 +123,12 @@ vi.mock("./invite-friend-popover", () => ({
 vi.mock("./pregame-settings", () => ({ PregameSettings: () => null }));
 vi.mock("./kick-player-action", () => ({ KickPlayerAction: () => null }));
 
+import { LobbyInviteToasts } from "./lobby-invite-toast";
 import { LobbyRoomShell } from "./lobby-room-shell";
 
 let renderer: ReactTestRenderer | null = null;
 
-function lobbyState(): LobbyRoomState {
+function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
     id: "lobby-1",
     version: 7,
@@ -148,6 +152,7 @@ function lobbyState(): LobbyRoomState {
       deck: null,
     },
     gameId: null,
+    ...overrides,
   };
 }
 
@@ -206,5 +211,95 @@ describe("LobbyRoomShell guest removal recovery", () => {
     expect(mocks.push).toHaveBeenCalledTimes(1);
     expect(mocks.push).toHaveBeenCalledWith("/lobbies");
     expect(renderer!.toJSON()).toBeNull();
+  });
+});
+
+describe("LobbyRoomShell party disband recovery", () => {
+  it("handles a CLOSED snapshot followed by the directed event exactly once", async () => {
+    const lobbyId = "closed-first-lobby";
+    mocks.apiGet.mockImplementation(async (url: string) => {
+      if (url === "/api/decks" || url === "/api/lobby-invites/pending") {
+        return { data: [] };
+      }
+      return { data: lobbyState({ id: lobbyId, status: "CLOSED" }) };
+    });
+
+    await act(async () => {
+      renderer = create(
+        <>
+          <LobbyInviteToasts />
+          <LobbyRoomShell lobbyId={lobbyId} currentUserId="guest-user" />
+        </>
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "You're no longer in this party"
+    );
+    const handler = mocks.handlers.get("lobby:party_disbanded");
+    expect(handler).toBeTypeOf("function");
+
+    await act(async () => {
+      handler?.({
+        type: "lobby:party_disbanded",
+        lobbyId,
+        hostName: "strawhat",
+      });
+    });
+
+    expect(mocks.toastInfo).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
+  });
+
+  it("handles the directed event followed by a CLOSED snapshot exactly once", async () => {
+    const lobbyId = "event-first-lobby";
+    let resolveLobby: ((value: { data: LobbyRoomState }) => void) | null = null;
+    const lobbyResponse = new Promise<{ data: LobbyRoomState }>((resolve) => {
+      resolveLobby = resolve;
+    });
+    mocks.apiGet.mockImplementation(async (url: string) => {
+      if (url === "/api/decks" || url === "/api/lobby-invites/pending") {
+        return { data: [] };
+      }
+      return lobbyResponse;
+    });
+
+    await act(async () => {
+      renderer = create(
+        <>
+          <LobbyInviteToasts />
+          <LobbyRoomShell lobbyId={lobbyId} currentUserId="guest-user" />
+        </>
+      );
+      await Promise.resolve();
+    });
+
+    const handler = mocks.handlers.get("lobby:party_disbanded");
+    expect(handler).toBeTypeOf("function");
+    await act(async () => {
+      handler?.({
+        type: "lobby:party_disbanded",
+        lobbyId,
+        hostName: "strawhat",
+      });
+    });
+
+    await act(async () => {
+      resolveLobby?.({
+        data: lobbyState({ id: lobbyId, status: "CLOSED" }),
+      });
+      await lobbyResponse;
+      await Promise.resolve();
+    });
+
+    expect(mocks.toastInfo).toHaveBeenCalledTimes(1);
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "strawhat disbanded the party. You've been returned to your own lobby."
+    );
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
   });
 });

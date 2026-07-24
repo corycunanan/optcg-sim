@@ -118,6 +118,7 @@ export const RealtimeServerEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("lobby:invite_canceled"), inviteId: z.string() }),
   z.object({
     type: z.literal("lobby:party_disbanded"),
+    lobbyId: z.string(),
     hostName: z.string(),
   }),
 ]);

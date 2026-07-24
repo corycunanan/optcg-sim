@@ -20,13 +20,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 2     | OPT-519 | /lobbies canonical resolver: active game → membership → lazy personal lobby              | —        | OPT-518                            | Done        | —                                                         | Canonical Play navigation and personal-lobby creation     |
 | 3     | OPT-520 | Post-game return to party: finalize resets lobby to WAITING with readiness cleared       | —        | OPT-518, OPT-519                   | Done        | —                                                         | Restores the persistent party after a match               |
 | 4     | OPT-522 | Join-by-code party switching with disband confirmation                                   | —        | OPT-519                            | In Progress | [#403](https://github.com/corycunanan/optcg-sim/pull/403) | PR open; transactional switch and host-disband semantics  |
-| 5     | OPT-523 | Kick player: host removes guest from party                                               | —        | OPT-518, OPT-519                   | In Progress | —                                                         | Parallel guest-removal capability                         |
+| 5     | OPT-523 | Kick player: host removes guest from party                                               | —        | OPT-518, OPT-519                   | Done        | [#401](https://github.com/corycunanan/optcg-sim/pull/401) | PR merged; guest-removal capability is on main            |
 | 6     | OPT-524 | Invite lifecycle: expiry countdown + cancel invite                                       | —        | OPT-519                            | In Progress | —                                                         | Parallel invite lifecycle surface                         |
 | 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | Backlog     | —                                                         | Integrate the completed behavior into the artifact layout |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-521 after OPT-522, OPT-523, and OPT-524 merge; OPT-523 and OPT-524 are already in progress in parallel.
+**Next up:** OPT-521 after PR #403 and OPT-524 merge; OPT-523 is already on main via merged PR #401.
 
 ---
 
