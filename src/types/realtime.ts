@@ -32,6 +32,11 @@ export type RealtimeServerEvent =
   | { type: "friend:removed"; userId: string }
   | { type: "lobby:state_changed"; lobby: LobbyRoomState }
   | {
+      type: "lobby:guest_removed";
+      lobbyId: string;
+      hostName: string;
+    }
+  | {
       type: "game:status";
       gameId: string;
       status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
@@ -86,8 +91,11 @@ export type RealtimeServerEvent =
  *   2. Validate + handle in `workers/game/src/UserChannel.ts`.
  *   3. Emit from a hook/component via `useUserChannelEvents().send(event)`.
  */
-export type RealtimeClientEvent =
-  | { type: "chat:typing"; toUserId: string; until: number };
+export type RealtimeClientEvent = {
+  type: "chat:typing";
+  toUserId: string;
+  until: number;
+};
 
 export interface SerializedMessage {
   id: string;

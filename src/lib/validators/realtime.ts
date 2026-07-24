@@ -83,6 +83,11 @@ export const RealtimeServerEventSchema = z.discriminatedUnion("type", [
     lobby: LobbyRoomStateSchema,
   }),
   z.object({
+    type: z.literal("lobby:guest_removed"),
+    lobbyId: z.string(),
+    hostName: z.string(),
+  }),
+  z.object({
     type: z.literal("game:status"),
     gameId: z.string(),
     status: z.enum(["IN_PROGRESS", "FINISHED", "ABANDONED"]),
