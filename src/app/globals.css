@@ -30,7 +30,7 @@
   --surface-step-interactive: oklch(30% 0.04 245);
   --surface-step-soft-strong: oklch(34% 0.035 245);
   --surface-step-soft: oklch(27% 0.03 245);
-  --surface-step-subdued: oklch(52% 0.035 245);
+  --surface-step-subdued: oklch(58% 0.04 245);
   --surface-step-ink: oklch(22% 0.04 245);
 
   /* Preserved desaturated surface primitives
