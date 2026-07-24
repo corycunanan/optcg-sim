@@ -10,9 +10,6 @@ const mocks = vi.hoisted(() => ({
   subscribe: vi.fn(() => vi.fn()),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
-  session: { user: { id: "user-1" } } as {
-    user: { id: string };
-  } | null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -24,10 +21,6 @@ vi.mock("next/link", () => ({
   default: ({ children, ...props }: React.ComponentProps<"a">) => (
     <a {...props}>{children}</a>
   ),
-}));
-
-vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: mocks.session }),
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -358,7 +351,6 @@ beforeEach(() => {
   mocks.subscribe.mockClear();
   mocks.toastError.mockReset();
   mocks.toastInfo.mockReset();
-  mocks.session = { user: { id: "user-1" } };
   mocks.apiGet.mockResolvedValue({
     data: [
       {
@@ -711,8 +703,7 @@ describe("deck builder navigation guard", () => {
     }
   });
 
-  it("keeps the complete navbar visible without a session", async () => {
-    mocks.session = null;
+  it("renders the complete navbar unconditionally", async () => {
     await renderGuard(<Navbar />, false);
 
     const links = renderer!.root.findAllByType("a");
