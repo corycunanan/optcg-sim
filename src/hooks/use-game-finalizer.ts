@@ -7,6 +7,9 @@ import type { RemoteGameStatus } from "./use-remote-game-status";
 import { apiPost } from "@/lib/api-client";
 import { ConcedeGameResponseSchema } from "@/lib/validators/game";
 
+const FINALIZE_MAX_ATTEMPTS = 3;
+const FINALIZE_RETRY_DELAY_MS = 250;
+
 export interface UseGameFinalizerArgs {
   gameId: string;
   gameState: GameState | null;
@@ -39,21 +42,44 @@ export function useGameFinalizer({
   const [fallbackSubmitting, setFallbackSubmitting] = useState(false);
   const [fallbackError, setFallbackError] = useState<string | null>(null);
 
-  const finalizedRef = useRef(false);
-  const finalizeGame = useCallback(async () => {
-    if (finalizedRef.current) return;
-    finalizedRef.current = true;
+  const finalizeSucceededRef = useRef(false);
+  const finalizeInFlightRef = useRef<Promise<boolean> | null>(null);
+  const finalizeGame = useCallback(async (): Promise<boolean> => {
+    if (finalizeSucceededRef.current) return true;
+    if (finalizeInFlightRef.current) return finalizeInFlightRef.current;
 
     const winnerId =
       gameOver?.winner != null && gameState
         ? gameState.players[gameOver.winner].playerId
         : null;
 
-    await apiPost(`/api/game/${gameId}`, {
-      action: "FINALIZE",
-      winnerId,
-      winReason: gameOver?.reason ?? "Game ended",
-    }).catch(() => {});
+    const request = (async () => {
+      for (let attempt = 1; attempt <= FINALIZE_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          await apiPost(`/api/game/${gameId}`, {
+            action: "FINALIZE",
+            winnerId,
+            winReason: gameOver?.reason ?? "Game ended",
+          });
+          finalizeSucceededRef.current = true;
+          return true;
+        } catch {
+          if (attempt < FINALIZE_MAX_ATTEMPTS) {
+            await waitForFinalizeRetry();
+          }
+        }
+      }
+      return false;
+    })();
+
+    finalizeInFlightRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (finalizeInFlightRef.current === request) {
+        finalizeInFlightRef.current = null;
+      }
+    }
   }, [gameId, gameOver, gameState]);
 
   useEffect(() => {
@@ -112,4 +138,8 @@ export function useGameFinalizer({
     handleLeaveGame,
     handleFallbackConcede,
   };
+}
+
+function waitForFinalizeRetry(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, FINALIZE_RETRY_DELAY_MS));
 }
