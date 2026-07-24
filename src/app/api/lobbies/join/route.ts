@@ -40,9 +40,11 @@ export async function POST(request: NextRequest) {
             ? 404
             : 409;
       return apiError(lobbyJoinFailureMessage(result.kind), status, {
-        ...(result.kind === "active_lobby_exists"
-          ? { code: "ACTIVE_LOBBY_EXISTS" }
-          : {}),
+        ...(result.kind === "active_game_exists"
+          ? { code: "ACTIVE_GAME_EXISTS" }
+          : result.kind === "active_lobby_exists"
+            ? { code: "ACTIVE_LOBBY_EXISTS" }
+            : {}),
       });
     }
 

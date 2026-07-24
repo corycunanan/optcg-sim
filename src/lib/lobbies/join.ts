@@ -8,6 +8,7 @@ import {
   claimActiveLobby,
   releaseActiveLobby,
 } from "./active-membership";
+import { findActiveGameLobby } from "./active-game";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 
 export type LobbyJoinFailureKind =
@@ -17,6 +18,7 @@ export type LobbyJoinFailureKind =
   | "occupied"
   | "solitaire"
   | "computer"
+  | "active_game_exists"
   | "active_lobby_exists";
 
 export type LobbyJoinResult =
@@ -24,6 +26,7 @@ export type LobbyJoinResult =
       kind: "joined";
       lobbyId: string;
       replacedLobbyId: string | null;
+      membership: "created" | "existing";
     }
   | { kind: LobbyJoinFailureKind };
 
@@ -41,6 +44,9 @@ export async function joinLobbyByCode({
   const normalizedCode = normalizeLobbyCode(code);
   if (normalizedCode.length < 4) return { kind: "invalid_code" };
 
+  const activeGame = await findActiveGameLobby(userId);
+  if (activeGame) return { kind: "active_game_exists" };
+
   try {
     return await prisma.$transaction(async (tx) => {
       const lobby = await tx.lobby.findFirst({
@@ -48,10 +54,21 @@ export async function joinLobbyByCode({
         include: { guest: true },
       });
 
-      if (!lobby || lobby.status !== "WAITING") {
+      if (!lobby) {
         return { kind: "not_found" as const };
       }
-      if (lobby.hostUserId === userId) return { kind: "self" as const };
+      const isExistingMember =
+        lobby.status !== "CLOSED" &&
+        (lobby.hostUserId === userId || lobby.guest?.userId === userId);
+      if (isExistingMember) {
+        return {
+          kind: "joined" as const,
+          lobbyId: lobby.id,
+          replacedLobbyId: null,
+          membership: "existing" as const,
+        };
+      }
+      if (lobby.status !== "WAITING") return { kind: "not_found" as const };
       if (lobby.guest) return { kind: "occupied" as const };
       if (lobby.mode === "SOLITAIRE") return { kind: "solitaire" as const };
       if (lobby.mode === "PVCOMPUTER") return { kind: "computer" as const };
@@ -78,6 +95,7 @@ export async function joinLobbyByCode({
         kind: "joined" as const,
         lobbyId: lobby.id,
         replacedLobbyId,
+        membership: "created" as const,
       };
     });
   } catch (error) {
@@ -96,6 +114,8 @@ export async function publishLobbyJoin(
   result: Extract<LobbyJoinResult, { kind: "joined" }>,
   actorUserId: string
 ) {
+  if (result.membership === "existing") return;
+
   const cancelReplacedLobby = result.replacedLobbyId
     ? cancelPendingLobbyInvites(result.replacedLobbyId).catch((error) => {
         console.error("[lobbies:join] invite cancellation failed", error);
@@ -127,6 +147,8 @@ export function lobbyJoinFailureMessage(kind: LobbyJoinFailureKind) {
       return "This lobby is in solo mode and cannot be joined";
     case "computer":
       return "This lobby is in computer mode and cannot be joined";
+    case "active_game_exists":
+      return "Finish or leave your current game first";
     case "active_lobby_exists":
       return "An active lobby already exists";
   }

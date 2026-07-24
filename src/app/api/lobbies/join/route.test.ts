@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
+const gameFindFirstMock = vi.fn();
 const lobbyFindFirstMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
@@ -39,6 +40,9 @@ vi.mock("next/server", async (importActual) => {
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {
+    gameSession: {
+      findFirst: (...args: unknown[]) => gameFindFirstMock(...args),
+    },
     lobby: {
       findFirst: (...args: unknown[]) => lobbyFindFirstMock(...args),
       updateMany: (...args: unknown[]) => lobbyUpdateManyMock(...args),
@@ -76,6 +80,7 @@ function buildRequest(body: unknown = { code: "ABCD", deckId: "guest-deck" }) {
 beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
+  gameFindFirstMock.mockReset();
   lobbyFindFirstMock.mockReset();
   lobbyUpdateManyMock.mockReset();
   lobbyGuestCreateMock.mockReset();
@@ -88,6 +93,7 @@ beforeEach(() => {
 
   authMock.mockResolvedValue({ user: { id: "guest-user" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
+  gameFindFirstMock.mockResolvedValue(null);
   lobbyFindFirstMock.mockResolvedValue({
     id: "lobby-1",
     joinCode: "ABCD",
@@ -364,5 +370,55 @@ describe("POST /api/lobbies/join", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "Invalid lobby code" });
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks code admission for an active game even with a stale pointer", async () => {
+    gameFindFirstMock.mockResolvedValue({ lobbyId: "active-game-lobby" });
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: null,
+      activeLobby: null,
+    });
+
+    const res = await POST(buildRequest({ code: "ABCD" }));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Finish or leave your current game first",
+      code: "ACTIVE_GAME_EXISTS",
+    });
+    expect(gameFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        status: "IN_PROGRESS",
+        OR: [{ player1Id: "guest-user" }, { player2Id: "guest-user" }],
+      },
+      select: { lobbyId: true },
+      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a current guest revisiting a READY lobby as success", async () => {
+    lobbyFindFirstMock.mockResolvedValue({
+      id: "lobby-1",
+      joinCode: "ABCD",
+      status: "READY",
+      hostUserId: "host-user",
+      hostDeckId: "host-deck",
+      format: "Standard",
+      mode: "PVP",
+      guest: { userId: "guest-user" },
+    });
+
+    const res = await POST(buildRequest({ code: "ABCD" }));
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ data: { lobbyId: "lobby-1" } });
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import {
   ActiveLobbyConflictError,
   claimActiveLobby,
 } from "./active-membership";
+import { findActiveGameLobby } from "./active-game";
 import { isJoinCodeCollision } from "./unique-constraints";
 
 const MAX_JOIN_CODE_ATTEMPTS = 5;
@@ -27,14 +28,7 @@ export interface LobbyResolution {
 export async function resolveCanonicalLobby(
   userId: string
 ): Promise<LobbyResolution> {
-  const activeGame = await prisma.gameSession.findFirst({
-    where: {
-      status: "IN_PROGRESS",
-      OR: [{ player1Id: userId }, { player2Id: userId }],
-    },
-    select: { lobbyId: true },
-    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-  });
+  const activeGame = await findActiveGameLobby(userId);
 
   if (activeGame) {
     return { lobbyId: activeGame.lobbyId, branch: "active_game" };

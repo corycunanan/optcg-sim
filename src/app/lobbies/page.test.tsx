@@ -22,6 +22,7 @@ vi.mock("@/lib/lobbies/join", () => ({
       invalid_code: "Invalid lobby code",
       not_found: "Lobby not found or already started",
       occupied: "Lobby already has a guest",
+      active_game_exists: "Finish or leave your current game first",
     })[kind] ?? "Could not join lobby",
 }));
 vi.mock("@/lib/lobbies/resolve", () => ({
@@ -56,6 +57,7 @@ describe("/lobbies code resolver", () => {
       kind: "joined",
       lobbyId: "host-lobby",
       replacedLobbyId: null,
+      membership: "created",
     };
     joinLobbyByCodeMock.mockResolvedValue(joined);
 
@@ -71,6 +73,25 @@ describe("/lobbies code resolver", () => {
     expect(resolveCanonicalLobbyMock).not.toHaveBeenCalled();
   });
 
+  it("lands an existing guest in their room without an error fallback", async () => {
+    const existingMembership = {
+      kind: "joined",
+      lobbyId: "host-lobby",
+      replacedLobbyId: null,
+      membership: "existing",
+    };
+    joinLobbyByCodeMock.mockResolvedValue(existingMembership);
+
+    await expect(
+      LobbiesPage({ searchParams: Promise.resolve({ code: "ABCD" }) })
+    ).rejects.toThrow("redirect:/lobbies/host-lobby");
+
+    expect(resolveCanonicalLobbyMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("joinError=")
+    );
+  });
+
   it.each([
     ["invalid_code", "Invalid%20lobby%20code"],
     ["not_found", "Lobby%20not%20found%20or%20already%20started"],
@@ -82,6 +103,23 @@ describe("/lobbies code resolver", () => {
       LobbiesPage({ searchParams: Promise.resolve({ code: "--" }) })
     ).rejects.toThrow(
       `redirect:/lobbies/personal-lobby?joinError=${encodedMessage}`
+    );
+
+    expect(resolveCanonicalLobbyMock).toHaveBeenCalledWith("invitee-user");
+    expect(publishLobbyJoinMock).not.toHaveBeenCalled();
+  });
+
+  it("falls through to the game lobby when admission finds an active game", async () => {
+    joinLobbyByCodeMock.mockResolvedValue({ kind: "active_game_exists" });
+    resolveCanonicalLobbyMock.mockResolvedValue({
+      lobbyId: "active-game-lobby",
+      branch: "active_game",
+    });
+
+    await expect(
+      LobbiesPage({ searchParams: Promise.resolve({ code: "ABCD" }) })
+    ).rejects.toThrow(
+      "redirect:/lobbies/active-game-lobby?joinError=Finish%20or%20leave%20your%20current%20game%20first"
     );
 
     expect(resolveCanonicalLobbyMock).toHaveBeenCalledWith("invitee-user");
