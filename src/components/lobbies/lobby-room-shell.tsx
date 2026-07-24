@@ -4,10 +4,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, Lock, Play, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { ApiError, apiGet } from "@/lib/api-client";
+import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { claimLobbyRecovery } from "@/lib/lobbies/recovery-once";
-import { useLobbyRoom, type LobbyRoomDeck } from "@/hooks/use-lobby-room";
+import {
+  useLobbyRoom,
+  type LobbyRoomDeck,
+  type LobbyRoomState,
+} from "@/hooks/use-lobby-room";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -41,10 +45,15 @@ import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 import { HostCloseAction, runHostClose } from "./host-close-action";
 import { lobbyRoomRecovery, rejoinGameId } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
+import {
+  formatInviteCountdown,
+  resolveInviteSeatTiming,
+} from "./invite-countdown";
 import { JoinPartyDialog } from "./join-party-dialog";
 import { PregameSettings } from "./pregame-settings";
 import { KickPlayerAction } from "./kick-player-action";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
+import { UserAvatar } from "@/components/social/user-avatar";
 
 interface DeckOption extends LobbyRoomDeck {
   format: string;
@@ -80,6 +89,7 @@ export function LobbyRoomShell({
     startLobby,
     leaveLobby,
     closeLobby,
+    refresh,
     kickGuest,
   } = useLobbyRoom(lobbyId);
   const [decks, setDecks] = useState<DeckOption[]>([]);
@@ -87,6 +97,7 @@ export function LobbyRoomShell({
   const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
+  const [cancelingInvite, setCancelingInvite] = useState(false);
   const recoveryHandledRef = useRef(false);
 
   useEffect(() => {
@@ -133,6 +144,7 @@ export function LobbyRoomShell({
   const guestName = lobby?.guest
     ? displayName(lobby.guest.user, "Opponent")
     : "Opponent";
+  const pendingInvite = lobby?.pendingInvite ?? null;
 
   const ownDeck = decks.find((deck) => deck.id === lobby?.hostDeck?.id);
   const canStart = useMemo(() => {
@@ -222,6 +234,25 @@ export function LobbyRoomShell({
         ),
       returnToBrowser: () => router.push("/lobbies"),
     });
+  };
+
+  const handleCancelInvite = async () => {
+    setCancelingInvite(true);
+    try {
+      await apiDelete(`/api/lobbies/${lobbyId}/invite`);
+      await refresh();
+      toast.success("Invite canceled");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 410) {
+        await refresh();
+        return;
+      }
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not cancel invite"
+      );
+    } finally {
+      setCancelingInvite(false);
+    }
   };
 
   const handleKick = async () => {
@@ -448,11 +479,16 @@ export function LobbyRoomShell({
                 />
               ) : (
                 <InvitePanel
+                  key={pendingInvite?.id ?? "open-seat"}
                   lobbyId={lobby.id}
                   joinCode={lobby.joinCode}
                   copied={copied}
                   onCopy={copyInvite}
                   showInviteFriend={isHost}
+                  pendingInvite={pendingInvite}
+                  cancelingInvite={cancelingInvite}
+                  onInviteSent={() => void refresh()}
+                  onCancelInvite={() => void handleCancelInvite()}
                 />
               )
             ) : (
@@ -651,19 +687,71 @@ function SeatPanel({
   );
 }
 
-function InvitePanel({
+export function InvitePanel({
   lobbyId,
   joinCode,
   copied,
   onCopy,
   showInviteFriend,
+  pendingInvite,
+  cancelingInvite,
+  onInviteSent,
+  onCancelInvite,
 }: {
   lobbyId: string;
   joinCode: string;
   copied: boolean;
   onCopy: () => void;
   showInviteFriend: boolean;
+  pendingInvite: NonNullable<LobbyRoomState["pendingInvite"]> | null;
+  cancelingInvite: boolean;
+  onInviteSent: () => void;
+  onCancelInvite: () => void;
 }) {
+  const [now, setNow] = useState(() => Date.now());
+  const pendingInviteName = pendingInvite
+    ? displayName(pendingInvite.user, "Friend")
+    : null;
+  const timing = pendingInvite
+    ? resolveInviteSeatTiming(pendingInvite.expiresAt, now)
+    : null;
+
+  useEffect(() => {
+    if (!pendingInvite) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [pendingInvite]);
+
+  if (pendingInvite && pendingInviteName && timing?.kind === "invited") {
+    return (
+      <section className="border-border bg-card flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border p-5 text-center">
+        <div className="ring-primary/30 animate-pulse rounded-full ring-2">
+          <UserAvatar user={pendingInvite.user} size="md" />
+        </div>
+        <div>
+          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            Side B
+          </p>
+          <p className="text-content-primary mt-2 text-lg font-semibold">
+            Invite sent to {pendingInviteName}
+          </p>
+          <p className="text-content-secondary mt-2 text-sm tabular-nums">
+            Expires in {formatInviteCountdown(timing.remainingMs)}
+          </p>
+        </div>
+        {showInviteFriend && (
+          <Button
+            variant="secondary"
+            onClick={onCancelInvite}
+            disabled={cancelingInvite}
+          >
+            {cancelingInvite ? "Canceling..." : "Cancel invite"}
+          </Button>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section className="border-border-strong bg-card flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border border-dashed p-5 text-center">
       <div>
@@ -674,7 +762,9 @@ function InvitePanel({
           Open seat
         </p>
         <p className="text-content-secondary mt-2 text-sm">
-          Share the room code when your opponent is ready.
+          {pendingInvite && pendingInviteName && timing?.kind === "expired"
+            ? `Invite to ${pendingInviteName} expired`
+            : "Share the room code when your opponent is ready."}
         </p>
       </div>
       <code className="border-border bg-background text-content-primary rounded-md border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em]">
@@ -689,7 +779,9 @@ function InvitePanel({
           )}
           {copied ? "Copied" : "Copy Invite"}
         </Button>
-        {showInviteFriend && <InviteFriendPopover lobbyId={lobbyId} />}
+        {showInviteFriend && (
+          <InviteFriendPopover lobbyId={lobbyId} onInviteSent={onInviteSent} />
+        )}
       </div>
     </section>
   );

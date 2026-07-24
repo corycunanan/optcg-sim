@@ -34,10 +34,35 @@ describe("LobbyRoomStateSchema version", () => {
 
   it("rejects the former timestamp version shape", () => {
     expect(
-      LobbyRoomStateSchema.safeParse(
-        lobbyState("2026-07-16T12:00:00.000Z")
-      ).success
+      LobbyRoomStateSchema.safeParse(lobbyState("2026-07-16T12:00:00.000Z"))
+        .success
     ).toBe(false);
+  });
+});
+
+describe("LobbyRoomStateSchema pending invite", () => {
+  it("accepts the additive server-timestamped invited-seat state", () => {
+    const pendingInvite = {
+      id: "invite-1",
+      expiresAt: "2026-07-24T20:05:00.000Z",
+      user: {
+        id: "friend-1",
+        username: "nami",
+        name: "Nami",
+        image: null,
+      },
+    };
+
+    expect(
+      LobbyRoomStateSchema.parse({ ...lobbyState(), pendingInvite })
+        .pendingInvite
+    ).toEqual(pendingInvite);
+  });
+
+  it("keeps legacy room snapshots valid when invite state is absent", () => {
+    expect(
+      LobbyRoomStateSchema.parse(lobbyState()).pendingInvite
+    ).toBeUndefined();
   });
 });
 
@@ -50,13 +75,16 @@ describe("pregame mode validation", () => {
     "SIDE_A_FIRST",
     "SIDE_B_FIRST",
     "SOLITAIRE_RANDOM",
-  ] as const)("accepts %s in lobby snapshots and PATCH bodies", (pregameMode) => {
-    expect(PregameModeSchema.parse(pregameMode)).toBe(pregameMode);
-    expect(PatchLobbySchema.parse({ pregameMode })).toEqual({ pregameMode });
-    expect(
-      LobbyRoomStateSchema.parse({ ...lobbyState(), pregameMode }).pregameMode
-    ).toBe(pregameMode);
-  });
+  ] as const)(
+    "accepts %s in lobby snapshots and PATCH bodies",
+    (pregameMode) => {
+      expect(PregameModeSchema.parse(pregameMode)).toBe(pregameMode);
+      expect(PatchLobbySchema.parse({ pregameMode })).toEqual({ pregameMode });
+      expect(
+        LobbyRoomStateSchema.parse({ ...lobbyState(), pregameMode }).pregameMode
+      ).toBe(pregameMode);
+    }
+  );
 
   it("defaults legacy lobby snapshots to priority roll", () => {
     expect(LobbyRoomStateSchema.parse(lobbyState()).pregameMode).toBe(
@@ -65,7 +93,8 @@ describe("pregame mode validation", () => {
   });
 
   it("rejects unknown future values", () => {
-    expect(PatchLobbySchema.safeParse({ pregameMode: "FUTURE_MODE" }).success)
-      .toBe(false);
+    expect(
+      PatchLobbySchema.safeParse({ pregameMode: "FUTURE_MODE" }).success
+    ).toBe(false);
   });
 });

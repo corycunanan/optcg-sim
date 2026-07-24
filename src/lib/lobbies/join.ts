@@ -13,6 +13,10 @@ import {
   releaseActiveLobby,
 } from "./active-membership";
 import { findActiveGameLobby } from "./active-game";
+import {
+  isRetryableTransactionConflict,
+  retryTransactionOnce,
+} from "./transaction-conflict";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 import { notifyUser } from "@/lib/realtime/fan-out";
 
@@ -30,7 +34,8 @@ export type LobbyJoinFailureKind =
   | "target_changed"
   | "invite_not_found"
   | "invite_forbidden"
-  | "invite_gone";
+  | "invite_gone"
+  | "concurrent_state_conflict";
 
 export interface PartySwitchConfirmation {
   kind: "confirmation_required";
@@ -85,6 +90,7 @@ interface JoinableLobby {
 interface JoinTarget {
   lobby: JoinableLobby;
   inviteId: string | null;
+  inviteExpired?: boolean;
 }
 
 const currentMembershipSelect = {
@@ -184,7 +190,7 @@ export async function joinLobbyByInvite({
   inviteId,
   confirmDisbandLobbyId,
 }: JoinLobbyByInviteInput): Promise<LobbyJoinResult> {
-  return joinLobby({
+  const result = await joinLobby({
     userId,
     confirmDisbandLobbyId,
     resolveTarget: async (tx) => {
@@ -210,16 +216,28 @@ export async function joinLobbyByInvite({
       if (!invite) return { kind: "invite_not_found" };
       if (invite.toUserId !== userId) return { kind: "invite_forbidden" };
       if (invite.status !== "PENDING") return { kind: "invite_gone" };
-      if (invite.expiresAt.getTime() <= Date.now()) {
-        await tx.lobbyInvite.updateMany({
-          where: { id: invite.id, status: "PENDING" },
-          data: { status: "EXPIRED" },
-        });
-        return { kind: "invite_gone" };
-      }
-      return { lobby: invite.lobby, inviteId: invite.id };
+      return {
+        lobby: invite.lobby,
+        inviteId: invite.id,
+        inviteExpired: invite.expiresAt.getTime() <= Date.now(),
+      };
     },
   });
+
+  if (result.kind !== "concurrent_state_conflict") return result;
+
+  // Both transaction attempts rolled back. Re-read outside the failed
+  // transaction so an invite that remains live gets a retryable 409, while
+  // an invite actually canceled/expired by the winner gets the expected 410.
+  const currentInvite = await prisma.lobbyInvite.findUnique({
+    where: { id: inviteId },
+    select: { status: true, expiresAt: true },
+  });
+  return !currentInvite ||
+    currentInvite.status !== "PENDING" ||
+    currentInvite.expiresAt.getTime() <= Date.now()
+    ? { kind: "invite_gone" }
+    : result;
 }
 
 interface JoinLobbyInput {
@@ -241,9 +259,26 @@ async function joinLobby({
   if (activeGame) return { kind: "active_game_exists" };
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await retryTransactionOnce(prisma, async (tx) => {
       const target = await resolveTarget(tx);
       if ("kind" in target) return target;
+
+      if (target.inviteId && target.inviteExpired) {
+        // Expiry follows the same lobby → invite lock order as send, cancel,
+        // and accept, avoiding an invite → lobby deadlock cycle.
+        const locked = await tx.lobby.updateMany({
+          where: { id: target.lobby.id, status: target.lobby.status },
+          data: { status: target.lobby.status },
+        });
+        if (locked.count !== 1) return { kind: "target_changed" };
+
+        const expired = await tx.lobbyInvite.updateMany({
+          where: { id: target.inviteId, status: "PENDING" },
+          data: { status: "EXPIRED" },
+        });
+        if (expired.count !== 1) throw new JoinRaceError("invite_gone");
+        return { kind: "invite_gone" };
+      }
 
       if (
         target.lobby.hostUserId !== userId &&
@@ -380,14 +415,6 @@ async function joinLobby({
         await releaseActiveLobby(tx, userId, current.activeLobbyId);
       }
 
-      if (target.inviteId) {
-        const accepted = await tx.lobbyInvite.updateMany({
-          where: { id: target.inviteId, status: "PENDING" },
-          data: { status: "ACCEPTED" },
-        });
-        if (accepted.count !== 1) throw new JoinRaceError("invite_gone");
-      }
-
       const acquired = await tx.lobby.updateMany({
         where: {
           id: target.lobby.id,
@@ -398,6 +425,14 @@ async function joinLobby({
         data: { status: "READY", revision: { increment: 1 } },
       });
       if (acquired.count !== 1) throw new JoinRaceError("occupied");
+
+      if (target.inviteId) {
+        const accepted = await tx.lobbyInvite.updateMany({
+          where: { id: target.inviteId, status: "PENDING" },
+          data: { status: "ACCEPTED" },
+        });
+        if (accepted.count !== 1) throw new JoinRaceError("invite_gone");
+      }
 
       await claimActiveLobby(tx, userId, target.lobby.id);
       try {
@@ -437,6 +472,9 @@ async function joinLobby({
       return { kind: "active_lobby_exists" };
     }
     if (error instanceof JoinRaceError) return { kind: error.kind };
+    if (isRetryableTransactionConflict(error)) {
+      return { kind: "concurrent_state_conflict" };
+    }
     throw error;
   }
 }
@@ -541,6 +579,8 @@ export function lobbyJoinFailureMessage(kind: LobbyJoinFailureKind) {
       return "Forbidden";
     case "invite_gone":
       return "Invite is no longer active";
+    case "concurrent_state_conflict":
+      return "Invite state changed concurrently. Try again.";
   }
 }
 

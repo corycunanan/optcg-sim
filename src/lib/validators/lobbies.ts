@@ -52,6 +52,14 @@ export const LobbyRoomStateSchema = z.object({
       deck: LobbyDeckSchema.nullable(),
     })
     .nullable(),
+  pendingInvite: z
+    .object({
+      id: z.string(),
+      expiresAt: z.string(),
+      user: LobbyUserSchema,
+    })
+    .nullable()
+    .optional(),
   gameId: z.string().nullable(),
   gameStatus: z.enum(["IN_PROGRESS", "FINISHED", "ABANDONED"]).optional(),
 });

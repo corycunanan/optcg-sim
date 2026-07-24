@@ -21,7 +21,9 @@ const { GET } = await import("./route");
 const RECIPIENT_ID = "user-recipient";
 const HOST_ID = "user-host";
 
-function makeInviteRow(overrides: Partial<{ status: string; lobbyStatus: string; id: string }> = {}) {
+function makeInviteRow(
+  overrides: Partial<{ status: string; lobbyStatus: string; id: string }> = {}
+) {
   return {
     id: overrides.id ?? "invite-1",
     lobbyId: "lobby-1",
@@ -67,6 +69,15 @@ describe("GET /api/lobby-invites/pending", () => {
     expect(json.data).toHaveLength(1);
     expect(json.data[0]?.id).toBe("invite-1");
     expect(json.data[0]?.lobby.joinCode).toBe("ABCD");
+    expect(inviteFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          toUserId: RECIPIENT_ID,
+          status: "PENDING",
+          expiresAt: { gt: expect.any(Date) },
+        }),
+      })
+    );
   });
 
   it("filters out invites whose lobby moved past WAITING/READY", async () => {

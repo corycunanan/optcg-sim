@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
@@ -83,6 +84,13 @@ const invite = {
     guest: null,
   },
 };
+
+function transactionConflict() {
+  return new Prisma.PrismaClientKnownRequestError(
+    "Transaction failed due to a write conflict or a deadlock",
+    { code: "P2034", clientVersion: "test" }
+  );
+}
 
 function request(body?: unknown) {
   return {
@@ -183,6 +191,9 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
       },
     });
     expect(notifyLobbyMock).toHaveBeenCalledOnce();
+    expect(lobbyUpdateManyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      inviteUpdateManyMock.mock.invocationCallOrder[0]!
+    );
   });
 
   it("returns the same host-switch confirmation contract", async () => {
@@ -287,5 +298,49 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     expect(staleInvite.status).toBe(410);
     expect(filled.status).toBe(409);
     expect(await filled.json()).toEqual({ error: "This party is full" });
+  });
+
+  it("retries one P2034 transaction conflict and then accepts", async () => {
+    transactionMock.mockRejectedValueOnce(transactionConflict());
+    const input = request();
+
+    const response = await POST(input.request, { params: input.params });
+
+    expect(response.status).toBe(200);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 409 when both accept attempts conflict and the invite is still pending", async () => {
+    transactionMock
+      .mockRejectedValueOnce(transactionConflict())
+      .mockRejectedValueOnce(transactionConflict());
+    const input = request();
+
+    const response = await POST(input.request, { params: input.params });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invite state changed concurrently. Try again.",
+    });
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 410 after both accept attempts conflict when the invite became inactive", async () => {
+    transactionMock
+      .mockRejectedValueOnce(transactionConflict())
+      .mockRejectedValueOnce(transactionConflict());
+    inviteFindUniqueMock.mockResolvedValueOnce({
+      ...invite,
+      status: "CANCELED",
+    });
+    const input = request();
+
+    const response = await POST(input.request, { params: input.params });
+
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invite is no longer active",
+    });
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 });

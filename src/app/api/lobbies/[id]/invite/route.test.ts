@@ -6,11 +6,15 @@ const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const lobbyFindUniqueMock = vi.fn();
 const lobbyUpdateManyMock = vi.fn();
+const lobbyUpdateMock = vi.fn();
 const friendshipFindFirstMock = vi.fn();
 const inviteCreateMock = vi.fn();
 const inviteUpdateManyMock = vi.fn();
+const inviteFindManyMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
+const notifyLobbyMock = vi.fn();
+const buildLobbyRoomStateMock = vi.fn();
 
 vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
@@ -28,6 +32,7 @@ vi.mock("@/lib/db", () => ({
     lobby: {
       findUnique: (...args: unknown[]) => lobbyFindUniqueMock(...args),
       updateMany: (...args: unknown[]) => lobbyUpdateManyMock(...args),
+      update: (...args: unknown[]) => lobbyUpdateMock(...args),
     },
     friendship: {
       findFirst: (...args: unknown[]) => friendshipFindFirstMock(...args),
@@ -35,6 +40,7 @@ vi.mock("@/lib/db", () => ({
     lobbyInvite: {
       create: (...args: unknown[]) => inviteCreateMock(...args),
       updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
+      findMany: (...args: unknown[]) => inviteFindManyMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
@@ -45,12 +51,32 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/realtime/fan-out", () => ({
   notifyUser: (...args: unknown[]) => notifyUserMock(...args),
 }));
+vi.mock("@/lib/realtime/fanout-lobby", () => ({
+  notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
+}));
+vi.mock("@/lib/lobbies/build-state", () => ({
+  buildLobbyRoomState: (...args: unknown[]) => buildLobbyRoomStateMock(...args),
+}));
 
-const { POST } = await import("./route");
+const { DELETE, POST } = await import("./route");
 
 const HOST_ID = "user-host";
 const FRIEND_ID = "user-friend";
 const LOBBY_ID = "lobby-1";
+
+function transactionConflict() {
+  return new Prisma.PrismaClientKnownRequestError(
+    "Transaction failed due to a write conflict or a deadlock",
+    { code: "P2034", clientVersion: "test" }
+  );
+}
+
+function postgresDeadlock() {
+  return new Prisma.PrismaClientUnknownRequestError(
+    "PostgreSQL error 40P01: deadlock detected",
+    { clientVersion: "test" }
+  );
+}
 
 function buildRequest(body: unknown = { toUserId: FRIEND_ID }) {
   return {
@@ -104,20 +130,28 @@ beforeEach(() => {
   rateLimitMock.mockReset();
   lobbyFindUniqueMock.mockReset();
   lobbyUpdateManyMock.mockReset();
+  lobbyUpdateMock.mockReset();
   friendshipFindFirstMock.mockReset();
   inviteCreateMock.mockReset();
   inviteUpdateManyMock.mockReset();
+  inviteFindManyMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
+  notifyLobbyMock.mockReset();
+  buildLobbyRoomStateMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: HOST_ID } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   lobbyFindUniqueMock.mockResolvedValue(lobbyOpen);
   lobbyUpdateManyMock.mockResolvedValue({ count: 1 });
+  lobbyUpdateMock.mockResolvedValue({});
   friendshipFindFirstMock.mockResolvedValue({ id: "friendship-1" });
   inviteCreateMock.mockResolvedValue(inviteRow);
   inviteUpdateManyMock.mockResolvedValue({ count: 0 });
+  inviteFindManyMock.mockResolvedValue([]);
   notifyUserMock.mockResolvedValue(undefined);
+  notifyLobbyMock.mockResolvedValue(undefined);
+  buildLobbyRoomStateMock.mockResolvedValue(null);
 
   // Default tx implementation: invoke the callback with a tx-shaped object
   // backed by the same mocks. Tests that need a P2002 throw replace this
@@ -125,9 +159,14 @@ beforeEach(() => {
   transactionMock.mockImplementation(async (fn: unknown) => {
     if (typeof fn !== "function") return fn;
     return (fn as (tx: unknown) => Promise<unknown>)({
-      lobby: { updateMany: lobbyUpdateManyMock },
+      lobby: {
+        findUnique: lobbyFindUniqueMock,
+        updateMany: lobbyUpdateManyMock,
+        update: lobbyUpdateMock,
+      },
       lobbyInvite: {
         updateMany: (...args: unknown[]) => inviteUpdateManyMock(...args),
+        findMany: (...args: unknown[]) => inviteFindManyMock(...args),
         create: (...args: unknown[]) => inviteCreateMock(...args),
       },
     });
@@ -136,6 +175,8 @@ beforeEach(() => {
 
 describe("POST /api/lobbies/[id]/invite", () => {
   it("creates an invite and fans out lobby:invite_received", async () => {
+    const roomState = { id: LOBBY_ID, version: 2 };
+    buildLobbyRoomStateMock.mockResolvedValueOnce(roomState);
     const { request, params } = buildRequest();
 
     // Single baseline timestamp so both bounds use the same reference. The
@@ -154,7 +195,10 @@ describe("POST /api/lobbies/[id]/invite", () => {
         mode: "PVP",
         guest: { is: null },
       },
-      data: { revision: { increment: 1 } },
+      data: {
+        status: "WAITING",
+        revision: { increment: 1 },
+      },
     });
     const createCall = inviteCreateMock.mock.calls[0]?.[0];
     expect(createCall?.data).toMatchObject({
@@ -166,12 +210,19 @@ describe("POST /api/lobbies/[id]/invite", () => {
     expect(expiresAt.getTime() - baseline).toBeGreaterThan(4 * 60 * 1000);
     expect(expiresAt.getTime() - baseline).toBeLessThan(6 * 60 * 1000);
 
-    expect(notifyUserMock).toHaveBeenCalledTimes(1);
-    const [target, event] = notifyUserMock.mock.calls[0] ?? [];
-    expect(target).toBe(FRIEND_ID);
-    expect(event).toMatchObject({
-      type: "lobby:invite_received",
-      invite: { id: "invite-1", toUserId: FRIEND_ID, fromUserId: HOST_ID },
+    await vi.waitFor(() => {
+      expect(notifyUserMock).toHaveBeenCalledWith(FRIEND_ID, {
+        type: "lobby:invite_received",
+        invite: expect.objectContaining({
+          id: "invite-1",
+          toUserId: FRIEND_ID,
+          fromUserId: HOST_ID,
+        }),
+      });
+      expect(notifyUserMock).toHaveBeenCalledWith(HOST_ID, {
+        type: "lobby:state_changed",
+        lobby: roomState,
+      });
     });
   });
 
@@ -187,13 +238,39 @@ describe("POST /api/lobbies/[id]/invite", () => {
     const where = inviteUpdateManyMock.mock.calls[0]?.[0]?.where;
     expect(where).toMatchObject({
       lobbyId: LOBBY_ID,
-      toUserId: FRIEND_ID,
       status: "PENDING",
     });
     expect(where?.expiresAt).toMatchObject({ lte: expect.any(Date) });
   });
 
-  it("translates a P2002 unique-violation into 409 (live PENDING dedup)", async () => {
+  it("voids the previous live invite and notifies both recipients", async () => {
+    inviteFindManyMock.mockResolvedValueOnce([
+      { id: "invite-old", toUserId: "user-old-friend" },
+    ]);
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(201);
+    expect(inviteUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["invite-old"] },
+        status: "PENDING",
+      },
+      data: { status: "CANCELED" },
+    });
+    expect(notifyUserMock.mock.calls).toEqual(
+      expect.arrayContaining([
+        [
+          "user-old-friend",
+          { type: "lobby:invite_canceled", inviteId: "invite-old" },
+        ],
+        [FRIEND_ID, expect.objectContaining({ type: "lobby:invite_received" })],
+      ])
+    );
+  });
+
+  it("translates a P2002 unique-violation into 409", async () => {
     // CodeRabbit critical — partial unique index on
     // (lobby_id, to_user_id) WHERE status='PENDING' rejects the duplicate
     // atomically. Two concurrent requests race; one wins, the other 409s
@@ -208,6 +285,28 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(409);
+  });
+
+  it("retries one P2034 transaction conflict and then sends", async () => {
+    transactionMock.mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 409 when the send retry also hits P2034", async () => {
+    transactionMock
+      .mockRejectedValueOnce(transactionConflict())
+      .mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(409);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 
   it("rejects non-host callers (403)", async () => {
@@ -296,5 +395,83 @@ describe("POST /api/lobbies/[id]/invite", () => {
 
     const res = await POST(request, { params });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("DELETE /api/lobbies/[id]/invite", () => {
+  it("cancels the live invite, bumps revision, and notifies the invitee", async () => {
+    inviteFindManyMock.mockResolvedValueOnce([
+      { id: "invite-1", toUserId: FRIEND_ID },
+    ]);
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(inviteUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["invite-1"] },
+        status: "PENDING",
+      },
+      data: { status: "CANCELED" },
+    });
+    expect(lobbyUpdateMock).toHaveBeenCalledWith({
+      where: { id: LOBBY_ID },
+      data: { revision: { increment: 1 } },
+    });
+    expect(notifyUserMock).toHaveBeenCalledWith(FRIEND_ID, {
+      type: "lobby:invite_canceled",
+      inviteId: "invite-1",
+    });
+  });
+
+  it("returns 410 when the server timestamp has already elapsed", async () => {
+    inviteFindManyMock.mockResolvedValueOnce([]);
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(410);
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-host without canceling the invite", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce({
+      ...lobbyOpen,
+      hostUserId: "another-host",
+    });
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(403);
+    expect(inviteUpdateManyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it("retries one PostgreSQL deadlock and then cancels", async () => {
+    transactionMock.mockRejectedValueOnce(postgresDeadlock());
+    inviteFindManyMock.mockResolvedValueOnce([
+      { id: "invite-1", toUserId: FRIEND_ID },
+    ]);
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 409 when the cancel retry also deadlocks", async () => {
+    transactionMock
+      .mockRejectedValueOnce(postgresDeadlock())
+      .mockRejectedValueOnce(postgresDeadlock());
+    const { request, params } = buildRequest();
+
+    const res = await DELETE(request, { params });
+
+    expect(res.status).toBe(409);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 });

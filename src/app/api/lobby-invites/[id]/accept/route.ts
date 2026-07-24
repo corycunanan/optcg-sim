@@ -108,6 +108,7 @@ function inviteJoinFailureResponse(
     case "target_changed":
     case "active_game_exists":
     case "active_lobby_exists":
+    case "concurrent_state_conflict":
       return apiError(message, 409, {
         ...(kind === "active_game_exists"
           ? { code: "ACTIVE_GAME_EXISTS" }
