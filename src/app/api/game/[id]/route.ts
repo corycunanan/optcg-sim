@@ -6,7 +6,7 @@
 import { after, NextRequest } from "next/server";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
-import { finalizeGameResult } from "@/lib/game/finalize";
+import { finalizeGameResult, notifyRestoredLobby } from "@/lib/game/finalize";
 import { buildNotifyEndPayload } from "@/lib/game/notify-end";
 import {
   gameWorkerFetch,
@@ -159,13 +159,18 @@ async function handleFinalize(
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
 
-  after(() =>
-    notifyGame(game.id, {
-      status: "FINISHED",
-      winnerId: updated!.winnerId,
-      winReason: updated!.winReason,
-    }),
-  );
+  after(async () => {
+    await Promise.all([
+      notifyGame(game.id, {
+        status: "FINISHED",
+        winnerId: updated!.winnerId,
+        winReason: updated!.winReason,
+      }),
+      finalization.restoredLobbyId
+        ? notifyRestoredLobby(finalization.restoredLobbyId)
+        : Promise.resolve(),
+    ]);
+  });
 
   return apiSuccess({
     id: updated!.id,
@@ -224,13 +229,18 @@ async function handleConcede(gameId: string, userId: string) {
     select: { id: true, status: true, winnerId: true, winReason: true },
   });
 
-  after(() =>
-    notifyGame(game.id, {
-      status: "FINISHED",
-      winnerId: updated.winnerId,
-      winReason: updated.winReason,
-    }),
-  );
+  after(async () => {
+    await Promise.all([
+      notifyGame(game.id, {
+        status: "FINISHED",
+        winnerId: updated.winnerId,
+        winReason: updated.winReason,
+      }),
+      finalization.restoredLobbyId
+        ? notifyRestoredLobby(finalization.restoredLobbyId)
+        : Promise.resolve(),
+    ]);
+  });
 
   const winnerIndex = winnerId === game.player1Id ? 0 : 1;
   if (isGameWorkerConfigured()) {

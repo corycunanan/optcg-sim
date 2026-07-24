@@ -35,6 +35,7 @@ import {
 } from "./session/persistence.js";
 import { createResultCallbackFetch } from "./session/result-callback.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
+import { handleGameStatusRequest } from "./session/status.js";
 import {
   computeEffectAvailability,
   effectAvailabilityForController,
@@ -108,7 +109,7 @@ export class GameSession implements DurableObject {
         nextJsUrl: env.NEXTJS_URL,
         workerSecret: env.GAME_WORKER_SECRET,
       },
-      createResultCallbackFetch(),
+      createResultCallbackFetch()
     );
     this.transport = new SessionTransport(state, (playerIndex) =>
       this.handlePlayerAway(playerIndex, "DISCONNECTED")
@@ -127,6 +128,16 @@ export class GameSession implements DurableObject {
     // POST /notify-end — DB already updated (e.g. API fallback concede); sync DO + notify clients
     if (request.method === "POST" && url.pathname.endsWith("/notify-end")) {
       return this.handleNotifyEnd(request);
+    }
+    if (request.method === "GET" && url.pathname.endsWith("/status")) {
+      return handleGameStatusRequest(
+        request,
+        this.env.GAME_WORKER_SECRET,
+        async () => {
+          if (!this.gameState) await this.loadFromStorage();
+          return this.gameState;
+        }
+      );
     }
 
     // GET /ws — WebSocket upgrade
@@ -633,7 +644,7 @@ export class GameSession implements DurableObject {
       this.rejectAction(
         ws,
         action,
-        "The action could not be saved; game state was not changed",
+        "The action could not be saved; game state was not changed"
       );
       return;
     }
@@ -717,7 +728,7 @@ export class GameSession implements DurableObject {
       this.rejectAction(
         ws,
         action,
-        "The response could not be saved; the prompt is still pending",
+        "The response could not be saved; the prompt is still pending"
       );
       return;
     }

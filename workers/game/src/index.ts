@@ -6,6 +6,7 @@
  *   GET  /game/:gameId/ws          — WebSocket upgrade (called directly by browser clients)
  *   GET  /game/:gameId/cards       — Card DB fetch
  *   POST /game/:gameId/notify-end  — Server-to-server result fallback
+ *   GET  /game/:gameId/status      — Server-to-server lifecycle probe
  *
  *   GET  /user/:userId/ws          — User-channel WebSocket upgrade (token in ?token=)
  *   POST /user/:userId/notify      — Server-to-server fanout from Next.js
@@ -16,7 +17,8 @@ export { GameSession } from "./GameSession.js";
 export { UserChannel } from "./UserChannel.js";
 import type { Env } from "./types.js";
 
-const GAME_ROUTE_PATTERN = /^\/game\/([^/]+)\/(init|ws|cards|notify-end)$/;
+const GAME_ROUTE_PATTERN =
+  /^\/game\/([^/]+)\/(init|ws|cards|notify-end|status)$/;
 const USER_ROUTE_PATTERN = /^\/user\/([^/]+)\/(ws|notify|health)$/;
 
 export default {
@@ -29,7 +31,8 @@ export default {
         headers: {
           "Access-Control-Allow-Origin": env.NEXTJS_URL,
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade",
+          "Access-Control-Allow-Headers":
+            "Content-Type, Authorization, Upgrade",
         },
       });
     }
@@ -42,8 +45,9 @@ export default {
       const [, gameId, route] = gameMatch;
 
       // Bearer-secret auth for server-to-server routes.
-      if (route === "init" || route === "notify-end") {
-        if (request.method !== "POST") {
+      if (route === "init" || route === "notify-end" || route === "status") {
+        const expectedMethod = route === "status" ? "GET" : "POST";
+        if (request.method !== expectedMethod) {
           return new Response("Method not allowed", { status: 405 });
         }
         const auth = request.headers.get("Authorization");

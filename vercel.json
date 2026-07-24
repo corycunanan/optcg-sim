@@ -3,6 +3,10 @@
   "buildCommand": "prisma migrate deploy && next build --webpack",
   "crons": [
     {
+      "path": "/api/cron/game-finalization-repair",
+      "schedule": "15 4 * * *"
+    },
+    {
       "path": "/api/cron/lobby-retention",
       "schedule": "0 4 * * *"
     }
