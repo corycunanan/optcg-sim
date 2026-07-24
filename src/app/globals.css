@@ -456,6 +456,14 @@
   letter-spacing: 0.025em;
 }
 
+/* Global navbar links use the locked Erode navigation treatment. */
+.font-nav {
+  font-family: var(--font-erode), var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ─── Social Surfaces ────────────────────────────────────────── */
 
 .social-rail {
