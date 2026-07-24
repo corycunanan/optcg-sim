@@ -152,7 +152,18 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       return apiError("Invite is no longer active", 410);
     }
     if (isRetryableTransactionConflict(error)) {
-      return apiError("Invite is no longer active", 410);
+      const currentInvite = await prisma.lobbyInvite.findUnique({
+        where: { id: inviteId },
+        select: { status: true, expiresAt: true },
+      });
+      if (
+        !currentInvite ||
+        currentInvite.status !== "PENDING" ||
+        currentInvite.expiresAt.getTime() <= now
+      ) {
+        return apiError("Invite is no longer active", 410);
+      }
+      return apiError("Invite state changed concurrently. Try again.", 409);
     }
     if (error instanceof ActiveLobbyConflictError) {
       return apiError("An active lobby already exists", 409, {

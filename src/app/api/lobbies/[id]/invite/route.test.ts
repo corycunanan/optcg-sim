@@ -71,6 +71,13 @@ function transactionConflict() {
   );
 }
 
+function postgresDeadlock() {
+  return new Prisma.PrismaClientUnknownRequestError(
+    "PostgreSQL error 40P01: deadlock detected",
+    { clientVersion: "test" }
+  );
+}
+
 function buildRequest(body: unknown = { toUserId: FRIEND_ID }) {
   return {
     request: new NextRequest(
@@ -444,9 +451,7 @@ describe("DELETE /api/lobbies/[id]/invite", () => {
   });
 
   it("retries one PostgreSQL deadlock and then cancels", async () => {
-    transactionMock.mockRejectedValueOnce(
-      Object.assign(new Error("deadlock detected"), { code: "40P01" })
-    );
+    transactionMock.mockRejectedValueOnce(postgresDeadlock());
     inviteFindManyMock.mockResolvedValueOnce([
       { id: "invite-1", toUserId: FRIEND_ID },
     ]);
@@ -459,11 +464,9 @@ describe("DELETE /api/lobbies/[id]/invite", () => {
   });
 
   it("returns 409 when the cancel retry also deadlocks", async () => {
-    const deadlock = () =>
-      Object.assign(new Error("deadlock detected"), { code: "40P01" });
     transactionMock
-      .mockRejectedValueOnce(deadlock())
-      .mockRejectedValueOnce(deadlock());
+      .mockRejectedValueOnce(postgresDeadlock())
+      .mockRejectedValueOnce(postgresDeadlock());
     const { request, params } = buildRequest();
 
     const res = await DELETE(request, { params });

@@ -272,10 +272,29 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
     expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 
-  it("returns 410 when the accept retry also hits P2034", async () => {
+  it("returns 409 when both accept attempts conflict and the invite is still pending", async () => {
     transactionMock
       .mockRejectedValueOnce(transactionConflict())
       .mockRejectedValueOnce(transactionConflict());
+    const { request, params } = buildRequest();
+
+    const res = await POST(request, { params });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      error: "Invite state changed concurrently. Try again.",
+    });
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 410 after both accept attempts conflict when the invite became inactive", async () => {
+    transactionMock
+      .mockRejectedValueOnce(transactionConflict())
+      .mockRejectedValueOnce(transactionConflict());
+    inviteFindUniqueMock.mockResolvedValueOnce({
+      status: "CANCELED",
+      expiresAt: livePendingInvite.expiresAt,
+    });
     const { request, params } = buildRequest();
 
     const res = await POST(request, { params });

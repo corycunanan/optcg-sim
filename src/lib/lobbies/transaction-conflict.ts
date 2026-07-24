@@ -10,7 +10,10 @@ export function isRetryableTransactionConflict(error: unknown): boolean {
     return true;
   }
 
-  return errorHasCode(error, POSTGRES_DEADLOCK_CODE, new Set());
+  return (
+    error instanceof Prisma.PrismaClientUnknownRequestError &&
+    error.message.includes(POSTGRES_DEADLOCK_CODE)
+  );
 }
 
 export async function retryTransactionOnce<T>(
@@ -27,23 +30,4 @@ export async function retryTransactionOnce<T>(
     if (!isRetryableTransactionConflict(error)) throw error;
     return client.$transaction(operation);
   }
-}
-
-function errorHasCode(
-  value: unknown,
-  expectedCode: string,
-  seen: Set<object>
-): boolean {
-  if (typeof value !== "object" || value === null || seen.has(value)) {
-    return false;
-  }
-  seen.add(value);
-
-  const record = value as Record<string, unknown>;
-  if (record.code === expectedCode) return true;
-
-  return (
-    errorHasCode(record.meta, expectedCode, seen) ||
-    errorHasCode(record.cause, expectedCode, seen)
-  );
 }
