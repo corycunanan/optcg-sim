@@ -64,6 +64,7 @@ function lobbySnapshot(overrides: Record<string, unknown> = {}) {
     hostUserId: "host-user",
     status: "READY",
     mode: "PVP",
+    revision: 7,
     host: { username: "strawhat", name: "Luffy" },
     guest: { userId: "guest-user" },
     ...overrides,
@@ -124,6 +125,7 @@ describe("DELETE /api/lobbies/[id]/guest", () => {
         hostUserId: "host-user",
         status: { in: ["WAITING", "READY"] },
         mode: "PVP",
+        revision: 7,
         guest: { is: { userId: "guest-user" } },
       },
       data: {
@@ -203,5 +205,141 @@ describe("DELETE /api/lobbies/[id]/guest", () => {
       code: "LOBBY_STATE_CHANGED",
     });
     expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a finalized-WAITING kick when its observed revision is stale", async () => {
+    lobbyFindUniqueMock
+      .mockResolvedValueOnce(lobbySnapshot({ status: "WAITING", revision: 12 }))
+      .mockResolvedValueOnce(
+        lobbySnapshot({ status: "WAITING", revision: 13 })
+      );
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const response = await DELETE(request, params);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Guest seat changed before it could be removed",
+      code: "LOBBY_STATE_CHANGED",
+    });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ revision: 12 }),
+      })
+    );
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: "game start",
+      current: lobbySnapshot({ status: "IN_GAME", revision: 8 }),
+      status: 409,
+      body: { error: "Lobby already started", code: "ALREADY_STARTED" },
+    },
+    {
+      name: "mode change",
+      current: lobbySnapshot({ mode: "SOLITAIRE", revision: 8 }),
+      status: 409,
+      body: { error: "Only a PVP guest can be kicked" },
+    },
+    {
+      name: "lobby removal",
+      current: null,
+      status: 404,
+      body: { error: "Guest not found" },
+    },
+    {
+      name: "seat removal",
+      current: lobbySnapshot({ guest: null, revision: 8 }),
+      status: 409,
+      body: {
+        error: "Guest seat changed before it could be removed",
+        code: "LOBBY_STATE_CHANGED",
+      },
+    },
+  ])(
+    "classifies a post-CAS $name from fresh state",
+    async ({ current, status, body }) => {
+      lobbyFindUniqueMock
+        .mockResolvedValueOnce(lobbySnapshot({ revision: 7 }))
+        .mockResolvedValueOnce(current);
+      lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+      const response = await DELETE(request, params);
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual(body);
+      expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("rolls back the lobby reset and seat delete when pointer release fails", async () => {
+    const persisted = {
+      status: "READY",
+      revision: 7,
+      guestUserId: "guest-user" as string | null,
+      activeLobbyId: "lobby-1" as string | null,
+    };
+    const before = { ...persisted };
+    let stateAtPointerRelease: typeof persisted | null = null;
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    transactionMock.mockImplementationOnce(
+      async (callback: (tx: unknown) => Promise<unknown>) => {
+        const snapshot = { ...persisted };
+        try {
+          return await callback({
+            lobby: {
+              findUnique: vi.fn().mockImplementation(async () =>
+                lobbySnapshot({
+                  status: persisted.status,
+                  revision: persisted.revision,
+                  guest: persisted.guestUserId
+                    ? { userId: persisted.guestUserId }
+                    : null,
+                })
+              ),
+              updateMany: vi.fn().mockImplementation(async () => {
+                persisted.status = "WAITING";
+                persisted.revision += 1;
+                return { count: 1 };
+              }),
+            },
+            lobbyGuest: {
+              deleteMany: vi.fn().mockImplementation(async () => {
+                persisted.guestUserId = null;
+                return { count: 1 };
+              }),
+            },
+            user: {
+              updateMany: vi.fn().mockImplementation(async () => {
+                stateAtPointerRelease = { ...persisted };
+                throw new Error("pointer release failed");
+              }),
+            },
+          });
+        } catch (error) {
+          Object.assign(persisted, snapshot);
+          throw error;
+        }
+      }
+    );
+
+    const response = await DELETE(request, params);
+
+    expect(response.status).toBe(500);
+    expect(stateAtPointerRelease).toMatchObject({
+      status: "WAITING",
+      revision: 8,
+      guestUserId: null,
+    });
+    expect(persisted).toEqual(before);
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

@@ -19,7 +19,7 @@ export function lobbyRoomRecovery(
   if (lobby.status === "EVICTED") {
     return {
       route: "/lobbies",
-      message: "Host changed the lobby to solo mode",
+      message: "You're no longer in this party",
     };
   }
   if (lobby.status === "CLOSED") {

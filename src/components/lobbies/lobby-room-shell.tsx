@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Loader2, Lock, Play, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -83,6 +83,7 @@ export function LobbyRoomShell({
   const [previewDeckId, setPreviewDeckId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
+  const recoveryHandledRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,19 +99,22 @@ export function LobbyRoomShell({
     };
   }, []);
 
-  useEffect(() => {
-    if (!lobby) return;
-    const recovery = lobbyRoomRecovery(lobby);
-    if (!recovery) return;
-    if (recovery.message) toast.info(recovery.message);
-    router.push(recovery.route);
-  }, [lobby, router]);
+  const recovery = useMemo(() => {
+    if (removedByHost) {
+      return {
+        route: "/lobbies",
+        message: `You were removed from ${removedByHost}'s party`,
+      };
+    }
+    return lobby ? lobbyRoomRecovery(lobby) : null;
+  }, [lobby, removedByHost]);
 
   useEffect(() => {
-    if (!removedByHost) return;
-    toast.info(`You were removed from ${removedByHost}'s party`);
-    router.push("/lobbies");
-  }, [removedByHost, router]);
+    if (!recovery || recoveryHandledRef.current) return;
+    recoveryHandledRef.current = true;
+    if (recovery.message) toast.info(recovery.message);
+    router.push(recovery.route);
+  }, [recovery, router]);
 
   const isHost = lobby?.hostUserId === currentUserId;
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
@@ -225,6 +229,8 @@ export function LobbyRoomShell({
       );
     }
   };
+
+  if (recovery) return null;
 
   if (loading && !lobby) {
     return (

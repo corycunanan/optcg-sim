@@ -102,6 +102,7 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
     mode: "PVP",
     pregameMode: "PRIORITY_ROLL",
     status: "READY",
+    revision: 7,
     hostReady: true,
     guest: {
       userId: "guest-user",
@@ -372,7 +373,12 @@ describe("PATCH /api/lobbies/[id]", () => {
       },
     });
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "lobby-1", status: "READY", mode: "PVP" },
+      where: {
+        id: "lobby-1",
+        status: "READY",
+        mode: "PVP",
+        revision: 7,
+      },
       data: {
         mode: "SOLITAIRE",
         pregameMode: "SOLITAIRE_RANDOM",
@@ -382,6 +388,34 @@ describe("PATCH /api/lobbies/[id]", () => {
       },
     });
     expect(transactionMock).toHaveBeenCalledOnce();
+  });
+
+  it("revision-guards forced Solitaire guest ejection against a concurrent kick", async () => {
+    lobbyFindUniqueMock
+      .mockResolvedValueOnce(baseLobby({ status: "WAITING", revision: 12 }))
+      .mockResolvedValueOnce({ status: "WAITING" });
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const res = await PATCH(
+      buildRequest(
+        { mode: "SOLITAIRE", pregameMode: "SOLITAIRE_RANDOM" },
+        "?force=true",
+      ),
+      params,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Lobby state changed before the update completed",
+      code: "LOBBY_STATE_CHANGED",
+    });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ revision: 12 }),
+      }),
+    );
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
   });
 
   it("cleans up host-as-guest state when switching Solitaire back to PVP", async () => {

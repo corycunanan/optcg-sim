@@ -220,7 +220,14 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     // has already committed CLOSED (or another mutation changed lifecycle
     // state), no guest-seat write below is allowed to run.
     const guarded = await tx.lobby.updateMany({
-      where: { id, status: lobby.status, mode: lobby.mode },
+      where: {
+        id,
+        status: lobby.status,
+        mode: lobby.mode,
+        ...(switchingToSolitaire && realGuest
+          ? { revision: lobby.revision }
+          : {}),
+      },
       data: {
         ...(Object.keys(lobbyData).length > 0
           ? lobbyData

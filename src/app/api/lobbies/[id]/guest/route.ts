@@ -41,6 +41,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: true,
           status: true,
           mode: true,
+          revision: true,
           host: { select: { username: true, name: true } },
           guest: { select: { userId: true } },
         },
@@ -58,6 +59,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: userId,
           status: { in: ["WAITING", "READY"] },
           mode: "PVP",
+          revision: lobby.revision,
           guest: { is: { userId: guestUserId } },
         },
         data: {
@@ -66,7 +68,20 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         },
       });
 
-      if (reset.count !== 1) return { failure: "SEAT_CHANGED" as const };
+      if (reset.count !== 1) {
+        const current = await tx.lobby.findUnique({
+          where: { id },
+          select: {
+            hostUserId: true,
+            status: true,
+            mode: true,
+            guest: { select: { userId: true } },
+          },
+        });
+        return {
+          failure: classifyChangedLobby(current, userId, guestUserId),
+        };
+      }
 
       const removed = await tx.lobbyGuest.deleteMany({
         where: { lobbyId: id, userId: guestUserId },
@@ -148,4 +163,24 @@ function kickFailureResponse(failure: KickFailure) {
         code: "LOBBY_STATE_CHANGED",
       });
   }
+}
+
+function classifyChangedLobby(
+  lobby: {
+    hostUserId: string;
+    status: string;
+    mode: string;
+    guest: { userId: string } | null;
+  } | null,
+  userId: string,
+  observedGuestUserId: string
+): KickFailure {
+  if (!lobby || lobby.status === "CLOSED") return "NOT_FOUND";
+  if (lobby.hostUserId !== userId) return "FORBIDDEN";
+  if (lobby.status === "IN_GAME") return "ALREADY_STARTED";
+  if (lobby.mode !== "PVP") return "NOT_PVP";
+  if (lobby.guest?.userId !== observedGuestUserId) return "SEAT_CHANGED";
+  // The seat is unchanged, but another mutation advanced the revision.
+  // Treat that stale snapshot as a retryable lobby-state conflict.
+  return "SEAT_CHANGED";
 }
