@@ -464,6 +464,16 @@
   letter-spacing: 0.04em;
 }
 
+/* ─── Social Surfaces ────────────────────────────────────────── */
+
+.social-rail {
+  border-left-color: var(--accent-border);
+}
+
+.social-chat-dock {
+  right: calc(17.5rem + 1rem);
+}
+
 /* ─── Base Styles ────────────────────────────────────────────── */
 
 html {

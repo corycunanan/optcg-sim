@@ -13,6 +13,12 @@
       "minimum": 4.5
     },
     {
+      "name": "primary/raised",
+      "foreground": "--text-primary",
+      "background": "--surface-raised",
+      "minimum": 4.5
+    },
+    {
       "name": "primary/inset",
       "foreground": "--text-primary",
       "background": "--surface-inset",

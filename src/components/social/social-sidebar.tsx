@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,8 +24,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuAction,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   UserPlus,
@@ -34,6 +33,7 @@ import {
   ChevronsUpDown,
   LogOut,
   Search,
+  MessageCircle,
 } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
@@ -311,73 +311,223 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
     (acc, f) => acc + (presence[f.user.id]?.online ? 1 : 0),
     0
   );
+  const onlineFriends = friends.filter(
+    ({ user: friendUser }) => presence[friendUser.id]?.online
+  );
+  const offlineFriends = friends.filter(
+    ({ user: friendUser }) => !presence[friendUser.id]?.online
+  );
+
+  const renderFriend = (
+    { friendshipId, user: friendUser }: FriendEntry,
+    isOnline: boolean
+  ) => {
+    const friendPresence = presence[friendUser.id];
+    const friendName = friendUser.username || friendUser.name || "Player";
+
+    return (
+      <SidebarMenuItem
+        key={friendshipId}
+        className={cn(
+          "transition-opacity",
+          !isOnline && "opacity-60 focus-within:opacity-100 hover:opacity-100"
+        )}
+      >
+        <SidebarMenuButton
+          size="lg"
+          onClick={() => onOpenChat(friendUser)}
+          className="pr-16"
+          aria-label={`Chat with ${friendName}`}
+        >
+          <UserAvatar
+            user={friendUser}
+            size="sm"
+            variant="dark"
+            showOnline={isOnline}
+            lastSeen={friendPresence?.lastSeen ?? null}
+          />
+          <span className="truncate font-medium">{friendName}</span>
+        </SidebarMenuButton>
+        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenChat(friendUser);
+            }}
+            className="text-content-secondary hover:text-content-primary size-8"
+            aria-label={`Open chat with ${friendName}`}
+          >
+            <MessageCircle className="size-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(event) => event.stopPropagation()}
+                className="text-content-secondary hover:text-content-primary size-8"
+                aria-label={`More actions for ${friendName}`}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="left" align="start">
+              <DropdownMenuItem
+                onSelect={() => setFriendToRemove(friendUser)}
+                className="text-error focus:text-error"
+              >
+                Unfriend
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <TooltipProvider>
-      <Sidebar side="right" collapsible="none">
-        {/* Header — User avatar + account menu */}
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
+      <Sidebar
+        side="right"
+        collapsible="none"
+        className="social-rail bg-surface-nav w-[280px] shrink-0 border-l"
+      >
+        <SidebarHeader className="border-border border-b px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-content-primary text-xl">
+              Friends
+            </h2>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                className="text-content-disabled size-8"
+                aria-label="Search friends"
+                title="Search friends"
+              >
+                <Search className="size-4" />
+              </Button>
+              <DropdownMenu
+                open={addOpen}
+                onOpenChange={(open) => {
+                  setAddOpen(open);
+                  if (!open) {
+                    searchRequestId.current += 1;
+                    setSearchQ("");
+                    setSearchResults([]);
+                    setSearchState("idle");
+                  }
+                }}
+              >
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg">
-                    <UserAvatar
-                      user={{
-                        username: user?.username ?? null,
-                        name: user?.name ?? null,
-                        image: user?.image ?? null,
-                      }}
-                      size="sm"
-                    />
-                    <div className="flex flex-col gap-1 leading-none">
-                      <span className="truncate font-semibold">{userName}</span>
-                      {user?.email && (
-                        <span className="truncate text-xs opacity-60">
-                          {user.email}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-content-secondary hover:text-content-primary size-8"
+                    aria-label="Add friend"
+                    title="Add friend"
+                  >
+                    <UserPlus className="size-4" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   side="bottom"
                   align="end"
-                  className="w-[--radix-dropdown-menu-trigger-width]"
+                  className="w-72 p-2"
                 >
-                  <DropdownMenuItem
-                    disabled
-                    className="flex items-center gap-2 opacity-100"
-                  >
-                    <UserAvatar
-                      user={{
-                        username: user?.username ?? null,
-                        name: user?.name ?? null,
-                        image: user?.image ?? null,
-                      }}
-                      size="sm"
-                    />
-                    <div className="flex flex-col gap-1 leading-none">
-                      <span className="truncate font-semibold">{userName}</span>
-                      {user?.email && (
-                        <span className="truncate text-xs opacity-60">
-                          {user.email}
-                        </span>
-                      )}
+                  <Input
+                    type="text"
+                    value={searchQ}
+                    onChange={(event) => search(event.target.value)}
+                    placeholder="Search 3+ username characters..."
+                    className="h-8 text-xs"
+                    autoFocus
+                  />
+                  {searchResults.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {searchResults.map((searchUser) => {
+                        const isFriend = friendIds.has(searchUser.id);
+                        const alreadySent = pendingSent.has(searchUser.id);
+                        const isSending = sendingRequests.has(searchUser.id);
+                        return (
+                          <div
+                            key={searchUser.id}
+                            className="flex items-center gap-2 rounded-md px-2 py-2 text-sm"
+                          >
+                            <UserAvatar user={searchUser} size="sm" />
+                            <span className="flex-1 truncate">
+                              {searchUser.username || searchUser.name}
+                            </span>
+                            {isFriend ? (
+                              <span className="text-content-tertiary text-xs">
+                                Friends
+                              </span>
+                            ) : isSending ? (
+                              <span className="text-content-tertiary text-xs">
+                                Sending…
+                              </span>
+                            ) : alreadySent ? (
+                              <span className="text-content-tertiary text-xs">
+                                Sent
+                              </span>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => sendRequest(searchUser.id)}
+                                disabled={isSending}
+                                aria-label={`Send friend request to ${searchUser.username || searchUser.name || "user"}`}
+                                className="size-8"
+                              >
+                                <UserPlus className="text-accent size-4" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                  >
-                    <LogOut className="size-4" />
-                    Sign Out
-                  </DropdownMenuItem>
+                  )}
+                  {normalizedSearchQ.length > 0 &&
+                    normalizedSearchQ.length < MIN_SUBSTRING_SEARCH_LENGTH && (
+                      <p className="text-content-tertiary mt-2 text-center text-xs">
+                        Enter at least 3 characters
+                      </p>
+                    )}
+                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                    searchState === "loading" && (
+                      <p className="text-content-tertiary mt-2 text-center text-xs">
+                        Searching…
+                      </p>
+                    )}
+                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                    searchState === "error" && (
+                      <div className="mt-2 flex items-center justify-center gap-2">
+                        <span className="text-error text-xs">
+                          Search failed.
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void search(searchQ)}
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    )}
+                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                    searchState === "success" &&
+                    searchResults.length === 0 && (
+                      <p className="text-content-tertiary mt-2 text-center text-xs">
+                        No users found
+                      </p>
+                    )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
+            </div>
+          </div>
         </SidebarHeader>
 
         <SidebarContent>
@@ -401,240 +551,173 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
             </SidebarGroup>
           )}
 
-          {/* Incoming requests */}
-          {incoming.length > 0 && (
-            <>
-              <SidebarGroup>
-                <SidebarGroupLabel>
-                  Requests ({incoming.length})
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu className="gap-1">
-                    {incoming.map((req) => (
-                      <SidebarMenuItem key={req.id}>
-                        <SidebarMenuButton size="lg" className="cursor-default">
-                          <UserAvatar
-                            user={req.fromUser!}
-                            size="sm"
-                            variant="dark"
-                          />
-                          <span className="truncate">
-                            {req.fromUser?.username || req.fromUser?.name}
-                          </span>
-                        </SidebarMenuButton>
-                        <div className="absolute top-1 right-1 flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() =>
-                              handleFriendRequest(req.id, "accept")
-                            }
-                            title="Accept"
-                            disabled={resolvingRequests.has(req.id)}
-                            className="text-gold-500 hover:text-gold-400 size-6"
-                          >
-                            <Check className="size-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() =>
-                              handleFriendRequest(req.id, "decline")
-                            }
-                            title="Decline"
-                            disabled={resolvingRequests.has(req.id)}
-                            className="size-6 opacity-50 hover:opacity-100"
-                          >
-                            <X className="size-3" />
-                          </Button>
-                        </div>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-              <SidebarSeparator />
-            </>
-          )}
-
-          {/* Friends list */}
-          <SidebarGroup>
-            <SidebarGroupLabel>
-              {friends.length > 0 ? `Online (${onlineCount})` : "Friends"}
+          <SidebarGroup className="py-3">
+            <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+              Requests {incoming.length > 0 && `(${incoming.length})`}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              {friendsLoadState === "loading" && friends.length === 0 ? (
-                <p className="px-2 text-xs opacity-50">Loading friends…</p>
-              ) : friendsLoadState === "error" &&
-                friends.length === 0 ? null : friends.length === 0 ? (
-                <p className="px-2 text-xs opacity-50">
-                  No friends yet. Search below to add players.
+              {requestsLoadState === "loading" && incoming.length === 0 ? (
+                <p className="text-content-tertiary px-2 text-xs">
+                  Loading requests…
+                </p>
+              ) : requestsLoadState === "error" &&
+                incoming.length === 0 ? null : incoming.length === 0 ? (
+                <p className="text-content-tertiary px-2 text-xs">
+                  No pending friend requests.
                 </p>
               ) : (
                 <SidebarMenu className="gap-1">
-                  {friends.map(({ friendshipId, user: friendUser }) => {
-                    const friendPresence = presence[friendUser.id];
-                    return (
-                      <SidebarMenuItem key={friendshipId}>
-                        <SidebarMenuButton
-                          size="lg"
-                          onClick={() => onOpenChat(friendUser)}
+                  {incoming.map((request) => (
+                    <SidebarMenuItem key={request.id}>
+                      <SidebarMenuButton
+                        size="lg"
+                        className="cursor-default pr-16"
+                      >
+                        <UserAvatar
+                          user={request.fromUser!}
+                          size="sm"
+                          variant="dark"
+                        />
+                        <span className="truncate font-medium">
+                          {request.fromUser?.username ||
+                            request.fromUser?.name ||
+                            "Player"}
+                        </span>
+                      </SidebarMenuButton>
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() =>
+                            handleFriendRequest(request.id, "accept")
+                          }
+                          title="Accept friend request"
+                          aria-label="Accept friend request"
+                          disabled={resolvingRequests.has(request.id)}
+                          className="text-accent hover:text-accent size-8"
                         >
-                          <UserAvatar
-                            user={friendUser}
-                            size="sm"
-                            variant="dark"
-                            showOnline={friendPresence?.online ?? false}
-                            lastSeen={friendPresence?.lastSeen ?? null}
-                          />
-                          <span className="truncate">
-                            {friendUser.username || friendUser.name}
-                          </span>
-                        </SidebarMenuButton>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction showOnHover>
-                              <MoreHorizontal className="size-4" />
-                            </SidebarMenuAction>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent side="left" align="start">
-                            <DropdownMenuItem
-                              onSelect={() => setFriendToRemove(friendUser)}
-                              className="text-error focus:text-error"
-                            >
-                              Unfriend
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </SidebarMenuItem>
-                    );
-                  })}
+                          <Check className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() =>
+                            handleFriendRequest(request.id, "decline")
+                          }
+                          title="Decline friend request"
+                          aria-label="Decline friend request"
+                          disabled={resolvingRequests.has(request.id)}
+                          className="text-content-secondary hover:text-content-primary size-8"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup className="py-3">
+            <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+              Online ({onlineCount})
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              {friendsLoadState === "loading" && friends.length === 0 ? (
+                <p className="text-content-tertiary px-2 text-xs">
+                  Loading friends…
+                </p>
+              ) : friendsLoadState === "error" &&
+                friends.length === 0 ? null : onlineFriends.length === 0 ? (
+                <p className="text-content-tertiary px-2 text-xs">
+                  No friends online.
+                </p>
+              ) : (
+                <SidebarMenu className="gap-1">
+                  {onlineFriends.map((friend) => renderFriend(friend, true))}
+                </SidebarMenu>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup className="py-3">
+            <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+              Offline ({offlineFriends.length})
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              {friendsLoadState !== "loading" &&
+              friendsLoadState !== "error" &&
+              friends.length === 0 ? (
+                <p className="text-content-tertiary px-2 text-xs">
+                  Add friends to start a conversation.
+                </p>
+              ) : offlineFriends.length === 0 ? (
+                <p className="text-content-tertiary px-2 text-xs">
+                  Everyone is online.
+                </p>
+              ) : (
+                <SidebarMenu className="gap-1">
+                  {offlineFriends.map((friend) => renderFriend(friend, false))}
                 </SidebarMenu>
               )}
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
 
-        {/* Footer — Add Friend */}
-        <SidebarFooter>
+        <SidebarFooter className="border-border border-t px-3 py-3">
           <UserChannelConnectionStatus connectionStatus={connectionStatus} />
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu
-                open={addOpen}
-                onOpenChange={(open) => {
-                  setAddOpen(open);
-                  if (!open) {
-                    searchRequestId.current += 1;
-                    setSearchQ("");
-                    setSearchResults([]);
-                    setSearchState("idle");
-                  }
-                }}
-              >
+              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton size="lg">
-                    <div className="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 items-center justify-center rounded-md">
-                      <Search className="size-4" />
-                    </div>
-                    <div className="flex flex-col gap-1 leading-none">
-                      <span className="font-semibold">Add Friend</span>
-                      <span className="text-xs opacity-60">
-                        Search by username
-                      </span>
-                    </div>
+                    <UserAvatar
+                      user={{
+                        username: user?.username ?? null,
+                        name: user?.name ?? null,
+                        image: user?.image ?? null,
+                      }}
+                      size="sm"
+                      variant="dark"
+                    />
+                    <span className="truncate font-semibold">{userName}</span>
                     <ChevronsUpDown className="ml-auto size-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   side="top"
-                  align="start"
-                  className="w-[--radix-dropdown-menu-trigger-width] p-2"
+                  align="end"
+                  className="w-[--radix-dropdown-menu-trigger-width]"
                 >
-                  <Input
-                    type="text"
-                    value={searchQ}
-                    onChange={(e) => search(e.target.value)}
-                    placeholder="Search 3+ username characters..."
-                    className="h-8 text-xs"
-                    autoFocus
-                  />
-                  {searchResults.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {searchResults.map((u) => {
-                        const isFriend = friendIds.has(u.id);
-                        const alreadySent = pendingSent.has(u.id);
-                        const isSending = sendingRequests.has(u.id);
-                        return (
-                          <div
-                            key={u.id}
-                            className="flex items-center gap-2 rounded-md px-2 py-2 text-sm"
-                          >
-                            <UserAvatar user={u} size="sm" />
-                            <span className="flex-1 truncate">
-                              {u.username || u.name}
-                            </span>
-                            {isFriend ? (
-                              <span className="text-xs opacity-50">
-                                Friends
-                              </span>
-                            ) : isSending ? (
-                              <span className="text-xs opacity-50">
-                                Sending…
-                              </span>
-                            ) : alreadySent ? (
-                              <span className="text-xs opacity-50">Sent</span>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => sendRequest(u.id)}
-                                disabled={isSending}
-                                aria-label={`Send friend request to ${u.username || u.name || "user"}`}
-                                className="size-6"
-                              >
-                                <UserPlus className="text-gold-500 size-3" />
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {normalizedSearchQ.length > 0 &&
-                    normalizedSearchQ.length < MIN_SUBSTRING_SEARCH_LENGTH && (
-                      <p className="mt-2 text-center text-xs opacity-50">
-                        Enter at least 3 characters
-                      </p>
-                    )}
-                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
-                    searchState === "loading" && (
-                      <p className="mt-2 text-center text-xs opacity-50">
-                        Searching…
-                      </p>
-                    )}
-                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
-                    searchState === "error" && (
-                      <div className="mt-2 flex items-center justify-center gap-2">
-                        <span className="text-error text-xs">
-                          Search failed.
+                  <DropdownMenuItem
+                    disabled
+                    className="flex items-center gap-2 opacity-100"
+                  >
+                    <UserAvatar
+                      user={{
+                        username: user?.username ?? null,
+                        name: user?.name ?? null,
+                        image: user?.image ?? null,
+                      }}
+                      size="sm"
+                    />
+                    <div className="flex min-w-0 flex-col gap-1 leading-none">
+                      <span className="truncate font-semibold">{userName}</span>
+                      {user?.email && (
+                        <span className="text-content-tertiary truncate text-xs">
+                          {user.email}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void search(searchQ)}
-                        >
-                          Retry
-                        </Button>
-                      </div>
-                    )}
-                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
-                    searchState === "success" &&
-                    searchResults.length === 0 && (
-                      <p className="mt-2 text-center text-xs opacity-50">
-                        No users found
-                      </p>
-                    )}
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                  >
+                    <LogOut className="size-4" />
+                    Sign Out
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </SidebarMenuItem>

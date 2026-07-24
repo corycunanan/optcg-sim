@@ -342,17 +342,18 @@ export function ChatWidget({
   return (
     <div
       className={cn(
-        "border-border fixed bottom-0 z-40 flex w-80 flex-col rounded-t-lg border border-b-0 shadow-xl",
-        sidebarCollapsed ? "right-10" : "right-16"
+        "border-border bg-surface-nav fixed bottom-0 z-40 flex w-[300px] flex-col rounded-t-md border border-b-0 shadow-lg",
+        minimized ? "h-auto" : "h-[380px]",
+        sidebarCollapsed ? "right-4" : "social-chat-dock"
       )}
     >
       {/* Header */}
       <div
-        className="bg-surface-nav flex cursor-pointer items-center gap-2 rounded-t-lg px-3 py-2"
+        className="bg-surface-base flex cursor-pointer items-center gap-2 rounded-t-md px-3 py-2"
         onClick={() => setMinimized((v) => !v)}
       >
         <UserAvatar user={user} size="sm" variant="dark" />
-        <span className="text-content-inverse flex-1 truncate text-sm font-semibold">
+        <span className="text-content-primary flex-1 truncate text-sm font-semibold">
           {displayName}
         </span>
         <Button
@@ -362,13 +363,14 @@ export function ChatWidget({
             e.stopPropagation();
             setMinimized((v) => !v);
           }}
-          className="text-content-inverse/60 hover:text-content-inverse size-6 hover:bg-transparent"
+          className="text-content-secondary hover:text-content-primary hover:bg-surface-2 size-8"
           title={minimized ? "Expand" : "Minimize"}
+          aria-label={minimized ? "Expand chat" : "Minimize chat"}
         >
           {minimized ? (
-            <ChevronUp className="size-3" />
+            <ChevronUp className="size-4" />
           ) : (
-            <Minus className="size-3" />
+            <Minus className="size-4" />
           )}
         </Button>
         <Button
@@ -378,10 +380,11 @@ export function ChatWidget({
             e.stopPropagation();
             onClose();
           }}
-          className="text-content-inverse/60 hover:text-content-inverse size-6 hover:bg-transparent"
+          className="text-content-secondary hover:text-content-primary hover:bg-surface-2 size-8"
           title="Close"
+          aria-label="Close chat"
         >
-          <X className="size-3" />
+          <X className="size-4" />
         </Button>
       </div>
 
@@ -389,7 +392,7 @@ export function ChatWidget({
       {!minimized && (
         <>
           {/* Messages */}
-          <div className="bg-card h-80 space-y-2 overflow-y-auto px-3 py-3">
+          <div className="bg-surface-nav min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
             {loading && (
               <p
                 className="text-content-tertiary py-6 text-center text-xs"
@@ -428,10 +431,8 @@ export function ChatWidget({
                 >
                   <div
                     className={cn(
-                      "max-w-[75%] rounded-lg px-3 py-2 text-xs",
-                      isMe
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-content-primary"
+                      "text-content-primary max-w-[75%] rounded-lg px-3 py-2 text-xs",
+                      isMe ? "bg-surface-base" : "bg-surface-2"
                     )}
                   >
                     <p className="break-words whitespace-pre-wrap">
@@ -439,7 +440,7 @@ export function ChatWidget({
                     </p>
                     {isMe && (
                       <div
-                        className="text-primary-foreground mt-1 flex justify-end"
+                        className="text-content-tertiary mt-1 flex justify-end"
                         aria-label={msg.readAt ? "Read" : "Sent"}
                       >
                         {msg.readAt ? (
@@ -457,7 +458,7 @@ export function ChatWidget({
           </div>
 
           {showTyping && (
-            <div className="text-content-tertiary px-3 py-1 text-xs italic">
+            <div className="bg-surface-nav text-content-tertiary px-3 py-1 text-xs italic">
               {displayName} is typing…
             </div>
           )}
@@ -465,7 +466,7 @@ export function ChatWidget({
           {/* Input */}
           <form
             onSubmit={send_}
-            className="border-border bg-card flex gap-2 border-t px-3 py-2"
+            className="border-border bg-surface-nav flex gap-2 border-t px-3 py-2"
           >
             <Input
               ref={inputRef}
@@ -474,9 +475,14 @@ export function ChatWidget({
               onChange={handleBodyChange}
               disabled={sending}
               placeholder={`Message ${displayName}...`}
-              className="bg-secondary h-8 flex-1 text-xs"
+              className="bg-surface-2 h-8 flex-1 text-xs"
             />
-            <Button type="submit" size="sm" disabled={!body.trim() || sending}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!body.trim() || sending}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
               Send
             </Button>
           </form>
