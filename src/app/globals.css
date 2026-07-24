@@ -19,23 +19,35 @@
 :root {
   /* ── Primitive layer: default theme raw values ── */
 
-  /* Desaturated elevation steps */
-  --elevation-page: oklch(14% 0.004 260); /* page background */
-  --elevation-panel: oklch(24% 0.004 260); /* cards, dialogs, menus */
-  --elevation-raised: oklch(28% 0.004 260); /* elevated and hover surfaces */
-  --elevation-inset: oklch(18% 0.004 260); /* inputs and recessed areas */
-  --elevation-nav: oklch(12% 0.004 260); /* global navbar */
+  /* Warm navy elevation steps */
+  --elevation-page: oklch(22% 0.04 245); /* page background */
+  --elevation-panel: oklch(27% 0.04 245); /* cards, dialogs, menus */
+  --elevation-raised: oklch(32% 0.04 245); /* elevated and hover surfaces */
+  --elevation-inset: oklch(37% 0.035 245); /* inputs and recessed areas */
+  --elevation-nav: oklch(18% 0.02 245); /* global navbar */
 
-  /* Desaturated surface steps */
-  --surface-step-interactive: oklch(30% 0.004 260);
-  --surface-step-soft-strong: oklch(28% 0.004 260);
-  --surface-step-soft: oklch(21% 0.004 260);
-  --surface-step-subdued: oklch(46% 0.004 260);
-  --surface-step-ink: oklch(14% 0.004 260);
+  /* Warm navy surface steps */
+  --surface-step-interactive: oklch(30% 0.04 245);
+  --surface-step-soft-strong: oklch(34% 0.035 245);
+  --surface-step-soft: oklch(27% 0.03 245);
+  --surface-step-subdued: oklch(58% 0.04 245);
+  --surface-step-ink: oklch(22% 0.04 245);
 
-  /* Preserved warm navy ramp
+  /* Preserved desaturated surface primitives
      These values are intentionally retained for a future preset. The default
      semantic layer below does not reference them. */
+  --desaturated-elevation-page: oklch(14% 0.004 260);
+  --desaturated-elevation-panel: oklch(24% 0.004 260);
+  --desaturated-elevation-raised: oklch(28% 0.004 260);
+  --desaturated-elevation-inset: oklch(18% 0.004 260);
+  --desaturated-elevation-nav: oklch(12% 0.004 260);
+  --desaturated-surface-step-interactive: oklch(30% 0.004 260);
+  --desaturated-surface-step-soft-strong: oklch(28% 0.004 260);
+  --desaturated-surface-step-soft: oklch(21% 0.004 260);
+  --desaturated-surface-step-subdued: oklch(46% 0.004 260);
+  --desaturated-surface-step-ink: oklch(14% 0.004 260);
+
+  /* Warm navy ramp used by feature-level color utilities. */
   --navy-900: oklch(22% 0.04 245); /* page base, deepest navy */
   --navy-800: oklch(30% 0.04 245); /* active and hover surfaces */
   --navy-700: oklch(42% 0.03 245); /* borders on dark surfaces */
@@ -44,11 +56,13 @@
   --navy-100: oklch(27% 0.03 245); /* soft navy surface */
 
   /* Gold ramp */
-  --gold-700: oklch(68% 0.14 75); /* pressed gold fill */
+  --gold-700: oklch(70% 0.14 75); /* pressed gold fill */
   --gold-600: oklch(78% 0.12 75); /* text and link accents */
-  --gold-500: oklch(72% 0.14 75); /* primary CTA fills, highlights, focus */
-  --gold-400: oklch(82% 0.1 75); /* hover on gold */
-  --gold-100: oklch(28% 0.035 75); /* soft gold surface */
+  --gold-500: oklch(78% 0.14 75); /* primary CTA fills, highlights, focus */
+  --gold-400: oklch(84% 0.12 75); /* hover on gold */
+  --gold-100: oklch(30% 0.05 75); /* soft gold surface */
+  /* Redesign artifact border for navbar/social refreshes (OPT-534/OPT-535). */
+  --gold-border: oklch(45% 0.06 75);
 
   /* Red ramp */
   --red-600: oklch(70% 0.17 25); /* emphasis, destructive */
@@ -120,6 +134,7 @@
   --accent-pressed: var(--gold-700);
   --accent-text: var(--gold-600);
   --accent-soft: var(--gold-100);
+  --accent-border: var(--gold-border);
   --accent-fg: var(--surface-step-ink);
 
   /* States */
@@ -432,13 +447,13 @@
 }
 
 /* ─── Display Font Treatment ─────────────────────────────────── */
-/* Display headings use Erode Semibold in sentence/title case. */
+/* Display headings use uppercase Erode Semibold. */
 
 .font-display {
   font-weight: 600;
   font-style: normal;
-  text-transform: none;
-  letter-spacing: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 /* ─── Base Styles ────────────────────────────────────────────── */
