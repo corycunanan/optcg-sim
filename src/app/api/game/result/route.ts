@@ -6,7 +6,7 @@
 
 import { after, NextRequest } from "next/server";
 import { apiAction, apiError } from "@/lib/api-response";
-import { finalizeGameResult } from "@/lib/game/finalize";
+import { finalizeGameResult, notifyRestoredLobby } from "@/lib/game/finalize";
 import { apiLimiter } from "@/lib/rate-limit";
 import { notifyGame } from "@/lib/realtime/fanout-game";
 import { GameResultSchema } from "@/lib/validators/game";
@@ -45,13 +45,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (finalization.finalized) {
-      after(() =>
-        notifyGame(gameId, {
-          status,
-          winnerId: winnerId ?? null,
-          winReason: winReason ?? null,
-        }),
-      );
+      after(async () => {
+        await Promise.all([
+          notifyGame(gameId, {
+            status,
+            winnerId: winnerId ?? null,
+            winReason: winReason ?? null,
+          }),
+          finalization.restoredLobbyId
+            ? notifyRestoredLobby(finalization.restoredLobbyId)
+            : Promise.resolve(),
+        ]);
+      });
     }
 
     return apiAction();

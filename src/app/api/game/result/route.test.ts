@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const finalizeGameResultMock = vi.fn();
+const notifyRestoredLobbyMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 29 }));
 const notifyGameMock = vi.fn();
 
@@ -31,6 +32,7 @@ vi.mock("next/server", async (importActual) => {
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/game/finalize", () => ({
   finalizeGameResult: (...args: unknown[]) => finalizeGameResultMock(...args),
+  notifyRestoredLobby: (...args: unknown[]) => notifyRestoredLobbyMock(...args),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
@@ -53,7 +55,9 @@ const validBody = {
 };
 
 function buildRequest(opts: { auth?: string; body?: unknown } = {}) {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
   if (opts.auth !== null) {
     headers.Authorization = opts.auth ?? `Bearer ${SECRET}`;
   }
@@ -66,7 +70,13 @@ function buildRequest(opts: { auth?: string; body?: unknown } = {}) {
 
 beforeEach(() => {
   finalizeGameResultMock.mockReset();
-  finalizeGameResultMock.mockResolvedValue({ finalized: true, alreadyFinal: false });
+  finalizeGameResultMock.mockResolvedValue({
+    finalized: true,
+    alreadyFinal: false,
+    restoredLobbyId: "lobby-1",
+  });
+  notifyRestoredLobbyMock.mockReset();
+  notifyRestoredLobbyMock.mockResolvedValue(undefined);
   rateLimitMock.mockReset();
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 29 });
   notifyGameMock.mockReset();
@@ -110,7 +120,9 @@ describe("POST /api/game/result", () => {
   });
 
   it("rejects non-terminal result payloads", async () => {
-    const res = await POST(buildRequest({ body: { ...validBody, status: "IN_PROGRESS" } }));
+    const res = await POST(
+      buildRequest({ body: { ...validBody, status: "IN_PROGRESS" } })
+    );
     expect(res.status).toBe(400);
     expect(finalizeGameResultMock).not.toHaveBeenCalled();
   });
@@ -134,12 +146,14 @@ describe("POST /api/game/result", () => {
       winnerId: "user-1",
       winReason: "Life-out",
     });
+    expect(notifyRestoredLobbyMock).toHaveBeenCalledWith("lobby-1");
   });
 
   it("does not fan out when the row was already terminal (idempotent re-call)", async () => {
     finalizeGameResultMock.mockResolvedValueOnce({
       finalized: false,
       alreadyFinal: true,
+      restoredLobbyId: null,
     });
 
     const res = await POST(buildRequest());
@@ -147,5 +161,6 @@ describe("POST /api/game/result", () => {
 
     expect(res.status).toBe(200);
     expect(notifyGameMock).not.toHaveBeenCalled();
+    expect(notifyRestoredLobbyMock).not.toHaveBeenCalled();
   });
 });
