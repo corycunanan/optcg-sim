@@ -847,7 +847,7 @@ describe("deck builder navigation guard", () => {
     expect(mocks.apiPost).toHaveBeenCalledOnce();
     expect(mocks.apiPost).toHaveBeenCalledWith(
       "/api/lobby-invites/invite-1/accept",
-      { confirmSwitch: false }
+      {}
     );
     expect(mocks.push).toHaveBeenCalledWith("/lobbies/lobby-1");
   });
@@ -892,7 +892,7 @@ describe("deck builder navigation guard", () => {
     expect(mocks.apiPost).toHaveBeenNthCalledWith(
       2,
       "/api/lobby-invites/invite-1/accept",
-      { confirmSwitch: true }
+      { confirmDisbandLobbyId: "current-lobby" }
     );
     expect(mocks.push).toHaveBeenCalledWith("/lobbies/lobby-1");
   });

@@ -191,6 +191,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
       activeLobby: {
         id: "hosted-lobby",
         status: "READY",
+        revision: 8,
         hostUserId: "recipient",
         host: { username: "Robin", name: null },
         guest: {
@@ -218,6 +219,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
       activeLobby: {
         id: "hosted-lobby",
         status: "READY",
+        revision: 8,
         hostUserId: "recipient",
         host: { username: "Robin", name: null },
         guest: {
@@ -228,7 +230,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
       },
     });
 
-    const input = request({ confirmSwitch: true });
+    const input = request({ confirmDisbandLobbyId: "hosted-lobby" });
     const response = await POST(input.request, { params: input.params });
     await flushAfter();
 
@@ -237,6 +239,7 @@ describe("POST /api/lobby-invites/[id]/accept", () => {
       where: {
         id: "hosted-lobby",
         hostUserId: "recipient",
+        revision: 8,
         status: { in: ["WAITING", "READY"] },
       },
       data: { status: "CLOSED", revision: { increment: 1 } },

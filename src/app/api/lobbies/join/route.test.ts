@@ -177,6 +177,7 @@ describe("POST /api/lobbies/join", () => {
       activeLobby: {
         id: "personal-lobby",
         status: "WAITING",
+        revision: 3,
         hostUserId: "joiner",
         host: { username: "Joiner", name: null },
         guest: null,
@@ -191,7 +192,10 @@ describe("POST /api/lobbies/join", () => {
       where: {
         id: "personal-lobby",
         hostUserId: "joiner",
+        revision: 3,
         status: { in: ["WAITING", "READY"] },
+        guest: { is: null },
+        invites: { none: { status: "PENDING" } },
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
     });
@@ -207,6 +211,7 @@ describe("POST /api/lobbies/join", () => {
       activeLobby: {
         id: "current-lobby",
         status: "READY",
+        revision: 4,
         hostUserId: "joiner",
         host: { username: "Joiner", name: null },
         guest: {
@@ -239,6 +244,7 @@ describe("POST /api/lobbies/join", () => {
       activeLobby: {
         id: "current-lobby",
         status: "WAITING",
+        revision: 5,
         hostUserId: "joiner",
         host: { username: "Joiner", name: null },
         guest: null,
@@ -263,6 +269,7 @@ describe("POST /api/lobbies/join", () => {
       activeLobby: {
         id: "current-lobby",
         status: "READY",
+        revision: 6,
         hostUserId: "joiner",
         host: { username: "Luffy", name: null },
         guest: {
@@ -277,7 +284,10 @@ describe("POST /api/lobbies/join", () => {
       .mockResolvedValueOnce([]);
 
     const response = await POST(
-      request({ code: "ABC123", confirmSwitch: true })
+      request({
+        code: "ABC123",
+        confirmDisbandLobbyId: "current-lobby",
+      })
     );
     await flushAfter();
 
@@ -301,6 +311,7 @@ describe("POST /api/lobbies/join", () => {
       type: "lobby:invite_canceled",
       inviteId: "pending-invite",
     });
+    expect(notifyUserMock).toHaveBeenCalledTimes(2);
   });
 
   it("lets a guest silently switch while returning the old host to WAITING", async () => {
@@ -309,6 +320,7 @@ describe("POST /api/lobbies/join", () => {
       activeLobby: {
         id: "old-lobby",
         status: "READY",
+        revision: 2,
         hostUserId: "old-host",
         host: { username: "Zoro", name: null },
         guest: {
@@ -378,28 +390,268 @@ describe("POST /api/lobbies/join", () => {
     });
   });
 
-  it("fails gracefully when the target fills between confirmation and commit", async () => {
-    userFindUniqueMock.mockResolvedValue({
-      activeLobbyId: "personal-lobby",
-      activeLobby: {
-        id: "personal-lobby",
-        status: "WAITING",
-        hostUserId: "joiner",
-        host: { username: "Joiner", name: null },
-        guest: null,
-        invites: [],
-      },
-    });
-    lobbyUpdateManyMock
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
+  it("re-prompts with fresh guest state when the unconfirmed close CAS loses", async () => {
+    userFindUniqueMock
+      .mockResolvedValueOnce({
+        activeLobbyId: "current-lobby",
+        activeLobby: {
+          id: "current-lobby",
+          status: "WAITING",
+          revision: 10,
+          hostUserId: "joiner",
+          host: { username: "Luffy", name: null },
+          guest: null,
+          invites: [],
+        },
+      })
+      .mockResolvedValueOnce({
+        activeLobbyId: "current-lobby",
+        activeLobby: {
+          id: "current-lobby",
+          status: "READY",
+          revision: 11,
+          hostUserId: "joiner",
+          host: { username: "Luffy", name: null },
+          guest: {
+            userId: "new-guest",
+            user: { username: "Usopp", name: null },
+          },
+          invites: [],
+        },
+      });
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
 
     const response = await POST(request());
 
     expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+      details: {
+        currentLobbyId: "current-lobby",
+        guestName: "Usopp",
+        hasPendingInvite: false,
+      },
+    });
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          revision: 10,
+          guest: { is: null },
+          invites: { none: { status: "PENDING" } },
+        }),
+      })
+    );
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+  });
+
+  it("re-prompts when a pending invite appears without changing revision", async () => {
+    const baseLobby = {
+      id: "current-lobby",
+      status: "WAITING",
+      revision: 12,
+      hostUserId: "joiner",
+      host: { username: "Luffy", name: null },
+      guest: null,
+    };
+    userFindUniqueMock
+      .mockResolvedValueOnce({
+        activeLobbyId: "current-lobby",
+        activeLobby: { ...baseLobby, invites: [] },
+      })
+      .mockResolvedValueOnce({
+        activeLobbyId: "current-lobby",
+        activeLobby: {
+          ...baseLobby,
+          invites: [{ id: "new-invite" }],
+        },
+      });
+    lobbyUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+      details: { currentLobbyId: "current-lobby", hasPendingInvite: true },
+    });
+    expect(lobbyGuestDeleteManyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let a stale confirmation authorize a different hosted lobby", async () => {
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "new-lobby",
+      activeLobby: {
+        id: "new-lobby",
+        status: "WAITING",
+        revision: 1,
+        hostUserId: "joiner",
+        host: { username: "Luffy", name: null },
+        guest: null,
+        invites: [],
+      },
+    });
+
+    const response = await POST(
+      request({ code: "ABC123", confirmDisbandLobbyId: "old-lobby" })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "PARTY_SWITCH_CONFIRMATION_REQUIRED",
+      details: { currentLobbyId: "new-lobby" },
+    });
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the old party when the target fills during commit", async () => {
+    type HarnessState = {
+      lobbies: Record<
+        string,
+        {
+          status: "WAITING" | "READY" | "CLOSED";
+          revision: number;
+          guestUserId: string | null;
+        }
+      >;
+      users: Record<string, { activeLobbyId: string | null }>;
+      invites: Record<
+        string,
+        {
+          lobbyId: string;
+          toUserId: string;
+          status: "PENDING" | "CANCELED";
+        }
+      >;
+    };
+
+    let state: HarnessState = {
+      lobbies: {
+        current: { status: "READY", revision: 7, guestUserId: "ex-guest" },
+        target: { status: "WAITING", revision: 2, guestUserId: null },
+      },
+      users: {
+        joiner: { activeLobbyId: "current" },
+        "ex-guest": { activeLobbyId: "current" },
+      },
+      invites: {
+        pending: {
+          lobbyId: "current",
+          toUserId: "invitee",
+          status: "PENDING",
+        },
+      },
+    };
+    const initialState = structuredClone(state);
+    let discardedState: HarnessState | null = null;
+
+    transactionMock.mockImplementationOnce(async (operation) => {
+      const draft = structuredClone(state);
+      const tx = {
+        lobby: {
+          findFirst: async () => ({ ...targetLobby, id: "target-lobby" }),
+          updateMany: async (args: {
+            where: { id: string };
+            data: { status: "CLOSED"; revision: { increment: number } };
+          }) => {
+            if (args.where.id === "current") {
+              draft.lobbies.current.status = "CLOSED";
+              draft.lobbies.current.revision += args.data.revision.increment;
+              return { count: 1 };
+            }
+            return { count: 0 };
+          },
+        },
+        lobbyGuest: {
+          deleteMany: async () => {
+            draft.lobbies.current.guestUserId = null;
+            return { count: 1 };
+          },
+          create: async () => undefined,
+        },
+        user: {
+          findUnique: async () => ({
+            activeLobbyId: draft.users.joiner.activeLobbyId,
+            activeLobby: {
+              id: "current",
+              status: draft.lobbies.current.status,
+              revision: draft.lobbies.current.revision,
+              hostUserId: "joiner",
+              host: { username: "Luffy", name: null },
+              guest: draft.lobbies.current.guestUserId
+                ? {
+                    userId: draft.lobbies.current.guestUserId,
+                    user: { username: "Nami", name: null },
+                  }
+                : null,
+              invites: Object.entries(draft.invites)
+                .filter(
+                  ([, value]) =>
+                    value.lobbyId === "current" && value.status === "PENDING"
+                )
+                .map(([id]) => ({ id })),
+            },
+          }),
+          updateMany: async (args: {
+            where: { activeLobbyId?: string; id?: string };
+            data: { activeLobbyId: string | null };
+          }) => {
+            if (args.where.activeLobbyId) {
+              for (const user of Object.values(draft.users)) {
+                if (user.activeLobbyId === args.where.activeLobbyId) {
+                  user.activeLobbyId = args.data.activeLobbyId;
+                }
+              }
+            }
+            return { count: 1 };
+          },
+        },
+        lobbyInvite: {
+          findMany: async () =>
+            Object.entries(draft.invites)
+              .filter(([, value]) => value.status === "PENDING")
+              .map(([id, value]) => ({ id, toUserId: value.toUserId })),
+          updateMany: async (args: { where: { id: string } }) => {
+            draft.invites[args.where.id].status = "CANCELED";
+            return { count: 1 };
+          },
+        },
+      };
+
+      try {
+        const result = await operation(tx);
+        state = draft;
+        return result;
+      } catch (error) {
+        discardedState = draft;
+        throw error;
+      }
+    });
+
+    const response = await POST(
+      request({ code: "ABC123", confirmDisbandLobbyId: "current" })
+    );
+
+    expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: "This party is full" });
-    expect(lobbyGuestCreateMock).not.toHaveBeenCalled();
-    expect(transactionMock).toHaveBeenCalledOnce();
+    expect(discardedState).toMatchObject({
+      lobbies: {
+        current: { status: "CLOSED", revision: 8, guestUserId: null },
+      },
+      users: {
+        joiner: { activeLobbyId: null },
+        "ex-guest": { activeLobbyId: null },
+      },
+      invites: { pending: { status: "CANCELED" } },
+    });
+    expect(state).toEqual(initialState);
+    expect(state.lobbies.current).toEqual({
+      status: "READY",
+      revision: 7,
+      guestUserId: "ex-guest",
+    });
+    expect(state.users.joiner.activeLobbyId).toBe("current");
+    expect(state.users["ex-guest"].activeLobbyId).toBe("current");
+    expect(state.invites.pending.status).toBe("PENDING");
   });
 
   it("blocks switching while the joiner has an active game", async () => {

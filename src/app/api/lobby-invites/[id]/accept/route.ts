@@ -16,7 +16,7 @@ import {
 type RouteContext = { params: Promise<{ id: string }> };
 
 const AcceptLobbyInviteSchema = z.object({
-  confirmSwitch: z.boolean().optional(),
+  confirmDisbandLobbyId: z.string().min(1).optional(),
 });
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const result = await joinLobbyByInvite({
       userId,
       inviteId,
-      confirmSwitch: parsed.confirmSwitch,
+      confirmDisbandLobbyId: parsed.confirmDisbandLobbyId,
     });
 
     if (result.kind === "confirmation_required") {

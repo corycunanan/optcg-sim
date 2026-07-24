@@ -42,7 +42,7 @@ export function JoinPartyDialog({
     null
   );
 
-  const submit = async (confirmSwitch: boolean) => {
+  const submit = async (confirmDisbandLobbyId?: string) => {
     const normalizedCode = normalizeLobbyCode(code);
     if (normalizedCode.length !== 6) {
       setError("Enter a valid 6-character party code");
@@ -54,7 +54,10 @@ export function JoinPartyDialog({
     try {
       const response = await apiPost(
         "/api/lobbies/join",
-        { code: normalizedCode, confirmSwitch },
+        {
+          code: normalizedCode,
+          ...(confirmDisbandLobbyId ? { confirmDisbandLobbyId } : {}),
+        },
         JoinLobbyResponseSchema
       );
       setSwitchDetails(null);
@@ -68,13 +71,13 @@ export function JoinPartyDialog({
           setSwitchDetails(details);
           return;
         }
-        if (confirmSwitch) setSwitchDetails(null);
+        if (confirmDisbandLobbyId) setSwitchDetails(null);
         setError(caught.message);
-        if (confirmSwitch) setOpen(true);
+        if (confirmDisbandLobbyId) setOpen(true);
       } else {
-        if (confirmSwitch) setSwitchDetails(null);
+        if (confirmDisbandLobbyId) setSwitchDetails(null);
         setError("Could not join party");
-        if (confirmSwitch) setOpen(true);
+        if (confirmDisbandLobbyId) setOpen(true);
       }
     } finally {
       setBusy(false);
@@ -83,7 +86,7 @@ export function JoinPartyDialog({
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void submit(false);
+    void submit();
   };
 
   return (
@@ -152,7 +155,7 @@ export function JoinPartyDialog({
         details={switchDetails}
         busy={busy}
         onStay={() => setSwitchDetails(null)}
-        onConfirm={() => void submit(true)}
+        onConfirm={() => void submit(switchDetails?.currentLobbyId)}
       />
     </>
   );

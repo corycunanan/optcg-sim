@@ -91,11 +91,11 @@ export function LobbyInviteToasts() {
   }, [invites.length]);
 
   const acceptInvite = useCallback(
-    async (invite: InviteToastEntry, confirmSwitch = false) => {
+    async (invite: InviteToastEntry, confirmDisbandLobbyId?: string) => {
       setBusyId(invite.id);
       try {
         await apiPost(`/api/lobby-invites/${invite.id}/accept`, {
-          confirmSwitch,
+          ...(confirmDisbandLobbyId ? { confirmDisbandLobbyId } : {}),
         });
         setInvites((prev) => removeInvite(prev, invite.id));
         setPendingSwitch(null);
@@ -114,7 +114,7 @@ export function LobbyInviteToasts() {
             return;
           }
         }
-        if (confirmSwitch) setPendingSwitch(null);
+        if (confirmDisbandLobbyId) setPendingSwitch(null);
         toast.error(
           err instanceof ApiError ? err.message : "Could not join lobby"
         );
@@ -191,7 +191,12 @@ export function LobbyInviteToasts() {
         busy={Boolean(busyId)}
         onStay={() => setPendingSwitch(null)}
         onConfirm={() => {
-          if (pendingSwitch) void acceptInvite(pendingSwitch.invite, true);
+          if (pendingSwitch) {
+            void acceptInvite(
+              pendingSwitch.invite,
+              pendingSwitch.details.currentLobbyId
+            );
+          }
         }}
       />
     </>

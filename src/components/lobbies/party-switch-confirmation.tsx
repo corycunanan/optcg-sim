@@ -74,10 +74,14 @@ export function PartySwitchConfirmation({
                 {details.targetCode} disbands your current party —{" "}
                 {details.guestName} will be returned to their own lobby.
               </>
-            ) : (
+            ) : details?.hasPendingInvite ? (
               <>
                 Joining party {details?.targetCode} disbands your current party
                 and cancels its pending invite.
+              </>
+            ) : (
+              <>
+                Joining party {details?.targetCode} disbands your current party.
               </>
             )}
           </AlertDialogDescription>

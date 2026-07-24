@@ -63,13 +63,13 @@ interface JoinLobbyByCodeInput {
   userId: string;
   code: string;
   deckId?: string;
-  confirmSwitch?: boolean;
+  confirmDisbandLobbyId?: string;
 }
 
 interface JoinLobbyByInviteInput {
   userId: string;
   inviteId: string;
-  confirmSwitch?: boolean;
+  confirmDisbandLobbyId?: string;
 }
 
 interface JoinableLobby {
@@ -86,6 +86,35 @@ interface JoinTarget {
   inviteId: string | null;
 }
 
+const currentMembershipSelect = {
+  activeLobbyId: true,
+  activeLobby: {
+    select: {
+      id: true,
+      status: true,
+      revision: true,
+      hostUserId: true,
+      host: { select: { username: true, name: true } },
+      guest: {
+        select: {
+          userId: true,
+          user: { select: { username: true, name: true } },
+        },
+      },
+      invites: {
+        where: { status: "PENDING" as const },
+        select: { id: true },
+      },
+    },
+  },
+} satisfies Prisma.UserSelect;
+
+type CurrentLobby = NonNullable<
+  NonNullable<
+    Prisma.UserGetPayload<{ select: typeof currentMembershipSelect }>
+  >["activeLobby"]
+>;
+
 class JoinRaceError extends Error {
   constructor(readonly kind: "occupied" | "target_changed" | "invite_gone") {
     super(kind);
@@ -94,11 +123,36 @@ class JoinRaceError extends Error {
 
 class CurrentLobbyChangedError extends Error {}
 
+function loadCurrentMembership(tx: Prisma.TransactionClient, userId: string) {
+  return tx.user.findUnique({
+    where: { id: userId },
+    select: currentMembershipSelect,
+  });
+}
+
+function buildPartySwitchConfirmation(
+  currentLobby: CurrentLobby,
+  targetCode: string
+): PartySwitchConfirmation {
+  const hostedGuest =
+    currentLobby.guest?.userId !== currentLobby.hostUserId
+      ? currentLobby.guest
+      : null;
+
+  return {
+    kind: "confirmation_required",
+    currentLobbyId: currentLobby.id,
+    targetCode,
+    guestName: hostedGuest ? displayName(hostedGuest.user, "Your guest") : null,
+    hasPendingInvite: currentLobby.invites.length > 0,
+  };
+}
+
 export async function joinLobbyByCode({
   userId,
   code,
   deckId,
-  confirmSwitch = false,
+  confirmDisbandLobbyId,
 }: JoinLobbyByCodeInput): Promise<LobbyJoinResult> {
   const normalizedCode = normalizeLobbyCode(code);
   if (normalizedCode.length !== 6) return { kind: "invalid_code" };
@@ -106,7 +160,7 @@ export async function joinLobbyByCode({
   return joinLobby({
     userId,
     deckId,
-    confirmSwitch,
+    confirmDisbandLobbyId,
     resolveTarget: async (tx) => {
       const lobby = await tx.lobby.findFirst({
         where: { joinCode: normalizedCode },
@@ -127,11 +181,11 @@ export async function joinLobbyByCode({
 export async function joinLobbyByInvite({
   userId,
   inviteId,
-  confirmSwitch = false,
+  confirmDisbandLobbyId,
 }: JoinLobbyByInviteInput): Promise<LobbyJoinResult> {
   return joinLobby({
     userId,
-    confirmSwitch,
+    confirmDisbandLobbyId,
     resolveTarget: async (tx) => {
       const invite = await tx.lobbyInvite.findUnique({
         where: { id: inviteId },
@@ -170,7 +224,7 @@ export async function joinLobbyByInvite({
 interface JoinLobbyInput {
   userId: string;
   deckId?: string;
-  confirmSwitch: boolean;
+  confirmDisbandLobbyId?: string;
   resolveTarget: (
     tx: Prisma.TransactionClient
   ) => Promise<JoinTarget | { kind: LobbyJoinFailureKind }>;
@@ -179,7 +233,7 @@ interface JoinLobbyInput {
 async function joinLobby({
   userId,
   deckId,
-  confirmSwitch,
+  confirmDisbandLobbyId,
   resolveTarget,
 }: JoinLobbyInput): Promise<LobbyJoinResult> {
   const activeGame = await findActiveGameLobby(userId);
@@ -201,30 +255,7 @@ async function joinLobby({
       const targetFailure = validateTarget(target.lobby, userId);
       if (targetFailure) return { kind: targetFailure };
 
-      const current = await tx.user.findUnique({
-        where: { id: userId },
-        select: {
-          activeLobbyId: true,
-          activeLobby: {
-            select: {
-              id: true,
-              status: true,
-              hostUserId: true,
-              host: { select: { username: true, name: true } },
-              guest: {
-                select: {
-                  userId: true,
-                  user: { select: { username: true, name: true } },
-                },
-              },
-              invites: {
-                where: { status: "PENDING" },
-                select: { id: true },
-              },
-            },
-          },
-        },
-      });
+      const current = await loadCurrentMembership(tx, userId);
 
       const currentLobby = current?.activeLobby;
       const isCurrentMember = Boolean(
@@ -242,25 +273,26 @@ async function joinLobby({
       const hasPendingInvite = Boolean(
         isHosting && currentLobby && currentLobby.invites.length > 0
       );
+      const confirmationTargetsCurrentLobby = Boolean(
+        isHosting && currentLobby && confirmDisbandLobbyId === currentLobby.id
+      );
+      const confirmationTargetsAnotherLobby = Boolean(
+        isHosting &&
+        currentLobby &&
+        confirmDisbandLobbyId &&
+        confirmDisbandLobbyId !== currentLobby.id
+      );
 
-      if ((hostedGuest || hasPendingInvite) && !confirmSwitch && currentLobby) {
-        return {
-          kind: "confirmation_required" as const,
-          currentLobbyId: currentLobby.id,
-          targetCode: target.lobby.joinCode,
-          guestName: hostedGuest
-            ? displayName(hostedGuest.user, "Your guest")
-            : null,
-          hasPendingInvite,
-        };
-      }
-
-      if (target.inviteId) {
-        const accepted = await tx.lobbyInvite.updateMany({
-          where: { id: target.inviteId, status: "PENDING" },
-          data: { status: "ACCEPTED" },
-        });
-        if (accepted.count !== 1) throw new JoinRaceError("invite_gone");
+      if (
+        currentLobby &&
+        (confirmationTargetsAnotherLobby ||
+          ((hostedGuest || hasPendingInvite) &&
+            !confirmationTargetsCurrentLobby))
+      ) {
+        return buildPartySwitchConfirmation(
+          currentLobby,
+          target.lobby.joinCode
+        );
       }
 
       let previousLobbyId: string | null = null;
@@ -271,15 +303,37 @@ async function joinLobby({
       if (isCurrentMember && currentLobby) {
         previousLobbyId = currentLobby.id;
         if (isHosting) {
+          const requiresNoUnconfirmedPartyImpact =
+            !confirmationTargetsCurrentLobby;
           const closed = await tx.lobby.updateMany({
             where: {
               id: currentLobby.id,
               hostUserId: userId,
+              revision: currentLobby.revision,
               status: { in: ["WAITING", "READY"] },
+              ...(requiresNoUnconfirmedPartyImpact
+                ? {
+                    guest: { is: null },
+                    invites: { none: { status: "PENDING" } },
+                  }
+                : {}),
             },
             data: { status: "CLOSED", revision: { increment: 1 } },
           });
-          if (closed.count !== 1) throw new CurrentLobbyChangedError();
+          if (closed.count !== 1) {
+            const fresh = await loadCurrentMembership(tx, userId);
+            if (
+              fresh?.activeLobbyId &&
+              fresh.activeLobby?.hostUserId === userId &&
+              fresh.activeLobby.status !== "CLOSED"
+            ) {
+              return buildPartySwitchConfirmation(
+                fresh.activeLobby,
+                target.lobby.joinCode
+              );
+            }
+            throw new CurrentLobbyChangedError();
+          }
 
           previousLobbyClosed = true;
           if (hostedGuest) {
@@ -322,6 +376,14 @@ async function joinLobby({
         }
       } else if (current?.activeLobbyId) {
         await releaseActiveLobby(tx, userId, current.activeLobbyId);
+      }
+
+      if (target.inviteId) {
+        const accepted = await tx.lobbyInvite.updateMany({
+          where: { id: target.inviteId, status: "PENDING" },
+          data: { status: "ACCEPTED" },
+        });
+        if (accepted.count !== 1) throw new JoinRaceError("invite_gone");
       }
 
       const acquired = await tx.lobby.updateMany({
@@ -442,22 +504,6 @@ export async function publishLobbyJoin(
         hostName: disbandedGuest.hostName,
       })
     );
-    if (result.previousLobbyId) {
-      effects.push(
-        buildLobbyRoomState(result.previousLobbyId)
-          .then((state) =>
-            state
-              ? notifyUser(disbandedGuest.userId, {
-                  type: "lobby:state_changed",
-                  lobby: state,
-                })
-              : Promise.resolve()
-          )
-          .catch((error) => {
-            console.error("[lobbies:join] disband state fanout failed", error);
-          })
-      );
-    }
   }
 
   await Promise.all(effects);
