@@ -102,8 +102,8 @@ export interface BoardLayoutProps {
   acceptedUpdate?: AcceptedGameUpdate | null;
   promptRespondingPlayer?: 0 | 1 | null;
   /** Suppresses board-driven user input. Default `"full"` (production game).
-   *  `"spectator"` and `"responseOnly"` are sandbox-only modes (OPT-290) that
-   *  disable drag and right-click menus while leaving prompt modals usable. */
+   *  `"spectator"` is fully read-only. `"responseOnly"` is sandbox-only and
+   *  leaves prompt responses usable while suppressing ordinary board input. */
   interactionMode?: InteractionMode;
   /** Design-canvas size supplied by the parent `<ScaledBoard>` (via `<Board>`).
    *  BoardLayout authors against this canvas; `<ScaledBoard>` owns the
@@ -161,7 +161,9 @@ function BoardLayoutInner({
   viewportSize,
   outerScale,
 }: BoardLayoutProps & { interactionMode?: InteractionMode }) {
-  const dndDisabled = interactionMode !== "full";
+  const boardInputEnabled = interactionMode === "full";
+  const spectatorMode = interactionMode === "spectator";
+  const dndDisabled = !boardInputEnabled;
   const zoneRegistry = useZonePosition();
   const viewport = viewportSize;
   const composition = resolveBoardComposition(
@@ -181,13 +183,13 @@ function BoardLayoutInner({
   });
   const dispatchBoardAction = useCallback(
     (action: GameAction) => {
-      if (!spotlight.isBlockingPrompt) onAction(action);
+      if (!spectatorMode && !spotlight.isBlockingPrompt) onAction(action);
     },
-    [onAction, spotlight.isBlockingPrompt]
+    [onAction, spectatorMode, spotlight.isBlockingPrompt]
   );
   const modalRouting = useBoardModalRouting({
     activePrompt,
-    promptBlocked: spotlight.isBlockingPrompt,
+    promptBlocked: spectatorMode || spotlight.isBlockingPrompt,
     me,
     opp,
     cardDb,
@@ -381,7 +383,7 @@ function BoardLayoutInner({
         playerIndex={myIndex}
         connectionStatus={connectionStatus}
         onLeave={onLeave}
-        onConcede={() => onAction({ type: "CONCEDE" })}
+        onConcede={() => dispatchBoardAction({ type: "CONCEDE" })}
         matchClosed={matchClosed}
       />
 
@@ -446,14 +448,22 @@ function BoardLayoutInner({
             isMyTurn={isMyTurn}
             phase={bs.phase}
             canEndPhase={
-              bs.canEndPhase && !boardPrompt && !spotlight.isBlockingPrompt
+              boardInputEnabled &&
+              bs.canEndPhase &&
+              !boardPrompt &&
+              !spotlight.isBlockingPrompt
             }
-            canPass={bs.canPass && !boardPrompt && !spotlight.isBlockingPrompt}
+            canPass={
+              boardInputEnabled &&
+              bs.canPass &&
+              !boardPrompt &&
+              !spotlight.isBlockingPrompt
+            }
             inBattle={bs.inBattle}
             activePrompt={boardPrompt}
             rejectionReason={actionRejection?.reason ?? null}
             battleInfo={bs.battleInfo}
-            blockerMode={bs.inBlockStep && !spotlight.isBlockingPrompt ? {
+            blockerMode={boardInputEnabled && bs.inBlockStep && !spotlight.isBlockingPrompt ? {
               selectedBlockerId: bs.selectedBlockerId,
               onBlock: () => {
                 if (bs.selectedBlockerId) {
@@ -479,7 +489,9 @@ function BoardLayoutInner({
             }
             isPromptHidden={modalRouting.isPromptHidden}
             onShowPrompt={modalRouting.showPrompt}
-            canUndo={canUndo && !spotlight.isBlockingPrompt}
+            canUndo={
+              boardInputEnabled && canUndo && !spotlight.isBlockingPrompt
+            }
             onAction={dispatchBoardAction}
           />
 
@@ -493,22 +505,29 @@ function BoardLayoutInner({
             activeDrag={drag.activeDrag}
             refreshWave={refreshWave}
             canInteract={
+              boardInputEnabled &&
               bs.canInteract &&
               !modalRouting.targetSelectionActive &&
               !spotlight.isBlockingPrompt
             }
             canActivateMain={
+              boardInputEnabled &&
               bs.canInteract &&
               !activePrompt &&
               !spotlight.isBlockingPrompt
             }
             oncePerTurnUsed={turn?.oncePerTurnUsed}
             canDragCounter={
+              boardInputEnabled &&
               bs.canDragCounter &&
               !modalRouting.targetSelectionActive &&
               !spotlight.isBlockingPrompt
             }
-            inBlockStep={bs.inBlockStep && !spotlight.isBlockingPrompt}
+            inBlockStep={
+              boardInputEnabled &&
+              bs.inBlockStep &&
+              !spotlight.isBlockingPrompt
+            }
             selectedBlockerId={bs.selectedBlockerId}
             setSelectedBlockerId={bs.setSelectedBlockerId}
             onAction={dispatchBoardAction}

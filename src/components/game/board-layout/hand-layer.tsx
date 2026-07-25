@@ -16,6 +16,8 @@ import { Card } from "../card";
 import { cardReject, cardRejectReduced } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
 import { FIELD_W, HAND_CARD_W, type HandCardDrag } from "./constants";
+import { useInteractionMode } from "./interaction-mode";
+import { cn } from "@/lib/utils";
 
 /**
  * OPT-364: returns instanceIds present in `currentIds` that were not in
@@ -242,6 +244,7 @@ export const HandLayer = React.memo(function HandLayer({
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
   const activeEffects = useActiveEffects();
+  const inputSuppressed = useInteractionMode() !== "full";
 
   // OPT-364: hide cards on their first render in this HandLayer instance so
   // the deck-to-hand flight has a chance to register a transition before the
@@ -301,6 +304,18 @@ export const HandLayer = React.memo(function HandLayer({
       );
     }
 
+    if (inputSuppressed) {
+      return (
+        <div
+          key={card.instanceId}
+          style={marginStyle}
+          className={cn(isInFlight && "invisible")}
+        >
+          <Card data={{ card, cardDb }} variant="hand" />
+        </div>
+      );
+    }
+
     const eligible = counterMode
       ? isCounterEligibleCard(cardDb[card.cardId])
       : true;
@@ -338,10 +353,10 @@ export const HandLayer = React.memo(function HandLayer({
     );
   };
 
-  // Opponent (face-down) hand has no reorder interaction — render without
-  // SortableContext. Player hand wraps in SortableContext so neighbors shift
-  // when a card is dragged over them.
-  if (faceDown) {
+  // Face-down and input-suppressed hands have no reorder interaction. Render
+  // them without dnd-kit so spectator cards cannot enter the keyboard tab
+  // order as disabled `role="button"` elements.
+  if (faceDown || inputSuppressed) {
     return (
       <div ref={handRef} className="pointer-events-auto flex items-center">
         {cards.map(renderCard)}
