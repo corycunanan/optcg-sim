@@ -1450,6 +1450,26 @@ describe("ACTIVATE_EFFECT via pipeline", () => {
     expect(result.state.players[1].hand).toHaveLength(actingHandBefore);
   });
 
+  it("does not reveal whether an unresolved or opponent-controlled source exists", () => {
+    const { state, cardDb, source } = setupOpponentActivation();
+    const missingSourceResult = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: "card_99999999", effectId: "activate_opponent_draw" },
+      cardDb,
+      1,
+    );
+    const opponentSourceResult = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate_opponent_draw" },
+      cardDb,
+      1,
+    );
+
+    expect(missingSourceResult).toEqual(opponentSourceResult);
+    expect(missingSourceResult.valid).toBe(false);
+    expect(missingSourceResult.error).toBe("Not your card");
+  });
+
   it("rejects activating an opponent-controlled cost-bearing effect before payment", () => {
     const { state, cardDb, source } = setupOpponentActivation([{ type: "REST_SELF" }]);
     const ownerHandBefore = state.players[0].hand.length;

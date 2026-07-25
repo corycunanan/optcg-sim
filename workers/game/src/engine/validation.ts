@@ -345,7 +345,7 @@ function validateActivateEffect(
   if (timingError) return timingError;
 
   const found = findCardInState(state, cardInstanceId);
-  if (!found) return null; // executeActivateEffect will no-op; keep behavior parity
+  if (!found) return "Not your card";
   if (found.playerIndex !== actingPlayerIndex) return "Not your card";
 
   const cardData = cardDb.get(found.card.cardId);
