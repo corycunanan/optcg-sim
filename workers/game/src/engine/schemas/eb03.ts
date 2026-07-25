@@ -889,22 +889,20 @@ export const EB03_021_ALVIDA: EffectSchema = {
           type: "RETURN_TO_DECK",
           target: {
             type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { base_power_max: 4000 },
-          },
-          params: { position: "BOTTOM" },
-        },
-        {
-          type: "RETURN_TO_DECK",
-          target: {
-            type: "CHARACTER",
             controller: "EITHER",
-            count: { up_to: 1 },
-            filter: { base_cost_max: 3 },
+            dual_targets: [
+              {
+                controller: "OPPONENT",
+                filter: { base_power_max: 4000 },
+                count: { up_to: 1 },
+              },
+              {
+                filter: { base_cost_max: 3 },
+                count: { up_to: 1 },
+              },
+            ],
           },
           params: { position: "BOTTOM" },
-          chain: "THEN",
         },
       ],
       flags: { optional: true },

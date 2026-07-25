@@ -326,7 +326,8 @@ export function handleSelectTarget(
       pausedAction.target,
       nextState,
       cardDb,
-      resultRefs
+      resultRefs,
+      { controller, sourceCardInstanceId: effectSourceInstanceId }
     )
   ) {
     const reprompt = buildSelectTargetPrompt(
