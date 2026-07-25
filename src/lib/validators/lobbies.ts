@@ -126,6 +126,7 @@ export const PatchLobbySchema = z
       .min(1, "guestDeckId is required")
       .nullable()
       .optional(),
+    allowSpectators: z.boolean().optional(),
     ready: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
