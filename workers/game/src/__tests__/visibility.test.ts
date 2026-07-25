@@ -11,6 +11,7 @@ import {
   filterStateForPlayer,
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
+import { visibleStateForSpectator } from "../session/visibility.js";
 import { setupGame, advanceToPhase } from "./factories.js";
 
 describe("filterStateForPlayer", () => {
@@ -260,5 +261,132 @@ describe("filterStateForPlayer", () => {
         expect(card.cardId).not.toBe("hidden");
       }
     }
+  });
+});
+
+describe("visibleStateForSpectator", () => {
+  function getMainPhaseState() {
+    const { state, cardDb } = setupGame();
+    return { state: advanceToPhase(state, "MAIN", cardDb), cardDb };
+  }
+
+  it("preserves both owners' real hand identities and attached DON!!", () => {
+    const { state, cardDb } = getMainPhaseState();
+    const expectedHands = state.players.map((player, playerIndex) =>
+      player.hand.map((card, cardIndex) => ({
+        ...card,
+        attachedDon: cardIndex === 0
+          ? [{
+              instanceId: `hand-don-${playerIndex}`,
+              state: "RESTED" as const,
+              attachedTo: card.instanceId,
+            }]
+          : card.attachedDon,
+      })),
+    ) as [typeof state.players[0]["hand"], typeof state.players[1]["hand"]];
+    const withAttachedDon = {
+      ...state,
+      players: [
+        { ...state.players[0], hand: expectedHands[0] },
+        { ...state.players[1], hand: expectedHands[1] },
+      ] as typeof state.players,
+    };
+
+    const spectator = visibleStateForSpectator(withAttachedDon, cardDb);
+
+    for (const playerIndex of [0, 1] as const) {
+      expect(spectator.players[playerIndex].hand).toEqual(expectedHands[playerIndex]);
+      for (const card of spectator.players[playerIndex].hand) {
+        expect(card.cardId).not.toBe("hidden");
+        expect(card.instanceId).not.toMatch(/^hidden-/);
+      }
+      expect(spectator.players[playerIndex].hand[0]?.attachedDon).toHaveLength(1);
+    }
+  });
+
+  it("re-obfuscates both decks and both players' face-down Life", () => {
+    const { state, cardDb } = getMainPhaseState();
+    const spectator = visibleStateForSpectator(state, cardDb);
+
+    for (const playerIndex of [0, 1] as const) {
+      for (const card of spectator.players[playerIndex].deck) {
+        expect(card.cardId).toBe("hidden");
+        expect(card.instanceId).toMatch(new RegExp(`^hidden-${playerIndex}-deck-`));
+      }
+      for (const lifeCard of spectator.players[playerIndex].life) {
+        if (lifeCard.face === "DOWN") {
+          expect(lifeCard.cardId).toBe("hidden");
+          expect(lifeCard.instanceId).toMatch(
+            new RegExp(`^hidden-${playerIndex}-life-`),
+          );
+        }
+      }
+    }
+  });
+
+  it("uses the shared redacted execution context and keeps effectStack empty", () => {
+    const { state, cardDb } = getMainPhaseState();
+    const playerZeroView = filterStateForPlayer(state, 0);
+    const playerOneView = filterStateForPlayer(state, 1);
+    const spectator = visibleStateForSpectator(state, cardDb);
+
+    expect(playerZeroView.executionContext).toEqual(playerOneView.executionContext);
+    expect(spectator.executionContext).toEqual(playerZeroView.executionContext);
+    expect(spectator.effectStack).toEqual([]);
+  });
+
+  it("preserves public zones identically for both players", () => {
+    const { state, cardDb } = getMainPhaseState();
+    const spectator = visibleStateForSpectator(state, cardDb);
+
+    for (const playerIndex of [0, 1] as const) {
+      expect(spectator.players[playerIndex].leader)
+        .toEqual(state.players[playerIndex].leader);
+      expect(spectator.players[playerIndex].characters)
+        .toEqual(state.players[playerIndex].characters);
+      expect(spectator.players[playerIndex].stage)
+        .toEqual(state.players[playerIndex].stage);
+      expect(spectator.players[playerIndex].trash)
+        .toEqual(state.players[playerIndex].trash);
+    }
+  });
+
+  it("throws when player views disagree on the redacted execution context", () => {
+    const { state, cardDb } = getMainPhaseState();
+    let versionReads = 0;
+    const divergentExecutionContext = { ...state.executionContext };
+    Object.defineProperty(divergentExecutionContext, "version", {
+      enumerable: true,
+      get: () => versionReads++ === 0 ? 1 : 2,
+    });
+    const divergentState = {
+      ...state,
+      executionContext: divergentExecutionContext,
+    } as typeof state;
+
+    expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
+      "Spectator visibility invariant violated: executionContext differs between player views",
+    );
+  });
+
+  it("throws when player views disagree on a public zone", () => {
+    const { state, cardDb } = getMainPhaseState();
+    const playerZero = { ...state.players[0] };
+    const leader = playerZero.leader;
+    let leaderReads = 0;
+    Object.defineProperty(playerZero, "leader", {
+      enumerable: true,
+      get: () => leaderReads++ === 0
+        ? leader
+        : { ...leader, cardId: "viewer-specific-leader" },
+    });
+    const divergentState = {
+      ...state,
+      players: [playerZero, state.players[1]],
+    } as typeof state;
+
+    expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
+      "Spectator visibility invariant violated: players[0].leader differs between player views",
+    );
   });
 });
