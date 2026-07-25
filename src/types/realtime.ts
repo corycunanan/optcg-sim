@@ -32,6 +32,11 @@ export type RealtimeServerEvent =
   | { type: "friend:removed"; userId: string }
   | { type: "lobby:state_changed"; lobby: LobbyRoomState }
   | {
+      type: "lobby:spectator_removed";
+      lobbyId: string;
+      reason: "SPECTATING_DISABLED" | "REMOVED_BY_HOST";
+    }
+  | {
       type: "lobby:guest_removed";
       lobbyId: string;
       hostName: string;

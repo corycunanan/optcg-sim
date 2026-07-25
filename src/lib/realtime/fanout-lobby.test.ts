@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { notifyLobby } from "./fanout-lobby";
+import { notifyLobby, notifySpectatorsRemoved } from "./fanout-lobby";
 import type { LobbyRoomState } from "@/lib/lobbies/state";
 
 const baseDeps = {
@@ -38,6 +38,23 @@ function withGuest(state: LobbyRoomState, guestUserId: string): LobbyRoomState {
       user: { id: guestUserId, username: null, name: null, image: null },
       deck: null,
     },
+  };
+}
+
+function withSpectators(
+  state: LobbyRoomState,
+  spectatorIds: string[]
+): LobbyRoomState {
+  return {
+    ...state,
+    allowSpectators: true,
+    spectators: spectatorIds.map((id) => ({
+      id,
+      username: null,
+      name: null,
+      image: null,
+    })),
+    spectatorCount: spectatorIds.length,
   };
 }
 
@@ -84,13 +101,73 @@ describe("notifyLobby", () => {
     );
   });
 
-  it("dedupes solitaire (host occupies the guest seat) into a single fanout", async () => {
+  it("notifies spectators with their rebuilt viewer-scoped state", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(null, { status: 202 }));
-    const state = withGuest(
-      lobbyState({ mode: "SOLITAIRE", status: "READY" }),
-      "host-user"
+    const state = withSpectators(withGuest(lobbyState(), "guest-user"), [
+      "spectator-1",
+      "spectator-2",
+    ]);
+    const stateBuilder = vi.fn(
+      async (_lobbyId: string, viewerUserId: string) => ({
+        ...state,
+        viewerRole: viewerUserId.startsWith("spectator-")
+          ? ("spectator" as const)
+          : null,
+      })
+    );
+
+    await notifyLobby(state, {
+      deps: { ...baseDeps, fetch: fetchMock },
+      stateBuilder,
+    });
+
+    expect(stateBuilder).toHaveBeenCalledTimes(4);
+    expect(stateBuilder).toHaveBeenCalledWith("lobby-1", "spectator-1");
+    expect(stateBuilder).toHaveBeenCalledWith("lobby-1", "spectator-2");
+    const spectatorPayloads = fetchMock.mock.calls
+      .filter(([url]) => url.includes("spectator-"))
+      .map(([, init]) => JSON.parse(init.body));
+    expect(spectatorPayloads).toHaveLength(2);
+    expect(
+      spectatorPayloads.every(({ lobby }) => lobby.viewerRole === "spectator")
+    ).toBe(true);
+  });
+
+  it("skips a spectator when that spectator is the actor", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const state = withSpectators(withGuest(lobbyState(), "guest-user"), [
+      "spectator-actor",
+    ]);
+    const stateBuilder = vi.fn(async () => state);
+
+    await notifyLobby(state, {
+      actorUserId: "spectator-actor",
+      deps: { ...baseDeps, fetch: fetchMock },
+      stateBuilder,
+    });
+
+    expect(stateBuilder).toHaveBeenCalledTimes(2);
+    expect(stateBuilder).not.toHaveBeenCalledWith("lobby-1", "spectator-actor");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://worker.example/user/host-user/notify",
+      "https://worker.example/user/guest-user/notify",
+    ]);
+  });
+
+  it("dedupes the solitaire host-as-guest while retaining spectators", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const state = withSpectators(
+      withGuest(
+        lobbyState({ mode: "SOLITAIRE", status: "READY" }),
+        "host-user"
+      ),
+      ["spectator-user"]
     );
 
     await notifyLobby(state, {
@@ -98,10 +175,10 @@ describe("notifyLobby", () => {
       stateBuilder: async () => state,
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      "https://worker.example/user/host-user/notify"
-    );
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://worker.example/user/host-user/notify",
+      "https://worker.example/user/spectator-user/notify",
+    ]);
   });
 
   it("is a no-op in solitaire when the host is also the actor", async () => {
@@ -208,4 +285,100 @@ describe("notifyLobby", () => {
       "guest-user"
     );
   });
+
+  it("sends nothing when a per-recipient rebuild returns null", async () => {
+    const fetchMock = vi.fn();
+    const viewerScopedInput = withGuest(
+      lobbyState({ viewerRole: "host" }),
+      "guest-user"
+    );
+
+    await notifyLobby(viewerScopedInput, {
+      deps: { ...baseDeps, fetch: fetchMock },
+      stateBuilder: async () => null,
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [0, 2],
+    [1, 3],
+    [20, 22],
+  ])(
+    "builds one viewer snapshot per target with %i spectators",
+    async (spectatorCount, expectedBuilds) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 202 }));
+      const state = withSpectators(
+        withGuest(lobbyState(), "guest-user"),
+        Array.from(
+          { length: spectatorCount },
+          (_, index) => `spectator-${index}`
+        )
+      );
+      const stateBuilder = vi.fn(async () => state);
+
+      await notifyLobby(state, {
+        deps: { ...baseDeps, fetch: fetchMock },
+        stateBuilder,
+      });
+
+      expect(stateBuilder).toHaveBeenCalledTimes(expectedBuilds);
+      expect(fetchMock).toHaveBeenCalledTimes(expectedBuilds);
+    }
+  );
+
+  it.each(["SPECTATING_DISABLED", "REMOVED_BY_HOST"] as const)(
+    "directs exactly one %s event to every removed spectator outside current-state fanout",
+    async (reason) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 202 }));
+      const currentState = withGuest(lobbyState(), "guest-user");
+
+      await notifySpectatorsRemoved(
+        {
+          lobbyId: currentState.id,
+          reason,
+          // Duplicate proves the bulk primitive emits at most one terminal
+          // event per captured user ID.
+          removedSpectatorUserIds: [
+            "removed-spectator",
+            "other-spectator",
+            "removed-spectator",
+          ],
+        },
+        { ...baseDeps, fetch: fetchMock }
+      );
+      await notifyLobby(currentState, {
+        actorUserId: "host-user",
+        deps: { ...baseDeps, fetch: fetchMock },
+        stateBuilder: async () => currentState,
+      });
+
+      const removedSpectatorCalls = fetchMock.mock.calls.filter(([url]) =>
+        url.includes("removed-spectator")
+      );
+      const otherSpectatorCalls = fetchMock.mock.calls.filter(([url]) =>
+        url.includes("other-spectator")
+      );
+      expect(removedSpectatorCalls).toHaveLength(1);
+      expect(otherSpectatorCalls).toHaveLength(1);
+      expect(JSON.parse(removedSpectatorCalls[0][1].body)).toEqual({
+        type: "lobby:spectator_removed",
+        lobbyId: "lobby-1",
+        reason,
+      });
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            (url.includes("removed-spectator") ||
+              url.includes("other-spectator")) &&
+            JSON.parse(init.body).type === "lobby:state_changed"
+        )
+      ).toBe(false);
+    }
+  );
 });
