@@ -17,6 +17,7 @@ import {
   isRetryableTransactionConflict,
   retryTransactionOnce,
 } from "./transaction-conflict";
+import { isLobbyGuestCollision } from "./unique-constraints";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 import { notifyUser } from "@/lib/realtime/fan-out";
 
@@ -93,32 +94,39 @@ interface JoinTarget {
   inviteExpired?: boolean;
 }
 
-const currentMembershipSelect = {
-  activeLobbyId: true,
-  activeLobby: {
-    select: {
-      id: true,
-      status: true,
-      revision: true,
-      hostUserId: true,
-      host: { select: { username: true, name: true } },
-      guest: {
-        select: {
-          userId: true,
-          user: { select: { username: true, name: true } },
+const currentMembershipSelect = (userId: string) =>
+  ({
+    activeLobbyId: true,
+    activeLobby: {
+      select: {
+        id: true,
+        status: true,
+        revision: true,
+        hostUserId: true,
+        host: { select: { username: true, name: true } },
+        guest: {
+          select: {
+            userId: true,
+            user: { select: { username: true, name: true } },
+          },
+        },
+        spectators: {
+          where: { userId },
+          select: { userId: true },
+        },
+        invites: {
+          where: { status: "PENDING" as const },
+          select: { id: true },
         },
       },
-      invites: {
-        where: { status: "PENDING" as const },
-        select: { id: true },
-      },
     },
-  },
-} satisfies Prisma.UserSelect;
+  }) satisfies Prisma.UserSelect;
 
 type CurrentLobby = NonNullable<
   NonNullable<
-    Prisma.UserGetPayload<{ select: typeof currentMembershipSelect }>
+    Prisma.UserGetPayload<{
+      select: ReturnType<typeof currentMembershipSelect>;
+    }>
   >["activeLobby"]
 >;
 
@@ -133,7 +141,7 @@ class CurrentLobbyChangedError extends Error {}
 function loadCurrentMembership(tx: Prisma.TransactionClient, userId: string) {
   return tx.user.findUnique({
     where: { id: userId },
-    select: currentMembershipSelect,
+    select: currentMembershipSelect(userId),
   });
 }
 
@@ -299,9 +307,12 @@ async function joinLobby({
         currentLobby &&
         currentLobby.status !== "CLOSED" &&
         (currentLobby.hostUserId === userId ||
-          currentLobby.guest?.userId === userId)
+          currentLobby.guest?.userId === userId ||
+          currentLobby.spectators?.length > 0)
       );
       const isHosting = isCurrentMember && currentLobby?.hostUserId === userId;
+      const isSpectating =
+        isCurrentMember && Boolean(currentLobby?.spectators?.length);
       const hostedGuest =
         isHosting && currentLobby?.guest?.userId !== userId
           ? currentLobby?.guest
@@ -390,6 +401,26 @@ async function joinLobby({
             tx,
             currentLobby.id
           );
+        } else if (isSpectating) {
+          if (currentLobby.id === target.lobby.id) {
+            previousLobbyId = null;
+          } else {
+            const released = await tx.lobby.updateMany({
+              where: {
+                id: currentLobby.id,
+                revision: currentLobby.revision,
+                status: { not: "CLOSED" },
+                spectators: { some: { userId } },
+              },
+              data: { revision: { increment: 1 } },
+            });
+            if (released.count !== 1) throw new CurrentLobbyChangedError();
+          }
+          const removed = await tx.lobbySpectator.deleteMany({
+            where: { lobbyId: currentLobby.id, userId },
+          });
+          if (removed.count !== 1) throw new CurrentLobbyChangedError();
+          await releaseActiveLobby(tx, userId, currentLobby.id);
         } else {
           const released = await tx.lobby.updateMany({
             where: {
@@ -440,10 +471,7 @@ async function joinLobby({
           data: { lobbyId: target.lobby.id, userId, deckId },
         });
       } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002"
-        ) {
+        if (isLobbyGuestCollision(error)) {
           throw new JoinRaceError("occupied");
         }
         throw error;
