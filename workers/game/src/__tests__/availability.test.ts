@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
-import { computeEffectAvailability } from "../engine/availability.js";
+import {
+  computeEffectAvailability,
+  effectAvailabilityForRecipient,
+  effectAvailabilityForSpectator,
+} from "../engine/availability.js";
 import type {
   EffectSchema,
   RuntimeActiveEffect,
@@ -337,5 +341,69 @@ describe("GameSession availability broadcast", () => {
       { effectId: "rest_self_effect", status: "blocked", reason: "PHASE" },
     ]);
     expect(payload1.state.effectAvailability).not.toHaveProperty(sourceId);
+  });
+
+  it("builds spectator availability from both controllers when their values differ", () => {
+    const { state, cardDb, sourceId } = activateMainFixture();
+    const opponentSourceId = state.players[1].characters[0]!.instanceId;
+    const availability = computeEffectAvailability(state, cardDb);
+
+    expect(availability[sourceId]).toEqual([
+      { effectId: "rest_self_effect", status: "usable" },
+    ]);
+    expect(availability[opponentSourceId]).toEqual([
+      { effectId: "rest_self_effect", status: "blocked", reason: "PHASE" },
+    ]);
+
+    const spectatorPayload = {
+      state: {
+        ...state,
+        effectAvailability: effectAvailabilityForRecipient(
+          state,
+          availability,
+          null
+        ),
+      },
+    };
+
+    expect(spectatorPayload.state.effectAvailability).toEqual({
+      [sourceId]: [{ effectId: "rest_self_effect", status: "usable" }],
+      [opponentSourceId]: [
+        {
+          effectId: "rest_self_effect",
+          status: "blocked",
+          reason: "PHASE",
+        },
+      ],
+    });
+  });
+});
+
+describe("effectAvailabilityForSpectator", () => {
+  it("fails loudly instead of clobbering overlapping controller keys", () => {
+    const { state, cardDb, sourceId } = activateMainFixture();
+    const opponentSource = state.players[1].characters[0]!;
+    const duplicateInstanceState = {
+      ...state,
+      players: [
+        state.players[0],
+        {
+          ...state.players[1],
+          characters: padChars([
+            { ...opponentSource, instanceId: sourceId, controller: 1 },
+          ]),
+        },
+      ],
+    } as GameState;
+    const availability = computeEffectAvailability(
+      duplicateInstanceState,
+      cardDb
+    );
+
+    expect(() =>
+      effectAvailabilityForSpectator(duplicateInstanceState, availability)
+    ).toThrow(
+      `Effect availability invariant violated: card instance ${sourceId} belongs to both controllers`
+    );
   });
 });

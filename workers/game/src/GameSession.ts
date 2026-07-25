@@ -38,7 +38,7 @@ import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
 import { handleGameStatusRequest } from "./session/status.js";
 import {
   computeEffectAvailability,
-  effectAvailabilityForController,
+  effectAvailabilityForRecipient,
 } from "./engine/availability.js";
 import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
@@ -847,9 +847,7 @@ export class GameSession implements DurableObject {
   }
 
   /**
-   * Send a state-bearing message to each player with their secret zones filtered.
-   * Each player receives their own zones in full; the opponent's hand, deck, and
-   * face-down life cards are obfuscated (§8-4-5).
+   * Send player-filtered state; opponent secret zones are obfuscated (§8-4-5).
    */
   private broadcastFilteredState(
     build: (
@@ -869,7 +867,9 @@ export class GameSession implements DurableObject {
         build(
           {
             ...filteredState,
-            effectAvailability: effectAvailabilityForController(
+            // OPT-552 passes null for spectators: merge both controllers because
+            // availability derives only from their already-visible board zones.
+            effectAvailability: effectAvailabilityForRecipient(
               state,
               availability,
               recipientPlayerIndex
