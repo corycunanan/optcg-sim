@@ -158,6 +158,10 @@ function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
     hostUserId: "host-user",
     host: { username: "strawhat", name: "Luffy", image: null },
     hostDeck: null,
+    allowSpectators: false,
+    spectators: [],
+    spectatorCount: 0,
+    viewerRole: "host",
     guest: {
       guestReady: true,
       user: {

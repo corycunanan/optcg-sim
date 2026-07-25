@@ -39,6 +39,7 @@ describe("buildLobbyRoomState participant deck contents", () => {
     pregameMode: "PRIORITY_ROLL",
     hostReady: true,
     hostUserId: "host-1",
+    allowSpectators: true,
     host: { username: "luffy", name: null, image: null },
     hostDeck: {
       id: "host-deck",
@@ -61,6 +62,16 @@ describe("buildLobbyRoomState participant deck contents", () => {
         leaderArtUrl: null,
       },
     },
+    spectators: [
+      {
+        user: {
+          id: "spectator-1",
+          username: "usopp",
+          name: "Usopp",
+          image: "https://images.example/usopp.png",
+        },
+      },
+    ],
     invites: [],
     gameSessions: [],
   };
@@ -138,6 +149,116 @@ describe("buildLobbyRoomState participant deck contents", () => {
   });
 });
 
+describe("buildLobbyRoomState spectator projection and viewer role", () => {
+  const lobby = {
+    id: "lobby-roles",
+    revision: 12,
+    status: "WAITING",
+    joinCode: "ROLE",
+    format: "Standard",
+    mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
+    hostReady: false,
+    hostUserId: "host-1",
+    allowSpectators: true,
+    host: { username: "luffy", name: null, image: null },
+    hostDeck: null,
+    guest: {
+      guestReady: false,
+      user: {
+        id: "guest-1",
+        username: "zoro",
+        name: "Zoro",
+        image: null,
+      },
+      deck: null,
+    },
+    spectators: [
+      {
+        user: {
+          id: "spectator-1",
+          username: "usopp",
+          name: "Usopp",
+          image: "https://images.example/usopp.png",
+        },
+      },
+      {
+        user: {
+          id: "spectator-2",
+          username: null,
+          name: "Robin",
+          image: null,
+        },
+      },
+    ],
+    invites: [],
+    gameSessions: [],
+  };
+
+  it("projects spectator users and a matching cheap count", async () => {
+    lobbyFindUniqueMock.mockResolvedValue(lobby);
+
+    const state = await buildLobbyRoomState("lobby-roles", "spectator-1");
+
+    expect(state).toMatchObject({
+      version: 12,
+      allowSpectators: true,
+      spectators: [
+        {
+          id: "spectator-1",
+          username: "usopp",
+          name: "Usopp",
+          image: "https://images.example/usopp.png",
+        },
+        {
+          id: "spectator-2",
+          username: null,
+          name: "Robin",
+          image: null,
+        },
+      ],
+      spectatorCount: 2,
+    });
+    expect(lobbyFindUniqueMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          allowSpectators: true,
+          spectators: expect.objectContaining({
+            orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          }),
+        }),
+      })
+    );
+  });
+
+  it.each([
+    ["host", "host-1"],
+    ["guest", "guest-1"],
+    ["spectator", "spectator-1"],
+    [null, "stranger-1"],
+    [null, undefined],
+  ] as const)(
+    "derives viewerRole=%s for viewer %s",
+    async (role, viewerUserId) => {
+      lobbyFindUniqueMock.mockResolvedValue(lobby);
+
+      const state = await buildLobbyRoomState("lobby-roles", viewerUserId);
+
+      expect(state?.viewerRole).toBe(role);
+    }
+  );
+});
+
 describe("buildLobbyRoomState pending invite", () => {
   it("serializes the live invited seat from its server expiry", async () => {
     lobbyFindUniqueMock.mockResolvedValue({
@@ -150,9 +271,11 @@ describe("buildLobbyRoomState pending invite", () => {
       pregameMode: "PRIORITY_ROLL",
       hostReady: false,
       hostUserId: "host-1",
+      allowSpectators: false,
       host: { username: "luffy", name: null, image: null },
       hostDeck: null,
       guest: null,
+      spectators: [],
       invites: [
         {
           id: "invite-1",
@@ -205,9 +328,11 @@ describe("buildLobbyRoomState pending invite", () => {
       pregameMode: "PRIORITY_ROLL",
       hostReady: false,
       hostUserId: "host-1",
+      allowSpectators: false,
       host: { username: "luffy", name: null, image: null },
       hostDeck: null,
       guest: null,
+      spectators: [],
       invites: [
         {
           id: "invite-secret",
@@ -242,9 +367,11 @@ describe("buildLobbyRoomState pending invite", () => {
       pregameMode: "PRIORITY_ROLL",
       hostReady: false,
       hostUserId: "host-1",
+      allowSpectators: false,
       host: { username: "luffy", name: null, image: null },
       hostDeck: null,
       guest: null,
+      spectators: [],
       invites: [],
       gameSessions: [],
     });

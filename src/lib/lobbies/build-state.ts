@@ -32,6 +32,7 @@ export async function buildLobbyRoomState(
       pregameMode: true,
       hostReady: true,
       hostUserId: true,
+      allowSpectators: true,
       host: { select: { username: true, name: true, image: true } },
       hostDeck: {
         select: { id: true, name: true, leaderId: true, leaderArtUrl: true },
@@ -49,6 +50,14 @@ export async function buildLobbyRoomState(
               leaderId: true,
               leaderArtUrl: true,
             },
+          },
+        },
+      },
+      spectators: {
+        orderBy: [{ joinedAt: "asc" as const }, { id: "asc" as const }],
+        select: {
+          user: {
+            select: { id: true, username: true, name: true, image: true },
           },
         },
       },
@@ -93,6 +102,15 @@ export async function buildLobbyRoomState(
     viewerUserId &&
     (viewerUserId === lobby.hostUserId || viewerUserId === lobby.guest?.user.id)
   );
+  let viewerRole: LobbyRoomState["viewerRole"] = null;
+  if (viewerUserId === lobby.hostUserId) viewerRole = "host";
+  else if (viewerUserId === lobby.guest?.user.id) viewerRole = "guest";
+  else if (
+    viewerUserId &&
+    lobby.spectators.some(({ user }) => user.id === viewerUserId)
+  ) {
+    viewerRole = "spectator";
+  }
 
   const [leaderCards, decksWithCards] = await Promise.all([
     leaderIds.length
@@ -183,6 +201,10 @@ export async function buildLobbyRoomState(
     hostUserId: lobby.hostUserId,
     host: lobby.host,
     hostDeck,
+    allowSpectators: lobby.allowSpectators,
+    spectators: lobby.spectators.map(({ user }) => user),
+    spectatorCount: lobby.spectators.length,
+    viewerRole,
     guest: lobby.guest
       ? {
           guestReady: lobby.guest.guestReady,
