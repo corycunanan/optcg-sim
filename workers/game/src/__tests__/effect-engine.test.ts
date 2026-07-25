@@ -1370,6 +1370,105 @@ describe("Replacement Effects", () => {
 // ─── ACTIVATE_EFFECT Pipeline Integration ──────────────────────────────────
 
 describe("ACTIVATE_EFFECT via pipeline", () => {
+  function setupOpponentActivation(costs?: EffectBlock["costs"]) {
+    const activateCard: CardData = {
+      id: "TEST-OPPONENT-ACTIVATE",
+      name: "Opponent Activator",
+      type: "Character",
+      color: ["Red"],
+      cost: 2,
+      power: 3000,
+      counter: null,
+      life: null,
+      attribute: [],
+      types: [],
+      effectText: "[Activate: Main] Draw 1 card.",
+      triggerText: null,
+      keywords: { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false },
+      effectSchema: {
+        card_id: "TEST-OPPONENT-ACTIVATE",
+        card_name: "Opponent Activator",
+        card_type: "Character",
+        effects: [
+          {
+            id: "activate_opponent_draw",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            ...(costs ? { costs } : {}),
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          },
+        ],
+      },
+      imageUrl: null,
+    };
+
+    const { state: baseState, cardDb } = setupGame();
+    cardDb.set(activateCard.id, activateCard);
+    const source: CardInstance = {
+      instanceId: "opponent-activate-char",
+      cardId: activateCard.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const players = [...baseState.players] as [typeof baseState.players[0], typeof baseState.players[1]];
+    players[0] = {
+      ...players[0],
+      characters: padChars([...players[0].characters.filter(Boolean) as CardInstance[], source]),
+    };
+    const state: GameState = {
+      ...baseState,
+      players,
+      turn: {
+        ...baseState.turn,
+        number: 2,
+        activePlayerIndex: 1,
+        phase: "MAIN",
+        battleSubPhase: null,
+        battle: null,
+      },
+    };
+    return { state, cardDb, source };
+  }
+
+  it("rejects activating an opponent-controlled no-cost effect", () => {
+    const { state, cardDb } = setupOpponentActivation();
+    const actingHandBefore = state.players[1].hand.length;
+
+    const result = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: "opponent-activate-char", effectId: "activate_opponent_draw" },
+      cardDb,
+      1,
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Not your card");
+    expect(result.state.players[1].hand).toHaveLength(actingHandBefore);
+  });
+
+  it("rejects activating an opponent-controlled cost-bearing effect before payment", () => {
+    const { state, cardDb, source } = setupOpponentActivation([{ type: "REST_SELF" }]);
+    const ownerHandBefore = state.players[0].hand.length;
+    const actingHandBefore = state.players[1].hand.length;
+
+    const result = runPipeline(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate_opponent_draw" },
+      cardDb,
+      1,
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Not your card");
+    expect(result.state.players[0].characters.find((card) => card?.instanceId === source.instanceId)?.state).toBe("ACTIVE");
+    expect(result.state.players[0].hand).toHaveLength(ownerHandBefore);
+    expect(result.state.players[1].hand).toHaveLength(actingHandBefore);
+  });
+
   it("resolves [Activate: Main] effect through the full pipeline", () => {
     // Create a card with an Activate Main effect that draws a card
     const activateCard: CardData = {
