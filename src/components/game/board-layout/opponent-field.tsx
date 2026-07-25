@@ -56,7 +56,7 @@ interface OpponentFieldProps {
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
   donCountAdjustments?: Map<string, number>;
-  /** Active arrivals keyed by pile zone (`o-deck`, `o-trash`, `o-life`). */
+  /** Active arrivals keyed by anchor-derived top pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;

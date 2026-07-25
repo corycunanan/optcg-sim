@@ -66,7 +66,7 @@ interface PlayerFieldProps {
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
   lifeScriedPulseNonce?: number;
-  /** Active arrivals keyed by pile zone (`p-deck`, `p-trash`, `p-life`). */
+  /** Active arrivals keyed by anchor-derived bottom pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
