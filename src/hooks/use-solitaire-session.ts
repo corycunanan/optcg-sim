@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useGameSession } from "@/hooks/use-game-session";
+import type { GameSessionPlayerGame } from "@/hooks/use-game-session";
 import type { GameAction, GameState } from "@shared/game-types";
 
 export type SolitairePerspective = 0 | 1;
@@ -94,14 +95,18 @@ export function useSolitaireSession(gameId: string, workerUrl: string) {
     },
     [myIndex, sides]
   );
+  const game =
+    current.game.viewerRole === "player"
+      ? ({
+          ...current.game,
+          myIndex,
+          sendAction,
+        } satisfies GameSessionPlayerGame)
+      : current.game;
 
   return {
     ...current,
-    game: {
-      ...current.game,
-      myIndex,
-      sendAction,
-    },
+    game,
     perspective: {
       myIndex,
       flipPerspective,

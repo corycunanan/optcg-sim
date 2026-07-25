@@ -19,7 +19,7 @@ import type {
 } from "@shared/game-types";
 import type { RemoteGameStatus } from "@/hooks/use-remote-game-status";
 
-export interface GameSessionGame {
+interface GameSessionGameCommon {
   gameState: GameState | null;
   cardDb: CardDb;
   cardDbReady: boolean;
@@ -30,16 +30,10 @@ export interface GameSessionGame {
   activePrompt: PromptOptions | null;
   activePromptId: string | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
-  sendAction: (action: GameAction) => void;
-  viewerRole: GameSessionViewerRole;
-  myIndex: 0 | 1 | null;
-  me: PlayerState | null;
-  opp: PlayerState | null;
   bottomPlayerIndex: 0 | 1;
   bottomPlayer: PlayerState | null;
   topPlayer: PlayerState | null;
   turn: TurnState | null;
-  isMyTurn: boolean;
   phase: string;
   battlePhase: string | null;
   inBattle: boolean;
@@ -48,6 +42,41 @@ export interface GameSessionGame {
   retryConnection: () => void;
   connectivityFailed: boolean;
 }
+
+export interface GameSessionPlayerGame extends GameSessionGameCommon {
+  viewerRole: "player";
+  gameState: GameState;
+  sendAction: (action: GameAction) => void;
+  myIndex: 0 | 1;
+  me: PlayerState;
+  opp: PlayerState;
+  bottomPlayer: PlayerState;
+  topPlayer: PlayerState;
+  isMyTurn: boolean;
+}
+
+export interface GameSessionSpectatorGame extends GameSessionGameCommon {
+  viewerRole: "spectator";
+  sendAction: (action: GameAction) => void;
+  myIndex: null;
+  me: null;
+  opp: null;
+  isMyTurn: false;
+}
+
+export interface GameSessionPendingGame extends GameSessionGameCommon {
+  viewerRole: "pending";
+  sendAction: (action: GameAction) => void;
+  myIndex: null;
+  me: null;
+  opp: null;
+  isMyTurn: false;
+}
+
+export type GameSessionGame =
+  | GameSessionPlayerGame
+  | GameSessionSpectatorGame
+  | GameSessionPendingGame;
 
 export interface GameSessionOpponent {
   opponentAway: boolean;
@@ -75,6 +104,13 @@ export interface GameSessionEndState {
   endReason: string;
 }
 
+export interface GameSession {
+  game: GameSessionGame;
+  opponent: GameSessionOpponent;
+  navigation: GameSessionNavigation;
+  endState: GameSessionEndState;
+}
+
 export type GameSessionViewerRole = "player" | "spectator";
 
 export type GameSessionPerspective =
@@ -88,7 +124,10 @@ export type GameSessionPerspective =
     };
 
 /**
- * Composes the client-side game session for one player perspective.
+ * Composes the client-side game session for one player or spectator
+ * perspective. Requested players remain `pending` until their seat and both
+ * player projections resolve; the final `player` and `spectator` variants
+ * therefore expose exact, non-overlapping identity contracts.
  *
  * Solitaire may mount this hook twice for the same `gameId`, but only when
  * each instance has a distinct `requestedPlayerIndex` (`0` and `1`). Each
@@ -106,7 +145,7 @@ export function useGameSession(
   gameId: string,
   workerUrl: string,
   perspective: GameSessionPerspective = {}
-) {
+): GameSession {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
   const viewerRole = perspective.viewerRole ?? "player";
@@ -372,36 +411,75 @@ export function useGameSession(
   const endReason =
     gameOver?.reason ?? remoteGameStatus?.winReason ?? "The game has ended.";
 
-  return {
-    game: {
-      gameState,
-      cardDb,
-      cardDbReady,
-      connectionStatus,
-      lastError: lastError ?? cardDbError,
-      actionRejection,
-      acceptedUpdate,
-      activePrompt,
-      activePromptId,
-      gameOver,
+  const commonGame = {
+    gameState,
+    cardDb,
+    cardDbReady,
+    connectionStatus,
+    lastError: lastError ?? cardDbError,
+    actionRejection,
+    acceptedUpdate,
+    activePrompt,
+    activePromptId,
+    gameOver,
+    bottomPlayerIndex,
+    bottomPlayer,
+    topPlayer,
+    turn,
+    phase,
+    battlePhase,
+    inBattle,
+    matchClosed,
+    canUndo,
+    retryConnection: retryConnectivity,
+    connectivityFailed: connectionStatus === "failed" || cardDbError !== null,
+  } satisfies GameSessionGameCommon;
+
+  let game: GameSessionGame;
+  if (viewerRole === "spectator") {
+    game = {
+      ...commonGame,
+      viewerRole: "spectator",
       sendAction,
-      viewerRole,
+      myIndex: null,
+      me: null,
+      opp: null,
+      isMyTurn: false,
+    };
+  } else if (
+    gameState &&
+    myIndex !== null &&
+    me &&
+    opp &&
+    bottomPlayer &&
+    topPlayer
+  ) {
+    game = {
+      ...commonGame,
+      viewerRole: "player",
+      gameState,
+      sendAction,
       myIndex,
       me,
       opp,
-      bottomPlayerIndex,
       bottomPlayer,
       topPlayer,
-      turn,
       isMyTurn,
-      phase,
-      battlePhase,
-      inBattle,
-      matchClosed,
-      canUndo,
-      retryConnection: retryConnectivity,
-      connectivityFailed: connectionStatus === "failed" || cardDbError !== null,
-    },
+    };
+  } else {
+    game = {
+      ...commonGame,
+      viewerRole: "pending",
+      sendAction,
+      myIndex: null,
+      me: null,
+      opp: null,
+      isMyTurn: false,
+    };
+  }
+
+  return {
+    game,
     opponent: {
       opponentAway,
       opponentAwayText,

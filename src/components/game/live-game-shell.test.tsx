@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   tickCountdown: null as (() => void) | null,
   sendAction: vi.fn(),
   backToLobbies: vi.fn(),
-  viewerRole: "player" as "player" | "spectator",
+  viewerRole: "player" as "pending" | "player" | "spectator",
   bottomPlayerIndex: ((value: 0 | 1) => value)(0),
   bottomPlayer: null as GameState["players"][number] | null,
   topPlayer: null as GameState["players"][number] | null,
@@ -178,5 +178,17 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(state?.bottomPlayerIndex).toBe(1);
     expect(state?.me?.playerId).toBe("player-0");
     expect(state?.opp?.playerId).toBe("player-1");
+  });
+
+  it("keeps pending player identity out of the interactive board", () => {
+    mocks.viewerRole = "pending";
+
+    act(() => {
+      renderer = create(
+        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />
+      );
+    });
+
+    expect(mocks.boardStates).toHaveLength(0);
   });
 });

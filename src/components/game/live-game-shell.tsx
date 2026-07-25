@@ -227,7 +227,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     );
   }
 
-  if (!game.gameState || !game.cardDbReady) {
+  if (game.viewerRole === "pending" || !game.gameState || !game.cardDbReady) {
     if (game.connectivityFailed) {
       return (
         <div className="bg-gb-board flex h-full w-full items-center justify-center px-4">
