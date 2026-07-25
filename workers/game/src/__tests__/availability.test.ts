@@ -342,7 +342,9 @@ describe("GameSession availability broadcast", () => {
     ]);
     expect(payload1.state.effectAvailability).not.toHaveProperty(sourceId);
   });
+});
 
+describe("effectAvailabilityForRecipient", () => {
   it("builds spectator availability from both controllers when their values differ", () => {
     const { state, cardDb, sourceId } = activateMainFixture();
     const opponentSourceId = state.players[1].characters[0]!.instanceId;

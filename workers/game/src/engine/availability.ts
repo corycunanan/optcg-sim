@@ -300,8 +300,10 @@ export function effectAvailabilityForController(
  * Combine both controllers' derived availability for a spectator.
  *
  * Keys are card instance IDs, which are expected to be globally unique across
- * both players. Throw on an overlap instead of letting an object spread
- * silently choose one controller's entry if that invariant is ever violated.
+ * both players. An overlap signals that uniqueness invariant was violated, so
+ * throw instead of silently choosing one controller's entry. Broadcast-path
+ * callers must contain this error per spectator so spectator delivery alone
+ * fails without interrupting delivery to any other recipient.
  */
 export function effectAvailabilityForSpectator(
   state: GameState,

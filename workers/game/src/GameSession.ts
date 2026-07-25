@@ -841,13 +841,13 @@ export class GameSession implements DurableObject {
   }
 
   // ─── Broadcast helpers ─────────────────────────────────────────────────────
-
   private broadcast(msg: ServerMessage): void {
     this.transport.broadcast(msg);
   }
-
   /**
-   * Send player-filtered state; opponent secret zones are obfuscated (§8-4-5).
+   * Send a state-bearing message to each player with their secret zones filtered.
+   * Each player receives their own zones in full; the opponent's hand, deck, and
+   * face-down life cards are obfuscated (§8-4-5).
    */
   private broadcastFilteredState(
     build: (
@@ -867,8 +867,8 @@ export class GameSession implements DurableObject {
         build(
           {
             ...filteredState,
-            // OPT-552 passes null for spectators: merge both controllers because
-            // availability derives only from their already-visible board zones.
+            // OPT-552 must catch null-recipient failures per recipient: an uncaught
+            // spectator-first/between throw would skip every later player delivery.
             effectAvailability: effectAvailabilityForRecipient(
               state,
               availability,
