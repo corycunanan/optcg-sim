@@ -139,6 +139,7 @@ export function LobbyRoomShell({
 
   const isHost = lobby?.hostUserId === currentUserId;
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
+  const isSpectator = lobby?.viewerRole === "spectator";
   const isInGame = lobby?.status === "IN_GAME";
   const activeGameId = lobby ? rejoinGameId(lobby) : null;
   const hasActiveMatch = Boolean(isInGame || activeGameId);
@@ -600,7 +601,7 @@ export function LobbyRoomShell({
                 onClick={() => router.push(`/game/${activeGameId}`)}
               >
                 <Play data-icon="inline-start" />
-                Rejoin Game
+                {isSpectator ? "Spectate Match" : "Rejoin Game"}
               </Button>
             ) : (
               <Button

@@ -41,7 +41,22 @@ export async function GET(
   const game = await prisma.gameSession.findFirst({
     where: {
       id,
-      OR: [{ player1Id: userId }, { player2Id: userId }],
+      OR: [
+        { player1Id: userId },
+        { player2Id: userId },
+        {
+          AND: [
+            { player1Id: { not: userId } },
+            { player2Id: { not: userId } },
+            {
+              lobby: {
+                allowSpectators: true,
+                spectators: { some: { userId } },
+              },
+            },
+          ],
+        },
+      ],
     },
     select: {
       id: true,
@@ -58,6 +73,10 @@ export async function GET(
     return apiError("Game not found", 404);
   }
 
+  const playerIndex =
+    game.player1Id === userId ? 0 : game.player2Id === userId ? 1 : undefined;
+  const isPlayer = playerIndex !== undefined;
+
   return apiSuccess(
     {
       id: game.id,
@@ -65,9 +84,11 @@ export async function GET(
       status: game.status,
       winnerId: game.winnerId,
       winReason: game.winReason,
-      winnerPerspective: getWinnerPerspective(game.winnerId, userId),
-      canFallbackConcede: game.status === "IN_PROGRESS",
-      playerIndex: game.player1Id === userId ? 0 : 1,
+      winnerPerspective: isPlayer
+        ? getWinnerPerspective(game.winnerId, userId)
+        : "NONE",
+      canFallbackConcede: isPlayer && game.status === "IN_PROGRESS",
+      ...(playerIndex !== undefined ? { playerIndex } : {}),
     },
     200,
     { "Cache-Control": "no-store" }

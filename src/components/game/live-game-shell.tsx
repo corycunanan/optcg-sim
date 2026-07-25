@@ -44,6 +44,8 @@ export interface LiveGameShellProps {
   workerUrl: string;
   playerIndex?: 0 | 1;
   gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+  viewerRole: "player" | "spectator";
+  bottomPlayerIndex?: 0 | 1;
 }
 
 export function LiveGameShell(props: LiveGameShellProps) {
@@ -61,8 +63,10 @@ function LiveGameShellContent({
   workerUrl,
   playerIndex,
   gameMode,
+  viewerRole,
+  bottomPlayerIndex,
 }: LiveGameShellProps) {
-  if (gameMode === "SOLITAIRE") {
+  if (gameMode === "SOLITAIRE" && viewerRole !== "spectator") {
     return <SolitaireGameSession gameId={gameId} workerUrl={workerUrl} />;
   }
 
@@ -71,6 +75,8 @@ function LiveGameShellContent({
       gameId={gameId}
       workerUrl={workerUrl}
       playerIndex={playerIndex}
+      viewerRole={viewerRole}
+      bottomPlayerIndex={bottomPlayerIndex}
     />
   );
 }
@@ -79,8 +85,11 @@ function PvpGameSession(props: LiveGameShellProps) {
   const session = useGameSession(
     props.gameId,
     props.workerUrl,
-    props.playerIndex === undefined
-      ? undefined
+    props.viewerRole === "spectator"
+      ? {
+          viewerRole: "spectator",
+          bottomPlayerIndex: props.bottomPlayerIndex,
+        }
       : { requestedPlayerIndex: props.playerIndex }
   );
 

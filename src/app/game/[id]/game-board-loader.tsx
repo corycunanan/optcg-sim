@@ -15,11 +15,15 @@ export function GameBoardLoader({
   workerUrl,
   playerIndex,
   gameMode,
+  viewerRole,
+  bottomPlayerIndex,
 }: {
   gameId: string;
   workerUrl: string;
   playerIndex?: 0 | 1;
   gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
+  viewerRole: "player" | "spectator";
+  bottomPlayerIndex?: 0 | 1;
 }) {
   return (
     <LiveGameShell
@@ -27,6 +31,8 @@ export function GameBoardLoader({
       workerUrl={workerUrl}
       playerIndex={playerIndex}
       gameMode={gameMode}
+      viewerRole={viewerRole}
+      bottomPlayerIndex={bottomPlayerIndex}
     />
   );
 }
