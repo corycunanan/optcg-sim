@@ -189,6 +189,77 @@ describe("OPT-549 spectator per-viewer merge", () => {
       .toEqual(PLAYER_VIEW_REWRITTEN_FIELDS);
   });
 
+  it("throws on an unhandled top-level player-view divergence", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+    const divergentStatus: GameState["status"] =
+      playerOneView.status === "FINISHED" ? "IN_PROGRESS" : "FINISHED";
+
+    expect(mergeDirectly(
+      state,
+      playerZeroView,
+      { ...playerOneView, status: divergentStatus },
+    )).toThrow(
+      "Spectator visibility invariant violated: unhandled player-view field status differs",
+    );
+  });
+
+  it("throws when promptRespondingPlayer differs between player views", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+
+    expect(mergeDirectly(
+      state,
+      { ...playerZeroView, promptRespondingPlayer: 0 },
+      { ...playerOneView, promptRespondingPlayer: 1 },
+    )).toThrow(
+      "Spectator visibility invariant violated: promptRespondingPlayer differs between player views",
+    );
+  });
+
+  it("throws when effectStack differs between player views", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+    const syntheticStack = (
+      [{ id: "viewer-specific-frame" }] as unknown
+    ) as GameState["effectStack"];
+
+    expect(mergeDirectly(
+      state,
+      playerZeroView,
+      { ...playerOneView, effectStack: syntheticStack },
+    )).toThrow(
+      "Spectator visibility invariant violated: effectStack differs between player views",
+    );
+  });
+
+  it("throws when filtered views come from a different authoritative id", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+    const differentSource = { ...state, id: "different-source" };
+
+    expect(mergeDirectly(
+      differentSource,
+      playerZeroView,
+      playerOneView,
+    )).toThrow(
+      "Spectator visibility invariant violated: player views do not match authoritative state id",
+    );
+  });
+
+  it("throws when the same filtered player view is supplied twice", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView } = filteredViews(state);
+
+    expect(mergeDirectly(
+      state,
+      playerZeroView,
+      playerZeroView,
+    )).toThrow(
+      "Spectator visibility invariant violated: player views are not their indexed owner views",
+    );
+  });
+
   it("exercises every viewer-divergent field and applies its spectator rule", () => {
     const { state, cardDb } = getMainPhaseState();
     const source = stateWithEveryViewerDivergence(state);

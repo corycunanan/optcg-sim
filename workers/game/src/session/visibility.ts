@@ -121,8 +121,9 @@ function mergeSpectatorEventLog(
   // either identical views or one fully revealed and one fully redacted view.
   // If a future event contains private identities belonging to both players,
   // choosing one side silently under-reveals and this must become a field-level
-  // union. The equal-count "ambiguous redaction" error below is the tripwire
-  // for exactly that unsupported shape; do not replace it with a side choice.
+  // union. The "ambiguous redaction" error below catches only the subset where
+  // both views hide equal identity counts. Unequal two-sided redaction is not
+  // detected and will under-reveal; whole-side selection is the known limit.
   return playerZeroEvents.map((playerZeroEvent, index) => {
     const playerOneEvent = playerOneEvents[index];
     if (
@@ -330,6 +331,26 @@ export function mergePlayerViewsForSpectator(
   playerZeroView: GameState,
   playerOneView: GameState,
 ): GameState {
+  if (
+    playerZeroView.id !== stripped.id ||
+    playerOneView.id !== stripped.id
+  ) {
+    throw new Error(
+      "Spectator visibility invariant violated: player views do not match authoritative state id",
+    );
+  }
+  // filterStateForPlayer preserves the receiving player's authoritative object
+  // reference and replaces only the opponent tuple entry. Besides being cheap,
+  // checking both indexed owner references rejects swapped or duplicated views.
+  if (
+    playerZeroView.players[0] !== stripped.players[0] ||
+    playerOneView.players[1] !== stripped.players[1]
+  ) {
+    throw new Error(
+      "Spectator visibility invariant violated: player views are not their indexed owner views",
+    );
+  }
+
   assertNoUnhandledPlayerViewDivergence(playerZeroView, playerOneView);
   assertSameSpectatorField(
     "executionContext",
