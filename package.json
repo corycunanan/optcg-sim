@@ -28,7 +28,7 @@
     "test": "vitest run",
     "test:db:friends": "tsx scripts/test-friend-request-concurrency.ts",
     "test:db:lobbies": "tsx scripts/test-lobby-concurrency.ts",
-    "test:db:lobby-invites": "tsx scripts/test-lobby-invite-concurrency.ts",
+    "test:db-concurrency": "tsx scripts/test-lobby-transaction-concurrency.ts",
     "test:contracts": "vitest run src/__tests__/contracts",
     "test:worker": "pnpm --filter optcg-game test",
     "test:worker:coverage": "pnpm --filter optcg-game test:coverage",
