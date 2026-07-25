@@ -36,6 +36,11 @@ export interface LifeCardTargetContext {
   visibility: "ENGINE_INTERNAL";
 }
 
+export interface TargetValidationContext {
+  controller: 0 | 1;
+  sourceCardInstanceId: string;
+}
+
 /**
  * Present a Life card to trusted target/filter code as a read-only card
  * candidate. This adapter must never be used for client serialization: its
@@ -140,8 +145,10 @@ export function validateTargetConstraints(
   state: GameState,
   cardDb: Map<string, CardData>,
   resultRefs?: Map<string, EffectResult>,
+  context?: TargetValidationContext,
 ): boolean {
   if (new Set(selectedIds).size !== selectedIds.length) return false;
+  if (target.dual_targets?.some((slot) => slot.controller !== undefined) && !context) return false;
 
   const count = target.count;
   if (count && "exact" in count && selectedIds.length !== count.exact) return false;
@@ -165,7 +172,7 @@ export function validateTargetConstraints(
     if (!validateNamedDistribution(selectedIds, target.named_distribution, state, cardDb)) return false;
   }
   if (target.dual_targets && target.dual_targets.length > 0) {
-    if (!validateDualTargetConstraints(selectedIds, target.dual_targets, state, cardDb, resultRefs)) return false;
+    if (!validateDualTargetConstraints(selectedIds, target, state, cardDb, resultRefs, context)) return false;
   }
 
   // unique_names on filter: all selected cards must have distinct names
@@ -272,39 +279,74 @@ function isEmptyFilter(filter: TargetFilter | undefined): boolean {
   return !filter || Object.keys(filter).length === 0;
 }
 
+function resolveDualTargetSlot(
+  state: GameState,
+  target: Target,
+  slot: DualTarget,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult> | undefined,
+  context: TargetValidationContext | undefined,
+  candidateIds: string[] = [],
+): string[] | null {
+  if (!context) {
+    if (slot.controller !== undefined) return null;
+    return candidateIds.filter((id) => {
+      if (isEmptyFilter(slot.filter)) return true;
+      const card = findCardInstance(state, id);
+      return card
+        ? matchesFilterForTarget(card, slot.filter, cardDb, state, resultRefs)
+        : false;
+    });
+  }
+
+  const slotTarget: Target = {
+    ...target,
+    controller: slot.controller ?? target.controller,
+    filter: slot.filter,
+    count: undefined,
+    dual_targets: undefined,
+  };
+  return computeAllValidTargets(
+    state,
+    slotTarget,
+    context.controller,
+    cardDb,
+    context.sourceCardInstanceId,
+    resultRefs ?? new Map<string, EffectResult>(),
+  );
+}
+
 function validateDualTargetConstraints(
   selectedIds: string[],
-  dualTargets: DualTarget[],
+  target: Target,
   state: GameState,
   cardDb: Map<string, CardData>,
   resultRefs?: Map<string, EffectResult>,
+  context?: TargetValidationContext,
 ): boolean {
   // Pre-compute which slots each selected ID can go into
-  const perSlotValidSets: Set<string>[] = dualTargets.map((dt) => {
-    const valid = new Set<string>();
-    for (const id of selectedIds) {
-      if (isEmptyFilter(dt.filter)) {
-        valid.add(id);
-      } else {
-        const card = findCardInstance(state, id);
-        if (card && matchesFilterForTarget(card, dt.filter, cardDb, state, resultRefs)) {
-          valid.add(id);
-        }
-      }
-    }
-    return valid;
-  });
+  const perSlotValidSets: Set<string>[] = target.dual_targets!.map((slot) =>
+    new Set(resolveDualTargetSlot(
+      state,
+      target,
+      slot,
+      cardDb,
+      resultRefs,
+      context,
+      selectedIds,
+    ) ?? []),
+  );
 
-  const slotMaxes = dualTargets.map((dt, i) => resolveCountMax(dt.count, perSlotValidSets[i].size));
-  const slotMins = dualTargets.map((dt) => resolveCountMin(dt.count));
-  const assignments: string[][] = dualTargets.map(() => []);
+  const slotMaxes = target.dual_targets!.map((dt, i) => resolveCountMax(dt.count, perSlotValidSets[i].size));
+  const slotMins = target.dual_targets!.map((dt) => resolveCountMin(dt.count));
+  const assignments: string[][] = target.dual_targets!.map(() => []);
 
   function backtrack(idx: number): boolean {
     if (idx === selectedIds.length) {
       return assignments.every((a, i) => a.length >= slotMins[i]);
     }
     const id = selectedIds[idx];
-    for (let s = 0; s < dualTargets.length; s++) {
+    for (let s = 0; s < target.dual_targets!.length; s++) {
       if (perSlotValidSets[s].has(id) && assignments[s].length < slotMaxes[s]) {
         assignments[s].push(id);
         if (backtrack(idx + 1)) return true;
@@ -331,21 +373,20 @@ export function computeAllValidTargets(
   const targetType = target.type;
   if (!targetType) return [];
 
-  // Dual targets: get base candidates (no filter/count), then union per-slot filtered IDs
+  // Dual targets: resolve each slot as a normal target, then union their pools.
   if (target.dual_targets && target.dual_targets.length > 0) {
-    const baseTarget: Target = { ...target, filter: undefined, count: undefined, dual_targets: undefined };
-    const allCandidateIds = computeAllValidTargets(state, baseTarget, controller, cardDb, sourceCardInstanceId, _resultRefs);
     const unionSet = new Set<string>();
-    for (const dt of target.dual_targets) {
-      for (const id of allCandidateIds) {
-        if (isEmptyFilter(dt.filter)) {
-          unionSet.add(id);
-        } else {
-          const card = findCardInstance(state, id);
-          if (card && matchesFilterForTarget(card, dt.filter, cardDb, state, _resultRefs)) {
-            unionSet.add(id);
-          }
-        }
+    for (const slot of target.dual_targets) {
+      const slotValidIds = resolveDualTargetSlot(
+        state,
+        target,
+        slot,
+        cardDb,
+        _resultRefs,
+        { controller, sourceCardInstanceId },
+      ) ?? [];
+      for (const id of slotValidIds) {
+        unionSet.add(id);
       }
     }
     return [...unionSet];
@@ -594,14 +635,18 @@ export function buildSelectTargetPrompt(
   const target = action.target;
 
   // Compute dual_targets metadata for the prompt
+  const authoritativeValidIds = new Set(allValidIds);
   const dualTargetsMetadata = target?.dual_targets?.length
     ? {
         slots: target.dual_targets.map((dt) => {
-          const slotValidIds = allValidIds.filter((id) => {
-            if (isEmptyFilter(dt.filter)) return true;
-            const card = findCardInstance(state, id);
-            return card ? matchesFilterForTarget(card, dt.filter, cardDb, state, resultRefs) : false;
-          });
+          const slotValidIds = (resolveDualTargetSlot(
+            state,
+            target,
+            dt,
+            cardDb,
+            resultRefs,
+            { controller, sourceCardInstanceId },
+          ) ?? []).filter((id) => authoritativeValidIds.has(id));
           return {
             validIds: slotValidIds,
             countMin: resolveCountMin(dt.count),

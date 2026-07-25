@@ -20,8 +20,10 @@ import {
   type EffectSchema,
   type EffectBlock,
   type Action,
+  type Controller,
   type Cost,
   type TargetFilter,
+  type TargetType,
 } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
@@ -128,6 +130,44 @@ const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
 const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
   TARGET_FILTER_KEYS,
 );
+const VALID_CONTROLLERS: ReadonlySet<Controller> = new Set([
+  "SELF",
+  "OPPONENT",
+  "EITHER",
+  "ANY",
+]);
+const SELF_OR_OPPONENT_CONTROLLERS: ReadonlySet<Controller> = new Set([
+  "SELF",
+  "OPPONENT",
+]);
+const NO_SLOT_CONTROLLERS: ReadonlySet<Controller> = new Set();
+const DUAL_TARGET_SLOT_CONTROLLER_MODES = {
+  SELF: NO_SLOT_CONTROLLERS,
+  YOUR_LEADER: NO_SLOT_CONTROLLERS,
+  OPPONENT_LEADER: NO_SLOT_CONTROLLERS,
+  CHARACTER: VALID_CONTROLLERS,
+  STAGE: SELF_OR_OPPONENT_CONTROLLERS,
+  LEADER_OR_CHARACTER: VALID_CONTROLLERS,
+  FIELD_CARD: VALID_CONTROLLERS,
+  ALL_YOUR_CHARACTERS: NO_SLOT_CONTROLLERS,
+  ALL_OPPONENT_CHARACTERS: NO_SLOT_CONTROLLERS,
+  CHARACTER_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  STAGE_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  EVENT_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_HAND: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_TRASH: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_ON_TOP_OF_DECK: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_DECK: SELF_OR_OPPONENT_CONTROLLERS,
+  LIFE_CARD: NO_SLOT_CONTROLLERS,
+  DON_IN_COST_AREA: SELF_OR_OPPONENT_CONTROLLERS,
+  DON_ATTACHED: NO_SLOT_CONTROLLERS,
+  DON_IN_DON_DECK: NO_SLOT_CONTROLLERS,
+  PLAYER: SELF_OR_OPPONENT_CONTROLLERS,
+  SELECTED_CARDS: NO_SLOT_CONTROLLERS,
+  OPPONENT_LIFE: NO_SLOT_CONTROLLERS,
+  TRIGGERING_CARD: NO_SLOT_CONTROLLERS,
+  TRIGGERING_CARD_IN_TRASH: NO_SLOT_CONTROLLERS,
+} satisfies Record<TargetType, ReadonlySet<Controller>>;
 
 /**
  * Validate an effect schema and return a list of error messages.
@@ -461,6 +501,23 @@ function validateTargetController(target: Action["target"], prefix: string): str
     `${prefix}.target`,
   ));
   for (let i = 0; i < (target?.dual_targets?.length ?? 0); i++) {
+    const slotController = target!.dual_targets![i].controller;
+    if (slotController !== undefined && !VALID_CONTROLLERS.has(slotController)) {
+      errors.push(
+        `${prefix}.dual_targets[${i}].controller: Invalid controller '${slotController}'`,
+      );
+    } else if (slotController !== undefined && target?.type) {
+      const supportedModes = DUAL_TARGET_SLOT_CONTROLLER_MODES[target.type]
+        ?? NO_SLOT_CONTROLLERS;
+      if (!supportedModes.has(slotController)) {
+        const guidance = supportedModes.size === 0
+          ? "this target type does not support a per-slot controller; remove the controller"
+          : "use SELF or OPPONENT";
+        errors.push(
+          `${prefix}.dual_targets[${i}].controller: [C7] Target type '${target.type}' does not support dual-target slot controller '${slotController}'; ${guidance}`,
+        );
+      }
+    }
     errors.push(...validateTargetFilterController(
       target!.dual_targets![i].filter as TargetFilter | undefined,
       `${prefix}.dual_targets[${i}]`,
