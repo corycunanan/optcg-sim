@@ -22,7 +22,7 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4     | OPT-522 | Join-by-code party switching with disband confirmation                                   | —        | OPT-519                            | In Progress | [#403](https://github.com/corycunanan/optcg-sim/pull/403) | PR open; transactional switch and host-disband semantics  |
 | 5     | OPT-523 | Kick player: host removes guest from party                                               | —        | OPT-518, OPT-519                   | Done        | [#401](https://github.com/corycunanan/optcg-sim/pull/401) | PR merged; guest-removal capability is on main            |
 | 6     | OPT-524 | Invite lifecycle: expiry countdown + cancel invite                                       | —        | OPT-519                            | In Progress | —                                                         | Parallel invite lifecycle surface                         |
-| 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | Backlog     | —                                                         | Integrate the completed behavior into the artifact layout |
+| 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | In Review   | [#405](https://github.com/corycunanan/optcg-sim/pull/405) | Artifact layout integrated; preview VQA pending           |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
