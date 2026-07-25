@@ -440,6 +440,46 @@ export function findCardInstance(
 
 // ─── Visibility filtering (§8-4-5) ───────────────────────────────────────────
 
+/** Replace a hidden card's identities while preserving placeholder metadata. */
+export function obfuscateCard(
+  card: CardInstance,
+  hiddenInstanceId: string,
+): CardInstance {
+  return {
+    ...card,
+    instanceId: hiddenInstanceId,
+    cardId: "hidden",
+    attachedDon: [],
+  };
+}
+
+/**
+ * Obfuscate the zones that are mutually hidden from both players: deck order
+ * and face-down Life identities.
+ *
+ * Spectator visibility is union-for-revealed, intersection-for-secret: hands
+ * and peeks remain visible through the union of the two player views, then
+ * deck order and face-down Life are re-obfuscated for BOTH players with this
+ * helper. A pure union would let a colluding spectator relay each player's
+ * private deck order and Life identities to the opponent. Consequently, a
+ * spectator board must never assume a deck card has `cardId !== "hidden"`.
+ */
+export function obfuscateMutuallyHiddenZones(
+  player: PlayerState,
+  playerIndex: 0 | 1,
+): PlayerState {
+  return {
+    ...player,
+    deck: player.deck.map((card, index) =>
+      obfuscateCard(card, `hidden-${playerIndex}-deck-${index}`)),
+    life: player.life.map((lc, index) =>
+      lc.face === "DOWN"
+        ? { ...lc, instanceId: `hidden-${playerIndex}-life-${index}`, cardId: "hidden" }
+        : lc,
+    ),
+  };
+}
+
 /**
  * Create a player-specific view of the game state that hides secret zone data
  * from the opponent. The receiving player sees their own zones in full; the
@@ -459,25 +499,14 @@ export function filterStateForPlayer(
   const opponentIndex = receivingPlayer === 0 ? 1 : 0;
   const opponent = state.players[opponentIndex];
 
-  const obfuscateCard = (card: CardInstance, hiddenInstanceId: string): CardInstance => ({
-    ...card,
-    instanceId: hiddenInstanceId,
-    cardId: "hidden",
-    attachedDon: [],
-  });
-
-  const filteredOpponent: PlayerState = {
-    ...opponent,
-    hand: opponent.hand.map((card, index) =>
-      obfuscateCard(card, `hidden-${opponentIndex}-hand-${index}`)),
-    deck: opponent.deck.map((card, index) =>
-      obfuscateCard(card, `hidden-${opponentIndex}-deck-${index}`)),
-    life: opponent.life.map((lc, index) =>
-      lc.face === "DOWN"
-        ? { ...lc, instanceId: `hidden-${opponentIndex}-life-${index}`, cardId: "hidden" }
-        : lc,
-    ),
-  };
+  const filteredOpponent = obfuscateMutuallyHiddenZones(
+    {
+      ...opponent,
+      hand: opponent.hand.map((card, index) =>
+        obfuscateCard(card, `hidden-${opponentIndex}-hand-${index}`)),
+    },
+    opponentIndex,
+  );
 
   const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
   newPlayers[opponentIndex] = filteredOpponent;
