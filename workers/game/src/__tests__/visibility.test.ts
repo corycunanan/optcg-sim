@@ -7,7 +7,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { filterStateForPlayer } from "../engine/state.js";
+import {
+  filterStateForPlayer,
+  obfuscatePlayersDecksAndFaceDownLife,
+} from "../engine/state.js";
 import { setupGame, advanceToPhase } from "./factories.js";
 
 describe("filterStateForPlayer", () => {
@@ -24,6 +27,21 @@ describe("filterStateForPlayer", () => {
     for (const card of filtered.players[0].hand) {
       expect(card.cardId).not.toBe("hidden");
     }
+  });
+
+  it("derives unique deck and face-down Life placeholders for both players", () => {
+    const state = getMainPhaseState();
+    const players = obfuscatePlayersDecksAndFaceDownLife(state.players);
+    const hiddenInstanceIds = players.flatMap((player) => [
+      ...player.deck.map((card) => card.instanceId),
+      ...player.life
+        .filter((card) => card.face === "DOWN")
+        .map((card) => card.instanceId),
+    ]);
+
+    expect(new Set(hiddenInstanceIds).size).toBe(hiddenInstanceIds.length);
+    expect(players[0].deck[0]?.instanceId).toMatch(/^hidden-0-deck-/);
+    expect(players[1].deck[0]?.instanceId).toMatch(/^hidden-1-deck-/);
   });
 
   it("redacts deterministic execution secrets from both player views", () => {
