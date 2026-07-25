@@ -353,8 +353,10 @@ model Lobby {
   activeMembers User[]        @relation("ActiveLobbyMembers")
   invites       LobbyInvite[]
 
-  // `User.activeLobbyId` is the active-membership invariant: lobby create,
-  // join, leave, and close transactions must claim/release that pointer.
+  // `User.activeLobbyId` is the active-membership invariant: hosting, joining,
+  // or spectating claims the pointer, and leave, close, or stop-spectating
+  // transactions release it. Seated and spectator membership are mutually
+  // exclusive; stopping spectate does not restore an earlier party pointer.
   // CLOSED lobbies have no active members; historical GameSessions remain.
   @@index([status, updatedAt, id])
   @@map("lobbies")
