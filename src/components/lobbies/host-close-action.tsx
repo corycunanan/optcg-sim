@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { EllipsisVertical, X } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ interface HostCloseActionProps {
   guestName: string | null;
   closing: boolean;
   disabled?: boolean;
+  compact?: boolean;
   onClose: () => void;
 }
 
@@ -53,9 +54,9 @@ export async function runHostClose({
 
 export function closeLobbyImpactCopy(guestName: string | null) {
   if (guestName) {
-    return `This will close the lobby for you and ${guestName}, cancel outstanding invites, and return ${guestName} to the lobby browser. This cannot be undone.`;
+    return `This will disband your party, cancel outstanding invites, and return ${guestName} to the lobby browser. This cannot be undone.`;
   }
-  return "This will close the lobby and cancel outstanding invites. This cannot be undone.";
+  return "This will disband your party and cancel outstanding invites. This cannot be undone.";
 }
 
 export function HostCloseAction({
@@ -63,6 +64,7 @@ export function HostCloseAction({
   guestName,
   closing,
   disabled = false,
+  compact = false,
   onClose,
 }: HostCloseActionProps) {
   if (!canClose) return null;
@@ -70,26 +72,38 @@ export function HostCloseAction({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="secondary" disabled={disabled || closing}>
-          <X data-icon="inline-start" />
-          {closing ? "Closing..." : "Close Lobby"}
+        <Button
+          type="button"
+          variant="secondary"
+          size={compact ? "icon" : "default"}
+          disabled={disabled || closing}
+          aria-label={compact ? "More actions for host" : undefined}
+        >
+          {compact ? (
+            <EllipsisVertical />
+          ) : (
+            <>
+              <X data-icon="inline-start" />
+              {closing ? "Disbanding..." : "Disband party"}
+            </>
+          )}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Close Lobby?</AlertDialogTitle>
+          <AlertDialogTitle>Disband party?</AlertDialogTitle>
           <AlertDialogDescription>
             {closeLobbyImpactCopy(guestName)}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={closing}>Keep Lobby</AlertDialogCancel>
+          <AlertDialogCancel disabled={closing}>Keep party</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={closing}
             onClick={onClose}
           >
-            {closing ? "Closing..." : "Close Lobby"}
+            {closing ? "Disbanding..." : "Disband party"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

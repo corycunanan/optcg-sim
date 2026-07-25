@@ -1,13 +1,20 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { EllipsisVertical, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ApiError } from "@/lib/api-client";
 
 interface GuestLeaveActionProps {
   isGuest: boolean;
   leaving: boolean;
   disabled?: boolean;
+  compact?: boolean;
   onLeave: () => void;
 }
 
@@ -44,12 +51,38 @@ export function GuestLeaveAction({
   isGuest,
   leaving,
   disabled = false,
+  compact = false,
   onLeave,
 }: GuestLeaveActionProps) {
   if (!isGuest) return null;
 
+  if (compact) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={disabled || leaving}
+            aria-label="More actions for guest"
+          >
+            <EllipsisVertical />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={onLeave}>
+            <LogOut />
+            {leaving ? "Leaving..." : "Leave lobby"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
     <Button
+      type="button"
       variant="secondary"
       onClick={onLeave}
       disabled={disabled || leaving}

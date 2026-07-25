@@ -110,7 +110,8 @@ vi.mock("@/components/ui/badge", () => ({
 }));
 vi.mock("./deck-preview-modal", () => ({ DeckPreviewModal: () => null }));
 vi.mock("./guest-leave-action", () => ({
-  GuestLeaveAction: () => null,
+  GuestLeaveAction: ({ isGuest }: { isGuest: boolean }) =>
+    isGuest ? <span>Leave lobby</span> : null,
   runGuestLeave: vi.fn(),
 }));
 vi.mock("./host-close-action", () => ({
@@ -127,6 +128,10 @@ import { LobbyInviteToasts } from "./lobby-invite-toast";
 import { LobbyRoomShell } from "./lobby-room-shell";
 
 let renderer: ReactTestRenderer | null = null;
+
+function renderedText() {
+  return JSON.stringify(renderer?.toJSON());
+}
 
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
   return {
@@ -181,6 +186,227 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
   vi.unstubAllGlobals();
+});
+
+describe("LobbyRoomShell redesign scenarios", () => {
+  it("renders the empty host room with persistent code, invite, and start guidance", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : { data: lobbyState({ status: "WAITING", guest: null }) }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("Game mode");
+    expect(renderedText()).toContain("Versus");
+    expect(renderedText()).toContain("Party code");
+    expect(renderedText()).toContain("ABCD");
+    expect(renderedText()).toContain("Join lobby");
+    expect(renderedText()).toContain("Open seat");
+    expect(renderedText()).toContain("Waiting for a challenger");
+    expect(renderedText()).toContain("You need an opponent first");
+    expect(renderedText()).toContain("Start Match");
+  });
+
+  it("renders the viewer-scoped invited seat and expiry countdown", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              status: "WAITING",
+              guest: null,
+              pendingInvite: {
+                id: "invite-1",
+                expiresAt: "2099-07-24T20:01:00.000Z",
+                user: {
+                  id: "friend-1",
+                  username: "nami",
+                  name: "Nami",
+                  image: null,
+                },
+              },
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("Invite sent to ");
+    expect(renderedText()).toContain("nami");
+    expect(renderedText()).toContain("Expires in ");
+    expect(renderedText()).toContain("Cancel invite");
+    expect(renderedText()).toContain(
+      "Cancel the invite before switching to solitaire"
+    );
+  });
+
+  it("renders occupied host and guest seats with self-scoped controls", async () => {
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="guest-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("strawhat");
+    expect(renderedText()).toContain("zoro");
+    expect(renderedText()).toContain("Host");
+    expect(renderedText()).toContain("Guest");
+    expect(renderedText()).toContain("Leave lobby");
+    expect(renderedText()).toContain("Leave the party to play solitaire");
+    expect(renderedText()).toContain("The host starts the match");
+  });
+
+  it("renders both selected decks and the ready state", async () => {
+    const deck = {
+      id: "deck-1",
+      name: "Straw Hat Rush",
+      leaderId: "OP01-001",
+      leaderName: "Monkey.D.Luffy",
+      leaderImageUrl: null,
+    };
+    mocks.apiGet.mockImplementation(async (url: string) => {
+      if (url === "/api/decks") {
+        return {
+          data: [
+            {
+              ...deck,
+              format: "Standard",
+              totalCards: 50,
+              colors: ["Red"],
+            },
+          ],
+        };
+      }
+      if (url.startsWith("/api/decks/")) {
+        return {
+          data: {
+            cards: [
+              {
+                cardId: "OP01-024",
+                quantity: 4,
+                selectedArtUrl: null,
+                card: {
+                  id: "OP01-024",
+                  name: "Monkey.D.Luffy",
+                  type: "Character",
+                  imageUrl: "/card.png",
+                },
+              },
+            ],
+          },
+        };
+      }
+      return {
+        data: lobbyState({
+          hostDeck: deck,
+          guest: {
+            guestReady: true,
+            user: {
+              id: "guest-user",
+              username: "zoro",
+              name: "Zoro",
+              image: null,
+            },
+            deck: { ...deck, id: "deck-2", name: "Three Sword Style" },
+          },
+        }),
+      };
+    });
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("Straw Hat Rush");
+    expect(renderedText()).toContain("Three Sword Style");
+    expect(renderedText()).toContain("Deck list");
+    expect(renderedText()).toContain("Characters");
+    expect(renderedText()).toContain("Everything is set");
+  });
+
+  it("renders the solitaire second-deck state", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              status: "WAITING",
+              mode: "SOLITAIRE",
+              pregameMode: "SOLITAIRE_RANDOM",
+              guest: {
+                guestReady: false,
+                user: {
+                  id: "host-user",
+                  username: "strawhat",
+                  name: "Luffy",
+                  image: null,
+                },
+                deck: null,
+              },
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("Solitaire");
+    expect(renderedText()).toContain("Your second deck");
+    expect(renderedText()).toContain("Play both sides");
+    expect(renderedText()).toContain("Both players need a deck");
+  });
+
+  it("replaces Start Match with Rejoin Game while a match is active", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              status: "IN_GAME",
+              gameId: "game-1",
+              gameStatus: "IN_PROGRESS",
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("Rejoin Game");
+    expect(renderedText()).not.toContain("Start Match");
+    expect(renderedText()).toContain("Your match is already in progress");
+  });
 });
 
 describe("LobbyRoomShell guest removal recovery", () => {
