@@ -1184,6 +1184,8 @@ export interface UniquenessConstraint {
 }
 
 export interface DualTarget {
+  /** Overrides the parent target controller for this slot; inherits it when omitted. */
+  controller?: Controller;
   filter: TargetFilter;
   count: CountMode;
 }

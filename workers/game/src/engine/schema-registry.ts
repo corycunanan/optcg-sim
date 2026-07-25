@@ -20,6 +20,7 @@ import {
   type EffectSchema,
   type EffectBlock,
   type Action,
+  type Controller,
   type Cost,
   type TargetFilter,
 } from "./effect-types.js";
@@ -128,6 +129,12 @@ const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
 const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
   TARGET_FILTER_KEYS,
 );
+const VALID_CONTROLLERS: ReadonlySet<Controller> = new Set([
+  "SELF",
+  "OPPONENT",
+  "EITHER",
+  "ANY",
+]);
 
 /**
  * Validate an effect schema and return a list of error messages.
@@ -461,6 +468,12 @@ function validateTargetController(target: Action["target"], prefix: string): str
     `${prefix}.target`,
   ));
   for (let i = 0; i < (target?.dual_targets?.length ?? 0); i++) {
+    const slotController = target!.dual_targets![i].controller;
+    if (slotController !== undefined && !VALID_CONTROLLERS.has(slotController)) {
+      errors.push(
+        `${prefix}.dual_targets[${i}].controller: Invalid controller '${slotController}'`,
+      );
+    }
     errors.push(...validateTargetFilterController(
       target!.dual_targets![i].filter as TargetFilter | undefined,
       `${prefix}.dual_targets[${i}]`,

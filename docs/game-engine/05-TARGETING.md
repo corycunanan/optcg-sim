@@ -601,6 +601,7 @@ A single action targets two separately filtered sets. Each set has its own filte
 
 ```typescript
 interface DualTarget {
+  controller?: Controller; // Inherits the parent target controller when omitted.
   filter: TargetFilter;
   count: CountMode;
 }
@@ -628,6 +629,26 @@ interface DualTarget {
 ```
 
 Both sub-targets resolve as part of the same action. A single Character may satisfy both filters — the engine must determine if the card text allows selecting the same card in both slots (typically it does not, as the intent is two distinct targets).
+
+**Mixed-controller example** — EB03-021 Alvida targets an opponent's low-power Character in its first slot, then either player's low-cost Character in its second slot:
+
+```json
+{
+  "type": "CHARACTER",
+  "controller": "EITHER",
+  "dual_targets": [
+    {
+      "controller": "OPPONENT",
+      "filter": { "base_power_max": 4000 },
+      "count": { "up_to": 1 }
+    },
+    {
+      "filter": { "base_cost_max": 3 },
+      "count": { "up_to": 1 }
+    }
+  ]
+}
+```
 
 ---
 
