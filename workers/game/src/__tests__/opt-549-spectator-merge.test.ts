@@ -9,6 +9,7 @@ import {
   PLAYER_VIEW_REWRITTEN_FIELDS,
 } from "../engine/state.js";
 import {
+  mergePlayerViewsForSpectator,
   SPECTATOR_PLAYER_VIEW_FIELDS,
   visibleStateForSpectator,
 } from "../session/visibility.js";
@@ -156,6 +157,32 @@ function stateWithEveryViewerDivergence(state: GameState): GameState {
   };
 }
 
+function filteredViews(state: GameState) {
+  return {
+    playerZeroView: filterStateForPlayer(state, 0),
+    playerOneView: filterStateForPlayer(state, 1),
+  };
+}
+
+function mergeDirectly(
+  source: GameState,
+  playerZeroView: GameState,
+  playerOneView: GameState,
+) {
+  return () => mergePlayerViewsForSpectator(
+    source,
+    playerZeroView,
+    playerOneView,
+  );
+}
+
+const publicEvent: GameEvent = {
+  type: "PHASE_CHANGED",
+  playerIndex: 0,
+  payload: { from: "DON", to: "MAIN" },
+  timestamp: 100,
+};
+
 describe("OPT-549 spectator per-viewer merge", () => {
   it("enumerates every field rewritten by the player filter", () => {
     expect(SPECTATOR_PLAYER_VIEW_FIELDS)
@@ -224,5 +251,243 @@ describe("OPT-549 spectator per-viewer merge", () => {
         expect(card.cardId).toBe("hidden");
       }
     }
+  });
+
+  it("throws on event-log length mismatch with the specific invariant", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+
+    expect(mergeDirectly(
+      state,
+      { ...playerZeroView, eventLog: [] },
+      { ...playerOneView, eventLog: [publicEvent] },
+    )).toThrow(
+      "Spectator visibility invariant violated: eventLog lengths differ between player views",
+    );
+  });
+
+  it.each([
+    {
+      name: "type",
+      playerZeroEvents: [publicEvent],
+      playerOneEvents: [{
+        ...publicEvent,
+        type: "TURN_STARTED",
+        payload: {},
+      } as GameEvent],
+    },
+    {
+      name: "player",
+      playerZeroEvents: [publicEvent],
+      playerOneEvents: [{ ...publicEvent, playerIndex: 1 } as GameEvent],
+    },
+    {
+      name: "timestamp",
+      playerZeroEvents: [publicEvent],
+      playerOneEvents: [{ ...publicEvent, timestamp: 101 } as GameEvent],
+    },
+    {
+      name: "order",
+      playerZeroEvents: [
+        publicEvent,
+        { ...publicEvent, timestamp: 101 } as GameEvent,
+      ],
+      playerOneEvents: [
+        { ...publicEvent, timestamp: 101 } as GameEvent,
+        publicEvent,
+      ],
+    },
+  ])("throws on event-log $name mismatch at the exact position", ({
+    playerZeroEvents,
+    playerOneEvents,
+  }) => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+
+    expect(mergeDirectly(
+      state,
+      { ...playerZeroView, eventLog: playerZeroEvents },
+      { ...playerOneView, eventLog: playerOneEvents },
+    )).toThrow(
+      "Spectator visibility invariant violated: eventLog[0] order differs between player views",
+    );
+  });
+
+  it("throws on a divergent public event with the specific invariant", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+    const divergentPublicEvent: GameEvent = {
+      ...publicEvent,
+      payload: { from: "DRAW", to: "DON" },
+    };
+
+    expect(mergeDirectly(
+      state,
+      { ...playerZeroView, eventLog: [publicEvent] },
+      { ...playerOneView, eventLog: [divergentPublicEvent] },
+    )).toThrow(
+      "Spectator visibility invariant violated: public eventLog[0] differs between player views",
+    );
+  });
+
+  it("throws on equal-count ambiguous event redaction with the specific invariant", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+    const playerZeroEvent: GameEvent = {
+      type: "CARD_DRAWN",
+      playerIndex: 0,
+      payload: { cardId: "hidden", cardInstanceId: "visible-to-one" },
+      timestamp: 200,
+    };
+    const playerOneEvent: GameEvent = {
+      ...playerZeroEvent,
+      payload: { cardId: "visible-to-zero", cardInstanceId: "hidden" },
+    };
+
+    expect(mergeDirectly(
+      state,
+      { ...playerZeroView, eventLog: [playerZeroEvent] },
+      { ...playerOneView, eventLog: [playerOneEvent] },
+    )).toThrow(
+      "Spectator visibility invariant violated: eventLog[0] has ambiguous redaction",
+    );
+  });
+
+  it("throws when both player views retain a prompt", () => {
+    const { state } = getMainPhaseState();
+    const source = stateWithEveryViewerDivergence(state);
+    const { playerZeroView, playerOneView } = filteredViews(source);
+    const retainedForZero: PendingPromptState = {
+      ...source.pendingPrompt!,
+      respondingPlayer: 0,
+    };
+
+    expect(mergeDirectly(
+      source,
+      { ...playerZeroView, pendingPrompt: retainedForZero },
+      playerOneView,
+    )).toThrow(
+      "Spectator visibility invariant violated: both player views contain pendingPrompt",
+    );
+  });
+
+  it("throws when the viewer-invariant turn remainder diverges", () => {
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+    const divergentPlayerOne = {
+      ...playerOneView,
+      turn: { ...playerOneView.turn, phase: "END" as const },
+    };
+
+    expect(mergeDirectly(
+      state,
+      playerZeroView,
+      divergentPlayerOne,
+    )).toThrow(
+      "Spectator visibility invariant violated: turn (excluding spectator-union fields) differs between player views",
+    );
+  });
+
+  it("throws when both views retain different battle Trigger Life cards", () => {
+    const { state } = getMainPhaseState();
+    const source = stateWithEveryViewerDivergence(state);
+    const { playerZeroView, playerOneView } = filteredViews(source);
+    const playerZeroLifeCard = source.players[0].life[0]!;
+    const playerZeroBattle = playerZeroView.turn.battle!;
+
+    expect(mergeDirectly(
+      source,
+      {
+        ...playerZeroView,
+        turn: {
+          ...playerZeroView.turn,
+          battle: {
+            ...playerZeroBattle,
+            pendingTriggerLifeCard: playerZeroLifeCard,
+          },
+        },
+      },
+      playerOneView,
+    )).toThrow(
+      "Spectator visibility invariant violated: turn.battle.pendingTriggerLifeCard differs between player views",
+    );
+  });
+
+  it("throws when both views retain different effect Trigger continuations", () => {
+    const { state } = getMainPhaseState();
+    const source = stateWithEveryViewerDivergence(state);
+    const { playerZeroView, playerOneView } = filteredViews(source);
+    const retainedForZero = {
+      ...source.turn.pendingTriggerFromEffect!,
+      lifeCard: source.players[0].life[0]!,
+      damagedPlayerIndex: 0 as const,
+    };
+
+    expect(mergeDirectly(
+      source,
+      {
+        ...playerZeroView,
+        turn: {
+          ...playerZeroView.turn,
+          pendingTriggerFromEffect: retainedForZero,
+        },
+      },
+      playerOneView,
+    )).toThrow(
+      "Spectator visibility invariant violated: turn.pendingTriggerFromEffect differs between player views",
+    );
+  });
+
+  it("throws when both views retain different battle damage continuations", () => {
+    const { state } = getMainPhaseState();
+    const source = stateWithEveryViewerDivergence(state);
+    const { playerZeroView, playerOneView } = filteredViews(source);
+    const retainedForZero = {
+      ...source.turn.pendingBattleDamageContinuation!,
+      battleId: "different-battle",
+      damagedPlayerIndex: 0 as const,
+    };
+
+    expect(mergeDirectly(
+      source,
+      {
+        ...playerZeroView,
+        turn: {
+          ...playerZeroView.turn,
+          pendingBattleDamageContinuation: retainedForZero,
+        },
+      },
+      playerOneView,
+    )).toThrow(
+      "Spectator visibility invariant violated: turn.pendingBattleDamageContinuation differs between player views",
+    );
+  });
+
+  it("preserves a battle shape with no pendingTriggerLifeCard property", () => {
+    const { state } = getMainPhaseState();
+    const sourceWithTrigger = stateWithEveryViewerDivergence(state);
+    const {
+      pendingTriggerLifeCard: _pendingTriggerLifeCard,
+      ...battleWithoutPendingTrigger
+    } = sourceWithTrigger.turn.battle!;
+    const source: GameState = {
+      ...sourceWithTrigger,
+      turn: {
+        ...sourceWithTrigger.turn,
+        battle: battleWithoutPendingTrigger,
+      },
+    };
+    const { playerZeroView, playerOneView } = filteredViews(source);
+
+    const spectator = mergePlayerViewsForSpectator(
+      source,
+      playerZeroView,
+      playerOneView,
+    );
+
+    expect(spectator.turn.battle).not.toBeNull();
+    expect(spectator.turn.battle).not.toHaveProperty(
+      "pendingTriggerLifeCard",
+    );
   });
 });

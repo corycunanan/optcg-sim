@@ -116,6 +116,13 @@ function mergeSpectatorEventLog(
     );
   }
 
+  // Whole-event side selection is correct only while every redacted event
+  // carries identities visible to at most one player: current policies produce
+  // either identical views or one fully revealed and one fully redacted view.
+  // If a future event contains private identities belonging to both players,
+  // choosing one side silently under-reveals and this must become a field-level
+  // union. The equal-count "ambiguous redaction" error below is the tripwire
+  // for exactly that unsupported shape; do not replace it with a side choice.
   return playerZeroEvents.map((playerZeroEvent, index) => {
     const playerOneEvent = playerOneEvents[index];
     if (
@@ -306,6 +313,23 @@ export function visibleStateForSpectator(
   const playerZeroView = filterStateForPlayer(stripped, 0);
   const playerOneView = filterStateForPlayer(stripped, 1);
 
+  return mergePlayerViewsForSpectator(
+    stripped,
+    playerZeroView,
+    playerOneView,
+  );
+}
+
+/**
+ * Merge two already-filtered player views under the spectator policy.
+ * Exported so defensive invariants can be tested with impossible synthetic
+ * view divergence without weakening or bypassing the production filters.
+ */
+export function mergePlayerViewsForSpectator(
+  stripped: GameState,
+  playerZeroView: GameState,
+  playerOneView: GameState,
+): GameState {
   assertNoUnhandledPlayerViewDivergence(playerZeroView, playerOneView);
   assertSameSpectatorField(
     "executionContext",
