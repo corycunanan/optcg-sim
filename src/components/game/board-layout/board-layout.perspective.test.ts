@@ -63,8 +63,34 @@ vi.mock("./drop-zones", () => ({
 vi.mock("./empty-slot", () => ({ EmptySlot: () => null }));
 vi.mock("./zone-ref", () => ({ ZoneRef: () => null }));
 vi.mock("./board-navbar", () => ({ BoardNavbar: () => null }));
-vi.mock("./mid-zone", () => ({ MidZone: () => null }));
-vi.mock("./board-modals", () => ({ BoardModals: () => null }));
+vi.mock("./mid-zone", () => ({
+  MidZone: ({
+    activePrompt,
+    canUndo,
+    onAction,
+  }: {
+    activePrompt: { promptType: string } | null;
+    canUndo: boolean;
+    onAction: (action: { type: "PASS" }) => void;
+  }) =>
+    React.createElement("button", {
+      "data-testid": "mid-zone",
+      "data-active-prompt": activePrompt?.promptType ?? "none",
+      "data-can-undo": String(canUndo),
+      onClick: () => onAction({ type: "PASS" }),
+    }),
+}));
+vi.mock("./board-modals", () => ({
+  BoardModals: ({
+    activePrompt,
+  }: {
+    activePrompt: { promptType: string } | null;
+  }) =>
+    React.createElement("div", {
+      "data-testid": "board-modals",
+      "data-active-prompt": activePrompt?.promptType ?? "none",
+    }),
+}));
 vi.mock("./board-drag-overlay", () => ({ BoardDragOverlay: () => null }));
 vi.mock("./card-animation-layer", () => ({ CardAnimationLayer: () => null }));
 vi.mock("../spotlight-overlay", () => ({ SpotlightOverlay: () => null }));
@@ -143,10 +169,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderComposition(bottomPlayerIndex: 0 | 1) {
+function renderComposition(
+  bottomPlayerIndex: 0 | 1,
+  overrides: Partial<BoardLayoutProps> = {},
+) {
   act(() => {
     renderer = create(
-      React.createElement(BoardLayout, { ...baseProps, bottomPlayerIndex }),
+      React.createElement(BoardLayout, {
+        ...baseProps,
+        ...overrides,
+        bottomPlayerIndex,
+      }),
     );
   });
   if (!renderer) throw new Error("BoardLayout renderer did not mount");
@@ -201,6 +234,65 @@ describe("BoardLayout bottom-player perspective", () => {
     expect(player1Bottom.topLife.props["data-life-instance-ids"]).toBe(
       "player-0-life-0",
     );
+  });
+
+  it("removes spectator prompt and mid-zone action affordances", () => {
+    const onAction = vi.fn();
+    renderComposition(0, {
+      onAction,
+      canUndo: true,
+      activePrompt: {
+        promptType: "OPTIONAL_EFFECT",
+        effectDescription: "Use the optional effect?",
+      },
+    });
+
+    expect(
+      renderer!.root.findByProps({ "data-testid": "mid-zone" }).props,
+    ).toMatchObject({
+      "data-active-prompt": "none",
+      "data-can-undo": "false",
+    });
+    expect(
+      renderer!.root.findByProps({ "data-testid": "board-modals" }).props[
+        "data-active-prompt"
+      ],
+    ).toBe("none");
+
+    act(() => {
+      renderer!.root.findByProps({ "data-testid": "mid-zone" }).props.onClick();
+    });
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("keeps response-only sandbox prompts available while suppressing non-prompt affordances", () => {
+    const onAction = vi.fn();
+    renderComposition(0, {
+      interactionMode: "responseOnly",
+      onAction,
+      canUndo: true,
+      activePrompt: {
+        promptType: "OPTIONAL_EFFECT",
+        effectDescription: "Use the optional effect?",
+      },
+    });
+
+    expect(
+      renderer!.root.findByProps({ "data-testid": "mid-zone" }).props,
+    ).toMatchObject({
+      "data-active-prompt": "OPTIONAL_EFFECT",
+      "data-can-undo": "false",
+    });
+    expect(
+      renderer!.root.findByProps({ "data-testid": "board-modals" }).props[
+        "data-active-prompt"
+      ],
+    ).toBe("OPTIONAL_EFFECT");
+
+    act(() => {
+      renderer!.root.findByProps({ "data-testid": "mid-zone" }).props.onClick();
+    });
+    expect(onAction).toHaveBeenCalledWith({ type: "PASS" });
   });
 });
 

@@ -23,7 +23,7 @@ export function NavMenu({
   matchClosed,
 }: {
   onLeave: () => void;
-  onConcede: () => void;
+  onConcede?: () => void;
   matchClosed: boolean;
 }) {
   const [concedeOpen, setConcedeOpen] = useState(false);
@@ -80,7 +80,7 @@ export function NavMenu({
           >
             &larr; Back to Lobbies
           </DropdownMenuItem>
-          {!matchClosed && (
+          {!matchClosed && onConcede && (
             <DropdownMenuItem
               onClick={() => setConcedeOpen(true)}
               className="text-gb-accent-red focus:bg-gb-surface-raised focus:text-gb-accent-red text-xs"

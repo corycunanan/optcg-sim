@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BoardNavbar, type BoardNavbarProps } from "./board-navbar";
 
 vi.mock("./nav-menu", () => ({
-  NavMenu: () => <button aria-label="Game menu" />,
+  NavMenu: ({ onConcede }: { onConcede?: () => void }) => (
+    <button
+      aria-label="Game menu"
+      data-concede-reachable={String(!!onConcede)}
+    />
+  ),
 }));
 
 const baseProps: BoardNavbarProps = {
@@ -108,6 +113,11 @@ describe("BoardNavbar accessibility", () => {
         "aria-label": "Spectator mode: watching",
       })
     ).toBeDefined();
+    expect(
+      root.findByProps({ "aria-label": "Game menu" }).props[
+        "data-concede-reachable"
+      ]
+    ).toBe("false");
 
     root = renderNavbar({ interactionMode: "responseOnly" });
     expect(

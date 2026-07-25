@@ -142,7 +142,7 @@ export function BoardNavbar({
         </div>
         <NavMenu
           onLeave={onLeave}
-          onConcede={onConcede}
+          onConcede={interactionMode === "full" ? onConcede : undefined}
           matchClosed={matchClosed}
         />
       </div>
