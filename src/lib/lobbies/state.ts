@@ -96,14 +96,20 @@ export interface LobbyRoomState {
 }
 
 /**
- * True when the viewer has no current role in a non-terminal lobby — i.e. they
- * were ejected during a mode switch and the lobby still exists. Used to
- * surface an `EVICTED` status to the previous guest from
- * `GET /api/lobbies/[id]`.
+ * True when the viewer is neither a spectator, the host, nor the current guest
+ * of a non-terminal lobby — i.e. they were ejected during a mode switch and
+ * the lobby still exists. Used to surface an `EVICTED` status to the previous
+ * guest from `GET /api/lobbies/[id]`.
  */
 export function viewerIsEvicted(
-  lobby: Pick<LobbyRoomState, "status" | "viewerRole">
+  lobby: Pick<
+    LobbyRoomState,
+    "status" | "hostUserId" | "guest" | "viewerRole"
+  >,
+  viewerUserId: string
 ): boolean {
+  if (lobby.viewerRole === "spectator") return false;
+  if (lobby.hostUserId === viewerUserId) return false;
   if (lobby.status !== "WAITING" && lobby.status !== "READY") return false;
-  return lobby.viewerRole === null;
+  return lobby.guest?.user.id !== viewerUserId;
 }
