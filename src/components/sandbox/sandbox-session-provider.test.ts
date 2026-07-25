@@ -186,6 +186,7 @@ describe("buildSandboxSession", () => {
       me: session.game.me,
       opp: session.game.opp,
       myIndex: session.game.myIndex,
+      bottomPlayerIndex: session.game.myIndex,
       turn: session.game.turn,
       cardDb: session.game.cardDb,
       isMyTurn: session.game.isMyTurn,

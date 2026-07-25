@@ -102,6 +102,9 @@ function OpponentHarness() {
       />
       <OpponentField
         opp={null}
+        playerIndex={1}
+        bottomPlayerIndex={0}
+        owner="opp"
         cardDb={cardDb}
         activeDragType={null}
         refreshWave={false}
@@ -150,6 +153,9 @@ function PlayerHarness({
       <InteractionModeProvider value={interactionMode}>
         <PlayerField
           me={player}
+          playerIndex={0}
+          bottomPlayerIndex={0}
+          owner="me"
           cardDb={cardDb}
           activeDragType={activeDrag?.type ?? null}
           activeDrag={activeDrag}

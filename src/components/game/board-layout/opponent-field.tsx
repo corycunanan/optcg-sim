@@ -21,6 +21,7 @@ import {
   leaderLeft,
   stgDonWidth,
   sideCardOffsetX,
+  boardZoneKey,
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
 import { DeckPile } from "./deck-pile";
@@ -34,10 +35,13 @@ import type { PowerModPulse } from "@/hooks/use-power-modified-pulse";
 
 interface OpponentFieldProps {
   opp: PlayerState | null;
+  playerIndex: 0 | 1;
+  bottomPlayerIndex: 0 | 1;
+  owner: "me" | "opp";
   cardDb: CardDb;
   activeDragType: string | null;
   refreshWave: boolean;
-  onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "opp" }) => void;
+  onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "me" | "opp" }) => void;
   attackerInstanceId?: string | null;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
@@ -52,7 +56,7 @@ interface OpponentFieldProps {
    *  (OPT-274). Negative while a DON token is in-flight so the counter
    *  doesn't increment before the token lands. */
   donCountAdjustments?: Map<string, number>;
-  /** Active arrivals keyed by pile zone (`o-deck`, `o-trash`, `o-life`). */
+  /** Active arrivals keyed by anchor-derived top pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
@@ -66,6 +70,9 @@ export function getOpponentStageTabIndex(
 
 function OpponentFieldComponent({
   opp,
+  playerIndex,
+  bottomPlayerIndex,
+  owner,
   cardDb,
   activeDragType,
   refreshWave,
@@ -86,14 +93,16 @@ function OpponentFieldComponent({
   onTargetToggle,
 }: OpponentFieldProps) {
   const stageDescriptionId = useId();
+  const zoneKey = (zone: string) =>
+    boardZoneKey(playerIndex, bottomPlayerIndex, zone);
   const oppTrash = opp?.trash ?? [];
   const stage = opp?.stage ?? null;
   const stageSelection = stage
     ? targetSelectionById?.get(stage.instanceId)
     : undefined;
   const handlePreviewLife = useCallback(
-    () => onPreviewZone({ type: "life", owner: "opp" }),
-    [onPreviewZone],
+    () => onPreviewZone({ type: "life", owner }),
+    [onPreviewZone, owner],
   );
   const handleStageKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -128,31 +137,31 @@ function OpponentFieldComponent({
         cardDb={cardDb}
         onClickTrash={
           oppTrash.length > 0
-            ? () => onPreviewZone({ type: "trash", owner: "opp" })
+            ? () => onPreviewZone({ type: "trash", owner })
             : undefined
         }
-        zoneKey="o-trash"
-        arrivingCount={pileArrivingCounts?.get("o-trash")}
+        zoneKey={zoneKey("trash")}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("trash"))}
         style={{ position: "absolute", left: sideCardOffsetX, top: oppTop }}
       />
       <DeckPile
         count={opp?.deck.length ?? 0}
-        arrivingCount={pileArrivingCounts?.get("o-deck")}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("deck"))}
         cardDb={cardDb}
         sleeveUrl={opp?.sleeveUrl}
-        zoneKey="o-deck"
+        zoneKey={zoneKey("deck")}
         style={{
           position: "absolute",
           left: sideCardOffsetX,
           top: oppTop + SQUARE + SIDE_ZONE_GAP,
         }}
         onClick={
-          opp ? () => onPreviewZone({ type: "deck", owner: "opp" }) : undefined
+          opp ? () => onPreviewZone({ type: "deck", owner }) : undefined
         }
       />
 
       {/* Zone 2: Leader row — STG / LDR / DON */}
-      <ZoneRef zoneKey="o-stage" style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
+      <ZoneRef zoneKey={zoneKey("stage")} style={{ position: "absolute", left: zone2Left, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }} className="flex items-center justify-center rounded-md border border-gb-border-strong/30">
         {stage ? (
           <div
             data-target-selection={stageSelection ? "" : undefined}
@@ -232,7 +241,7 @@ function OpponentFieldComponent({
           counterPulse={counterPulseIds?.has(opp.leader.instanceId)}
           targetSelection={targetSelectionById?.get(opp.leader.instanceId)}
           onTargetToggle={() => onTargetToggle?.(opp.leader.instanceId)}
-          zoneKey="o-leader"
+          zoneKey={zoneKey("leader")}
           style={{ position: "absolute", left: leaderLeft, top: oppLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
           donCountAdjust={donCountAdjustments?.get(opp.leader.instanceId)}
@@ -247,7 +256,7 @@ function OpponentFieldComponent({
 
       <DonZone
         player={opp}
-        zoneKey="o-don"
+        zoneKey={zoneKey("don")}
         donArtUrl={opp?.donArtUrl}
         style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}
         animationDelay={refreshWave ? 0.2 : undefined}
@@ -272,7 +281,7 @@ function OpponentFieldComponent({
             counterPulse={counterPulseIds?.has(char.instanceId)}
             targetSelection={targetSelectionById?.get(char.instanceId)}
             onTargetToggle={() => onTargetToggle?.(char.instanceId)}
-            zoneKey={`o-char-${i}`}
+            zoneKey={zoneKey(`char-${i}`)}
             style={{ position: "absolute", left: pos.left, top: oppCharTop }}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
             donCountAdjust={donCountAdjustments?.get(char.instanceId)}
@@ -291,9 +300,9 @@ function OpponentFieldComponent({
       <LifeZone
         life={opp?.life ?? []}
         cardDb={cardDb}
-        zoneKey="o-life"
+        zoneKey={zoneKey("life")}
         sleeveUrl={opp?.sleeveUrl}
-        arrivingCount={pileArrivingCounts?.get("o-life")}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("life"))}
         triggerPulse={lifeTriggerPulse}
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}

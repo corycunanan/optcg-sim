@@ -19,7 +19,12 @@ import {
   FIELD_W,
   BOARD_CONTENT_H,
 } from "./constants";
-import { midTop, computeBoardScaling } from "./board-geometry";
+import {
+  boardZoneKey,
+  midTop,
+  computeBoardScaling,
+  resolveBoardComposition,
+} from "./board-geometry";
 import { boardCollisionDetection } from "./board-collision";
 import { useHandOrder, useHiddenHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
@@ -77,6 +82,8 @@ export interface BoardLayoutProps {
   me: PlayerState | null;
   opp: PlayerState | null;
   myIndex: 0 | 1 | null;
+  /** Engine player index whose field is anchored to the bottom edge. */
+  bottomPlayerIndex: 0 | 1;
   turn: TurnState | null;
   cardDb: CardDb;
   isMyTurn: boolean;
@@ -134,6 +141,7 @@ function BoardLayoutInner({
   me,
   opp,
   myIndex,
+  bottomPlayerIndex,
   turn,
   cardDb,
   isMyTurn,
@@ -156,6 +164,15 @@ function BoardLayoutInner({
   const dndDisabled = interactionMode !== "full";
   const zoneRegistry = useZonePosition();
   const viewport = viewportSize;
+  const composition = resolveBoardComposition(
+    me,
+    opp,
+    myIndex,
+    bottomPlayerIndex,
+  );
+  const bottomPlayer = composition.bottom;
+  const topPlayer = composition.top;
+  const topPlayerIndex = composition.topPlayerIndex;
   const spotlight = useCardSpotlight({
     eventLog,
     acceptedUpdate,
@@ -211,7 +228,7 @@ function BoardLayoutInner({
 
   const { transitions: cardAnimations, removeTransition } = useCardTransitions(
     eventLog,
-    myIndex,
+    bottomPlayerIndex,
     drag.activeDrag !== null,
     zoneRegistry,
     spotlight.presentation,
@@ -245,19 +262,12 @@ function BoardLayoutInner({
   );
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
   const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
-  const opponentIndex = myIndex === null ? null : myIndex === 0 ? 1 : 0;
-  const playerLifeTriggerPulse =
-    myIndex !== null && triggerPulsePlayerIndexes.has(myIndex);
-  const opponentLifeTriggerPulse =
-    opponentIndex !== null && triggerPulsePlayerIndexes.has(opponentIndex);
-  const playerLifeDamagePulseNonce =
-    myIndex === null ? undefined : lifeDamagePulseNonces.get(myIndex);
-  const opponentLifeDamagePulseNonce =
-    opponentIndex === null ? undefined : lifeDamagePulseNonces.get(opponentIndex);
-  const playerLifeScriedPulseNonce =
-    myIndex === null ? undefined : lifeScriedPulses.get(myIndex);
-  const opponentLifeScriedPulseNonce =
-    opponentIndex === null ? undefined : lifeScriedPulses.get(opponentIndex);
+  const playerLifeTriggerPulse = triggerPulsePlayerIndexes.has(bottomPlayerIndex);
+  const opponentLifeTriggerPulse = triggerPulsePlayerIndexes.has(topPlayerIndex);
+  const playerLifeDamagePulseNonce = lifeDamagePulseNonces.get(bottomPlayerIndex);
+  const opponentLifeDamagePulseNonce = lifeDamagePulseNonces.get(topPlayerIndex);
+  const playerLifeScriedPulseNonce = lifeScriedPulses.get(bottomPlayerIndex);
+  const opponentLifeScriedPulseNonce = lifeScriedPulses.get(topPlayerIndex);
 
   // While a DON token is flying onto a target card, the displayed count is
   // held back by the number of in-flight tokens so the counter doesn't
@@ -295,18 +305,32 @@ function BoardLayoutInner({
     );
   }, [redistribution.donCountAdjustments, inFlightDonAdjustByCard]);
 
-  const playerHandAnim = useHandAnimationState(cardAnimations, playerOrderedHand, "p-hand");
-  const oppHandAnim = useHandAnimationState(cardAnimations, opponentOrderedHand, "o-hand");
+  const bottomOrderedHand = composition.bottomOwner === "me"
+    ? playerOrderedHand
+    : opponentOrderedHand;
+  const topOrderedHand = composition.topOwner === "me"
+    ? playerOrderedHand
+    : opponentOrderedHand;
+  const playerHandAnim = useHandAnimationState(
+    cardAnimations,
+    bottomOrderedHand,
+    boardZoneKey(bottomPlayerIndex, bottomPlayerIndex, "hand"),
+  );
+  const oppHandAnim = useHandAnimationState(
+    cardAnimations,
+    topOrderedHand,
+    boardZoneKey(topPlayerIndex, bottomPlayerIndex, "hand"),
+  );
 
   /* ── Sleeve/DON URLs per player index ────────────────────────── */
 
-  const sleeveUrls: [string | null, string | null] = myIndex === 0
-    ? [me?.sleeveUrl ?? null, opp?.sleeveUrl ?? null]
-    : [opp?.sleeveUrl ?? null, me?.sleeveUrl ?? null];
+  const sleeveUrls: [string | null, string | null] = bottomPlayerIndex === 0
+    ? [bottomPlayer?.sleeveUrl ?? null, topPlayer?.sleeveUrl ?? null]
+    : [topPlayer?.sleeveUrl ?? null, bottomPlayer?.sleeveUrl ?? null];
 
-  const donArtUrls: [string | null, string | null] = myIndex === 0
-    ? [me?.donArtUrl ?? null, opp?.donArtUrl ?? null]
-    : [opp?.donArtUrl ?? null, me?.donArtUrl ?? null];
+  const donArtUrls: [string | null, string | null] = bottomPlayerIndex === 0
+    ? [bottomPlayer?.donArtUrl ?? null, topPlayer?.donArtUrl ?? null]
+    : [topPlayer?.donArtUrl ?? null, bottomPlayer?.donArtUrl ?? null];
 
   /* ── Refresh phase stagger detection ────────────────────────── */
 
@@ -375,7 +399,7 @@ function BoardLayoutInner({
             zoom: boardScale,
           }}
         >
-          <HandLayer cards={opponentOrderedHand} faceDown cardDb={cardDb} zoneKey="o-hand" inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={opp?.sleeveUrl} />
+          <HandLayer cards={topOrderedHand} faceDown cardDb={cardDb} zoneKey={boardZoneKey(topPlayerIndex, bottomPlayerIndex, "hand")} inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={topPlayer?.sleeveUrl} />
         </div>
       </div>
 
@@ -393,7 +417,10 @@ function BoardLayoutInner({
           }}
         >
           <OpponentField
-            opp={opp}
+            opp={topPlayer}
+            playerIndex={topPlayerIndex}
+            bottomPlayerIndex={bottomPlayerIndex}
+            owner={composition.topOwner}
             cardDb={cardDb}
             activeDragType={drag.activeDragType}
             refreshWave={refreshWave}
@@ -457,7 +484,10 @@ function BoardLayoutInner({
           />
 
           <PlayerField
-            me={me}
+            me={bottomPlayer}
+            playerIndex={bottomPlayerIndex}
+            bottomPlayerIndex={bottomPlayerIndex}
+            owner={composition.bottomOwner}
             cardDb={cardDb}
             activeDragType={drag.activeDragType}
             activeDrag={drag.activeDrag}
@@ -517,7 +547,7 @@ function BoardLayoutInner({
           }}
         >
           <HandLayer
-            cards={playerOrderedHand}
+            cards={bottomOrderedHand}
             cardDb={cardDb}
             enableDrag={
               !dndDisabled &&
@@ -533,12 +563,12 @@ function BoardLayoutInner({
             }
             availableDon={
               !dndDisabled && bs.canInteract
-                ? (me?.donCostArea.filter((don) => don.state === "ACTIVE").length ?? 0)
+                ? (bottomPlayer?.donCostArea.filter((don) => don.state === "ACTIVE").length ?? 0)
                 : undefined
             }
-            zoneKey="p-hand"
+            zoneKey={boardZoneKey(bottomPlayerIndex, bottomPlayerIndex, "hand")}
             inFlightInstanceIds={playerHandAnim.inFlightInstanceIds}
-            sleeveUrl={me?.sleeveUrl}
+            sleeveUrl={bottomPlayer?.sleeveUrl}
           />
         </div>
       </div>

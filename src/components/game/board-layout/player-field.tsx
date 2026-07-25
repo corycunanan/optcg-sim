@@ -23,6 +23,7 @@ import {
   leaderLeft,
   stgDonWidth,
   sideCardOffsetX,
+  boardZoneKey,
 } from "./board-geometry";
 import { DonZone } from "./don-zone";
 import { DeckPile } from "./deck-pile";
@@ -36,6 +37,9 @@ import { useInteractionMode } from "./interaction-mode";
 
 interface PlayerFieldProps {
   me: PlayerState | null;
+  playerIndex: 0 | 1;
+  bottomPlayerIndex: 0 | 1;
+  owner: "me" | "opp";
   cardDb: CardDb;
   activeDragType: string | null;
   activeDrag: DragPayload | null;
@@ -48,7 +52,7 @@ interface PlayerFieldProps {
   selectedBlockerId: string | null;
   setSelectedBlockerId: (id: string | null) => void;
   onAction: (action: GameAction) => void;
-  onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "me" }) => void;
+  onPreviewZone: (preview: { type: "deck" | "trash" | "life"; owner: "me" | "opp" }) => void;
   redistributeSourceIds?: Set<string>;
   pendingTransferDonIdsByCard?: Map<string, Set<string>>;
   donCountAdjustments?: Map<string, number>;
@@ -62,7 +66,7 @@ interface PlayerFieldProps {
   lifeTriggerPulse?: boolean;
   lifeDamagePulseNonce?: number;
   lifeScriedPulseNonce?: number;
-  /** Active arrivals keyed by pile zone (`p-deck`, `p-trash`, `p-life`). */
+  /** Active arrivals keyed by anchor-derived bottom pile zone keys. */
   pileArrivingCounts?: ReadonlyMap<string, number>;
   targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
   onTargetToggle?: (instanceId: string) => void;
@@ -70,6 +74,9 @@ interface PlayerFieldProps {
 
 function PlayerFieldComponent({
   me,
+  playerIndex,
+  bottomPlayerIndex,
+  owner,
   cardDb,
   activeDragType,
   activeDrag,
@@ -101,9 +108,11 @@ function PlayerFieldComponent({
   onTargetToggle,
 }: PlayerFieldProps) {
   const interactionMode = useInteractionMode();
+  const zoneKey = (zone: string) =>
+    boardZoneKey(playerIndex, bottomPlayerIndex, zone);
   const handlePreviewLife = useCallback(
-    () => onPreviewZone({ type: "life", owner: "me" }),
-    [onPreviewZone],
+    () => onPreviewZone({ type: "life", owner }),
+    [onPreviewZone, owner],
   );
   // Detect newly-arrived cards so the summon-entry pop plays on mount
   // (OPT-274). `useFieldArrivals` compares against the previous render's
@@ -136,9 +145,9 @@ function PlayerFieldComponent({
       <LifeZone
         life={me?.life ?? []}
         cardDb={cardDb}
-        zoneKey="p-life"
+        zoneKey={zoneKey("life")}
         sleeveUrl={me?.sleeveUrl}
-        arrivingCount={pileArrivingCounts?.get("p-life")}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("life"))}
         triggerPulse={lifeTriggerPulse}
         damagePulseNonce={lifeDamagePulseNonce}
         scryPulseNonce={lifeScriedPulseNonce}
@@ -159,7 +168,7 @@ function PlayerFieldComponent({
               draggedCardType={draggedHandData?.type}
               playSignalActive={playSignalActive}
               eventDropTarget={eventFieldDropActive}
-              zoneKey={`p-char-${i}`}
+              zoneKey={zoneKey(`char-${i}`)}
               style={{ position: "absolute", left: pos.left, top: playerCharTop }}
             />
           );
@@ -205,7 +214,7 @@ function PlayerFieldComponent({
                 : undefined
             }
             onAction={onAction}
-            zoneKey={`p-char-${i}`}
+            zoneKey={zoneKey(`char-${i}`)}
             slotIndex={i}
             boardFull={(me?.characters.filter(Boolean).length ?? 0) >= 5}
             animationDelay={refreshWave ? 0.03 * (i + 1) : undefined}
@@ -223,7 +232,7 @@ function PlayerFieldComponent({
       <DonZone
         player={me}
         enableDrag={canInteract}
-        zoneKey="p-don"
+        zoneKey={zoneKey("don")}
         donArtUrl={me?.donArtUrl}
         style={{ left: zone2Left, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
         animationDelay={refreshWave ? 0.2 : undefined}
@@ -251,7 +260,7 @@ function PlayerFieldComponent({
           targetSelection={targetSelectionById?.get(me.leader.instanceId)}
           onTargetToggle={() => onTargetToggle?.(me.leader.instanceId)}
           onAction={onAction}
-          zoneKey="p-leader"
+          zoneKey={zoneKey("leader")}
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
           animationDelay={refreshWave ? 0 : undefined}
           redistributeSource={redistributeSourceIds?.has(me.leader.instanceId)}
@@ -283,7 +292,7 @@ function PlayerFieldComponent({
           if (me?.stage) onTargetToggle?.(me.stage.instanceId);
         }}
         onAction={onAction}
-        zoneKey="p-stage"
+        zoneKey={zoneKey("stage")}
         style={{ position: "absolute", left: zone2Right - stgDonWidth, top: playerLeaderTop, width: stgDonWidth, height: SQUARE }}
         animationDelay={refreshWave ? 0.18 : undefined}
       />
@@ -291,27 +300,27 @@ function PlayerFieldComponent({
       {/* Zone 3 (right): Deck + Trash */}
       <DeckPile
         count={me?.deck.length ?? 0}
-        arrivingCount={pileArrivingCounts?.get("p-deck")}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("deck"))}
         cardDb={cardDb}
         sleeveUrl={me?.sleeveUrl}
-        zoneKey="p-deck"
+        zoneKey={zoneKey("deck")}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,
           top: playerTop,
         }}
         onClick={
-          me ? () => onPreviewZone({ type: "deck", owner: "me" }) : undefined
+          me ? () => onPreviewZone({ type: "deck", owner }) : undefined
         }
       />
       <DroppableTrashZone
         trash={me?.trash ?? []}
         cardDb={cardDb}
         onClickTrash={me && me.trash.length > 0
-          ? () => onPreviewZone({ type: "trash", owner: "me" })
+          ? () => onPreviewZone({ type: "trash", owner })
           : undefined}
-        zoneKey="p-trash"
-        arrivingCount={pileArrivingCounts?.get("p-trash")}
+        zoneKey={zoneKey("trash")}
+        arrivingCount={pileArrivingCounts?.get(zoneKey("trash"))}
         style={{
           position: "absolute",
           left: FIELD_W - SQUARE + sideCardOffsetX,

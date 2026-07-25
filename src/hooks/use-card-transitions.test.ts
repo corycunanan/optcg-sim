@@ -161,6 +161,27 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
     expect(out[0].toZoneKey).toBe("p-hand");
     expect(out[0].kind).toBeUndefined();
   });
+
+  it("routes the same player to the opposite visual side when the anchor flips", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 0,
+      timestamp: 1,
+      payload: { cardId: "OP01-001", cardInstanceId: "i-1" },
+    } as unknown as GameEvent;
+
+    const anchoredAtPlayer0 = eventToTransitions(ev, 0, registry)[0];
+    const anchoredAtPlayer1 = eventToTransitions(ev, 1, registry)[0];
+
+    expect(anchoredAtPlayer0).toMatchObject({
+      fromZoneKey: "p-deck",
+      toZoneKey: "p-hand",
+    });
+    expect(anchoredAtPlayer1).toMatchObject({
+      fromZoneKey: "o-deck",
+      toZoneKey: "o-hand",
+    });
+  });
 });
 
 describe("eventToTransitions — travel vs transform", () => {

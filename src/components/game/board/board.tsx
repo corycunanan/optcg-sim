@@ -22,6 +22,7 @@ export interface BoardState {
   me: PlayerState | null;
   opp: PlayerState | null;
   myIndex: 0 | 1 | null;
+  bottomPlayerIndex: 0 | 1;
   turn: TurnState | null;
   cardDb: CardDb;
   isMyTurn: boolean;
@@ -52,14 +53,14 @@ export interface BoardProps {
 
 export function Board({ state, dispatch }: BoardProps) {
   const { scale, designWidth, designHeight } = useBoardScale();
-  // Solitaire flips `myIndex` between 0 and 1, swapping `me`/`opp` to entirely
-  // different player data. Keying on `myIndex` remounts the visual-transition
+  // Solitaire flips the bottom anchor between 0 and 1, swapping `me`/`opp` to entirely
+  // different player data. Keying on the anchor remounts the visual-transition
   // hooks (useFieldArrivals, useCardTransitions, useHandOrder), so all-new
   // instanceIds aren't misread as arrivals (which would hide hand cards and
   // replay summon-pop animations). The fade-to-black covers the remount.
   return (
     <BoardLayout
-      key={state.myIndex ?? 0}
+      key={state.bottomPlayerIndex}
       {...state}
       onAction={dispatch.onAction}
       onLeave={dispatch.onLeave}
