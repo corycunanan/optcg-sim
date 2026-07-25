@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -420,9 +424,36 @@ describe("OPT-117 dual-target slot controllers", () => {
             "TEST-117"
           )
         ).toContain(
-          `[TEST-117] effects[0].actions[0].dual_targets[0].controller: [C6] Target type '${targetType}' does not support dual-target slot controller '${slotController}'; use SELF or OPPONENT`
+          `[TEST-117] effects[0].actions[0].dual_targets[0].controller: [C7] Target type '${targetType}' does not support dual-target slot controller '${slotController}'; use SELF or OPPONENT`
         );
       }
+    }
+  );
+
+  it.each([
+    "SELF",
+    "YOUR_LEADER",
+    "OPPONENT_LEADER",
+    "ALL_YOUR_CHARACTERS",
+    "ALL_OPPONENT_CHARACTERS",
+    "LIFE_CARD",
+    "OPPONENT_LIFE",
+    "SELECTED_CARDS",
+    "TRIGGERING_CARD",
+    "TRIGGERING_CARD_IN_TRASH",
+    "DON_ATTACHED",
+    "DON_IN_DON_DECK",
+  ] as const)(
+    "rejects any declared slot controller for unsupported target type %s",
+    (targetType) => {
+      expect(
+        validateEffectSchema(
+          buildSlotControllerSchema(targetType, "OPPONENT"),
+          "TEST-117"
+        )
+      ).toContain(
+        `[TEST-117] effects[0].actions[0].dual_targets[0].controller: [C7] Target type '${targetType}' does not support dual-target slot controller 'OPPONENT'; this target type does not support a per-slot controller; remove the controller`
+      );
     }
   );
 
@@ -482,6 +513,63 @@ describe("OPT-117 dual-target slot controllers", () => {
       friendlyLowCost.instanceId
     );
     expect(options.dualTargets!.slots[0].countMax).toBe(1);
+  });
+
+  it("reports C7 through lint-schemas.sh for unsupported and invalid slot modes", () => {
+    const fixtureDir = mkdtempSync(join(tmpdir(), "opt117-lint-"));
+    try {
+      writeFileSync(join(fixtureDir, "fixture.ts"), `
+export const BAD_UNSUPPORTED_SLOT_CONTROLLER: EffectSchema = {
+  card_id: "TEST-C7-A",
+  card_name: "Bad Unsupported Slot Controller",
+  card_type: "Character",
+  effects: [{
+    id: "bad_unsupported_slot_controller",
+    category: "auto",
+    trigger: { keyword: "ON_PLAY" },
+    actions: [{
+      type: "DRAW",
+      target: {
+        type: "LIFE_CARD",
+        dual_targets: [{ controller: "OPPONENT", filter: {}, count: { up_to: 1 } }],
+      },
+    }],
+  }],
+};
+export const BAD_COLLAPSING_SLOT_CONTROLLER: EffectSchema = {
+  card_id: "TEST-C7-B",
+  card_name: "Bad Collapsing Slot Controller",
+  card_type: "Character",
+  effects: [{
+    id: "bad_collapsing_slot_controller",
+    category: "auto",
+    trigger: { keyword: "ON_PLAY" },
+    actions: [{
+      type: "RETURN_TO_HAND",
+      target: {
+        type: "CARD_IN_HAND",
+        source_zone: "HAND",
+        dual_targets: [{ controller: "EITHER", filter: {}, count: { up_to: 1 } }],
+      },
+    }],
+  }],
+};
+`);
+      const linter = resolve(__dirname, "../engine/schemas/lint-schemas.sh");
+      let output = "";
+      try {
+        output = execFileSync("node", [linter, join(fixtureDir, "fixture.ts")], {
+          encoding: "utf8",
+        });
+      } catch (error) {
+        output = (error as { stdout?: string }).stdout ?? "";
+      }
+      const c7Lines = output.split("\n").filter((line) => line.includes("C7"));
+      expect(c7Lines.some((line) => line.includes("TEST-C7-A"))).toBe(true);
+      expect(c7Lines.some((line) => line.includes("TEST-C7-B"))).toBe(true);
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 
   it("resolves EB03-021 as one mixed-controller prompt and returns both cards to their owners' deck bottoms", () => {

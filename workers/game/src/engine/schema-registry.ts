@@ -140,24 +140,34 @@ const SELF_OR_OPPONENT_CONTROLLERS: ReadonlySet<Controller> = new Set([
   "SELF",
   "OPPONENT",
 ]);
-const DUAL_TARGET_SLOT_CONTROLLER_MODES: ReadonlyMap<
-  TargetType,
-  ReadonlySet<Controller>
-> = new Map([
-  ["CHARACTER", VALID_CONTROLLERS],
-  ["LEADER_OR_CHARACTER", VALID_CONTROLLERS],
-  ["FIELD_CARD", VALID_CONTROLLERS],
-  ["CARD_IN_HAND", SELF_OR_OPPONENT_CONTROLLERS],
-  ["CHARACTER_CARD", SELF_OR_OPPONENT_CONTROLLERS],
-  ["EVENT_CARD", SELF_OR_OPPONENT_CONTROLLERS],
-  ["STAGE_CARD", SELF_OR_OPPONENT_CONTROLLERS],
-  ["CARD_IN_TRASH", SELF_OR_OPPONENT_CONTROLLERS],
-  ["CARD_IN_DECK", SELF_OR_OPPONENT_CONTROLLERS],
-  ["DON_IN_COST_AREA", SELF_OR_OPPONENT_CONTROLLERS],
-  ["STAGE", SELF_OR_OPPONENT_CONTROLLERS],
-  ["PLAYER", SELF_OR_OPPONENT_CONTROLLERS],
-  ["CARD_ON_TOP_OF_DECK", SELF_OR_OPPONENT_CONTROLLERS],
-]);
+const NO_SLOT_CONTROLLERS: ReadonlySet<Controller> = new Set();
+const DUAL_TARGET_SLOT_CONTROLLER_MODES = {
+  SELF: NO_SLOT_CONTROLLERS,
+  YOUR_LEADER: NO_SLOT_CONTROLLERS,
+  OPPONENT_LEADER: NO_SLOT_CONTROLLERS,
+  CHARACTER: VALID_CONTROLLERS,
+  STAGE: SELF_OR_OPPONENT_CONTROLLERS,
+  LEADER_OR_CHARACTER: VALID_CONTROLLERS,
+  FIELD_CARD: VALID_CONTROLLERS,
+  ALL_YOUR_CHARACTERS: NO_SLOT_CONTROLLERS,
+  ALL_OPPONENT_CHARACTERS: NO_SLOT_CONTROLLERS,
+  CHARACTER_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  STAGE_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  EVENT_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_HAND: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_TRASH: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_ON_TOP_OF_DECK: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_DECK: SELF_OR_OPPONENT_CONTROLLERS,
+  LIFE_CARD: NO_SLOT_CONTROLLERS,
+  DON_IN_COST_AREA: SELF_OR_OPPONENT_CONTROLLERS,
+  DON_ATTACHED: NO_SLOT_CONTROLLERS,
+  DON_IN_DON_DECK: NO_SLOT_CONTROLLERS,
+  PLAYER: SELF_OR_OPPONENT_CONTROLLERS,
+  SELECTED_CARDS: NO_SLOT_CONTROLLERS,
+  OPPONENT_LIFE: NO_SLOT_CONTROLLERS,
+  TRIGGERING_CARD: NO_SLOT_CONTROLLERS,
+  TRIGGERING_CARD_IN_TRASH: NO_SLOT_CONTROLLERS,
+} satisfies Record<TargetType, ReadonlySet<Controller>>;
 
 /**
  * Validate an effect schema and return a list of error messages.
@@ -497,10 +507,14 @@ function validateTargetController(target: Action["target"], prefix: string): str
         `${prefix}.dual_targets[${i}].controller: Invalid controller '${slotController}'`,
       );
     } else if (slotController !== undefined && target?.type) {
-      const supportedModes = DUAL_TARGET_SLOT_CONTROLLER_MODES.get(target.type);
-      if (supportedModes && !supportedModes.has(slotController)) {
+      const supportedModes = DUAL_TARGET_SLOT_CONTROLLER_MODES[target.type]
+        ?? NO_SLOT_CONTROLLERS;
+      if (!supportedModes.has(slotController)) {
+        const guidance = supportedModes.size === 0
+          ? "this target type does not support a per-slot controller; remove the controller"
+          : "use SELF or OPPONENT";
         errors.push(
-          `${prefix}.dual_targets[${i}].controller: [C6] Target type '${target.type}' does not support dual-target slot controller '${slotController}'; use SELF or OPPONENT`,
+          `${prefix}.dual_targets[${i}].controller: [C7] Target type '${target.type}' does not support dual-target slot controller '${slotController}'; ${guidance}`,
         );
       }
     }
