@@ -9,6 +9,7 @@ import {
   type SpotlightCard,
   type SpotlightPresentation,
 } from "@/lib/game/spotlight";
+import { boardZonePrefix } from "@/components/game/board-layout/board-geometry";
 
 export interface CardTransition {
   id: string;
@@ -69,17 +70,22 @@ function nextId() {
  *  Exported for unit testing. */
 export function eventToTransitions(
   event: GameEvent,
-  myIndex: 0 | 1 | null,
+  bottomPlayerIndex: 0 | 1,
   zoneRegistry: ZonePositionRegistry | null,
   spotlight: SpotlightPresentation | null = null
 ): CardTransition[] {
-  const single = eventToTransition(event, myIndex, zoneRegistry, spotlight);
+  const single = eventToTransition(
+    event,
+    bottomPlayerIndex,
+    zoneRegistry,
+    spotlight,
+  );
   if (single) return [single];
 
   // DON_GIVEN_TO_CARD fans out into `count` staggered token flights.
   if (event.type === "DON_GIVEN_TO_CARD") {
     const { playerIndex } = event;
-    const prefix = playerIndex === myIndex ? "p" : "o";
+    const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
     const targetId = event.payload.targetInstanceId;
     if (!targetId || !zoneRegistry) return [];
     const toZoneKey = zoneRegistry.getCardZone(targetId);
@@ -109,7 +115,7 @@ export function eventToTransitions(
   // sequence rather than a single ghost.
   if (event.type === "LIFE_CARD_TO_DECK") {
     const { playerIndex } = event;
-    const prefix = playerIndex === myIndex ? "p" : "o";
+    const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
     const count = Math.max(1, event.payload.count ?? 1);
     return makeFaceDownBurst(
       count,
@@ -131,7 +137,7 @@ export function eventToTransitions(
     !event.payload.newCardInstanceId
   ) {
     const { playerIndex } = event;
-    const prefix = playerIndex === myIndex ? "p" : "o";
+    const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
     const count = Math.max(1, event.payload.count ?? 1);
     return makeFaceDownBurst(
       count,
@@ -238,12 +244,12 @@ function matchSpotlightCard(
 
 function eventToTransition(
   event: GameEvent,
-  myIndex: 0 | 1 | null,
+  bottomPlayerIndex: 0 | 1,
   zoneRegistry: ZonePositionRegistry | null,
   spotlight: SpotlightPresentation | null
 ): CardTransition | null {
   const { type, playerIndex } = event;
-  const prefix = playerIndex === myIndex ? "p" : "o";
+  const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
 
   let from: string | null = null;
   let to: string | null = null;
@@ -433,7 +439,7 @@ export function applyBatchStagger(batch: CardTransition[]): CardTransition[] {
 
 export function useCardTransitions(
   eventLog: GameEvent[],
-  myIndex: 0 | 1 | null,
+  bottomPlayerIndex: 0 | 1,
   isDragging: boolean,
   zoneRegistry?: ZonePositionRegistry | null,
   activeSpotlight: SpotlightPresentation | null = null
@@ -515,7 +521,7 @@ export function useCardTransitions(
     for (const event of newEvents) {
       const produced = eventToTransitions(
         event,
-        myIndex,
+        bottomPlayerIndex,
         zoneRegistry ?? null,
         batchSpotlight
       );
@@ -559,7 +565,7 @@ export function useCardTransitions(
         return combined.slice(-MAX_CONCURRENT);
       });
     });
-  }, [eventLog, myIndex, isDragging, zoneRegistry, activeSpotlight]);
+  }, [eventLog, bottomPlayerIndex, isDragging, zoneRegistry, activeSpotlight]);
 
   // Auto-expire old transitions
   useEffect(() => {

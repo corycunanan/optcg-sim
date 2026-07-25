@@ -38,6 +38,55 @@ export const leaderLeft = zone2Left + (CHAR_ROW_W - SQUARE) / 2;
 export const stgDonWidth = (CHAR_ROW_W - SQUARE - 2 * LEADER_GAP) / 2;
 export const sideCardOffsetX = CARD_OFFSET_X;
 
+export type BoardZonePrefix = "p" | "o";
+
+/** Resolve a game-engine player index to its visual board side. `p` is the
+ * bottom field and `o` is the top field; neither prefix implies viewer
+ * identity. */
+export function boardZonePrefix(
+  playerIndex: 0 | 1,
+  bottomPlayerIndex: 0 | 1,
+): BoardZonePrefix {
+  return playerIndex === bottomPlayerIndex ? "p" : "o";
+}
+
+export function boardZoneKey(
+  playerIndex: 0 | 1,
+  bottomPlayerIndex: 0 | 1,
+  zone: string,
+): string {
+  return `${boardZonePrefix(playerIndex, bottomPlayerIndex)}-${zone}`;
+}
+
+export interface BoardComposition<T> {
+  bottom: T;
+  top: T;
+  bottomOwner: "me" | "opp";
+  topOwner: "me" | "opp";
+  topPlayerIndex: 0 | 1;
+}
+
+/** Order identity-relative `me` / `opp` data onto the explicit visual anchor.
+ * Spectator projections use the host (engine player 0) in the legacy `me`
+ * slot until the spectator session lands; `bottomPlayerIndex` remains the
+ * only input that decides which player is rendered at the bottom. */
+export function resolveBoardComposition<T>(
+  me: T,
+  opp: T,
+  myIndex: 0 | 1 | null,
+  bottomPlayerIndex: 0 | 1,
+): BoardComposition<T> {
+  const mePlayerIndex = myIndex ?? 0;
+  const meIsBottom = mePlayerIndex === bottomPlayerIndex;
+  return {
+    bottom: meIsBottom ? me : opp,
+    top: meIsBottom ? opp : me,
+    bottomOwner: meIsBottom ? "me" : "opp",
+    topOwner: meIsBottom ? "opp" : "me",
+    topPlayerIndex: bottomPlayerIndex === 0 ? 1 : 0,
+  };
+}
+
 /* ── Design-canvas fit ─────────────────────────────────────────────── */
 
 export interface BoardScaling {

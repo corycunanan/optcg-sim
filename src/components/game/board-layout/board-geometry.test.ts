@@ -5,7 +5,11 @@
 // to the actual viewport.
 
 import { describe, expect, it } from "vitest";
-import { computeBoardScaling } from "./board-geometry";
+import {
+  boardZoneKey,
+  computeBoardScaling,
+  resolveBoardComposition,
+} from "./board-geometry";
 import {
   FIELD_W,
   BOARD_CONTENT_H,
@@ -71,5 +75,44 @@ describe("computeBoardScaling", () => {
       height: 1080,
     });
     expect(playerHandTop).toBeGreaterThan(boardTop);
+  });
+});
+
+describe("explicit bottom-player perspective", () => {
+  it.each([0, 1] as const)(
+    "keeps seated player %s at the bottom when the caller passes its own index",
+    (myIndex) => {
+      const composition = resolveBoardComposition(
+        "me",
+        "opp",
+        myIndex,
+        myIndex,
+      );
+
+      expect(composition).toMatchObject({
+        bottom: "me",
+        top: "opp",
+        bottomOwner: "me",
+        topOwner: "opp",
+      });
+      expect(boardZoneKey(myIndex, myIndex, "life")).toBe("p-life");
+      expect(boardZoneKey(myIndex === 0 ? 1 : 0, myIndex, "life")).toBe(
+        "o-life",
+      );
+    },
+  );
+
+  it("flips the composition and zone geometry when the other seat is anchored", () => {
+    const composition = resolveBoardComposition("host", "guest", null, 1);
+
+    expect(composition).toEqual({
+      bottom: "guest",
+      top: "host",
+      bottomOwner: "opp",
+      topOwner: "me",
+      topPlayerIndex: 0,
+    });
+    expect(boardZoneKey(1, 1, "deck")).toBe("p-deck");
+    expect(boardZoneKey(0, 1, "deck")).toBe("o-deck");
   });
 });

@@ -342,6 +342,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     me: game.me,
     opp: game.opp,
     myIndex: game.myIndex,
+    bottomPlayerIndex: game.myIndex ?? 0,
     turn: game.turn,
     cardDb: game.cardDb,
     isMyTurn: game.isMyTurn,
