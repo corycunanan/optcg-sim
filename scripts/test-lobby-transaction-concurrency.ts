@@ -16,7 +16,10 @@
  */
 
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { joinLobbyByCode } from "../src/lib/lobbies/join";
+import { resolveCanonicalLobby } from "../src/lib/lobbies/resolve";
 import {
   assert,
   assertCommitted,
@@ -807,6 +810,109 @@ async function inviteCancelVsAccept(harness: LobbyConcurrencyHarness) {
   );
 }
 
+async function closedLobbyZombieResolutionAndJoin(
+  harness: LobbyConcurrencyHarness
+) {
+  const [user, targetHost] = await Promise.all([
+    harness.createUser("closed-zombie-user"),
+    harness.createUser("closed-zombie-target-host"),
+  ]);
+  const targetCode = randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase();
+  const [closedLobby, targetLobby] = await Promise.all([
+    harness.createLobby("closed-zombie", user.id, { status: "CLOSED" }),
+    harness.createLobby("closed-zombie-target", targetHost.id, {
+      joinCode: targetCode,
+    }),
+  ]);
+  await harness.pointUserAtLobby(targetHost.id, targetLobby.id);
+  await harness.observer.gameSession.create({
+    data: {
+      lobbyId: closedLobby.id,
+      player1Id: user.id,
+      player2Id: targetHost.id,
+      player1DeckId: `${harness.runTag}-zombie-player-1-deck`,
+      player2DeckId: `${harness.runTag}-zombie-player-2-deck`,
+      format: "Standard",
+      status: "IN_PROGRESS",
+    },
+  });
+
+  const resolution = await resolveCanonicalLobby(user.id);
+  assert(
+    resolution.branch !== "active_game",
+    "resolver returned the closed lobby through active_game"
+  );
+  assert(
+    resolution.branch === "created",
+    `resolver did not lazily create a personal lobby (${resolution.branch})`
+  );
+
+  const membershipAfterResolution =
+    await harness.observer.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: {
+        activeLobbyId: true,
+        activeLobby: {
+          select: { id: true, hostUserId: true, status: true },
+        },
+      },
+    });
+  const personalLobby = membershipAfterResolution.activeLobby;
+  assert(
+    membershipAfterResolution.activeLobbyId === resolution.lobbyId &&
+      personalLobby?.id === resolution.lobbyId,
+    "resolver-created lobby is not the user's active membership"
+  );
+  assert(
+    personalLobby.hostUserId === user.id && personalLobby.status !== "CLOSED",
+    "resolver returned a CLOSED or non-personal lobby"
+  );
+
+  const joinResult = await joinLobbyByCode({
+    userId: user.id,
+    code: targetCode,
+  });
+  assert(
+    joinResult.kind !== "active_game_exists",
+    "closed-lobby zombie blocked the join path"
+  );
+  assert(
+    joinResult.kind === "joined" && joinResult.lobbyId === targetLobby.id,
+    `join target was not acquired (${joinResult.kind})`
+  );
+
+  const [storedUser, storedTarget, storedPersonalLobby, activeMemberships] =
+    await Promise.all([
+      harness.observer.user.findUniqueOrThrow({ where: { id: user.id } }),
+      harness.observer.lobby.findUniqueOrThrow({
+        where: { id: targetLobby.id },
+        include: { guest: true },
+      }),
+      harness.observer.lobby.findUniqueOrThrow({
+        where: { id: personalLobby.id },
+      }),
+      harness.observer.lobby.count({
+        where: {
+          status: { not: "CLOSED" },
+          OR: [{ hostUserId: user.id }, { guest: { is: { userId: user.id } } }],
+        },
+      }),
+    ]);
+  assert(activeMemberships === 1, "user has more than one active membership");
+  assert(
+    storedUser.activeLobbyId === targetLobby.id,
+    "user pointer does not reference the join target"
+  );
+  assert(
+    storedTarget.status === "READY" && storedTarget.guest?.userId === user.id,
+    "user is not seated as the target lobby guest"
+  );
+  assert(
+    storedPersonalLobby.status === "CLOSED",
+    "silent switch did not close the resolver-created personal lobby"
+  );
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -841,6 +947,9 @@ async function main(): Promise<void> {
     await runScenario("kick CAS interleavings", () => kickCasRaces(harness));
     await runScenario("invite cancel-vs-accept", () =>
       inviteCancelVsAccept(harness)
+    );
+    await runScenario("closed-lobby zombie resolution and join", () =>
+      closedLobbyZombieResolutionAndJoin(harness)
     );
   } finally {
     if (connected) {

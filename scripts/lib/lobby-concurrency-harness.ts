@@ -102,9 +102,10 @@ export class LobbyConcurrencyHarness {
     label: string,
     hostUserId: string,
     data: Partial<{
-      status: "WAITING" | "READY";
+      status: "WAITING" | "READY" | "CLOSED";
       mode: "PVP" | "SOLITAIRE";
       revision: number;
+      joinCode: string;
     }> = {}
   ) {
     return this.observer.lobby.create({
@@ -177,31 +178,44 @@ export class LobbyConcurrencyHarness {
     });
     const userIds = taggedUsers.map(({ id }) => id);
 
+    const taggedLobbies = await this.observer.lobby.findMany({
+      where: {
+        OR: [
+          { joinCode: { startsWith: `${this.runTag}-` } },
+          ...(userIds.length > 0 ? [{ hostUserId: { in: userIds } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    const lobbyIds = taggedLobbies.map(({ id }) => id);
+
     await this.observer.$transaction(async (tx) => {
-      await tx.lobby.deleteMany({
-        where: {
-          OR: [
-            { joinCode: { startsWith: `${this.runTag}-` } },
-            ...(userIds.length > 0 ? [{ hostUserId: { in: userIds } }] : []),
-          ],
-        },
-      });
+      if (lobbyIds.length > 0) {
+        await tx.gameSession.deleteMany({
+          where: { lobbyId: { in: lobbyIds } },
+        });
+        await tx.lobby.deleteMany({ where: { id: { in: lobbyIds } } });
+      }
       if (userIds.length > 0) {
         await tx.user.deleteMany({ where: { id: { in: userIds } } });
       }
     });
 
-    const [remainingUsers, remainingLobbies] = await Promise.all([
-      this.observer.user.count({
-        where: { email: { startsWith: `${this.runTag}-` } },
-      }),
-      this.observer.lobby.count({
-        where: { joinCode: { startsWith: `${this.runTag}-` } },
-      }),
-    ]);
+    const [remainingUsers, remainingLobbies, remainingGames] =
+      await Promise.all([
+        this.observer.user.count({
+          where: { email: { startsWith: `${this.runTag}-` } },
+        }),
+        this.observer.lobby.count({
+          where: { id: { in: lobbyIds } },
+        }),
+        this.observer.gameSession.count({
+          where: { lobbyId: { in: lobbyIds } },
+        }),
+      ]);
     assert(
-      remainingUsers === 0 && remainingLobbies === 0,
-      `Cleanup verification failed (${remainingUsers} users, ${remainingLobbies} lobbies remain)`
+      remainingUsers === 0 && remainingLobbies === 0 && remainingGames === 0,
+      `Cleanup verification failed (${remainingUsers} users, ${remainingLobbies} lobbies, ${remainingGames} games remain)`
     );
   }
 
