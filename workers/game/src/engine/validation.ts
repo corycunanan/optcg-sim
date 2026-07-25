@@ -17,6 +17,7 @@ export function validate(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
 ): string | null {
   if (state.status === "FINISHED") return "Game is already over";
 
@@ -49,7 +50,13 @@ export function validate(
       return validatePass(state);
 
     case "ACTIVATE_EFFECT":
-      return validateActivateEffect(state, action.cardInstanceId, action.effectId, cardDb);
+      return validateActivateEffect(
+        state,
+        action.cardInstanceId,
+        action.effectId,
+        cardDb,
+        actingPlayerIndex,
+      );
 
     case "CONCEDE":
       return null; // always legal
@@ -332,12 +339,14 @@ function validateActivateEffect(
   cardInstanceId: string,
   effectId: string,
   cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
 ): string | null {
   const timingError = getActivateEffectTimingError(state);
   if (timingError) return timingError;
 
   const found = findCardInState(state, cardInstanceId);
-  if (!found) return null; // executeActivateEffect will no-op; keep behavior parity
+  if (!found) return "Not your card";
+  if (found.playerIndex !== actingPlayerIndex) return "Not your card";
 
   const cardData = cardDb.get(found.card.cardId);
   const schema = cardData?.effectSchema;

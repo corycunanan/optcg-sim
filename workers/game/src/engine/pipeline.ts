@@ -69,7 +69,7 @@ export function runPipeline(
 
   // Step 1: Validate
   log("pipeline.step", { ...logCtx, step: "validate" });
-  const validationError = validate(state, action, cardDb);
+  const validationError = validate(state, action, cardDb, actingPlayerIndex);
   if (validationError) {
     log("pipeline.end", { ...logCtx, outcome: "invalid", error: validationError });
     return { state, valid: false, error: validationError };

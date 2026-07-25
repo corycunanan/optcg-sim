@@ -204,7 +204,7 @@ describe("OPT-400: validateUseCounter honors grants", () => {
       type: "USE_COUNTER",
       cardInstanceId: "h1",
       counterTargetInstanceId: "L0",
-    }, db);
+    }, db, 0);
     expect(error).toBeNull();
   });
 
@@ -214,7 +214,7 @@ describe("OPT-400: validateUseCounter honors grants", () => {
       type: "USE_COUNTER",
       cardInstanceId: "h3",
       counterTargetInstanceId: "L0",
-    }, db);
+    }, db, 0);
     expect(error).toContain("no counter value");
   });
 });
