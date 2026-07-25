@@ -66,6 +66,52 @@ describe("LobbyRoomStateSchema pending invite", () => {
   });
 });
 
+describe("LobbyRoomStateSchema participant deck contents", () => {
+  it("accepts additive grouped card summaries on a seat deck", () => {
+    const contents = {
+      characters: [
+        {
+          id: "OP01-024",
+          name: "Monkey.D.Luffy",
+          quantity: 4,
+          imageUrl: "https://images.example/OP01-024.png",
+        },
+      ],
+      events: [],
+      stages: [],
+    };
+
+    const parsed = LobbyRoomStateSchema.parse({
+      ...lobbyState(),
+      hostDeck: {
+        id: "deck-1",
+        name: "Straw Hats",
+        leaderId: "OP01-001",
+        leaderName: "Roronoa Zoro",
+        leaderImageUrl: null,
+        contents,
+      },
+    });
+
+    expect(parsed.hostDeck?.contents).toEqual(contents);
+  });
+
+  it("keeps legacy deck summaries valid without contents", () => {
+    const parsed = LobbyRoomStateSchema.parse({
+      ...lobbyState(),
+      hostDeck: {
+        id: "deck-1",
+        name: "Straw Hats",
+        leaderId: "OP01-001",
+        leaderName: "Roronoa Zoro",
+        leaderImageUrl: null,
+      },
+    });
+
+    expect(parsed.hostDeck?.contents).toBeUndefined();
+  });
+});
+
 describe("pregame mode validation", () => {
   it.each([
     "PRIORITY_ROLL",

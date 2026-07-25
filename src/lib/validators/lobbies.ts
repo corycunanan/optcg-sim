@@ -25,12 +25,26 @@ const LobbyUserSchema = z.object({
   image: z.string().nullable(),
 });
 
+const LobbyDeckCardSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  quantity: z.number().int().positive(),
+  imageUrl: z.string(),
+});
+
+const LobbyDeckContentsSchema = z.object({
+  characters: z.array(LobbyDeckCardSchema),
+  events: z.array(LobbyDeckCardSchema),
+  stages: z.array(LobbyDeckCardSchema),
+});
+
 const LobbyDeckSchema = z.object({
   id: z.string(),
   name: z.string(),
   leaderId: z.string(),
   leaderName: z.string().nullable(),
   leaderImageUrl: z.string().nullable(),
+  contents: LobbyDeckContentsSchema.optional(),
 });
 
 export const LobbyRoomStateSchema = z.object({

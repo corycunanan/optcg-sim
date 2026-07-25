@@ -1,15 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Layers3, Lock, UserRound } from "lucide-react";
-import { apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import type { LobbyRoomDeck } from "@/lib/lobbies/state";
-import {
-  DeckDetailResponseSchema,
-  type DeckDetailResponse,
-} from "@/lib/validators/cards";
+import type { LobbyRoomDeck, LobbyRoomDeckCard } from "@/lib/lobbies/state";
 import { UserAvatar } from "@/components/social/user-avatar";
 import {
   Select,
@@ -26,13 +21,10 @@ interface DeckOption extends LobbyRoomDeck {
   colors: string[];
 }
 
-type DeckDetail = DeckDetailResponse["data"];
-type DeckCard = DeckDetail["cards"][number];
-
 const DECK_GROUPS = [
-  { type: "Character", label: "Characters" },
-  { type: "Event", label: "Events" },
-  { type: "Stage", label: "Stages" },
+  { key: "characters", label: "Characters" },
+  { key: "events", label: "Events" },
+  { key: "stages", label: "Stages" },
 ] as const;
 
 export function LobbySeatCard({
@@ -183,40 +175,20 @@ function SelectedDeck({
   onPreview: (deckId: string) => void;
   previewSide: "left" | "right";
 }) {
-  const [detail, setDetail] = useState<DeckDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hoveredCard, setHoveredCard] = useState<DeckCard | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiGet(`/api/decks/${deck.id}`, DeckDetailResponseSchema)
-      .then((response) => {
-        if (!cancelled) setDetail(response.data);
-      })
-      .catch(() => {
-        if (!cancelled) setDetail(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [deck.id]);
+  const [hoveredCard, setHoveredCard] = useState<LobbyRoomDeckCard | null>(
+    null
+  );
 
   const groupedCards = useMemo(
     () =>
       DECK_GROUPS.map((group) => ({
         ...group,
-        cards:
-          detail?.cards.filter((entry) => entry.card.type === group.type) ?? [],
+        cards: deck.contents?.[group.key] ?? [],
       })).filter((group) => group.cards.length > 0),
-    [detail]
+    [deck.contents]
   );
 
-  const hoveredImage = hoveredCard
-    ? (hoveredCard.selectedArtUrl ?? hoveredCard.card.imageUrl)
-    : null;
+  const hoveredImage = hoveredCard?.imageUrl ?? null;
 
   return (
     <div className="relative grid flex-1 gap-5 p-5 sm:grid-cols-[auto_1fr]">
@@ -266,11 +238,9 @@ function SelectedDeck({
         </div>
 
         <div className="border-border bg-surface-3 h-64 overflow-y-auto rounded-md border">
-          {loading ? (
-            <DeckListSkeleton />
-          ) : groupedCards.length > 0 ? (
+          {groupedCards.length > 0 ? (
             groupedCards.map((group) => (
-              <div key={group.type}>
+              <div key={group.key}>
                 <div className="bg-surface-2 text-content-tertiary sticky top-0 z-10 flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-widest uppercase">
                   <span>{group.label}</span>
                   <span className="tabular-nums">
@@ -282,7 +252,7 @@ function SelectedDeck({
                 </div>
                 <ul className="divide-border divide-y">
                   {group.cards.map((entry) => (
-                    <li key={entry.cardId}>
+                    <li key={entry.id}>
                       <button
                         type="button"
                         onMouseEnter={() => setHoveredCard(entry)}
@@ -291,7 +261,7 @@ function SelectedDeck({
                         onBlur={() => setHoveredCard(null)}
                         className="text-content-secondary hover:bg-surface-2 hover:text-content-primary focus-visible:bg-surface-2 focus-visible:text-content-primary flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors outline-none"
                       >
-                        <span className="truncate">{entry.card.name}</span>
+                        <span className="truncate">{entry.name}</span>
                         <span className="text-content-primary shrink-0 font-semibold tabular-nums">
                           ×{entry.quantity}
                         </span>
@@ -350,19 +320,6 @@ function NoDeckChosen() {
         <Skeleton className="h-3 w-4/5" />
         <Skeleton className="h-3 w-3/5" />
       </div>
-    </div>
-  );
-}
-
-function DeckListSkeleton() {
-  return (
-    <div className="flex flex-col gap-3 p-3" aria-label="Loading deck list">
-      <Skeleton className="h-4 w-2/5" />
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-4/5" />
-      <Skeleton className="h-4 w-1/3" />
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-3/5" />
     </div>
   );
 }

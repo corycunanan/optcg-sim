@@ -137,6 +137,7 @@ export function LobbyRoomShell({
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
   const isInGame = lobby?.status === "IN_GAME";
   const activeGameId = lobby ? rejoinGameId(lobby) : null;
+  const hasActiveMatch = Boolean(isInGame || activeGameId);
   const realGuestPresent =
     Boolean(lobby?.guest) && lobby?.guest?.user.id !== lobby?.hostUserId;
   const guestName = lobby?.guest
@@ -333,10 +334,22 @@ export function LobbyRoomShell({
                   copied={copied}
                   onCopy={() => void copyInvite()}
                 />
-                <JoinPartyDialog
-                  disabled={mutating || starting || closing}
-                  initialCode={initialJoinCode}
-                />
+                <Tooltip
+                  content={
+                    hasActiveMatch
+                      ? "Rejoin your active match before switching parties"
+                      : undefined
+                  }
+                >
+                  <span>
+                    <JoinPartyDialog
+                      disabled={
+                        mutating || starting || closing || hasActiveMatch
+                      }
+                      initialCode={initialJoinCode}
+                    />
+                  </span>
+                </Tooltip>
               </div>
             </div>
 
@@ -485,7 +498,7 @@ export function LobbyRoomShell({
                       <GuestLeaveAction
                         isGuest={Boolean(isGuest)}
                         leaving={leaving}
-                        disabled={mutating}
+                        disabled={mutating || hasActiveMatch}
                         compact
                         onLeave={() => void handleLeave()}
                       />

@@ -21,6 +21,21 @@ describe("HostCloseAction", () => {
     expect(markup).toContain("Disband party");
   });
 
+  it("uses a menu trigger before confirmation in compact seat mode", () => {
+    const markup = renderToStaticMarkup(
+      <HostCloseAction
+        canClose
+        guestName={null}
+        closing={false}
+        compact
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).not.toContain('aria-haspopup="dialog"');
+  });
+
   it("renders no action for excluded lobby lifecycles", () => {
     const markup = renderToStaticMarkup(
       <HostCloseAction

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { EllipsisVertical, X } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HostCloseActionProps {
   canClose: boolean;
@@ -67,7 +74,46 @@ export function HostCloseAction({
   compact = false,
   onClose,
 }: HostCloseActionProps) {
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+
   if (!canClose) return null;
+
+  if (compact) {
+    return (
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={disabled || closing}
+              aria-label="More actions for host"
+            >
+              <EllipsisVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmationOpen(true)}
+            >
+              <X />
+              Disband party
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <AlertDialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+          <HostCloseConfirmation
+            guestName={guestName}
+            closing={closing}
+            onClose={onClose}
+          />
+        </AlertDialog>
+      </>
+    );
+  }
 
   return (
     <AlertDialog>
@@ -75,38 +121,49 @@ export function HostCloseAction({
         <Button
           type="button"
           variant="secondary"
-          size={compact ? "icon" : "default"}
+          size="default"
           disabled={disabled || closing}
-          aria-label={compact ? "More actions for host" : undefined}
         >
-          {compact ? (
-            <EllipsisVertical />
-          ) : (
-            <>
-              <X data-icon="inline-start" />
-              {closing ? "Disbanding..." : "Disband party"}
-            </>
-          )}
+          <X data-icon="inline-start" />
+          {closing ? "Disbanding..." : "Disband party"}
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Disband party?</AlertDialogTitle>
-          <AlertDialogDescription>
-            {closeLobbyImpactCopy(guestName)}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={closing}>Keep party</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={closing}
-            onClick={onClose}
-          >
-            {closing ? "Disbanding..." : "Disband party"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
+      <HostCloseConfirmation
+        guestName={guestName}
+        closing={closing}
+        onClose={onClose}
+      />
     </AlertDialog>
+  );
+}
+
+function HostCloseConfirmation({
+  guestName,
+  closing,
+  onClose,
+}: {
+  guestName: string | null;
+  closing: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Disband party?</AlertDialogTitle>
+        <AlertDialogDescription>
+          {closeLobbyImpactCopy(guestName)}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={closing}>Keep party</AlertDialogCancel>
+        <AlertDialogAction
+          variant="destructive"
+          disabled={closing}
+          onClick={onClose}
+        >
+          {closing ? "Disbanding..." : "Disband party"}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
   );
 }

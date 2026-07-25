@@ -5,7 +5,11 @@
  */
 
 import { prisma } from "@/lib/db";
-import type { LobbyRoomDeck, LobbyRoomState } from "./state";
+import type {
+  LobbyRoomDeck,
+  LobbyRoomDeckContents,
+  LobbyRoomState,
+} from "./state";
 import {
   LobbyModeSchema,
   LobbyStatusSchema,
@@ -79,16 +83,52 @@ export async function buildLobbyRoomState(
   if (!lobby) return null;
 
   const leaderIds: string[] = [];
+  const deckIds: string[] = [];
   if (lobby.hostDeck) leaderIds.push(lobby.hostDeck.leaderId);
   if (lobby.guest?.deck?.leaderId) leaderIds.push(lobby.guest.deck.leaderId);
+  if (lobby.hostDeck) deckIds.push(lobby.hostDeck.id);
+  if (lobby.guest?.deck) deckIds.push(lobby.guest.deck.id);
 
-  const leaderCards = leaderIds.length
-    ? await prisma.card.findMany({
-        where: { id: { in: leaderIds } },
-        select: { id: true, name: true, imageUrl: true },
-      })
-    : [];
+  const viewerIsParticipant = Boolean(
+    viewerUserId &&
+    (viewerUserId === lobby.hostUserId || viewerUserId === lobby.guest?.user.id)
+  );
+
+  const [leaderCards, decksWithCards] = await Promise.all([
+    leaderIds.length
+      ? prisma.card.findMany({
+          where: { id: { in: leaderIds } },
+          select: { id: true, name: true, imageUrl: true },
+        })
+      : [],
+    viewerIsParticipant && deckIds.length
+      ? prisma.deck.findMany({
+          where: { id: { in: deckIds } },
+          select: {
+            id: true,
+            cards: {
+              orderBy: { cardId: "asc" },
+              select: {
+                cardId: true,
+                quantity: true,
+                selectedArtUrl: true,
+                card: {
+                  select: {
+                    name: true,
+                    type: true,
+                    imageUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+      : [],
+  ]);
   const leaderMap = new Map(leaderCards.map((c) => [c.id, c]));
+  const contentsMap = new Map(
+    decksWithCards.map((deck) => [deck.id, groupDeckCards(deck.cards)])
+  );
 
   const hostLeader = lobby.hostDeck
     ? leaderMap.get(lobby.hostDeck.leaderId)
@@ -105,6 +145,12 @@ export async function buildLobbyRoomState(
         leaderName: hostLeader?.name ?? null,
         leaderImageUrl:
           lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
+        ...(viewerIsParticipant
+          ? {
+              contents:
+                contentsMap.get(lobby.hostDeck.id) ?? emptyDeckContents(),
+            }
+          : {}),
       }
     : null;
 
@@ -116,6 +162,12 @@ export async function buildLobbyRoomState(
         leaderName: guestLeader?.name ?? null,
         leaderImageUrl:
           lobby.guest.deck.leaderArtUrl ?? guestLeader?.imageUrl ?? null,
+        ...(viewerIsParticipant
+          ? {
+              contents:
+                contentsMap.get(lobby.guest.deck.id) ?? emptyDeckContents(),
+            }
+          : {}),
       }
     : null;
 
@@ -151,5 +203,42 @@ export async function buildLobbyRoomState(
         : null,
     gameId: lobby.gameSessions[0]?.id ?? null,
     gameStatus: lobby.gameSessions[0]?.status,
+  };
+}
+
+type DeckCardRow = {
+  cardId: string;
+  quantity: number;
+  selectedArtUrl: string | null;
+  card: {
+    name: string;
+    type: string;
+    imageUrl: string;
+  };
+};
+
+function groupDeckCards(cards: DeckCardRow[]): LobbyRoomDeckContents {
+  const contents = emptyDeckContents();
+
+  for (const entry of cards) {
+    const card = {
+      id: entry.cardId,
+      name: entry.card.name,
+      quantity: entry.quantity,
+      imageUrl: entry.selectedArtUrl ?? entry.card.imageUrl,
+    };
+    if (entry.card.type === "Character") contents.characters.push(card);
+    if (entry.card.type === "Event") contents.events.push(card);
+    if (entry.card.type === "Stage") contents.stages.push(card);
+  }
+
+  return contents;
+}
+
+function emptyDeckContents(): LobbyRoomDeckContents {
+  return {
+    characters: [],
+    events: [],
+    stages: [],
   };
 }

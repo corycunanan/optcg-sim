@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import type { LobbyRoomState } from "@/lib/lobbies/state";
@@ -60,8 +60,10 @@ vi.mock("@/components/deck-builder/deck-navigation-guard", () => ({
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children }: { children?: ReactNode }) => (
-    <button type="button">{children}</button>
+  Button: ({ children, ...props }: ComponentProps<"button">) => (
+    <button type="button" {...props}>
+      {children}
+    </button>
   ),
 }));
 vi.mock("@/components/ui/alert-dialog", () => {
@@ -110,8 +112,18 @@ vi.mock("@/components/ui/badge", () => ({
 }));
 vi.mock("./deck-preview-modal", () => ({ DeckPreviewModal: () => null }));
 vi.mock("./guest-leave-action", () => ({
-  GuestLeaveAction: ({ isGuest }: { isGuest: boolean }) =>
-    isGuest ? <span>Leave lobby</span> : null,
+  GuestLeaveAction: ({
+    isGuest,
+    disabled,
+  }: {
+    isGuest: boolean;
+    disabled?: boolean;
+  }) =>
+    isGuest ? (
+      <button type="button" disabled={disabled}>
+        Leave lobby
+      </button>
+    ) : null,
   runGuestLeave: vi.fn(),
 }));
 vi.mock("./host-close-action", () => ({
@@ -279,6 +291,18 @@ describe("LobbyRoomShell redesign scenarios", () => {
       leaderId: "OP01-001",
       leaderName: "Monkey.D.Luffy",
       leaderImageUrl: null,
+      contents: {
+        characters: [
+          {
+            id: "OP01-024",
+            name: "Monkey.D.Luffy",
+            quantity: 4,
+            imageUrl: "/card.png",
+          },
+        ],
+        events: [],
+        stages: [],
+      },
     };
     mocks.apiGet.mockImplementation(async (url: string) => {
       if (url === "/api/decks") {
@@ -291,25 +315,6 @@ describe("LobbyRoomShell redesign scenarios", () => {
               colors: ["Red"],
             },
           ],
-        };
-      }
-      if (url.startsWith("/api/decks/")) {
-        return {
-          data: {
-            cards: [
-              {
-                cardId: "OP01-024",
-                quantity: 4,
-                selectedArtUrl: null,
-                card: {
-                  id: "OP01-024",
-                  name: "Monkey.D.Luffy",
-                  type: "Character",
-                  imageUrl: "/card.png",
-                },
-              },
-            ],
-          },
         };
       }
       return {
@@ -343,6 +348,11 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Deck list");
     expect(renderedText()).toContain("Characters");
     expect(renderedText()).toContain("Everything is set");
+    expect(
+      mocks.apiGet.mock.calls.some(
+        ([url]) => typeof url === "string" && url.startsWith("/api/decks/"),
+      ),
+    ).toBe(false);
   });
 
   it("renders the solitaire second-deck state", async () => {
@@ -406,6 +416,38 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Rejoin Game");
     expect(renderedText()).not.toContain("Start Match");
     expect(renderedText()).toContain("Your match is already in progress");
+
+    const joinButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Join lobby"));
+    expect(joinButton?.props.disabled).toBe(true);
+  });
+
+  it("removes guest leave from keyboard access while a match is active", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              status: "IN_GAME",
+              gameId: "game-1",
+              gameStatus: "IN_PROGRESS",
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="guest-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const leaveButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Leave lobby"));
+    expect(leaveButton?.props.disabled).toBe(true);
   });
 });
 
