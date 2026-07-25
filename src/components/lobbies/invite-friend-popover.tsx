@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { UserPlus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,8 +89,10 @@ export function InviteFriendPopover({ lobbyId, onInviteSent }: Props) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="default">
-          <UserPlus data-icon="inline-start" />
+        <Button variant="ghost" className="group">
+          <span className="bg-gold-500 text-navy-900 group-hover:bg-gold-400 flex size-8 items-center justify-center rounded-full transition-colors">
+            <Plus className="size-4" />
+          </span>
           Invite a friend
         </Button>
       </PopoverTrigger>

@@ -14,6 +14,7 @@
  */
 
 import type { LobbyRoomState } from "@/lib/lobbies/state";
+import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { notifyUser, type NotifyUserDeps } from "./fan-out";
 
 export interface NotifyLobbyOptions {
@@ -21,11 +22,16 @@ export interface NotifyLobbyOptions {
   actorUserId?: string;
   /** Test seam — production callers leave this undefined. */
   deps?: NotifyUserDeps;
+  /** Test seam for participant-scoped state serialization. */
+  stateBuilder?: (
+    lobbyId: string,
+    viewerUserId: string
+  ) => Promise<LobbyRoomState | null>;
 }
 
 export async function notifyLobby(
   lobby: LobbyRoomState,
-  options: NotifyLobbyOptions = {},
+  options: NotifyLobbyOptions = {}
 ): Promise<void> {
   const memberIds = collectLobbyMemberIds(lobby);
   const targets = options.actorUserId
@@ -34,14 +40,16 @@ export async function notifyLobby(
 
   if (targets.length === 0) return;
 
+  const stateBuilder = options.stateBuilder ?? buildLobbyRoomState;
   await Promise.all(
-    targets.map((userId) =>
-      notifyUser(
+    targets.map(async (userId) => {
+      const viewerState = await stateBuilder(lobby.id, userId);
+      return notifyUser(
         userId,
-        { type: "lobby:state_changed", lobby },
-        options.deps,
-      ),
-    ),
+        { type: "lobby:state_changed", lobby: viewerState ?? lobby },
+        options.deps
+      );
+    })
   );
 }
 

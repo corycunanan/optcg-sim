@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Loader2, Lock, Play, UserRound } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Eye,
+  Layers3,
+  Loader2,
+  Play,
+  Plus,
+  Swords,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -12,6 +22,7 @@ import {
   type LobbyRoomDeck,
   type LobbyRoomState,
 } from "@/hooks/use-lobby-room";
+import { DeckListResponseSchema } from "@/lib/validators/cards";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -30,16 +41,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
-import {
-  PageHeader,
-  PageHeaderActions,
-  PageHeaderContent,
-  PageHeaderDescription,
-  PageHeaderTitle,
-} from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/social/user-avatar";
 import { DeckPreviewModal } from "./deck-preview-modal";
 import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 import { HostCloseAction, runHostClose } from "./host-close-action";
@@ -50,10 +53,8 @@ import {
   resolveInviteSeatTiming,
 } from "./invite-countdown";
 import { JoinPartyDialog } from "./join-party-dialog";
-import { PregameSettings } from "./pregame-settings";
 import { KickPlayerAction } from "./kick-player-action";
-import { DeckListResponseSchema } from "@/lib/validators/cards";
-import { UserAvatar } from "@/components/social/user-avatar";
+import { LobbySeatCard } from "./lobby-seat-card";
 
 interface DeckOption extends LobbyRoomDeck {
   format: string;
@@ -98,6 +99,7 @@ export function LobbyRoomShell({
   const [copied, setCopied] = useState(false);
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
   const [cancelingInvite, setCancelingInvite] = useState(false);
+  const [recoveryReentry, setRecoveryReentry] = useState(false);
   const recoveryHandledRef = useRef(false);
 
   useEffect(() => {
@@ -127,7 +129,10 @@ export function LobbyRoomShell({
   useEffect(() => {
     if (!recovery || recoveryHandledRef.current) return;
     recoveryHandledRef.current = true;
-    if (!claimLobbyRecovery(lobbyId)) return;
+    if (!claimLobbyRecovery(lobbyId)) {
+      setRecoveryReentry(true);
+      return;
+    }
     if (recovery.message) toast.info(recovery.message);
     router.push(recovery.route);
   }, [lobbyId, recovery, router]);
@@ -136,9 +141,7 @@ export function LobbyRoomShell({
   const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
   const isInGame = lobby?.status === "IN_GAME";
   const activeGameId = lobby ? rejoinGameId(lobby) : null;
-  const canEditPregame = Boolean(
-    isHost && (lobby?.status === "WAITING" || lobby?.status === "READY")
-  );
+  const hasActiveMatch = Boolean(isInGame || activeGameId);
   const realGuestPresent =
     Boolean(lobby?.guest) && lobby?.guest?.user.id !== lobby?.hostUserId;
   const guestName = lobby?.guest
@@ -227,7 +230,7 @@ export function LobbyRoomShell({
   const handleClose = async () => {
     await runHostClose({
       close: closeLobby,
-      onSuccess: () => toast.success("Lobby closed"),
+      onSuccess: () => toast.success("Party disbanded"),
       onError: (err) =>
         toast.error(
           err instanceof ApiError ? err.message : "Could not close lobby"
@@ -266,14 +269,34 @@ export function LobbyRoomShell({
     }
   };
 
-  if (recovery) return null;
+  if (recovery) {
+    if (!recoveryReentry) return null;
+
+    return (
+      <div className="bg-background flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl px-6 py-10">
+          <div className="border-border bg-card rounded-lg border p-6">
+            <p className="text-content-primary text-lg font-semibold">
+              This party is no longer available
+            </p>
+            <p className="text-content-secondary mt-2 text-sm">
+              Return to Play to find or create an available party room.
+            </p>
+            <Button className="mt-4" onClick={() => router.push("/lobbies")}>
+              Back to Play
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !lobby) {
     return (
       <div className="bg-background flex-1 overflow-y-auto">
-        <div className="text-content-secondary mx-auto flex max-w-5xl items-center gap-2 px-6 py-10 text-sm">
-          <span className="bg-content-tertiary h-2 w-2 animate-pulse rounded-full" />
-          Loading lobby...
+        <div className="text-content-secondary mx-auto flex max-w-7xl items-center gap-2 px-6 py-10 text-sm">
+          <span className="bg-content-tertiary size-2 animate-pulse rounded-full" />
+          Loading party room...
         </div>
       </div>
     );
@@ -296,22 +319,280 @@ export function LobbyRoomShell({
     );
   }
 
+  const solitaireBlockedReason = isGuest
+    ? "Leave the party to play solitaire"
+    : pendingInvite
+      ? "Cancel the invite before switching to solitaire"
+      : realGuestPresent
+        ? "Your guest must leave before switching to solitaire"
+        : null;
+  const startHint = getStartHint({
+    lobby,
+    isHost: Boolean(isHost),
+    realGuestPresent,
+    activeGameId,
+  });
+
   return (
     <TooltipProvider>
       <div className="bg-background flex-1 overflow-y-auto">
-        <PageHeader>
-          <PageHeaderContent>
-            <PageHeaderTitle>Lobby Room</PageHeaderTitle>
-            <PageHeaderDescription>
-              {activeGameId
-                ? "Your match is in progress. Rejoin when you are ready."
-                : isInGame
-                  ? "The match has ended. This room is waiting to reset."
-                  : "Pick decks, ready up, then the host starts the game."}
-            </PageHeaderDescription>
-          </PageHeaderContent>
-          <PageHeaderActions>
-            <Badge variant="secondary">{lobby.format}</Badge>
+        <header className="border-border bg-surface-1 border-b">
+          <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+            <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
+              <div>
+                <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
+                  Game mode
+                </p>
+                <h1 className="font-display text-content-primary mt-1 text-4xl">
+                  {lobby.mode === "SOLITAIRE" ? "Solitaire" : "Versus"}
+                </h1>
+                <p className="text-content-secondary mt-2 text-sm">
+                  {lobby.format} · {displayName(lobby.host, "Host")}
+                  &apos;s party
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <PartyCode
+                  code={lobby.joinCode}
+                  copied={copied}
+                  onCopy={() => void copyInvite()}
+                />
+                <Tooltip
+                  content={
+                    hasActiveMatch
+                      ? "Rejoin your active match before switching parties"
+                      : undefined
+                  }
+                >
+                  <span>
+                    <JoinPartyDialog
+                      disabled={
+                        mutating || starting || closing || hasActiveMatch
+                      }
+                      initialCode={initialJoinCode}
+                    />
+                  </span>
+                </Tooltip>
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div
+                className="border-border bg-surface-3 inline-flex w-fit rounded-md border p-1"
+                role="group"
+                aria-label="Game mode"
+              >
+                <button
+                  type="button"
+                  onClick={() => void onModeChange("PVP")}
+                  disabled={!isHost || mutating || isInGame}
+                  className={cn(
+                    "focus-visible:outline-border-focus flex min-h-10 items-center gap-2 rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    lobby.mode === "PVP"
+                      ? "bg-surface-2 text-content-primary"
+                      : "text-content-secondary hover:text-content-primary"
+                  )}
+                  aria-pressed={lobby.mode === "PVP"}
+                >
+                  <Swords className="size-4" />
+                  Versus
+                </button>
+                <Tooltip
+                  content={
+                    solitaireBlockedReason ??
+                    (!isHost ? "Only the host can change game mode" : undefined)
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => void onModeChange("SOLITAIRE")}
+                      disabled={
+                        !isHost ||
+                        mutating ||
+                        isInGame ||
+                        Boolean(solitaireBlockedReason)
+                      }
+                      className={cn(
+                        "focus-visible:outline-border-focus flex min-h-10 items-center gap-2 rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                        lobby.mode === "SOLITAIRE"
+                          ? "bg-surface-2 text-content-primary"
+                          : "text-content-secondary hover:text-content-primary"
+                      )}
+                      aria-pressed={lobby.mode === "SOLITAIRE"}
+                    >
+                      <Layers3 className="size-4" />
+                      Solitaire
+                    </button>
+                  </span>
+                </Tooltip>
+              </div>
+
+              {solitaireBlockedReason && (
+                <p className="text-content-tertiary text-xs">
+                  {solitaireBlockedReason}
+                </p>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+          {joinError && (
+            <div
+              className="border-error/30 bg-error-soft text-error rounded-lg border p-4 text-sm"
+              role="alert"
+            >
+              {joinError}
+            </div>
+          )}
+
+          {deckLoadError && (
+            <div
+              className="border-error/30 bg-error-soft text-error rounded-lg border p-4 text-sm"
+              role="alert"
+            >
+              {deckLoadError}
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <LobbySeatCard
+              role="Host"
+              player={
+                lobby.host ?? { username: null, name: "Host", image: null }
+              }
+              deck={lobby.hostDeck}
+              ready={lobby.hostReady}
+              readyEditable={Boolean(isHost && !isInGame)}
+              readyDisabled={!lobby.hostDeck || mutating}
+              deckEditable={Boolean(isHost && !isInGame)}
+              decks={decks}
+              deckPlaceholder="Choose your deck"
+              onDeckChange={(deckId) => void runPatch({ hostDeckId: deckId })}
+              onReadyChange={(ready) => void runPatch({ ready })}
+              onPreview={setPreviewDeckId}
+              previewSide="left"
+              disabled={isInGame}
+              actions={
+                <HostCloseAction
+                  canClose={Boolean(
+                    isHost &&
+                    lobby.mode === "PVP" &&
+                    (lobby.status === "WAITING" || lobby.status === "READY")
+                  )}
+                  guestName={realGuestPresent ? guestName : null}
+                  closing={closing}
+                  disabled={mutating || starting}
+                  compact
+                  onClose={() => void handleClose()}
+                />
+              }
+            />
+
+            {lobby.mode === "PVP" ? (
+              lobby.guest && realGuestPresent ? (
+                <LobbySeatCard
+                  role="Guest"
+                  player={lobby.guest.user}
+                  deck={lobby.guest.deck}
+                  ready={lobby.guest.guestReady}
+                  readyEditable={Boolean(isGuest && !isInGame)}
+                  readyDisabled={!lobby.guest.deck || mutating}
+                  deckEditable={Boolean(isGuest && !isInGame)}
+                  decks={decks}
+                  deckPlaceholder="Choose your deck"
+                  onDeckChange={(deckId) =>
+                    void runPatch({ guestDeckId: deckId })
+                  }
+                  onReadyChange={(ready) => void runPatch({ ready })}
+                  onPreview={setPreviewDeckId}
+                  previewSide="right"
+                  disabled={isInGame}
+                  actions={
+                    isHost ? (
+                      <KickPlayerAction
+                        playerName={guestName}
+                        kicking={kicking}
+                        disabled={mutating || starting || isInGame}
+                        onKick={() => void handleKick()}
+                      />
+                    ) : (
+                      <GuestLeaveAction
+                        isGuest={Boolean(isGuest)}
+                        leaving={leaving}
+                        disabled={mutating || hasActiveMatch}
+                        compact
+                        onLeave={() => void handleLeave()}
+                      />
+                    )
+                  }
+                />
+              ) : (
+                <InvitePanel
+                  key={pendingInvite?.id ?? "open-seat"}
+                  lobbyId={lobby.id}
+                  joinCode={lobby.joinCode}
+                  copied={copied}
+                  onCopy={copyInvite}
+                  showInviteFriend={Boolean(isHost)}
+                  pendingInvite={pendingInvite}
+                  cancelingInvite={cancelingInvite}
+                  onInviteSent={() => void refresh()}
+                  onCancelInvite={() => void handleCancelInvite()}
+                />
+              )
+            ) : (
+              <SolitaireSeat
+                deck={lobby.guest?.deck ?? null}
+                decks={decks}
+                editable={Boolean(isHost && !isInGame)}
+                disabled={mutating || isInGame}
+                onDeckChange={(deckId) =>
+                  void runPatch({ guestDeckId: deckId })
+                }
+                onPreview={setPreviewDeckId}
+              />
+            )}
+          </div>
+
+          {decks.length === 0 && (
+            <p className="text-content-tertiary text-center text-sm">
+              You can wait here now, but you&apos;ll need a playable deck before
+              the match can start.{" "}
+              <button
+                type="button"
+                className="text-gold-600 hover:text-gold-400 font-semibold"
+                onClick={() => router.push("/decks")}
+              >
+                Build a deck
+              </button>
+            </p>
+          )}
+
+          {ownDeck && ownDeck.totalCards < 50 && (
+            <p className="text-content-tertiary text-center text-xs">
+              Deck legality is checked when Start is clicked, so unfinished
+              decks can stay selected while players coordinate.
+            </p>
+          )}
+        </main>
+
+        <div className="border-border bg-surface-1 sticky bottom-0 z-20 border-t shadow-[var(--shadow-lg)]">
+          <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
+            <div className="flex items-center gap-3">
+              <Tooltip content="Spectator mode is coming in a future update">
+                <span>
+                  <Button variant="secondary" disabled>
+                    <Eye data-icon="inline-start" />
+                    Spectators
+                  </Button>
+                </span>
+              </Tooltip>
+              <p className="text-content-tertiary text-xs">{startHint}</p>
+            </div>
+
             {activeGameId ? (
               <Button
                 variant="gold"
@@ -322,216 +603,23 @@ export function LobbyRoomShell({
                 Rejoin Game
               </Button>
             ) : (
-              <>
-                <JoinPartyDialog
-                  disabled={mutating || starting || closing}
-                  initialCode={initialJoinCode}
-                />
-                <GuestLeaveAction
-                  isGuest={Boolean(isGuest)}
-                  leaving={leaving}
-                  disabled={mutating}
-                  onLeave={() => void handleLeave()}
-                />
-                <HostCloseAction
-                  canClose={Boolean(
-                    isHost &&
-                    lobby.mode === "PVP" &&
-                    (lobby.status === "WAITING" || lobby.status === "READY")
-                  )}
-                  guestName={realGuestPresent ? guestName : null}
-                  closing={closing}
-                  disabled={mutating || starting}
-                  onClose={() => void handleClose()}
-                />
-                {isHost && (
-                  <Button
-                    onClick={handleStart}
-                    disabled={!canStart || mutating || starting || closing}
-                  >
-                    {starting ? (
-                      <Loader2
-                        data-icon="inline-start"
-                        className="animate-spin"
-                      />
-                    ) : (
-                      <Play data-icon="inline-start" />
-                    )}
-                    Start Game
-                  </Button>
-                )}
-              </>
-            )}
-          </PageHeaderActions>
-        </PageHeader>
-
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-          {joinError && (
-            <div
-              className="border-error/30 bg-card text-error rounded-lg border p-4 text-sm"
-              role="alert"
-            >
-              {joinError}
-            </div>
-          )}
-          <div className="border-border bg-card flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
-            <Tabs value={lobby.mode} onValueChange={onModeChange}>
-              <TabsList>
-                <TabsTrigger
-                  value="PVP"
-                  disabled={!isHost || mutating || isInGame}
-                >
-                  PVP
-                </TabsTrigger>
-                <TabsTrigger
-                  value="SOLITAIRE"
-                  disabled={!isHost || mutating || isInGame}
-                >
-                  Solitaire
-                </TabsTrigger>
-                <Tooltip content="Coming soon">
-                  <span>
-                    <TabsTrigger
-                      value="PVCOMPUTER"
-                      disabled
-                      aria-disabled="true"
-                      className="pointer-events-auto"
-                    >
-                      PVComputer
-                    </TabsTrigger>
-                  </span>
-                </Tooltip>
-              </TabsList>
-            </Tabs>
-            <p className="text-content-secondary max-w-xl text-sm">
-              {isHost
-                ? "You control lobby mode and the Start button."
-                : "The host controls mode and starts the game."}
-            </p>
-          </div>
-
-          <PregameSettings
-            mode={lobby.mode}
-            value={lobby.pregameMode}
-            editable={canEditPregame}
-            disabled={mutating || starting}
-            onChange={(pregameMode) => runPatch({ pregameMode })}
-          />
-
-          {deckLoadError && (
-            <div className="border-error/30 bg-card text-error rounded-lg border p-4 text-sm">
-              {deckLoadError}
-            </div>
-          )}
-
-          <div
-            className={cn(
-              "grid gap-6 lg:grid-cols-[1fr_auto_1fr]",
-              isInGame && "pointer-events-none opacity-45"
-            )}
-          >
-            <SeatPanel
-              label="Side A"
-              playerName={displayName(lobby.host, "Host")}
-              deck={lobby.hostDeck}
-              ready={lobby.hostReady}
-              editable={Boolean(isHost && !isInGame)}
-              readyEditable={Boolean(isHost && !isInGame)}
-              readyDisabled={!lobby.hostDeck || mutating}
-              decks={decks}
-              selectPlaceholder="Choose host deck"
-              onDeckChange={(deckId) => runPatch({ hostDeckId: deckId })}
-              onReadyChange={(ready) => runPatch({ ready })}
-              onPreview={setPreviewDeckId}
-            />
-
-            <div className="flex items-center justify-center">
-              <div className="border-border bg-card text-content-tertiary rounded-full border px-4 py-2 text-xs font-semibold uppercase">
-                {lobby.mode === "SOLITAIRE" ? "Solo Test" : "Versus"}
-              </div>
-            </div>
-
-            {lobby.mode === "PVP" ? (
-              lobby.guest && realGuestPresent ? (
-                <SeatPanel
-                  label="Side B"
-                  playerName={guestName}
-                  deck={lobby.guest.deck}
-                  ready={lobby.guest.guestReady}
-                  editable={Boolean(isGuest && !isInGame)}
-                  readyEditable={Boolean(isGuest && !isInGame)}
-                  readyDisabled={!lobby.guest.deck || mutating}
-                  actions={
-                    isHost ? (
-                      <KickPlayerAction
-                        playerName={guestName}
-                        kicking={kicking}
-                        disabled={mutating || starting || isInGame}
-                        onKick={() => void handleKick()}
-                      />
-                    ) : null
-                  }
-                  decks={decks}
-                  selectPlaceholder="Choose guest deck"
-                  onDeckChange={(deckId) => runPatch({ guestDeckId: deckId })}
-                  onReadyChange={(ready) => runPatch({ ready })}
-                  onPreview={setPreviewDeckId}
-                />
-              ) : (
-                <InvitePanel
-                  key={pendingInvite?.id ?? "open-seat"}
-                  lobbyId={lobby.id}
-                  joinCode={lobby.joinCode}
-                  copied={copied}
-                  onCopy={copyInvite}
-                  showInviteFriend={isHost}
-                  pendingInvite={pendingInvite}
-                  cancelingInvite={cancelingInvite}
-                  onInviteSent={() => void refresh()}
-                  onCancelInvite={() => void handleCancelInvite()}
-                />
-              )
-            ) : (
-              <SeatPanel
-                label="Side B"
-                playerName={displayName(lobby.host, "Host")}
-                deck={lobby.guest?.deck ?? null}
-                ready={false}
-                showReady={false}
-                editable={Boolean(isHost && !isInGame)}
-                readyEditable={false}
-                readyDisabled
-                decks={decks}
-                selectPlaceholder="Choose side-B deck"
-                onDeckChange={(deckId) => runPatch({ guestDeckId: deckId })}
-                onReadyChange={() => undefined}
-                onPreview={setPreviewDeckId}
-              />
-            )}
-          </div>
-
-          {decks.length === 0 && (
-            <div className="border-border bg-card rounded-lg border p-5">
-              <p className="text-content-secondary text-sm">
-                You can sit in the room now, but you need a playable deck before
-                you can ready and start.
-              </p>
               <Button
-                className="mt-4"
-                variant="secondary"
-                onClick={() => router.push("/decks")}
+                variant="gold"
+                size="lg"
+                onClick={() => void handleStart()}
+                disabled={
+                  !canStart || mutating || starting || closing || isInGame
+                }
               >
-                Build a Deck
+                {starting ? (
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
+                ) : (
+                  <Play data-icon="inline-start" />
+                )}
+                Start Match
               </Button>
-            </div>
-          )}
-
-          {ownDeck && ownDeck.totalCards < 50 && (
-            <p className="text-content-tertiary text-xs">
-              Deck legality is checked when Start is clicked, so unfinished
-              decks can stay selected while players coordinate.
-            </p>
-          )}
+            )}
+          </div>
         </div>
 
         <AlertDialog open={pendingSolitaire} onOpenChange={setPendingSolitaire}>
@@ -574,124 +662,49 @@ export function LobbyRoomShell({
   );
 }
 
-function SeatPanel({
-  label,
-  playerName,
-  deck,
-  ready,
-  showReady = true,
-  editable,
-  readyEditable,
-  readyDisabled,
-  decks,
-  selectPlaceholder,
-  onDeckChange,
-  onReadyChange,
-  onPreview,
-  actions,
+function PartyCode({
+  code,
+  copied,
+  onCopy,
 }: {
-  label: string;
-  playerName: string;
-  deck: LobbyRoomDeck | null;
-  ready: boolean;
-  showReady?: boolean;
-  editable: boolean;
-  readyEditable: boolean;
-  readyDisabled: boolean;
-  decks: DeckOption[];
-  selectPlaceholder: string;
-  onDeckChange: (deckId: string) => void;
-  onReadyChange: (ready: boolean) => void;
-  onPreview: (deckId: string) => void;
-  actions?: ReactNode;
+  code: string;
+  copied: boolean;
+  onCopy: () => void;
 }) {
   return (
-    <section className="border-border bg-card flex min-h-[480px] flex-col gap-5 rounded-lg border p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-            {label}
-          </p>
-          <p className="text-content-primary mt-1 text-lg font-semibold">
-            {playerName}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {showReady && (
-            <Badge variant={ready ? "default" : "secondary"}>
-              {ready ? "Ready" : "Not Ready"}
-            </Badge>
-          )}
-          {actions}
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          if (deck) onPreview(deck.id);
-        }}
-        disabled={!deck}
+    <button
+      type="button"
+      onClick={onCopy}
+      className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus flex min-h-10 items-center gap-3 rounded-md border px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      aria-label={copied ? "Party link copied" : "Copy party link"}
+    >
+      <span>
+        <span className="text-content-tertiary block text-xs leading-none">
+          Party code
+        </span>
+        <span className="text-content-primary mt-1 block font-mono text-sm font-semibold tracking-widest">
+          {code}
+        </span>
+      </span>
+      {copied ? (
+        <Check className="text-success size-4" />
+      ) : (
+        <Copy className="text-content-tertiary size-4" />
+      )}
+      <span
         className={cn(
-          "bg-secondary flex min-h-72 items-center justify-center rounded-lg transition-transform",
-          deck && "hover:scale-[1.02]"
+          "text-xs font-semibold",
+          copied ? "text-success" : "text-content-secondary"
         )}
       >
-        {deck?.leaderImageUrl ? (
-          <img
-            src={deck.leaderImageUrl}
-            alt={deck.leaderName ?? deck.name}
-            className="h-72 rounded-lg object-contain shadow-[var(--shadow-md)]"
-          />
-        ) : (
-          <div className="text-content-tertiary flex flex-col items-center gap-3">
-            <UserRound />
-            <span className="text-sm">No deck selected</span>
-          </div>
-        )}
-      </button>
-
-      <div className="flex flex-col gap-3">
-        {editable ? (
-          <Select value={deck?.id ?? ""} onValueChange={onDeckChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={selectPlaceholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {decks.map((deckOption) => (
-                <SelectItem key={deckOption.id} value={deckOption.id}>
-                  {deckOption.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="border-border bg-background text-content-secondary flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-            <Lock />
-            {deck?.name ?? "Waiting for deck"}
-          </div>
-        )}
-
-        {readyEditable && (
-          <Button
-            variant={ready ? "secondary" : "default"}
-            onClick={() => onReadyChange(!ready)}
-            disabled={readyDisabled}
-          >
-            <Check data-icon="inline-start" />
-            {ready ? "Unready" : "Ready"}
-          </Button>
-        )}
-      </div>
-    </section>
+        {copied ? "Copied!" : "Copy"}
+      </span>
+    </button>
   );
 }
 
 export function InvitePanel({
   lobbyId,
-  joinCode,
-  copied,
-  onCopy,
   showInviteFriend,
   pendingInvite,
   cancelingInvite,
@@ -724,67 +737,198 @@ export function InvitePanel({
 
   if (pendingInvite && pendingInviteName && timing?.kind === "invited") {
     return (
-      <section className="border-border bg-card flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border p-5 text-center">
-        <div className="ring-primary/30 animate-pulse rounded-full ring-2">
-          <UserAvatar user={pendingInvite.user} size="md" />
-        </div>
-        <div>
-          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-            Side B
-          </p>
-          <p className="text-content-primary mt-2 text-lg font-semibold">
-            Invite sent to {pendingInviteName}
-          </p>
-          <p className="text-content-secondary mt-2 text-sm tabular-nums">
+      <section className="border-border bg-surface-1 flex min-h-96 flex-col rounded-lg border">
+        <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
+          <div className="ring-gold-500/30 animate-pulse rounded-full ring-2">
+            <UserAvatar user={pendingInvite.user} size="md" variant="dark" />
+          </div>
+          <div>
+            <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+              Guest
+            </p>
+            <p className="text-content-primary text-lg font-semibold">
+              Invite pending
+            </p>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 py-10 text-center">
+          <div>
+            <h2 className="font-display text-content-primary text-2xl">
+              Invite sent to {pendingInviteName}
+            </h2>
+            <p className="text-content-secondary mt-2 text-sm">
+              Their seat is reserved until the invitation expires.
+            </p>
+          </div>
+          <p className="border-border bg-surface-3 text-content-primary rounded-full border px-4 py-2 text-sm font-semibold tabular-nums">
             Expires in {formatInviteCountdown(timing.remainingMs)}
           </p>
+          {showInviteFriend && (
+            <Button
+              variant="secondary"
+              onClick={onCancelInvite}
+              disabled={cancelingInvite}
+            >
+              {cancelingInvite ? "Canceling..." : "Cancel invite"}
+            </Button>
+          )}
         </div>
-        {showInviteFriend && (
-          <Button
-            variant="secondary"
-            onClick={onCancelInvite}
-            disabled={cancelingInvite}
-          >
-            {cancelingInvite ? "Canceling..." : "Cancel invite"}
-          </Button>
-        )}
       </section>
     );
   }
 
   return (
-    <section className="border-border-strong bg-card flex min-h-[480px] flex-col items-center justify-center gap-5 rounded-lg border border-dashed p-5 text-center">
+    <section className="border-border-strong bg-surface-1 flex min-h-96 flex-col items-center justify-center gap-6 rounded-lg border border-dashed p-8 text-center">
+      <div className="border-gold-500 text-gold-500 flex size-16 items-center justify-center rounded-full border">
+        <Plus className="size-6" />
+      </div>
       <div>
         <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-          Side B
+          Guest
         </p>
-        <p className="text-content-primary mt-2 text-lg font-semibold">
+        <h2 className="font-display text-content-primary mt-2 text-2xl">
           Open seat
-        </p>
+        </h2>
         <p className="text-content-secondary mt-2 text-sm">
           {pendingInvite && pendingInviteName && timing?.kind === "expired"
             ? `Invite to ${pendingInviteName} expired`
-            : "Share the room code when your opponent is ready."}
+            : "Waiting for a challenger"}
         </p>
       </div>
-      <code className="border-border bg-background text-content-primary rounded-md border px-4 py-2 font-mono text-lg font-bold tracking-[0.3em]">
-        {joinCode}
-      </code>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button variant="secondary" onClick={onCopy}>
-          {copied ? (
-            <Check data-icon="inline-start" />
-          ) : (
-            <Copy data-icon="inline-start" />
-          )}
-          {copied ? "Copied" : "Copy Invite"}
-        </Button>
-        {showInviteFriend && (
-          <InviteFriendPopover lobbyId={lobbyId} onInviteSent={onInviteSent} />
-        )}
-      </div>
+      {showInviteFriend && (
+        <InviteFriendPopover lobbyId={lobbyId} onInviteSent={onInviteSent} />
+      )}
     </section>
   );
+}
+
+function SolitaireSeat({
+  deck,
+  decks,
+  editable,
+  disabled,
+  onDeckChange,
+  onPreview,
+}: {
+  deck: LobbyRoomDeck | null;
+  decks: DeckOption[];
+  editable: boolean;
+  disabled: boolean;
+  onDeckChange: (deckId: string) => void;
+  onPreview: (deckId: string) => void;
+}) {
+  return (
+    <section
+      className={cn(
+        "border-border bg-surface-1 relative flex min-h-96 flex-col overflow-hidden rounded-lg border",
+        disabled && "pointer-events-none opacity-50"
+      )}
+      aria-label="Solitaire second deck"
+    >
+      <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
+        <div className="bg-gold-100 text-gold-600 flex size-10 items-center justify-center rounded-full">
+          <Layers3 className="size-5" />
+        </div>
+        <div>
+          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            Solitaire
+          </p>
+          <h2 className="text-content-primary text-lg font-semibold">
+            Your second deck
+          </h2>
+        </div>
+      </header>
+
+      <div className="relative flex flex-1 items-center gap-8 overflow-hidden px-8 py-10">
+        <button
+          type="button"
+          disabled={!deck}
+          onClick={() => deck && onPreview(deck.id)}
+          className="bg-surface-3 border-border aspect-card focus-visible:outline-border-focus relative w-32 shrink-0 -rotate-6 overflow-hidden rounded-md border shadow-[var(--shadow-lg)] transition-transform hover:-rotate-3 focus-visible:outline-2 focus-visible:outline-offset-2"
+          aria-label={deck ? `Preview ${deck.name}` : "No second deck chosen"}
+        >
+          {deck?.leaderImageUrl ? (
+            <Image
+              src={deck.leaderImageUrl}
+              alt={deck.leaderName ?? deck.name}
+              fill
+              sizes="128px"
+              unoptimized
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-content-tertiary flex h-full items-center justify-center">
+              <Layers3 className="size-8" />
+            </span>
+          )}
+        </button>
+        <div className="relative z-10 max-w-sm">
+          <h3 className="font-display text-content-primary text-2xl">
+            Play both sides
+          </h3>
+          <p className="text-content-secondary mt-3 text-sm leading-relaxed">
+            Test matchups at your own pace. You&apos;ll control each side of the
+            table and switch perspective between turns.
+          </p>
+          {deck && (
+            <div className="mt-5">
+              <p className="text-content-primary text-sm font-semibold">
+                {deck.name}
+              </p>
+              <p className="text-content-tertiary mt-1 font-mono text-xs">
+                {deck.leaderName ?? deck.leaderId}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <footer className="border-border mt-auto border-t p-4">
+        {editable ? (
+          <Select value={deck?.id ?? ""} onValueChange={onDeckChange}>
+            <SelectTrigger className="bg-surface-3 w-full">
+              <SelectValue placeholder="Choose your second deck" />
+            </SelectTrigger>
+            <SelectContent>
+              {decks.map((deckOption) => (
+                <SelectItem key={deckOption.id} value={deckOption.id}>
+                  {deckOption.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="border-border bg-surface-3 text-content-secondary flex min-h-10 items-center rounded-md border px-3 text-sm">
+            {deck?.name ?? "Choose a second deck"}
+          </div>
+        )}
+      </footer>
+    </section>
+  );
+}
+
+function getStartHint({
+  lobby,
+  isHost,
+  realGuestPresent,
+  activeGameId,
+}: {
+  lobby: LobbyRoomState;
+  isHost: boolean;
+  realGuestPresent: boolean;
+  activeGameId: string | null;
+}) {
+  if (activeGameId) return "Your match is already in progress";
+  if (lobby.status === "IN_GAME") return "Waiting for this room to reset";
+  if (!isHost) return "The host starts the match";
+  if (lobby.mode === "PVP" && !realGuestPresent)
+    return "You need an opponent first";
+  if (!lobby.hostDeck || !lobby.guest?.deck) return "Both players need a deck";
+  if (lobby.mode === "PVP" && (!lobby.hostReady || !lobby.guest.guestReady))
+    return "Both players must be ready";
+  if (lobby.mode === "SOLITAIRE" && !lobby.hostReady)
+    return "Ready up when both decks are set";
+  return "Everything is set";
 }
 
 function displayName(

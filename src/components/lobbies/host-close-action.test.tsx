@@ -18,7 +18,22 @@ describe("HostCloseAction", () => {
       />
     );
 
-    expect(markup).toContain("Close Lobby");
+    expect(markup).toContain("Disband party");
+  });
+
+  it("uses a menu trigger before confirmation in compact seat mode", () => {
+    const markup = renderToStaticMarkup(
+      <HostCloseAction
+        canClose
+        guestName={null}
+        closing={false}
+        compact
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).not.toContain('aria-haspopup="dialog"');
   });
 
   it("renders no action for excluded lobby lifecycles", () => {
@@ -36,7 +51,7 @@ describe("HostCloseAction", () => {
 
   it("names the impact on a seated guest in confirmation copy", () => {
     expect(closeLobbyImpactCopy("Guest Player")).toBe(
-      "This will close the lobby for you and Guest Player, cancel outstanding invites, and return Guest Player to the lobby browser. This cannot be undone."
+      "This will disband your party, cancel outstanding invites, and return Guest Player to the lobby browser. This cannot be undone."
     );
   });
 

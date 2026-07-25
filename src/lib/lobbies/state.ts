@@ -22,12 +22,27 @@ export type LobbyRoomStatus =
   | "CLOSED"
   | "EVICTED";
 
+export interface LobbyRoomDeckCard {
+  id: string;
+  name: string;
+  quantity: number;
+  imageUrl: string;
+}
+
+export interface LobbyRoomDeckContents {
+  characters: LobbyRoomDeckCard[];
+  events: LobbyRoomDeckCard[];
+  stages: LobbyRoomDeckCard[];
+}
+
 export interface LobbyRoomDeck {
   id: string;
   name: string;
   leaderId: string;
   leaderName: string | null;
   leaderImageUrl: string | null;
+  /** Participant-only grouped card summaries; absent on legacy/public states. */
+  contents?: LobbyRoomDeckContents;
 }
 
 export interface LobbyRoomState {

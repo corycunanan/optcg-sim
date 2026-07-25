@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 import { ApiError, apiPost } from "@/lib/api-client";
@@ -34,7 +34,9 @@ export function JoinPartyDialog({
   const normalizedInitialCode = initialCode
     ? normalizeLobbyCode(initialCode).slice(0, 6)
     : "";
-  const [open, setOpen] = useState(Boolean(normalizedInitialCode));
+  const [open, setOpen] = useState(
+    Boolean(normalizedInitialCode) && !disabled
+  );
   const [code, setCode] = useState(normalizedInitialCode);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,7 +44,15 @@ export function JoinPartyDialog({
     null
   );
 
+  useEffect(() => {
+    if (!disabled) return;
+    setOpen(false);
+    setSwitchDetails(null);
+  }, [disabled]);
+
   const submit = async (confirmDisbandLobbyId?: string) => {
+    if (disabled) return;
+
     const normalizedCode = normalizeLobbyCode(code);
     if (normalizedCode.length !== 6) {
       setError("Enter a valid 6-character party code");
@@ -94,7 +104,7 @@ export function JoinPartyDialog({
       <Dialog
         open={open}
         onOpenChange={(nextOpen) => {
-          if (busy) return;
+          if (busy || (disabled && nextOpen)) return;
           setOpen(nextOpen);
           if (nextOpen) setError(null);
         }}

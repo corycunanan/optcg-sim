@@ -1,6 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
+import { useState } from "react";
+import { EllipsisVertical, X } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,12 +15,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HostCloseActionProps {
   canClose: boolean;
   guestName: string | null;
   closing: boolean;
   disabled?: boolean;
+  compact?: boolean;
   onClose: () => void;
 }
 
@@ -53,9 +61,9 @@ export async function runHostClose({
 
 export function closeLobbyImpactCopy(guestName: string | null) {
   if (guestName) {
-    return `This will close the lobby for you and ${guestName}, cancel outstanding invites, and return ${guestName} to the lobby browser. This cannot be undone.`;
+    return `This will disband your party, cancel outstanding invites, and return ${guestName} to the lobby browser. This cannot be undone.`;
   }
-  return "This will close the lobby and cancel outstanding invites. This cannot be undone.";
+  return "This will disband your party and cancel outstanding invites. This cannot be undone.";
 }
 
 export function HostCloseAction({
@@ -63,36 +71,99 @@ export function HostCloseAction({
   guestName,
   closing,
   disabled = false,
+  compact = false,
   onClose,
 }: HostCloseActionProps) {
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+
   if (!canClose) return null;
+
+  if (compact) {
+    return (
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={disabled || closing}
+              aria-label="More actions for host"
+            >
+              <EllipsisVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmationOpen(true)}
+            >
+              <X />
+              Disband party
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <AlertDialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+          <HostCloseConfirmation
+            guestName={guestName}
+            closing={closing}
+            onClose={onClose}
+          />
+        </AlertDialog>
+      </>
+    );
+  }
 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="secondary" disabled={disabled || closing}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="default"
+          disabled={disabled || closing}
+        >
           <X data-icon="inline-start" />
-          {closing ? "Closing..." : "Close Lobby"}
+          {closing ? "Disbanding..." : "Disband party"}
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Close Lobby?</AlertDialogTitle>
-          <AlertDialogDescription>
-            {closeLobbyImpactCopy(guestName)}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={closing}>Keep Lobby</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={closing}
-            onClick={onClose}
-          >
-            {closing ? "Closing..." : "Close Lobby"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
+      <HostCloseConfirmation
+        guestName={guestName}
+        closing={closing}
+        onClose={onClose}
+      />
     </AlertDialog>
+  );
+}
+
+function HostCloseConfirmation({
+  guestName,
+  closing,
+  onClose,
+}: {
+  guestName: string | null;
+  closing: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Disband party?</AlertDialogTitle>
+        <AlertDialogDescription>
+          {closeLobbyImpactCopy(guestName)}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={closing}>Keep party</AlertDialogCancel>
+        <AlertDialogAction
+          variant="destructive"
+          disabled={closing}
+          onClick={onClose}
+        >
+          {closing ? "Disbanding..." : "Disband party"}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
   );
 }

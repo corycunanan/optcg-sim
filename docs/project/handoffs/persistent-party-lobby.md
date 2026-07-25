@@ -1,7 +1,7 @@
 ---
 linear-project: Persistent Party Lobby
 linear-project-url: https://linear.app/optcg-sim/project/persistent-party-lobby-6cf7fc95b90c
-last-updated: 2026-07-24
+last-updated: 2026-07-25
 ---
 
 # Persistent Party Lobby — Handoff Doc
@@ -14,20 +14,20 @@ Users resolve to one persistent party, explicitly switch parties, return to that
 
 Tickets in execution order. Ordering criteria: dependencies → estimate → priority → risk.
 
-| Order | Ticket  | Title                                                                                    | Estimate | Depends on                         | Status      | PR                                                        | Notes                                                   |
-| ----- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------------------------- | ----------- | --------------------------------------------------------- | ------------------------------------------------------- |
-| 1     | OPT-518 | Schema: multi-game lobbies + one-active-lobby-per-user invariant                         | —        | —                                  | Done        | —                                                         | Membership and historical-game foundation               |
-| 2     | OPT-519 | /lobbies canonical resolver: active game → membership → lazy personal lobby              | —        | OPT-518                            | Done        | —                                                         | Canonical Play navigation and personal-lobby creation   |
-| 3     | OPT-520 | Post-game return to party: finalize resets lobby to WAITING with readiness cleared       | —        | OPT-518, OPT-519                   | Done        | —                                                         | Restores the persistent party after a match             |
-| 4     | OPT-522 | Join-by-code party switching with disband confirmation                                   | —        | OPT-519                            | Done        | [#403](https://github.com/corycunanan/optcg-sim/pull/403) | Transactional switch and host-disband semantics shipped |
-| 5     | OPT-523 | Kick player: host removes guest from party                                               | —        | OPT-518, OPT-519                   | Done        | [#401](https://github.com/corycunanan/optcg-sim/pull/401) | PR merged; guest-removal capability is on main          |
-| 6     | OPT-524 | Invite lifecycle: expiry countdown + cancel invite                                       | —        | OPT-519                            | Done        | [#402](https://github.com/corycunanan/optcg-sim/pull/402) | Invite lifecycle surface shipped                        |
-| 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | In Progress | —                                                         | Parallel workstream owns `src/components/lobbies/**`    |
-| 8     | OPT-567 | Real-database concurrency test harness for lobby transactional flows                     | —        | OPT-522, OPT-523, OPT-524          | In Review   | [#404](https://github.com/corycunanan/optcg-sim/pull/404) | Manual DEV database concurrency and rollback proof      |
+| Order | Ticket  | Title                                                                                    | Estimate | Depends on                         | Status    | PR                                                        | Notes                                                   |
+| ----- | ------- | ---------------------------------------------------------------------------------------- | -------- | ---------------------------------- | --------- | --------------------------------------------------------- | ------------------------------------------------------- |
+| 1     | OPT-518 | Schema: multi-game lobbies + one-active-lobby-per-user invariant                         | —        | —                                  | Done      | —                                                         | Membership and historical-game foundation               |
+| 2     | OPT-519 | /lobbies canonical resolver: active game → membership → lazy personal lobby              | —        | OPT-518                            | Done      | —                                                         | Canonical Play navigation and personal-lobby creation   |
+| 3     | OPT-520 | Post-game return to party: finalize resets lobby to WAITING with readiness cleared       | —        | OPT-518, OPT-519                   | Done      | —                                                         | Restores the persistent party after a match             |
+| 4     | OPT-522 | Join-by-code party switching with disband confirmation                                   | —        | OPT-519                            | Done      | [#403](https://github.com/corycunanan/optcg-sim/pull/403) | Transactional switch and host-disband semantics shipped |
+| 5     | OPT-523 | Kick player: host removes guest from party                                               | —        | OPT-518, OPT-519                   | Done      | [#401](https://github.com/corycunanan/optcg-sim/pull/401) | PR merged; guest-removal capability is on main          |
+| 6     | OPT-524 | Invite lifecycle: expiry countdown + cancel invite                                       | —        | OPT-519                            | Done      | [#402](https://github.com/corycunanan/optcg-sim/pull/402) | Invite lifecycle surface shipped                        |
+| 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | In Review | [#405](https://github.com/corycunanan/optcg-sim/pull/405) | Rebuild and VQA fixes complete; awaiting review         |
+| 8     | OPT-567 | Real-database concurrency test harness for lobby transactional flows                     | —        | OPT-522, OPT-523, OPT-524          | In Review | [#404](https://github.com/corycunanan/optcg-sim/pull/404) | Manual DEV database concurrency and rollback proof      |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-521 is in progress; its behavior dependencies are merged.
+**Next up:** OPT-521 is in review; its behavior dependencies are merged.
 
 ---
 
