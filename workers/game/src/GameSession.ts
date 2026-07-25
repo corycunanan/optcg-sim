@@ -841,9 +841,11 @@ export class GameSession implements DurableObject {
   }
 
   // ─── Broadcast helpers ─────────────────────────────────────────────────────
+
   private broadcast(msg: ServerMessage): void {
     this.transport.broadcast(msg);
   }
+
   /**
    * Send a state-bearing message to each player with their secret zones filtered.
    * Each player receives their own zones in full; the opponent's hand, deck, and
@@ -866,11 +868,9 @@ export class GameSession implements DurableObject {
       (filteredState, recipientPlayerIndex) =>
         build(
           {
-            ...filteredState,
-            // OPT-552 must catch null-recipient failures per recipient: an uncaught
-            // spectator-first/between throw would skip every later player delivery.
+            ...filteredState, // OPT-550: spectators merge both controllers because availability derives only from already-visible zones and adds no information.
             effectAvailability: effectAvailabilityForRecipient(
-              state,
+              state, // OPT-552: catch null-recipient failures per recipient; a spectator-first/between throw otherwise skips later player delivery.
               availability,
               recipientPlayerIndex
             ),
