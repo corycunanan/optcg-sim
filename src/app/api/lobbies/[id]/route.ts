@@ -48,9 +48,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   return apiSuccess(
-    viewerIsEvicted(state, authResult.userId)
-      ? { ...state, status: "EVICTED" as const }
-      : state,
+    viewerIsEvicted(state) ? { ...state, status: "EVICTED" as const } : state,
     200,
     { "Cache-Control": "no-store" },
   );

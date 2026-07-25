@@ -62,6 +62,15 @@ export interface LobbyRoomState {
     image: string | null;
   } | null;
   hostDeck: LobbyRoomDeck | null;
+  allowSpectators: boolean;
+  spectators: {
+    id: string;
+    username: string | null;
+    name: string | null;
+    image: string | null;
+  }[];
+  spectatorCount: number;
+  viewerRole: "host" | "guest" | "spectator" | null;
   guest: {
     guestReady: boolean;
     user: {
@@ -87,16 +96,14 @@ export interface LobbyRoomState {
 }
 
 /**
- * True when the viewer is neither the host nor the current guest of a
- * non-terminal lobby — i.e. they were ejected during a mode switch and the
- * lobby still exists. Used to surface an `EVICTED` status to the previous
- * guest from `GET /api/lobbies/[id]`.
+ * True when the viewer has no current role in a non-terminal lobby — i.e. they
+ * were ejected during a mode switch and the lobby still exists. Used to
+ * surface an `EVICTED` status to the previous guest from
+ * `GET /api/lobbies/[id]`.
  */
 export function viewerIsEvicted(
-  lobby: Pick<LobbyRoomState, "status" | "hostUserId" | "guest">,
-  viewerUserId: string
+  lobby: Pick<LobbyRoomState, "status" | "viewerRole">
 ): boolean {
-  if (lobby.hostUserId === viewerUserId) return false;
   if (lobby.status !== "WAITING" && lobby.status !== "READY") return false;
-  return lobby.guest?.user.id !== viewerUserId;
+  return lobby.viewerRole === null;
 }

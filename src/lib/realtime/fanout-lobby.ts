@@ -1,7 +1,7 @@
 /**
  * Fanout helper for lobby state updates.
  *
- * Resolves the host + guest userIds from a `LobbyRoomState` and calls
+ * Resolves the host, guest, and spectator userIds from a `LobbyRoomState` and calls
  * `notifyUser` for each member with `{ type: "lobby:state_changed", lobby }`.
  * The actor (the user whose request triggered the mutation) is skipped — their
  * UI updates from the route response.
@@ -58,5 +58,6 @@ function collectLobbyMemberIds(lobby: LobbyRoomState): string[] {
   // one fanout per state change.
   const ids = new Set<string>([lobby.hostUserId]);
   if (lobby.guest) ids.add(lobby.guest.user.id);
+  for (const spectator of lobby.spectators) ids.add(spectator.id);
   return Array.from(ids);
 }

@@ -20,6 +20,10 @@ function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
     hostUserId: "host-user",
     host: { username: "hosty", name: null, image: null },
     hostDeck: null,
+    allowSpectators: false,
+    spectators: [],
+    spectatorCount: 0,
+    viewerRole: null,
     guest: null,
     gameId: null,
     ...overrides,
@@ -202,6 +206,47 @@ describe("notifyLobby", () => {
     );
     expect(payloads[1].lobby.hostDeck.contents.characters[0].name).toBe(
       "guest-user"
+    );
+  });
+
+  it("fans out a spectator-scoped snapshot to each spectator", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const state = lobbyState({
+      allowSpectators: true,
+      spectators: [
+        {
+          id: "spectator-user",
+          username: "usopp",
+          name: "Usopp",
+          image: null,
+        },
+      ],
+      spectatorCount: 1,
+    });
+    const stateBuilder = vi.fn(
+      async (_lobbyId: string, viewerUserId: string) => ({
+        ...state,
+        viewerRole:
+          viewerUserId === "host-user"
+            ? ("host" as const)
+            : ("spectator" as const),
+      })
+    );
+
+    await notifyLobby(state, {
+      deps: { ...baseDeps, fetch: fetchMock },
+      stateBuilder,
+    });
+
+    expect(stateBuilder).toHaveBeenCalledWith("lobby-1", "host-user");
+    expect(stateBuilder).toHaveBeenCalledWith("lobby-1", "spectator-user");
+    const spectatorCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("/user/spectator-user/")
+    );
+    expect(JSON.parse(spectatorCall?.[1].body).lobby.viewerRole).toBe(
+      "spectator"
     );
   });
 });

@@ -16,6 +16,10 @@ function lobbyState(version?: unknown) {
     hostUserId: "host-user",
     host: { username: "hosty", name: null, image: null },
     hostDeck: null,
+    allowSpectators: false,
+    spectators: [],
+    spectatorCount: 0,
+    viewerRole: null,
     guest: null,
     gameId: null,
   };
@@ -63,6 +67,32 @@ describe("LobbyRoomStateSchema pending invite", () => {
     expect(
       LobbyRoomStateSchema.parse(lobbyState()).pendingInvite
     ).toBeUndefined();
+  });
+});
+
+describe("LobbyRoomStateSchema spectator state", () => {
+  it("preserves spectator projection, count, policy, and viewer role", () => {
+    const spectatorState = {
+      ...lobbyState(),
+      allowSpectators: true,
+      spectators: [
+        {
+          id: "spectator-1",
+          username: "usopp",
+          name: "Usopp",
+          image: null,
+        },
+      ],
+      spectatorCount: 1,
+      viewerRole: "spectator" as const,
+    };
+
+    expect(LobbyRoomStateSchema.parse(spectatorState)).toMatchObject({
+      allowSpectators: true,
+      spectators: spectatorState.spectators,
+      spectatorCount: 1,
+      viewerRole: "spectator",
+    });
   });
 });
 

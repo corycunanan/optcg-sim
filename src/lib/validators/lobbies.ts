@@ -59,6 +59,10 @@ export const LobbyRoomStateSchema = z.object({
   hostUserId: z.string(),
   host: LobbyUserSchema.omit({ id: true }).nullable(),
   hostDeck: LobbyDeckSchema.nullable(),
+  allowSpectators: z.boolean(),
+  spectators: z.array(LobbyUserSchema),
+  spectatorCount: z.number().int().nonnegative(),
+  viewerRole: z.enum(["host", "guest", "spectator"]).nullable(),
   guest: z
     .object({
       guestReady: z.boolean(),

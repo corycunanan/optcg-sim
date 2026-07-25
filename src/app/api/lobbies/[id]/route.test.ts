@@ -166,6 +166,7 @@ beforeEach(() => {
     id: "lobby-1",
     status: "READY",
     hostUserId: "host-user",
+    viewerRole: "host",
     guest: null,
   });
   notifyLobbyMock.mockResolvedValue(undefined);
@@ -185,6 +186,27 @@ describe("GET /api/lobbies/[id]", () => {
       "lobby-1",
       "host-user",
     );
+  });
+
+  it("does not mark a current spectator as evicted", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "spectator-user" } });
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      id: "lobby-1",
+      status: "WAITING",
+      hostUserId: "host-user",
+      guest: null,
+      viewerRole: "spectator",
+    });
+
+    const res = await GET(
+      new NextRequest("http://localhost/api/lobbies/lobby-1"),
+      params,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { status: "WAITING", viewerRole: "spectator" },
+    });
   });
 });
 
