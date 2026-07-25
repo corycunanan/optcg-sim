@@ -196,6 +196,40 @@ function buildScenario() {
   };
 }
 
+function buildSlotControllerSchema(
+  targetType: Target["type"],
+  slotController: unknown
+): EffectSchema {
+  return {
+    card_id: "TEST-117",
+    card_name: "Slot Controller",
+    card_type: "Character",
+    effects: [
+      {
+        id: "slot-controller",
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [
+          {
+            type: "RETURN_TO_HAND",
+            target: {
+              type: targetType,
+              source_zone: "HAND",
+              dual_targets: [
+                {
+                  controller: slotController,
+                  filter: {},
+                  count: { up_to: 1 },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  } as EffectSchema;
+}
+
 describe("OPT-117 dual-target slot controllers", () => {
   it("narrows prompt metadata per slot controller", () => {
     const {
@@ -340,38 +374,114 @@ describe("OPT-117 dual-target slot controllers", () => {
   });
 
   it("rejects an invalid dual-target slot controller during schema validation", () => {
-    const schema = {
-      card_id: "TEST-117",
-      card_name: "Invalid Controller",
-      card_type: "Character",
-      effects: [
-        {
-          id: "invalid-controller",
-          category: "auto",
-          trigger: { keyword: "ON_PLAY" },
-          actions: [
-            {
-              type: "KO",
-              target: {
-                type: "CHARACTER",
-                controller: "EITHER",
-                dual_targets: [
-                  {
-                    controller: "INVALID",
-                    filter: {},
-                    count: { up_to: 1 },
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      ],
-    } as unknown as EffectSchema;
+    const schema = buildSlotControllerSchema("CHARACTER", "INVALID");
 
     expect(validateEffectSchema(schema, "TEST-117")).toContain(
       "[TEST-117] effects[0].actions[0].dual_targets[0].controller: Invalid controller 'INVALID'"
     );
+  });
+
+  it.each(["EITHER", "ANY"] as const)(
+    "accepts %s slot controllers for target types with both-player resolution",
+    (slotController) => {
+      for (const targetType of [
+        "CHARACTER",
+        "LEADER_OR_CHARACTER",
+        "FIELD_CARD",
+      ] as const) {
+        expect(
+          validateEffectSchema(
+            buildSlotControllerSchema(targetType, slotController),
+            "TEST-117"
+          )
+        ).toEqual([]);
+      }
+    }
+  );
+
+  it.each(["EITHER", "ANY"] as const)(
+    "rejects %s slot controllers for target types that collapse both-player modes",
+    (slotController) => {
+      for (const targetType of [
+        "CARD_IN_HAND",
+        "CHARACTER_CARD",
+        "EVENT_CARD",
+        "STAGE_CARD",
+        "CARD_IN_TRASH",
+        "CARD_IN_DECK",
+        "DON_IN_COST_AREA",
+        "STAGE",
+        "PLAYER",
+        "CARD_ON_TOP_OF_DECK",
+      ] as const) {
+        expect(
+          validateEffectSchema(
+            buildSlotControllerSchema(targetType, slotController),
+            "TEST-117"
+          )
+        ).toContain(
+          `[TEST-117] effects[0].actions[0].dual_targets[0].controller: [C6] Target type '${targetType}' does not support dual-target slot controller '${slotController}'; use SELF or OPPONENT`
+        );
+      }
+    }
+  );
+
+  it.each(["SELF", "OPPONENT"] as const)(
+    "accepts %s slot controllers for single-player target branches",
+    (slotController) => {
+      expect(
+        validateEffectSchema(
+          buildSlotControllerSchema("CARD_IN_HAND", slotController),
+          "TEST-117"
+        )
+      ).toEqual([]);
+    }
+  );
+
+  it("keeps prompt slot pools within the caller's authoritative valid IDs", () => {
+    const {
+      state,
+      cardDb,
+      alvida,
+      friendlyLowCost,
+      opponentLowCost,
+    } = buildScenario();
+    const action: ActionOf<"RETURN_TO_DECK"> = {
+      type: "RETURN_TO_DECK",
+      target: {
+        type: "CHARACTER",
+        controller: "EITHER",
+        dual_targets: [
+          {
+            filter: { base_cost_max: 3 },
+            count: { any_number: true },
+          },
+        ],
+      },
+      params: { position: "BOTTOM" },
+    };
+    const result = buildSelectTargetPrompt(
+      state,
+      action,
+      [opponentLowCost.instanceId],
+      alvida.instanceId,
+      0,
+      cardDb,
+      new Map()
+    );
+    const options = result.pendingPrompt!.options;
+    expect(options.promptType).toBe("SELECT_TARGET");
+    if (options.promptType !== "SELECT_TARGET")
+      throw new Error("unexpected prompt type");
+
+    expect(options.validTargets).toEqual([opponentLowCost.instanceId]);
+    expect(options.dualTargets!.slots[0].validIds).toEqual([
+      opponentLowCost.instanceId,
+    ]);
+    expect(options.dualTargets!.slots[0].validIds).not.toContain(
+      friendlyLowCost.instanceId
+    );
+    expect(options.dualTargets!.slots[0].countMax).toBe(1);
   });
 
   it("resolves EB03-021 as one mixed-controller prompt and returns both cards to their owners' deck bottoms", () => {

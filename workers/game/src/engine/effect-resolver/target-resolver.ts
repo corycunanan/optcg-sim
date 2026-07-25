@@ -635,17 +635,18 @@ export function buildSelectTargetPrompt(
   const target = action.target;
 
   // Compute dual_targets metadata for the prompt
+  const authoritativeValidIds = new Set(allValidIds);
   const dualTargetsMetadata = target?.dual_targets?.length
     ? {
         slots: target.dual_targets.map((dt) => {
-          const slotValidIds = resolveDualTargetSlot(
+          const slotValidIds = (resolveDualTargetSlot(
             state,
             target,
             dt,
             cardDb,
             resultRefs,
             { controller, sourceCardInstanceId },
-          ) ?? [];
+          ) ?? []).filter((id) => authoritativeValidIds.has(id));
           return {
             validIds: slotValidIds,
             countMin: resolveCountMin(dt.count),

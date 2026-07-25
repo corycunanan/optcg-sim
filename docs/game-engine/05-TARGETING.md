@@ -607,6 +607,11 @@ interface DualTarget {
 }
 ```
 
+The both-player slot modes `EITHER` and `ANY` are supported only when the
+parent target type implements both-player resolution: `CHARACTER`,
+`LEADER_OR_CHARACTER`, or `FIELD_CARD`. Other controller-sensitive target
+types support only `SELF` and `OPPONENT` in a dual-target slot.
+
 **Cards:** OP01-096 King, OP03-018, EB04-059
 
 **Example** — OP01-096 King: "K.O. up to 1 of your opponent's Characters with a cost of 3 or less and up to 1 of your opponent's Characters with a cost of 2 or less."

@@ -23,6 +23,7 @@ import {
   type Controller,
   type Cost,
   type TargetFilter,
+  type TargetType,
 } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
@@ -134,6 +135,28 @@ const VALID_CONTROLLERS: ReadonlySet<Controller> = new Set([
   "OPPONENT",
   "EITHER",
   "ANY",
+]);
+const SELF_OR_OPPONENT_CONTROLLERS: ReadonlySet<Controller> = new Set([
+  "SELF",
+  "OPPONENT",
+]);
+const DUAL_TARGET_SLOT_CONTROLLER_MODES: ReadonlyMap<
+  TargetType,
+  ReadonlySet<Controller>
+> = new Map([
+  ["CHARACTER", VALID_CONTROLLERS],
+  ["LEADER_OR_CHARACTER", VALID_CONTROLLERS],
+  ["FIELD_CARD", VALID_CONTROLLERS],
+  ["CARD_IN_HAND", SELF_OR_OPPONENT_CONTROLLERS],
+  ["CHARACTER_CARD", SELF_OR_OPPONENT_CONTROLLERS],
+  ["EVENT_CARD", SELF_OR_OPPONENT_CONTROLLERS],
+  ["STAGE_CARD", SELF_OR_OPPONENT_CONTROLLERS],
+  ["CARD_IN_TRASH", SELF_OR_OPPONENT_CONTROLLERS],
+  ["CARD_IN_DECK", SELF_OR_OPPONENT_CONTROLLERS],
+  ["DON_IN_COST_AREA", SELF_OR_OPPONENT_CONTROLLERS],
+  ["STAGE", SELF_OR_OPPONENT_CONTROLLERS],
+  ["PLAYER", SELF_OR_OPPONENT_CONTROLLERS],
+  ["CARD_ON_TOP_OF_DECK", SELF_OR_OPPONENT_CONTROLLERS],
 ]);
 
 /**
@@ -473,6 +496,13 @@ function validateTargetController(target: Action["target"], prefix: string): str
       errors.push(
         `${prefix}.dual_targets[${i}].controller: Invalid controller '${slotController}'`,
       );
+    } else if (slotController !== undefined && target?.type) {
+      const supportedModes = DUAL_TARGET_SLOT_CONTROLLER_MODES.get(target.type);
+      if (supportedModes && !supportedModes.has(slotController)) {
+        errors.push(
+          `${prefix}.dual_targets[${i}].controller: [C6] Target type '${target.type}' does not support dual-target slot controller '${slotController}'; use SELF or OPPONENT`,
+        );
+      }
     }
     errors.push(...validateTargetFilterController(
       target!.dual_targets![i].filter as TargetFilter | undefined,
