@@ -10,6 +10,8 @@ function assertSameSpectatorField(
   playerZeroValue: unknown,
   playerOneValue: unknown,
 ): void {
+  if (playerZeroValue === playerOneValue) return;
+
   if (JSON.stringify(playerZeroValue) !== JSON.stringify(playerOneValue)) {
     throw new Error(
       `Spectator visibility invariant violated: ${field} differs between player views`,
@@ -47,6 +49,12 @@ export function visibleStateForPlayer(
  * BOTH players. Otherwise, a colluding spectator could relay each player's own
  * deck order or Life identities to their opponent. Consequently, spectator
  * clients must never assume a deck card has `cardId !== "hidden"`.
+ *
+ * OPT-550 decides spectator `effectAvailability` at
+ * `GameSession.broadcastFilteredState`; this pure core deliberately does not
+ * set that transport-only field. OPT-552 broadcast callers must contain any
+ * invariant error from this function so spectator delivery alone fails,
+ * without interrupting authoritative player delivery.
  */
 export function visibleStateForSpectator(
   state: GameState,
@@ -63,23 +71,13 @@ export function visibleStateForSpectator(
   );
 
   for (const playerIndex of [0, 1] as const) {
-    const playerZeroPublicZones = {
-      leader: playerZeroView.players[playerIndex].leader,
-      characters: playerZeroView.players[playerIndex].characters,
-      stage: playerZeroView.players[playerIndex].stage,
-      trash: playerZeroView.players[playerIndex].trash,
-    };
-    const playerOnePublicZones = {
-      leader: playerOneView.players[playerIndex].leader,
-      characters: playerOneView.players[playerIndex].characters,
-      stage: playerOneView.players[playerIndex].stage,
-      trash: playerOneView.players[playerIndex].trash,
-    };
-    assertSameSpectatorField(
-      `players[${playerIndex}] public zones`,
-      playerZeroPublicZones,
-      playerOnePublicZones,
-    );
+    for (const zone of ["leader", "characters", "stage", "trash"] as const) {
+      assertSameSpectatorField(
+        `players[${playerIndex}].${zone}`,
+        playerZeroView.players[playerIndex][zone],
+        playerOneView.players[playerIndex][zone],
+      );
+    }
   }
 
   const players = obfuscatePlayersDecksAndFaceDownLife([
@@ -87,10 +85,21 @@ export function visibleStateForSpectator(
     playerOneView.players[1],
   ]);
 
+  // Deliberately explicit: do not replace this literal with a view spread.
+  // Record<keyof ...> makes newly-added optional core fields fail type-check
+  // too, forcing a deliberate spectator decision for every state field.
   return {
-    ...playerZeroView,
+    id: stripped.id,
     executionContext: playerZeroView.executionContext,
     players,
+    // TODO(OPT-549): Spectator private turn-field merge semantics are decided there.
+    turn: playerZeroView.turn,
+    pregame: stripped.pregame,
+    activeEffects: stripped.activeEffects,
+    prohibitions: stripped.prohibitions,
+    scheduledActions: stripped.scheduledActions,
+    oneTimeModifiers: stripped.oneTimeModifiers,
+    triggerRegistry: stripped.triggerRegistry,
     // TODO(OPT-549): Spectator event-log merge semantics are decided there.
     eventLog: playerZeroView.eventLog,
     // TODO(OPT-549): Spectator prompt merge semantics are decided there.
@@ -98,9 +107,13 @@ export function visibleStateForSpectator(
     // TODO(OPT-549): Spectator prompt ownership semantics are decided there.
     promptRespondingPlayer: playerZeroView.promptRespondingPlayer,
     effectStack: [],
-    // TODO(OPT-549): Spectator private turn-field merge semantics are decided there.
-    turn: playerZeroView.turn,
-    // TODO(OPT-550): Spectator effect availability is decided there.
-    effectAvailability: playerZeroView.effectAvailability,
-  };
+    status: stripped.status,
+    winner: stripped.winner,
+    winReason: stripped.winReason,
+    engineOutcome: stripped.engineOutcome,
+    engineActionCount: stripped.engineActionCount,
+  } satisfies GameState & Record<
+    keyof Omit<GameState, "effectAvailability">,
+    unknown
+  >;
 }

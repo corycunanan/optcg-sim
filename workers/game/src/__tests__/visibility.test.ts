@@ -350,4 +350,43 @@ describe("visibleStateForSpectator", () => {
         .toEqual(state.players[playerIndex].trash);
     }
   });
+
+  it("throws when player views disagree on the redacted execution context", () => {
+    const { state, cardDb } = getMainPhaseState();
+    let versionReads = 0;
+    const divergentExecutionContext = { ...state.executionContext };
+    Object.defineProperty(divergentExecutionContext, "version", {
+      enumerable: true,
+      get: () => versionReads++ === 0 ? 1 : 2,
+    });
+    const divergentState = {
+      ...state,
+      executionContext: divergentExecutionContext,
+    } as typeof state;
+
+    expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
+      "Spectator visibility invariant violated: executionContext differs between player views",
+    );
+  });
+
+  it("throws when player views disagree on a public zone", () => {
+    const { state, cardDb } = getMainPhaseState();
+    const playerZero = { ...state.players[0] };
+    const leader = playerZero.leader;
+    let leaderReads = 0;
+    Object.defineProperty(playerZero, "leader", {
+      enumerable: true,
+      get: () => leaderReads++ === 0
+        ? leader
+        : { ...leader, cardId: "viewer-specific-leader" },
+    });
+    const divergentState = {
+      ...state,
+      players: [playerZero, state.players[1]],
+    } as typeof state;
+
+    expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
+      "Spectator visibility invariant violated: players[0].leader differs between player views",
+    );
+  });
 });
