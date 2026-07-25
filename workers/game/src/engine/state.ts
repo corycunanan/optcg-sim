@@ -440,6 +440,99 @@ export function findCardInstance(
 
 // ─── Visibility filtering (§8-4-5) ───────────────────────────────────────────
 
+function obfuscateCard(
+  card: CardInstance,
+  playerIndex: 0 | 1,
+  zone: "hand" | "deck",
+  zoneIndex: number,
+): CardInstance {
+  return {
+    ...card,
+    instanceId: `hidden-${playerIndex}-${zone}-${zoneIndex}`,
+    cardId: "hidden",
+    attachedDon: [],
+  };
+}
+
+/**
+ * Obfuscate cards in one player's hidden zone while preserving placeholder
+ * metadata. Zone indices and synthetic IDs are derived by this helper rather
+ * than supplied individually by callers.
+ */
+export function obfuscateCards(
+  cards: readonly CardInstance[],
+  playerIndex: 0 | 1,
+  zone: "hand" | "deck",
+): CardInstance[] {
+  return cards.map((card, index) =>
+    obfuscateCard(card, playerIndex, zone, index));
+}
+
+/**
+ * Obfuscate one player's deck order and face-down Life identities.
+ *
+ * The player-specific path applies this only to the opponent: each receiving
+ * player legitimately receives their own deck and face-down Life identities
+ * in full. Callers of this lower-level helper own matching `playerIndex` to
+ * the supplied player. Use obfuscatePlayersDecksAndFaceDownLife when applying
+ * the policy to both players so their indices are derived positionally.
+ */
+export function obfuscatePlayerDeckAndFaceDownLife(
+  player: PlayerState,
+  playerIndex: 0 | 1,
+): PlayerState {
+  return {
+    ...player,
+    deck: obfuscateCards(player.deck, playerIndex, "deck"),
+    life: player.life.map((lc, index) =>
+      lc.face === "DOWN"
+        ? { ...lc, instanceId: `hidden-${playerIndex}-life-${index}`, cardId: "hidden" }
+        : lc,
+    ),
+  };
+}
+
+/**
+ * Obfuscate both players' deck order and face-down Life identities, deriving
+ * each synthetic-ID namespace from the player's tuple position.
+ *
+ * Spectator visibility is union-for-revealed, intersection-for-secret: hands
+ * and peeks remain visible through the union of the two player views, then
+ * this helper re-obfuscates deck order and face-down Life for BOTH players.
+ * Without that final step, a colluding spectator could relay each player's
+ * own deck order and Life identities to the opponent. Consequently, a
+ * spectator board must never assume a deck card has `cardId !== "hidden"`.
+ */
+export function obfuscatePlayersDecksAndFaceDownLife(
+  players: readonly [PlayerState, PlayerState],
+): [PlayerState, PlayerState] {
+  return [
+    obfuscatePlayerDeckAndFaceDownLife(players[0], 0),
+    obfuscatePlayerDeckAndFaceDownLife(players[1], 1),
+  ];
+}
+
+/**
+ * Top-level GameState fields deliberately rewritten for a player snapshot.
+ *
+ * The typed override object in filterStateForPlayer is coupled to this list.
+ * Spectator tests independently enumerate their merge policies and compare
+ * against this contract, so adding a player-view rewrite cannot silently leak
+ * or disappear from spectator snapshots.
+ */
+export const PLAYER_VIEW_REWRITTEN_FIELDS = [
+  "executionContext",
+  "players",
+  "turn",
+  "eventLog",
+  "pendingPrompt",
+  "promptRespondingPlayer",
+  "effectStack",
+] as const satisfies readonly (keyof GameState)[];
+
+type PlayerViewRewrittenField =
+  (typeof PLAYER_VIEW_REWRITTEN_FIELDS)[number];
+
 /**
  * Create a player-specific view of the game state that hides secret zone data
  * from the opponent. The receiving player sees their own zones in full; the
@@ -459,25 +552,13 @@ export function filterStateForPlayer(
   const opponentIndex = receivingPlayer === 0 ? 1 : 0;
   const opponent = state.players[opponentIndex];
 
-  const obfuscateCard = (card: CardInstance, hiddenInstanceId: string): CardInstance => ({
-    ...card,
-    instanceId: hiddenInstanceId,
-    cardId: "hidden",
-    attachedDon: [],
-  });
-
-  const filteredOpponent: PlayerState = {
-    ...opponent,
-    hand: opponent.hand.map((card, index) =>
-      obfuscateCard(card, `hidden-${opponentIndex}-hand-${index}`)),
-    deck: opponent.deck.map((card, index) =>
-      obfuscateCard(card, `hidden-${opponentIndex}-deck-${index}`)),
-    life: opponent.life.map((lc, index) =>
-      lc.face === "DOWN"
-        ? { ...lc, instanceId: `hidden-${opponentIndex}-life-${index}`, cardId: "hidden" }
-        : lc,
-    ),
-  };
+  const filteredOpponent = obfuscatePlayerDeckAndFaceDownLife(
+    {
+      ...opponent,
+      hand: obfuscateCards(opponent.hand, opponentIndex, "hand"),
+    },
+    opponentIndex,
+  );
 
   const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
   newPlayers[opponentIndex] = filteredOpponent;
@@ -504,8 +585,7 @@ export function filterStateForPlayer(
         : state.turn.pendingBattleDamageContinuation,
   };
 
-  return {
-    ...state,
+  const playerViewOverrides = {
     executionContext: {
       version: state.executionContext.version,
       seed: "redacted",
@@ -522,7 +602,11 @@ export function filterStateForPlayer(
     promptRespondingPlayer: state.pendingPrompt?.respondingPlayer ?? null,
     effectStack: [],
     turn: filteredTurn,
+  } satisfies {
+    [Field in PlayerViewRewrittenField]: GameState[Field];
   };
+
+  return { ...state, ...playerViewOverrides };
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────

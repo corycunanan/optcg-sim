@@ -38,7 +38,7 @@ import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
 import { handleGameStatusRequest } from "./session/status.js";
 import {
   computeEffectAvailability,
-  effectAvailabilityForController,
+  effectAvailabilityForRecipient,
 } from "./engine/availability.js";
 import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
@@ -868,9 +868,9 @@ export class GameSession implements DurableObject {
       (filteredState, recipientPlayerIndex) =>
         build(
           {
-            ...filteredState,
-            effectAvailability: effectAvailabilityForController(
-              state,
+            ...filteredState, // OPT-550: spectators merge both controllers because availability derives only from already-visible zones and adds no information.
+            effectAvailability: effectAvailabilityForRecipient(
+              state, // OPT-552: catch null-recipient failures per recipient; a spectator-first/between throw otherwise skips later player delivery.
               availability,
               recipientPlayerIndex
             ),

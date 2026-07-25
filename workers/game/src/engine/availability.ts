@@ -295,3 +295,49 @@ export function effectAvailabilityForController(
     )
   );
 }
+
+/**
+ * Combine both controllers' derived availability for a spectator.
+ *
+ * Keys are card instance IDs, which are expected to be globally unique across
+ * both players. An overlap signals that uniqueness invariant was violated, so
+ * throw instead of silently choosing one controller's entry. Broadcast-path
+ * callers must contain this error per spectator so spectator delivery alone
+ * fails without interrupting delivery to any other recipient.
+ */
+export function effectAvailabilityForSpectator(
+  state: GameState,
+  availability: Record<string, EffectAvailability[]>
+): Record<string, EffectAvailability[]> {
+  const controllerZero = effectAvailabilityForController(
+    state,
+    availability,
+    0
+  );
+  const controllerOne = effectAvailabilityForController(state, availability, 1);
+
+  for (const instanceId of Object.keys(controllerZero)) {
+    if (Object.prototype.hasOwnProperty.call(controllerOne, instanceId)) {
+      throw new Error(
+        `Effect availability invariant violated: card instance ${instanceId} belongs to both controllers`
+      );
+    }
+  }
+
+  return { ...controllerZero, ...controllerOne };
+}
+
+/** Select controller-scoped or merged spectator availability without guessing. */
+export function effectAvailabilityForRecipient(
+  state: GameState,
+  availability: Record<string, EffectAvailability[]>,
+  recipientPlayerIndex: 0 | 1 | null
+): Record<string, EffectAvailability[]> {
+  return recipientPlayerIndex === null
+    ? effectAvailabilityForSpectator(state, availability)
+    : effectAvailabilityForController(
+        state,
+        availability,
+        recipientPlayerIndex
+      );
+}
