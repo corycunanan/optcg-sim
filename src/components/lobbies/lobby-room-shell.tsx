@@ -99,6 +99,7 @@ export function LobbyRoomShell({
   const [copied, setCopied] = useState(false);
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
   const [cancelingInvite, setCancelingInvite] = useState(false);
+  const [recoveryReentry, setRecoveryReentry] = useState(false);
   const recoveryHandledRef = useRef(false);
 
   useEffect(() => {
@@ -128,7 +129,10 @@ export function LobbyRoomShell({
   useEffect(() => {
     if (!recovery || recoveryHandledRef.current) return;
     recoveryHandledRef.current = true;
-    if (!claimLobbyRecovery(lobbyId)) return;
+    if (!claimLobbyRecovery(lobbyId)) {
+      setRecoveryReentry(true);
+      return;
+    }
     if (recovery.message) toast.info(recovery.message);
     router.push(recovery.route);
   }, [lobbyId, recovery, router]);
@@ -265,7 +269,27 @@ export function LobbyRoomShell({
     }
   };
 
-  if (recovery) return null;
+  if (recovery) {
+    if (!recoveryReentry) return null;
+
+    return (
+      <div className="bg-background flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl px-6 py-10">
+          <div className="border-border bg-card rounded-lg border p-6">
+            <p className="text-content-primary text-lg font-semibold">
+              This party is no longer available
+            </p>
+            <p className="text-content-secondary mt-2 text-sm">
+              Return to Play to find or create an available party room.
+            </p>
+            <Button className="mt-4" onClick={() => router.push("/lobbies")}>
+              Back to Play
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !lobby) {
     return (

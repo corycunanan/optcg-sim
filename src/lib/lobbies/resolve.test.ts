@@ -63,6 +63,32 @@ describe("resolveCanonicalLobby", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("ignores an in-progress session whose lobby is closed", async () => {
+    gameFindFirstMock.mockImplementation(async (query: unknown) =>
+      (query as { where: { lobby?: { status?: { not?: string } } } }).where
+        .lobby?.status?.not === "CLOSED"
+        ? null
+        : { lobbyId: "closed-game-lobby" }
+    );
+    userFindUniqueMock.mockResolvedValue(activeMembership);
+
+    await expect(resolveCanonicalLobby("user-1")).resolves.toEqual({
+      lobbyId: "lobby-active",
+      branch: "membership",
+    });
+
+    expect(gameFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        status: "IN_PROGRESS",
+        OR: [{ player1Id: "user-1" }, { player2Id: "user-1" }],
+        lobby: { status: { not: "CLOSED" } },
+      },
+      select: { lobbyId: true },
+      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("uses a valid active-lobby membership without creating", async () => {
     userFindUniqueMock.mockResolvedValue(activeMembership);
 

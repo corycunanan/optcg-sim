@@ -483,6 +483,47 @@ describe("LobbyRoomShell guest removal recovery", () => {
 });
 
 describe("LobbyRoomShell party disband recovery", () => {
+  it("renders a recovery panel when the router re-enters an already-claimed lobby", async () => {
+    const lobbyId = "reentered-closed-lobby";
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : { data: lobbyState({ id: lobbyId, status: "CLOSED" }) }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId={lobbyId} currentUserId="guest-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderer!.toJSON()).toBeNull();
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
+
+    act(() => renderer?.unmount());
+    renderer = null;
+    mocks.push.mockReset();
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId={lobbyId} currentUserId="guest-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("This party is no longer available");
+    const backButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Back to Play"));
+    expect(backButton).toBeDefined();
+
+    act(() => backButton?.props.onClick());
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
+  });
+
   it("handles a CLOSED snapshot followed by the directed event exactly once", async () => {
     const lobbyId = "closed-first-lobby";
     mocks.apiGet.mockImplementation(async (url: string) => {

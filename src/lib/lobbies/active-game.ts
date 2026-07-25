@@ -6,6 +6,7 @@ export async function findActiveGameLobby(userId: string) {
     where: {
       status: "IN_PROGRESS",
       OR: [{ player1Id: userId }, { player2Id: userId }],
+      lobby: { status: { not: "CLOSED" } },
     },
     select: { lobbyId: true },
     orderBy: [{ startedAt: "desc" }, { id: "desc" }],
