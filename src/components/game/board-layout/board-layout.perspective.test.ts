@@ -8,6 +8,23 @@ vi.mock("@/components/ui", () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+vi.mock("./use-battle-state", () => ({
+  useBattleState: () => ({
+    battle: null,
+    battleInfo: null,
+    canDragCounter: true,
+    canEndPhase: true,
+    canInteract: true,
+    canPass: true,
+    inBattle: false,
+    inBlockStep: true,
+    isDefender: false,
+    phase: "MAIN",
+    selectedBlockerId: null,
+    setSelectedBlockerId: vi.fn(),
+  }),
+}));
+
 vi.mock("./field-card", () => ({
   PlayerFieldCard: ({
     card,
@@ -51,6 +68,48 @@ vi.mock("./life-zone", () => ({
     }),
 }));
 
+vi.mock("./player-field", () => ({
+  PlayerField: ({
+    me,
+    canInteract,
+    canActivateMain,
+    canDragCounter,
+    inBlockStep,
+  }: {
+    me: PlayerState | null;
+    canInteract: boolean;
+    canActivateMain: boolean;
+    canDragCounter: boolean;
+    inBlockStep: boolean;
+  }) =>
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement("div", {
+        "data-testid": "player-field",
+        "data-can-interact": String(canInteract),
+        "data-can-activate-main": String(canActivateMain),
+        "data-can-drag-counter": String(canDragCounter),
+        "data-in-block-step": String(inBlockStep),
+      }),
+      React.createElement("div", {
+        "data-life-instance-ids": (me?.life ?? [])
+          .map((card) => card.instanceId)
+          .join(","),
+        "data-life-zone-key": "p-life",
+      }),
+      ...[me?.leader, ...(me?.characters ?? [])]
+        .filter((card): card is CardInstance => !!card)
+        .map((card) =>
+          React.createElement("div", {
+            key: card.instanceId,
+            "data-field": "bottom",
+            "data-instance-id": card.instanceId,
+          }),
+        ),
+    ),
+}));
+
 vi.mock("./hand-layer", () => ({ HandLayer: () => null }));
 vi.mock("./deck-pile", () => ({ DeckPile: () => null }));
 vi.mock("./don-zone", () => ({ DonZone: () => null }));
@@ -62,20 +121,35 @@ vi.mock("./drop-zones", () => ({
 }));
 vi.mock("./empty-slot", () => ({ EmptySlot: () => null }));
 vi.mock("./zone-ref", () => ({ ZoneRef: () => null }));
-vi.mock("./board-navbar", () => ({ BoardNavbar: () => null }));
+vi.mock("./board-navbar", () => ({
+  BoardNavbar: ({ onConcede }: { onConcede: () => void }) =>
+    React.createElement("button", {
+      "data-testid": "navbar-concede-probe",
+      onClick: onConcede,
+    }),
+}));
 vi.mock("./mid-zone", () => ({
   MidZone: ({
     activePrompt,
+    blockerMode,
+    canEndPhase,
+    canPass,
     canUndo,
     onAction,
   }: {
     activePrompt: { promptType: string } | null;
+    blockerMode?: unknown;
+    canEndPhase: boolean;
+    canPass: boolean;
     canUndo: boolean;
     onAction: (action: { type: "PASS" }) => void;
   }) =>
     React.createElement("button", {
       "data-testid": "mid-zone",
       "data-active-prompt": activePrompt?.promptType ?? "none",
+      "data-blocker-mode": String(!!blockerMode),
+      "data-can-end-phase": String(canEndPhase),
+      "data-can-pass": String(canPass),
       "data-can-undo": String(canUndo),
       onClick: () => onAction({ type: "PASS" }),
     }),
@@ -236,6 +310,79 @@ describe("BoardLayout bottom-player perspective", () => {
     );
   });
 
+  it("suppresses every ordinary spectator affordance regardless of board anchor", () => {
+    for (const bottomPlayerIndex of [0, 1] as const) {
+      renderComposition(bottomPlayerIndex, { canUndo: true });
+
+      expect(
+        renderer!.root.findByProps({ "data-testid": "mid-zone" }).props,
+      ).toMatchObject({
+        "data-blocker-mode": "false",
+        "data-can-end-phase": "false",
+        "data-can-pass": "false",
+        "data-can-undo": "false",
+      });
+      expect(
+        renderer!.root.findByProps({ "data-testid": "player-field" }).props,
+      ).toMatchObject({
+        "data-can-interact": "false",
+        "data-can-activate-main": "false",
+        "data-can-drag-counter": "false",
+        "data-in-block-step": "false",
+      });
+
+      act(() => renderer?.unmount());
+      renderer = null;
+    }
+  });
+
+  it("preserves every ordinary affordance in full interaction mode", () => {
+    renderComposition(0, { interactionMode: "full", canUndo: true });
+
+    expect(
+      renderer!.root.findByProps({ "data-testid": "mid-zone" }).props,
+    ).toMatchObject({
+      "data-blocker-mode": "true",
+      "data-can-end-phase": "true",
+      "data-can-pass": "true",
+      "data-can-undo": "true",
+    });
+    expect(
+      renderer!.root.findByProps({ "data-testid": "player-field" }).props,
+    ).toMatchObject({
+      "data-can-interact": "true",
+      "data-can-activate-main": "true",
+      "data-can-drag-counter": "true",
+      "data-in-block-step": "true",
+    });
+  });
+
+  it("routes Concede through the spectator dispatch guard", () => {
+    const onAction = vi.fn();
+    renderComposition(0, { onAction });
+
+    act(() => {
+      renderer!.root
+        .findByProps({ "data-testid": "navbar-concede-probe" })
+        .props.onClick();
+    });
+
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("preserves Concede dispatch in full interaction mode", () => {
+    const onAction = vi.fn();
+    renderComposition(0, { interactionMode: "full", onAction });
+
+    act(() => {
+      renderer!.root
+        .findByProps({ "data-testid": "navbar-concede-probe" })
+        .props.onClick();
+    });
+
+    expect(onAction).toHaveBeenCalledWith({ type: "CONCEDE" });
+  });
+
   it("removes spectator prompt and mid-zone action affordances", () => {
     const onAction = vi.fn();
     renderComposition(0, {
@@ -295,4 +442,3 @@ describe("BoardLayout bottom-player perspective", () => {
     expect(onAction).toHaveBeenCalledWith({ type: "PASS" });
   });
 });
-

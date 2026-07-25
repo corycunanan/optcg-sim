@@ -383,7 +383,7 @@ function BoardLayoutInner({
         playerIndex={myIndex}
         connectionStatus={connectionStatus}
         onLeave={onLeave}
-        onConcede={() => onAction({ type: "CONCEDE" })}
+        onConcede={() => dispatchBoardAction({ type: "CONCEDE" })}
         matchClosed={matchClosed}
       />
 

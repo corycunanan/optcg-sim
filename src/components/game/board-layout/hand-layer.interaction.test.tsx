@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CardDb, CardInstance } from "@shared/game-types";
 import { InteractionModeProvider } from "./interaction-mode";
 
-const { useSortable } = vi.hoisted(() => ({
+const { SortableContext, useSortable } = vi.hoisted(() => ({
+  SortableContext: vi.fn(
+    ({ children }: { children: React.ReactNode }) => children,
+  ),
   useSortable: vi.fn(() => ({
     attributes: { tabIndex: 0, "aria-describedby": "dnd-help" },
     listeners: { onKeyDown: vi.fn() },
@@ -17,7 +20,7 @@ const { useSortable } = vi.hoisted(() => ({
 
 vi.mock("@dnd-kit/sortable", () => ({
   horizontalListSortingStrategy: {},
-  SortableContext: ({ children }: { children: React.ReactNode }) => children,
+  SortableContext,
   useSortable,
 }));
 vi.mock("motion/react", () => ({
@@ -45,37 +48,71 @@ vi.mock("./action-feedback", () => ({
 
 import { HandLayer } from "./hand-layer";
 
-const card = {
-  instanceId: "hand-1",
-  cardId: "TEST-001",
-  zone: "HAND",
-  state: "ACTIVE",
-  attachedDon: [],
-  turnPlayed: null,
-  controller: 0,
-  owner: 0,
-} as CardInstance;
+function makeCard(instanceId: string, controller: 0 | 1): CardInstance {
+  return {
+    instanceId,
+    cardId: `TEST-${controller}`,
+    zone: "HAND",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: null,
+    controller,
+    owner: controller,
+  } as CardInstance;
+}
+
+const bottomCard = makeCard("bottom-hand-1", 0);
+const topCard = makeCard("top-hand-1", 1);
 
 let renderer: ReactTestRenderer | null = null;
 
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
+  SortableContext.mockClear();
   useSortable.mockClear();
 });
 
 describe("HandLayer spectator interaction", () => {
-  it("renders face-up spectator cards without pointer or keyboard affordances", () => {
+  it("renders both face-up spectator hands without pointer or keyboard affordances", () => {
     act(() => {
       renderer = create(
         <InteractionModeProvider value="spectator">
-          <HandLayer cards={[card]} cardDb={{} as CardDb} />
+          <>
+            <HandLayer cards={[bottomCard]} cardDb={{} as CardDb} />
+            <HandLayer cards={[topCard]} cardDb={{} as CardDb} />
+          </>
         </InteractionModeProvider>
       );
     });
 
+    expect(
+      renderer!.root.findByProps({ "data-testid": "card-bottom-hand-1" })
+    ).toBeDefined();
+    expect(
+      renderer!.root.findByProps({ "data-testid": "card-top-hand-1" })
+    ).toBeDefined();
     expect(renderer!.root.findAllByProps({ role: "button" })).toHaveLength(0);
     expect(renderer!.root.findAllByProps({ tabIndex: 0 })).toHaveLength(0);
+    expect(SortableContext).not.toHaveBeenCalled();
     expect(useSortable).not.toHaveBeenCalled();
+  });
+
+  it("preserves sortable keyboard affordances for both hands in full mode", () => {
+    act(() => {
+      renderer = create(
+        <InteractionModeProvider value="full">
+          <>
+            <HandLayer cards={[bottomCard]} cardDb={{} as CardDb} enableDrag />
+            <HandLayer cards={[topCard]} cardDb={{} as CardDb} enableDrag />
+          </>
+        </InteractionModeProvider>
+      );
+    });
+
+    expect(renderer!.root.findAllByProps({ role: "button" })).toHaveLength(2);
+    expect(renderer!.root.findAllByProps({ tabIndex: 0 })).toHaveLength(2);
+    expect(SortableContext).toHaveBeenCalledTimes(2);
+    expect(useSortable).toHaveBeenCalledTimes(2);
   });
 });
