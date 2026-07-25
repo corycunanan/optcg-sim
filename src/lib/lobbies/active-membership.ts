@@ -10,7 +10,7 @@ export class ActiveLobbyConflictError extends Error {
 export async function claimActiveLobby(
   tx: Prisma.TransactionClient,
   userId: string,
-  lobbyId: string,
+  lobbyId: string
 ) {
   const claim = () =>
     tx.user.updateMany({
@@ -30,6 +30,10 @@ export async function claimActiveLobby(
           status: true,
           hostUserId: true,
           guest: { select: { userId: true } },
+          spectators: {
+            where: { userId },
+            select: { userId: true },
+          },
         },
       },
     },
@@ -42,7 +46,8 @@ export async function claimActiveLobby(
     (!pointedLobby ||
       pointedLobby.status === "CLOSED" ||
       (pointedLobby.hostUserId !== userId &&
-        pointedLobby.guest?.userId !== userId));
+        pointedLobby.guest?.userId !== userId &&
+        pointedLobby.spectators.length === 0));
 
   if (pointerIsStale && current?.activeLobbyId) {
     const cleared = await tx.user.updateMany({
@@ -62,7 +67,7 @@ export async function claimActiveLobby(
 export async function releaseActiveLobby(
   tx: Prisma.TransactionClient,
   userId: string,
-  lobbyId: string,
+  lobbyId: string
 ) {
   return tx.user.updateMany({
     where: { id: userId, activeLobbyId: lobbyId },

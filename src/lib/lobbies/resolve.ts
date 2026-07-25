@@ -31,6 +31,15 @@ export async function resolveCanonicalLobby(
   const activeGame = await findActiveGameLobby(userId);
 
   if (activeGame) {
+    const spectator = await prisma.lobbySpectator.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    if (spectator) {
+      throw new Error(
+        "Active lobby invariant violated: a player cannot also be a spectator"
+      );
+    }
     return { lobbyId: activeGame.lobbyId, branch: "active_game" };
   }
 
@@ -84,6 +93,10 @@ async function findActiveLobbyMembership(userId: string) {
           status: true,
           hostUserId: true,
           guest: { select: { userId: true } },
+          spectators: {
+            where: { userId },
+            select: { userId: true },
+          },
         },
       },
     },
@@ -93,6 +106,8 @@ async function findActiveLobbyMembership(userId: string) {
   if (!user?.activeLobbyId || !lobby || lobby.status === "CLOSED") return null;
 
   const isMember =
-    lobby.hostUserId === userId || lobby.guest?.userId === userId;
+    lobby.hostUserId === userId ||
+    lobby.guest?.userId === userId ||
+    lobby.spectators.length > 0;
   return isMember ? lobby.id : null;
 }

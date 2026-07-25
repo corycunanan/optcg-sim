@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const gameFindFirstMock = vi.fn();
 const userFindUniqueMock = vi.fn();
+const spectatorFindFirstMock = vi.fn();
 const lobbyCreateMock = vi.fn();
 const userUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
@@ -12,6 +13,9 @@ vi.mock("@/lib/db", () => ({
       findFirst: (...args: unknown[]) => gameFindFirstMock(...args),
     },
     user: { findUnique: (...args: unknown[]) => userFindUniqueMock(...args) },
+    lobbySpectator: {
+      findFirst: (...args: unknown[]) => spectatorFindFirstMock(...args),
+    },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
@@ -25,18 +29,21 @@ const activeMembership = {
     status: "WAITING",
     hostUserId: "user-1",
     guest: null,
+    spectators: [],
   },
 };
 
 beforeEach(() => {
   gameFindFirstMock.mockReset();
   userFindUniqueMock.mockReset();
+  spectatorFindFirstMock.mockReset();
   lobbyCreateMock.mockReset();
   userUpdateManyMock.mockReset();
   transactionMock.mockReset();
 
   gameFindFirstMock.mockResolvedValue(null);
   userFindUniqueMock.mockResolvedValue(null);
+  spectatorFindFirstMock.mockResolvedValue(null);
   lobbyCreateMock.mockResolvedValue({ id: "lobby-created" });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
   transactionMock.mockImplementation(async (operation) =>
@@ -59,6 +66,21 @@ describe("resolveCanonicalLobby", () => {
       branch: "active_game",
     });
 
+    expect(userFindUniqueMock).not.toHaveBeenCalled();
+    expect(spectatorFindFirstMock).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("asserts that an active player is never also a spectator", async () => {
+    gameFindFirstMock.mockResolvedValue({ lobbyId: "lobby-in-game" });
+    spectatorFindFirstMock.mockResolvedValue({ id: "spectator-row" });
+
+    await expect(resolveCanonicalLobby("user-1")).rejects.toThrow(
+      "Active lobby invariant violated: a player cannot also be a spectator"
+    );
     expect(userFindUniqueMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
@@ -94,6 +116,26 @@ describe("resolveCanonicalLobby", () => {
 
     await expect(resolveCanonicalLobby("user-1")).resolves.toEqual({
       lobbyId: "lobby-active",
+      branch: "membership",
+    });
+
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("resolves a spectator through the existing membership branch", async () => {
+    userFindUniqueMock.mockResolvedValue({
+      activeLobbyId: "lobby-spectated",
+      activeLobby: {
+        id: "lobby-spectated",
+        status: "IN_GAME",
+        hostUserId: "host-user",
+        guest: { userId: "guest-user" },
+        spectators: [{ userId: "user-1" }],
+      },
+    });
+
+    await expect(resolveCanonicalLobby("user-1")).resolves.toEqual({
+      lobbyId: "lobby-spectated",
       branch: "membership",
     });
 
@@ -163,6 +205,7 @@ describe("resolveCanonicalLobby", () => {
                 status: "WAITING",
                 hostUserId: "user-1",
                 guest: null,
+                spectators: [],
               },
             }
           : null
@@ -193,6 +236,7 @@ describe("resolveCanonicalLobby", () => {
                   status: "WAITING",
                   hostUserId: "user-1",
                   guest: null,
+                  spectators: [],
                 }
               : null,
           }),
