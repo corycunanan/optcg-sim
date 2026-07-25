@@ -22,6 +22,7 @@ import {
   assertCommitted,
   assertExpectedConflict,
   deferred,
+  type Deferred,
   errorMessage,
   ExpectedConflict,
   isDatabaseUnavailable,
@@ -38,15 +39,66 @@ interface ScenarioResult {
 }
 
 const scenarioResults: ScenarioResult[] = [];
+const COORDINATION_TIMEOUT_MS = 10_000;
+
+interface CoordinationWait {
+  label: string;
+  signal: Deferred;
+  owner: Promise<unknown>;
+  transactions: Promise<unknown>[];
+  peers: Deferred[];
+}
+
+async function awaitCoordination({
+  label,
+  signal,
+  owner,
+  transactions,
+  peers,
+}: CoordinationWait): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const ownerSettledFirst = owner.then(
+    () => {
+      throw new Error(
+        `Coordination failed before ${label}: owning transaction completed without signaling`
+      );
+    },
+    (error: unknown) => {
+      throw new Error(
+        `Coordination failed before ${label}: owning transaction failed (${errorMessage(error)})`
+      );
+    }
+  );
+  const timedOut = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(
+        new Error(
+          `Coordination timed out after ${COORDINATION_TIMEOUT_MS}ms waiting for ${label}`
+        )
+      );
+    }, COORDINATION_TIMEOUT_MS);
+  });
+
+  try {
+    await Promise.race([signal.promise, ownerSettledFirst, timedOut]);
+  } catch (error) {
+    for (const peer of peers) peer.resolve();
+    await Promise.allSettled(transactions);
+    throw error;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 async function observeBlockedThenRelease(
   harness: LobbyConcurrencyHarness,
-  pid: number,
+  blockedPid: number,
+  blockingPid: number,
   label: string,
   release: () => void
 ): Promise<unknown | null> {
   try {
-    await harness.awaitBlocked(pid, label);
+    await harness.awaitBlocked(blockedPid, blockingPid, label);
     return null;
   } catch (error) {
     return error;
@@ -118,9 +170,11 @@ async function silentSwitchRace(harness: LobbyConcurrencyHarness) {
   const targetLocked = deferred();
   const loserPidReady = deferred();
   const releaseWinner = deferred();
+  let winnerPid = 0;
   let loserPid = 0;
 
   const winnerAttempt = transaction(winnerClient, async (tx) => {
+    winnerPid = await transactionBackendPid(tx);
     await closePersonalLobby(tx, winner.id, winnerLobby.id, 0);
     await loserClosedOwnLobby.promise;
     await acquireTargetLock(tx, targetLobby.id);
@@ -139,10 +193,17 @@ async function silentSwitchRace(harness: LobbyConcurrencyHarness) {
     await claimTargetSeat(tx, loser.id, targetLobby.id);
   });
 
-  await loserPidReady.promise;
+  await awaitCoordination({
+    label: "silent-switch loser backend PID",
+    signal: loserPidReady,
+    owner: loserAttempt,
+    transactions: [winnerAttempt, loserAttempt],
+    peers: [loserClosedOwnLobby, targetLocked, loserPidReady, releaseWinner],
+  });
   const overlapError = await observeBlockedThenRelease(
     harness,
     loserPid,
+    winnerPid,
     "silent-switch loser",
     releaseWinner.resolve
   );
@@ -260,9 +321,11 @@ async function disbandRollback(harness: LobbyConcurrencyHarness) {
   const targetLocked = deferred();
   const releaseFiller = deferred();
   const switchPidReady = deferred();
+  let fillerPid = 0;
   let switchPid = 0;
 
   const fillerAttempt = transaction(fillerClient, async (tx) => {
+    fillerPid = await transactionBackendPid(tx);
     await acquireTargetLock(tx, targetLobby.id);
     targetLocked.resolve();
     await releaseFiller.promise;
@@ -297,10 +360,17 @@ async function disbandRollback(harness: LobbyConcurrencyHarness) {
     await claimTargetSeat(tx, host.id, targetLobby.id);
   });
 
-  await switchPidReady.promise;
+  await awaitCoordination({
+    label: "confirmed-switch backend PID",
+    signal: switchPidReady,
+    owner: switchAttempt,
+    transactions: [fillerAttempt, switchAttempt],
+    peers: [targetLocked, releaseFiller, switchPidReady],
+  });
   const overlapError = await observeBlockedThenRelease(
     harness,
     switchPid,
+    fillerPid,
     "confirmed switch",
     releaseFiller.resolve
   );
@@ -349,6 +419,7 @@ async function disbandRollback(harness: LobbyConcurrencyHarness) {
 async function kickCasRaces(harness: LobbyConcurrencyHarness) {
   await kickWinsAgainstLeave(harness);
   await solitaireWinsAgainstKick(harness);
+  await revisionOnlyChangeWinsAgainstKick(harness);
 }
 
 async function createOccupiedLobby(
@@ -374,9 +445,11 @@ async function kickWinsAgainstLeave(harness: LobbyConcurrencyHarness) {
   const kickLocked = deferred();
   const releaseKick = deferred();
   const leavePidReady = deferred();
+  let kickPid = 0;
   let leavePid = 0;
 
   const kickAttempt = transaction(kickClient, async (tx) => {
+    kickPid = await transactionBackendPid(tx);
     await kickCas(tx, fixture);
     kickLocked.resolve();
     await releaseKick.promise;
@@ -404,10 +477,17 @@ async function kickWinsAgainstLeave(harness: LobbyConcurrencyHarness) {
     await removeGuestAndPointer(tx, fixture.lobbyId, fixture.guestId);
   });
 
-  await leavePidReady.promise;
+  await awaitCoordination({
+    label: "guest-leave backend PID",
+    signal: leavePidReady,
+    owner: leaveAttempt,
+    transactions: [kickAttempt, leaveAttempt],
+    peers: [kickLocked, releaseKick, leavePidReady],
+  });
   const overlapError = await observeBlockedThenRelease(
     harness,
     leavePid,
+    kickPid,
     "guest leave",
     releaseKick.resolve
   );
@@ -428,9 +508,11 @@ async function solitaireWinsAgainstKick(harness: LobbyConcurrencyHarness) {
   const forceLocked = deferred();
   const releaseForce = deferred();
   const kickPidReady = deferred();
+  let forcePid = 0;
   let kickPid = 0;
 
   const forceAttempt = transaction(forceClient, async (tx) => {
+    forcePid = await transactionBackendPid(tx);
     const forced = await tx.lobby.updateMany({
       where: {
         id: fixture.lobbyId,
@@ -464,10 +546,17 @@ async function solitaireWinsAgainstKick(harness: LobbyConcurrencyHarness) {
     await removeGuestAndPointer(tx, fixture.lobbyId, fixture.guestId);
   });
 
-  await kickPidReady.promise;
+  await awaitCoordination({
+    label: "kick-against-Solitaire backend PID",
+    signal: kickPidReady,
+    owner: kickAttempt,
+    transactions: [forceAttempt, kickAttempt],
+    peers: [forceLocked, releaseForce, kickPidReady],
+  });
   const overlapError = await observeBlockedThenRelease(
     harness,
     kickPid,
+    forcePid,
     "kick against forced Solitaire",
     releaseForce.resolve
   );
@@ -492,6 +581,87 @@ async function solitaireWinsAgainstKick(harness: LobbyConcurrencyHarness) {
   assert(lobby.mode === "SOLITAIRE", "forced Solitaire did not win");
   assert(seat.userId === fixture.hostId, "Solitaire host seat is incorrect");
   assert(guest.activeLobbyId === null, "ejected guest pointer was not cleared");
+}
+
+async function revisionOnlyChangeWinsAgainstKick(
+  harness: LobbyConcurrencyHarness
+) {
+  const fixture = await createOccupiedLobby(harness, "kick-revision");
+  const revisionClient = harness.createClient();
+  const kickClient = harness.createClient();
+  const revisionLocked = deferred();
+  const releaseRevision = deferred();
+  const kickPidReady = deferred();
+  let revisionPid = 0;
+  let kickPid = 0;
+
+  const revisionAttempt = transaction(revisionClient, async (tx) => {
+    revisionPid = await transactionBackendPid(tx);
+    const advanced = await tx.lobby.updateMany({
+      where: {
+        id: fixture.lobbyId,
+        status: "READY",
+        mode: "PVP",
+        revision: 0,
+        guest: { is: { userId: fixture.guestId } },
+      },
+      data: { revision: { increment: 1 } },
+    });
+    if (advanced.count !== 1) {
+      throw new ExpectedConflict("revision-only update lost CAS");
+    }
+    revisionLocked.resolve();
+    await releaseRevision.promise;
+  });
+  const kickAttempt = transaction(kickClient, async (tx) => {
+    await revisionLocked.promise;
+    kickPid = await transactionBackendPid(tx);
+    kickPidReady.resolve();
+    await kickCas(tx, fixture);
+    await removeGuestAndPointer(tx, fixture.lobbyId, fixture.guestId);
+  });
+
+  await awaitCoordination({
+    label: "kick-against-revision-only-change backend PID",
+    signal: kickPidReady,
+    owner: kickAttempt,
+    transactions: [revisionAttempt, kickAttempt],
+    peers: [revisionLocked, releaseRevision, kickPidReady],
+  });
+  const overlapError = await observeBlockedThenRelease(
+    harness,
+    kickPid,
+    revisionPid,
+    "kick against revision-only change",
+    releaseRevision.resolve
+  );
+  const [revisionResult, kickResult] = await Promise.allSettled([
+    revisionAttempt,
+    kickAttempt,
+  ]);
+  if (overlapError) throw overlapError;
+  assertCommitted(revisionResult, "revision-only change");
+  assertExpectedConflict(kickResult, "stale kick");
+
+  const [lobby, guest, seat] = await Promise.all([
+    harness.observer.lobby.findUniqueOrThrow({
+      where: { id: fixture.lobbyId },
+    }),
+    harness.observer.user.findUniqueOrThrow({
+      where: { id: fixture.guestId },
+    }),
+    harness.observer.lobbyGuest.findUniqueOrThrow({
+      where: { lobbyId: fixture.lobbyId },
+    }),
+  ]);
+  assert(lobby.revision === 1, "revision-only winner did not advance once");
+  assert(lobby.status === "READY", "revision-only winner changed status");
+  assert(lobby.mode === "PVP", "revision-only winner changed mode");
+  assert(seat.userId === fixture.guestId, "stale kick removed the guest");
+  assert(
+    guest.activeLobbyId === fixture.lobbyId,
+    "stale kick cleared the guest pointer"
+  );
 }
 
 async function kickCas(
@@ -565,9 +735,11 @@ async function inviteCancelVsAccept(harness: LobbyConcurrencyHarness) {
   const acceptLocked = deferred();
   const releaseAccept = deferred();
   const cancelPidReady = deferred();
+  let acceptPid = 0;
   let cancelPid = 0;
 
   const acceptAttempt = transaction(acceptClient, async (tx) => {
+    acceptPid = await transactionBackendPid(tx);
     const acquired = await tx.lobby.updateMany({
       where: { id: lobby.id, status: "WAITING" },
       data: { status: "READY", revision: { increment: 1 } },
@@ -599,10 +771,17 @@ async function inviteCancelVsAccept(harness: LobbyConcurrencyHarness) {
     });
   });
 
-  await cancelPidReady.promise;
+  await awaitCoordination({
+    label: "invite-cancel backend PID",
+    signal: cancelPidReady,
+    owner: cancelAttempt,
+    transactions: [acceptAttempt, cancelAttempt],
+    peers: [acceptLocked, releaseAccept, cancelPidReady],
+  });
   const overlapError = await observeBlockedThenRelease(
     harness,
     cancelPid,
+    acceptPid,
     "invite cancel",
     releaseAccept.resolve
   );

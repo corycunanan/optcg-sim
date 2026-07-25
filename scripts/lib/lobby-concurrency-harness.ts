@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 
-export const REQUIRED_DEV_DATABASE_HOST = "ep-aged-base-a45y6qrm";
+export const REQUIRED_DEV_DATABASE_HOSTS = [
+  "ep-aged-base-a45y6qrm.us-east-1.aws.neon.tech",
+  "ep-aged-base-a45y6qrm-pooler.us-east-1.aws.neon.tech",
+] as const;
 
 const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 15_000 } as const;
 
@@ -130,26 +133,40 @@ export class LobbyConcurrencyHarness {
     });
   }
 
-  async awaitBlocked(pid: number, label: string): Promise<void> {
+  async awaitBlocked(
+    blockedPid: number,
+    blockingPid: number,
+    label: string
+  ): Promise<void> {
     const deadline = Date.now() + 5_000;
 
     while (Date.now() < deadline) {
       const rows = await this.observer.$queryRaw<
-        Array<{ waitEventType: string | null; waitEvent: string | null }>
+        Array<{
+          waitEventType: string | null;
+          waitEvent: string | null;
+          blockingPids: number[];
+        }>
       >(Prisma.sql`
         SELECT
           wait_event_type AS "waitEventType",
-          wait_event AS "waitEvent"
+          wait_event AS "waitEvent",
+          pg_blocking_pids(pid)::int[] AS "blockingPids"
         FROM pg_stat_activity
-        WHERE pid = ${pid}
+        WHERE pid = ${blockedPid}
       `);
       const activity = rows[0];
-      if (activity?.waitEventType === "Lock") return;
+      if (
+        activity?.waitEventType === "Lock" &&
+        activity.blockingPids.includes(blockingPid)
+      ) {
+        return;
+      }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
     throw new Error(
-      `${label} never entered a PostgreSQL lock wait; overlap was not proven`
+      `${label} (backend ${blockedPid}) was not blocked by expected backend ${blockingPid}; overlap was not proven`
     );
   }
 
@@ -203,9 +220,13 @@ export function validateDatabaseUrl(databaseUrl: string): void {
     throw new Error("DATABASE_URL is not a valid URL");
   }
 
-  if (!hostname.includes(REQUIRED_DEV_DATABASE_HOST)) {
+  if (
+    !REQUIRED_DEV_DATABASE_HOSTS.some(
+      (requiredHostname) => hostname === requiredHostname
+    )
+  ) {
     throw new Error(
-      `Refusing to run against ${hostname}; expected the shared OPTCG DEV Neon branch (${REQUIRED_DEV_DATABASE_HOST})`
+      `Refusing to run against ${hostname}; expected one of the shared OPTCG DEV Neon hosts (${REQUIRED_DEV_DATABASE_HOSTS.join(", ")})`
     );
   }
 }
