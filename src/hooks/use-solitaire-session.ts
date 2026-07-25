@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useGameSession } from "@/hooks/use-game-session";
+import type { GameSessionPlayerGame } from "@/hooks/use-game-session";
 import type { GameAction, GameState } from "@shared/game-types";
 
 export type SolitairePerspective = 0 | 1;
@@ -22,7 +23,7 @@ const getPromptedIndex = (
   player0State: GameState | null,
   player1State: GameState | null,
   player0HasPrompt: boolean,
-  player1HasPrompt: boolean,
+  player1HasPrompt: boolean
 ): SolitairePerspective | null => {
   const pendingPrompt =
     player0State?.pendingPrompt ?? player1State?.pendingPrompt ?? null;
@@ -35,15 +36,19 @@ const getPromptedIndex = (
 
 const getActiveTurnIndex = (
   player0State: GameState | null,
-  player1State: GameState | null,
+  player1State: GameState | null
 ): SolitairePerspective | null =>
   player0State?.turn.activePlayerIndex ??
   player1State?.turn.activePlayerIndex ??
   null;
 
 export function useSolitaireSession(gameId: string, workerUrl: string) {
-  const player0 = useGameSession(gameId, workerUrl, 0);
-  const player1 = useGameSession(gameId, workerUrl, 1);
+  const player0 = useGameSession(gameId, workerUrl, {
+    requestedPlayerIndex: 0,
+  });
+  const player1 = useGameSession(gameId, workerUrl, {
+    requestedPlayerIndex: 1,
+  });
 
   const player0State = player0.game.gameState;
   const player1State = player1.game.gameState;
@@ -51,7 +56,7 @@ export function useSolitaireSession(gameId: string, workerUrl: string) {
     player0State,
     player1State,
     player0.game.activePrompt !== null,
-    player1.game.activePrompt !== null,
+    player1.game.activePrompt !== null
   );
   const activeTurnIndex = getActiveTurnIndex(player0State, player1State);
   const autoPerspective = promptedIndex ?? activeTurnIndex ?? 0;
@@ -80,7 +85,7 @@ export function useSolitaireSession(gameId: string, workerUrl: string) {
 
   const sides = useMemo<SolitaireSessionSides>(
     () => ({ 0: player0, 1: player1 }),
-    [player0, player1],
+    [player0, player1]
   );
   const current = sides[myIndex];
 
@@ -88,16 +93,20 @@ export function useSolitaireSession(gameId: string, workerUrl: string) {
     (action: GameAction) => {
       sides[myIndex].game.sendAction(action);
     },
-    [myIndex, sides],
+    [myIndex, sides]
   );
+  const game =
+    current.game.viewerRole === "player"
+      ? ({
+          ...current.game,
+          myIndex,
+          sendAction,
+        } satisfies GameSessionPlayerGame)
+      : current.game;
 
   return {
     ...current,
-    game: {
-      ...current.game,
-      myIndex,
-      sendAction,
-    },
+    game,
     perspective: {
       myIndex,
       flipPerspective,
