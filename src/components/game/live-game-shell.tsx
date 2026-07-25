@@ -79,7 +79,9 @@ function PvpGameSession(props: LiveGameShellProps) {
   const session = useGameSession(
     props.gameId,
     props.workerUrl,
-    props.playerIndex
+    props.playerIndex === undefined
+      ? undefined
+      : { requestedPlayerIndex: props.playerIndex }
   );
 
   return <GameSessionView session={session} />;
@@ -338,11 +340,19 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
     );
   }
 
+  // BoardLayout still accepts identity-relative `me` / `opp` slots and uses
+  // the explicit OPT-561 anchor to place them. Spectators have no identity,
+  // so adapt the session's visual pair back to engine order for that legacy
+  // boundary; `bottomPlayerIndex` remains the sole positioning input.
+  const enginePlayerZero =
+    game.bottomPlayerIndex === 0 ? game.bottomPlayer : game.topPlayer;
+  const enginePlayerOne =
+    game.bottomPlayerIndex === 0 ? game.topPlayer : game.bottomPlayer;
   const state: BoardState = {
-    me: game.me,
-    opp: game.opp,
+    me: game.viewerRole === "spectator" ? enginePlayerZero : game.me,
+    opp: game.viewerRole === "spectator" ? enginePlayerOne : game.opp,
     myIndex: game.myIndex,
-    bottomPlayerIndex: game.myIndex ?? 0,
+    bottomPlayerIndex: game.bottomPlayerIndex,
     turn: game.turn,
     cardDb: game.cardDb,
     isMyTurn: game.isMyTurn,
@@ -361,6 +371,7 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
       game.gameState.promptRespondingPlayer ??
       game.gameState.pendingPrompt?.respondingPlayer ??
       (activePrompt ? game.myIndex : null),
+    interactionMode: game.viewerRole === "spectator" ? "spectator" : undefined,
   };
 
   const dispatch: BoardDispatch = {
@@ -461,7 +472,8 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
           cardDb={game.cardDb}
           activePrompt={activePrompt}
           promptRespondingPlayer={
-            game.gameState.pendingPrompt?.respondingPlayer ?? (activePrompt ? game.myIndex : null)
+            game.gameState.pendingPrompt?.respondingPlayer ??
+            (activePrompt ? game.myIndex : null)
           }
           onAction={dispatch.onAction}
         />

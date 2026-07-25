@@ -39,7 +39,10 @@ vi.mock("@/hooks/use-remote-game-status", () => ({
 
 import { useGameFinalizer } from "@/hooks/use-game-finalizer";
 import type { UseGameFinalizerReturn } from "@/hooks/use-game-finalizer";
-import { useGameSession } from "@/hooks/use-game-session";
+import {
+  useGameSession,
+  type GameSessionPerspective,
+} from "@/hooks/use-game-session";
 
 class FakeWebSocket {
   static OPEN = 1;
@@ -147,9 +150,14 @@ let latestSession: GameSession | null = null;
 let latestFinalizer: UseGameFinalizerReturn | null = null;
 let postResponder: () => Promise<Response>;
 let fetchMock: ReturnType<typeof vi.fn>;
+let sessionPerspective: GameSessionPerspective = {};
 
 function SessionProbe() {
-  const value = useGameSession("game-1", "https://worker.example");
+  const value = useGameSession(
+    "game-1",
+    "https://worker.example",
+    sessionPerspective
+  );
   useEffect(() => {
     latestSession = value;
   }, [value]);
@@ -181,7 +189,8 @@ function finalizer(): UseGameFinalizerReturn {
   return latestFinalizer;
 }
 
-async function mountSession() {
+async function mountSession(perspective: GameSessionPerspective = {}) {
+  sessionPerspective = perspective;
   await act(async () => {
     renderer = create(<SessionProbe />);
     await Promise.resolve();
@@ -226,6 +235,7 @@ beforeEach(() => {
   latestSession = null;
   latestFinalizer = null;
   renderer = null;
+  sessionPerspective = {};
 
   postResponder = async () =>
     new Response(JSON.stringify({ data: {} }), { status: 200 });
@@ -493,5 +503,71 @@ describe("useGameSession behavior", () => {
       JSON.stringify({ type: "game:leave" })
     );
     expect(window.location.href).toBe("/lobbies");
+  });
+
+  it("connects and retries spectators without a playerIndex token parameter", async () => {
+    await mountSession({ viewerRole: "spectator", bottomPlayerIndex: 1 });
+    const firstTokenUrl = String(fetchMock.mock.calls[0]?.[0]);
+    expect(firstTokenUrl).toBe("/api/game/token?gameId=game-1");
+
+    const firstSocket = FakeWebSocket.instances[0]!;
+    await act(async () => firstSocket.simulateOpen());
+    await act(async () => firstSocket.simulateServerClose());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(FakeWebSocket.instances).toHaveLength(2);
+
+    const reconnectedSocket = FakeWebSocket.instances[1]!;
+    await act(async () => reconnectedSocket.simulateOpen());
+    await act(async () => {
+      session().game.retryConnection();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(reconnectedSocket.close).toHaveBeenCalledOnce();
+    expect(FakeWebSocket.instances).toHaveLength(3);
+    expect(
+      fetchMock.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.startsWith("/api/game/token?"))
+    ).not.toContainEqual(expect.stringContaining("playerIndex"));
+  });
+
+  it("keeps real spectator action, finalization, and concede transports inert", async () => {
+    boundaries.remoteGameStatus = {
+      ...inProgressStatus(),
+      canFallbackConcede: true,
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await mountSession({ viewerRole: "spectator", bottomPlayerIndex: 1 });
+    const socket = FakeWebSocket.instances[0]!;
+    await act(async () => socket.simulateOpen());
+
+    await emit({
+      type: "game:state",
+      state: createGameState({
+        status: "FINISHED",
+        winner: 0,
+        winReason: "Player 1 won",
+      }),
+    });
+    expect(session().game.viewerRole).toBe("spectator");
+    expect(session().game.myIndex).toBeNull();
+    expect(session().game.bottomPlayerIndex).toBe(1);
+    expect(session().game.isMyTurn).toBe(false);
+
+    await act(async () => {
+      session().game.sendAction({ type: "ADVANCE_PHASE" });
+      await session().navigation.handleFallbackConcede();
+      await Promise.resolve();
+    });
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(postCalls()).toHaveLength(0);
+    expect(socket.send).not.toHaveBeenCalled();
+    expect(session().navigation.fallbackConcedeAvailable).toBe(false);
+    warn.mockRestore();
   });
 });

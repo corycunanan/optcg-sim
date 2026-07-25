@@ -71,7 +71,10 @@ vi.mock("@/hooks/use-remote-game-status", () => ({
   }),
 }));
 
-import { useGameSession } from "@/hooks/use-game-session";
+import {
+  useGameSession,
+  type GameSessionPerspective,
+} from "@/hooks/use-game-session";
 
 const createGameState = (
   playerIds: [string, string],
@@ -110,8 +113,8 @@ const createWsReturn = (
   ...overrides,
 });
 
-const useRenderedSession = (requestedPlayerIndex?: 0 | 1) =>
-  useGameSession("game-1", "https://worker.example", requestedPlayerIndex);
+const useRenderedSession = (perspective: GameSessionPerspective = {}) =>
+  useGameSession("game-1", "https://worker.example", perspective);
 
 const flushAsync = async () => {
   await Promise.resolve();
@@ -147,8 +150,8 @@ describe("useGameSession multi-instance composition", () => {
       createWsReturn({ gameState: sameUserState }),
     ];
 
-    const player0 = useRenderedSession(0);
-    const player1 = useRenderedSession(1);
+    const player0 = useRenderedSession({ requestedPlayerIndex: 0 });
+    const player1 = useRenderedSession({ requestedPlayerIndex: 1 });
 
     expect(player0.game.myIndex).toBe(0);
     expect(player1.game.myIndex).toBe(1);
@@ -162,8 +165,8 @@ describe("useGameSession multi-instance composition", () => {
       createWsReturn({ sendAction: player1SendAction }),
     ];
 
-    const player0 = useRenderedSession(0);
-    const player1 = useRenderedSession(1);
+    const player0 = useRenderedSession({ requestedPlayerIndex: 0 });
+    const player1 = useRenderedSession({ requestedPlayerIndex: 1 });
     const action = { type: "END_TURN" } as unknown as GameAction;
 
     player0.game.sendAction(action);
@@ -179,8 +182,8 @@ describe("useGameSession multi-instance composition", () => {
       createWsReturn({ connectionStatus: "connected" }),
     ];
 
-    const player0 = useRenderedSession(0);
-    const player1 = useRenderedSession(1);
+    const player0 = useRenderedSession({ requestedPlayerIndex: 0 });
+    const player1 = useRenderedSession({ requestedPlayerIndex: 1 });
 
     expect(player0.game.connectionStatus).toBe("error");
     expect(player1.game.connectionStatus).toBe("connected");
@@ -194,8 +197,8 @@ describe("useGameSession multi-instance composition", () => {
       createWsReturn({ gameState: finishedState, gameOver }),
     ];
 
-    useRenderedSession(0);
-    const player1 = useRenderedSession(1);
+    useRenderedSession({ requestedPlayerIndex: 0 });
+    const player1 = useRenderedSession({ requestedPlayerIndex: 1 });
     await flushAsync();
 
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
@@ -231,5 +234,68 @@ describe("useGameSession multi-instance composition", () => {
         }),
       })
     );
+  });
+
+  it("projects spectator identity separately from the explicit board anchor", () => {
+    const state = createGameState(["user-a", "opponent-b"]);
+    mocks.wsReturns = [createWsReturn({ gameState: state })];
+
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      bottomPlayerIndex: 1,
+    });
+
+    expect(spectator.game.viewerRole).toBe("spectator");
+    expect(spectator.game.myIndex).toBeNull();
+    expect(spectator.game.me).toBeNull();
+    expect(spectator.game.opp).toBeNull();
+    expect(spectator.game.bottomPlayerIndex).toBe(1);
+    expect(spectator.game.bottomPlayer).toBe(state.players[1]);
+    expect(spectator.game.topPlayer).toBe(state.players[0]);
+    expect(spectator.game.isMyTurn).toBe(false);
+  });
+
+  it("logs and drops spectator actions before the websocket sender", () => {
+    const rawSendAction = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.wsReturns = [createWsReturn({ sendAction: rawSendAction })];
+    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const action = { type: "END_TURN" } as unknown as GameAction;
+
+    spectator.game.sendAction(action);
+
+    expect(rawSendAction).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      "[game-session] Ignored spectator action",
+      action
+    );
+    warn.mockRestore();
+  });
+
+  it("keeps finalization, leave, and fallback-concede mutations inert for spectators", async () => {
+    const finishedState = createGameState(["user-a", "opponent-b"], "FINISHED");
+    const leaveGame = vi.fn().mockResolvedValue(undefined);
+    mocks.remoteGameStatus = {
+      mode: "PVP",
+      status: "IN_PROGRESS",
+      canFallbackConcede: true,
+    };
+    mocks.wsReturns = [
+      createWsReturn({
+        gameState: finishedState,
+        gameOver: { winner: 0, reason: "Victory" },
+        leaveGame,
+      }),
+    ];
+
+    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    await flushAsync();
+    await spectator.navigation.handleFallbackConcede();
+    await spectator.navigation.handleLeaveGame();
+
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(leaveGame).not.toHaveBeenCalled();
+    expect(spectator.navigation.fallbackConcedeAvailable).toBe(false);
+    expect(window.location.href).toBe("/lobbies");
   });
 });

@@ -2,12 +2,18 @@ import React, { useState, type ReactNode } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameAction, GameState } from "@shared/game-types";
+import type { BoardState } from "@/components/game/board";
 
 const mocks = vi.hoisted(() => ({
   actionRefs: [] as Array<(action: GameAction) => void>,
+  boardStates: [] as BoardState[],
   tickCountdown: null as (() => void) | null,
   sendAction: vi.fn(),
   backToLobbies: vi.fn(),
+  viewerRole: "player" as "player" | "spectator",
+  bottomPlayerIndex: ((value: 0 | 1) => value)(0),
+  bottomPlayer: null as GameState["players"][number] | null,
+  topPlayer: null as GameState["players"][number] | null,
 }));
 
 vi.mock("@/hooks/use-game-session", () => ({
@@ -35,9 +41,13 @@ vi.mock("@/hooks/use-game-session", () => ({
         activePromptId: null,
         gameOver: null,
         sendAction: mocks.sendAction,
+        viewerRole: mocks.viewerRole,
         myIndex: 0,
         me: null,
         opp: null,
+        bottomPlayerIndex: mocks.bottomPlayerIndex,
+        bottomPlayer: mocks.bottomPlayer,
+        topPlayer: mocks.topPlayer,
         turn: null,
         isMyTurn: false,
         phase: "MAIN",
@@ -77,10 +87,13 @@ vi.mock("@/hooks/use-game-session", () => ({
 
 vi.mock("@/components/game/board", () => ({
   Board: ({
+    state,
     dispatch,
   }: {
+    state: BoardState;
     dispatch: { onAction: (action: GameAction) => void };
   }) => {
+    mocks.boardStates.push(state);
     mocks.actionRefs.push(dispatch.onAction);
     return null;
   },
@@ -110,9 +123,14 @@ let renderer: ReactTestRenderer | null = null;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mocks.actionRefs.length = 0;
+  mocks.boardStates.length = 0;
   mocks.tickCountdown = null;
   mocks.sendAction.mockReset();
   mocks.backToLobbies.mockReset();
+  mocks.viewerRole = "player";
+  mocks.bottomPlayerIndex = 0;
+  mocks.bottomPlayer = null;
+  mocks.topPlayer = null;
 });
 
 afterEach(() => {
@@ -125,7 +143,7 @@ describe("LiveGameShell dispatch wiring", () => {
   it("keeps onAction stable across an opponent countdown render", () => {
     act(() => {
       renderer = create(
-        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />,
+        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />
       );
     });
     const initialOnAction = mocks.actionRefs.at(-1);
@@ -137,5 +155,28 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(rerenderedOnAction).toBe(initialOnAction);
     rerenderedOnAction?.({ type: "ADVANCE_PHASE" });
     expect(mocks.sendAction).toHaveBeenCalledWith({ type: "ADVANCE_PHASE" });
+  });
+
+  it("maps spectator identity to OPT-562's read-only board mode", () => {
+    mocks.viewerRole = "spectator";
+    mocks.bottomPlayerIndex = 1;
+    mocks.bottomPlayer = {
+      playerId: "player-1",
+    } as GameState["players"][number];
+    mocks.topPlayer = {
+      playerId: "player-0",
+    } as GameState["players"][number];
+
+    act(() => {
+      renderer = create(
+        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />
+      );
+    });
+
+    const state = mocks.boardStates.at(-1);
+    expect(state?.interactionMode).toBe("spectator");
+    expect(state?.bottomPlayerIndex).toBe(1);
+    expect(state?.me?.playerId).toBe("player-0");
+    expect(state?.opp?.playerId).toBe("player-1");
   });
 });

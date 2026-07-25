@@ -118,6 +118,8 @@ describe("BoardNavbar accessibility", () => {
         "data-concede-reachable"
       ]
     ).toBe("false");
+    expect(announcementText(root)).toBe("Turn 3. Watching. MAIN");
+    expect(srOnlySpanText(root)).toContain("Watching");
 
     root = renderNavbar({ interactionMode: "responseOnly" });
     expect(

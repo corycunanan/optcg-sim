@@ -21,10 +21,18 @@ export function getBoardStatusAnnouncement({
   turnNumber,
   isMyTurn,
   phaseLabel,
-}: Pick<BoardNavbarProps, "turnNumber" | "isMyTurn" | "phaseLabel">): string {
+  interactionMode,
+}: Pick<
+  BoardNavbarProps,
+  "turnNumber" | "isMyTurn" | "phaseLabel" | "interactionMode"
+>): string {
   return [
     turnNumber === null ? "Turn unavailable" : `Turn ${turnNumber}`,
-    isMyTurn ? "Your turn" : "Opponent's turn",
+    interactionMode === "spectator"
+      ? "Watching"
+      : isMyTurn
+        ? "Your turn"
+        : "Opponent's turn",
     phaseLabel,
   ]
     .filter(Boolean)
@@ -48,11 +56,17 @@ export function BoardNavbar({
       : connectionStatus === "connecting"
         ? "bg-gb-accent-amber"
         : "bg-gb-accent-red";
-  const turnLabel = isMyTurn ? "Your Turn" : "Opponent\u2019s Turn";
+  const turnLabel =
+    interactionMode === "spectator"
+      ? "Watching"
+      : isMyTurn
+        ? "Your Turn"
+        : "Opponent\u2019s Turn";
   const announcement = getBoardStatusAnnouncement({
     turnNumber,
     isMyTurn,
     phaseLabel,
+    interactionMode,
   });
 
   return (

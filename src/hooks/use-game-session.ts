@@ -31,9 +31,13 @@ export interface GameSessionGame {
   activePromptId: string | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   sendAction: (action: GameAction) => void;
+  viewerRole: GameSessionViewerRole;
   myIndex: 0 | 1 | null;
   me: PlayerState | null;
   opp: PlayerState | null;
+  bottomPlayerIndex: 0 | 1;
+  bottomPlayer: PlayerState | null;
+  topPlayer: PlayerState | null;
   turn: TurnState | null;
   isMyTurn: boolean;
   phase: string;
@@ -71,6 +75,18 @@ export interface GameSessionEndState {
   endReason: string;
 }
 
+export type GameSessionViewerRole = "player" | "spectator";
+
+export type GameSessionPerspective =
+  | {
+      viewerRole?: "player";
+      requestedPlayerIndex?: 0 | 1;
+    }
+  | {
+      viewerRole: "spectator";
+      bottomPlayerIndex?: 0 | 1;
+    };
+
 /**
  * Composes the client-side game session for one player perspective.
  *
@@ -89,10 +105,15 @@ export interface GameSessionEndState {
 export function useGameSession(
   gameId: string,
   workerUrl: string,
-  requestedPlayerIndex?: 0 | 1
+  perspective: GameSessionPerspective = {}
 ) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
+  const viewerRole = perspective.viewerRole ?? "player";
+  const requestedPlayerIndex =
+    perspective.viewerRole === "spectator"
+      ? undefined
+      : perspective.requestedPlayerIndex;
 
   /* ── Remote game status polling ───────────────────────────────────── */
 
@@ -145,6 +166,10 @@ export function useGameSession(
   const lastSendRef = useRef<{ signature: string; at: number } | null>(null);
   const sendAction = useCallback(
     (action: GameAction) => {
+      if (viewerRole === "spectator") {
+        console.warn("[game-session] Ignored spectator action", action);
+        return;
+      }
       const signature = JSON.stringify(action);
       const now = Date.now();
       const last = lastSendRef.current;
@@ -154,7 +179,7 @@ export function useGameSession(
       lastSendRef.current = { signature, at: now };
       rawSendAction(action);
     },
-    [rawSendAction]
+    [rawSendAction, viewerRole]
   );
 
   /* ── Card DB ──────────────────────────────────────────────────────── */
@@ -180,21 +205,45 @@ export function useGameSession(
     gameState.players[0].playerId === userId &&
     gameState.players[1].playerId === userId
   );
+  const matchedPlayerIndex =
+    gameState?.players[0].playerId === userId
+      ? 0
+      : gameState?.players[1].playerId === userId
+        ? 1
+        : null;
   const explicitPlayerIndex = isSameUserSolitairePerspective
-    ? requestedPlayerIndex
-    : undefined;
-  const myIndex = gameState
-    ? (explicitPlayerIndex ??
-      ((gameState.players[0].playerId === userId ? 0 : 1) as 0 | 1))
+    ? (requestedPlayerIndex ?? null)
     : null;
+  const myIndex =
+    viewerRole === "player" && gameState
+      ? (explicitPlayerIndex ?? matchedPlayerIndex)
+      : null;
   const oppIndex: 0 | 1 | null =
-    myIndex !== null ? (myIndex === 0 ? 1 : 0) : null;
-  const me = myIndex !== null && gameState ? gameState.players[myIndex] : null;
+    viewerRole === "player" && myIndex !== null
+      ? myIndex === 0
+        ? 1
+        : 0
+      : null;
+  const me =
+    viewerRole === "player" && myIndex !== null && gameState
+      ? gameState.players[myIndex]
+      : null;
   const opp =
-    oppIndex !== null && gameState ? gameState.players[oppIndex] : null;
+    viewerRole === "player" && oppIndex !== null && gameState
+      ? gameState.players[oppIndex]
+      : null;
+  const bottomPlayerIndex: 0 | 1 =
+    perspective.viewerRole === "spectator"
+      ? (perspective.bottomPlayerIndex ?? 0)
+      : (myIndex ?? requestedPlayerIndex ?? 0);
+  const topPlayerIndex: 0 | 1 = bottomPlayerIndex === 0 ? 1 : 0;
+  const bottomPlayer = gameState?.players[bottomPlayerIndex] ?? null;
+  const topPlayer = gameState?.players[topPlayerIndex] ?? null;
   const turn = gameState?.turn ?? null;
   const isMyTurn =
-    myIndex !== null && turn ? turn.activePlayerIndex === myIndex : false;
+    viewerRole === "player" && myIndex !== null && turn
+      ? turn.activePlayerIndex === myIndex
+      : false;
   const phase = turn?.phase ?? "";
   const battlePhase = turn?.battleSubPhase ?? null;
   const inBattle = !!battlePhase;
@@ -249,8 +298,12 @@ export function useGameSession(
   /* ── Finalize / leave handlers ────────────────────────────────────── */
 
   const finalizerEnabled =
-    requestedPlayerIndex === undefined || requestedPlayerIndex === 0;
+    viewerRole === "player" &&
+    (requestedPlayerIndex === undefined || requestedPlayerIndex === 0);
   const noopNavigationHandler = useCallback(async () => {}, []);
+  const handleSpectatorBackToLobbies = useCallback(async () => {
+    window.location.href = "/lobbies";
+  }, []);
 
   const finalizerNavigation = useGameFinalizer({
     gameId,
@@ -270,15 +323,25 @@ export function useGameSession(
     handleFallbackConcede,
   } = finalizerEnabled
     ? finalizerNavigation
-    : {
-        leavingGame: false,
-        leaveError: null,
-        fallbackSubmitting: false,
-        fallbackError: null,
-        handleBackToLobbies: noopNavigationHandler,
-        handleLeaveGame: noopNavigationHandler,
-        handleFallbackConcede: noopNavigationHandler,
-      };
+    : viewerRole === "spectator"
+      ? {
+          leavingGame: false,
+          leaveError: null,
+          fallbackSubmitting: false,
+          fallbackError: null,
+          handleBackToLobbies: handleSpectatorBackToLobbies,
+          handleLeaveGame: handleSpectatorBackToLobbies,
+          handleFallbackConcede: noopNavigationHandler,
+        }
+      : {
+          leavingGame: false,
+          leaveError: null,
+          fallbackSubmitting: false,
+          fallbackError: null,
+          handleBackToLobbies: noopNavigationHandler,
+          handleLeaveGame: noopNavigationHandler,
+          handleFallbackConcede: noopNavigationHandler,
+        };
 
   /* ── End-of-match display values ──────────────────────────────────── */
 
@@ -322,9 +385,13 @@ export function useGameSession(
       activePromptId,
       gameOver,
       sendAction,
+      viewerRole,
       myIndex,
       me,
       opp,
+      bottomPlayerIndex,
+      bottomPlayer,
+      topPlayer,
       turn,
       isMyTurn,
       phase,

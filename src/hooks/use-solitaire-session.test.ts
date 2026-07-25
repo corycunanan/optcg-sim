@@ -33,14 +33,18 @@ vi.mock("react", async (importActual) => {
       mocks.stateCursor += 1;
       if (!(index in mocks.stateValues)) {
         mocks.stateValues[index] =
-          typeof initial === "function" ? (initial as () => unknown)() : initial;
+          typeof initial === "function"
+            ? (initial as () => unknown)()
+            : initial;
       }
       return [
         mocks.stateValues[index],
         (next: unknown) => {
           mocks.stateValues[index] =
             typeof next === "function"
-              ? (next as (current: unknown) => unknown)(mocks.stateValues[index])
+              ? (next as (current: unknown) => unknown)(
+                  mocks.stateValues[index]
+                )
               : next;
         },
       ];
@@ -56,7 +60,7 @@ import { useSolitaireSession } from "@/hooks/use-solitaire-session";
 
 const createGameState = (
   activePlayerIndex: 0 | 1,
-  respondingPlayer?: 0 | 1,
+  respondingPlayer?: 0 | 1
 ): GameState =>
   ({
     id: "game-1",
@@ -97,7 +101,7 @@ const createGameState = (
 
 const createSession = (
   index: 0 | 1,
-  overrides: Partial<GameSessionReturn["game"]> = {},
+  overrides: Partial<GameSessionReturn["game"]> = {}
 ): GameSessionReturn =>
   ({
     game: {
@@ -159,8 +163,11 @@ beforeEach(() => {
   mocks.sessions = [createSession(0), createSession(1)];
   mocks.useGameSession.mockReset();
   mocks.useGameSession.mockImplementation(
-    (_gameId: string, _workerUrl: string, requestedIndex: 0 | 1) =>
-      mocks.sessions[requestedIndex],
+    (
+      _gameId: string,
+      _workerUrl: string,
+      perspective: { requestedPlayerIndex?: 0 | 1 }
+    ) => mocks.sessions[perspective.requestedPlayerIndex ?? 0]
   );
   mocks.stateCursor = 0;
   mocks.stateValues = [];
@@ -175,12 +182,12 @@ describe("useSolitaireSession", () => {
     expect(mocks.useGameSession).toHaveBeenCalledWith(
       "game-1",
       "https://worker.example",
-      0,
+      { requestedPlayerIndex: 0 }
     );
     expect(mocks.useGameSession).toHaveBeenCalledWith(
       "game-1",
       "https://worker.example",
-      1,
+      { requestedPlayerIndex: 1 }
     );
   });
 
