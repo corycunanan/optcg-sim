@@ -513,6 +513,27 @@ export function obfuscatePlayersDecksAndFaceDownLife(
 }
 
 /**
+ * Top-level GameState fields deliberately rewritten for a player snapshot.
+ *
+ * The typed override object in filterStateForPlayer is coupled to this list.
+ * Spectator tests independently enumerate their merge policies and compare
+ * against this contract, so adding a player-view rewrite cannot silently leak
+ * or disappear from spectator snapshots.
+ */
+export const PLAYER_VIEW_REWRITTEN_FIELDS = [
+  "executionContext",
+  "players",
+  "turn",
+  "eventLog",
+  "pendingPrompt",
+  "promptRespondingPlayer",
+  "effectStack",
+] as const satisfies readonly (keyof GameState)[];
+
+type PlayerViewRewrittenField =
+  (typeof PLAYER_VIEW_REWRITTEN_FIELDS)[number];
+
+/**
  * Create a player-specific view of the game state that hides secret zone data
  * from the opponent. The receiving player sees their own zones in full; the
  * opponent's hand, deck, and face-down life cards are obfuscated.
@@ -564,8 +585,7 @@ export function filterStateForPlayer(
         : state.turn.pendingBattleDamageContinuation,
   };
 
-  return {
-    ...state,
+  const playerViewOverrides = {
     executionContext: {
       version: state.executionContext.version,
       seed: "redacted",
@@ -582,7 +602,11 @@ export function filterStateForPlayer(
     promptRespondingPlayer: state.pendingPrompt?.respondingPlayer ?? null,
     effectStack: [],
     turn: filteredTurn,
+  } satisfies {
+    [Field in PlayerViewRewrittenField]: GameState[Field];
   };
+
+  return { ...state, ...playerViewOverrides };
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────
