@@ -57,6 +57,7 @@ model User {
   receivedMessages  Message[]       @relation("ReceivedMessages")
   hostedLobbies     Lobby[]         @relation("HostedLobbies")
   lobbyGuests       LobbyGuest[]
+  lobbySpectators   LobbySpectator[]
   activeLobby       Lobby?          @relation("ActiveLobbyMembers", fields: [activeLobbyId], references: [id], onDelete: SetNull)
   sentLobbyInvites      LobbyInvite[] @relation("SentLobbyInvites")
   receivedLobbyInvites  LobbyInvite[] @relation("ReceivedLobbyInvites")
@@ -339,6 +340,7 @@ model Lobby {
   pregameMode PregameMode @default(PRIORITY_ROLL) @map("pregame_mode")
   status     LobbyStatus @default(WAITING)
   hostReady  Boolean     @default(false) @map("host_ready")
+  allowSpectators Boolean     @default(false) @map("allow_spectators")
   revision   Int         @default(0)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -346,6 +348,7 @@ model Lobby {
   host          User          @relation("HostedLobbies", fields: [hostUserId], references: [id])
   hostDeck      Deck?         @relation("LobbyHostDeck", fields: [hostDeckId], references: [id])
   guest         LobbyGuest?
+  spectators    LobbySpectator[]
   gameSessions  GameSession[]
   activeMembers User[]        @relation("ActiveLobbyMembers")
   invites       LobbyInvite[]
@@ -369,6 +372,20 @@ model LobbyGuest {
   deck  Deck? @relation(fields: [deckId], references: [id])
 
   @@map("lobby_guests")
+}
+
+model LobbySpectator {
+  id       String   @id @default(uuid())
+  lobbyId  String   @map("lobby_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([lobbyId, userId])
+  @@index([userId])
+  @@map("lobby_spectators")
 }
 
 enum LobbyInviteStatus {
