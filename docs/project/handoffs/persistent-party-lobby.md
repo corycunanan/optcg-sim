@@ -22,12 +22,13 @@ Tickets in execution order. Ordering criteria: dependencies → estimate → pri
 | 4     | OPT-522 | Join-by-code party switching with disband confirmation                                   | —        | OPT-519                            | Done      | [#403](https://github.com/corycunanan/optcg-sim/pull/403) | Transactional switch and host-disband semantics shipped |
 | 5     | OPT-523 | Kick player: host removes guest from party                                               | —        | OPT-518, OPT-519                   | Done      | [#401](https://github.com/corycunanan/optcg-sim/pull/401) | PR merged; guest-removal capability is on main          |
 | 6     | OPT-524 | Invite lifecycle: expiry countdown + cancel invite                                       | —        | OPT-519                            | Done      | [#402](https://github.com/corycunanan/optcg-sim/pull/402) | Invite lifecycle surface shipped                        |
-| 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | In Review | [#405](https://github.com/corycunanan/optcg-sim/pull/405) | Rebuild and VQA fixes complete; awaiting review         |
-| 8     | OPT-567 | Real-database concurrency test harness for lobby transactional flows                     | —        | OPT-522, OPT-523, OPT-524          | In Review | [#404](https://github.com/corycunanan/optcg-sim/pull/404) | Manual DEV database concurrency and rollback proof      |
+| 7     | OPT-521 | Party room UI per redesign artifact (seats, deck panels, empty/invited/solitaire states) | —        | OPT-519, OPT-522, OPT-523, OPT-524 | Done      | [#405](https://github.com/corycunanan/optcg-sim/pull/405) | Rebuild and VQA fixes merged                            |
+| 8     | OPT-567 | Real-database concurrency test harness for lobby transactional flows                     | —        | OPT-522, OPT-523, OPT-524          | Done      | [#404](https://github.com/corycunanan/optcg-sim/pull/404) | Manual DEV database concurrency and rollback proof      |
+| 9     | OPT-571 | Extend lobby concurrency harness: closed-lobby zombie resolution + join-path scenario    | —        | OPT-521, OPT-567                   | In Review | [#411](https://github.com/corycunanan/optcg-sim/pull/411) | Real-relation regression coverage for closed zombies    |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`). Don't invent.
 
-**Next up:** OPT-521 is in review; its behavior dependencies are merged.
+**Next up:** Project complete after OPT-571 merges; no follow-up tickets are listed.
 
 ---
 
@@ -54,3 +55,13 @@ Append new entries at the bottom. Each entry is written _by_ the agent who just 
 - **Gotchas / do NOT touch:** Keep `pnpm test:db-concurrency` manual and DEV-only; it refuses non-DEV hosts and must not enter CI or `pnpm verify`. OPT-521 owns the lobby UI and does not need to modify this harness.
 - **Unresolved:** Route handlers expose no deterministic transaction hook, so the harness mirrors their Prisma mutations and CAS predicates without modifying product code.
 - **Pointer:** Run `git show 27f95c0` for the implementation diff; the DEV run output is recorded in PR #404.
+
+### OPT-571 → Project complete
+
+**From:** Codex session on 2026-07-25 · **Commit:** `e8d0c5d` · **PR:** [#411](https://github.com/corycunanan/optcg-sim/pull/411)
+
+- **Primer:** The DEV harness now proves real closed-lobby game-session relations cannot trap canonical resolution or block a subsequent party join.
+- **Read first:** `scripts/test-lobby-transaction-concurrency.ts` and `scripts/lib/lobby-concurrency-harness.ts`.
+- **Gotchas / do NOT touch:** Keep the exact DEV hostname allowlist, manual-only execution, run-tag fixture scope, and game-session-before-lobby cleanup order.
+- **Unresolved:** None.
+- **Pointer:** Run `git show e8d0c5d`; the full five-scenario DEV output is recorded in PR #411.
