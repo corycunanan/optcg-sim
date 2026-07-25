@@ -61,20 +61,36 @@ export async function notifyLobby(
   );
 }
 
+export interface RemovedSpectatorAudience {
+  lobbyId: string;
+  reason: SpectatorRemovedEvent["reason"];
+  removedSpectatorUserIds: readonly string[];
+}
+
 /**
- * Notifies a spectator after mutation removed them from the current lobby
- * audience. Endpoint callers must invoke this directly with the captured userId.
+ * Notifies spectators after mutation removes them from the current audience.
+ *
+ * Callers MUST capture `removedSpectatorUserIds` inside or before the transaction
+ * that deletes the spectator rows. Reading the spectator list after deletion
+ * yields an empty set and silently sends no terminal events.
  */
-export async function notifySpectatorRemoved(
-  targetUserId: string,
-  lobbyId: string,
-  reason: SpectatorRemovedEvent["reason"],
+export async function notifySpectatorsRemoved(
+  audience: RemovedSpectatorAudience,
   deps?: NotifyUserDeps
 ): Promise<void> {
-  return notifyUser(
-    targetUserId,
-    { type: "lobby:spectator_removed", lobbyId, reason },
-    deps
+  const targetUserIds = new Set(audience.removedSpectatorUserIds);
+  await Promise.all(
+    Array.from(targetUserIds, (targetUserId) =>
+      notifyUser(
+        targetUserId,
+        {
+          type: "lobby:spectator_removed",
+          lobbyId: audience.lobbyId,
+          reason: audience.reason,
+        },
+        deps
+      )
+    )
   );
 }
 

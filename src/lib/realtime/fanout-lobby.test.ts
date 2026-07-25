@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { notifyLobby, notifySpectatorRemoved } from "./fanout-lobby";
+import { notifyLobby, notifySpectatorsRemoved } from "./fanout-lobby";
 import type { LobbyRoomState } from "@/lib/lobbies/state";
 
 const baseDeps = {
@@ -331,17 +331,25 @@ describe("notifyLobby", () => {
   );
 
   it.each(["SPECTATING_DISABLED", "REMOVED_BY_HOST"] as const)(
-    "directs exactly one %s event to a removed spectator outside current-state fanout",
+    "directs exactly one %s event to every removed spectator outside current-state fanout",
     async (reason) => {
       const fetchMock = vi
         .fn()
         .mockResolvedValue(new Response(null, { status: 202 }));
       const currentState = withGuest(lobbyState(), "guest-user");
 
-      await notifySpectatorRemoved(
-        "removed-spectator",
-        currentState.id,
-        reason,
+      await notifySpectatorsRemoved(
+        {
+          lobbyId: currentState.id,
+          reason,
+          // Duplicate proves the bulk primitive emits at most one terminal
+          // event per captured user ID.
+          removedSpectatorUserIds: [
+            "removed-spectator",
+            "other-spectator",
+            "removed-spectator",
+          ],
+        },
         { ...baseDeps, fetch: fetchMock }
       );
       await notifyLobby(currentState, {
@@ -353,7 +361,11 @@ describe("notifyLobby", () => {
       const removedSpectatorCalls = fetchMock.mock.calls.filter(([url]) =>
         url.includes("removed-spectator")
       );
+      const otherSpectatorCalls = fetchMock.mock.calls.filter(([url]) =>
+        url.includes("other-spectator")
+      );
       expect(removedSpectatorCalls).toHaveLength(1);
+      expect(otherSpectatorCalls).toHaveLength(1);
       expect(JSON.parse(removedSpectatorCalls[0][1].body)).toEqual({
         type: "lobby:spectator_removed",
         lobbyId: "lobby-1",
@@ -362,7 +374,8 @@ describe("notifyLobby", () => {
       expect(
         fetchMock.mock.calls.some(
           ([url, init]) =>
-            url.includes("removed-spectator") &&
+            (url.includes("removed-spectator") ||
+              url.includes("other-spectator")) &&
             JSON.parse(init.body).type === "lobby:state_changed"
         )
       ).toBe(false);
