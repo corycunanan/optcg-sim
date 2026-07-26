@@ -110,7 +110,25 @@ vi.mock("./player-field", () => ({
     ),
 }));
 
-vi.mock("./hand-layer", () => ({ HandLayer: () => null }));
+vi.mock("./hand-layer", () => ({
+  HandLayer: ({
+    cards,
+    zoneKey,
+    enableDrag,
+  }: {
+    cards: CardInstance[];
+    zoneKey: string;
+    enableDrag?: boolean;
+  }) =>
+    React.createElement("div", {
+      "data-hand-zone-key": zoneKey,
+      "data-hand-card-ids": cards.map((card) => card.cardId).join(","),
+      "data-hand-instance-ids": cards
+        .map((card) => card.instanceId)
+        .join(","),
+      "data-hand-drag-enabled": String(!!enableDrag),
+    }),
+}));
 vi.mock("./deck-pile", () => ({ DeckPile: () => null }));
 vi.mock("./don-zone", () => ({ DonZone: () => null }));
 vi.mock("./trash-zone", () => ({ DroppableTrashZone: () => null }));
@@ -205,6 +223,23 @@ function makePlayer(playerIndex: 0 | 1): PlayerState {
     rejoinDeadlineAt: null,
     sleeveUrl: null,
     donArtUrl: null,
+  };
+}
+
+function makeHandCard(
+  playerIndex: 0 | 1,
+  instanceId: string,
+  cardId: string,
+): CardInstance {
+  return {
+    instanceId,
+    cardId,
+    zone: "HAND",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: null,
+    controller: playerIndex,
+    owner: playerIndex,
   };
 }
 
@@ -334,6 +369,87 @@ describe("BoardLayout bottom-player perspective", () => {
       act(() => renderer?.unmount());
       renderer = null;
     }
+  });
+
+  it("passes both spectator hands through in received order for either anchor", () => {
+    const player0 = {
+      ...players[0],
+      hand: [
+        makeHandCard(0, "p0-hand-a", "OP01-001"),
+        makeHandCard(0, "p0-hand-b", "OP01-002"),
+      ],
+    };
+    const player1 = {
+      ...players[1],
+      hand: [
+        makeHandCard(1, "p1-hand-a", "OP02-001"),
+        makeHandCard(1, "p1-hand-b", "OP02-002"),
+      ],
+    };
+
+    for (const bottomPlayerIndex of [0, 1] as const) {
+      renderComposition(bottomPlayerIndex, {
+        me: player0,
+        opp: player1,
+        myIndex: null,
+      });
+
+      const bottomHand = renderer!.root.findByProps({
+        "data-hand-zone-key": "p-hand",
+      });
+      const topHand = renderer!.root.findByProps({
+        "data-hand-zone-key": "o-hand",
+      });
+      const expectedBottom = bottomPlayerIndex === 0 ? player0 : player1;
+      const expectedTop = bottomPlayerIndex === 0 ? player1 : player0;
+
+      expect(bottomHand.props["data-hand-card-ids"]).toBe(
+        expectedBottom.hand.map((card) => card.cardId).join(","),
+      );
+      expect(bottomHand.props["data-hand-instance-ids"]).toBe(
+        expectedBottom.hand.map((card) => card.instanceId).join(","),
+      );
+      expect(topHand.props["data-hand-card-ids"]).toBe(
+        expectedTop.hand.map((card) => card.cardId).join(","),
+      );
+      expect(topHand.props["data-hand-instance-ids"]).toBe(
+        expectedTop.hand.map((card) => card.instanceId).join(","),
+      );
+      expect(bottomHand.props["data-hand-drag-enabled"]).toBe("false");
+      expect(topHand.props["data-hand-drag-enabled"]).toBe("false");
+
+      act(() => renderer?.unmount());
+      renderer = null;
+    }
+  });
+
+  it("preserves the seated player real/hidden hand projection", () => {
+    const player0 = {
+      ...players[0],
+      hand: [makeHandCard(0, "p0-hand", "OP01-001")],
+    };
+    const player1 = {
+      ...players[1],
+      hand: [makeHandCard(1, "hidden-1-hand-0", "hidden")],
+    };
+
+    renderComposition(0, {
+      me: player0,
+      opp: player1,
+      myIndex: 0,
+      interactionMode: "full",
+    });
+
+    expect(
+      renderer!.root.findByProps({ "data-hand-zone-key": "p-hand" }).props[
+        "data-hand-card-ids"
+      ],
+    ).toBe("OP01-001");
+    expect(
+      renderer!.root.findByProps({ "data-hand-zone-key": "o-hand" }).props[
+        "data-hand-card-ids"
+      ],
+    ).toBe("hidden");
   });
 
   it("preserves every ordinary affordance in full interaction mode", () => {

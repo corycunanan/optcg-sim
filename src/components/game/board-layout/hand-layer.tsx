@@ -219,7 +219,6 @@ function SortableHandCard({
 
 export const HandLayer = React.memo(function HandLayer({
   cards,
-  faceDown,
   cardDb,
   enableDrag,
   counterMode,
@@ -229,7 +228,6 @@ export const HandLayer = React.memo(function HandLayer({
   sleeveUrl,
 }: {
   cards: CardInstance[];
-  faceDown?: boolean;
   cardDb: CardDb;
   enableDrag?: boolean;
   counterMode?: boolean;
@@ -241,6 +239,7 @@ export const HandLayer = React.memo(function HandLayer({
   sleeveUrl?: string | null;
 }) {
   const count = cards.length;
+  const hasVisibleCards = cards.some((card) => card.cardId !== "hidden");
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
   const activeEffects = useActiveEffects();
@@ -291,16 +290,23 @@ export const HandLayer = React.memo(function HandLayer({
       (inFlightInstanceIds?.has(card.instanceId) ?? false) ||
       freshlyAdded.has(card.instanceId);
 
-    if (faceDown) {
+    // The server projection is the sole visibility authority. A real cardId
+    // renders face-up on either side; the redaction sentinel degrades to a
+    // sleeve without relying on viewer identity or board position.
+    if (card.cardId === "hidden") {
       return (
-        <Card
+        <div
           key={card.instanceId}
-          data={{ card, cardDb }}
-          variant="hand"
-          faceDown
-          sleeveUrl={sleeveUrl}
           style={marginStyle}
-        />
+          className={cn(isInFlight && "invisible")}
+        >
+          <Card
+            data={{ card, cardDb }}
+            variant="hand"
+            faceDown
+            sleeveUrl={sleeveUrl}
+          />
+        </div>
       );
     }
 
@@ -353,10 +359,10 @@ export const HandLayer = React.memo(function HandLayer({
     );
   };
 
-  // Face-down and input-suppressed hands have no reorder interaction. Render
-  // them without dnd-kit so spectator cards cannot enter the keyboard tab
-  // order as disabled `role="button"` elements.
-  if (faceDown || inputSuppressed) {
+  // Fully redacted and input-suppressed hands have no reorder interaction.
+  // Render them without dnd-kit so spectator cards cannot enter the keyboard
+  // tab order as disabled `role="button"` elements.
+  if (!hasVisibleCards || inputSuppressed) {
     return (
       <div ref={handRef} className="pointer-events-auto flex items-center">
         {cards.map(renderCard)}
@@ -367,7 +373,9 @@ export const HandLayer = React.memo(function HandLayer({
   return (
     <div ref={handRef} className="pointer-events-auto flex items-center">
       <SortableContext
-        items={cards.map((c) => `hand-${c.instanceId}`)}
+        items={cards
+          .filter((card) => card.cardId !== "hidden")
+          .map((card) => `hand-${card.instanceId}`)}
         strategy={horizontalListSortingStrategy}
       >
         {cards.map(renderCard)}
