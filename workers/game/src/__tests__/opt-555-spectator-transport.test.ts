@@ -134,6 +134,7 @@ describe("OPT-555 spectator transport", () => {
     const afterWake = transport(restoredState);
     const player = new MockWebSocket();
     afterWake.accept(0, player as unknown as WebSocket);
+    const playerIndexFor = vi.spyOn(afterWake, "playerIndexFor");
 
     expect(
       afterWake.spectatorIdFor(restoredSpectator as unknown as WebSocket)
@@ -148,6 +149,25 @@ describe("OPT-555 spectator transport", () => {
 
     expect(player.sent).toHaveLength(1);
     expect(restoredSpectator.sent).toEqual([]);
+    expect(playerIndexFor).toHaveBeenCalledOnce();
+    expect(playerIndexFor).toHaveBeenCalledWith(player as unknown as WebSocket);
+  });
+
+  it("denies a socket with no identifiable session identity", () => {
+    const state = new MockSocketState();
+    const sessionTransport = transport(state);
+    const unidentified = new MockWebSocket();
+    state.acceptWebSocket(unidentified as unknown as WebSocket, []);
+    const player = new MockWebSocket();
+    sessionTransport.accept(0, player as unknown as WebSocket);
+
+    sessionTransport.broadcast({
+      type: "game:player_reconnected",
+      playerIndex: 0,
+    });
+
+    expect(player.sent).toHaveLength(1);
+    expect(unidentified.sent).toEqual([]);
   });
 
   it.each([
