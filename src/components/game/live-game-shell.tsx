@@ -36,6 +36,7 @@ import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
 import { PregameOverlay } from "./pregame/pregame-overlay";
+import { GameOverlayGate } from "./pregame/game-overlay-gate";
 import type { GameAction, PromptOptions } from "@shared/game-types";
 import type { SolitairePerspective } from "@/hooks/use-solitaire-session";
 
@@ -46,6 +47,7 @@ export interface LiveGameShellProps {
   gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
   viewerRole: "player" | "spectator";
   bottomPlayerIndex?: 0 | 1;
+  playerDisplayNames: readonly [string, string];
 }
 
 export function LiveGameShell(props: LiveGameShellProps) {
@@ -65,9 +67,16 @@ function LiveGameShellContent({
   gameMode,
   viewerRole,
   bottomPlayerIndex,
+  playerDisplayNames,
 }: LiveGameShellProps) {
   if (gameMode === "SOLITAIRE" && viewerRole !== "spectator") {
-    return <SolitaireGameSession gameId={gameId} workerUrl={workerUrl} />;
+    return (
+      <SolitaireGameSession
+        gameId={gameId}
+        workerUrl={workerUrl}
+        playerDisplayNames={playerDisplayNames}
+      />
+    );
   }
 
   return (
@@ -77,6 +86,7 @@ function LiveGameShellContent({
       playerIndex={playerIndex}
       viewerRole={viewerRole}
       bottomPlayerIndex={bottomPlayerIndex}
+      playerDisplayNames={playerDisplayNames}
     />
   );
 }
@@ -93,18 +103,25 @@ function PvpGameSession(props: LiveGameShellProps) {
       : { requestedPlayerIndex: props.playerIndex }
   );
 
-  return <GameSessionView session={session} />;
+  return (
+    <GameSessionView
+      session={session}
+      playerDisplayNames={props.playerDisplayNames}
+    />
+  );
 }
 
 function SolitaireGameSession({
   gameId,
   workerUrl,
-}: Pick<LiveGameShellProps, "gameId" | "workerUrl">) {
+  playerDisplayNames,
+}: Pick<LiveGameShellProps, "gameId" | "workerUrl" | "playerDisplayNames">) {
   const session = useSolitaireSession(gameId, workerUrl);
 
   return (
     <GameSessionView
       session={session}
+      playerDisplayNames={playerDisplayNames}
       solitaire={{
         myIndex: session.perspective.myIndex,
         activeTurnIndex: session.perspective.activeTurnIndex,
@@ -119,6 +136,7 @@ type GameSessionReturn = ReturnType<typeof useGameSession>;
 
 interface GameSessionViewProps {
   session: GameSessionReturn;
+  playerDisplayNames: readonly [string, string];
   solitaire?: {
     myIndex: SolitairePerspective;
     activeTurnIndex: SolitairePerspective | null;
@@ -127,7 +145,11 @@ interface GameSessionViewProps {
   };
 }
 
-function GameSessionView({ session, solitaire }: GameSessionViewProps) {
+function GameSessionView({
+  session,
+  playerDisplayNames,
+  solitaire,
+}: GameSessionViewProps) {
   const { game, opponent, navigation, endState } = session;
   const { sendAction } = game;
   const { handleBackToLobbies } = navigation;
@@ -473,20 +495,28 @@ function GameSessionView({ session, solitaire }: GameSessionViewProps) {
         <Board state={state} dispatch={dispatch} />
       </ScaledBoard>
 
-      {game.gameState.pregame && (
-        <PregameOverlay
-          pregame={game.gameState.pregame}
-          myIndex={game.myIndex}
-          myHand={game.me?.hand ?? []}
-          cardDb={game.cardDb}
-          activePrompt={activePrompt}
-          promptRespondingPlayer={
-            game.gameState.pendingPrompt?.respondingPlayer ??
-            (activePrompt ? game.myIndex : null)
-          }
-          onAction={dispatch.onAction}
-        />
-      )}
+      <GameOverlayGate
+        viewerRole={game.viewerRole}
+        pregame={game.gameState.pregame}
+        pendingPrompt={game.gameState.pendingPrompt}
+        promptRespondingPlayer={game.gameState.promptRespondingPlayer ?? null}
+        playerDisplayNames={playerDisplayNames}
+      >
+        {game.gameState.pregame && (
+          <PregameOverlay
+            pregame={game.gameState.pregame}
+            myIndex={game.myIndex}
+            myHand={game.me?.hand ?? []}
+            cardDb={game.cardDb}
+            activePrompt={activePrompt}
+            promptRespondingPlayer={
+              game.gameState.pendingPrompt?.respondingPlayer ??
+              (activePrompt ? game.myIndex : null)
+            }
+            onAction={dispatch.onAction}
+          />
+        )}
+      </GameOverlayGate>
 
       {process.env.NODE_ENV === "development" && game.me && (
         <div className="fixed right-4 bottom-4 z-[300] flex items-center gap-2">

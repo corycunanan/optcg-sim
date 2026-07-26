@@ -499,7 +499,7 @@ describe("BoardLayout bottom-player perspective", () => {
     expect(onAction).toHaveBeenCalledWith({ type: "CONCEDE" });
   });
 
-  it("removes spectator prompt and mid-zone action affordances", () => {
+  it("blocks the spectator prompt modal at the board routing choke point", () => {
     const onAction = vi.fn();
     renderComposition(0, {
       onAction,

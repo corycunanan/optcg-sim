@@ -175,6 +175,7 @@ describe("LiveGameShell dispatch wiring", () => {
         <LiveGameShell
           gameId="game-1"
           workerUrl="https://worker.test"
+          playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="player"
         />
       );
@@ -205,6 +206,7 @@ describe("LiveGameShell dispatch wiring", () => {
         <LiveGameShell
           gameId="game-1"
           workerUrl="https://worker.test"
+          playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="spectator"
           bottomPlayerIndex={1}
         />
@@ -230,6 +232,7 @@ describe("LiveGameShell dispatch wiring", () => {
         <LiveGameShell
           gameId="game-1"
           workerUrl="https://worker.test"
+          playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="player"
         />
       );
@@ -250,6 +253,7 @@ describe("LiveGameShell dispatch wiring", () => {
         <LiveGameShell
           gameId="game-1"
           workerUrl="https://worker.test"
+          playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="spectator"
           bottomPlayerIndex={0}
         />
@@ -271,6 +275,7 @@ describe("LiveGameShell dispatch wiring", () => {
         <LiveGameShell
           gameId="game-1"
           workerUrl="https://worker.test"
+          playerDisplayNames={["Player 1", "Player 2"]}
           gameMode="SOLITAIRE"
           viewerRole="spectator"
           bottomPlayerIndex={0}

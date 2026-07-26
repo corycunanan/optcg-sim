@@ -59,6 +59,8 @@ export default async function GamePage({
       mode: true,
       player1Id: true,
       player2Id: true,
+      player1: { select: { username: true, name: true } },
+      player2: { select: { username: true, name: true } },
       lobby: { select: { hostUserId: true } },
     },
   });
@@ -86,6 +88,10 @@ export default async function GamePage({
       gameMode={game.mode}
       viewerRole={viewerRole}
       bottomPlayerIndex={bottomPlayerIndex}
+      playerDisplayNames={[
+        game.player1.username ?? game.player1.name ?? "Player 1",
+        game.player2.username ?? game.player2.name ?? "Player 2",
+      ]}
     />
   );
 }
