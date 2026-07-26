@@ -157,7 +157,7 @@ export function useGameSession(
   /* ── Remote game status polling ───────────────────────────────────── */
 
   const { remoteGameStatus, remoteGameNotFound, setRemoteGameStatus } =
-    useRemoteGameStatus(gameId);
+    useRemoteGameStatus(gameId, viewerRole === "spectator");
   const liveGameId = remoteGameNotFound ? "" : gameId;
 
   const getToken = useCallback(async () => {

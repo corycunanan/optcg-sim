@@ -14,10 +14,26 @@ const mocks = vi.hoisted(() => ({
   bottomPlayerIndex: ((value: 0 | 1) => value)(0),
   bottomPlayer: null as GameState["players"][number] | null,
   topPlayer: null as GameState["players"][number] | null,
+  gameState: {
+    eventLog: [],
+    activeEffects: [],
+    pendingPrompt: null,
+    pregame: null,
+  } as unknown as GameState | null,
+  cardDbReady: true,
+  connectivityFailed: false,
+  lastError: null as string | null,
+  sessionPerspectives: [] as unknown[],
+  solitaireCalls: 0,
 }));
 
 vi.mock("@/hooks/use-game-session", () => ({
-  useGameSession: () => {
+  useGameSession: (
+    _gameId: string,
+    _workerUrl: string,
+    perspective: unknown
+  ) => {
+    mocks.sessionPerspectives.push(perspective);
     const [opponentDeadlineRemaining, setOpponentDeadlineRemaining] =
       useState(30_000);
     mocks.tickCountdown = () =>
@@ -25,16 +41,11 @@ vi.mock("@/hooks/use-game-session", () => ({
 
     return {
       game: {
-        gameState: {
-          eventLog: [],
-          activeEffects: [],
-          pendingPrompt: null,
-          pregame: null,
-        } as unknown as GameState,
+        gameState: mocks.gameState,
         cardDb: {},
-        cardDbReady: true,
+        cardDbReady: mocks.cardDbReady,
         connectionStatus: "connected",
-        lastError: null,
+        lastError: mocks.lastError,
         actionRejection: null,
         acceptedUpdate: null,
         activePrompt: null,
@@ -56,7 +67,7 @@ vi.mock("@/hooks/use-game-session", () => ({
         matchClosed: false,
         canUndo: false,
         retryConnection: vi.fn(),
-        connectivityFailed: false,
+        connectivityFailed: mocks.connectivityFailed,
       },
       opponent: {
         opponentAway: true,
@@ -82,6 +93,13 @@ vi.mock("@/hooks/use-game-session", () => ({
         endReason: "",
       },
     };
+  },
+}));
+
+vi.mock("@/hooks/use-solitaire-session", () => ({
+  useSolitaireSession: () => {
+    mocks.solitaireCalls += 1;
+    throw new Error("unexpected solitaire player session");
   },
 }));
 
@@ -131,6 +149,17 @@ beforeEach(() => {
   mocks.bottomPlayerIndex = 0;
   mocks.bottomPlayer = null;
   mocks.topPlayer = null;
+  mocks.gameState = {
+    eventLog: [],
+    activeEffects: [],
+    pendingPrompt: null,
+    pregame: null,
+  } as unknown as GameState;
+  mocks.cardDbReady = true;
+  mocks.connectivityFailed = false;
+  mocks.lastError = null;
+  mocks.sessionPerspectives.length = 0;
+  mocks.solitaireCalls = 0;
 });
 
 afterEach(() => {
@@ -143,7 +172,11 @@ describe("LiveGameShell dispatch wiring", () => {
   it("keeps onAction stable across an opponent countdown render", () => {
     act(() => {
       renderer = create(
-        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />
+        <LiveGameShell
+          gameId="game-1"
+          workerUrl="https://worker.test"
+          viewerRole="player"
+        />
       );
     });
     const initialOnAction = mocks.actionRefs.at(-1);
@@ -169,10 +202,19 @@ describe("LiveGameShell dispatch wiring", () => {
 
     act(() => {
       renderer = create(
-        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />
+        <LiveGameShell
+          gameId="game-1"
+          workerUrl="https://worker.test"
+          viewerRole="spectator"
+          bottomPlayerIndex={1}
+        />
       );
     });
 
+    expect(mocks.sessionPerspectives.at(-1)).toEqual({
+      viewerRole: "spectator",
+      bottomPlayerIndex: 1,
+    });
     const state = mocks.boardStates.at(-1);
     expect(state?.interactionMode).toBe("spectator");
     expect(state?.bottomPlayerIndex).toBe(1);
@@ -185,10 +227,61 @@ describe("LiveGameShell dispatch wiring", () => {
 
     act(() => {
       renderer = create(
-        <LiveGameShell gameId="game-1" workerUrl="https://worker.test" />
+        <LiveGameShell
+          gameId="game-1"
+          workerUrl="https://worker.test"
+          viewerRole="player"
+        />
       );
     });
 
     expect(mocks.boardStates).toHaveLength(0);
+  });
+
+  it("shows the controller's finite recovery state after spectator token authorization fails", () => {
+    mocks.viewerRole = "spectator";
+    mocks.gameState = null;
+    mocks.cardDbReady = false;
+    mocks.connectivityFailed = true;
+    mocks.lastError = "Failed to get auth token";
+
+    act(() => {
+      renderer = create(
+        <LiveGameShell
+          gameId="game-1"
+          workerUrl="https://worker.test"
+          viewerRole="spectator"
+          bottomPlayerIndex={0}
+        />
+      );
+    });
+
+    const output = JSON.stringify(renderer?.toJSON());
+    expect(output).toContain("Can");
+    expect(output).toContain("reach the game server");
+    expect(output).toContain("Failed to get auth token");
+    expect(mocks.boardStates).toHaveLength(0);
+  });
+
+  it("uses one spectator session even when the game mode is Solitaire", () => {
+    mocks.viewerRole = "spectator";
+
+    act(() => {
+      renderer = create(
+        <LiveGameShell
+          gameId="game-1"
+          workerUrl="https://worker.test"
+          gameMode="SOLITAIRE"
+          viewerRole="spectator"
+          bottomPlayerIndex={0}
+        />
+      );
+    });
+
+    expect(mocks.solitaireCalls).toBe(0);
+    expect(mocks.sessionPerspectives.at(-1)).toEqual({
+      viewerRole: "spectator",
+      bottomPlayerIndex: 0,
+    });
   });
 });

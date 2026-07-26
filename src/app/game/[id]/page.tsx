@@ -34,19 +34,58 @@ export default async function GamePage({
         : 1
       : undefined;
   const game = await prisma.gameSession.findFirst({
+    // Deliberately omit a status filter. An admitted spectator may keep viewing
+    // the same board after FINISHED/ABANDONED; OPT-565 owns terminal-game UX.
     where: {
       id,
-      OR: [{ player1Id: session.user.id }, { player2Id: session.user.id }],
+      OR: [
+        { player1Id: session.user.id },
+        { player2Id: session.user.id },
+        {
+          AND: [
+            { player1Id: { not: session.user.id } },
+            { player2Id: { not: session.user.id } },
+            {
+              lobby: {
+                allowSpectators: true,
+                spectators: { some: { userId: session.user.id } },
+              },
+            },
+          ],
+        },
+      ],
     },
-    select: { mode: true },
+    select: {
+      mode: true,
+      player1Id: true,
+      player2Id: true,
+      lobby: { select: { hostUserId: true } },
+    },
   });
+
+  if (!game) {
+    redirect("/lobbies");
+  }
+
+  const viewerRole =
+    game.player1Id === session.user.id || game.player2Id === session.user.id
+      ? "player"
+      : "spectator";
+  const bottomPlayerIndex =
+    viewerRole === "spectator"
+      ? game.lobby.hostUserId === game.player1Id
+        ? 0
+        : 1
+      : undefined;
 
   return (
     <GameBoardLoader
       gameId={id}
       workerUrl={GAME_WORKER_URL}
       playerIndex={playerIndex}
-      gameMode={game?.mode}
+      gameMode={game.mode}
+      viewerRole={viewerRole}
+      bottomPlayerIndex={bottomPlayerIndex}
     />
   );
 }

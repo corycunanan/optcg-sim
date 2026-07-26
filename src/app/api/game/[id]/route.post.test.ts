@@ -52,7 +52,8 @@ vi.mock("@/lib/realtime/fanout-game", () => ({
 
 vi.stubGlobal("fetch", fetchMock);
 
-const { POST } = await import("./route");
+const gameRoute = await import("./route");
+const { POST } = gameRoute;
 const params = { params: Promise.resolve({ id: "game-1" }) };
 
 beforeEach(() => {
@@ -91,6 +92,55 @@ beforeEach(() => {
 });
 
 describe("POST /api/game/[id]", () => {
+  it.each([
+    {
+      action: "CONCEDE",
+      expectedWhere: {
+        id: "game-1",
+        status: "IN_PROGRESS",
+        OR: [
+          { player1Id: "spectator-1" },
+          { player2Id: "spectator-1" },
+        ],
+      },
+    },
+    {
+      action: "FINALIZE",
+      expectedWhere: {
+        id: "game-1",
+        OR: [
+          { player1Id: "spectator-1" },
+          { player2Id: "spectator-1" },
+        ],
+      },
+    },
+  ])("keeps spectator $action mutations player-only", async ({
+    action,
+    expectedWhere,
+  }) => {
+    authMock.mockResolvedValue({ user: { id: "spectator-1" } });
+    gameSessionFindFirstMock.mockResolvedValue(null);
+    const request = new NextRequest("http://localhost/api/game/game-1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+
+    const res = await POST(request, params);
+
+    expect(res.status).toBe(404);
+    expect(gameSessionFindFirstMock).toHaveBeenCalledWith({
+      where: expectedWhere,
+      select: expect.any(Object),
+    });
+    expect(finalizeGameResultMock).not.toHaveBeenCalled();
+  });
+
+  it("does not expose PATCH or DELETE mutation handlers", () => {
+    expect("PATCH" in gameRoute).toBe(false);
+    expect("DELETE" in gameRoute).toBe(false);
+  });
+
   it("keeps fallback concede successful and silently skips worker sync when misconfigured", async () => {
     vi.stubEnv("GAME_WORKER_URL", "");
     const request = new NextRequest("http://localhost/api/game/game-1", {

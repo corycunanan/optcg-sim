@@ -427,6 +427,39 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(joinButton?.props.disabled).toBe(true);
   });
 
+  it("routes an in-game spectator through the matching Spectate Match CTA", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              status: "IN_GAME",
+              viewerRole: "spectator",
+              gameId: "game-1",
+              gameStatus: "IN_PROGRESS",
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain("Spectate Match");
+    expect(renderedText()).not.toContain("Rejoin Game");
+
+    const spectateButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Spectate Match"));
+    act(() => spectateButton?.props.onClick());
+
+    expect(mocks.push).toHaveBeenCalledWith("/game/game-1");
+  });
+
   it("removes guest leave from keyboard access while a match is active", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
