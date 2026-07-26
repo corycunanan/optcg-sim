@@ -36,8 +36,7 @@ export interface LobbyRoomStateRead {
 }
 
 export async function readLobbyRoomState(
-  lobbyId: string,
-  deckContentsViewerUserId?: string | null
+  lobbyId: string
 ): Promise<LobbyRoomStateRead | null> {
   const lobby = await prisma.lobby.findUnique({
     where: { id: lobbyId },
@@ -110,11 +109,6 @@ export async function readLobbyRoomState(
 
   if (!lobby) return null;
 
-  const shouldReadDeckContents =
-    deckContentsViewerUserId === undefined ||
-    deckContentsViewerUserId === lobby.hostUserId ||
-    deckContentsViewerUserId === lobby.guest?.user.id;
-
   const leaderIds: string[] = [];
   const deckIds: string[] = [];
   if (lobby.hostDeck) leaderIds.push(lobby.hostDeck.leaderId);
@@ -129,7 +123,7 @@ export async function readLobbyRoomState(
           select: { id: true, name: true, imageUrl: true },
         })
       : [],
-    shouldReadDeckContents && deckIds.length
+    deckIds.length
       ? prisma.deck.findMany({
           where: { id: { in: deckIds } },
           select: {
@@ -275,7 +269,7 @@ export async function buildLobbyRoomState(
   lobbyId: string,
   viewerUserId?: string
 ): Promise<LobbyRoomState | null> {
-  const read = await readLobbyRoomState(lobbyId, viewerUserId ?? null);
+  const read = await readLobbyRoomState(lobbyId);
   return read ? projectLobbyRoomState(read, viewerUserId ?? null) : null;
 }
 

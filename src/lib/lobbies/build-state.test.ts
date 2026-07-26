@@ -3,6 +3,7 @@ import type { LobbyRoomState } from "./state";
 import type {
   LobbyRoomStateRead,
   projectLobbyRoomState,
+  readLobbyRoomState,
 } from "./build-state";
 
 const lobbyFindUniqueMock = vi.fn();
@@ -38,6 +39,9 @@ describe("shared lobby read boundary", () => {
     expectTypeOf<LobbyRoomStateRead>().not.toMatchTypeOf<LobbyRoomState>();
     expectTypeOf<Parameters<typeof projectLobbyRoomState>>().toEqualTypeOf<
       [LobbyRoomStateRead, string | null]
+    >();
+    expectTypeOf<Parameters<typeof readLobbyRoomState>>().toEqualTypeOf<
+      [string]
     >();
   });
 });
@@ -152,14 +156,14 @@ describe("buildLobbyRoomState participant deck contents", () => {
     }
   );
 
-  it("omits all deck contents for a non-participant viewer", async () => {
+  it("loads deck contents once but omits them for a non-participant viewer", async () => {
     lobbyFindUniqueMock.mockResolvedValue(lobbyWithDecks);
 
     const state = await buildLobbyRoomState("lobby-1", "stranger-1");
 
     expect(state?.hostDeck?.contents).toBeUndefined();
     expect(state?.guest?.deck?.contents).toBeUndefined();
-    expect(deckFindManyMock).not.toHaveBeenCalled();
+    expect(deckFindManyMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -19,6 +19,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+const { buildLobbyRoomState } = await import("@/lib/lobbies/build-state");
 const { notifyLobby } = await import("./fanout-lobby");
 
 const baseDeps = {
@@ -172,6 +173,36 @@ describe("notifyLobby production database cost", () => {
     }
   );
 
+  it.each([
+    [0, 2, 6],
+    [1, 3, 6],
+    [20, 22, 6],
+  ])(
+    "runs route-style build plus %i-spectator fanout to %i recipients with %i database queries",
+    async (spectatorCount, expectedRecipients, expectedQueries) => {
+      lobbyFindUniqueMock.mockResolvedValue(databaseLobby(spectatorCount));
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 202 }));
+
+      const state = await buildLobbyRoomState("lobby-cost");
+      expect(state).not.toBeNull();
+      await notifyLobby(state!, {
+        deps: { ...baseDeps, fetch: fetchMock },
+      });
+
+      expect(lobbyFindUniqueMock).toHaveBeenCalledTimes(2);
+      expect(cardFindManyMock).toHaveBeenCalledTimes(2);
+      expect(deckFindManyMock).toHaveBeenCalledTimes(2);
+      expect(
+        lobbyFindUniqueMock.mock.calls.length +
+          cardFindManyMock.mock.calls.length +
+          deckFindManyMock.mock.calls.length
+      ).toBe(expectedQueries);
+      expect(fetchMock).toHaveBeenCalledTimes(expectedRecipients);
+    }
+  );
+
   async function fanoutPayloads(spectatorCount = 1) {
     lobbyFindUniqueMock.mockResolvedValue(databaseLobby(spectatorCount));
     const fetchMock = vi
@@ -214,15 +245,41 @@ describe("notifyLobby production database cost", () => {
     }
   });
 
-  it("keeps deck contents participant-only", async () => {
+  it("delivers grouped cards to both participants and omits contents for spectators", async () => {
+    deckFindManyMock.mockResolvedValue([
+      {
+        id: "host-deck",
+        cards: [
+          {
+            cardId: "OP01-024",
+            quantity: 4,
+            selectedArtUrl: "/known-alt.png",
+            card: {
+              name: "Known Character",
+              type: "Character",
+              imageUrl: "/known-base.png",
+            },
+          },
+        ],
+      },
+      { id: "guest-deck", cards: [] },
+    ]);
     const payloads = await fanoutPayloads();
+    const knownContents = {
+      characters: [
+        {
+          id: "OP01-024",
+          name: "Known Character",
+          quantity: 4,
+          imageUrl: "/known-alt.png",
+        },
+      ],
+      events: [],
+      stages: [],
+    };
 
     for (const userId of ["host-user", "guest-user"]) {
-      expect(payloads.get(userId)?.hostDeck?.contents).toEqual({
-        characters: [],
-        events: [],
-        stages: [],
-      });
+      expect(payloads.get(userId)?.hostDeck?.contents).toEqual(knownContents);
       expect(payloads.get(userId)?.guest?.deck?.contents).toEqual({
         characters: [],
         events: [],
