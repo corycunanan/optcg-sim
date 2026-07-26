@@ -6,6 +6,7 @@
  *   GET  /game/:gameId/ws          — WebSocket upgrade (called directly by browser clients)
  *   GET  /game/:gameId/cards       — Card DB fetch
  *   POST /game/:gameId/notify-end  — Server-to-server result fallback
+ *   POST /game/:gameId/revoke-spectators — Server-to-server socket revocation
  *   GET  /game/:gameId/status      — Server-to-server lifecycle probe
  *
  *   GET  /user/:userId/ws          — User-channel WebSocket upgrade (token in ?token=)
@@ -18,7 +19,7 @@ export { UserChannel } from "./UserChannel.js";
 import type { Env } from "./types.js";
 
 const GAME_ROUTE_PATTERN =
-  /^\/game\/([^/]+)\/(init|ws|cards|notify-end|status)$/;
+  /^\/game\/([^/]+)\/(init|ws|cards|notify-end|revoke-spectators|status)$/;
 const USER_ROUTE_PATTERN = /^\/user\/([^/]+)\/(ws|notify|health)$/;
 
 export default {
@@ -45,7 +46,12 @@ export default {
       const [, gameId, route] = gameMatch;
 
       // Bearer-secret auth for server-to-server routes.
-      if (route === "init" || route === "notify-end" || route === "status") {
+      if (
+        route === "init" ||
+        route === "notify-end" ||
+        route === "revoke-spectators" ||
+        route === "status"
+      ) {
         const expectedMethod = route === "status" ? "GET" : "POST";
         if (request.method !== expectedMethod) {
           return new Response("Method not allowed", { status: 405 });

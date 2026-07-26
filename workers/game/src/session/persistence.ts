@@ -297,7 +297,10 @@ export class SessionRepository {
     }
   }
 
-  async syncAlarm(state: GameState): Promise<void> {
+  async syncAlarm(
+    state: GameState,
+    spectatorDeadline: number | null = null
+  ): Promise<void> {
     const nextDeadline = state.players.reduce<number | null>(
       (current, player) => {
         if (player.connected || player.rejoinDeadlineAt === null)
@@ -305,7 +308,7 @@ export class SessionRepository {
         if (current === null) return player.rejoinDeadlineAt;
         return Math.min(current, player.rejoinDeadlineAt);
       },
-      null
+      spectatorDeadline
     );
 
     if (nextDeadline === null) {

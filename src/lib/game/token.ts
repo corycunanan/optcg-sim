@@ -10,9 +10,9 @@ export type GameTokenOptions = {
 /**
  * Mint a short-lived app-signed token for the database-less game worker.
  * A signed spectator role is authoritative at that trust boundary, and the app
- * cannot revoke a minted token. The worker checks exp only at WebSocket upgrade
- * and never rechecks it or schedules an expiry close, so an established socket
- * is not bounded by the default 300-second TTL. OPT-574 owns that revocation.
+ * cannot revoke a minted token itself. Established spectator sockets carry exp
+ * as a hibernation-stable lease: delivery stops and the DO closes the socket at
+ * expiry. Membership mutations also push prompt revocation to the game DO.
  */
 export async function mintGameToken(
   userId: string,

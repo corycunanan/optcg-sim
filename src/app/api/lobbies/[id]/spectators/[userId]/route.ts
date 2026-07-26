@@ -14,6 +14,7 @@ import {
   notifyLobby,
   notifySpectatorsRemoved,
 } from "@/lib/realtime/fanout-lobby";
+import { revokeSpectatorSocketsForLobby } from "@/lib/realtime/revoke-spectators";
 
 type RouteContext = {
   params: Promise<{ id: string; userId: string }>;
@@ -108,12 +109,19 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         reason: "REMOVED_BY_HOST",
         removedSpectatorUserIds: [result.removedSpectatorUserId],
       });
+      const socketRevocation = revokeSpectatorSocketsForLobby(id, [
+        result.removedSpectatorUserId,
+      ]);
       const stateFanout = buildLobbyRoomState(id).then((state) =>
         state ? notifyLobby(state) : undefined
       );
 
       // A rebuild failure must not suppress the directed terminal event.
-      await Promise.allSettled([directedEjection, stateFanout]);
+      await Promise.allSettled([
+        directedEjection,
+        socketRevocation,
+        stateFanout,
+      ]);
     });
 
     return apiAction();

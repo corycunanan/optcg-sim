@@ -19,6 +19,7 @@ import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { viewerIsEvicted } from "@/lib/lobbies/state";
 import { notifyUser } from "@/lib/realtime/fan-out";
+import { revokeSpectatorSocketsForLobby } from "@/lib/realtime/revoke-spectators";
 import {
   notifyLobby,
   notifySpectatorsRemoved,
@@ -94,7 +95,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     },
   });
 
-  if (!lobby || (lobby.status !== "WAITING" && lobby.status !== "READY")) {
+  if (!lobby || lobby.status === "CLOSED") {
     return apiError("Lobby not found or already started", 404);
   }
 
@@ -124,6 +125,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const hasNonSpectatorPatchField = Object.keys(parsed).some(
     (field) => field !== "allowSpectators",
   );
+  if (
+    lobby.status === "IN_GAME" &&
+    (parsed.allowSpectators === undefined || hasNonSpectatorPatchField)
+  ) {
+    return apiError("Lobby not found or already started", 404);
+  }
   if (
     parsed.allowSpectators !== undefined &&
     !spectatorSettingChanged &&
@@ -382,6 +389,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           removedSpectatorUserIds: result.removedSpectatorUserIds,
         })
       : Promise.resolve();
+    const socketRevocation = revokeSpectatorSocketsForLobby(
+      id,
+      result.removedSpectatorUserIds
+    );
     const stateFanout = buildLobbyRoomState(id).then(async (state) => {
       if (!state) return;
 
@@ -394,7 +405,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       }
     });
 
-    await Promise.allSettled([spectatorEjectionFanout, stateFanout]);
+    await Promise.allSettled([
+      spectatorEjectionFanout,
+      socketRevocation,
+      stateFanout,
+    ]);
   });
 
   return apiAction();
@@ -495,6 +510,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
             removedSpectatorUserIds: result.removedSpectatorUserIds,
           })
         : Promise.resolve();
+      const socketRevocation = revokeSpectatorSocketsForLobby(
+        id,
+        result.removedSpectatorUserIds
+      );
       const guestTerminalFanout = buildLobbyRoomState(id).then((state) => {
         if (!state) return;
 
@@ -513,6 +532,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       await Promise.allSettled([
         cancelInvites,
         spectatorEjectionFanout,
+        socketRevocation,
         guestTerminalFanout,
       ]);
     });

@@ -295,6 +295,24 @@ export function validateNotifyEndPayload(raw: unknown): NotifyEndPayload {
   return { winnerIndex: obj.winnerIndex, reason: obj.reason };
 }
 
+export function validateRevokeSpectatorsPayload(raw: unknown): {
+  userIds: string[];
+} {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("Body must be an object");
+  }
+  const userIds = (raw as Record<string, unknown>).userIds;
+  if (
+    !Array.isArray(userIds) ||
+    userIds.length === 0 ||
+    userIds.length > 20 ||
+    !userIds.every((userId) => typeof userId === "string" && userId.length > 0)
+  ) {
+    throw new Error("userIds must contain 1-20 non-empty strings");
+  }
+  return { userIds: Array.from(new Set(userIds)) };
+}
+
 // ─── ClientMessage ───────────────────────────────────────────────────────────
 
 export function validateClientMessage(raw: unknown): ClientMessage {

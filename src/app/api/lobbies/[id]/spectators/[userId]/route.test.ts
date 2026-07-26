@@ -12,6 +12,7 @@ const userUpdateManyMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
 const notifySpectatorsRemovedMock = vi.fn();
+const revokeSpectatorSocketsMock = vi.fn();
 
 const afterCalls = vi.hoisted(() => ({ pending: [] as Promise<void>[] }));
 
@@ -47,6 +48,10 @@ vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifySpectatorsRemoved: (...args: unknown[]) =>
     notifySpectatorsRemovedMock(...args),
 }));
+vi.mock("@/lib/realtime/revoke-spectators", () => ({
+  revokeSpectatorSocketsForLobby: (...args: unknown[]) =>
+    revokeSpectatorSocketsMock(...args),
+}));
 
 const { DELETE } = await import("./route");
 
@@ -81,6 +86,7 @@ beforeEach(() => {
     buildLobbyRoomStateMock,
     notifyLobbyMock,
     notifySpectatorsRemovedMock,
+    revokeSpectatorSocketsMock,
   ]) {
     mock.mockReset();
   }
@@ -101,6 +107,7 @@ beforeEach(() => {
   });
   notifyLobbyMock.mockResolvedValue(undefined);
   notifySpectatorsRemovedMock.mockResolvedValue(undefined);
+  revokeSpectatorSocketsMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(
     async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
@@ -168,6 +175,9 @@ describe("DELETE /api/lobbies/[id]/spectators/[userId]", () => {
       reason: "REMOVED_BY_HOST",
       removedSpectatorUserIds: ["target-user"],
     });
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith("lobby-1", [
+      "target-user",
+    ]);
   });
 
   it("still sends the directed ejection event when state rebuilding fails", async () => {
