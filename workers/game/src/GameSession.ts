@@ -307,7 +307,7 @@ export class GameSession implements DurableObject {
     if (!token) {
       return new Response("Missing token", { status: 401 });
     }
-
+    // Fail closed until OPT-555 adds spectator sockets; OPT-552/556/557 own safe view delivery and enforcement.
     const identity = await this.validateToken(token);
     if (identity === null || identity.role === "spectator") {
       return new Response("Unauthorized", { status: 401 });

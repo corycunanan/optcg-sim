@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { GameSession } from "../GameSession.js";
 import {
   SessionAuthorizer,
   type SessionParticipantIdentity,
 } from "../session/authorization.js";
-import type { GameState } from "../types.js";
+import type { Env, GameState } from "../types.js";
 import { setupGame } from "./factories.js";
 
 const logMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../lib/log.js", () => ({ log: logMock }));
+vi.mock("../lib/log.js", () => ({ configureLogger: vi.fn(), log: logMock }));
 
 class MemoryStorage {
   private readonly data = new Map<string, unknown>();
@@ -21,6 +22,38 @@ class MemoryStorage {
     this.data.set(key, value);
   }
 }
+
+class MockDurableObjectState {
+  private readonly data = new Map<string, unknown>();
+  readonly acceptedSockets: WebSocket[] = [];
+
+  storage = {
+    get: async <T>(key: string): Promise<T | undefined> =>
+      this.data.get(key) as T | undefined,
+    put: async (key: string, value: unknown): Promise<void> => {
+      this.data.set(key, value);
+    },
+    setAlarm: async (): Promise<void> => undefined,
+    deleteAlarm: async (): Promise<void> => undefined,
+  };
+
+  acceptWebSocket(ws: WebSocket): void {
+    this.acceptedSockets.push(ws);
+  }
+
+  getWebSockets(): WebSocket[] {
+    return [];
+  }
+
+  getTags(): string[] {
+    return [];
+  }
+}
+
+type GameSessionTestAccess = {
+  gameState: GameState;
+  fetch(request: Request): Promise<Response>;
+};
 
 type TokenClaims = {
   sub?: string;
@@ -97,6 +130,46 @@ describe("OPT-554 spectator session authorization", () => {
       gameId: state.id,
       userId: "spectator-user",
     });
+  });
+
+  it("rejects spectator WebSocket upgrades before pair construction or socket acceptance", async () => {
+    const durableState = new MockDurableObjectState();
+    const env = {
+      GAME_WORKER_SECRET: "test-secret",
+      NEXTJS_URL: "https://app.example.test",
+    } as Env;
+    const session = new GameSession(
+      durableState as unknown as DurableObjectState,
+      env
+    ) as unknown as GameSessionTestAccess;
+    const { state } = setupGame();
+    session.gameState = state;
+    const token = await mintToken(state, { jti: "spectator-upgrade" });
+    const originalWebSocketPair = (globalThis as Record<string, unknown>)
+      .WebSocketPair;
+    const pairConstructor = vi.fn(function MockWebSocketPair() {});
+    (globalThis as Record<string, unknown>).WebSocketPair = pairConstructor;
+
+    try {
+      const response = await session.fetch(
+        new Request(
+          `https://worker.example.test/game/${state.id}/ws?token=${encodeURIComponent(token)}`,
+          { headers: { Upgrade: "websocket" } }
+        )
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.text()).toBe("Unauthorized");
+      expect(pairConstructor).not.toHaveBeenCalled();
+      expect(durableState.acceptedSockets).toEqual([]);
+    } finally {
+      if (originalWebSocketPair === undefined) {
+        delete (globalThis as Record<string, unknown>).WebSocketPair;
+      } else {
+        (globalThis as Record<string, unknown>).WebSocketPair =
+          originalWebSocketPair;
+      }
+    }
   });
 
   it("rejects a spectator token carrying playerIndex with its own reason", async () => {
