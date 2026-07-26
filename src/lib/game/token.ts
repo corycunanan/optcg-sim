@@ -4,13 +4,24 @@ export type GameTokenOptions = {
   gameId?: string;
   jti?: string;
   playerIndex?: 0 | 1;
+  role?: "spectator";
 };
 
+/**
+ * Mint a short-lived app-signed token for the database-less game worker.
+ * A signed spectator role is authoritative at that trust boundary: lobby
+ * removal cannot revoke an existing token, so route-issued spectator access
+ * can remain valid until the default 300-second (5-minute) TTL expires.
+ */
 export async function mintGameToken(
   userId: string,
   secret: string,
   options: GameTokenOptions = {},
 ): Promise<string> {
+  if (options.role === "spectator" && options.playerIndex !== undefined) {
+    throw new Error("Spectator game tokens cannot include playerIndex");
+  }
+
   const now = options.now ?? Math.floor(Date.now() / 1000);
   const jti = options.jti ?? crypto.randomUUID();
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
@@ -21,6 +32,7 @@ export async function mintGameToken(
     jti,
     ...(options.gameId ? { gameId: options.gameId } : {}),
     ...(options.playerIndex !== undefined ? { playerIndex: options.playerIndex } : {}),
+    ...(options.role ? { role: options.role } : {}),
   }));
 
   const signingInput = `${header}.${payload}`;
