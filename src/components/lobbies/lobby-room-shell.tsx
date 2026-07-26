@@ -21,6 +21,7 @@ import {
   useLobbyRoom,
   type LobbyRoomDeck,
   type LobbyRoomState,
+  type SpectatorRemovalReason,
 } from "@/hooks/use-lobby-room";
 import { DeckListResponseSchema } from "@/lib/validators/cards";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,9 @@ export function LobbyRoomShell({
     closing,
     kicking,
     spectatorToggling,
+    stoppingSpectating,
     removedByHost,
+    spectatorRemovalReason,
     patchLobby,
     setAllowSpectators,
     startLobby,
@@ -94,6 +97,7 @@ export function LobbyRoomShell({
     closeLobby,
     refresh,
     kickGuest,
+    stopSpectating,
   } = useLobbyRoom(lobbyId);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
@@ -105,8 +109,11 @@ export function LobbyRoomShell({
   const [spectatorsOpen, setSpectatorsOpen] = useState(false);
   const recoveryHandledRef = useRef(false);
   const spectatorCountButtonRef = useRef<HTMLButtonElement>(null);
+  const viewerRole = lobby?.viewerRole;
 
   useEffect(() => {
+    if (!viewerRole || viewerRole === "spectator") return;
+
     let cancelled = false;
     apiGet("/api/decks", DeckListResponseSchema)
       .then((json) => {
@@ -118,9 +125,15 @@ export function LobbyRoomShell({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [viewerRole]);
 
   const recovery = useMemo(() => {
+    if (spectatorRemovalReason) {
+      return {
+        route: "/lobbies",
+        message: spectatorRemovalMessage(spectatorRemovalReason),
+      };
+    }
     if (removedByHost) {
       return {
         route: "/lobbies",
@@ -128,7 +141,7 @@ export function LobbyRoomShell({
       };
     }
     return lobby ? lobbyRoomRecovery(lobby) : null;
-  }, [lobby, removedByHost]);
+  }, [lobby, removedByHost, spectatorRemovalReason]);
 
   useEffect(() => {
     if (!recovery || recoveryHandledRef.current) return;
@@ -274,6 +287,18 @@ export function LobbyRoomShell({
     }
   };
 
+  const handleStopSpectating = async () => {
+    try {
+      await stopSpectating();
+      toast.success("You stopped spectating");
+      router.push("/lobbies");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not stop spectating"
+      );
+    }
+  };
+
   const handleSpectatorToggle = async (allowSpectators: boolean) => {
     try {
       await setAllowSpectators(allowSpectators);
@@ -337,6 +362,18 @@ export function LobbyRoomShell({
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (isSpectator) {
+    return (
+      <SpectatorRoom
+        lobby={lobby}
+        activeGameId={activeGameId}
+        stopping={stoppingSpectating}
+        onStop={() => void handleStopSpectating()}
+        onSpectate={(gameId) => router.push(`/game/${gameId}`)}
+      />
     );
   }
 
@@ -711,6 +748,149 @@ export function LobbyRoomShell({
       </div>
     </TooltipProvider>
   );
+}
+
+function SpectatorRoom({
+  lobby,
+  activeGameId,
+  stopping,
+  onStop,
+  onSpectate,
+}: {
+  lobby: LobbyRoomState;
+  activeGameId: string | null;
+  stopping: boolean;
+  onStop: () => void;
+  onSpectate: (gameId: string) => void;
+}) {
+  const realGuestPresent =
+    Boolean(lobby.guest) && lobby.guest?.user.id !== lobby.hostUserId;
+
+  return (
+    <div className="bg-background flex-1 overflow-y-auto">
+      <header className="border-border bg-surface-1 border-b">
+        <div className="mx-auto max-w-7xl px-6 py-8">
+          <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
+            Watching party
+          </p>
+          <h1 className="font-display text-content-primary mt-1 text-4xl">
+            {displayName(lobby.host, "Host")}&apos;s party
+          </h1>
+          <p className="text-content-secondary mt-2 text-sm">{lobby.format}</p>
+        </div>
+      </header>
+
+      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SpectatorSeat
+            role="Host"
+            player={
+              lobby.host ?? { username: null, name: "Host", image: null }
+            }
+            deck={lobby.hostDeck}
+          />
+          <SpectatorSeat
+            role="Guest"
+            player={
+              realGuestPresent && lobby.guest
+                ? lobby.guest.user
+                : { username: null, name: "Waiting for player", image: null }
+            }
+            deck={realGuestPresent ? (lobby.guest?.deck ?? null) : null}
+          />
+        </div>
+
+        <div className="border-border bg-surface-1 rounded-lg border p-6 text-center">
+          <Eye className="text-gold-600 mx-auto size-6" aria-hidden="true" />
+          <p className="text-content-primary mt-3 text-lg font-semibold">
+            {activeGameId
+              ? "Match in progress"
+              : "Waiting for the match to start"}
+          </p>
+          <p className="text-content-secondary mt-2 text-sm">
+            You can see who is playing. Only deck names are shared before the
+            match.
+          </p>
+        </div>
+      </main>
+
+      <div className="border-border bg-surface-1 sticky bottom-0 z-20 border-t shadow-[var(--shadow-lg)]">
+        <div className="mx-auto flex max-w-7xl flex-col justify-end gap-3 px-6 py-4 sm:flex-row">
+          <Button
+            variant="secondary"
+            size="lg"
+            disabled={stopping}
+            onClick={onStop}
+          >
+            {stopping ? "Stopping..." : "Stop spectating"}
+          </Button>
+          {activeGameId && (
+            <Button
+              variant="gold"
+              size="lg"
+              onClick={() => onSpectate(activeGameId)}
+            >
+              <Play data-icon="inline-start" />
+              Spectate Match
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpectatorSeat({
+  role,
+  player,
+  deck,
+}: {
+  role: "Host" | "Guest";
+  player: {
+    username: string | null;
+    name: string | null;
+    image: string | null;
+  };
+  deck: LobbyRoomDeck | null;
+}) {
+  const playerName = displayName(player, "Player");
+
+  return (
+    <section
+      className="border-border bg-surface-1 flex min-h-48 flex-col rounded-lg border"
+      aria-label={`${role} seat — ${playerName}`}
+    >
+      <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
+        <UserAvatar user={player} size="md" variant="dark" />
+        <div className="min-w-0">
+          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            {role}
+          </p>
+          <h2 className="text-content-primary truncate text-lg font-semibold">
+            {playerName}
+          </h2>
+        </div>
+      </header>
+      <div className="flex flex-1 flex-col justify-center px-5 py-6">
+        <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+          Deck
+        </p>
+        <p className="text-content-primary mt-2 text-base font-semibold">
+          {deck?.name ?? "Waiting for deck selection"}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export function spectatorRemovalMessage(reason: SpectatorRemovalReason) {
+  if (reason === "SPECTATING_DISABLED") {
+    return "The host turned off spectating. You've been returned to your own lobby.";
+  }
+  if (reason === "REMOVED_BY_HOST") {
+    return "The host removed you. You've been returned to your own lobby.";
+  }
+  return "The party closed. You've been returned to your own lobby.";
 }
 
 function SpectatorPill({
