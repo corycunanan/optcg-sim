@@ -10,9 +10,10 @@ export type GameTokenOptions = {
 
 /**
  * Mint a short-lived app-signed token for the database-less game worker.
- * A signed spectator role is authoritative at that trust boundary, and the app
- * cannot revoke a minted token itself. Established spectator sockets carry exp
- * as a hibernation-stable lease: delivery stops synchronously at expiry.
+ * A signed spectator role is authoritative at that trust boundary. The live
+ * game upgrade path explicitly admits it, while every worker caller must opt in.
+ * Established spectator sockets carry exp as a hibernation-stable lease:
+ * delivery stops synchronously at expiry.
  * The DO also schedules an expiry alarm, but physical close timing depends on
  * alarm delivery and has no numeric upper bound. Membership mutations push
  * prompt, revision-protected revocation to the game DO.

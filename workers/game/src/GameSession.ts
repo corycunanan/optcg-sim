@@ -2,8 +2,8 @@
  * GameSession Durable Object
  *
  * One instance per active game. Holds GameState in memory, accepts WebSocket
- * connections from both players, and serializes all incoming actions through
- * the rules engine pipeline.
+ * connections from players and admitted spectators, and serializes all
+ * incoming actions through the rules engine pipeline.
  */
 
 import type {
@@ -332,7 +332,7 @@ export class GameSession implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
     if (identity.role === "spectator") {
-      const response = await this.spectatorLifecycle.handleUpgrade(identity, false);
+      const response = await this.spectatorLifecycle.handleUpgrade(identity, true);
       await this.syncAlarm();
       return response;
     }
