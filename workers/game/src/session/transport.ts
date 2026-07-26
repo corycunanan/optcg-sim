@@ -7,10 +7,15 @@ import type {
   ServerMessage,
 } from "../types.js";
 import { filterPromptOptionsForPlayer } from "../engine/visibility.js";
+import { log } from "../lib/log.js";
 import { visibleStateForPlayer } from "./visibility.js";
 
 export const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
 export const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
+export const MAX_SPECTATOR_SOCKETS = 20;
+export const SPECTATOR_CAPACITY_CLOSE_CODE = 1013;
+export const SPECTATOR_CAPACITY_CLOSE_REASON = "spectator capacity reached";
+const SPECTATOR_CAPACITY_REJECTED_TAG = "spectator-capacity-rejected";
 export const DISCONNECT_BROADCAST_DEBOUNCE_MS = 500;
 
 export interface PlayerSocketAttachment {
@@ -19,6 +24,17 @@ export interface PlayerSocketAttachment {
   connectionId: string;
   acceptedAt: number;
 }
+
+export interface SpectatorSocketAttachment {
+  type: "game-session-spectator-socket";
+  userId: string;
+  connectionId: string;
+  acceptedAt: number;
+}
+
+export type SessionSocketAttachment =
+  | PlayerSocketAttachment
+  | SpectatorSocketAttachment;
 
 export interface SessionSocketState {
   acceptWebSocket(ws: WebSocket, tags?: string[]): void;
@@ -53,6 +69,39 @@ export class SessionTransport {
     this.closeStaleSockets(playerIndex, ws);
   }
 
+  acceptSpectator(userId: string, ws: WebSocket): boolean {
+    const existing = this.spectatorSocket(userId);
+    const spectatorCount = this.spectatorCount();
+    if (existing === null && spectatorCount >= MAX_SPECTATOR_SOCKETS) {
+      this.state.acceptWebSocket(ws, [SPECTATOR_CAPACITY_REJECTED_TAG]);
+      log("ws.spectator_capacity_rejected", {
+        userId,
+        spectatorCount,
+        limit: MAX_SPECTATOR_SOCKETS,
+      });
+      try {
+        ws.close(
+          SPECTATOR_CAPACITY_CLOSE_CODE,
+          SPECTATOR_CAPACITY_CLOSE_REASON
+        );
+      } catch {
+        // Already closed.
+      }
+      return false;
+    }
+
+    this.state.acceptWebSocket(ws, [`spectator:${userId}`]);
+    const acceptedAt = this.now();
+    ws.serializeAttachment({
+      type: "game-session-spectator-socket",
+      userId,
+      connectionId: `${acceptedAt}-${this.nextWebSocketSequence++}`,
+      acceptedAt,
+    } satisfies SpectatorSocketAttachment);
+    this.closeStaleSpectatorSockets(userId, ws);
+    return true;
+  }
+
   playerIndexFor(ws: WebSocket): 0 | 1 | null {
     const tag = this.state
       .getTags(ws)
@@ -60,6 +109,15 @@ export class SessionTransport {
     if (!tag) return null;
     const parsed = Number.parseInt(tag.slice("player-".length), 10);
     return parsed === 0 || parsed === 1 ? parsed : null;
+  }
+
+  spectatorIdFor(ws: WebSocket): string | null {
+    const tag = this.state
+      .getTags(ws)
+      .find((candidate) => candidate.startsWith("spectator:"));
+    if (!tag) return null;
+    const userId = tag.slice("spectator:".length);
+    return userId.length > 0 ? userId : null;
   }
 
   isAuthoritative(ws: WebSocket, playerIndex: 0 | 1): boolean {
@@ -73,6 +131,27 @@ export class SessionTransport {
     for (const ws of sockets) {
       const attachment = getPlayerSocketAttachment(ws);
       if (!attachment || attachment.playerIndex !== playerIndex) continue;
+      if (
+        !newest ||
+        attachment.acceptedAt > newest.attachment.acceptedAt ||
+        (attachment.acceptedAt === newest.attachment.acceptedAt &&
+          attachment.connectionId > newest.attachment.connectionId)
+      ) {
+        newest = { ws, attachment };
+      }
+    }
+    return newest?.ws ?? sockets[0] ?? null;
+  }
+
+  spectatorSocket(userId: string): WebSocket | null {
+    const sockets = this.state.getWebSockets(`spectator:${userId}`);
+    let newest: {
+      ws: WebSocket;
+      attachment: SpectatorSocketAttachment;
+    } | null = null;
+    for (const ws of sockets) {
+      const attachment = getSpectatorSocketAttachment(ws);
+      if (!attachment || attachment.userId !== userId) continue;
       if (
         !newest ||
         attachment.acceptedAt > newest.attachment.acceptedAt ||
@@ -236,13 +315,46 @@ export class SessionTransport {
     }
   }
 
+  private closeStaleSpectatorSockets(
+    userId: string,
+    authoritative: WebSocket
+  ): void {
+    for (const ws of this.state.getWebSockets(`spectator:${userId}`)) {
+      if (ws === authoritative) continue;
+      try {
+        ws.close(SUPERSEDED_SOCKET_CLOSE_CODE, SUPERSEDED_SOCKET_CLOSE_REASON);
+      } catch {
+        // Already closed.
+      }
+    }
+  }
+
+  private spectatorCount(): number {
+    const userIds = new Set<string>();
+    for (const ws of this.state.getWebSockets()) {
+      const userId = this.spectatorIdFor(ws);
+      if (userId !== null) userIds.add(userId);
+    }
+    return userIds.size;
+  }
+
   private shouldSend(ws: WebSocket): boolean {
+    if (
+      getSpectatorSocketAttachment(ws) !== null ||
+      this.spectatorIdFor(ws) !== null ||
+      this.state.getTags(ws).includes(SPECTATOR_CAPACITY_REJECTED_TAG)
+    ) {
+      return false;
+    }
     const playerIndex = this.playerIndexFor(ws);
-    return playerIndex === null || this.isAuthoritative(ws, playerIndex);
+    if (playerIndex === null) return false;
+    const attachment = getPlayerSocketAttachment(ws);
+    if (!attachment || attachment.playerIndex !== playerIndex) return false;
+    return this.isAuthoritative(ws, playerIndex);
   }
 }
 
-function isPlayerSocketAttachment(
+export function isPlayerSocketAttachment(
   value: unknown
 ): value is PlayerSocketAttachment {
   if (value === null || typeof value !== "object") return false;
@@ -258,12 +370,40 @@ function isPlayerSocketAttachment(
   );
 }
 
+export function isSpectatorSocketAttachment(
+  value: unknown
+): value is SpectatorSocketAttachment {
+  if (value === null || typeof value !== "object") return false;
+  return (
+    "type" in value &&
+    value.type === "game-session-spectator-socket" &&
+    "userId" in value &&
+    typeof value.userId === "string" &&
+    value.userId.length > 0 &&
+    "connectionId" in value &&
+    typeof value.connectionId === "string" &&
+    "acceptedAt" in value &&
+    typeof value.acceptedAt === "number"
+  );
+}
+
 function getPlayerSocketAttachment(
   ws: WebSocket
 ): PlayerSocketAttachment | null {
   try {
     const attachment = ws.deserializeAttachment();
     return isPlayerSocketAttachment(attachment) ? attachment : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSpectatorSocketAttachment(
+  ws: WebSocket
+): SpectatorSocketAttachment | null {
+  try {
+    const attachment = ws.deserializeAttachment();
+    return isSpectatorSocketAttachment(attachment) ? attachment : null;
   } catch {
     return null;
   }

@@ -4,7 +4,8 @@ import {
   SessionAuthorizer,
   type SessionParticipantIdentity,
 } from "../session/authorization.js";
-import type { Env, GameState } from "../types.js";
+import { SessionTransport } from "../session/transport.js";
+import type { CardData, Env, GameState } from "../types.js";
 import { setupGame } from "./factories.js";
 
 const logMock = vi.hoisted(() => vi.fn());
@@ -23,9 +24,32 @@ class MemoryStorage {
   }
 }
 
+class MockWebSocket {
+  readonly sent: string[] = [];
+  readonly closed: Array<{ code?: number; reason?: string }> = [];
+  private attachment: unknown;
+
+  send(payload: string): void {
+    this.sent.push(payload);
+  }
+
+  close(code?: number, reason?: string): void {
+    this.closed.push({ code, reason });
+  }
+
+  serializeAttachment(value: unknown): void {
+    this.attachment = value;
+  }
+
+  deserializeAttachment(): unknown {
+    return this.attachment;
+  }
+}
+
 class MockDurableObjectState {
   private readonly data = new Map<string, unknown>();
   readonly acceptedSockets: WebSocket[] = [];
+  private readonly tags = new Map<WebSocket, string[]>();
 
   storage = {
     get: async <T>(key: string): Promise<T | undefined> =>
@@ -37,22 +61,28 @@ class MockDurableObjectState {
     deleteAlarm: async (): Promise<void> => undefined,
   };
 
-  acceptWebSocket(ws: WebSocket): void {
+  acceptWebSocket(ws: WebSocket, tags?: string[]): void {
     this.acceptedSockets.push(ws);
+    this.tags.set(ws, tags ?? []);
   }
 
-  getWebSockets(): WebSocket[] {
-    return [];
+  getWebSockets(tag?: string): WebSocket[] {
+    return tag
+      ? this.acceptedSockets.filter((ws) => this.tags.get(ws)?.includes(tag))
+      : this.acceptedSockets;
   }
 
-  getTags(): string[] {
-    return [];
+  getTags(ws: WebSocket): string[] {
+    return this.tags.get(ws) ?? [];
   }
 }
 
 type GameSessionTestAccess = {
   gameState: GameState;
+  cardDb: Map<string, CardData>;
+  transport: SessionTransport;
   fetch(request: Request): Promise<Response>;
+  webSocketMessage(ws: WebSocket, message: string): Promise<void>;
 };
 
 type TokenClaims = {
@@ -170,6 +200,51 @@ describe("OPT-554 spectator session authorization", () => {
           originalWebSocketPair;
       }
     }
+  });
+
+  it("drops every spectator frame as a non-player without closing the socket", async () => {
+    const durableState = new MockDurableObjectState();
+    const env = {
+      GAME_WORKER_SECRET: "test-secret",
+      NEXTJS_URL: "https://app.example.test",
+    } as Env;
+    const session = new GameSession(
+      durableState as unknown as DurableObjectState,
+      env
+    ) as unknown as GameSessionTestAccess;
+    const { state, cardDb } = setupGame();
+    session.gameState = state;
+    session.cardDb = cardDb;
+    const stateBeforeFrames = structuredClone(state);
+    const spectator = new MockWebSocket();
+    session.transport.acceptSpectator(
+      "spectator-user",
+      spectator as unknown as WebSocket
+    );
+    const playerIndexFor = vi.spyOn(session.transport, "playerIndexFor");
+
+    for (const frame of [
+      JSON.stringify({ type: "game:action", action: { type: "END_TURN" } }),
+      JSON.stringify({
+        type: "game:prompt",
+        promptId: "spectator-prompt",
+        options: { promptType: "PLAYER_CHOICE" },
+      }),
+      "{malformed-json",
+    ]) {
+      await session.webSocketMessage(
+        spectator as unknown as WebSocket,
+        frame
+      );
+    }
+
+    expect(playerIndexFor).toHaveBeenCalledTimes(3);
+    expect(
+      session.transport.playerIndexFor(spectator as unknown as WebSocket)
+    ).toBeNull();
+    expect(spectator.closed).toEqual([]);
+    expect(spectator.sent).toEqual([]);
+    expect(session.gameState).toEqual(stateBeforeFrames);
   });
 
   it("rejects a spectator token carrying playerIndex with its own reason", async () => {
