@@ -41,6 +41,7 @@ export function LobbySeatCard({
   onReadyChange,
   onPreview,
   previewSide,
+  disclosure,
   actions,
   disabled = false,
 }: {
@@ -61,6 +62,7 @@ export function LobbySeatCard({
   onReadyChange: (ready: boolean) => void;
   onPreview: (deckId: string) => void;
   previewSide: "left" | "right";
+  disclosure?: ReactNode;
   actions?: ReactNode;
   disabled?: boolean;
 }) {
@@ -74,6 +76,14 @@ export function LobbySeatCard({
       )}
       aria-label={`${role} seat — ${playerName}`}
     >
+      {disclosure && (
+        <div
+          className="border-border bg-surface-2 flex items-center border-b px-5 py-3"
+          data-spectator-consent
+        >
+          {disclosure}
+        </div>
+      )}
       <header className="border-border flex min-h-20 items-center justify-between gap-4 border-b px-5 py-4">
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar user={player} size="md" variant="dark" />

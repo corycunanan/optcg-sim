@@ -528,6 +528,20 @@ export function LobbyRoomShell({
                   onPreview={setPreviewDeckId}
                   previewSide="right"
                   disabled={isInGame}
+                  disclosure={
+                    isGuest ? (
+                      <SpectatorPill
+                        allowSpectators={lobby.allowSpectators}
+                        spectatorCount={lobby.spectatorCount}
+                        viewerRole={lobby.viewerRole}
+                        toggling={spectatorToggling}
+                        onToggle={(allowSpectators) =>
+                          void handleSpectatorToggle(allowSpectators)
+                        }
+                        onOpenSpectators={handleOpenSpectators}
+                      />
+                    ) : undefined
+                  }
                   actions={
                     isHost ? (
                       <KickPlayerAction
@@ -600,16 +614,18 @@ export function LobbyRoomShell({
         <div className="border-border bg-surface-1 sticky bottom-0 z-20 border-t shadow-[var(--shadow-lg)]">
           <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
             <div className="flex items-center gap-3">
-              <SpectatorPill
-                allowSpectators={lobby.allowSpectators}
-                spectatorCount={lobby.spectatorCount}
-                viewerRole={lobby.viewerRole}
-                toggling={spectatorToggling}
-                onToggle={(allowSpectators) =>
-                  void handleSpectatorToggle(allowSpectators)
-                }
-                onOpenSpectators={handleOpenSpectators}
-              />
+              {!isGuest && (
+                <SpectatorPill
+                  allowSpectators={lobby.allowSpectators}
+                  spectatorCount={lobby.spectatorCount}
+                  viewerRole={lobby.viewerRole}
+                  toggling={spectatorToggling}
+                  onToggle={(allowSpectators) =>
+                    void handleSpectatorToggle(allowSpectators)
+                  }
+                  onOpenSpectators={handleOpenSpectators}
+                />
+              )}
               <p className="text-content-tertiary text-xs">{startHint}</p>
             </div>
 
@@ -699,6 +715,12 @@ function SpectatorPill({
 }) {
   const isHost = viewerRole === "host";
   const watchingLabel = `${spectatorCount} watching`;
+  const toggleLabel =
+    allowSpectators && spectatorCount > 0
+      ? `Allow spectators. Turning this off removes ${spectatorCount} ${
+          spectatorCount === 1 ? "watcher" : "watchers"
+        }.`
+      : "Allow spectators";
 
   return (
     <div className="border-border bg-surface-3 flex min-h-10 items-center gap-3 rounded-full border p-1 pl-3">
@@ -708,7 +730,7 @@ function SpectatorPill({
             type="button"
             role="switch"
             aria-checked={allowSpectators}
-            aria-label="Allow spectators"
+            aria-label={toggleLabel}
             disabled={toggling}
             onClick={() => onToggle(!allowSpectators)}
             className={cn(

@@ -45,8 +45,10 @@ export function useLobbyRoom(
   const cancelledRef = useRef(false);
   const authoritativeLobbyRef = useRef<LobbyRoomState | null>(initialLobby);
   const spectatorToggleRef = useRef<{
+    requestId: number;
     desired: boolean;
   } | null>(null);
+  const spectatorToggleRequestIdRef = useRef(0);
   const refreshInFlightRef = useRef(false);
   const queuedRefreshRef = useRef(false);
   const latestVersionRef = useRef<{
@@ -250,7 +252,9 @@ export function useLobbyRoom(
         return;
       }
 
-      spectatorToggleRef.current = { desired: allowSpectators };
+      const requestId = spectatorToggleRequestIdRef.current + 1;
+      spectatorToggleRequestIdRef.current = requestId;
+      spectatorToggleRef.current = { requestId, desired: allowSpectators };
       setSpectatorToggling(true);
       setLobby((current) =>
         current ? { ...current, allowSpectators } : current
@@ -262,10 +266,23 @@ export function useLobbyRoom(
           { allowSpectators },
           LobbyActionResponseSchema
         );
+        if (spectatorToggleRef.current?.requestId === requestId) {
+          const authoritativeLobby = authoritativeLobbyRef.current;
+          if (authoritativeLobby) {
+            authoritativeLobbyRef.current = {
+              ...authoritativeLobby,
+              allowSpectators,
+            };
+          }
+          spectatorToggleRef.current = null;
+          setSpectatorToggling(false);
+        }
       } catch (error) {
-        spectatorToggleRef.current = null;
-        setSpectatorToggling(false);
-        setLobby(authoritativeLobbyRef.current);
+        if (spectatorToggleRef.current?.requestId === requestId) {
+          spectatorToggleRef.current = null;
+          setSpectatorToggling(false);
+          setLobby(authoritativeLobbyRef.current);
+        }
         throw error;
       }
     },

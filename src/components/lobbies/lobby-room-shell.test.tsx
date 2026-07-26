@@ -325,6 +325,49 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(
       renderer?.root.findAllByProps({ "aria-label": "Allow spectators" })
     ).toHaveLength(0);
+
+    const guestSeat = renderer?.root.findByProps({
+      "aria-label": "Guest seat — zoro",
+    });
+    const guestTraversal = guestSeat?.findAll(() => true) ?? [];
+    const consentIndex = guestTraversal.findIndex(
+      (node) => node.props["data-spectator-consent"] !== undefined
+    );
+    const readyIndex = guestTraversal.findIndex(
+      (node) => node.type === "button" && node.props["aria-pressed"] === false
+    );
+    expect(consentIndex).toBeGreaterThanOrEqual(0);
+    expect(readyIndex).toBeGreaterThan(consentIndex);
+  });
+
+  it("warns hosts that turning spectators off removes current watchers", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              allowSpectators: true,
+              spectatorCount: 3,
+              viewerRole: "host",
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      renderer?.root.findByProps({
+        role: "switch",
+        "aria-label":
+          "Allow spectators. Turning this off removes 3 watchers.",
+      })
+    ).toBeDefined();
   });
 
   it("rolls back a failed spectator toggle with one error toast", async () => {

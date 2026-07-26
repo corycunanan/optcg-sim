@@ -181,7 +181,7 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     });
 
     expect(mocks.apiGet).toHaveBeenCalledTimes(readsAfterMount);
-    expect(room().spectatorToggling).toBe(true);
+    expect(room().spectatorToggling).toBe(false);
 
     await act(async () => {
       mocks.subscribeHandler?.({
@@ -196,6 +196,42 @@ describe("useLobbyRoom degraded delivery recovery", () => {
 
     expect(room().lobby?.allowSpectators).toBe(true);
     expect(room().spectatorToggling).toBe(false);
+  });
+
+  it("releases a successful toggle after polling ends when the push is dropped", async () => {
+    const initial = lobbyState({
+      version: 4,
+      allowSpectators: false,
+      viewerRole: "host",
+    });
+    mocks.apiGet.mockResolvedValue({ data: initial });
+    mocks.apiPatch.mockResolvedValue({ success: true });
+    await mount(initial);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(
+        LOBBY_RECONCILIATION_INTERVAL_MS *
+          LOBBY_RECONCILIATION_MAX_ATTEMPTS
+      );
+    });
+
+    await act(async () => {
+      await room().setAllowSpectators(true);
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+
+    expect(room().lobby?.allowSpectators).toBe(true);
+    expect(room().spectatorToggling).toBe(false);
+
+    await act(async () => {
+      await room().setAllowSpectators(false);
+    });
+    expect(mocks.apiPatch).toHaveBeenNthCalledWith(
+      2,
+      "/api/lobbies/lobby-1",
+      { allowSpectators: false },
+      expect.anything()
+    );
   });
 
   it("preserves optimism across unrelated events then rolls back to the latest snapshot", async () => {
