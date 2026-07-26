@@ -53,6 +53,7 @@ import {
 } from "./session/rate-limiter.js";
 import { SpectatorPolicy } from "./session/spectator-policy.js";
 import {
+  type FilteredStateMessage,
   type FilteredStateRecipient,
   SUPERSEDED_SOCKET_CLOSE_CODE,
   SUPERSEDED_SOCKET_CLOSE_REASON,
@@ -858,7 +859,7 @@ export class GameSession implements DurableObject {
     build: (
       filteredState: GameState,
       recipientPlayerIndex: FilteredStateRecipient
-    ) => ServerMessage,
+    ) => FilteredStateMessage,
     exclude?: WebSocket
   ): void {
     if (!this.gameState || !this.cardDb) return;
