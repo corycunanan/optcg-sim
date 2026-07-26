@@ -22,6 +22,24 @@ export const SPECTATOR_CAPACITY_CLOSE_REASON = "spectator capacity reached";
 const SPECTATOR_CAPACITY_REJECTED_TAG = "spectator-capacity-rejected";
 export const DISCONNECT_BROADCAST_DEBOUNCE_MS = 500;
 
+/**
+ * Spectator delivery is default-deny: every ServerMessage type must be
+ * classified here before it can reach a spectator socket via plain broadcast.
+ * State-bearing messages stay on broadcastFilteredState so recipient-specific
+ * visibility filtering cannot be bypassed.
+ */
+const SPECTATOR_VISIBLE_SERVER_MESSAGES = {
+  "game:state": false,
+  "game:update": false,
+  "game:prompt": false,
+  "action:rejected": false,
+  "game:error": false,
+  "game:over": true,
+  "game:player_disconnected": true,
+  "game:player_reconnected": true,
+  "game:undo": false,
+} as const satisfies Record<ServerMessage["type"], boolean>;
+
 export interface PlayerSocketAttachment {
   type: "game-session-player-socket";
   playerIndex: 0 | 1;
@@ -217,7 +235,7 @@ export class SessionTransport {
   broadcast(message: ServerMessage): void {
     const payload = JSON.stringify(message);
     for (const ws of this.state.getWebSockets()) {
-      if (!this.shouldSend(ws)) continue;
+      if (!this.shouldSend(ws, message.type)) continue;
       try {
         ws.send(payload);
       } catch {
@@ -229,7 +247,7 @@ export class SessionTransport {
   broadcastExcept(exclude: WebSocket, message: ServerMessage): void {
     const payload = JSON.stringify(message);
     for (const ws of this.state.getWebSockets()) {
-      if (ws === exclude || !this.shouldSend(ws)) continue;
+      if (ws === exclude || !this.shouldSend(ws, message.type)) continue;
       try {
         ws.send(payload);
       } catch {
@@ -364,9 +382,17 @@ export class SessionTransport {
     return userIds.size;
   }
 
-  private shouldSend(ws: WebSocket): boolean {
+  private shouldSend(
+    ws: WebSocket,
+    messageType: ServerMessage["type"]
+  ): boolean {
     const playerIndex = this.playerIndexFor(ws);
-    if (playerIndex === null) return false;
+    if (playerIndex === null) {
+      return (
+        this.spectatorIdFor(ws) !== null &&
+        SPECTATOR_VISIBLE_SERVER_MESSAGES[messageType]
+      );
+    }
     const attachment = getPlayerSocketAttachment(ws);
     if (!attachment || attachment.playerIndex !== playerIndex) return false;
     return this.isAuthoritative(ws, playerIndex);
