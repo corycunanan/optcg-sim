@@ -1,6 +1,6 @@
 /**
  * GET    /api/lobbies/[id] — Poll lobby status (host uses this to discover game start)
- * PATCH  /api/lobbies/[id] — Mutate in-room mode, deck, and ready state
+ * PATCH  /api/lobbies/[id] — Mutate in-room settings, decks, and ready state
  * DELETE /api/lobbies/[id] — Close a pre-game PVP lobby (host only)
  */
 
@@ -19,7 +19,10 @@ import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
 import { cancelPendingLobbyInvites } from "@/lib/lobbies/cancel-invites";
 import { viewerIsEvicted } from "@/lib/lobbies/state";
 import { notifyUser } from "@/lib/realtime/fan-out";
-import { notifyLobby } from "@/lib/realtime/fanout-lobby";
+import {
+  notifyLobby,
+  notifySpectatorsRemoved,
+} from "@/lib/realtime/fanout-lobby";
 import { resolvePregameMode, type PregameMode } from "@shared/game-init";
 import { releaseActiveLobby } from "@/lib/lobbies/active-membership";
 
@@ -30,6 +33,7 @@ type PatchLobbyData = {
   pregameMode?: PregameMode;
   format?: string;
   hostDeckId?: string | null;
+  allowSpectators?: boolean;
   hostReady?: boolean;
   status?: "WAITING" | "READY";
 };
@@ -79,6 +83,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           user: { select: { id: true, username: true, name: true } },
         },
       },
+      spectators: {
+        where: { userId },
+        select: { userId: true },
+      },
     },
   });
 
@@ -88,17 +96,36 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const isHost = lobby.hostUserId === userId;
   const isGuest = lobby.guest?.userId === userId && !isHost;
+  const isSpectator = lobby.spectators.length > 0;
   if (!isHost && !isGuest) {
-    return apiError("Forbidden", 403);
+    return isSpectator
+      ? apiError("Forbidden", 403)
+      : apiError("Lobby not found", 404);
   }
 
-  const hasHostControlledChange =
+  const hasReadinessAffectingHostChange =
     parsed.mode !== undefined ||
     parsed.pregameMode !== undefined ||
     parsed.format !== undefined ||
     parsed.hostDeckId !== undefined;
+  const hasHostControlledChange =
+    hasReadinessAffectingHostChange || parsed.allowSpectators !== undefined;
   if (hasHostControlledChange && !isHost) {
     return apiError("Forbidden", 403);
+  }
+
+  const spectatorSettingChanged =
+    parsed.allowSpectators !== undefined &&
+    parsed.allowSpectators !== lobby.allowSpectators;
+  const hasNonSpectatorPatchField = Object.keys(parsed).some(
+    (field) => field !== "allowSpectators",
+  );
+  if (
+    parsed.allowSpectators !== undefined &&
+    !spectatorSettingChanged &&
+    !hasNonSpectatorPatchField
+  ) {
+    return apiAction();
   }
 
   const targetMode = parsed.mode ?? lobby.mode;
@@ -203,8 +230,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
   if (parsed.format !== undefined) lobbyData.format = parsed.format;
   if (parsed.hostDeckId !== undefined) lobbyData.hostDeckId = parsed.hostDeckId;
-  if (hasHostControlledChange) lobbyData.hostReady = false;
-  if (isHost && parsed.ready !== undefined && !hasHostControlledChange) {
+  if (spectatorSettingChanged) {
+    lobbyData.allowSpectators = parsed.allowSpectators;
+  }
+  if (hasReadinessAffectingHostChange) lobbyData.hostReady = false;
+  if (
+    isHost &&
+    parsed.ready !== undefined &&
+    !hasReadinessAffectingHostChange
+  ) {
     lobbyData.hostReady = parsed.ready;
   }
 
@@ -224,7 +258,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         id,
         status: lobby.status,
         mode: lobby.mode,
-        ...(switchingToSolitaire && realGuest
+        ...((switchingToSolitaire && realGuest) || spectatorSettingChanged
           ? { revision: lobby.revision }
           : {}),
       },
@@ -246,7 +280,25 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           !current || current.status === "CLOSED"
             ? ("NOT_FOUND" as const)
             : ("CONFLICT" as const),
+        removedSpectatorUserIds: [] as string[],
       };
+    }
+
+    let removedSpectatorUserIds: string[] = [];
+    if (spectatorSettingChanged && parsed.allowSpectators === false) {
+      // Capture the terminal-event audience before deleting it. Removed
+      // spectators cannot be recovered from the post-mutation room state.
+      const spectators = await tx.lobbySpectator.findMany({
+        where: { lobbyId: id },
+        select: { userId: true },
+      });
+      removedSpectatorUserIds = spectators.map(({ userId }) => userId);
+      await tx.lobbySpectator.deleteMany({ where: { lobbyId: id } });
+      await Promise.all(
+        removedSpectatorUserIds.map((spectatorUserId) =>
+          releaseActiveLobby(tx, spectatorUserId, id),
+        ),
+      );
     }
 
     if (switchingToSolitaire) {
@@ -299,7 +351,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       });
     }
 
-    return { failure: null };
+    return { failure: null, removedSpectatorUserIds };
   });
 
   if (result.failure === "NOT_FOUND") {
@@ -318,17 +370,26 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     switchingToSolitaire && realGuest ? realGuest.userId : null;
 
   after(async () => {
-    const state = await buildLobbyRoomState(id);
-    if (!state) return;
+    const spectatorEjectionFanout = result.removedSpectatorUserIds.length
+      ? notifySpectatorsRemoved({
+          lobbyId: id,
+          reason: "SPECTATING_DISABLED",
+          removedSpectatorUserIds: result.removedSpectatorUserIds,
+        })
+      : Promise.resolve();
+    const stateFanout = buildLobbyRoomState(id).then(async (state) => {
+      if (!state) return;
 
-    await notifyLobby(state, { actorUserId: userId });
+      await notifyLobby(state, { actorUserId: userId });
+      if (ejectedGuestUserId) {
+        await notifyUser(ejectedGuestUserId, {
+          type: "lobby:state_changed",
+          lobby: { ...state, status: "EVICTED" },
+        });
+      }
+    });
 
-    if (ejectedGuestUserId) {
-      await notifyUser(ejectedGuestUserId, {
-        type: "lobby:state_changed",
-        lobby: { ...state, status: "EVICTED" },
-      });
-    }
+    await Promise.allSettled([spectatorEjectionFanout, stateFanout]);
   });
 
   return apiAction();
