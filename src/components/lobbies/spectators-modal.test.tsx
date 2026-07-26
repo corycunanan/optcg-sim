@@ -234,7 +234,7 @@ describe("SpectatorsModal", () => {
     expect(returnFocus).toHaveBeenCalledOnce();
   });
 
-  it("lets the dialog primitive close through onOpenChange, including Escape", () => {
+  it("forwards close changes from the dialog primitive", () => {
     act(() => renderModal());
     act(() =>
       renderer?.root.findByProps({ "data-dialog-root": true }).props.onClick()
@@ -301,6 +301,38 @@ describe("SpectatorsModal", () => {
     });
     expect(onRefresh).toHaveBeenCalledOnce();
     expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it("releases a successful no-op row after reconciliation is dropped and accepts a retry", async () => {
+    vi.useFakeTimers();
+    mocks.apiDelete.mockResolvedValue({ success: true });
+
+    try {
+      act(() => renderModal());
+
+      await act(async () => {
+        removeButtons()[0]?.props.onClick();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+
+      expect(onRefresh).toHaveBeenCalledOnce();
+      expect(removeButtons()[0]?.props.disabled).toBe(false);
+      expect(removeButtons()[0]?.children).toEqual(["Remove"]);
+
+      await act(async () => {
+        removeButtons()[0]?.props.onClick();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(mocks.apiDelete).toHaveBeenCalledTimes(2);
+      expect(mocks.toastError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows exactly one API message for an ApiError failure", async () => {
