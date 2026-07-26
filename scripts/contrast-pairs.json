@@ -103,6 +103,12 @@
       "minimum": 4.5
     },
     {
+      "name": "destructive-button-foreground/destructive-fill",
+      "foreground": "--navy-900",
+      "background": "--destructive",
+      "minimum": 4.5
+    },
+    {
       "name": "focus-ring/page",
       "foreground": "--border-focus",
       "background": "--surface-page",

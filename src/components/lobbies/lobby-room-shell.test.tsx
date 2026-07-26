@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   toastInfo: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  spectatorsModal: vi.fn(),
   handlers: new Map<string, (event: RealtimeServerEvent) => void>(),
 }));
 
@@ -111,6 +112,21 @@ vi.mock("@/components/ui/badge", () => ({
   Badge: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 vi.mock("./deck-preview-modal", () => ({ DeckPreviewModal: () => null }));
+vi.mock("./spectators-modal", () => ({
+  SpectatorsModal: (props: {
+    open: boolean;
+    spectators: LobbyRoomState["spectators"];
+  }) => {
+    mocks.spectatorsModal(props);
+    return props.open ? (
+      <section data-spectators-modal>
+        {props.spectators.map((spectator) => (
+          <span key={spectator.id}>{spectator.username ?? spectator.name}</span>
+        ))}
+      </section>
+    ) : null;
+  },
+}));
 vi.mock("./guest-leave-action", () => ({
   GuestLeaveAction: ({
     isGuest,
@@ -186,6 +202,7 @@ beforeEach(() => {
   mocks.toastInfo.mockReset();
   mocks.toastSuccess.mockReset();
   mocks.toastError.mockReset();
+  mocks.spectatorsModal.mockReset();
   mocks.handlers.clear();
   mocks.apiGet.mockImplementation(async (url: string) =>
     url === "/api/decks" ? { data: [] } : { data: lobbyState() }
@@ -231,7 +248,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Start Match");
   });
 
-  it("renders an interactive host spectator toggle and disables an empty count", async () => {
+  it("renders an interactive host spectator toggle and keeps the empty count available", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
         ? { data: [] }
@@ -262,7 +279,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
     });
 
     expect(toggle?.props["aria-checked"]).toBe(false);
-    expect(count?.props.disabled).toBe(true);
+    expect(count?.props.disabled).toBeUndefined();
 
     await act(async () => {
       toggle?.props.onClick();
@@ -368,6 +385,67 @@ describe("LobbyRoomShell redesign scenarios", () => {
           "Allow spectators. Turning this off removes 3 watchers.",
       })
     ).toBeDefined();
+  });
+
+  it("opens the spectator surface and reconciles live membership without closing", async () => {
+    const firstSpectator = {
+      id: "spectator-1",
+      username: "nami",
+      name: "Nami",
+      image: null,
+    };
+    const secondSpectator = {
+      id: "spectator-2",
+      username: "usopp",
+      name: "Usopp",
+      image: null,
+    };
+    const initial = lobbyState({
+      allowSpectators: true,
+      spectators: [firstSpectator],
+      spectatorCount: 1,
+      viewerRole: "host",
+    });
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks" ? { data: [] } : { data: initial }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      renderer?.root
+        .findByProps({ "aria-label": "View spectators (1)" })
+        .props.onClick();
+    });
+    expect(renderedText()).toContain("nami");
+
+    await act(async () => {
+      mocks.handlers.get("lobby:state_changed")?.({
+        type: "lobby:state_changed",
+        lobby: {
+          ...initial,
+          version: 8,
+          spectators: [secondSpectator, firstSpectator],
+          spectatorCount: 2,
+        },
+      });
+    });
+
+    const latestModalProps = mocks.spectatorsModal.mock.calls.at(-1)?.[0] as {
+      open: boolean;
+      spectators: LobbyRoomState["spectators"];
+    };
+    expect(latestModalProps.open).toBe(true);
+    expect(
+      latestModalProps.spectators.map((spectator) => spectator.id)
+    ).toEqual(["spectator-2", "spectator-1"]);
+    expect(renderedText()).toMatch(/usopp.*nami/);
   });
 
   it("rolls back a failed spectator toggle with one error toast", async () => {

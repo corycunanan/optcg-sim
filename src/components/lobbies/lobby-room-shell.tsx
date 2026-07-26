@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -55,6 +55,7 @@ import {
 import { JoinPartyDialog } from "./join-party-dialog";
 import { KickPlayerAction } from "./kick-player-action";
 import { LobbySeatCard } from "./lobby-seat-card";
+import { SpectatorsModal } from "./spectators-modal";
 
 interface DeckOption extends LobbyRoomDeck {
   format: string;
@@ -101,7 +102,9 @@ export function LobbyRoomShell({
   const [pendingSolitaire, setPendingSolitaire] = useState(false);
   const [cancelingInvite, setCancelingInvite] = useState(false);
   const [recoveryReentry, setRecoveryReentry] = useState(false);
+  const [spectatorsOpen, setSpectatorsOpen] = useState(false);
   const recoveryHandledRef = useRef(false);
+  const spectatorCountButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -284,7 +287,7 @@ export function LobbyRoomShell({
   };
 
   const handleOpenSpectators = () => {
-    // TODO(OPT-545): Open the Spectators (N) modal.
+    setSpectatorsOpen(true);
   };
 
   if (recovery) {
@@ -539,6 +542,7 @@ export function LobbyRoomShell({
                           void handleSpectatorToggle(allowSpectators)
                         }
                         onOpenSpectators={handleOpenSpectators}
+                        countButtonRef={spectatorCountButtonRef}
                       />
                     ) : undefined
                   }
@@ -624,6 +628,7 @@ export function LobbyRoomShell({
                     void handleSpectatorToggle(allowSpectators)
                   }
                   onOpenSpectators={handleOpenSpectators}
+                  countButtonRef={spectatorCountButtonRef}
                 />
               )}
               <p className="text-content-tertiary text-xs">{startHint}</p>
@@ -693,6 +698,16 @@ export function LobbyRoomShell({
             if (!open) setPreviewDeckId(null);
           }}
         />
+        <SpectatorsModal
+          lobbyId={lobby.id}
+          open={spectatorsOpen}
+          spectatorCount={lobby.spectatorCount}
+          spectators={lobby.spectators}
+          viewerRole={lobby.viewerRole}
+          returnFocusRef={spectatorCountButtonRef}
+          onOpenChange={setSpectatorsOpen}
+          onRefresh={refresh}
+        />
       </div>
     </TooltipProvider>
   );
@@ -705,6 +720,7 @@ function SpectatorPill({
   toggling,
   onToggle,
   onOpenSpectators,
+  countButtonRef,
 }: {
   allowSpectators: boolean;
   spectatorCount: number;
@@ -712,6 +728,7 @@ function SpectatorPill({
   toggling: boolean;
   onToggle: (allowSpectators: boolean) => void;
   onOpenSpectators: () => void;
+  countButtonRef: RefObject<HTMLButtonElement | null>;
 }) {
   const isHost = viewerRole === "host";
   const watchingLabel = `${spectatorCount} watching`;
@@ -761,11 +778,11 @@ function SpectatorPill({
       )}
 
       <button
+        ref={countButtonRef}
         type="button"
         aria-label={`View spectators (${spectatorCount})`}
-        disabled={spectatorCount === 0}
         onClick={onOpenSpectators}
-        className="border-border bg-surface-1 text-content-primary hover:border-border-strong focus-visible:ring-border-focus inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
+        className="border-border bg-surface-1 text-content-primary hover:border-border-strong focus-visible:ring-border-focus inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
       >
         {spectatorCount}
       </button>
