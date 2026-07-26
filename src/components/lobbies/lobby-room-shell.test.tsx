@@ -712,6 +712,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
 
     expect(renderedText()).toContain("Spectate Match");
     expect(renderedText()).not.toContain("Rejoin Game");
+    expect(renderedText()).toContain("Match in progress");
+    expect(renderedText()).not.toContain("Waiting for the match to start");
 
     const spectateButton = renderer!.root
       .findAllByType("button")
@@ -719,6 +721,180 @@ describe("LobbyRoomShell redesign scenarios", () => {
     act(() => spectateButton?.props.onClick());
 
     expect(mocks.push).toHaveBeenCalledWith("/game/game-1");
+  });
+
+  it("renders a minimal pre-game spectator branch with names but no private or seated-player controls", async () => {
+    const hostDeck = {
+      id: "deck-host",
+      name: "Straw Hat Rush",
+      leaderId: "OP01-001",
+      leaderName: "Monkey.D.Luffy",
+      leaderImageUrl: "/leader.png",
+      contents: {
+        characters: [
+          {
+            id: "OP01-024",
+            name: "Private Gum-Gum Card",
+            quantity: 4,
+            imageUrl: "/card.png",
+          },
+        ],
+        events: [],
+        stages: [],
+      },
+    };
+    const guestDeck = {
+      ...hostDeck,
+      id: "deck-guest",
+      name: "Three Sword Style",
+      leaderName: "Roronoa Zoro",
+      contents: {
+        characters: [
+          {
+            id: "OP01-025",
+            name: "Private Three Sword Card",
+            quantity: 4,
+            imageUrl: "/card.png",
+          },
+        ],
+        events: [],
+        stages: [],
+      },
+    };
+    mocks.apiGet.mockImplementation(async (url: string) => ({
+      data:
+        url === "/api/decks"
+          ? []
+          : lobbyState({
+              viewerRole: "spectator",
+              hostDeck,
+              guest: {
+                guestReady: true,
+                user: {
+                  id: "guest-user",
+                  username: "zoro",
+                  name: "Zoro",
+                  image: null,
+                },
+                deck: guestDeck,
+              },
+            }),
+    }));
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const text = renderedText();
+    expect(text).toContain("Waiting for the match to start");
+    expect(text).toContain("strawhat");
+    expect(text).toContain("zoro");
+    expect(text).toContain("Straw Hat Rush");
+    expect(text).toContain("Three Sword Style");
+    expect(text).not.toContain("Private Gum-Gum Card");
+    expect(text).not.toContain("Private Three Sword Card");
+    expect(text).not.toContain("Monkey.D.Luffy");
+    expect(text).not.toContain("Roronoa Zoro");
+    expect(text).not.toContain("Deck list");
+    expect(text).not.toContain("Ready");
+    expect(text).not.toContain("Party code");
+    expect(text).not.toContain("Game mode");
+    expect(text).not.toContain("Join lobby");
+    expect(text).not.toContain("Start Match");
+    expect(text).not.toContain("Invite");
+    expect(text).not.toContain("Solitaire");
+    expect(text).not.toContain("Spectate Match");
+    expect(
+      renderer!.root.findAllByType("button").map((button) => button.children)
+    ).toEqual([["Stop spectating"]]);
+    expect(
+      mocks.apiGet.mock.calls.some(([url]) => url === "/api/decks")
+    ).toBe(false);
+  });
+
+  it.each([
+    ["host", "Start Match"],
+    ["guest", "Leave lobby"],
+  ] as const)("keeps the %s seated-player branch", async (viewerRole, action) => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : { data: lobbyState({ viewerRole }) }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId={`${viewerRole}-user`} />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain(action);
+    expect(renderedText()).not.toContain("Waiting for the match to start");
+  });
+
+  it("stops spectating through self-leave and returns to the personal lobby", async () => {
+    mocks.apiGet.mockResolvedValue({
+      data: lobbyState({ viewerRole: "spectator" }),
+    });
+    mocks.apiDelete.mockResolvedValue({ data: { success: true } });
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const stopButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Stop spectating"));
+    await act(async () => {
+      stopButton?.props.onClick();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiDelete).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/spectators",
+      expect.anything()
+    );
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("You stopped spectating");
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
+  });
+
+  it("keeps a spectator in place when self-leave fails exceptionally", async () => {
+    mocks.apiGet.mockResolvedValue({
+      data: lobbyState({ viewerRole: "spectator" }),
+    });
+    mocks.apiDelete.mockRejectedValue(new Error("offline"));
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const stopButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Stop spectating"));
+    await act(async () => {
+      stopButton?.props.onClick();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith("Could not stop spectating");
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(renderedText()).toContain("Stop spectating");
   });
 
   it("removes guest leave from keyboard access while a match is active", async () => {
@@ -747,6 +923,58 @@ describe("LobbyRoomShell redesign scenarios", () => {
       .findAllByType("button")
       .find((button) => button.children.includes("Leave lobby"));
     expect(leaveButton?.props.disabled).toBe(true);
+  });
+});
+
+describe("LobbyRoomShell spectator ejection recovery", () => {
+  it.each([
+    [
+      "SPECTATING_DISABLED",
+      "The host turned off spectating. You've been returned to your own lobby.",
+    ],
+    [
+      "REMOVED_BY_HOST",
+      "The host removed you. You've been returned to your own lobby.",
+    ],
+    [
+      "LOBBY_CLOSED",
+      "The party closed. You've been returned to your own lobby.",
+    ],
+  ] as const)("routes %s with one explanatory toast", async (reason, message) => {
+    const lobbyId = `spectator-ejection-${reason.toLowerCase()}`;
+    mocks.apiGet.mockResolvedValue({
+      data: lobbyState({ id: lobbyId, viewerRole: "spectator" }),
+    });
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId={lobbyId} currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const handler = mocks.handlers.get("lobby:spectator_removed");
+    expect(handler).toBeTypeOf("function");
+    await act(async () => {
+      handler?.({
+        type: "lobby:spectator_removed",
+        lobbyId: "some-other-lobby",
+        reason,
+      });
+    });
+    expect(mocks.toastInfo).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    await act(async () => {
+      handler?.({ type: "lobby:spectator_removed", lobbyId, reason });
+    });
+
+    expect(mocks.toastInfo).toHaveBeenCalledTimes(1);
+    expect(mocks.toastInfo).toHaveBeenCalledWith(message);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
+    expect(renderer!.toJSON()).toBeNull();
   });
 });
 

@@ -14,6 +14,7 @@ import type {
   LobbyRoomState,
   LobbyRoomStatus,
 } from "@/lib/lobbies/state";
+import type { RealtimeServerEvent } from "@/types/realtime";
 
 export type { LobbyRoomDeck, LobbyRoomMode, LobbyRoomState, LobbyRoomStatus };
 
@@ -28,6 +29,11 @@ interface RefreshLaunch {
   promise: Promise<LobbyRoomState | null>;
 }
 
+export type SpectatorRemovalReason = Extract<
+  RealtimeServerEvent,
+  { type: "lobby:spectator_removed" }
+>["reason"];
+
 export function useLobbyRoom(
   lobbyId: string,
   initialLobby: LobbyRoomState | null = null
@@ -41,7 +47,10 @@ export function useLobbyRoom(
   const [closing, setClosing] = useState(false);
   const [kicking, setKicking] = useState(false);
   const [spectatorToggling, setSpectatorToggling] = useState(false);
+  const [stoppingSpectating, setStoppingSpectating] = useState(false);
   const [removedByHost, setRemovedByHost] = useState<string | null>(null);
+  const [spectatorRemovalReason, setSpectatorRemovalReason] =
+    useState<SpectatorRemovalReason | null>(null);
   const cancelledRef = useRef(false);
   const authoritativeLobbyRef = useRef<LobbyRoomState | null>(initialLobby);
   const spectatorToggleRef = useRef<{
@@ -177,6 +186,13 @@ export function useLobbyRoom(
     return subscribe("lobby:guest_removed", (event) => {
       if (event.lobbyId !== lobbyId) return;
       setRemovedByHost(event.hostName);
+    });
+  }, [subscribe, lobbyId]);
+
+  useEffect(() => {
+    return subscribe("lobby:spectator_removed", (event) => {
+      if (event.lobbyId !== lobbyId) return;
+      setSpectatorRemovalReason(event.reason);
     });
   }, [subscribe, lobbyId]);
 
@@ -338,6 +354,18 @@ export function useLobbyRoom(
     }
   }, [lobbyId, refresh]);
 
+  const stopSpectating = useCallback(async () => {
+    setStoppingSpectating(true);
+    try {
+      await apiDelete(
+        `/api/lobbies/${lobbyId}/spectators`,
+        LobbyActionResponseSchema
+      );
+    } finally {
+      setStoppingSpectating(false);
+    }
+  }, [lobbyId]);
+
   return {
     lobby,
     loading,
@@ -348,7 +376,9 @@ export function useLobbyRoom(
     closing,
     kicking,
     spectatorToggling,
+    stoppingSpectating,
     removedByHost,
+    spectatorRemovalReason,
     refresh,
     patchLobby,
     setAllowSpectators,
@@ -356,5 +386,6 @@ export function useLobbyRoom(
     leaveLobby,
     closeLobby,
     kickGuest,
+    stopSpectating,
   };
 }

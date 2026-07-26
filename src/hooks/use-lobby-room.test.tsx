@@ -7,6 +7,11 @@ type GuestRemovedEvent = {
   lobbyId: string;
   hostName: string;
 };
+type SpectatorRemovedEvent = {
+  type: "lobby:spectator_removed";
+  lobbyId: string;
+  reason: "SPECTATING_DISABLED" | "REMOVED_BY_HOST" | "LOBBY_CLOSED";
+};
 
 const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -19,6 +24,9 @@ const mocks = vi.hoisted(() => ({
   setterIndex: 0,
   subscribeHandler: null as ((event: LobbyEvent) => void) | null,
   guestRemovedHandler: null as ((event: GuestRemovedEvent) => void) | null,
+  spectatorRemovedHandler: null as
+    | ((event: SpectatorRemovedEvent) => void)
+    | null,
   subscribeUnsub: vi.fn(),
   effectCleanups: [] as Array<() => void>,
 }));
@@ -26,7 +34,8 @@ const mocks = vi.hoisted(() => ({
 // Mock React's hooks to run synchronously and capture per-`useState` setter
 // calls in declaration order. The hook declares state in this order:
 //   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting, 5: leaving,
-//   6: closing, 7: kicking, 8: spectatorToggling, 9: removedByHost
+//   6: closing, 7: kicking, 8: spectatorToggling, 9: stoppingSpectating,
+//   10: removedByHost, 11: spectatorRemovalReason
 // Tests assert on the lobby setter (index 0) and the error setter (index 2).
 vi.mock("react", async (importActual) => {
   const actual = await importActual<typeof import("react")>();
@@ -64,7 +73,9 @@ vi.mock("@/components/realtime/user-channel-provider", () => ({
   useUserChannelEvents: () => ({
     subscribe: <T extends string>(
       type: T,
-      handler: (event: LobbyEvent | GuestRemovedEvent) => void
+      handler: (
+        event: LobbyEvent | GuestRemovedEvent | SpectatorRemovedEvent
+      ) => void
     ) => {
       if (type === "lobby:state_changed") {
         mocks.subscribeHandler = handler as (event: LobbyEvent) => void;
@@ -72,6 +83,11 @@ vi.mock("@/components/realtime/user-channel-provider", () => ({
       if (type === "lobby:guest_removed") {
         mocks.guestRemovedHandler = handler as (
           event: GuestRemovedEvent
+        ) => void;
+      }
+      if (type === "lobby:spectator_removed") {
+        mocks.spectatorRemovedHandler = handler as (
+          event: SpectatorRemovedEvent
         ) => void;
       }
       return mocks.subscribeUnsub;
@@ -115,6 +131,7 @@ beforeEach(() => {
   mocks.subscribeUnsub.mockReset();
   mocks.subscribeHandler = null;
   mocks.guestRemovedHandler = null;
+  mocks.spectatorRemovedHandler = null;
   mocks.setterCalls = [];
   mocks.setterIndex = 0;
   mocks.effectCleanups = [];
@@ -173,7 +190,7 @@ describe("useLobbyRoom subscribe behavior", () => {
       cleanup();
     }
 
-    expect(mocks.subscribeUnsub).toHaveBeenCalledTimes(2);
+    expect(mocks.subscribeUnsub).toHaveBeenCalledTimes(3);
   });
 
   it("captures a directed removal event for the current lobby", () => {
@@ -185,7 +202,7 @@ describe("useLobbyRoom subscribe behavior", () => {
       hostName: "strawhat",
     });
 
-    expect(mocks.setterCalls[9]).toContain("strawhat");
+    expect(mocks.setterCalls[10]).toContain("strawhat");
   });
 
   it("ignores a directed removal event for another lobby", () => {
@@ -197,7 +214,25 @@ describe("useLobbyRoom subscribe behavior", () => {
       hostName: "strawhat",
     });
 
-    expect(mocks.setterCalls[9]).toEqual([]);
+    expect(mocks.setterCalls[10]).toEqual([]);
+  });
+
+  it("captures a spectator ejection reason only for the current lobby", () => {
+    useLobbyRoom("lobby-1", lobbyState({ viewerRole: "spectator" }));
+
+    mocks.spectatorRemovedHandler?.({
+      type: "lobby:spectator_removed",
+      lobbyId: "lobby-2",
+      reason: "REMOVED_BY_HOST",
+    });
+    expect(mocks.setterCalls[11]).toEqual([]);
+
+    mocks.spectatorRemovedHandler?.({
+      type: "lobby:spectator_removed",
+      lobbyId: "lobby-1",
+      reason: "REMOVED_BY_HOST",
+    });
+    expect(mocks.setterCalls[11]).toContain("REMOVED_BY_HOST");
   });
 
   it("clears stale error state when a matching event arrives", () => {
