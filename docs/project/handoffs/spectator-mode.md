@@ -1,7 +1,7 @@
 ---
 linear-project: Spectator Mode
 linear-project-url: https://linear.app/optcg-sim/project/spectator-mode-192cfdb2b208
-last-updated: 2026-07-25
+last-updated: 2026-07-26
 ---
 
 # Spectator Mode — Handoff Doc
@@ -20,14 +20,14 @@ Tickets on the current worker/visibility critical path plus the urgent revocatio
 | 2 | OPT-552 | Broadcast wiring for the spectator view + third-filtered-state cost | — | OPT-551, OPT-555 | Done | [#433](https://github.com/corycunanan/optcg-sim/pull/433) | Merged-view delivery is wired; admission remains closed. |
 | 3 | OPT-557 | Broadcast allowlist: audit which ServerMessages reach spectator sockets | — | OPT-555 | Done | [#431](https://github.com/corycunanan/optcg-sim/pull/431) | Explicit default-deny policy; admission remains closed. |
 | 4 | OPT-556 | Receive-only enforcement + spectator connection and message budgets | — | OPT-557 | Done | [#430](https://github.com/corycunanan/optcg-sim/pull/430) | Merged before OPT-557; admission remains fail-closed. |
-| 5 | OPT-574 | Spectator socket revocation: removed spectators stream indefinitely once connected | — | — | In Review | [#434](https://github.com/corycunanan/optcg-sim/pull/434) | Revision-protected push closes promptly; exp synchronously bounds delivery. |
-| 6 | OPT-558 | Spectator connection lifecycle: connect snapshot, join/leave events, close at game end | — | OPT-552, OPT-556 | Backlog | — | |
-| 7 | OPT-565 | Spectator chrome: banner, Stop spectating, player toasts, game-end routing | — | OPT-558, OPT-543, OPT-564 | Todo | — | |
+| 5 | OPT-574 | Spectator socket revocation: removed spectators stream indefinitely once connected | — | — | Done | [#434](https://github.com/corycunanan/optcg-sim/pull/434) | Revision-protected push closes promptly; exp synchronously bounds delivery. |
+| 6 | OPT-558 | Spectator connection lifecycle: connect snapshot, join/leave events, close at game end | — | OPT-552, OPT-556 | Done | [#437](https://github.com/corycunanan/optcg-sim/pull/437) | Player-only lifecycle visibility and terminal spectator close are live. |
+| 7 | OPT-565 | Spectator chrome: banner, Stop spectating, player toasts, game-end routing | — | OPT-558, OPT-543, OPT-564 | In Review | [#442](https://github.com/corycunanan/optcg-sim/pull/442) | App chrome, lifecycle toasts, safe exit, and reconnect UX. |
 | 8 | OPT-566 | Watch-through integration coverage for a full spectated game | — | OPT-565, OPT-574, OPT-545 | Backlog | — | Final integration gate. |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-558 after PR #434 merges; it must preserve revocation and lease enforcement.
+**Next up:** OPT-566 after PR #442 merges; it is the full watch-through integration gate.
 
 ---
 
@@ -59,3 +59,12 @@ Tickets on the current worker/visibility critical path plus the urgent revocatio
 - **Gotchas / do NOT touch:** Keep the 401 closed until separately approved. OPT-558 must not route spectator closes through seated-player presence handling or replace the shared alarm's earliest-deadline composition.
 - **Unresolved:** Alarm delivery requests physical close but provides no numeric close-time bound; per-send enforcement is the exact 300-second delivery bound.
 - **Pointer:** PR #434 contains replay, hibernation/alarm, and four removal-path end-to-end server-close proofs.
+
+### OPT-565 → OPT-566
+**From:** session on 2026-07-26 · **PR:** [#442](https://github.com/corycunanan/optcg-sim/pull/442)
+
+- **Primer:** Spectator sockets now have explicit read-only chrome, player-visible validated join/leave toasts, endpoint-backed Stop spectating, reconnect-only disconnect UX, and a non-Dialog terminal exit that preserves party membership.
+- **Read first:** `src/hooks/use-game-session.ts`, `src/hooks/use-game-ws.ts`, `src/components/game/live-game-shell.tsx`, `src/components/game/pregame/game-overlay-gate.tsx`.
+- **Gotchas / do NOT touch:** Keep spectators out of `useGameFinalizer` and fallback concede; preserve the worker's player-only lifecycle event delivery and the passive overlay's no-focus-trap policy.
+- **Unresolved:** OPT-566 owns production-boundary watch-through integration across connect, player toast visibility, reconnect, stop, and game-over return.
+- **Pointer:** Implementation commit `a8c9d4f`; PR #442 includes the full guard mutation audit.
