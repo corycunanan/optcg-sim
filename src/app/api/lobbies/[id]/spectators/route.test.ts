@@ -265,7 +265,12 @@ describe("DELETE /api/lobbies/[id]/spectators", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
     expect(rateLimitMock).toHaveBeenCalledWith("lobby-leave:spectator-user");
-    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    expect(queryRawMock.mock.invocationCallOrder[0]).toBeLessThan(
+      lobbyFindUniqueMock.mock.invocationCallOrder[0]
+    );
+    expect(lobbyFindUniqueMock.mock.invocationCallOrder[0]).toBeLessThan(
+      lobbySpectatorDeleteManyMock.mock.invocationCallOrder[0]
+    );
     expect(lobbySpectatorDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1", userId: "spectator-user" },
     });
@@ -325,18 +330,40 @@ describe("DELETE /api/lobbies/[id]/spectators", () => {
       userId: "guest-user",
     },
   ])(
-    "returns 403 before mutation when the $name attempts self-leave",
+    "returns the same 200 no-op when the $name attempts self-leave",
     async ({ userId }) => {
       authMock.mockResolvedValueOnce({ user: { id: userId } });
 
       const response = await DELETE(request(), params);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true });
       expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
       expect(userUpdateManyMock).not.toHaveBeenCalled();
       expect(lobbyUpdateMock).not.toHaveBeenCalled();
+      expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
     }
   );
+
+  it("returns the same 200 no-op for a stranger without revealing lobby existence", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "stranger-user" } });
+    lobbyFindUniqueMock.mockResolvedValueOnce({
+      status: "IN_GAME",
+      hostUserId: "host-user",
+      guest: { userId: "guest-user" },
+      spectators: [],
+    });
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+  });
 
   it("returns 401 before rate limiting or mutation when unauthenticated", async () => {
     authMock.mockResolvedValueOnce(null);
@@ -357,18 +384,20 @@ describe("DELETE /api/lobbies/[id]/spectators", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("returns 404 before mutation when the lobby lock cannot be acquired", async () => {
+  it("returns the same 200 no-op when the lobby does not exist", async () => {
     queryRawMock.mockResolvedValueOnce([]);
 
     const response = await DELETE(request(), params);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
     expect(lobbyFindUniqueMock).not.toHaveBeenCalled();
     expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
     expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
   });
 
-  it("returns 404 before mutation for a closed lobby", async () => {
+  it("returns the same 200 no-op for a closed lobby", async () => {
     lobbyFindUniqueMock.mockResolvedValueOnce({
       status: "CLOSED",
       hostUserId: "host-user",
@@ -378,9 +407,11 @@ describe("DELETE /api/lobbies/[id]/spectators", () => {
 
     const response = await DELETE(request(), params);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
     expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
     expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
   });
 
   it("returns 409 and relies on transaction rollback when the row changes after capture", async () => {

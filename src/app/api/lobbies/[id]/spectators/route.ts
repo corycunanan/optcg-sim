@@ -112,7 +112,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
     const result = await prisma.$transaction(async (tx) => {
       if (!(await lockLobbyMembership(tx, id))) {
-        return { failure: "NOT_FOUND" as const, changed: false };
+        // Self-leave is uniformly successful after auth/rate limiting. Missing,
+        // closed, and absent-membership states must not form an existence oracle.
+        return { changed: false };
       }
 
       const lobby = await tx.lobby.findUnique({
@@ -129,17 +131,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       });
 
       if (!lobby || lobby.status === "CLOSED") {
-        return { failure: "NOT_FOUND" as const, changed: false };
+        return { changed: false };
       }
       if (lobby.hostUserId === userId || lobby.guest?.userId === userId) {
-        return { failure: "FORBIDDEN" as const, changed: false };
+        return { changed: false };
       }
 
       const spectator = lobby.spectators[0];
       if (!spectator) {
         // The caller is the implicit target, so an already-removed row is a
         // successful no-op and does not churn the lobby revision or fanout.
-        return { failure: null, changed: false };
+        return { changed: false };
       }
 
       // Capture the departing userId before deleting the membership row.
@@ -157,15 +159,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         data: { revision: { increment: 1 } },
       });
 
-      return { failure: null, changed: true };
+      return { changed: true };
     });
 
-    if (result.failure === "NOT_FOUND") {
-      return apiError("Lobby not found", 404);
-    }
-    if (result.failure === "FORBIDDEN") {
-      return apiError("Forbidden", 403);
-    }
     if (!result.changed) return apiAction();
 
     after(async () => {
