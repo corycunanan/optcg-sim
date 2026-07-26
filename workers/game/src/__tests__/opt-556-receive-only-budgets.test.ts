@@ -258,7 +258,10 @@ describe("OPT-556 receive-only spectator enforcement", () => {
     expect(spectator.closed).toEqual([
       { code: 1009, reason: "message too big" },
     ]);
-    expect(spectator.deserializeAttachment()).toEqual(attachmentBefore);
+    expect(spectator.deserializeAttachment()).toEqual({
+      ...(attachmentBefore as SpectatorSocketAttachment),
+      closeIntent: "MESSAGE_TOO_LARGE",
+    });
   });
 
   it("closes and logs a spectator socket that exceeds its own frame budget", async () => {

@@ -10,7 +10,12 @@ export interface SessionAuthorizationContext {
 
 export type SessionParticipantIdentity =
   | { role: "player"; playerIndex: 0 | 1 }
-  | { role: "spectator"; userId: string; expiresAt: number };
+  | {
+      role: "spectator";
+      userId: string;
+      displayName: string;
+      expiresAt: number;
+    };
 
 /**
  * Verifies and consumes single-use game tokens without coupling authorization
@@ -66,7 +71,12 @@ export class SessionAuthorizer {
         return null;
       }
 
-      return { role: "spectator", userId, expiresAt: payload.exp * 1000 };
+      return {
+        role: "spectator",
+        userId,
+        displayName: payload.spectatorName ?? "Spectator",
+        expiresAt: payload.exp * 1000,
+      };
     }
 
     const matchesPlayer1 = gameState.players[0].playerId === userId;

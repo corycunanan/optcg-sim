@@ -19,6 +19,7 @@ export interface VerifiedGameToken {
   jti: string;
   playerIndex?: 0 | 1;
   role?: "spectator";
+  spectatorName?: string;
 }
 
 export interface VerifiedUserToken {
@@ -36,6 +37,7 @@ interface RawTokenPayload {
   gameId?: unknown;
   playerIndex?: unknown;
   role?: unknown;
+  spectatorName?: unknown;
 }
 
 async function verifySignatureAndDecode(
@@ -93,6 +95,16 @@ export async function verifyGameToken(
     return null;
   }
   if (payload.role !== undefined && payload.role !== "spectator") return null;
+  if (
+    payload.spectatorName !== undefined &&
+    (payload.role !== "spectator" ||
+      typeof payload.spectatorName !== "string" ||
+      payload.spectatorName.trim() !== payload.spectatorName ||
+      payload.spectatorName.length === 0 ||
+      payload.spectatorName.length > 80)
+  ) {
+    return null;
+  }
   if (isExpired(payload.exp)) return null;
   if (expectedGameId && payload.gameId !== expectedGameId) return null;
 
@@ -104,6 +116,9 @@ export async function verifyGameToken(
     jti: payload.jti,
     ...(payload.playerIndex !== undefined ? { playerIndex: payload.playerIndex } : {}),
     ...(payload.role === "spectator" ? { role: payload.role } : {}),
+    ...(typeof payload.spectatorName === "string"
+      ? { spectatorName: payload.spectatorName }
+      : {}),
   };
 }
 

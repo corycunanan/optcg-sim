@@ -660,7 +660,11 @@ export type ServerMessage =
   | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
   | { type: "game:player_reconnected"; playerIndex: 0 | 1 }
   | { type: "game:spectator_joined"; spectator: SpectatorDisplayIdentity }
-  | { type: "game:spectator_left"; spectator: SpectatorDisplayIdentity }
+  | {
+      type: "game:spectator_left";
+      spectator: SpectatorDisplayIdentity;
+      cause: "DEPARTED" | "EJECTED";
+    }
   | { type: "game:undo"; playerIndex: 0 | 1; canUndo: boolean };
 
 export interface SpectatorDisplayIdentity {

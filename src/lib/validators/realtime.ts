@@ -199,5 +199,6 @@ export const GameServerMessageSchema: z.ZodType<ServerMessage> =
     z.object({
       type: z.literal("game:spectator_left"),
       spectator: SpectatorDisplayIdentitySchema,
+      cause: z.enum(["DEPARTED", "EJECTED"]),
     }),
   ]);

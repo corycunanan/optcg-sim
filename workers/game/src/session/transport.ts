@@ -73,7 +73,17 @@ export interface SpectatorSocketAttachment {
   displayName?: string;
   expiresAt?: number;
   messageBudget?: TokenBucket;
+  closeIntent?: SpectatorServerCloseIntent;
 }
+
+export type SpectatorServerCloseIntent =
+  | "REVOKED"
+  | "LEASE_EXPIRED"
+  | "GAME_ENDED"
+  | "RATE_LIMITED"
+  | "INVALID_IDENTITY"
+  | "MESSAGE_TOO_LARGE"
+  | "SUPERSEDED";
 
 export type SessionSocketAttachment =
   | PlayerSocketAttachment
@@ -172,7 +182,15 @@ export class SessionTransport {
     let closed = 0;
     for (const userId of new Set(userIds)) {
       for (const ws of this.state.getWebSockets(`spectator:${userId}`)) {
-        if (this.closeSpectator(ws, SPECTATOR_REVOKED_CLOSE_REASON)) closed++;
+        if (
+          this.closeSpectatorForCause(
+            ws,
+            "REVOKED",
+            SPECTATOR_REVOKED_CLOSE_CODE,
+            SPECTATOR_REVOKED_CLOSE_REASON
+          )
+        )
+          closed++;
       }
     }
     return closed;
@@ -185,7 +203,15 @@ export class SessionTransport {
       if (!attachment) continue;
       if (attachment.expiresAt !== undefined && attachment.expiresAt > now)
         continue;
-      if (this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON)) closed++;
+      if (
+        this.closeSpectatorForCause(
+          ws,
+          "LEASE_EXPIRED",
+          SPECTATOR_REVOKED_CLOSE_CODE,
+          SPECTATOR_LEASE_EXPIRED_CLOSE_REASON
+        )
+      )
+        closed++;
     }
     return closed;
   }
@@ -194,15 +220,15 @@ export class SessionTransport {
     let closed = 0;
     for (const ws of this.state.getWebSockets()) {
       if (!getSpectatorSocketAttachment(ws)) continue;
-      try {
-        ws.close(
+      if (
+        this.closeSpectatorForCause(
+          ws,
+          "GAME_ENDED",
           SPECTATOR_GAME_ENDED_CLOSE_CODE,
           SPECTATOR_GAME_ENDED_CLOSE_REASON
-        );
+        )
+      )
         closed++;
-      } catch {
-        // Already closed.
-      }
     }
     return closed;
   }
@@ -250,6 +276,28 @@ export class SessionTransport {
   ): boolean {
     try {
       ws.serializeAttachment({ ...attachment, messageBudget });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  closeSpectatorForCause(
+    ws: WebSocket,
+    closeIntent: SpectatorServerCloseIntent,
+    code: number,
+    reason: string
+  ): boolean {
+    const attachment = getSpectatorSocketAttachment(ws);
+    if (attachment) {
+      try {
+        ws.serializeAttachment({ ...attachment, closeIntent });
+      } catch {
+        // Continue with the security close even if the socket is already closing.
+      }
+    }
+    try {
+      ws.close(code, reason);
       return true;
     } catch {
       return false;
@@ -354,13 +402,23 @@ export class SessionTransport {
     build: FilteredStateMessageBuilder,
     exclude?: WebSocket
   ): void {
+    this.broadcastFilteredMessages(
+      (recipient) =>
+        this.buildFilteredStateForRecipient(state, cardDb, recipient, build),
+      exclude,
+      state.id
+    );
+  }
+
+  broadcastFilteredMessages(
+    build: (recipient: FilteredStateRecipient) => FilteredStateMessage,
+    exclude?: WebSocket,
+    gameId?: string
+  ): void {
     for (const playerIndex of [0, 1] as const) {
       const ws = this.playerSocket(playerIndex);
       if (!ws || ws === exclude) continue;
-      this.send(
-        ws,
-        this.buildFilteredStateForRecipient(state, cardDb, playerIndex, build)
-      );
+      this.send(ws, build(playerIndex));
     }
 
     let spectatorPayload:
@@ -378,12 +436,7 @@ export class SessionTransport {
 
       if (spectatorPayload.status === "unbuilt") {
         try {
-          const message = this.buildFilteredStateForRecipient(
-            state,
-            cardDb,
-            null,
-            build
-          );
+          const message = build(null);
           spectatorPayload = spectatorMessageVisibility(message.type)
             .filteredState
             ? { status: "ready", payload: JSON.stringify(message) }
@@ -391,7 +444,7 @@ export class SessionTransport {
         } catch (error) {
           spectatorPayload = { status: "failed" };
           log("ws.spectator_state_build_failed", {
-            gameId: state.id,
+            gameId,
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -505,11 +558,12 @@ export class SessionTransport {
   ): void {
     for (const ws of this.state.getWebSockets(`spectator:${userId}`)) {
       if (ws === authoritative) continue;
-      try {
-        ws.close(SUPERSEDED_SOCKET_CLOSE_CODE, SUPERSEDED_SOCKET_CLOSE_REASON);
-      } catch {
-        // Already closed.
-      }
+      this.closeSpectatorForCause(
+        ws,
+        "SUPERSEDED",
+        SUPERSEDED_SOCKET_CLOSE_CODE,
+        SUPERSEDED_SOCKET_CLOSE_REASON
+      );
     }
   }
 
@@ -542,21 +596,22 @@ export class SessionTransport {
   private spectatorLeaseAllowsSend(ws: WebSocket): boolean {
     const attachment = getSpectatorSocketAttachment(ws);
     if (!attachment || attachment.expiresAt === undefined) {
-      this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON);
+      this.closeSpectatorForCause(
+        ws,
+        "LEASE_EXPIRED",
+        SPECTATOR_REVOKED_CLOSE_CODE,
+        SPECTATOR_LEASE_EXPIRED_CLOSE_REASON
+      );
       return false;
     }
     if (attachment.expiresAt > this.now()) return true;
-    this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON);
+    this.closeSpectatorForCause(
+      ws,
+      "LEASE_EXPIRED",
+      SPECTATOR_REVOKED_CLOSE_CODE,
+      SPECTATOR_LEASE_EXPIRED_CLOSE_REASON
+    );
     return false;
-  }
-
-  private closeSpectator(ws: WebSocket, reason: string): boolean {
-    try {
-      ws.close(SPECTATOR_REVOKED_CLOSE_CODE, reason);
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   private sendPayload(ws: WebSocket, payload: string): void {
@@ -602,7 +657,23 @@ export function isSpectatorSocketAttachment(
     (!("expiresAt" in value) ||
       (typeof value.expiresAt === "number" &&
         Number.isFinite(value.expiresAt))) &&
-    (!("messageBudget" in value) || isTokenBucket(value.messageBudget))
+    (!("messageBudget" in value) || isTokenBucket(value.messageBudget)) &&
+    (!("closeIntent" in value) ||
+      isSpectatorServerCloseIntent(value.closeIntent))
+  );
+}
+
+function isSpectatorServerCloseIntent(
+  value: unknown
+): value is SpectatorServerCloseIntent {
+  return (
+    value === "REVOKED" ||
+    value === "LEASE_EXPIRED" ||
+    value === "GAME_ENDED" ||
+    value === "RATE_LIMITED" ||
+    value === "INVALID_IDENTITY" ||
+    value === "MESSAGE_TOO_LARGE" ||
+    value === "SUPERSEDED"
   );
 }
 

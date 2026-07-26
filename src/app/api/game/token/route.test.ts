@@ -33,7 +33,9 @@ beforeEach(() => {
   authMock.mockReset();
   gameSessionFindFirstMock.mockReset();
 
-  authMock.mockResolvedValue({ user: { id: "user-1" } });
+  authMock.mockResolvedValue({
+    user: { id: "user-1", username: "Nami", name: "Nami Real" },
+  });
   gameSessionFindFirstMock.mockResolvedValue({
     id: "game-1",
     mode: "PVP",
@@ -219,6 +221,7 @@ describe("GET /api/game/token", () => {
       sub: "user-1",
       gameId: "game-1",
       role: "spectator",
+      spectatorName: "Nami",
     });
     expect(decodePayload(body.data.token)).not.toHaveProperty("playerIndex");
   });

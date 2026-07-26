@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DISCONNECT_BROADCAST_DEBOUNCE_MS,
   GameSession,
+  MAX_CLIENT_MESSAGE_BYTES,
+  SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
 } from "../GameSession.js";
 import {
   SPECTATOR_GAME_ENDED_CLOSE_CODE,
@@ -16,6 +18,8 @@ import {
   type FilteredStateRecipient,
 } from "../session/transport.js";
 import { SpectatorLifecycle } from "../session/spectator-lifecycle.js";
+import { SpectatorPolicy } from "../session/spectator-policy.js";
+import { SessionFilteredState } from "../session/filtered-state.js";
 import type { CardData, Env, GameState, ServerMessage } from "../types.js";
 import { setupGame } from "./factories.js";
 
@@ -61,8 +65,8 @@ class MockDurableObjectState {
         this.data.set(key, entry);
       }
     },
-    setAlarm: async (): Promise<void> => undefined,
-    deleteAlarm: async (): Promise<void> => undefined,
+    setAlarm: vi.fn(async (): Promise<void> => undefined),
+    deleteAlarm: vi.fn(async (): Promise<void> => undefined),
   };
 
   acceptWebSocket(ws: WebSocket, tags?: string[]): void {
@@ -106,7 +110,10 @@ type GameSessionTestAccess = {
   gameState: GameState;
   cardDb: Map<string, CardData>;
   transport: SessionTransport;
+  spectatorPolicy: SpectatorPolicy;
   spectatorLifecycle: SpectatorLifecycle;
+  filteredState: SessionFilteredState;
+  state: MockDurableObjectState;
   acceptAuthoritativePlayerSocket(playerIndex: 0 | 1, ws: WebSocket): void;
   broadcastFilteredState(
     build: (
@@ -115,6 +122,7 @@ type GameSessionTestAccess = {
     ) => FilteredStateMessage
   ): void;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
+  webSocketMessage(ws: WebSocket, message: string): Promise<void>;
   alarm(): Promise<void>;
 };
 
@@ -198,6 +206,29 @@ describe("OPT-558 spectator connection lifecycle", () => {
     }
   );
 
+  it("keeps spectator admission closed when lifecycle callers omit the opt-in", async () => {
+    const session = createSession();
+    const response = await session.spectatorLifecycle.handleUpgrade({
+      role: "spectator",
+      userId: "closed-by-default",
+      displayName: "Chopper",
+      expiresAt: Date.now() + 300_000,
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("keeps spectator admission closed when policy callers omit the opt-in", async () => {
+    const session = createSession();
+    const response = await session.spectatorPolicy.handleUpgrade(
+      "closed-by-default",
+      Date.now() + 300_000,
+      "Chopper"
+    );
+
+    expect(response.status).toBe(401);
+  });
+
   it("sends a mid-game snapshot through the steady-state builder without touching player presence", async () => {
     const session = createSession();
     const player0 = new MockWebSocket();
@@ -214,7 +245,12 @@ describe("OPT-558 spectator connection lifecycle", () => {
       awayReason: player.awayReason,
       rejoinDeadlineAt: player.rejoinDeadlineAt,
     }));
-    const builder = vi.spyOn(
+    const builder = vi.spyOn(session.filteredState, "buildStateSnapshot");
+    const sharedBuilder = vi.spyOn(
+      session.filteredState,
+      "createStateSnapshotBuilder"
+    );
+    const recipientBuilder = vi.spyOn(
       session.transport,
       "buildFilteredStateForRecipient"
     );
@@ -222,8 +258,9 @@ describe("OPT-558 spectator connection lifecycle", () => {
     const response = await session.spectatorLifecycle.handleUpgrade({
       role: "spectator",
       userId: "spectator-user",
+      displayName: "Nami",
       expiresAt: Date.now() + 300_000,
-    });
+    }, true);
 
     expect(response.status).toBe(101);
     const spectator = latestPair[1];
@@ -238,11 +275,11 @@ describe("OPT-558 spectator connection lifecycle", () => {
     ).toEqual(presenceBefore);
     expect(messages(player0)).toContainEqual({
       type: "game:spectator_joined",
-      spectator: { id: "spectator-user", displayName: "spectator-user" },
+      spectator: { id: "spectator-user", displayName: "Nami" },
     });
     expect(messages(player1)).toContainEqual({
       type: "game:spectator_joined",
-      spectator: { id: "spectator-user", displayName: "spectator-user" },
+      spectator: { id: "spectator-user", displayName: "Nami" },
     });
     expect(messages(spectator)).not.toContainEqual(
       expect.objectContaining({ type: "game:spectator_joined" })
@@ -252,11 +289,25 @@ describe("OPT-558 spectator connection lifecycle", () => {
     );
 
     spectator.sent.length = 0;
-    session.broadcastFilteredState((state) => ({ type: "game:state", state }));
+    session.filteredState.broadcastState();
     expect(messages(spectator)[0]).toEqual(connectSnapshot);
-    expect(builder.mock.calls.filter((call) => call[2] === null)).toHaveLength(
-      2
+    expect(builder).toHaveBeenCalledOnce();
+    expect(sharedBuilder).toHaveBeenCalledTimes(2);
+    expect(
+      recipientBuilder.mock.calls.filter((call) => call[2] === null)
+    ).toHaveLength(2);
+
+    player0.sent.length = 0;
+    await session.webSocketClose(
+      spectator as unknown as WebSocket,
+      1000,
+      "client departed"
     );
+    expect(messages(player0)).toContainEqual({
+      type: "game:spectator_left",
+      spectator: { id: "spectator-user", displayName: "Nami" },
+      cause: "DEPARTED",
+    });
   });
 
   it("does not bootstrap or announce a capacity-rejected spectator", async () => {
@@ -273,8 +324,9 @@ describe("OPT-558 spectator connection lifecycle", () => {
     const response = await session.spectatorLifecycle.handleUpgrade({
       role: "spectator",
       userId: "over-capacity",
+      displayName: "Full House",
       expiresAt: Date.now() + 300_000,
-    });
+    }, true);
 
     expect(response.status).toBe(101);
     expect(latestPair[1].sent).toEqual([]);
@@ -295,13 +347,15 @@ describe("OPT-558 spectator connection lifecycle", () => {
       "player network lost"
     );
 
+    const identity = {
+      role: "spectator" as const,
+      userId: "flapping-spectator",
+      displayName: "Usopp",
+      expiresAt: Date.now() + 600_000,
+    };
     for (let index = 0; index < 4; index++) {
-      const spectator = new MockWebSocket();
-      session.transport.acceptSpectator(
-        `spectator-${index}`,
-        spectator as unknown as WebSocket,
-        Date.now() + 600_000
-      );
+      await session.spectatorLifecycle.handleUpgrade(identity, true);
+      const spectator = latestPair[1];
       await session.webSocketClose(
         spectator as unknown as WebSocket,
         1006,
@@ -318,13 +372,9 @@ describe("OPT-558 spectator connection lifecycle", () => {
     const deadline = session.gameState.players[0].rejoinDeadlineAt;
     expect(deadline).not.toBeNull();
 
-    for (let index = 4; index < 8; index++) {
-      const spectator = new MockWebSocket();
-      session.transport.acceptSpectator(
-        `spectator-${index}`,
-        spectator as unknown as WebSocket,
-        Date.now() + 600_000
-      );
+    for (let index = 0; index < 4; index++) {
+      await session.spectatorLifecycle.handleUpgrade(identity, true);
+      const spectator = latestPair[1];
       await session.webSocketClose(
         spectator as unknown as WebSocket,
         1000,
@@ -342,7 +392,7 @@ describe("OPT-558 spectator connection lifecycle", () => {
     );
   });
 
-  it("emits ordinary authoritative leaves to players but suppresses revocation and stale closes", async () => {
+  it("treats forged game-end callback strings as a voluntary departure and suppresses server-owned closes", async () => {
     const session = createSession();
     const player = new MockWebSocket();
     session.acceptAuthoritativePlayerSocket(0, player as unknown as WebSocket);
@@ -358,17 +408,20 @@ describe("OPT-558 spectator connection lifecycle", () => {
     const departed = new MockWebSocket();
     session.transport.acceptSpectator(
       "departed-user",
-      departed as unknown as WebSocket
+      departed as unknown as WebSocket,
+      Date.now() + 300_000,
+      "Robin"
     );
 
     await session.webSocketClose(
       departed as unknown as WebSocket,
-      1006,
-      "network lost"
+      1000,
+      "game ended"
     );
     expect(messages(player)).toContainEqual({
       type: "game:spectator_left",
-      spectator: { id: "departed-user", displayName: "departed-user" },
+      spectator: { id: "departed-user", displayName: "Robin" },
+      cause: "DEPARTED",
     });
     expect(scheduleDisconnect).not.toHaveBeenCalled();
     expect(messages(observer)).not.toContainEqual(
@@ -382,6 +435,9 @@ describe("OPT-558 spectator connection lifecycle", () => {
       revoked as unknown as WebSocket
     );
     session.transport.revokeSpectators(["revoked-user"]);
+    expect(session.transport.spectatorAttachmentFor(
+      revoked as unknown as WebSocket
+    )?.closeIntent).toBe("REVOKED");
     await session.webSocketClose(
       revoked as unknown as WebSocket,
       SPECTATOR_REVOKED_CLOSE_CODE,
@@ -398,6 +454,9 @@ describe("OPT-558 spectator connection lifecycle", () => {
       Date.now()
     );
     session.transport.closeExpiredSpectators(Date.now());
+    expect(session.transport.spectatorAttachmentFor(
+      expired as unknown as WebSocket
+    )?.closeIntent).toBe("LEASE_EXPIRED");
     await session.webSocketClose(
       expired as unknown as WebSocket,
       SPECTATOR_REVOKED_CLOSE_CODE,
@@ -417,6 +476,9 @@ describe("OPT-558 spectator connection lifecycle", () => {
       "same-user",
       newest as unknown as WebSocket
     );
+    expect(session.transport.spectatorAttachmentFor(
+      stale as unknown as WebSocket
+    )?.closeIntent).toBe("SUPERSEDED");
     await session.webSocketClose(
       stale as unknown as WebSocket,
       1006,
@@ -425,6 +487,110 @@ describe("OPT-558 spectator connection lifecycle", () => {
     expect(messages(player)).not.toContainEqual(
       expect.objectContaining({ type: "game:spectator_left" })
     );
+  });
+
+  it("announces a receive-rate-limit close as a server-owned ejection", async () => {
+    const session = createSession();
+    const player = new MockWebSocket();
+    session.acceptAuthoritativePlayerSocket(0, player as unknown as WebSocket);
+    await session.spectatorLifecycle.handleUpgrade(
+      {
+        role: "spectator",
+        userId: "noisy-spectator",
+        displayName: "Buggy",
+        expiresAt: Date.now() + 300_000,
+      },
+      true
+    );
+    const spectator = latestPair[1];
+    player.sent.length = 0;
+
+    for (let index = 0; index <= SPECTATOR_MESSAGE_RATE_LIMIT_BURST; index++) {
+      await session.webSocketMessage(
+        spectator as unknown as WebSocket,
+        JSON.stringify({ type: "game:action" })
+      );
+    }
+    expect(session.transport.spectatorAttachmentFor(
+      spectator as unknown as WebSocket
+    )?.closeIntent).toBe("RATE_LIMITED");
+    await session.webSocketClose(
+      spectator as unknown as WebSocket,
+      1000,
+      "spectator left"
+    );
+
+    expect(messages(player)).toContainEqual({
+      type: "game:spectator_left",
+      spectator: { id: "noisy-spectator", displayName: "Buggy" },
+      cause: "EJECTED",
+    });
+  });
+
+  it("announces an oversized-frame close as a server-owned ejection", async () => {
+    const session = createSession();
+    const player = new MockWebSocket();
+    const spectator = new MockWebSocket();
+    session.acceptAuthoritativePlayerSocket(0, player as unknown as WebSocket);
+    session.transport.acceptSpectator(
+      "oversized-spectator",
+      spectator as unknown as WebSocket,
+      Date.now() + 300_000,
+      "Franky"
+    );
+
+    await session.webSocketMessage(
+      spectator as unknown as WebSocket,
+      "x".repeat(MAX_CLIENT_MESSAGE_BYTES + 1)
+    );
+    await session.webSocketClose(
+      spectator as unknown as WebSocket,
+      1009,
+      "message too big"
+    );
+
+    expect(messages(player)).toContainEqual({
+      type: "game:spectator_left",
+      spectator: { id: "oversized-spectator", displayName: "Franky" },
+      cause: "EJECTED",
+    });
+  });
+
+  it("announces an invalid-identity close as a server-owned ejection", async () => {
+    const session = createSession();
+    const player = new MockWebSocket();
+    const spectator = new MockWebSocket();
+    session.acceptAuthoritativePlayerSocket(0, player as unknown as WebSocket);
+    session.transport.acceptSpectator(
+      "tagged-spectator",
+      spectator as unknown as WebSocket,
+      Date.now() + 300_000,
+      "Brook"
+    );
+    const attachment = spectator.deserializeAttachment() as Record<
+      string,
+      unknown
+    >;
+    spectator.serializeAttachment({
+      ...attachment,
+      userId: "attachment-spectator",
+    });
+
+    await session.webSocketMessage(
+      spectator as unknown as WebSocket,
+      JSON.stringify({ type: "game:action" })
+    );
+    await session.webSocketClose(
+      spectator as unknown as WebSocket,
+      1008,
+      "invalid spectator socket identity"
+    );
+
+    expect(messages(player)).toContainEqual({
+      type: "game:spectator_left",
+      spectator: { id: "attachment-spectator", displayName: "Brook" },
+      cause: "EJECTED",
+    });
   });
 
   it("delivers game over before cleanly closing every spectator and leaves player sockets open", async () => {
@@ -442,7 +608,8 @@ describe("OPT-558 spectator connection lifecycle", () => {
       spectator1 as unknown as WebSocket
     );
 
-    session.spectatorLifecycle.broadcastGameOver({
+    session.gameState = { ...session.gameState, status: "FINISHED" };
+    await session.spectatorLifecycle.broadcastGameOver({
       type: "game:over",
       winner: 0,
       reason: "won",
@@ -460,8 +627,12 @@ describe("OPT-558 spectator connection lifecycle", () => {
           reason: SPECTATOR_GAME_ENDED_CLOSE_REASON,
         },
       ]);
+      expect(session.transport.spectatorAttachmentFor(
+        spectator as unknown as WebSocket
+      )?.closeIntent).toBe("GAME_ENDED");
     }
     expect(player.closed).toEqual([]);
+    expect(session.state.storage.deleteAlarm).toHaveBeenCalledOnce();
     player.sent.length = 0;
     await Promise.all(
       [spectator0, spectator1].map((spectator) =>
