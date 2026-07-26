@@ -282,7 +282,7 @@ Board wipe — OP01-094 Kaido: "K.O. all Characters other than this Character."
 {
   "type": "KO",
   "target": {
-    "controller": "ANY",
+    "controller": "EITHER",
     "card_type": "CHARACTER",
     "count": "ALL",
     "filter": { "exclude_self": true }
@@ -290,12 +290,12 @@ Board wipe — OP01-094 Kaido: "K.O. all Characters other than this Character."
 }
 ```
 
-Board wipe patterns do not require a separate primitive. They use `KO` with broad targeting: `count: "ALL"` combined with `controller: "ANY"`, `"SELF"`, or `"OPPONENT"` and optional filters. Examples:
+Board wipe patterns do not require a separate primitive. They use `KO` with broad targeting: `count: "ALL"` combined with `controller: "EITHER"`, `"SELF"`, or `"OPPONENT"` and optional filters. Examples:
 
 | Pattern | Targeting | Example Cards |
 |---------|-----------|---------------|
-| All Characters except self (both sides) | `controller: "ANY"`, `exclude_self: true` | OP01-094 Kaido |
-| All Characters with cost ≤ N (both sides) | `controller: "ANY"`, `filter: { cost: ... }` | ST08-005 Shanks |
+| All Characters except self (both sides) | `controller: "EITHER"`, `exclude_self: true` | OP01-094 Kaido |
+| All Characters with cost ≤ N (both sides) | `controller: "EITHER"`, `filter: { cost: ... }` | ST08-005 Shanks |
 | All opponent's Characters with filter | `controller: "OPPONENT"`, `count: "ALL"` | OP15-114 Wyper |
 | All your own Characters | `controller: "SELF"`, `count: "ALL"` | OP13-082 Five Elders |
 

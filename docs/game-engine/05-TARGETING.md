@@ -146,10 +146,12 @@ controller modes. An omitted controller retains the resolver's existing default.
 | `OPPONENT_LEADER`, `OPPONENT_LIFE` | `OPPONENT` (redundant on fixed-scope types) |
 | `DON_ATTACHED`, `DON_IN_DON_DECK`, `SELECTED_CARDS`, `TRIGGERING_CARD` | none; scope is fixed by the target type |
 
-For `STAGE` and `LIFE_CARD`, `EITHER` returns candidates belonging to both
-players. A Life selection is blind until the chooser selects a candidate; only
-the chooser then receives the selected identity and the top-or-bottom placement
-prompt. The other player and observers receive neither prompt nor identity.
+For `STAGE`, `EITHER` returns candidates belonging to both players. For
+`LIFE_CARD`, each selected player contributes only their top Life card;
+`OPPONENT_LIFE` remains the distinct full-stack target type. A Life selection is
+blind until the chooser selects a candidate, then only the chooser receives the
+selected identity and the top-or-bottom placement prompt through the player
+visibility path. Spectator prompt merging is a separate session-layer concern.
 
 ### Defaults
 

@@ -536,8 +536,10 @@ export function computeAllValidTargets(
       const playerIndexes: (0 | 1)[] = ctrl === "EITHER"
         ? [0, 1]
         : [ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0)];
+      // Authored LIFE_CARD targets are exclusively top-of-Life effects. Keep
+      // OPPONENT_LIFE as the distinct full-stack target type.
       return playerIndexes.flatMap((playerIndex) =>
-        state.players[playerIndex].life.map((card) => card.instanceId));
+        state.players[playerIndex].life.slice(0, 1).map((card) => card.instanceId));
     }
     case "PLAYER": {
       // Return player index as a string identifier

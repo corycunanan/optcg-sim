@@ -107,8 +107,8 @@ describe("OPT-572 LIFE_CARD + EITHER", () => {
       expect(offered.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       if (offered.pendingPrompt?.options.promptType !== "SELECT_TARGET") return;
       expect(offered.pendingPrompt.options.validTargets).toEqual([
-        ...state.players[0].life.map((card) => card.instanceId),
-        ...state.players[1].life.map((card) => card.instanceId),
+        state.players[0].life[0].instanceId,
+        state.players[1].life[0].instanceId,
       ]);
       expect(offered.pendingPrompt.options.blindSelection).toBe(true);
 
@@ -171,6 +171,40 @@ describe("OPT-572 LIFE_CARD + EITHER", () => {
         1,
       )))
         .not.toContain(opponentTop.instanceId);
+    },
+  );
+
+  it.each([0, 1] as const)(
+    "rejects a crafted selection below player %i's top Life card",
+    (owner) => {
+      const cardDb = createTestCardDb();
+      const state = withDistinctLifeAndStages(createBattleReadyState(cardDb), cardDb);
+      const action = ST07_008_CHARLOTTE_PUDDING.effects[0]
+        .actions![0] as ActionOf<"LIFE_SCRY">;
+      const nonTop = state.players[owner].life.at(-1)!;
+
+      const offered = resolveEffect(
+        state,
+        actionBlock(action),
+        state.players[0].leader.instanceId,
+        0,
+        cardDb,
+      );
+      expect(offered.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      if (offered.pendingPrompt?.options.promptType !== "SELECT_TARGET") return;
+      expect(offered.pendingPrompt.options.validTargets).not.toContain(
+        nonTop.instanceId,
+      );
+
+      const rejected = resumeFromStack(
+        offered.state,
+        { type: "SELECT_TARGET", selectedInstanceIds: [nonTop.instanceId] },
+        cardDb,
+      );
+      expect(rejected.rejected).toBe(true);
+      expect(rejected.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      expect(rejected.events.some((event) => event.type === "LIFE_SCRIED"))
+        .toBe(false);
     },
   );
 });
@@ -271,12 +305,15 @@ describe("OPT-572 parent controller guard and ANY normalization", () => {
     expect(resolve({ type: "STAGE", controller: "SELF" })).toEqual(["stage-0"]);
     expect(resolve({ type: "STAGE", controller: "OPPONENT" })).toEqual(["stage-1"]);
     expect(resolve({ type: "LIFE_CARD" })).toEqual(
-      state.players[0].life.map((card) => card.instanceId),
+      [state.players[0].life[0].instanceId],
     );
     expect(resolve({ type: "LIFE_CARD", controller: "SELF" })).toEqual(
-      state.players[0].life.map((card) => card.instanceId),
+      [state.players[0].life[0].instanceId],
     );
     expect(resolve({ type: "LIFE_CARD", controller: "OPPONENT" })).toEqual(
+      [state.players[1].life[0].instanceId],
+    );
+    expect(resolve({ type: "OPPONENT_LIFE" })).toEqual(
       state.players[1].life.map((card) => card.instanceId),
     );
   });
