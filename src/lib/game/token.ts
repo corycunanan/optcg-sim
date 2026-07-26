@@ -9,9 +9,10 @@ export type GameTokenOptions = {
 
 /**
  * Mint a short-lived app-signed token for the database-less game worker.
- * A signed spectator role is authoritative at that trust boundary: lobby
- * removal cannot revoke an existing token, so route-issued spectator access
- * can remain valid until the default 300-second (5-minute) TTL expires.
+ * A signed spectator role is authoritative at that trust boundary, and the app
+ * cannot revoke a minted token. The worker checks exp only at WebSocket upgrade
+ * and never rechecks it or schedules an expiry close, so an established socket
+ * is not bounded by the default 300-second TTL. OPT-574 owns that revocation.
  */
 export async function mintGameToken(
   userId: string,

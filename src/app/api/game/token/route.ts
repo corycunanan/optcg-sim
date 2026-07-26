@@ -9,9 +9,10 @@
  * GAME_WORKER_SECRET — a shared secret both sides already have.
  *
  * The worker has no database access, so a signed spectator role is its
- * authoritative authorization. Removing a spectator or disabling spectators
- * cannot revoke an already-minted route token; that access remains valid for
- * at most the default 5-minute TTL.
+ * authoritative authorization, and the app cannot revoke a minted token.
+ * The worker checks exp only during the WebSocket upgrade; it does not recheck
+ * expiry or close an established socket, whose access is therefore not bounded
+ * by the 5-minute token TTL. OPT-574 owns server-side spectator revocation.
  */
 
 import { NextRequest } from "next/server";
