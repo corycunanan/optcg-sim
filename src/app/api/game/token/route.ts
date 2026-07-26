@@ -9,10 +9,11 @@
  * GAME_WORKER_SECRET — a shared secret both sides already have.
  *
  * The worker has no database access, so a signed spectator role is its
- * authoritative authorization, and the app cannot revoke a minted token.
- * The worker checks exp only during the WebSocket upgrade; it does not recheck
- * expiry or close an established socket, whose access is therefore not bounded
- * by the 5-minute token TTL. OPT-574 owns server-side spectator revocation.
+ * authoritative authorization. Established spectator sockets carry exp as a
+ * hibernation-stable lease, so server-side delivery is bounded by the 5-minute
+ * token TTL even if a membership-change push is missed. An alarm also requests
+ * physical socket close, whose timing is not numerically bounded. Lobby
+ * mutations push prompt, revision-protected revocation to the game DO.
  */
 
 import { NextRequest } from "next/server";

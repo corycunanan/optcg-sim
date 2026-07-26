@@ -54,8 +54,17 @@ class MockDurableObjectState {
   storage = {
     get: async <T>(key: string): Promise<T | undefined> =>
       this.data.get(key) as T | undefined,
-    put: async (key: string, value: unknown): Promise<void> => {
-      this.data.set(key, value);
+    put: async (
+      keyOrEntries: string | Record<string, unknown>,
+      value?: unknown
+    ): Promise<void> => {
+      if (typeof keyOrEntries === "string") {
+        this.data.set(keyOrEntries, value);
+        return;
+      }
+      for (const [key, entry] of Object.entries(keyOrEntries)) {
+        this.data.set(key, entry);
+      }
     },
     setAlarm: async (): Promise<void> => undefined,
     deleteAlarm: async (): Promise<void> => undefined,
@@ -82,6 +91,8 @@ type GameSessionTestAccess = {
   cardDb: Map<string, CardData>;
   transport: SessionTransport;
   fetch(request: Request): Promise<Response>;
+  persist(): Promise<void>;
+  alarm(): Promise<void>;
   webSocketMessage(ws: WebSocket, message: string): Promise<void>;
 };
 
@@ -147,11 +158,16 @@ describe("OPT-554 spectator session authorization", () => {
     const storage = new MemoryStorage();
     const authorizer = new SessionAuthorizer(storage, "test-secret");
     const { state } = setupGame();
-    const token = await mintToken(state);
+    const exp = Math.floor(Date.now() / 1000) + 300;
+    const token = await mintToken(state, { exp });
 
     await expect(
       authorizer.validate(token, { state, mode: "PVP" })
-    ).resolves.toEqual({ role: "spectator", userId: "spectator-user" });
+    ).resolves.toEqual({
+      role: "spectator",
+      userId: "spectator-user",
+      expiresAt: exp * 1000,
+    });
     await expect(
       authorizer.validate(token, { state, mode: "PVP" })
     ).resolves.toBeNull();
@@ -200,6 +216,161 @@ describe("OPT-554 spectator session authorization", () => {
           originalWebSocketPair;
       }
     }
+  });
+
+  it("authenticates server push and closes a spectator without client cooperation", async () => {
+    const durableState = new MockDurableObjectState();
+    const session = new GameSession(
+      durableState as unknown as DurableObjectState,
+      {
+        GAME_WORKER_SECRET: "test-secret",
+        NEXTJS_URL: "https://app.example.test",
+      } as Env
+    ) as unknown as GameSessionTestAccess;
+    const { state, cardDb } = setupGame();
+    session.gameState = state;
+    session.cardDb = cardDb;
+    const player = new MockWebSocket();
+    const spectator = new MockWebSocket();
+    session.transport.accept(0, player as unknown as WebSocket);
+    session.transport.acceptSpectator(
+      "spectator-user",
+      spectator as unknown as WebSocket,
+      Date.now() + 300_000
+    );
+
+    const unauthorized = await session.fetch(
+      new Request(`https://worker.test/game/${state.id}/revoke-spectators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lobbyId: "lobby-1",
+          revision: 8,
+          userIds: ["spectator-user"],
+        }),
+      })
+    );
+    expect(unauthorized.status).toBe(401);
+    expect(spectator.closed).toEqual([]);
+
+    const malformed = await session.fetch(
+      new Request(`https://worker.test/game/${state.id}/revoke-spectators`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-secret",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lobbyId: "lobby-1", revision: 8, userIds: [] }),
+      })
+    );
+    expect(malformed.status).toBe(400);
+    expect(spectator.closed).toEqual([]);
+
+    const response = await session.fetch(
+      new Request(`https://worker.test/game/${state.id}/revoke-spectators`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-secret",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lobbyId: "lobby-1",
+          revision: 8,
+          userIds: ["spectator-user"],
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, closed: 1 });
+    expect(spectator.closed).toEqual([
+      { code: 1008, reason: "spectator access revoked" },
+    ]);
+    expect(player.closed).toEqual([]);
+
+    const reconstructed = new GameSession(
+      durableState as unknown as DurableObjectState,
+      {
+        GAME_WORKER_SECRET: "test-secret",
+        NEXTJS_URL: "https://app.example.test",
+      } as Env
+    ) as unknown as GameSessionTestAccess;
+    const rejoined = new MockWebSocket();
+    reconstructed.transport.acceptSpectator(
+      "spectator-user",
+      rejoined as unknown as WebSocket,
+      Date.now() + 300_000
+    );
+    const replay = await reconstructed.fetch(
+      new Request(`https://worker.test/game/${state.id}/revoke-spectators`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-secret",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lobbyId: "lobby-1",
+          revision: 8,
+          userIds: ["spectator-user"],
+        }),
+      })
+    );
+    expect(replay.status).toBe(409);
+    expect(rejoined.closed).toEqual([]);
+
+    const overlong = await reconstructed.fetch(
+      new Request(`https://worker.test/game/${state.id}/revoke-spectators`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-secret",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lobbyId: "lobby-1",
+          revision: 9,
+          userIds: ["x".repeat(100_000)],
+        }),
+      })
+    );
+    expect(overlong.status).toBe(400);
+    expect(rejoined.closed).toEqual([]);
+  });
+
+  it("reconstructs the DO and closes a hibernated spectator from alarm expiry", async () => {
+    const durableState = new MockDurableObjectState();
+    const env = {
+      GAME_WORKER_SECRET: "test-secret",
+      NEXTJS_URL: "https://app.example.test",
+    } as Env;
+    const beforeHibernate = new GameSession(
+      durableState as unknown as DurableObjectState,
+      env
+    ) as unknown as GameSessionTestAccess;
+    const { state, cardDb } = setupGame();
+    beforeHibernate.gameState = state;
+    beforeHibernate.cardDb = cardDb;
+    const spectator = new MockWebSocket();
+    beforeHibernate.transport.acceptSpectator(
+      "spectator-user",
+      spectator as unknown as WebSocket,
+      2_000
+    );
+    await beforeHibernate.persist();
+
+    const afterHibernate = new GameSession(
+      durableState as unknown as DurableObjectState,
+      env
+    ) as unknown as GameSessionTestAccess;
+    const now = vi.spyOn(Date, "now").mockReturnValue(2_000);
+    try {
+      await afterHibernate.alarm();
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(spectator.closed).toEqual([
+      { code: 1008, reason: "spectator token expired" },
+    ]);
   });
 
   it("drops every spectator frame as a non-player without closing the socket", async () => {
@@ -318,6 +489,7 @@ describe("OPT-554 spectator session authorization", () => {
     const spectator: SessionParticipantIdentity = {
       role: "spectator",
       userId: "spectator-user",
+      expiresAt: 1,
     };
 
     expect(player.playerIndex).toBe(1);

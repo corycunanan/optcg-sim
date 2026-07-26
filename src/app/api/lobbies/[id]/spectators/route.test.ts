@@ -13,6 +13,7 @@ const lobbySpectatorDeleteManyMock = vi.fn();
 const lobbyUpdateMock = vi.fn();
 const userUpdateManyMock = vi.fn();
 const notifyLobbyMock = vi.fn();
+const revokeSpectatorSocketsMock = vi.fn();
 
 const afterCalls = vi.hoisted(() => ({ pending: [] as Promise<void>[] }));
 
@@ -63,6 +64,10 @@ vi.mock("@/lib/lobbies/build-state", () => ({
 vi.mock("@/lib/realtime/fanout-lobby", () => ({
   notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
 }));
+vi.mock("@/lib/realtime/revoke-spectators", () => ({
+  revokeSpectatorSocketsForLobby: (...args: unknown[]) =>
+    revokeSpectatorSocketsMock(...args),
+}));
 
 const { DELETE, POST } = await import("./route");
 
@@ -106,6 +111,7 @@ beforeEach(() => {
     lobbyUpdateMock,
     userUpdateManyMock,
     notifyLobbyMock,
+    revokeSpectatorSocketsMock,
   ]) {
     mock.mockReset();
   }
@@ -117,6 +123,7 @@ beforeEach(() => {
   queryRawMock.mockResolvedValue([{ id: "lobby-1" }]);
   lobbyFindUniqueMock.mockResolvedValue({
     status: "IN_GAME",
+    revision: 7,
     hostUserId: "host-user",
     guest: { userId: "guest-user" },
     spectators: [{ userId: "spectator-user" }],
@@ -125,6 +132,7 @@ beforeEach(() => {
   lobbyUpdateMock.mockResolvedValue({ id: "lobby-1" });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
   notifyLobbyMock.mockResolvedValue(undefined);
+  revokeSpectatorSocketsMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(
     async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
@@ -282,6 +290,11 @@ describe("DELETE /api/lobbies/[id]/spectators", () => {
       where: { id: "lobby-1" },
       data: { revision: { increment: 1 } },
     });
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      ["spectator-user"],
+    );
   });
 
   it("fans out the decremented spectator count without a directed self-ejection event", async () => {

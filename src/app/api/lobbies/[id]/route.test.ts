@@ -20,6 +20,7 @@ const queryRawMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
 const notifySpectatorsRemovedAudienceMock = vi.fn();
+const revokeSpectatorSocketsMock = vi.fn();
 const notifyUserMock = vi.fn();
 const cancelPendingLobbyInvitesMock = vi.fn();
 const releaseActiveLobbyCallMock = vi.fn();
@@ -92,6 +93,10 @@ vi.mock("@/lib/realtime/fanout-lobby", async (importActual) => {
 });
 vi.mock("@/lib/realtime/fan-out", () => ({
   notifyUser: (...args: unknown[]) => notifyUserMock(...args),
+}));
+vi.mock("@/lib/realtime/revoke-spectators", () => ({
+  revokeSpectatorSocketsForLobby: (...args: unknown[]) =>
+    revokeSpectatorSocketsMock(...args),
 }));
 vi.mock("@/lib/lobbies/cancel-invites", () => ({
   cancelPendingLobbyInvites: (...args: unknown[]) =>
@@ -188,11 +193,13 @@ beforeEach(() => {
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
   notifySpectatorsRemovedAudienceMock.mockReset();
+  revokeSpectatorSocketsMock.mockReset();
   notifyUserMock.mockReset();
   cancelPendingLobbyInvitesMock.mockReset();
   releaseActiveLobbyCallMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "host-user" } });
+  revokeSpectatorSocketsMock.mockResolvedValue(undefined);
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   lobbyFindUniqueMock.mockResolvedValue(baseLobby());
   lobbyFindFirstMock.mockResolvedValue({
@@ -400,7 +407,7 @@ describe("PATCH /api/lobbies/[id]", () => {
       userId,
       }));
     lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({ allowSpectators: true }),
+      baseLobby({ allowSpectators: true, status: "IN_GAME" }),
     );
     lobbySpectatorFindManyMock.mockImplementation(async () => [
       ...persistedSpectators,
@@ -412,7 +419,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
     buildLobbyRoomStateMock.mockResolvedValueOnce({
       id: "lobby-1",
-      status: "READY",
+      status: "IN_GAME",
       hostUserId: "host-user",
       guest: { user: { id: "guest-user" } },
       spectators: [],
@@ -426,7 +433,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
       where: {
         id: "lobby-1",
-        status: "READY",
+        status: "IN_GAME",
         mode: "PVP",
         revision: 7,
       },
@@ -451,6 +458,11 @@ describe("PATCH /api/lobbies/[id]", () => {
       reason: "SPECTATING_DISABLED",
       removedSpectatorUserIds: preMutationSpectatorUserIds,
     });
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      preMutationSpectatorUserIds,
+    );
     expect(userUpdateManyMock).toHaveBeenCalledTimes(2);
     expect(releaseActiveLobbyCallMock.mock.calls).toEqual(
       preMutationSpectatorUserIds.map((spectatorUserId) => [
@@ -510,6 +522,11 @@ describe("PATCH /api/lobbies/[id]", () => {
       reason: "SPECTATING_DISABLED",
       removedSpectatorUserIds,
     });
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      removedSpectatorUserIds,
+    );
     for (const spectatorUserId of removedSpectatorUserIds) {
       expect(notifyUserMock).toHaveBeenCalledWith(
         spectatorUserId,
@@ -1037,6 +1054,7 @@ describe("DELETE /api/lobbies/[id]", () => {
         hostUserId: "host-user",
         mode: "PVP",
         status: { in: ["WAITING", "READY"] },
+        revision: 7,
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
     });
@@ -1114,6 +1132,11 @@ describe("DELETE /api/lobbies/[id]", () => {
       reason: "LOBBY_CLOSED",
       removedSpectatorUserIds: ["spectator-1", "spectator-2"],
     });
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      ["spectator-1", "spectator-2"],
+    );
     expect(notifyUserMock).toHaveBeenCalledWith(
       "spectator-1",
       {

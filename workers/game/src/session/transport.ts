@@ -22,6 +22,9 @@ export const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
 export const MAX_SPECTATOR_SOCKETS = 20;
 export const SPECTATOR_CAPACITY_CLOSE_CODE = 1013;
 export const SPECTATOR_CAPACITY_CLOSE_REASON = "spectator capacity reached";
+export const SPECTATOR_REVOKED_CLOSE_CODE = 1008;
+export const SPECTATOR_REVOKED_CLOSE_REASON = "spectator access revoked";
+export const SPECTATOR_LEASE_EXPIRED_CLOSE_REASON = "spectator token expired";
 const SPECTATOR_CAPACITY_REJECTED_TAG = "spectator-capacity-rejected";
 export const DISCONNECT_BROADCAST_DEBOUNCE_MS = 500;
 
@@ -57,6 +60,7 @@ export interface SpectatorSocketAttachment {
   userId: string;
   connectionId: string;
   acceptedAt: number;
+  expiresAt?: number;
   messageBudget?: TokenBucket;
 }
 
@@ -109,7 +113,11 @@ export class SessionTransport {
     this.closeStaleSockets(playerIndex, ws);
   }
 
-  acceptSpectator(userId: string, ws: WebSocket): boolean {
+  acceptSpectator(
+    userId: string,
+    ws: WebSocket,
+    expiresAt = Number.MAX_SAFE_INTEGER
+  ): boolean {
     const existing = this.spectatorSocket(userId);
     const spectatorCount = this.spectatorCount();
     if (existing === null && spectatorCount >= MAX_SPECTATOR_SOCKETS) {
@@ -137,6 +145,7 @@ export class SessionTransport {
       userId,
       connectionId: `${acceptedAt}-${this.nextWebSocketSequence++}`,
       acceptedAt,
+      expiresAt,
       messageBudget: {
         tokens: SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
         updatedAt: acceptedAt,
@@ -144,6 +153,38 @@ export class SessionTransport {
     } satisfies SpectatorSocketAttachment);
     this.closeStaleSpectatorSockets(userId, ws);
     return true;
+  }
+
+  revokeSpectators(userIds: readonly string[]): number {
+    let closed = 0;
+    for (const userId of new Set(userIds)) {
+      for (const ws of this.state.getWebSockets(`spectator:${userId}`)) {
+        if (this.closeSpectator(ws, SPECTATOR_REVOKED_CLOSE_REASON)) closed++;
+      }
+    }
+    return closed;
+  }
+
+  closeExpiredSpectators(now = this.now()): number {
+    let closed = 0;
+    for (const ws of this.state.getWebSockets()) {
+      const attachment = getSpectatorSocketAttachment(ws);
+      if (!attachment) continue;
+      if (attachment.expiresAt !== undefined && attachment.expiresAt > now)
+        continue;
+      if (this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON)) closed++;
+    }
+    return closed;
+  }
+
+  nextSpectatorExpiry(now = this.now()): number | null {
+    let next: number | null = null;
+    for (const ws of this.state.getWebSockets()) {
+      const expiresAt = getSpectatorSocketAttachment(ws)?.expiresAt;
+      if (expiresAt === undefined || expiresAt <= now) continue;
+      next = next === null ? expiresAt : Math.min(next, expiresAt);
+    }
+    return next;
   }
 
   playerIndexFor(ws: WebSocket): 0 | 1 | null {
@@ -298,6 +339,7 @@ export class SessionTransport {
       if (ws === exclude) continue;
       const spectatorId = this.spectatorIdFor(ws);
       if (spectatorId === null) continue;
+      if (!this.spectatorLeaseAllowsSend(ws)) continue;
       if (this.spectatorSocket(spectatorId) !== ws) continue;
 
       if (spectatorPayload.status === "unbuilt") {
@@ -454,12 +496,33 @@ export class SessionTransport {
     if (playerIndex === null) {
       return (
         this.spectatorIdFor(ws) !== null &&
+        this.spectatorLeaseAllowsSend(ws) &&
         SPECTATOR_VISIBLE_SERVER_MESSAGES[messageType].broadcast
       );
     }
     const attachment = getPlayerSocketAttachment(ws);
     if (!attachment || attachment.playerIndex !== playerIndex) return false;
     return this.isAuthoritative(ws, playerIndex);
+  }
+
+  private spectatorLeaseAllowsSend(ws: WebSocket): boolean {
+    const attachment = getSpectatorSocketAttachment(ws);
+    if (!attachment || attachment.expiresAt === undefined) {
+      this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON);
+      return false;
+    }
+    if (attachment.expiresAt > this.now()) return true;
+    this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON);
+    return false;
+  }
+
+  private closeSpectator(ws: WebSocket, reason: string): boolean {
+    try {
+      ws.close(SPECTATOR_REVOKED_CLOSE_CODE, reason);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private sendPayload(ws: WebSocket, payload: string): void {
@@ -502,6 +565,9 @@ export function isSpectatorSocketAttachment(
     typeof value.connectionId === "string" &&
     "acceptedAt" in value &&
     typeof value.acceptedAt === "number" &&
+    (!("expiresAt" in value) ||
+      (typeof value.expiresAt === "number" &&
+        Number.isFinite(value.expiresAt))) &&
     (!("messageBudget" in value) || isTokenBucket(value.messageBudget))
   );
 }

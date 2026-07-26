@@ -52,6 +52,7 @@ import {
   getClientMessageByteLength,
 } from "./session/rate-limiter.js";
 import { SpectatorPolicy } from "./session/spectator-policy.js";
+import { handleSpectatorRevocationRequest } from "./session/spectator-revocation.js";
 import {
   type FilteredStateMessage,
   type FilteredStateRecipient,
@@ -60,23 +61,13 @@ import {
   SessionTransport,
 } from "./session/transport.js";
 
-export {
-  ACTION_RATE_LIMIT_BURST,
-  ACTION_RATE_LIMIT_CLOSE_REASON,
-  ACTION_RATE_LIMIT_REFILL_PER_SECOND,
-  INVALID_MESSAGE_RATE_LIMIT_BURST,
-  INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON,
-  INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND,
-  MAX_CLIENT_MESSAGE_BYTES,
-  RATE_LIMIT_CLOSE_CODE,
-  SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
-  SPECTATOR_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND,
-  UPGRADE_RATE_LIMIT_BURST,
-  UPGRADE_RATE_LIMIT_REFILL_PER_SECOND,
-  UPGRADE_RATE_LIMIT_RESPONSE_BODY,
-  consumeTokenBucket,
-  getClientMessageByteLength,
-  getTokenBucketRetryAfterSeconds,
+export { ACTION_RATE_LIMIT_BURST, ACTION_RATE_LIMIT_CLOSE_REASON,
+  ACTION_RATE_LIMIT_REFILL_PER_SECOND, INVALID_MESSAGE_RATE_LIMIT_BURST,
+  INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON, INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND,
+  MAX_CLIENT_MESSAGE_BYTES, RATE_LIMIT_CLOSE_CODE, SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
+  SPECTATOR_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND, UPGRADE_RATE_LIMIT_BURST,
+  UPGRADE_RATE_LIMIT_REFILL_PER_SECOND, UPGRADE_RATE_LIMIT_RESPONSE_BODY,
+  consumeTokenBucket, getClientMessageByteLength, getTokenBucketRetryAfterSeconds,
 } from "./session/rate-limiter.js";
 export { DISCONNECT_BROADCAST_DEBOUNCE_MS } from "./session/transport.js";
 export {
@@ -135,6 +126,13 @@ export class GameSession implements DurableObject {
     // POST /notify-end — DB already updated (e.g. API fallback concede); sync DO + notify clients
     if (request.method === "POST" && url.pathname.endsWith("/notify-end")) {
       return this.handleNotifyEnd(request);
+    }
+    if (request.method === "POST" && url.pathname.endsWith("/revoke-spectators")) {
+      return handleSpectatorRevocationRequest(
+        request, this.env.GAME_WORKER_SECRET,
+        this.state.storage, this.transport,
+        () => this.syncAlarm()
+      );
     }
     if (request.method === "GET" && url.pathname.endsWith("/status")) {
       return handleGameStatusRequest(
@@ -314,12 +312,16 @@ export class GameSession implements DurableObject {
     if (!token) {
       return new Response("Missing token", { status: 401 });
     }
-    // Fail closed pending acceptance of spectator frame byte limiting and
-    // hibernation-persistent connection/message budget proofs.
-    // OPT-552/557 must also land before spectator payload delivery.
     const identity = await this.validateToken(token);
-    if (identity === null || identity.role === "spectator") {
+    if (identity === null) {
       return new Response("Unauthorized", { status: 401 });
+    }
+    if (identity.role === "spectator") {
+      // Keep admission closed while wiring expiry into the eventual path.
+      const response = await this.spectatorPolicy.handleUpgrade(identity.userId,
+        identity.expiresAt, false);
+      await this.syncAlarm();
+      return response;
     }
     const { playerIndex } = identity;
 
@@ -557,9 +559,10 @@ export class GameSession implements DurableObject {
 
   async alarm(): Promise<void> {
     if (!this.gameState) await this.loadFromStorage();
-    if (!this.gameState || this.gameState.status !== "IN_PROGRESS") return;
-
     const now = Date.now();
+    this.transport.closeExpiredSpectators(now);
+    if (!this.gameState || this.gameState.status !== "IN_PROGRESS")
+      return this.syncAlarm();
     const expiredPlayers = ([0, 1] as const).filter((playerIndex) => {
       const player = this.gameState!.players[playerIndex];
       return (
@@ -989,6 +992,7 @@ export class GameSession implements DurableObject {
 
   private async syncAlarm(): Promise<void> {
     if (!this.gameState) return;
-    await this.repository.syncAlarm(this.gameState);
+    await this.repository.syncAlarm(this.gameState,
+      this.transport.nextSpectatorExpiry());
   }
 }

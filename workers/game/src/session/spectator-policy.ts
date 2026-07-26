@@ -36,7 +36,12 @@ export class SpectatorPolicy {
     private readonly gameId: () => string | undefined
   ) {}
 
-  async handleUpgrade(userId: string): Promise<Response> {
+  async handleUpgrade(
+    userId: string,
+    expiresAt: number,
+    admissionEnabled = true
+  ): Promise<Response> {
+    if (!admissionEnabled) return new Response("Unauthorized", { status: 401 });
     const budget = await this.consumeUpgrade(userId);
     if (!budget.allowed) {
       return new Response(SPECTATOR_UPGRADE_RATE_LIMIT_RESPONSE_BODY, {
@@ -46,7 +51,7 @@ export class SpectatorPolicy {
     }
 
     const { 0: client, 1: server } = new WebSocketPair();
-    this.transport.acceptSpectator(userId, server);
+    this.transport.acceptSpectator(userId, server, expiresAt);
     // OPT-558 owns the connect snapshot and spectator lifecycle. Until then,
     // admission sends no initial payload.
     return new Response(null, { status: 101, webSocket: client });

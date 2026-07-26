@@ -295,6 +295,46 @@ export function validateNotifyEndPayload(raw: unknown): NotifyEndPayload {
   return { winnerIndex: obj.winnerIndex, reason: obj.reason };
 }
 
+// Cloudflare WebSocket tags are limited to 256 bytes. Reserve the ten bytes in
+// the `spectator:` prefix before a user ID reaches getWebSockets(tag).
+export const MAX_SPECTATOR_USER_ID_BYTES = 246;
+
+export function validateRevokeSpectatorsPayload(raw: unknown): {
+  lobbyId: string;
+  revision: number;
+  userIds: string[];
+} {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("Body must be an object");
+  }
+  const body = raw as Record<string, unknown>;
+  const revision = body.revision;
+  const userIds = body.userIds;
+  if (
+    typeof body.lobbyId !== "string" ||
+    body.lobbyId.length === 0 ||
+    !Number.isSafeInteger(revision) ||
+    (revision as number) < 0 ||
+    !Array.isArray(userIds) ||
+    userIds.length === 0 ||
+    userIds.length > 20 ||
+    !userIds.every(
+      (userId) =>
+        typeof userId === "string" &&
+        userId.length > 0 &&
+        new TextEncoder().encode(userId).byteLength <=
+          MAX_SPECTATOR_USER_ID_BYTES
+    )
+  ) {
+    throw new Error("Invalid spectator revocation payload");
+  }
+  return {
+    lobbyId: body.lobbyId,
+    revision: revision as number,
+    userIds: Array.from(new Set(userIds)),
+  };
+}
+
 // ─── ClientMessage ───────────────────────────────────────────────────────────
 
 export function validateClientMessage(raw: unknown): ClientMessage {

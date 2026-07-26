@@ -237,6 +237,8 @@ describe("OPT-479 GameSession collaborator contracts", () => {
     };
     await repository.syncAlarm(alarmState);
     expect(storage.alarms).toEqual([1_500]);
+    await repository.syncAlarm(alarmState, 1_250);
+    expect(storage.alarms).toEqual([1_500, 1_250]);
 
     await repository.syncAlarm({
       ...alarmState,

@@ -127,3 +127,38 @@ describe("GET /game/:gameId/status", () => {
     expect(stubFetch).toHaveBeenCalledOnce();
   });
 });
+
+describe("POST /game/:gameId/revoke-spectators", () => {
+  it("enforces method and bearer auth before routing to the game DO", async () => {
+    const stubFetch = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+    const env = {
+      GAME_WORKER_SECRET: "test-secret",
+      GAME_SESSION: {
+        idFromName: vi.fn().mockReturnValue("durable-id"),
+        get: vi.fn().mockReturnValue({ fetch: stubFetch }),
+      },
+    } as unknown as Env;
+    const url = "https://worker.example/game/game-1/revoke-spectators";
+
+    expect(
+      (await worker.fetch(new Request(url, {
+        method: "POST",
+        headers: { Authorization: "Bearer wrong" },
+      }), env)).status
+    ).toBe(401);
+    expect(
+      (await worker.fetch(new Request(url, {
+        method: "GET",
+        headers: { Authorization: "Bearer test-secret" },
+      }), env)).status
+    ).toBe(405);
+    expect(stubFetch).not.toHaveBeenCalled();
+
+    const response = await worker.fetch(new Request(url, {
+      method: "POST",
+      headers: { Authorization: "Bearer test-secret" },
+    }), env);
+    expect(response.status).toBe(200);
+    expect(stubFetch).toHaveBeenCalledOnce();
+  });
+});

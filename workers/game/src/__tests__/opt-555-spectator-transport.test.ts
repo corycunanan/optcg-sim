@@ -6,6 +6,9 @@ import {
   SessionTransport,
   SPECTATOR_CAPACITY_CLOSE_CODE,
   SPECTATOR_CAPACITY_CLOSE_REASON,
+  SPECTATOR_LEASE_EXPIRED_CLOSE_REASON,
+  SPECTATOR_REVOKED_CLOSE_CODE,
+  SPECTATOR_REVOKED_CLOSE_REASON,
   isPlayerSocketAttachment,
   isSpectatorSocketAttachment,
 } from "../session/transport.js";
@@ -352,6 +355,110 @@ describe("OPT-555 spectator transport", () => {
       "ws.spectator_capacity_rejected",
       expect.anything()
     );
+  });
+
+  it("closes only targeted spectator sockets when the client does nothing", () => {
+    const sessionTransport = transport();
+    const player = new MockWebSocket();
+    const removed = new MockWebSocket();
+    const retained = new MockWebSocket();
+    sessionTransport.accept(0, player as unknown as WebSocket);
+    sessionTransport.acceptSpectator(
+      "removed-user",
+      removed as unknown as WebSocket
+    );
+    sessionTransport.acceptSpectator(
+      "retained-user",
+      retained as unknown as WebSocket
+    );
+
+    expect(
+      sessionTransport.revokeSpectators(["removed-user", "removed-user"])
+    ).toBe(1);
+    expect(removed.closed).toEqual([
+      {
+        code: SPECTATOR_REVOKED_CLOSE_CODE,
+        reason: SPECTATOR_REVOKED_CLOSE_REASON,
+      },
+    ]);
+    expect(retained.closed).toEqual([]);
+    expect(player.closed).toEqual([]);
+  });
+
+  it("blocks delivery at exp and closes an uncooperative spectator", () => {
+    let now = 1_000;
+    const sessionTransport = transport(new MockSocketState(), () => now);
+    const spectator = new MockWebSocket();
+    sessionTransport.acceptSpectator(
+      "spectator-user",
+      spectator as unknown as WebSocket,
+      2_000
+    );
+    expect(sessionTransport.nextSpectatorExpiry()).toBe(2_000);
+
+    now = 2_000;
+    sessionTransport.broadcast({
+      type: "game:player_reconnected",
+      playerIndex: 0,
+    });
+
+    expect(spectator.sent).toEqual([]);
+    expect(spectator.closed).toEqual([
+      {
+        code: SPECTATOR_REVOKED_CLOSE_CODE,
+        reason: SPECTATOR_LEASE_EXPIRED_CLOSE_REASON,
+      },
+    ]);
+    expect(sessionTransport.nextSpectatorExpiry()).toBeNull();
+  });
+
+  it("alarm enforcement closes only expired spectator leases", () => {
+    const sessionTransport = transport(new MockSocketState(), () => 2_000);
+    const expired = new MockWebSocket();
+    const active = new MockWebSocket();
+    const player = new MockWebSocket();
+    sessionTransport.accept(0, player as unknown as WebSocket);
+    sessionTransport.acceptSpectator(
+      "expired",
+      expired as unknown as WebSocket,
+      2_000
+    );
+    sessionTransport.acceptSpectator(
+      "active",
+      active as unknown as WebSocket,
+      2_001
+    );
+
+    expect(sessionTransport.closeExpiredSpectators()).toBe(1);
+    expect(expired.closed).toEqual([
+      { code: 1008, reason: SPECTATOR_LEASE_EXPIRED_CLOSE_REASON },
+    ]);
+    expect(active.closed).toEqual([]);
+    expect(player.closed).toEqual([]);
+  });
+
+  it("fails closed for a hibernated spectator attachment without a lease", () => {
+    const state = new MockSocketState();
+    const spectator = new MockWebSocket({
+      type: "game-session-spectator-socket",
+      userId: "legacy-user",
+      connectionId: "legacy-1",
+      acceptedAt: 1_000,
+    });
+    state.acceptWebSocket(spectator as unknown as WebSocket, [
+      "spectator:legacy-user",
+    ]);
+    const sessionTransport = transport(state, () => 2_000);
+
+    sessionTransport.broadcast({
+      type: "game:player_reconnected",
+      playerIndex: 0,
+    });
+
+    expect(spectator.sent).toEqual([]);
+    expect(spectator.closed).toEqual([
+      { code: 1008, reason: SPECTATOR_LEASE_EXPIRED_CLOSE_REASON },
+    ]);
   });
 });
 
