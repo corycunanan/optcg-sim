@@ -24,6 +24,11 @@ export type NotifyEndPayload = {
   reason: string;
 };
 
+export function readDiscriminant(value: unknown, key: "type"): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return Reflect.get(value, key);
+}
+
 // ─── GameInitPayload ─────────────────────────────────────────────────────────
 
 function isString(v: unknown): v is string {
