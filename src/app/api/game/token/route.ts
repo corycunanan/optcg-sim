@@ -26,7 +26,7 @@ const GAME_WORKER_SECRET = process.env.GAME_WORKER_SECRET ?? "";
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
-  const { userId } = authResult;
+  const { session, userId } = authResult;
   const gameId = request.nextUrl.searchParams.get("gameId");
   const playerIndexParam = request.nextUrl.searchParams.get("playerIndex");
 
@@ -84,9 +84,14 @@ export async function GET(request: NextRequest) {
   }
 
   if (!isPlayer) {
+    const spectatorDisplayName =
+      session.user.username?.trim() ||
+      session.user.name?.trim() ||
+      "Spectator";
     const token = await mintGameToken(userId, GAME_WORKER_SECRET, {
       gameId: game.id,
       role: "spectator",
+      spectatorDisplayName,
     });
     return apiSuccess({ token });
   }

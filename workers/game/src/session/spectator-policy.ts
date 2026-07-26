@@ -39,7 +39,9 @@ export class SpectatorPolicy {
   async handleUpgrade(
     userId: string,
     expiresAt: number,
-    admissionEnabled = true
+    displayName: string,
+    admissionEnabled = false,
+    onAccepted?: (ws: WebSocket) => void
   ): Promise<Response> {
     if (!admissionEnabled) return new Response("Unauthorized", { status: 401 });
     const budget = await this.consumeUpgrade(userId);
@@ -51,9 +53,13 @@ export class SpectatorPolicy {
     }
 
     const { 0: client, 1: server } = new WebSocketPair();
-    this.transport.acceptSpectator(userId, server, expiresAt);
-    // OPT-558 owns the connect snapshot and spectator lifecycle. Until then,
-    // admission sends no initial payload.
+    const accepted = this.transport.acceptSpectator(
+      userId,
+      server,
+      expiresAt,
+      displayName
+    );
+    if (accepted) onAccepted?.(server);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -144,7 +150,12 @@ export class SpectatorPolicy {
       userId: attachment.userId,
       connectionId: attachment.connectionId,
     });
-    this.close(ws, SPECTATOR_MESSAGE_RATE_LIMIT_CLOSE_REASON);
+    this.transport.closeSpectatorForCause(
+      ws,
+      "RATE_LIMITED",
+      RATE_LIMIT_CLOSE_CODE,
+      SPECTATOR_MESSAGE_RATE_LIMIT_CLOSE_REASON
+    );
   }
 
   private rejectInvalidIdentity(
@@ -157,15 +168,12 @@ export class SpectatorPolicy {
       attachmentUserId,
       taggedUserId,
     });
-    this.close(ws, SPECTATOR_INVALID_SOCKET_CLOSE_REASON);
-  }
-
-  private close(ws: WebSocket, reason: string): void {
-    try {
-      ws.close(RATE_LIMIT_CLOSE_CODE, reason);
-    } catch {
-      // Already closed.
-    }
+    this.transport.closeSpectatorForCause(
+      ws,
+      "INVALID_IDENTITY",
+      RATE_LIMIT_CLOSE_CODE,
+      SPECTATOR_INVALID_SOCKET_CLOSE_REASON
+    );
   }
 }
 

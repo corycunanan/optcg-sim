@@ -301,6 +301,10 @@ export class SessionRepository {
     state: GameState,
     spectatorDeadline: number | null = null
   ): Promise<void> {
+    if (state.status !== "IN_PROGRESS") {
+      await this.storage.deleteAlarm();
+      return;
+    }
     const nextDeadline = state.players.reduce<number | null>(
       (current, player) => {
         if (player.connected || player.rejoinDeadlineAt === null)

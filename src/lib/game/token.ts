@@ -5,6 +5,7 @@ export type GameTokenOptions = {
   jti?: string;
   playerIndex?: 0 | 1;
   role?: "spectator";
+  spectatorDisplayName?: string;
 };
 
 /**
@@ -24,6 +25,16 @@ export async function mintGameToken(
   if (options.role === "spectator" && options.playerIndex !== undefined) {
     throw new Error("Spectator game tokens cannot include playerIndex");
   }
+  if (
+    options.spectatorDisplayName !== undefined &&
+    options.role !== "spectator"
+  ) {
+    throw new Error("Only spectator game tokens can include a display name");
+  }
+  const spectatorName =
+    options.role === "spectator"
+      ? normalizeSpectatorDisplayName(options.spectatorDisplayName)
+      : undefined;
 
   const now = options.now ?? Math.floor(Date.now() / 1000);
   const jti = options.jti ?? crypto.randomUUID();
@@ -36,6 +47,7 @@ export async function mintGameToken(
     ...(options.gameId ? { gameId: options.gameId } : {}),
     ...(options.playerIndex !== undefined ? { playerIndex: options.playerIndex } : {}),
     ...(options.role ? { role: options.role } : {}),
+    ...(spectatorName ? { spectatorName } : {}),
   }));
 
   const signingInput = `${header}.${payload}`;
@@ -48,6 +60,11 @@ export async function mintGameToken(
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signingInput));
   return `${signingInput}.${b64url(Buffer.from(sig).toString("base64"))}`;
+}
+
+function normalizeSpectatorDisplayName(value: string | undefined): string {
+  const normalized = value?.trim();
+  return normalized ? normalized.slice(0, 80) : "Spectator";
 }
 
 function b64url(input: string): string {

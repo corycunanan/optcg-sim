@@ -103,6 +103,7 @@ type TokenClaims = {
   exp?: number;
   playerIndex?: 0 | 1;
   role?: string;
+  spectatorName?: string;
 };
 
 async function mintToken(
@@ -159,13 +160,14 @@ describe("OPT-554 spectator session authorization", () => {
     const authorizer = new SessionAuthorizer(storage, "test-secret");
     const { state } = setupGame();
     const exp = Math.floor(Date.now() / 1000) + 300;
-    const token = await mintToken(state, { exp });
+    const token = await mintToken(state, { exp, spectatorName: "Nico Robin" });
 
     await expect(
       authorizer.validate(token, { state, mode: "PVP" })
     ).resolves.toEqual({
       role: "spectator",
       userId: "spectator-user",
+      displayName: "Nico Robin",
       expiresAt: exp * 1000,
     });
     await expect(
@@ -175,6 +177,23 @@ describe("OPT-554 spectator session authorization", () => {
       reason: "spectator_token_replay",
       gameId: state.id,
       userId: "spectator-user",
+    });
+  });
+
+  it("renders legacy spectator tokens without a name as Spectator", async () => {
+    const storage = new MemoryStorage();
+    const authorizer = new SessionAuthorizer(storage, "test-secret");
+    const { state } = setupGame();
+    const exp = Math.floor(Date.now() / 1000) + 300;
+    const token = await mintToken(state, { exp, jti: "legacy-name-jti" });
+
+    await expect(
+      authorizer.validate(token, { state, mode: "PVP" })
+    ).resolves.toEqual({
+      role: "spectator",
+      userId: "spectator-user",
+      displayName: "Spectator",
+      expiresAt: exp * 1000,
     });
   });
 
@@ -489,6 +508,7 @@ describe("OPT-554 spectator session authorization", () => {
     const spectator: SessionParticipantIdentity = {
       role: "spectator",
       userId: "spectator-user",
+      displayName: "Spectator",
       expiresAt: 1,
     };
 
