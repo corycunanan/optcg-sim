@@ -270,7 +270,7 @@ describe("OPT-549 spectator per-viewer merge", () => {
     const divergentFields = PLAYER_VIEW_REWRITTEN_FIELDS.filter(
       (field) =>
         JSON.stringify(playerZeroView[field]) !==
-        JSON.stringify(playerOneView[field]),
+        JSON.stringify(playerOneView[field])
     );
     expect(divergentFields).toEqual([
       "players",
@@ -279,21 +279,48 @@ describe("OPT-549 spectator per-viewer merge", () => {
       "pendingPrompt",
     ]);
 
-    expect(spectator.pendingPrompt).toEqual(playerOneView.pendingPrompt);
+    expect(spectator.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    if (spectator.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      expect(
+        spectator.pendingPrompt.options.cards.every(
+          (card) => card.cardId === "hidden"
+        )
+      ).toBe(true);
+    }
     expect(spectator.pendingPrompt?.resumeContext).toBeNull();
     expect(spectator.promptRespondingPlayer).toBe(1);
 
-    expect(spectator.eventLog).toEqual(source.eventLog);
     expect(spectator.eventLog).toHaveLength(source.eventLog.length);
-    expect(spectator.eventLog.map((event) => event.type))
-      .toEqual(source.eventLog.map((event) => event.type));
+    expect(spectator.eventLog.map((event) => event.type)).toEqual(
+      source.eventLog.map((event) => event.type)
+    );
+    for (const secret of [
+      "DRAW-SECRET",
+      "draw-instance",
+      "HAND-SECRET",
+      "hand-instance",
+      "new-hand-instance",
+      "LIFE-HAND-SECRET",
+      "life-hand-instance",
+      "TRIGGER-SECRET",
+      "DECK-SECRET",
+      "deck-instance",
+      "new-deck-instance",
+      "REVEAL-SECRET",
+      "reveal-instance",
+      "SCRY-SECRET",
+      "scry-instance",
+      "life-2",
+      "life-1",
+      "removed-life-instance",
+      "new-removed-life-instance",
+    ]) {
+      expect(JSON.stringify(spectator.eventLog)).not.toContain(secret);
+    }
 
-    expect(spectator.turn.battle?.pendingTriggerLifeCard)
-      .toEqual(source.turn.battle?.pendingTriggerLifeCard);
-    expect(spectator.turn.pendingTriggerFromEffect)
-      .toEqual(source.turn.pendingTriggerFromEffect);
-    expect(spectator.turn.pendingBattleDamageContinuation)
-      .toEqual(source.turn.pendingBattleDamageContinuation);
+    expect(spectator.turn.battle?.pendingTriggerLifeCard).toBeUndefined();
+    expect(spectator.turn.pendingTriggerFromEffect).toBeNull();
+    expect(spectator.turn.pendingBattleDamageContinuation).toBeNull();
   });
 
   it("preserves blind-selection redaction in the unioned prompt", () => {

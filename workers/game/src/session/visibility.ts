@@ -11,7 +11,11 @@ import {
   filterStateForPlayer,
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
-import { GAME_EVENT_VISIBILITY } from "../engine/visibility.js";
+import {
+  filterEventForRecipient,
+  filterPromptForRecipient,
+  GAME_EVENT_VISIBILITY,
+} from "../engine/visibility.js";
 
 function assertSameSpectatorField(
   field: string,
@@ -27,32 +31,6 @@ function assertSameSpectatorField(
   }
 }
 
-type RedactedGameEventType = {
-  [Type in keyof typeof GAME_EVENT_VISIBILITY]:
-    (typeof GAME_EVENT_VISIBILITY)[Type] extends { redactor: string }
-      ? Type
-      : never;
-}[keyof typeof GAME_EVENT_VISIBILITY];
-
-/**
- * Spectators union every identity that either player was allowed to see.
- *
- * This is intentionally exhaustive over GAME_EVENT_VISIBILITY policies with a
- * redactor. A new redacted event type fails type-check until its spectator
- * union rule is documented here.
- */
-const SPECTATOR_REDACTED_EVENT_RULES = {
-  CARD_DRAWN: "Union the owner's drawn-card identity.",
-  CARD_RETURNED_TO_HAND: "Union the owner's returned-card identity.",
-  CARD_ADDED_TO_HAND_FROM_LIFE: "Union the owner's revealed Life identity.",
-  TRIGGER_ACTIVATED: "Union the offered Trigger identity seen by its owner.",
-  CARD_RETURNED_TO_DECK: "Union the owner's returned-card identity.",
-  CARDS_REVEALED: "Union controller-only peek identities.",
-  LIFE_SCRIED: "Union the owner's Life peek identities.",
-  LIFE_REORDERED: "Union the owner's revealed Life ordering.",
-  CARD_REMOVED_FROM_LIFE: "Union the owner's removed-Life identity.",
-} satisfies Record<RedactedGameEventType, string>;
-
 /**
  * Every top-level field rewritten by filterStateForPlayer has a spectator rule.
  * This list is independently checked against PLAYER_VIEW_REWRITTEN_FIELDS by
@@ -61,9 +39,9 @@ const SPECTATOR_REDACTED_EVENT_RULES = {
 export const SPECTATOR_PLAYER_VIEW_FIELDS = [
   "executionContext", // Both views contain the same redacted context; assert.
   "players", // Owner-view union, followed by deck/face-down-Life intersection.
-  "turn", // Union three revealed continuations; assert every other turn field.
-  "eventLog", // Pairwise identity union; never concatenate.
-  "pendingPrompt", // Union the single responder's filtered prompt.
+  "turn", // Assert both views, then omit private in-flight Trigger identities.
+  "eventLog", // Validate player views, then apply observer event semantics.
+  "pendingPrompt", // Apply observer semantics to the authoritative prompt.
   "promptRespondingPlayer", // Derived from authoritative prompt; assert equal.
   "effectStack", // Engine-only and empty in both views.
 ] as const satisfies readonly (keyof GameState)[];
@@ -92,21 +70,8 @@ function assertNoUnhandledPlayerViewDivergence(
   }
 }
 
-function hiddenIdentityCount(value: unknown): number {
-  if (value === "hidden") return 1;
-  if (Array.isArray(value)) {
-    return value.reduce((count, item) => count + hiddenIdentityCount(item), 0);
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.values(value).reduce(
-      (count, item) => count + hiddenIdentityCount(item),
-      0,
-    );
-  }
-  return 0;
-}
-
 function mergeSpectatorEventLog(
+  authoritativeEvents: readonly GameEvent[],
   playerZeroEvents: readonly GameEvent[],
   playerOneEvents: readonly GameEvent[],
 ): GameEvent[] {
@@ -116,15 +81,8 @@ function mergeSpectatorEventLog(
     );
   }
 
-  // Whole-event side selection is correct only while every redacted event
-  // carries identities visible to at most one player: current policies produce
-  // either identical views or one fully revealed and one fully redacted view.
-  // If a future event contains private identities belonging to both players,
-  // choosing one side silently under-reveals and this must become a field-level
-  // union. The "ambiguous redaction" error below catches only the subset where
-  // both views hide equal identity counts. Unequal two-sided redaction is not
-  // detected and will under-reveal; whole-side selection is the known limit.
   return playerZeroEvents.map((playerZeroEvent, index) => {
+    const authoritativeEvent = authoritativeEvents[index];
     const playerOneEvent = playerOneEvents[index];
     if (
       playerZeroEvent.type !== playerOneEvent.type ||
@@ -136,30 +94,52 @@ function mergeSpectatorEventLog(
       );
     }
 
-    if (isStructurallyEqual(playerZeroEvent, playerOneEvent)) {
-      return playerZeroEvent;
+    if (
+      authoritativeEvent &&
+      authoritativeEvent.type === playerZeroEvent.type &&
+      authoritativeEvent.playerIndex === playerZeroEvent.playerIndex &&
+      authoritativeEvent.timestamp === playerZeroEvent.timestamp
+    ) {
+      const expectedPlayerZeroEvent = filterEventForRecipient(
+        authoritativeEvent,
+        { kind: "PLAYER", playerIndex: 0 },
+      );
+      const expectedPlayerOneEvent = filterEventForRecipient(
+        authoritativeEvent,
+        { kind: "PLAYER", playerIndex: 1 },
+      );
+      if (!isStructurallyEqual(playerZeroEvent, expectedPlayerZeroEvent)) {
+        throw new Error(
+          `Spectator visibility invariant violated: eventLog[${index}] differs from player zero projection`,
+        );
+      }
+      if (!isStructurallyEqual(playerOneEvent, expectedPlayerOneEvent)) {
+        throw new Error(
+          `Spectator visibility invariant violated: eventLog[${index}] differs from player one projection`,
+        );
+      }
+      return filterEventForRecipient(authoritativeEvent, { kind: "OBSERVER" });
     }
 
-    if (!(playerZeroEvent.type in SPECTATOR_REDACTED_EVENT_RULES)) {
+    if (isStructurallyEqual(playerZeroEvent, playerOneEvent)) {
+      return filterEventForRecipient(playerZeroEvent, { kind: "OBSERVER" });
+    }
+
+    const policy = GAME_EVENT_VISIBILITY[playerZeroEvent.type];
+    if (!policy || !("redactor" in policy)) {
       throw new Error(
         `Spectator visibility invariant violated: public eventLog[${index}] differs between player views`,
       );
     }
 
-    const playerZeroHiddenCount = hiddenIdentityCount(playerZeroEvent);
-    const playerOneHiddenCount = hiddenIdentityCount(playerOneEvent);
-    if (playerZeroHiddenCount === playerOneHiddenCount) {
-      throw new Error(
-        `Spectator visibility invariant violated: eventLog[${index}] has ambiguous redaction`,
-      );
-    }
-    return playerZeroHiddenCount < playerOneHiddenCount
-      ? playerZeroEvent
-      : playerOneEvent;
+    throw new Error(
+      `Spectator visibility invariant violated: eventLog[${index}] has ambiguous redaction`,
+    );
   });
 }
 
 function mergeSpectatorPrompt(
+  authoritativePrompt: PendingPromptState | null,
   playerZeroPrompt: PendingPromptState | null,
   playerOnePrompt: PendingPromptState | null,
 ): PendingPromptState | null {
@@ -170,7 +150,7 @@ function mergeSpectatorPrompt(
       "Spectator visibility invariant violated: both player views contain pendingPrompt",
     );
   }
-  return playerZeroPrompt ?? playerOnePrompt;
+  return filterPromptForRecipient(authoritativePrompt, { kind: "OBSERVER" });
 }
 
 function unionViewerField<Value>(
@@ -208,17 +188,14 @@ function mergeSpectatorBattle(
     playerOnePublicBattle,
   );
 
-  // Face-down Life identities unseen by either player remain hidden under the
-  // intersection rule. This card has already been revealed to its owner, so it
-  // is a peek and union-visible rather than an unrevealed face-down Life card.
-  const pendingTriggerLifeCard = unionViewerField(
+  // Validate the player projections, but do not union a private Trigger-Life
+  // identity into the observer projection before activation makes it public.
+  unionViewerField(
     "turn.battle.pendingTriggerLifeCard",
     playerZeroPendingTrigger,
     playerOnePendingTrigger,
   );
-  return pendingTriggerLifeCard
-    ? { ...playerZeroPublicBattle, pendingTriggerLifeCard }
-    : playerZeroPublicBattle;
+  return playerZeroPublicBattle;
 }
 
 function mergeSpectatorTurn(
@@ -248,19 +225,22 @@ function mergeSpectatorTurn(
     playerOneInvariantTurn,
   );
 
+  unionViewerField(
+    "turn.pendingTriggerFromEffect",
+    playerZeroPendingTriggerFromEffect,
+    playerOnePendingTriggerFromEffect,
+  );
+  unionViewerField(
+    "turn.pendingBattleDamageContinuation",
+    playerZeroPendingBattleDamageContinuation,
+    playerOnePendingBattleDamageContinuation,
+  );
+
   return {
     ...playerZeroInvariantTurn,
     battle: mergeSpectatorBattle(playerZeroBattle, playerOneBattle),
-    pendingTriggerFromEffect: unionViewerField(
-      "turn.pendingTriggerFromEffect",
-      playerZeroPendingTriggerFromEffect,
-      playerOnePendingTriggerFromEffect,
-    ),
-    pendingBattleDamageContinuation: unionViewerField(
-      "turn.pendingBattleDamageContinuation",
-      playerZeroPendingBattleDamageContinuation,
-      playerOnePendingBattleDamageContinuation,
-    ),
+    pendingTriggerFromEffect: null,
+    pendingBattleDamageContinuation: null,
   };
 }
 
@@ -288,12 +268,10 @@ export function visibleStateForPlayer(
 }
 
 /**
- * Build the spectator state using union-for-revealed and
- * intersection-for-secret visibility. Each player's owner view supplies their
- * hand and other zones, but deck order and face-down Life are re-obfuscated for
- * BOTH players. Otherwise, a colluding spectator could relay each player's own
- * deck order or Life identities to their opponent. Consequently, spectator
- * clients must never assume a deck card has `cardId !== "hidden"`.
+ * Build the spectator state from both player projections, then apply explicit
+ * observer semantics to private prompts, events, and in-flight Trigger state.
+ * Deck order and face-down Life are re-obfuscated for BOTH players so a
+ * colluding spectator cannot relay either player's private ordering.
  *
  * OPT-550 decides spectator `effectAvailability` at
  * `GameSession.broadcastFilteredState`; this pure core deliberately does not
@@ -377,10 +355,12 @@ export function mergePlayerViewsForSpectator(
     playerOneView.turn,
   );
   const eventLog = mergeSpectatorEventLog(
+    stripped.eventLog,
     playerZeroView.eventLog,
     playerOneView.eventLog,
   );
   const pendingPrompt = mergeSpectatorPrompt(
+    stripped.pendingPrompt,
     playerZeroView.pendingPrompt,
     playerOneView.pendingPrompt,
   );

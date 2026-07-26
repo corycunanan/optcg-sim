@@ -218,15 +218,36 @@ describe("OPT-470 hidden-information visibility contract", () => {
     });
   });
 
-  it("classifies every prompt as responding-player-only", () => {
+  it("classifies every prompt for responders and observers", () => {
     expect(PROMPT_VISIBILITY).toEqual({
-      SELECT_BLOCKER: "RESPONDING_PLAYER",
-      REVEAL_TRIGGER: "RESPONDING_PLAYER",
-      ARRANGE_TOP_CARDS: "RESPONDING_PLAYER",
-      SELECT_TARGET: "RESPONDING_PLAYER",
-      REDISTRIBUTE_DON: "RESPONDING_PLAYER",
-      PLAYER_CHOICE: "RESPONDING_PLAYER",
-      OPTIONAL_EFFECT: "RESPONDING_PLAYER",
+      SELECT_BLOCKER: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "NONE",
+      },
+      REVEAL_TRIGGER: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "REDACT_CARDS",
+      },
+      ARRANGE_TOP_CARDS: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "REDACT_CARDS",
+      },
+      SELECT_TARGET: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "REDACT_CARDS",
+      },
+      REDISTRIBUTE_DON: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "NONE",
+      },
+      PLAYER_CHOICE: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "NONE",
+      },
+      OPTIONAL_EFFECT: {
+        audience: "RESPONDING_PLAYER",
+        observerIdentities: "REDACT_CARDS",
+      },
     });
   });
 

@@ -448,7 +448,7 @@ const INVARIANTS = [
   },
   {
     id: 6,
-    invariant: "6. private peek history persists while shuffled deck order stays hidden",
+    invariant: "6. private peek history persists with identities and order hidden",
     assert: (scenario: Scenario) => {
       if (!scenario.peek) return;
       const spectator = spectatorFor(scenario);
@@ -458,16 +458,17 @@ const INVARIANTS = [
           ? event.payload.cards
           : []
       );
-      const visibleCardIds = privatePeekCards.map((card) => card.cardId);
-      const visibleInstanceIds = privatePeekCards.map((card) => card.instanceId);
-      // Peek events are historical and legitimately persist for the peeker,
-      // and therefore for the spectator under union-for-revealed. A shuffle
-      // invalidates positional knowledge, not the fact that the peek occurred.
+      expect(privatePeekCards).toHaveLength(scenario.peek.cardIds.length);
+      expect(privatePeekCards.every((card) =>
+        card.cardId === "hidden" && card.instanceId === "hidden"
+      )).toBe(true);
+      // The observer retains the historical event and its public metadata, but
+      // never inherits the peeker's private identity entitlement.
       for (const identity of scenario.peek.cardIds) {
-        expect(visibleCardIds).toContain(identity);
+        expect(privatePeekCards.map((card) => card.cardId)).not.toContain(identity);
       }
       for (const identity of scenario.peek.instanceIds) {
-        expect(visibleInstanceIds).toContain(identity);
+        expect(privatePeekCards.map((card) => card.instanceId)).not.toContain(identity);
       }
       if (scenario.peek.kind === "post-shuffle") {
         for (const card of spectator.players[0].deck) {
