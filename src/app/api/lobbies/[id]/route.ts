@@ -24,7 +24,10 @@ import {
   notifySpectatorsRemoved,
 } from "@/lib/realtime/fanout-lobby";
 import { resolvePregameMode, type PregameMode } from "@shared/game-init";
-import { releaseActiveLobby } from "@/lib/lobbies/active-membership";
+import {
+  releaseActiveLobby,
+  releaseActiveLobbyMembers,
+} from "@/lib/lobbies/active-membership";
 import { lockLobbyMembership } from "@/lib/lobbies/membership-lock";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -292,14 +295,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       const spectators = await tx.lobbySpectator.findMany({
         where: { lobbyId: id },
         select: { userId: true },
+        orderBy: { userId: "asc" },
       });
-      removedSpectatorUserIds = spectators.map(({ userId }) => userId);
+      removedSpectatorUserIds = spectators
+        .map(({ userId }) => userId)
+        .sort((a, b) => a.localeCompare(b));
       await tx.lobbySpectator.deleteMany({ where: { lobbyId: id } });
-      await Promise.all(
-        removedSpectatorUserIds.map((spectatorUserId) =>
-          releaseActiveLobby(tx, spectatorUserId, id),
-        ),
-      );
+      for (const spectatorUserId of removedSpectatorUserIds) {
+        await releaseActiveLobby(tx, spectatorUserId, id);
+      }
     }
 
     if (switchingToSolitaire) {
@@ -425,7 +429,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: true,
           mode: true,
           status: true,
-          spectators: { select: { userId: true } },
+          spectators: {
+            select: { userId: true },
+            orderBy: { userId: "asc" },
+          },
         },
       });
 
@@ -448,9 +455,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
       // Capture the directed terminal-event audience before CLOSED clears
       // active membership. The post-mutation room audience is not authoritative.
-      const removedSpectatorUserIds = lobby.spectators.map(
-        ({ userId }) => userId,
-      );
+      const removedSpectatorUserIds = lobby.spectators
+        .map(({ userId }) => userId)
+        .sort((a, b) => a.localeCompare(b));
       const closed = await tx.lobby.updateMany({
         where: {
           id,
@@ -462,10 +469,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       });
 
       if (closed.count === 1) {
-        await tx.user.updateMany({
-          where: { activeLobbyId: id },
-          data: { activeLobbyId: null },
-        });
+        await releaseActiveLobbyMembers(tx, id);
         return { failure: null, removedSpectatorUserIds };
       }
       return {

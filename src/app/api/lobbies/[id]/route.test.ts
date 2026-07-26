@@ -13,6 +13,7 @@ const lobbyGuestUpsertMock = vi.fn();
 const lobbySpectatorFindManyMock = vi.fn();
 const lobbySpectatorDeleteManyMock = vi.fn();
 const userUpdateManyMock = vi.fn();
+const userFindManyMock = vi.fn();
 const deckFindFirstMock = vi.fn();
 const transactionMock = vi.fn();
 const queryRawMock = vi.fn();
@@ -163,7 +164,7 @@ function createTransactionClient() {
       findMany: lobbySpectatorFindManyMock,
       deleteMany: lobbySpectatorDeleteManyMock,
     },
-    user: { updateMany: userUpdateManyMock },
+    user: { findMany: userFindManyMock, updateMany: userUpdateManyMock },
   };
 }
 
@@ -180,6 +181,7 @@ beforeEach(() => {
   lobbySpectatorFindManyMock.mockReset();
   lobbySpectatorDeleteManyMock.mockReset();
   userUpdateManyMock.mockReset();
+  userFindManyMock.mockReset();
   deckFindFirstMock.mockReset();
   transactionMock.mockReset();
   queryRawMock.mockReset();
@@ -206,6 +208,7 @@ beforeEach(() => {
   lobbySpectatorFindManyMock.mockResolvedValue([]);
   lobbySpectatorDeleteManyMock.mockResolvedValue({ count: 0 });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindManyMock.mockResolvedValue([]);
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
   transactionMock.mockImplementation(async (operation) => {
     if (typeof operation !== "function") return [];
@@ -391,9 +394,11 @@ describe("PATCH /api/lobbies/[id]", () => {
 
   it("captures spectators before deletion, releases their claims, and ejects each one", async () => {
     const preMutationSpectatorUserIds = ["spectator-1", "spectator-2"];
-    let persistedSpectators = preMutationSpectatorUserIds.map((userId) => ({
+    let persistedSpectators = [...preMutationSpectatorUserIds]
+      .reverse()
+      .map((userId) => ({
       userId,
-    }));
+      }));
     lobbyFindUniqueMock.mockResolvedValueOnce(
       baseLobby({ allowSpectators: true }),
     );
@@ -433,6 +438,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     expect(lobbySpectatorFindManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1" },
       select: { userId: true },
+      orderBy: { userId: "asc" },
     });
     expect(lobbySpectatorDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "lobby-1" },
@@ -446,6 +452,12 @@ describe("PATCH /api/lobbies/[id]", () => {
       removedSpectatorUserIds: preMutationSpectatorUserIds,
     });
     expect(userUpdateManyMock).toHaveBeenCalledTimes(2);
+    expect(releaseActiveLobbyCallMock.mock.calls).toEqual(
+      preMutationSpectatorUserIds.map((spectatorUserId) => [
+        spectatorUserId,
+        "lobby-1",
+      ]),
+    );
     for (const spectatorUserId of preMutationSpectatorUserIds) {
       expect(releaseActiveLobbyCallMock).toHaveBeenCalledWith(
         spectatorUserId,
@@ -1028,9 +1040,10 @@ describe("DELETE /api/lobbies/[id]", () => {
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
     });
-    expect(userUpdateManyMock).toHaveBeenCalledWith({
+    expect(userFindManyMock).toHaveBeenCalledWith({
       where: { activeLobbyId: "lobby-1" },
-      data: { activeLobbyId: null },
+      select: { id: true },
+      orderBy: { id: "asc" },
     });
     expect(cancelPendingLobbyInvitesMock).toHaveBeenCalledWith("lobby-1");
     expect(notifyUserMock).not.toHaveBeenCalled();

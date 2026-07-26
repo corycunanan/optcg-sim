@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import {
   ActiveLobbyConflictError,
   claimActiveLobby,
+  releaseActiveLobbyMembers,
 } from "./active-membership";
 
 function transactionClient(user: {
@@ -172,4 +173,34 @@ describe("claimActiveLobby", () => {
       expect(activeLobbyId).toBe(winningLobbyId);
     }
   );
+});
+
+describe("releaseActiveLobbyMembers", () => {
+  it("locks and releases multiple users in ascending user-id order", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      { id: "user-z" },
+      { id: "user-a" },
+      { id: "user-m" },
+    ]);
+    const released: string[] = [];
+    const updateMany = vi.fn(async ({ where }: { where: { id: string } }) => {
+      released.push(where.id);
+      return { count: 1 };
+    });
+    const tx = {
+      user: { findMany, updateMany },
+    } as unknown as Prisma.TransactionClient;
+
+    await expect(releaseActiveLobbyMembers(tx, "lobby-1")).resolves.toEqual([
+      "user-a",
+      "user-m",
+      "user-z",
+    ]);
+    expect(findMany).toHaveBeenCalledWith({
+      where: { activeLobbyId: "lobby-1" },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    expect(released).toEqual(["user-a", "user-m", "user-z"]);
+  });
 });

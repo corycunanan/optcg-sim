@@ -11,6 +11,7 @@ import {
   ActiveLobbyConflictError,
   claimActiveLobby,
   releaseActiveLobby,
+  releaseActiveLobbyMembers,
 } from "./active-membership";
 import { findActiveGameLobby } from "./active-game";
 import {
@@ -18,6 +19,7 @@ import {
   retryTransactionOnce,
 } from "./transaction-conflict";
 import { isLobbyGuestCollision } from "./unique-constraints";
+import { lockLobbyMemberships } from "./membership-lock";
 import { notifyLobby } from "@/lib/realtime/fanout-lobby";
 import { notifyUser } from "@/lib/realtime/fan-out";
 
@@ -342,6 +344,18 @@ async function joinLobby({
         );
       }
 
+      const lobbyIdsToLock = [target.lobby.id];
+      if (
+        isCurrentMember &&
+        currentLobby &&
+        currentLobby.id !== target.lobby.id
+      ) {
+        lobbyIdsToLock.push(currentLobby.id);
+      }
+      if (!(await lockLobbyMemberships(tx, lobbyIdsToLock))) {
+        throw new CurrentLobbyChangedError();
+      }
+
       let previousLobbyId: string | null = null;
       let previousLobbyClosed = false;
       let disbandedGuest: DisbandedGuest | null = null;
@@ -393,10 +407,7 @@ async function joinLobby({
           await tx.lobbyGuest.deleteMany({
             where: { lobbyId: currentLobby.id },
           });
-          await tx.user.updateMany({
-            where: { activeLobbyId: currentLobby.id },
-            data: { activeLobbyId: null },
-          });
+          await releaseActiveLobbyMembers(tx, currentLobby.id);
           canceledInvites = await cancelPendingLobbyInvitesInTransaction(
             tx,
             currentLobby.id

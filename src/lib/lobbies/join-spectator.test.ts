@@ -12,6 +12,7 @@ const spectatorFindManyMock = vi.fn();
 const spectatorDeleteManyMock = vi.fn();
 const guestDeleteManyMock = vi.fn();
 const userFindUniqueMock = vi.fn();
+const userFindManyMock = vi.fn();
 const userUpdateManyMock = vi.fn();
 const inviteFindManyMock = vi.fn();
 const inviteUpdateManyMock = vi.fn();
@@ -72,6 +73,7 @@ function transactionClient() {
     lobbyGuest: { deleteMany: guestDeleteManyMock },
     user: {
       findUnique: userFindUniqueMock,
+      findMany: userFindManyMock,
       updateMany: userUpdateManyMock,
     },
     lobbyInvite: {
@@ -95,6 +97,7 @@ beforeEach(() => {
     spectatorDeleteManyMock,
     guestDeleteManyMock,
     userFindUniqueMock,
+    userFindManyMock,
     userUpdateManyMock,
     inviteFindManyMock,
     inviteUpdateManyMock,
@@ -121,6 +124,7 @@ beforeEach(() => {
     activeLobby: null,
   });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindManyMock.mockResolvedValue([]);
   inviteFindManyMock.mockResolvedValue([]);
   inviteUpdateManyMock.mockResolvedValue({ count: 1 });
   transactionMock.mockImplementation(async (operation) =>
@@ -179,7 +183,7 @@ describe("joinLobbyAsSpectator", () => {
     "returns %s without membership or revision mutation",
     async (kind, lobby, count) => {
       if (kind === "not_found") {
-        queryRawMock.mockResolvedValueOnce([]);
+        lobbyFindUniqueMock.mockResolvedValueOnce(null);
       } else {
         lobbyFindUniqueMock.mockResolvedValueOnce(lobby);
       }
@@ -434,9 +438,10 @@ describe("joinLobbyAsSpectator", () => {
     expect(spectatorFindManyMock.mock.invocationCallOrder[0]).toBeLessThan(
       lobbyUpdateManyMock.mock.invocationCallOrder[0]
     );
-    expect(userUpdateManyMock).toHaveBeenCalledWith({
+    expect(userFindManyMock).toHaveBeenCalledWith({
       where: { activeLobbyId: "old-lobby" },
-      data: { activeLobbyId: null },
+      select: { id: true },
+      orderBy: { id: "asc" },
     });
   });
 

@@ -10,9 +10,10 @@ import {
   ActiveLobbyConflictError,
   claimActiveLobby,
   releaseActiveLobby,
+  releaseActiveLobbyMembers,
 } from "./active-membership";
 import { findActiveGameLobby } from "./active-game";
-import { lockLobbyMembership } from "./membership-lock";
+import { lockLobbyMemberships } from "./membership-lock";
 import {
   isRetryableTransactionConflict,
   retryTransactionOnce,
@@ -105,6 +106,27 @@ function loadCurrentMembership(tx: Prisma.TransactionClient, userId: string) {
   });
 }
 
+function loadSpectatorTarget(
+  tx: Prisma.TransactionClient,
+  lobbyId: string,
+  userId: string
+) {
+  return tx.lobby.findUnique({
+    where: { id: lobbyId },
+    select: {
+      id: true,
+      status: true,
+      allowSpectators: true,
+      hostUserId: true,
+      guest: { select: { userId: true } },
+      spectators: {
+        where: { userId },
+        select: { userId: true },
+      },
+    },
+  });
+}
+
 export async function joinLobbyAsSpectator({
   userId,
   lobbyId,
@@ -115,25 +137,39 @@ export async function joinLobbyAsSpectator({
 
   try {
     return await retryTransactionOnce(prisma, async (tx) => {
-      if (!(await lockLobbyMembership(tx, lobbyId))) {
-        return { kind: "not_found" as const };
+      let target = await loadSpectatorTarget(tx, lobbyId, userId);
+
+      if (!target) return { kind: "not_found" as const };
+      if (target.status === "CLOSED") return { kind: "closed" as const };
+      if (!target.allowSpectators) {
+        return { kind: "spectating_disabled" as const };
+      }
+      if (target.hostUserId === userId || target.guest?.userId === userId) {
+        return { kind: "seated" as const };
+      }
+      if (target.spectators.length > 0) {
+        return existingMembership(lobbyId);
+      }
+      let current = await loadCurrentMembership(tx, userId);
+      let currentLobby = current?.activeLobby;
+      let isCurrentMember = Boolean(
+        current?.activeLobbyId &&
+        currentLobby &&
+        currentLobby.status !== "CLOSED" &&
+        (currentLobby.hostUserId === userId ||
+          currentLobby.guest?.userId === userId ||
+          currentLobby.spectators.length > 0)
+      );
+
+      const lobbyIdsToLock = [lobbyId];
+      if (isCurrentMember && currentLobby && currentLobby.id !== lobbyId) {
+        lobbyIdsToLock.push(currentLobby.id);
+      }
+      if (!(await lockLobbyMemberships(tx, lobbyIdsToLock))) {
+        throw new CurrentLobbyChangedError();
       }
 
-      const target = await tx.lobby.findUnique({
-        where: { id: lobbyId },
-        select: {
-          id: true,
-          status: true,
-          allowSpectators: true,
-          hostUserId: true,
-          guest: { select: { userId: true } },
-          spectators: {
-            where: { userId },
-            select: { userId: true },
-          },
-        },
-      });
-
+      target = await loadSpectatorTarget(tx, lobbyId, userId);
       if (!target) return { kind: "not_found" as const };
       if (target.status === "CLOSED") return { kind: "closed" as const };
       if (!target.allowSpectators) {
@@ -152,21 +188,7 @@ export async function joinLobbyAsSpectator({
         return { kind: "full" as const };
       }
 
-      let current = await loadCurrentMembership(tx, userId);
-      let currentLobby = current?.activeLobby;
-      const isCurrentMember = Boolean(
-        current?.activeLobbyId &&
-        currentLobby &&
-        currentLobby.status !== "CLOSED" &&
-        (currentLobby.hostUserId === userId ||
-          currentLobby.guest?.userId === userId ||
-          currentLobby.spectators.length > 0)
-      );
-
       if (isCurrentMember && currentLobby && currentLobby.id !== lobbyId) {
-        if (!(await lockLobbyMembership(tx, currentLobby.id))) {
-          throw new CurrentLobbyChangedError();
-        }
         current = await loadCurrentMembership(tx, userId);
         if (
           current?.activeLobbyId !== currentLobby.id ||
@@ -176,6 +198,11 @@ export async function joinLobbyAsSpectator({
           throw new CurrentLobbyChangedError();
         }
         currentLobby = current.activeLobby;
+        isCurrentMember = Boolean(
+          currentLobby.hostUserId === userId ||
+            currentLobby.guest?.userId === userId ||
+            currentLobby.spectators.length > 0
+        );
       }
 
       const isHosting =
@@ -230,6 +257,7 @@ export async function joinLobbyAsSpectator({
           const spectators = await tx.lobbySpectator.findMany({
             where: { lobbyId: currentLobby.id },
             select: { userId: true },
+            orderBy: { userId: "asc" },
           });
           removedSpectatorUserIds = spectators.map(({ userId }) => userId);
 
@@ -261,10 +289,7 @@ export async function joinLobbyAsSpectator({
           await tx.lobbyGuest.deleteMany({
             where: { lobbyId: currentLobby.id },
           });
-          await tx.user.updateMany({
-            where: { activeLobbyId: currentLobby.id },
-            data: { activeLobbyId: null },
-          });
+          await releaseActiveLobbyMembers(tx, currentLobby.id);
           canceledInvites = await cancelPendingLobbyInvitesInTransaction(
             tx,
             currentLobby.id

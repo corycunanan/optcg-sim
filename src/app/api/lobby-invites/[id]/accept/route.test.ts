@@ -12,7 +12,9 @@ const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
 const userFindUniqueMock = vi.fn();
+const userFindManyMock = vi.fn();
 const userUpdateManyMock = vi.fn();
+const queryRawMock = vi.fn();
 const transactionMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
@@ -53,6 +55,7 @@ vi.mock("@/lib/db", () => ({
     },
     user: {
       findUnique: (...args: unknown[]) => userFindUniqueMock(...args),
+      findMany: (...args: unknown[]) => userFindManyMock(...args),
       updateMany: (...args: unknown[]) => userUpdateManyMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
@@ -122,7 +125,9 @@ beforeEach(() => {
     lobbyGuestCreateMock,
     lobbyGuestDeleteManyMock,
     userFindUniqueMock,
+    userFindManyMock,
     userUpdateManyMock,
+    queryRawMock,
     transactionMock,
     buildLobbyRoomStateMock,
     notifyLobbyMock,
@@ -144,6 +149,8 @@ beforeEach(() => {
     activeLobby: null,
   });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindManyMock.mockResolvedValue([]);
+  queryRawMock.mockResolvedValue([{ id: "locked" }]);
   buildLobbyRoomStateMock.mockResolvedValue({
     id: "target-lobby",
     hostUserId: "target-host",
@@ -153,6 +160,7 @@ beforeEach(() => {
   notifyUserMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(async (operation) =>
     operation({
+      $queryRaw: queryRawMock,
       lobbyInvite: {
         findUnique: inviteFindUniqueMock,
         findMany: inviteFindManyMock,
@@ -163,7 +171,11 @@ beforeEach(() => {
         create: lobbyGuestCreateMock,
         deleteMany: lobbyGuestDeleteManyMock,
       },
-      user: { findUnique: userFindUniqueMock, updateMany: userUpdateManyMock },
+      user: {
+        findUnique: userFindUniqueMock,
+        findMany: userFindManyMock,
+        updateMany: userUpdateManyMock,
+      },
     })
   );
   afterCalls.pending.length = 0;
