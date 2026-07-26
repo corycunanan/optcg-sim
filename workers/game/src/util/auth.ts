@@ -18,6 +18,7 @@ export interface VerifiedGameToken {
   gameId: string;
   jti: string;
   playerIndex?: 0 | 1;
+  role?: "spectator";
 }
 
 export interface VerifiedUserToken {
@@ -34,6 +35,7 @@ interface RawTokenPayload {
   jti: unknown;
   gameId?: unknown;
   playerIndex?: unknown;
+  role?: unknown;
 }
 
 async function verifySignatureAndDecode(
@@ -90,6 +92,7 @@ export async function verifyGameToken(
   ) {
     return null;
   }
+  if (payload.role !== undefined && payload.role !== "spectator") return null;
   if (isExpired(payload.exp)) return null;
   if (expectedGameId && payload.gameId !== expectedGameId) return null;
 
@@ -99,7 +102,8 @@ export async function verifyGameToken(
     exp: payload.exp,
     gameId: payload.gameId,
     jti: payload.jti,
-    ...(payload.playerIndex !== undefined ? { playerIndex: payload.playerIndex as 0 | 1 } : {}),
+    ...(payload.playerIndex !== undefined ? { playerIndex: payload.playerIndex } : {}),
+    ...(payload.role === "spectator" ? { role: payload.role } : {}),
   };
 }
 

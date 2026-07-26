@@ -289,7 +289,7 @@ describe("OPT-479 GameSession collaborator contracts", () => {
 
     await expect(
       authorizer.validate(token, { state: solitaire, mode: "SOLITAIRE" })
-    ).resolves.toBe(1);
+    ).resolves.toEqual({ role: "player", playerIndex: 1 });
     await expect(
       authorizer.validate(token, { state: solitaire, mode: "SOLITAIRE" })
     ).resolves.toBeNull();
