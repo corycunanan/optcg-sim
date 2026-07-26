@@ -66,6 +66,7 @@ export function GameOverlayGate({
           winner={winner}
           reason={endState.reason}
           playerDisplayNames={playerDisplayNames}
+          onBackToLobbies={onBackToLobbies}
         />
       );
     }
@@ -147,14 +148,20 @@ function SpectatorMatchComplete({
   winner,
   reason,
   playerDisplayNames,
+  onBackToLobbies,
 }: {
   winner: 0 | 1 | null;
   reason: string;
   playerDisplayNames: readonly [string, string];
+  onBackToLobbies: () => void | Promise<void>;
 }) {
   return (
-    <div className="bg-gb-board/90 pointer-events-none fixed inset-0 z-[90] flex items-center justify-center px-6 text-center backdrop-blur-sm">
-      <div role="status" aria-live="polite" className="flex flex-col gap-3">
+    <div className="bg-gb-board/90 fixed inset-0 z-[90] flex items-center justify-center px-6 text-center backdrop-blur-sm">
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex flex-col items-center gap-3"
+      >
         <span className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">
           Match complete
         </span>
@@ -164,6 +171,9 @@ function SpectatorMatchComplete({
         <p className="text-gb-text max-w-md text-sm leading-relaxed">
           {reason}
         </p>
+        <GameButton variant="primary" size="lg" onClick={onBackToLobbies}>
+          Back to Party
+        </GameButton>
       </div>
     </div>
   );

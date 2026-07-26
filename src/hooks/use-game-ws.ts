@@ -9,6 +9,7 @@ import type {
 } from "@shared/game-types";
 import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
 import { GameServerMessageSchema } from "@/lib/validators/realtime";
+import { toast } from "sonner";
 
 export interface ActionRejection {
   action: GameAction;
@@ -173,6 +174,16 @@ export function useGameWs(
       case "game:player_disconnected":
       case "game:player_reconnected":
         // Game state update (connected flag) will arrive via next broadcast
+        break;
+      case "game:spectator_joined":
+        toast.info(`${msg.spectator.displayName} started spectating`);
+        break;
+      case "game:spectator_left":
+        toast.info(
+          msg.cause === "EJECTED"
+            ? `${msg.spectator.displayName} was removed from spectating`
+            : `${msg.spectator.displayName} stopped spectating`
+        );
         break;
     }
   }, []);

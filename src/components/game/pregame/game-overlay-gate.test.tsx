@@ -16,9 +16,13 @@ vi.mock("@/components/ui", () => ({
   DialogTitle: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock("../game-button", () => ({
-  GameButton: ({ children }: { children: React.ReactNode }) => (
-    <button>{children}</button>
-  ),
+  GameButton: ({
+    children,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
 }));
 vi.mock("./pregame-overlay", () => ({
   PregameOverlay: ({
@@ -61,6 +65,7 @@ function renderGate({
   matchClosed = false,
   winner = null,
   activePrompt = null,
+  onBackToLobbies = vi.fn(),
 }: {
   pregame?: GameState["pregame"];
   pendingPrompt?: PendingPromptState | null;
@@ -69,6 +74,7 @@ function renderGate({
   matchClosed?: boolean;
   winner?: 0 | 1 | null;
   activePrompt?: PromptOptions | null;
+  onBackToLobbies?: () => void;
 }) {
   act(() => {
     renderer = create(
@@ -90,7 +96,7 @@ function renderGate({
         cardDb={{}}
         activePrompt={activePrompt}
         onAction={vi.fn()}
-        onBackToLobbies={vi.fn()}
+        onBackToLobbies={onBackToLobbies}
       />
     );
   });
@@ -248,11 +254,13 @@ describe("GameOverlayGate spectator policy", () => {
     expect(output).toContain("arranging cards");
   });
 
-  it("renders match completion passively without a dialog or routing control", () => {
+  it("renders match completion without a dialog and offers a non-trapping exit", () => {
+    const onBackToLobbies = vi.fn();
     const rendered = renderGate({
       matchClosed: true,
       winner: 1,
       pregame: pregame({ phase: "MULLIGAN_DECISIONS" }),
+      onBackToLobbies,
     });
     const root = rendered.root;
     const output = JSON.stringify(rendered.toJSON());
@@ -261,7 +269,12 @@ describe("GameOverlayGate spectator policy", () => {
     expect(output).toContain("Match complete");
     expect(output).toContain("Robin wins");
     expect(output).toContain("Conceded");
-    expect(output).not.toContain("Back to Lobbies");
+    const exit = root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Back to Party"));
+    expect(exit).toBeDefined();
+    act(() => exit?.props.onClick());
+    expect(onBackToLobbies).toHaveBeenCalledOnce();
     expect(output).not.toContain("Keep hand");
   });
 

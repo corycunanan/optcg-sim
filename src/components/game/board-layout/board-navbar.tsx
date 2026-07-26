@@ -121,10 +121,10 @@ export function BoardNavbar({
           <span
             data-testid="board-spectator-badge"
             role="note"
-            aria-label="Spectator mode: watching"
+            aria-label="Spectator mode: viewing only"
             className="bg-gb-accent-amber/20 text-gb-accent-amber border-gb-accent-amber/40 rounded border px-2 py-1 text-xs font-bold tracking-widest uppercase"
           >
-            Watching
+            Spectator Mode
           </span>
         )}
         {interactionMode === "responseOnly" && (
@@ -158,6 +158,7 @@ export function BoardNavbar({
           onLeave={onLeave}
           onConcede={interactionMode === "full" ? onConcede : undefined}
           matchClosed={matchClosed}
+          spectator={interactionMode === "spectator"}
         />
       </div>
 

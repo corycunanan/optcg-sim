@@ -141,7 +141,7 @@ beforeEach(() => {
   mocks.fetch.mockReset();
   mocks.fetch.mockResolvedValue({
     ok: true,
-    json: vi.fn().mockResolvedValue({ data: {} }),
+    json: vi.fn().mockResolvedValue({ success: true }),
   });
   vi.stubGlobal("fetch", mocks.fetch);
   vi.stubGlobal("window", { location: { href: "" } });
@@ -263,6 +263,7 @@ describe("useGameSession multi-instance composition", () => {
     const spectator = useRenderedSession({
       viewerRole: "spectator",
       bottomPlayerIndex: 1,
+      lobbyId: "lobby-1",
     });
 
     if (spectator.game.viewerRole !== "spectator") {
@@ -304,7 +305,10 @@ describe("useGameSession multi-instance composition", () => {
     const rawSendAction = vi.fn();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.wsReturns = [createWsReturn({ sendAction: rawSendAction })];
-    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
     const action = { type: "END_TURN" } as unknown as GameAction;
 
     spectator.game.sendAction(action);
@@ -317,7 +321,7 @@ describe("useGameSession multi-instance composition", () => {
     warn.mockRestore();
   });
 
-  it("keeps finalization, leave, and fallback-concede mutations inert for spectators", async () => {
+  it("keeps finalization and fallback concede inert while stop-spectating uses only its endpoint", async () => {
     const finishedState = createGameState(["user-a", "opponent-b"], "FINISHED");
     const leaveGame = vi.fn().mockResolvedValue(undefined);
     mocks.remoteGameStatus = {
@@ -333,14 +337,37 @@ describe("useGameSession multi-instance composition", () => {
       }),
     ];
 
-    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
     await flushAsync();
     await spectator.navigation.handleFallbackConcede();
     await spectator.navigation.handleLeaveGame();
 
-    expect(mocks.fetch).not.toHaveBeenCalled();
-    expect(leaveGame).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/spectators",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(leaveGame).toHaveBeenCalledOnce();
     expect(spectator.navigation.fallbackConcedeAvailable).toBe(false);
+    expect(window.location.href).toBe("/lobbies");
+  });
+
+  it("returns a completed spectator to the party without deleting membership", async () => {
+    const finishedState = createGameState(["user-a", "opponent-b"], "FINISHED");
+    const leaveGame = vi.fn().mockResolvedValue(undefined);
+    mocks.wsReturns = [createWsReturn({ gameState: finishedState, leaveGame })];
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
+
+    await spectator.navigation.handleBackToLobbies();
+
+    expect(leaveGame).toHaveBeenCalledOnce();
+    expect(mocks.fetch).not.toHaveBeenCalled();
     expect(window.location.href).toBe("/lobbies");
   });
 
@@ -357,7 +384,10 @@ describe("useGameSession multi-instance composition", () => {
       }),
     ];
 
-    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
 
     expect(spectator.game.viewerRole).toBe("spectator");
     expect(spectator.game.gameState).toBeNull();

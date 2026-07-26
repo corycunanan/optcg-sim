@@ -27,6 +27,31 @@ afterEach(() => {
 });
 
 describe("useGameFinalizer", () => {
+  it("keeps every finalization and fallback mutation inert when disabled", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("window", { location: { href: "/game/game-1" } });
+    const leaveGame = vi.fn().mockResolvedValue(undefined);
+    const { handleBackToLobbies, handleLeaveGame, handleFallbackConcede } =
+      useGameFinalizer({
+        gameId: "game-1",
+        gameState: null,
+        gameOver: { winner: null, reason: "Game over" },
+        matchClosed: true,
+        enabled: false,
+        leaveGame,
+        setRemoteGameStatus: vi.fn(),
+      });
+
+    await Promise.resolve();
+    await handleBackToLobbies();
+    await handleLeaveGame();
+    await handleFallbackConcede();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(leaveGame).not.toHaveBeenCalled();
+    expect(window.location.href).toBe("/game/game-1");
+  });
   it("finalizes a completed match before returning to the shared party", async () => {
     const fetchMock = vi
       .fn()

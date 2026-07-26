@@ -4,10 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BoardNavbar, type BoardNavbarProps } from "./board-navbar";
 
 vi.mock("./nav-menu", () => ({
-  NavMenu: ({ onConcede }: { onConcede?: () => void }) => (
+  NavMenu: ({
+    onConcede,
+    spectator,
+  }: {
+    onConcede?: () => void;
+    spectator?: boolean;
+  }) => (
     <button
       aria-label="Game menu"
       data-concede-reachable={String(!!onConcede)}
+      data-spectator={String(!!spectator)}
     />
   ),
 }));
@@ -110,7 +117,7 @@ describe("BoardNavbar accessibility", () => {
     expect(
       root.findByProps({
         role: "note",
-        "aria-label": "Spectator mode: watching",
+        "aria-label": "Spectator mode: viewing only",
       })
     ).toBeDefined();
     expect(
@@ -120,6 +127,9 @@ describe("BoardNavbar accessibility", () => {
     ).toBe("false");
     expect(announcementText(root)).toBe("Turn 3. Watching. MAIN");
     expect(srOnlySpanText(root)).toContain("Watching");
+    expect(
+      root.findByProps({ "aria-label": "Game menu" }).props["data-spectator"]
+    ).toBe("true");
 
     root = renderNavbar({ interactionMode: "responseOnly" });
     expect(

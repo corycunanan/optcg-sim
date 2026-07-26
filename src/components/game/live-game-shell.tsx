@@ -39,6 +39,7 @@ export interface LiveGameShellProps {
   playerIndex?: 0 | 1;
   gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
   viewerRole: "player" | "spectator";
+  lobbyId: string;
   bottomPlayerIndex?: 0 | 1;
   playerDisplayNames: readonly [string, string];
 }
@@ -59,6 +60,7 @@ function LiveGameShellContent({
   playerIndex,
   gameMode,
   viewerRole,
+  lobbyId,
   bottomPlayerIndex,
   playerDisplayNames,
 }: LiveGameShellProps) {
@@ -78,6 +80,7 @@ function LiveGameShellContent({
       workerUrl={workerUrl}
       playerIndex={playerIndex}
       viewerRole={viewerRole}
+      lobbyId={lobbyId}
       bottomPlayerIndex={bottomPlayerIndex}
       playerDisplayNames={playerDisplayNames}
     />
@@ -92,6 +95,7 @@ function PvpGameSession(props: LiveGameShellProps) {
       ? {
           viewerRole: "spectator",
           bottomPlayerIndex: props.bottomPlayerIndex,
+          lobbyId: props.lobbyId,
         }
       : { requestedPlayerIndex: props.playerIndex }
   );
@@ -145,7 +149,7 @@ function GameSessionView({
 }: GameSessionViewProps) {
   const { game, opponent, navigation, endState } = session;
   const { sendAction } = game;
-  const { handleBackToLobbies } = navigation;
+  const { handleBackToLobbies, handleLeaveGame } = navigation;
   const [devPrompt, setDevPrompt] = useState<PromptOptions | null>(null);
   const [fadeVisible, setFadeVisible] = useState(false);
   const [turnBanner, setTurnBanner] = useState<string | null>(null);
@@ -242,8 +246,10 @@ function GameSessionView({
   );
 
   const handleLeave = useCallback(() => {
-    void handleBackToLobbies();
-  }, [handleBackToLobbies]);
+    void (game.viewerRole === "spectator"
+      ? handleLeaveGame()
+      : handleBackToLobbies());
+  }, [game.viewerRole, handleBackToLobbies, handleLeaveGame]);
 
   if (navigation.remoteGameNotFound) {
     return (
@@ -450,37 +456,60 @@ function GameSessionView({
         )}
       />
 
-      {!game.matchClosed && opponent.opponentAway && (
-        <div
-          className={cn(
-            "fixed inset-x-0 top-0 z-[60] flex min-h-12 flex-wrap items-center gap-3 px-4 py-2",
-            opponent.gamePausedForOpponent
-              ? "bg-gb-prompt-bg border-gb-accent-amber/25 border-b"
-              : "bg-gb-surface border-gb-border-strong border-b"
-          )}
-        >
-          <span
+      {game.viewerRole !== "spectator" &&
+        !game.matchClosed &&
+        opponent.opponentAway && (
+          <div
             className={cn(
-              "text-sm font-bold",
+              "fixed inset-x-0 top-0 z-[60] flex min-h-12 flex-wrap items-center gap-3 px-4 py-2",
               opponent.gamePausedForOpponent
-                ? "text-gb-accent-amber"
-                : "text-gb-accent-blue"
+                ? "bg-gb-prompt-bg border-gb-accent-amber/25 border-b"
+                : "bg-gb-surface border-gb-border-strong border-b"
             )}
           >
-            {opponent.gamePausedForOpponent ? "GAME PAUSED" : "OPPONENT AWAY"}
-          </span>
-          <span className="text-gb-text-dim text-xs">
-            {opponent.opponentAwayText}{" "}
-            {opponent.gamePausedForOpponent
-              ? "The game will resume once they reconnect."
-              : "You can keep making moves until their input is required."}
-          </span>
-          {opponent.opponentDeadlineRemaining !== null && (
-            <span className="text-gb-accent-amber text-xs">
-              Rejoin window:{" "}
-              {formatCountdown(opponent.opponentDeadlineRemaining)}
+            <span
+              className={cn(
+                "text-sm font-bold",
+                opponent.gamePausedForOpponent
+                  ? "text-gb-accent-amber"
+                  : "text-gb-accent-blue"
+              )}
+            >
+              {opponent.gamePausedForOpponent ? "GAME PAUSED" : "OPPONENT AWAY"}
             </span>
-          )}
+            <span className="text-gb-text-dim text-xs">
+              {opponent.opponentAwayText}{" "}
+              {opponent.gamePausedForOpponent
+                ? "The game will resume once they reconnect."
+                : "You can keep making moves until their input is required."}
+            </span>
+            {opponent.opponentDeadlineRemaining !== null && (
+              <span className="text-gb-accent-amber text-xs">
+                Rejoin window:{" "}
+                {formatCountdown(opponent.opponentDeadlineRemaining)}
+              </span>
+            )}
+          </div>
+        )}
+
+      {game.viewerRole === "spectator" &&
+        !game.matchClosed &&
+        game.connectionStatus !== "connected" && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="border-gb-accent-amber/30 bg-gb-prompt-bg text-gb-accent-amber fixed inset-x-0 top-0 z-[60] flex min-h-12 items-center justify-center border-b px-4 py-2 text-xs font-semibold"
+          >
+            Reconnecting to the live match…
+          </div>
+        )}
+
+      {navigation.leaveError && (
+        <div
+          role="alert"
+          className="border-gb-accent-red/30 bg-gb-surface text-gb-accent-red fixed inset-x-0 bottom-0 z-[60] border-t px-4 py-2 text-center text-xs font-semibold"
+        >
+          {navigation.leaveError}
         </div>
       )}
 

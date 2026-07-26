@@ -52,6 +52,20 @@ describe("NavMenu spectator-safe actions", () => {
     ).toHaveLength(0);
   });
 
+  it("labels the spectator action as Stop spectating", () => {
+    act(() => {
+      renderer = create(
+        <NavMenu onLeave={vi.fn()} matchClosed={false} spectator />
+      );
+    });
+
+    const buttonText = renderer!.root
+      .findAllByType("button")
+      .map((button) => button.children.join(""));
+    expect(buttonText).toContain("Stop spectating");
+    expect(buttonText).not.toContain("← Back to Lobbies");
+  });
+
   it("mounts the concede dialog policy only when concession is available", () => {
     act(() => {
       renderer = create(

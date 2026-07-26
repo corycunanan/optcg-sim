@@ -506,7 +506,11 @@ describe("useGameSession behavior", () => {
   });
 
   it("connects and retries spectators without a playerIndex token parameter", async () => {
-    await mountSession({ viewerRole: "spectator", bottomPlayerIndex: 1 });
+    await mountSession({
+      viewerRole: "spectator",
+      bottomPlayerIndex: 1,
+      lobbyId: "lobby-1",
+    });
     const firstTokenUrl = String(fetchMock.mock.calls[0]?.[0]);
     expect(firstTokenUrl).toBe("/api/game/token?gameId=game-1");
 
@@ -541,7 +545,11 @@ describe("useGameSession behavior", () => {
       canFallbackConcede: true,
     };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await mountSession({ viewerRole: "spectator", bottomPlayerIndex: 1 });
+    await mountSession({
+      viewerRole: "spectator",
+      bottomPlayerIndex: 1,
+      lobbyId: "lobby-1",
+    });
     const socket = FakeWebSocket.instances[0]!;
     await act(async () => socket.simulateOpen());
 

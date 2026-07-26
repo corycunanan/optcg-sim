@@ -52,7 +52,7 @@ const expectedAdmissionQuery = {
     player2Id: true,
     player1: { select: { username: true, name: true } },
     player2: { select: { username: true, name: true } },
-    lobby: { select: { hostUserId: true } },
+    lobby: { select: { id: true, hostUserId: true } },
   },
 };
 
@@ -80,7 +80,7 @@ describe("/game/[id] spectator admission and retention", () => {
       player1Id: "viewer-1",
       player2Id: "player-2",
       ...playerIdentities,
-      lobby: { hostUserId: "viewer-1" },
+      lobby: { id: "lobby-1", hostUserId: "viewer-1" },
     });
 
     const result = await renderGamePage();
@@ -99,7 +99,7 @@ describe("/game/[id] spectator admission and retention", () => {
       player1Id: "player-1",
       player2Id: "viewer-1",
       ...playerIdentities,
-      lobby: { hostUserId: "player-1" },
+      lobby: { id: "lobby-1", hostUserId: "player-1" },
     });
 
     const result = await renderGamePage();
@@ -119,7 +119,7 @@ describe("/game/[id] spectator admission and retention", () => {
         player1Id: "player-1",
         player2Id: "player-2",
         ...playerIdentities,
-        lobby: { hostUserId },
+        lobby: { id: "lobby-1", hostUserId },
       });
 
       const result = await renderGamePage();
@@ -132,6 +132,7 @@ describe("/game/[id] spectator admission and retention", () => {
         gameMode: "PVP",
         viewerRole: "spectator",
         bottomPlayerIndex: expectedBottomPlayerIndex,
+        lobbyId: "lobby-1",
         playerDisplayNames: ["luffy", "zoro"],
       });
     }
@@ -146,7 +147,7 @@ describe("/game/[id] spectator admission and retention", () => {
         player1Id: "player-1",
         player2Id: "player-2",
         ...playerIdentities,
-        lobby: { hostUserId: "player-1" },
+        lobby: { id: "lobby-1", hostUserId: "player-1" },
       });
 
       const result = await renderGamePage();
@@ -169,7 +170,7 @@ describe("/game/[id] spectator admission and retention", () => {
       player2Id: "player-2",
       player1: { username: null, name: "Monkey D. Luffy" },
       player2: { username: null, name: null },
-      lobby: { hostUserId: "player-1" },
+      lobby: { id: "lobby-1", hostUserId: "player-1" },
     });
 
     const result = await renderGamePage();

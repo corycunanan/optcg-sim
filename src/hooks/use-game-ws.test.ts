@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameState, ServerMessage } from "@shared/game-types";
+import type { GameState } from "@shared/game-types";
 
 const mocks = vi.hoisted(() => ({
-  onMessage: null as ((message: ServerMessage) => void) | null,
+  onMessage: null as ((message: unknown) => void) | null,
   send: vi.fn(),
   stateSetters: [] as Array<ReturnType<typeof vi.fn>>,
+  toastInfo: vi.fn(),
 }));
 
 vi.mock("react", async (importActual) => {
@@ -26,9 +27,7 @@ vi.mock("react", async (importActual) => {
 });
 
 vi.mock("@/hooks/use-authed-websocket", () => ({
-  useAuthedWebSocket: (options: {
-    onMessage: (message: ServerMessage) => void;
-  }) => {
+  useAuthedWebSocket: (options: { onMessage: (message: unknown) => void }) => {
     mocks.onMessage = options.onMessage;
     return {
       connectionStatus: "connected",
@@ -40,13 +39,52 @@ vi.mock("@/hooks/use-authed-websocket", () => ({
   },
 }));
 
+vi.mock("sonner", () => ({ toast: { info: mocks.toastInfo } }));
+
 import { useGameWs } from "@/hooks/use-game-ws";
 
 describe("useGameWs prompt identity", () => {
   beforeEach(() => {
     mocks.onMessage = null;
     mocks.send.mockReset();
+    mocks.toastInfo.mockReset();
     mocks.stateSetters.length = 0;
+  });
+
+  it("toasts each validated spectator lifecycle event with truthful copy", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+
+    mocks.onMessage?.({
+      type: "game:spectator_joined",
+      spectator: { id: "watcher-1", displayName: "Vivi" },
+    });
+    mocks.onMessage?.({
+      type: "game:spectator_left",
+      spectator: { id: "legacy", displayName: "Spectator" },
+      cause: "DEPARTED",
+    });
+    mocks.onMessage?.({
+      type: "game:spectator_left",
+      spectator: { id: "watcher-2", displayName: "Usopp" },
+      cause: "EJECTED",
+    });
+
+    expect(mocks.toastInfo.mock.calls).toEqual([
+      ["Vivi started spectating"],
+      ["Spectator stopped spectating"],
+      ["Usopp was removed from spectating"],
+    ]);
+  });
+
+  it("does not toast an unvalidated spectator frame", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+
+    mocks.onMessage?.({
+      type: "game:spectator_joined",
+      spectator: { id: "watcher-1" },
+    });
+
+    expect(mocks.toastInfo).not.toHaveBeenCalled();
   });
 
   it("stores a typed rejection and does not clear it when the next action is sent", () => {
@@ -177,7 +215,7 @@ describe("useGameWs prompt identity", () => {
     mocks.onMessage?.({ type: "game:update", state: nextState });
 
     const installState = gameStateSetter.mock.calls[0]?.[0] as (
-      previous: GameState,
+      previous: GameState
     ) => GameState;
     const installedState = installState(previousState);
     expect(installedState.players[0]).toBe(nextState.players[0]);

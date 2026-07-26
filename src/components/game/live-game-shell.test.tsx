@@ -6,10 +6,12 @@ import type { BoardState } from "@/components/game/board";
 
 const mocks = vi.hoisted(() => ({
   actionRefs: [] as Array<(action: GameAction) => void>,
+  leaveRefs: [] as Array<() => void>,
   boardStates: [] as BoardState[],
   tickCountdown: null as (() => void) | null,
   sendAction: vi.fn(),
   backToLobbies: vi.fn(),
+  stopSpectating: vi.fn(),
   viewerRole: "player" as "pending" | "player" | "spectator",
   bottomPlayerIndex: ((value: 0 | 1) => value)(0),
   bottomPlayer: null as GameState["players"][number] | null,
@@ -23,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   cardDbReady: true,
   connectivityFailed: false,
   lastError: null as string | null,
+  connectionStatus: "connected",
   sessionPerspectives: [] as unknown[],
   solitaireCalls: 0,
 }));
@@ -44,7 +47,7 @@ vi.mock("@/hooks/use-game-session", () => ({
         gameState: mocks.gameState,
         cardDb: {},
         cardDbReady: mocks.cardDbReady,
-        connectionStatus: "connected",
+        connectionStatus: mocks.connectionStatus,
         lastError: mocks.lastError,
         actionRejection: null,
         acceptedUpdate: null,
@@ -84,7 +87,7 @@ vi.mock("@/hooks/use-game-session", () => ({
         handleFallbackConcede: vi.fn(),
         leavingGame: false,
         leaveError: null,
-        handleLeaveGame: vi.fn(),
+        handleLeaveGame: mocks.stopSpectating,
         handleBackToLobbies: mocks.backToLobbies,
       },
       endState: {
@@ -109,10 +112,11 @@ vi.mock("@/components/game/board", () => ({
     dispatch,
   }: {
     state: BoardState;
-    dispatch: { onAction: (action: GameAction) => void };
+    dispatch: { onAction: (action: GameAction) => void; onLeave: () => void };
   }) => {
     mocks.boardStates.push(state);
     mocks.actionRefs.push(dispatch.onAction);
+    mocks.leaveRefs.push(dispatch.onLeave);
     return null;
   },
 }));
@@ -141,10 +145,12 @@ let renderer: ReactTestRenderer | null = null;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mocks.actionRefs.length = 0;
+  mocks.leaveRefs.length = 0;
   mocks.boardStates.length = 0;
   mocks.tickCountdown = null;
   mocks.sendAction.mockReset();
   mocks.backToLobbies.mockReset();
+  mocks.stopSpectating.mockReset();
   mocks.viewerRole = "player";
   mocks.bottomPlayerIndex = 0;
   mocks.bottomPlayer = null;
@@ -158,6 +164,7 @@ beforeEach(() => {
   mocks.cardDbReady = true;
   mocks.connectivityFailed = false;
   mocks.lastError = null;
+  mocks.connectionStatus = "connected";
   mocks.sessionPerspectives.length = 0;
   mocks.solitaireCalls = 0;
 });
@@ -174,6 +181,7 @@ describe("LiveGameShell dispatch wiring", () => {
       renderer = create(
         <LiveGameShell
           gameId="game-1"
+          lobbyId="lobby-1"
           workerUrl="https://worker.test"
           playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="player"
@@ -205,6 +213,7 @@ describe("LiveGameShell dispatch wiring", () => {
       renderer = create(
         <LiveGameShell
           gameId="game-1"
+          lobbyId="lobby-1"
           workerUrl="https://worker.test"
           playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="spectator"
@@ -216,12 +225,16 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(mocks.sessionPerspectives.at(-1)).toEqual({
       viewerRole: "spectator",
       bottomPlayerIndex: 1,
+      lobbyId: "lobby-1",
     });
     const state = mocks.boardStates.at(-1);
     expect(state?.interactionMode).toBe("spectator");
     expect(state?.bottomPlayerIndex).toBe(1);
     expect(state?.me?.playerId).toBe("player-0");
     expect(state?.opp?.playerId).toBe("player-1");
+    act(() => mocks.leaveRefs.at(-1)?.());
+    expect(mocks.stopSpectating).toHaveBeenCalledOnce();
+    expect(mocks.backToLobbies).not.toHaveBeenCalled();
   });
 
   it("keeps pending player identity out of the interactive board", () => {
@@ -231,6 +244,7 @@ describe("LiveGameShell dispatch wiring", () => {
       renderer = create(
         <LiveGameShell
           gameId="game-1"
+          lobbyId="lobby-1"
           workerUrl="https://worker.test"
           playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="player"
@@ -256,6 +270,7 @@ describe("LiveGameShell dispatch wiring", () => {
           playerDisplayNames={["Player 1", "Player 2"]}
           viewerRole="spectator"
           bottomPlayerIndex={0}
+          lobbyId="lobby-1"
         />
       );
     });
@@ -265,6 +280,30 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(output).toContain("reach the game server");
     expect(output).toContain("Failed to get auth token");
     expect(mocks.boardStates).toHaveLength(0);
+  });
+
+  it("shows spectator reconnect chrome without player-away or forfeit semantics", () => {
+    mocks.viewerRole = "spectator";
+    mocks.connectionStatus = "connecting";
+
+    act(() => {
+      renderer = create(
+        <LiveGameShell
+          gameId="game-1"
+          workerUrl="https://worker.test"
+          playerDisplayNames={["Player 1", "Player 2"]}
+          viewerRole="spectator"
+          bottomPlayerIndex={0}
+          lobbyId="lobby-1"
+        />
+      );
+    });
+
+    const output = JSON.stringify(renderer?.toJSON());
+    expect(output).toContain("Reconnecting to the live match");
+    expect(output).not.toContain("OPPONENT AWAY");
+    expect(output).not.toContain("GAME PAUSED");
+    expect(output).not.toContain("Concede Match");
   });
 
   it("uses one spectator session even when the game mode is Solitaire", () => {
@@ -279,6 +318,7 @@ describe("LiveGameShell dispatch wiring", () => {
           gameMode="SOLITAIRE"
           viewerRole="spectator"
           bottomPlayerIndex={0}
+          lobbyId="lobby-1"
         />
       );
     });
@@ -287,6 +327,7 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(mocks.sessionPerspectives.at(-1)).toEqual({
       viewerRole: "spectator",
       bottomPlayerIndex: 0,
+      lobbyId: "lobby-1",
     });
   });
 });
