@@ -353,8 +353,10 @@ describe("OPT-555 spectator transport", () => {
       expect.anything()
     );
   });
+});
 
-  it("denies spectator sockets every plain broadcast by default", () => {
+describe("OPT-557 spectator broadcast allowlist", () => {
+  it("delivers an allowlisted presence broadcast to spectator sockets", () => {
     const sessionTransport = transport();
     const player = new MockWebSocket();
     const spectator = new MockWebSocket();
@@ -370,6 +372,66 @@ describe("OPT-555 spectator transport", () => {
     } satisfies ServerMessage);
 
     expect(player.sent).toHaveLength(1);
+    expect(spectator.sent).toEqual([
+      JSON.stringify({
+        type: "game:player_reconnected",
+        playerIndex: 0,
+      } satisfies ServerMessage),
+    ]);
+  });
+
+  it("denies a non-allowlisted message type to spectator sockets", () => {
+    const sessionTransport = transport();
+    const player = new MockWebSocket();
+    const spectator = new MockWebSocket();
+    sessionTransport.accept(0, player as unknown as WebSocket);
+    sessionTransport.acceptSpectator(
+      "spectator-user",
+      spectator as unknown as WebSocket
+    );
+
+    sessionTransport.broadcast({
+      type: "game:undo",
+      playerIndex: 0,
+      canUndo: false,
+    });
+
+    expect(player.sent).toHaveLength(1);
     expect(spectator.sent).toEqual([]);
+  });
+
+  it("applies the allowlist to broadcastExcept spectator delivery", () => {
+    const sessionTransport = transport();
+    const excludedPlayer = new MockWebSocket();
+    const spectator = new MockWebSocket();
+    sessionTransport.accept(0, excludedPlayer as unknown as WebSocket);
+    sessionTransport.acceptSpectator(
+      "spectator-user",
+      spectator as unknown as WebSocket
+    );
+
+    sessionTransport.broadcastExcept(
+      excludedPlayer as unknown as WebSocket,
+      {
+        type: "game:player_disconnected",
+        playerIndex: 0,
+      }
+    );
+    sessionTransport.broadcastExcept(
+      excludedPlayer as unknown as WebSocket,
+      {
+        type: "game:undo",
+        playerIndex: 0,
+        canUndo: false,
+      }
+    );
+
+    expect(excludedPlayer.sent).toEqual([]);
+    expect(spectator.sent).toEqual([
+      JSON.stringify({
+        type: "game:player_disconnected",
+        playerIndex: 0,
+      } satisfies ServerMessage),
+    ]);
   });
 });
