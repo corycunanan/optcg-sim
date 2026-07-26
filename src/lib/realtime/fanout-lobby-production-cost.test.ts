@@ -127,19 +127,30 @@ function databaseLobby(spectatorCount: number) {
       },
     },
     spectators: spectatorUsers(spectatorCount).map((user) => ({ user })),
-    invites: [],
+    invites: [
+      {
+        id: "invite-secret",
+        expiresAt: new Date("2026-07-25T12:00:00.000Z"),
+        toUser: {
+          id: "invitee-secret",
+          username: "nami",
+          name: "Nami",
+          image: "/private-invitee.png",
+        },
+      },
+    ],
     gameSessions: [],
   };
 }
 
 describe("notifyLobby production database cost", () => {
   it.each([
-    [0, 2, 6],
-    [1, 3, 8],
-    [20, 22, 46],
+    [0, 2, 3],
+    [1, 3, 3],
+    [20, 22, 3],
   ])(
-    "runs %i-spectator fanout through %i builders and %i database queries",
-    async (spectatorCount, expectedBuilders, expectedQueries) => {
+    "runs %i-spectator fanout to %i recipients with %i database queries",
+    async (spectatorCount, expectedRecipients, expectedQueries) => {
       lobbyFindUniqueMock.mockResolvedValue(databaseLobby(spectatorCount));
       const fetchMock = vi
         .fn()
@@ -149,15 +160,158 @@ describe("notifyLobby production database cost", () => {
         deps: { ...baseDeps, fetch: fetchMock },
       });
 
-      expect(lobbyFindUniqueMock).toHaveBeenCalledTimes(expectedBuilders);
-      expect(cardFindManyMock).toHaveBeenCalledTimes(expectedBuilders);
-      expect(deckFindManyMock).toHaveBeenCalledTimes(2);
+      expect(lobbyFindUniqueMock).toHaveBeenCalledTimes(1);
+      expect(cardFindManyMock).toHaveBeenCalledTimes(1);
+      expect(deckFindManyMock).toHaveBeenCalledTimes(1);
       expect(
         lobbyFindUniqueMock.mock.calls.length +
           cardFindManyMock.mock.calls.length +
           deckFindManyMock.mock.calls.length
       ).toBe(expectedQueries);
-      expect(fetchMock).toHaveBeenCalledTimes(expectedBuilders);
+      expect(fetchMock).toHaveBeenCalledTimes(expectedRecipients);
     }
   );
+
+  async function fanoutPayloads(spectatorCount = 1) {
+    lobbyFindUniqueMock.mockResolvedValue(databaseLobby(spectatorCount));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+
+    await notifyLobby(wireLobby(spectatorCount), {
+      deps: { ...baseDeps, fetch: fetchMock },
+    });
+
+    return new Map(
+      fetchMock.mock.calls.map(([url, init]) => [
+        new URL(url).pathname.split("/")[2],
+        JSON.parse(init.body).lobby as LobbyRoomState,
+      ])
+    );
+  }
+
+  it("keeps every recipient's viewer role isolated", async () => {
+    const payloads = await fanoutPayloads();
+
+    expect(payloads.get("host-user")?.viewerRole).toBe("host");
+    expect(payloads.get("guest-user")?.viewerRole).toBe("guest");
+    expect(payloads.get("spectator-0")?.viewerRole).toBe("spectator");
+  });
+
+  it("keeps pending invite identity host-only", async () => {
+    const payloads = await fanoutPayloads();
+
+    expect(payloads.get("host-user")?.pendingInvite).toMatchObject({
+      id: "invite-secret",
+      user: { id: "invitee-secret" },
+    });
+    for (const userId of ["guest-user", "spectator-0"]) {
+      const payload = payloads.get(userId);
+      expect(payload?.pendingInvite).toBeNull();
+      expect(JSON.stringify(payload)).not.toContain("invite-secret");
+      expect(JSON.stringify(payload)).not.toContain("invitee-secret");
+      expect(JSON.stringify(payload)).not.toContain("private-invitee.png");
+    }
+  });
+
+  it("keeps deck contents participant-only", async () => {
+    const payloads = await fanoutPayloads();
+
+    for (const userId of ["host-user", "guest-user"]) {
+      expect(payloads.get(userId)?.hostDeck?.contents).toEqual({
+        characters: [],
+        events: [],
+        stages: [],
+      });
+      expect(payloads.get(userId)?.guest?.deck?.contents).toEqual({
+        characters: [],
+        events: [],
+        stages: [],
+      });
+    }
+    expect(payloads.get("spectator-0")?.hostDeck?.contents).toBeUndefined();
+    expect(payloads.get("spectator-0")?.guest?.deck?.contents).toBeUndefined();
+  });
+
+  it("keeps the spectator projection byte-identical to the pre-refactor snapshot", async () => {
+    const payloads = await fanoutPayloads();
+    const preRefactorSpectatorSnapshot: LobbyRoomState = {
+      id: "lobby-cost",
+      version: 1,
+      status: "READY",
+      joinCode: "COST",
+      format: "Standard",
+      mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
+      hostReady: true,
+      hostUserId: "host-user",
+      host: { username: "host", name: null, image: null },
+      hostDeck: {
+        id: "host-deck",
+        name: "Host Deck",
+        leaderId: "OP01-001",
+        leaderName: "Leader A",
+        leaderImageUrl: "/leader-a.png",
+      },
+      allowSpectators: true,
+      spectators: spectatorUsers(1),
+      spectatorCount: 1,
+      viewerRole: "spectator",
+      guest: {
+        guestReady: true,
+        user: {
+          id: "guest-user",
+          username: "guest",
+          name: null,
+          image: null,
+        },
+        deck: {
+          id: "guest-deck",
+          name: "Guest Deck",
+          leaderId: "OP01-002",
+          leaderName: "Leader B",
+          leaderImageUrl: "/leader-b.png",
+        },
+      },
+      pendingInvite: null,
+      gameId: null,
+    };
+
+    expect(JSON.stringify(payloads.get("spectator-0"))).toBe(
+      JSON.stringify(preRefactorSpectatorSnapshot)
+    );
+  });
+
+  it("gives every recipient one revision when a mutation races the shared read", async () => {
+    let releaseRead!: (lobby: ReturnType<typeof databaseLobby>) => void;
+    lobbyFindUniqueMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseRead = resolve;
+        })
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+
+    const pendingFanout = notifyLobby(wireLobby(1), {
+      deps: { ...baseDeps, fetch: fetchMock },
+    });
+    await vi.waitFor(() =>
+      expect(lobbyFindUniqueMock).toHaveBeenCalledTimes(1)
+    );
+    let databaseRevision = 41;
+    const capturedRead = { ...databaseLobby(1), revision: databaseRevision };
+    releaseRead(capturedRead);
+    databaseRevision = 42;
+    await pendingFanout;
+
+    expect(databaseRevision).toBe(42);
+    expect(
+      fetchMock.mock.calls.map(
+        ([, init]) => JSON.parse(init.body).lobby.version
+      )
+    ).toEqual([41, 41, 41]);
+    expect(lobbyFindUniqueMock).toHaveBeenCalledTimes(1);
+  });
 });

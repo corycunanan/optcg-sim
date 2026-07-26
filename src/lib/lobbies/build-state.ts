@@ -16,10 +16,29 @@ import {
   PregameModeSchema,
 } from "@/lib/validators/lobbies";
 
-export async function buildLobbyRoomState(
+type LobbyRoomPendingInvite = NonNullable<LobbyRoomState["pendingInvite"]>;
+
+/**
+ * Viewer-invariant database snapshot used to derive lobby wire states.
+ *
+ * The nested shape is intentionally distinct from `LobbyRoomState`: it contains
+ * unredacted participant decks and invite data and therefore must be projected
+ * for a required viewer before it can cross the realtime boundary.
+ */
+export interface LobbyRoomStateRead {
+  common: Omit<
+    LobbyRoomState,
+    "hostDeck" | "guest" | "viewerRole" | "pendingInvite"
+  >;
+  hostDeck: LobbyRoomDeck | null;
+  guest: LobbyRoomState["guest"];
+  pendingInvite: LobbyRoomPendingInvite | null;
+}
+
+export async function readLobbyRoomState(
   lobbyId: string,
-  viewerUserId?: string
-): Promise<LobbyRoomState | null> {
+  deckContentsViewerUserId?: string | null
+): Promise<LobbyRoomStateRead | null> {
   const lobby = await prisma.lobby.findUnique({
     where: { id: lobbyId },
     select: {
@@ -91,26 +110,17 @@ export async function buildLobbyRoomState(
 
   if (!lobby) return null;
 
+  const shouldReadDeckContents =
+    deckContentsViewerUserId === undefined ||
+    deckContentsViewerUserId === lobby.hostUserId ||
+    deckContentsViewerUserId === lobby.guest?.user.id;
+
   const leaderIds: string[] = [];
   const deckIds: string[] = [];
   if (lobby.hostDeck) leaderIds.push(lobby.hostDeck.leaderId);
   if (lobby.guest?.deck?.leaderId) leaderIds.push(lobby.guest.deck.leaderId);
   if (lobby.hostDeck) deckIds.push(lobby.hostDeck.id);
   if (lobby.guest?.deck) deckIds.push(lobby.guest.deck.id);
-
-  const viewerIsParticipant = Boolean(
-    viewerUserId &&
-    (viewerUserId === lobby.hostUserId || viewerUserId === lobby.guest?.user.id)
-  );
-  let viewerRole: LobbyRoomState["viewerRole"] = null;
-  if (viewerUserId === lobby.hostUserId) viewerRole = "host";
-  else if (viewerUserId === lobby.guest?.user.id) viewerRole = "guest";
-  else if (
-    viewerUserId &&
-    lobby.spectators.some(({ user }) => user.id === viewerUserId)
-  ) {
-    viewerRole = "spectator";
-  }
 
   const [leaderCards, decksWithCards] = await Promise.all([
     leaderIds.length
@@ -119,7 +129,7 @@ export async function buildLobbyRoomState(
           select: { id: true, name: true, imageUrl: true },
         })
       : [],
-    viewerIsParticipant && deckIds.length
+    shouldReadDeckContents && deckIds.length
       ? prisma.deck.findMany({
           where: { id: { in: deckIds } },
           select: {
@@ -163,12 +173,7 @@ export async function buildLobbyRoomState(
         leaderName: hostLeader?.name ?? null,
         leaderImageUrl:
           lobby.hostDeck.leaderArtUrl ?? hostLeader?.imageUrl ?? null,
-        ...(viewerIsParticipant
-          ? {
-              contents:
-                contentsMap.get(lobby.hostDeck.id) ?? emptyDeckContents(),
-            }
-          : {}),
+        contents: contentsMap.get(lobby.hostDeck.id) ?? emptyDeckContents(),
       }
     : null;
 
@@ -180,31 +185,29 @@ export async function buildLobbyRoomState(
         leaderName: guestLeader?.name ?? null,
         leaderImageUrl:
           lobby.guest.deck.leaderArtUrl ?? guestLeader?.imageUrl ?? null,
-        ...(viewerIsParticipant
-          ? {
-              contents:
-                contentsMap.get(lobby.guest.deck.id) ?? emptyDeckContents(),
-            }
-          : {}),
+        contents: contentsMap.get(lobby.guest.deck.id) ?? emptyDeckContents(),
       }
     : null;
 
   return {
-    id: lobby.id,
-    version: lobby.revision,
-    status: LobbyStatusSchema.parse(lobby.status),
-    joinCode: lobby.joinCode,
-    format: lobby.format,
-    mode: LobbyModeSchema.parse(lobby.mode),
-    pregameMode: PregameModeSchema.parse(lobby.pregameMode),
-    hostReady: lobby.hostReady,
-    hostUserId: lobby.hostUserId,
-    host: lobby.host,
+    common: {
+      id: lobby.id,
+      version: lobby.revision,
+      status: LobbyStatusSchema.parse(lobby.status),
+      joinCode: lobby.joinCode,
+      format: lobby.format,
+      mode: LobbyModeSchema.parse(lobby.mode),
+      pregameMode: PregameModeSchema.parse(lobby.pregameMode),
+      hostReady: lobby.hostReady,
+      hostUserId: lobby.hostUserId,
+      host: lobby.host,
+      allowSpectators: lobby.allowSpectators,
+      spectators: lobby.spectators.map(({ user }) => user),
+      spectatorCount: lobby.spectators.length,
+      gameId: lobby.gameSessions[0]?.id ?? null,
+      gameStatus: lobby.gameSessions[0]?.status,
+    },
     hostDeck,
-    allowSpectators: lobby.allowSpectators,
-    spectators: lobby.spectators.map(({ user }) => user),
-    spectatorCount: lobby.spectators.length,
-    viewerRole,
     guest: lobby.guest
       ? {
           guestReady: lobby.guest.guestReady,
@@ -212,19 +215,82 @@ export async function buildLobbyRoomState(
           deck: guestDeck,
         }
       : null,
-    // Invitee identity is host-only. Callers that do not represent a viewer
-    // get the safe default (no pending-invite payload), which prevents shared
-    // realtime snapshots from disclosing it to guests or arbitrary users.
-    pendingInvite:
-      lobby.hostUserId === viewerUserId && lobby.invites[0]
-        ? {
-            id: lobby.invites[0].id,
-            expiresAt: lobby.invites[0].expiresAt.toISOString(),
-            user: lobby.invites[0].toUser,
-          }
-        : null,
-    gameId: lobby.gameSessions[0]?.id ?? null,
-    gameStatus: lobby.gameSessions[0]?.status,
+    pendingInvite: lobby.invites[0]
+      ? {
+          id: lobby.invites[0].id,
+          expiresAt: lobby.invites[0].expiresAt.toISOString(),
+          user: lobby.invites[0].toUser,
+        }
+      : null,
+  };
+}
+
+/** Project an unredacted shared read into the public state for one viewer. */
+export function projectLobbyRoomState(
+  read: LobbyRoomStateRead,
+  viewerUserId: string | null
+): LobbyRoomState {
+  const viewerIsHost = viewerUserId === read.common.hostUserId;
+  const viewerIsGuest = viewerUserId === read.guest?.user.id;
+  const viewerIsParticipant = viewerIsHost || viewerIsGuest;
+  let viewerRole: LobbyRoomState["viewerRole"] = null;
+  if (viewerIsHost) viewerRole = "host";
+  else if (viewerIsGuest) viewerRole = "guest";
+  else if (
+    viewerUserId &&
+    read.common.spectators.some((spectator) => spectator.id === viewerUserId)
+  ) {
+    viewerRole = "spectator";
+  }
+
+  return {
+    id: read.common.id,
+    version: read.common.version,
+    status: read.common.status,
+    joinCode: read.common.joinCode,
+    format: read.common.format,
+    mode: read.common.mode,
+    pregameMode: read.common.pregameMode,
+    hostReady: read.common.hostReady,
+    hostUserId: read.common.hostUserId,
+    host: read.common.host,
+    hostDeck: projectDeck(read.hostDeck, viewerIsParticipant),
+    allowSpectators: read.common.allowSpectators,
+    spectators: read.common.spectators,
+    spectatorCount: read.common.spectatorCount,
+    viewerRole,
+    guest: read.guest
+      ? {
+          ...read.guest,
+          deck: projectDeck(read.guest.deck, viewerIsParticipant),
+        }
+      : null,
+    pendingInvite: viewerIsHost ? read.pendingInvite : null,
+    gameId: read.common.gameId,
+    gameStatus: read.common.gameStatus,
+  };
+}
+
+export async function buildLobbyRoomState(
+  lobbyId: string,
+  viewerUserId?: string
+): Promise<LobbyRoomState | null> {
+  const read = await readLobbyRoomState(lobbyId, viewerUserId ?? null);
+  return read ? projectLobbyRoomState(read, viewerUserId ?? null) : null;
+}
+
+function projectDeck(
+  deck: LobbyRoomDeck | null,
+  includeContents: boolean
+): LobbyRoomDeck | null {
+  if (!deck) return null;
+  if (includeContents) return deck;
+  return {
+    id: deck.id,
+    name: deck.name,
+    leaderId: deck.leaderId,
+    leaderName: deck.leaderName,
+    leaderImageUrl: deck.leaderImageUrl,
   };
 }
 

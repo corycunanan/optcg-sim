@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import type { LobbyRoomState } from "./state";
+import type {
+  LobbyRoomStateRead,
+  projectLobbyRoomState,
+} from "./build-state";
 
 const lobbyFindUniqueMock = vi.fn();
 const cardFindManyMock = vi.fn();
@@ -26,6 +31,15 @@ beforeEach(() => {
   deckFindManyMock.mockReset();
   cardFindManyMock.mockResolvedValue([]);
   deckFindManyMock.mockResolvedValue([]);
+});
+
+describe("shared lobby read boundary", () => {
+  it("cannot be confused with the wire type and requires an explicit viewer", () => {
+    expectTypeOf<LobbyRoomStateRead>().not.toMatchTypeOf<LobbyRoomState>();
+    expectTypeOf<Parameters<typeof projectLobbyRoomState>>().toEqualTypeOf<
+      [LobbyRoomStateRead, string | null]
+    >();
+  });
 });
 
 describe("buildLobbyRoomState participant deck contents", () => {
