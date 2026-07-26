@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RemoteGameStatus } from "@/hooks/use-remote-game-status";
 
 type GameStatusEvent = {
@@ -9,10 +9,19 @@ type GameStatusEvent = {
   winReason: string | null;
 };
 
+type SpectatorRemovedEvent = {
+  type: "lobby:spectator_removed";
+  lobbyId: string;
+  reason: "SPECTATING_DISABLED" | "REMOVED_BY_HOST";
+};
+
 const mocks = vi.hoisted(() => ({
   setterCalls: [] as unknown[][],
   setterIndex: 0,
   subscribeHandler: null as ((event: GameStatusEvent) => void) | null,
+  spectatorRemovedHandler: null as
+    | ((event: SpectatorRemovedEvent) => void | Promise<void>)
+    | null,
   subscribeUnsub: vi.fn(),
   effectCleanups: [] as Array<() => void>,
   session: { data: { user: { id: "user-a" } } } as unknown,
@@ -52,12 +61,17 @@ vi.mock("next-auth/react", () => ({
 
 vi.mock("@/components/realtime/user-channel-provider", () => ({
   useUserChannelEvents: () => ({
-    subscribe: <T extends string>(
-      type: T,
-      handler: (event: GameStatusEvent) => void,
+    subscribe: (
+      type: string,
+      handler: (event: GameStatusEvent | SpectatorRemovedEvent) => void,
     ) => {
       if (type === "game:status") {
-        mocks.subscribeHandler = handler;
+        mocks.subscribeHandler = handler as (event: GameStatusEvent) => void;
+      }
+      if (type === "lobby:spectator_removed") {
+        mocks.spectatorRemovedHandler = handler as (
+          event: SpectatorRemovedEvent
+        ) => void | Promise<void>;
       }
       return mocks.subscribeUnsub;
     },
@@ -80,6 +94,7 @@ const baseStatus: RemoteGameStatus = {
 
 beforeEach(() => {
   mocks.subscribeHandler = null;
+  mocks.spectatorRemovedHandler = null;
   mocks.subscribeUnsub.mockReset();
   mocks.setterCalls = [];
   mocks.setterIndex = 0;
@@ -87,13 +102,19 @@ beforeEach(() => {
   mocks.session = { data: { user: { id: "user-a" } } };
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ data: baseStatus }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    ),
+    vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ data: baseStatus }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      )
+    )
   );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("useRemoteGameStatus subscribe behavior", () => {
@@ -101,6 +122,66 @@ describe("useRemoteGameStatus subscribe behavior", () => {
     useRemoteGameStatus("game-1");
 
     expect(mocks.subscribeHandler).toBeTypeOf("function");
+  });
+
+  it("does not subscribe seated players to spectator revocation events", async () => {
+    useRemoteGameStatus("game-1", false);
+    await flushPromises();
+
+    expect(mocks.spectatorRemovedHandler).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      "SPECTATING_DISABLED",
+      "/lobbies?joinError=Spectating%20was%20disabled%20for%20this%20party",
+    ],
+    [
+      "REMOVED_BY_HOST",
+      "/lobbies?joinError=You%20were%20removed%20from%20this%20party",
+    ],
+  ] as const)(
+    "revalidates a mounted spectator on %s and redirects only after a 404",
+    async (reason, expectedRedirect) => {
+      vi.stubGlobal("window", { location: { href: "" } });
+      useRemoteGameStatus("game-1", true);
+      await flushPromises();
+
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Game not found" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        })
+      );
+
+      await mocks.spectatorRemovedHandler?.({
+        type: "lobby:spectator_removed",
+        lobbyId: "lobby-1",
+        reason,
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(window.location.href).toBe(expectedRedirect);
+      expect(mocks.setterCalls[0]).toContain(null);
+      expect(mocks.setterCalls[1]).toContain(true);
+    }
+  );
+
+  it("keeps a mounted spectator when event-triggered revalidation still admits them", async () => {
+    vi.stubGlobal("window", { location: { href: "" } });
+    useRemoteGameStatus("game-1", true);
+    await flushPromises();
+
+    await mocks.spectatorRemovedHandler?.({
+      type: "lobby:spectator_removed",
+      lobbyId: "unrelated-lobby",
+      reason: "REMOVED_BY_HOST",
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(window.location.href).toBe("");
+    expect(mocks.setterCalls[1]).not.toContain(true);
   });
 
   it("recomputes winnerPerspective=SELF when the viewer is the winner", () => {
@@ -253,4 +334,10 @@ function invokeHandlerAndCaptureUpdater(event: GameStatusEvent) {
   const updater = calls[calls.length - 1];
   expect(updater).toBeTypeOf("function");
   return updater as (prev: RemoteGameStatus | null) => RemoteGameStatus | null;
+}
+
+async function flushPromises() {
+  for (let index = 0; index < 10; index += 1) {
+    await Promise.resolve();
+  }
 }

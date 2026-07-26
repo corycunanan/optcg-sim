@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSession } from "next-auth/react";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
@@ -9,6 +9,7 @@ import {
   RemoteGameStatusResponseSchema,
   type RemoteGameStatus,
 } from "@/lib/validators/game";
+import type { RealtimeServerEvent } from "@/types/realtime";
 
 export type { RemoteGameStatus } from "@/lib/validators/game";
 
@@ -16,6 +17,23 @@ export interface UseRemoteGameStatusReturn {
   remoteGameStatus: RemoteGameStatus | null;
   remoteGameNotFound: boolean;
   setRemoteGameStatus: Dispatch<SetStateAction<RemoteGameStatus | null>>;
+}
+
+type SpectatorRemovalEvent = Extract<
+  RealtimeServerEvent,
+  { type: "lobby:spectator_removed" }
+>;
+
+type GameStatusLoadResult = "admitted" | "not_found" | "error";
+
+export function spectatorRemovalRedirect(
+  reason: SpectatorRemovalEvent["reason"]
+): string {
+  const message =
+    reason === "SPECTATING_DISABLED"
+      ? "Spectating was disabled for this party"
+      : "You were removed from this party";
+  return `/lobbies?joinError=${encodeURIComponent(message)}`;
 }
 
 function deriveWinnerPerspective(
@@ -26,7 +44,10 @@ function deriveWinnerPerspective(
   return winnerId === userId ? "SELF" : "OPPONENT";
 }
 
-export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
+export function useRemoteGameStatus(
+  gameId: string,
+  revalidateSpectatorAccess = false
+): UseRemoteGameStatusReturn {
   const [remoteGameStatus, setRemoteGameStatus] =
     useState<RemoteGameStatus | null>(null);
   const [remoteGameNotFound, setRemoteGameNotFound] = useState(false);
@@ -34,34 +55,55 @@ export function useRemoteGameStatus(gameId: string): UseRemoteGameStatusReturn {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? "";
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadGameStatus = async () => {
+  const loadGameStatus = useCallback(
+    async (signal?: AbortSignal): Promise<GameStatusLoadResult> => {
       try {
         const json = await apiGet(
           `/api/game/${gameId}`,
           RemoteGameStatusResponseSchema,
-          { cache: "no-store" }
+          { cache: "no-store", signal }
         );
-        if (cancelled) return;
+        if (signal?.aborted) return "error";
         setRemoteGameStatus(json.data);
         setRemoteGameNotFound(false);
+        return "admitted";
       } catch (error) {
-        if (cancelled) return;
+        if (signal?.aborted) return "error";
         if (error instanceof ApiError && error.status === 404) {
           setRemoteGameStatus(null);
           setRemoteGameNotFound(true);
+          return "not_found";
         }
+        return "error";
       }
-    };
+    },
+    [gameId]
+  );
 
-    void loadGameStatus();
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadInitialStatus = async () => {
+      await loadGameStatus(controller.signal);
+    };
+    void loadInitialStatus();
+    return () => controller.abort();
+  }, [loadGameStatus]);
+
+  useEffect(() => {
+    if (!revalidateSpectatorAccess) return;
+
+    let active = true;
+    const unsubscribe = subscribe("lobby:spectator_removed", async (event) => {
+      const result = await loadGameStatus();
+      if (!active || result !== "not_found") return;
+      window.location.href = spectatorRemovalRedirect(event.reason);
+    });
 
     return () => {
-      cancelled = true;
+      active = false;
+      unsubscribe();
     };
-  }, [gameId]);
+  }, [loadGameStatus, revalidateSpectatorAccess, subscribe]);
 
   // Push-based status updates from the UserChannel. Replaces the 2s poll —
   // status only transitions to terminal (FINISHED/ABANDONED) at game end, so

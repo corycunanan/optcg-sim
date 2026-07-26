@@ -130,6 +130,39 @@ describe("GET /api/game/[id]", () => {
     expect(body.data.canFallbackConcede).toBe(true);
   });
 
+  it.each(["FINISHED", "ABANDONED"] as const)(
+    "deliberately admits a qualifying spectator after the game is %s",
+    async (status) => {
+      authMock.mockResolvedValue({ user: { id: "spectator-1" } });
+      gameSessionFindFirstMock.mockResolvedValue({
+        id: "game-1",
+        mode: "PVP",
+        status,
+        winnerId: status === "FINISHED" ? "player-1" : null,
+        winReason: status === "FINISHED" ? "Game ended" : null,
+        player1Id: "player-1",
+        player2Id: "player-2",
+      });
+
+      const res = await GET(
+        new NextRequest("http://localhost/api/game/game-1"),
+        params
+      );
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.data).toMatchObject({
+        status,
+        winnerPerspective: "NONE",
+        canFallbackConcede: false,
+      });
+      expect(body.data).not.toHaveProperty("playerIndex");
+      expect(gameSessionFindFirstMock.mock.calls[0]?.[0]).not.toHaveProperty(
+        "where.status"
+      );
+    }
+  );
+
   it.each([
     "no LobbySpectator row",
     "a LobbySpectator row for a different lobby",

@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   },
   remoteGameNotFound: false,
   setRemoteGameStatus: vi.fn(),
+  remoteStatusCalls: [] as Array<[string, boolean]>,
   retryFetchCards: vi.fn(),
   fetch: vi.fn(),
 }));
@@ -64,11 +65,14 @@ vi.mock("@/hooks/use-card-database", () => ({
 }));
 
 vi.mock("@/hooks/use-remote-game-status", () => ({
-  useRemoteGameStatus: () => ({
-    remoteGameStatus: mocks.remoteGameStatus,
-    remoteGameNotFound: mocks.remoteGameNotFound,
-    setRemoteGameStatus: mocks.setRemoteGameStatus,
-  }),
+  useRemoteGameStatus: (gameId: string, revalidateSpectatorAccess: boolean) => {
+    mocks.remoteStatusCalls.push([gameId, revalidateSpectatorAccess]);
+    return {
+      remoteGameStatus: mocks.remoteGameStatus,
+      remoteGameNotFound: mocks.remoteGameNotFound,
+      setRemoteGameStatus: mocks.setRemoteGameStatus,
+    };
+  },
 }));
 
 import {
@@ -132,6 +136,7 @@ beforeEach(() => {
   };
   mocks.remoteGameNotFound = false;
   mocks.setRemoteGameStatus.mockReset();
+  mocks.remoteStatusCalls = [];
   mocks.retryFetchCards.mockReset();
   mocks.fetch.mockReset();
   mocks.fetch.mockResolvedValue({
@@ -155,6 +160,10 @@ describe("useGameSession multi-instance composition", () => {
 
     expect(player0.game.myIndex).toBe(0);
     expect(player1.game.myIndex).toBe(1);
+    expect(mocks.remoteStatusCalls).toEqual([
+      ["game-1", false],
+      ["game-1", false],
+    ]);
   });
 
   it("keeps each instance wired to its own sendAction", () => {
@@ -274,6 +283,7 @@ describe("useGameSession multi-instance composition", () => {
     expect(spectator.game.bottomPlayer).toBe(state.players[1]);
     expect(spectator.game.topPlayer).toBe(state.players[0]);
     expect(spectator.game.isMyTurn).toBe(false);
+    expect(mocks.remoteStatusCalls).toEqual([["game-1", true]]);
   });
 
   it("represents unresolved player identity with the pending variant", () => {

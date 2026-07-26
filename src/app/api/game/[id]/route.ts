@@ -39,6 +39,8 @@ export async function GET(
   const { id } = await params;
 
   const game = await prisma.gameSession.findFirst({
+    // Deliberately omit a status filter. An admitted spectator may keep viewing
+    // the same board after FINISHED/ABANDONED; OPT-565 owns terminal-game UX.
     where: {
       id,
       OR: [

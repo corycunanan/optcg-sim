@@ -66,7 +66,7 @@ function renderGamePage() {
   });
 }
 
-describe("/game/[id] spectator admission", () => {
+describe("/game/[id] spectator admission and retention", () => {
   it("passes a resolved player role to the board loader", async () => {
     gameSessionFindFirstMock.mockResolvedValue({
       mode: "PVP",
@@ -123,6 +123,30 @@ describe("/game/[id] spectator admission", () => {
         viewerRole: "spectator",
         bottomPlayerIndex: expectedBottomPlayerIndex,
       });
+    }
+  );
+
+  it.each(["FINISHED", "ABANDONED"] as const)(
+    "deliberately keeps an admitted spectator on a %s board",
+    async (status) => {
+      gameSessionFindFirstMock.mockResolvedValue({
+        mode: "PVP",
+        status,
+        player1Id: "player-1",
+        player2Id: "player-2",
+        lobby: { hostUserId: "player-1" },
+      });
+
+      const result = await renderGamePage();
+
+      expect(gameSessionFindFirstMock).toHaveBeenCalledWith(
+        expectedAdmissionQuery
+      );
+      expect(result.props).toMatchObject({
+        viewerRole: "spectator",
+        bottomPlayerIndex: 0,
+      });
+      expect(redirectMock).not.toHaveBeenCalled();
     }
   );
 

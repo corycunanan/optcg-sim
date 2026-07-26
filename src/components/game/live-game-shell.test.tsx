@@ -238,12 +238,12 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(mocks.boardStates).toHaveLength(0);
   });
 
-  it("shows a finite recovery state when spectator token authorization fails", () => {
+  it("shows the controller's finite recovery state after spectator token authorization fails", () => {
     mocks.viewerRole = "spectator";
     mocks.gameState = null;
     mocks.cardDbReady = false;
     mocks.connectivityFailed = true;
-    mocks.lastError = "Token fetch: 404";
+    mocks.lastError = "Failed to get auth token";
 
     act(() => {
       renderer = create(
@@ -259,7 +259,7 @@ describe("LiveGameShell dispatch wiring", () => {
     const output = JSON.stringify(renderer?.toJSON());
     expect(output).toContain("Can");
     expect(output).toContain("reach the game server");
-    expect(output).toContain("Token fetch: 404");
+    expect(output).toContain("Failed to get auth token");
     expect(mocks.boardStates).toHaveLength(0);
   });
 

@@ -510,8 +510,10 @@ describe("createAuthedWebSocketController", () => {
     expect(harness.scheduledDelays.length).toBe(scheduledBefore);
   });
 
-  it("token fetch failure surfaces 'failed' after MAX attempts", async () => {
-    const getToken = vi.fn().mockRejectedValue(new Error("nope"));
+  it("replaces a spectator token 404 with the controller error and fails after MAX attempts", async () => {
+    const getToken = vi
+      .fn()
+      .mockRejectedValue(new Error("Token fetch: 404"));
     const { controller, harness, advanceTimers } = makeController({ getToken });
     controller.start();
     await Promise.resolve();
@@ -526,6 +528,9 @@ describe("createAuthedWebSocketController", () => {
 
     expect(getToken).toHaveBeenCalledTimes(MAX_RECONNECT_ATTEMPTS + 1);
     expect(harness.statuses[harness.statuses.length - 1]).toBe("failed");
-    expect(harness.errors).toContain("Failed to get auth token");
+    expect(harness.errors[harness.errors.length - 1]).toBe(
+      "Failed to get auth token"
+    );
+    expect(harness.errors).not.toContain("Token fetch: 404");
   });
 });
