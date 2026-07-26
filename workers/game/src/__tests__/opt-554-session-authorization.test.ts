@@ -4,7 +4,8 @@ import {
   SessionAuthorizer,
   type SessionParticipantIdentity,
 } from "../session/authorization.js";
-import type { Env, GameState } from "../types.js";
+import { isSpectatorSocketAttachment } from "../session/transport.js";
+import type { Env, GameState, ServerMessage } from "../types.js";
 import { setupGame } from "./factories.js";
 
 const logMock = vi.hoisted(() => vi.fn());
@@ -23,9 +24,32 @@ class MemoryStorage {
   }
 }
 
+class MockWebSocket {
+  readonly sent: string[] = [];
+  readonly closed: Array<{ code?: number; reason?: string }> = [];
+  private attachment: unknown;
+
+  send(payload: string): void {
+    this.sent.push(payload);
+  }
+
+  close(code?: number, reason?: string): void {
+    this.closed.push({ code, reason });
+  }
+
+  serializeAttachment(value: unknown): void {
+    this.attachment = value;
+  }
+
+  deserializeAttachment(): unknown {
+    return this.attachment;
+  }
+}
+
 class MockDurableObjectState {
   private readonly data = new Map<string, unknown>();
   readonly acceptedSockets: WebSocket[] = [];
+  private readonly tags = new Map<WebSocket, string[]>();
 
   storage = {
     get: async <T>(key: string): Promise<T | undefined> =>
@@ -37,22 +61,48 @@ class MockDurableObjectState {
     deleteAlarm: async (): Promise<void> => undefined,
   };
 
-  acceptWebSocket(ws: WebSocket): void {
+  acceptWebSocket(ws: WebSocket, tags?: string[]): void {
     this.acceptedSockets.push(ws);
+    this.tags.set(ws, tags ?? []);
   }
 
-  getWebSockets(): WebSocket[] {
-    return [];
+  getWebSockets(tag?: string): WebSocket[] {
+    return tag
+      ? this.acceptedSockets.filter((ws) => this.tags.get(ws)?.includes(tag))
+      : this.acceptedSockets;
   }
 
-  getTags(): string[] {
-    return [];
+  getTags(ws: WebSocket): string[] {
+    return this.tags.get(ws) ?? [];
+  }
+}
+
+class PermissiveResponse {
+  status: number;
+  body: BodyInit | null;
+  webSocket: unknown;
+  headers: Headers;
+
+  constructor(
+    body: BodyInit | null = null,
+    init: ResponseInit & { webSocket?: unknown } = {}
+  ) {
+    this.status = init.status ?? 200;
+    this.body = body;
+    this.webSocket = init.webSocket;
+    this.headers = new Headers(init.headers ?? {});
+  }
+
+  async text(): Promise<string> {
+    return this.body ? String(this.body) : "";
   }
 }
 
 type GameSessionTestAccess = {
   gameState: GameState;
   fetch(request: Request): Promise<Response>;
+  broadcast(message: ServerMessage): void;
+  webSocketMessage(ws: WebSocket, message: string): Promise<void>;
 };
 
 type TokenClaims = {
@@ -132,7 +182,7 @@ describe("OPT-554 spectator session authorization", () => {
     });
   });
 
-  it("rejects spectator WebSocket upgrades before pair construction or socket acceptance", async () => {
+  it("admits a spectator socket without player side effects or plain broadcast delivery", async () => {
     const durableState = new MockDurableObjectState();
     const env = {
       GAME_WORKER_SECRET: "test-secret",
@@ -144,11 +194,21 @@ describe("OPT-554 spectator session authorization", () => {
     ) as unknown as GameSessionTestAccess;
     const { state } = setupGame();
     session.gameState = state;
+    const stateBeforeUpgrade = structuredClone(state);
     const token = await mintToken(state, { jti: "spectator-upgrade" });
     const originalWebSocketPair = (globalThis as Record<string, unknown>)
       .WebSocketPair;
-    const pairConstructor = vi.fn(function MockWebSocketPair() {});
+    const originalResponse = globalThis.Response;
+    const client = new MockWebSocket();
+    const server = new MockWebSocket();
+    const pairConstructor = vi.fn(function MockWebSocketPair(
+      this: Record<number, MockWebSocket>
+    ) {
+      this[0] = client;
+      this[1] = server;
+    });
     (globalThis as Record<string, unknown>).WebSocketPair = pairConstructor;
+    globalThis.Response = PermissiveResponse as unknown as typeof Response;
 
     try {
       const response = await session.fetch(
@@ -158,10 +218,27 @@ describe("OPT-554 spectator session authorization", () => {
         )
       );
 
-      expect(response.status).toBe(401);
-      expect(await response.text()).toBe("Unauthorized");
-      expect(pairConstructor).not.toHaveBeenCalled();
-      expect(durableState.acceptedSockets).toEqual([]);
+      expect(response.status).toBe(101);
+      expect(pairConstructor).toHaveBeenCalledOnce();
+      expect(durableState.acceptedSockets).toEqual([server]);
+      expect(durableState.getTags(server as unknown as WebSocket)).toEqual([
+        "spectator:spectator-user",
+      ]);
+      expect(isSpectatorSocketAttachment(server.deserializeAttachment())).toBe(
+        true
+      );
+      expect(session.gameState).toEqual(stateBeforeUpgrade);
+
+      session.broadcast({
+        type: "game:player_reconnected",
+        playerIndex: 0,
+      });
+      await session.webSocketMessage(
+        server as unknown as WebSocket,
+        JSON.stringify({ type: "game:leave" })
+      );
+      expect(server.sent).toEqual([]);
+      expect(session.gameState).toEqual(stateBeforeUpgrade);
     } finally {
       if (originalWebSocketPair === undefined) {
         delete (globalThis as Record<string, unknown>).WebSocketPair;
@@ -169,6 +246,7 @@ describe("OPT-554 spectator session authorization", () => {
         (globalThis as Record<string, unknown>).WebSocketPair =
           originalWebSocketPair;
       }
+      globalThis.Response = originalResponse;
     }
   });
 
