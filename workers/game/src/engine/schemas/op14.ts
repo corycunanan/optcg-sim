@@ -1895,7 +1895,7 @@ export const OP14_049_JINBE: EffectSchema = {
           type: "RETURN_TO_HAND",
           target: {
             type: "CHARACTER",
-            controller: "ANY",
+            controller: "EITHER",
             count: { up_to: 1 },
             filter: { cost_max: 7 },
           },
@@ -2191,7 +2191,7 @@ export const OP14_058_OCEAN_CURRENT_SHOULDER_THROW: EffectSchema = {
           type: "RETURN_TO_HAND",
           target: {
             type: "CHARACTER",
-            controller: "ANY",
+            controller: "EITHER",
             count: { up_to: 1 },
             filter: { base_power_exact: 6000 },
           },
@@ -2265,7 +2265,7 @@ export const OP14_059_PLEASE_TAKE_ME_WITH_YOU: EffectSchema = {
           type: "RETURN_TO_HAND",
           target: {
             type: "CHARACTER",
-            controller: "ANY",
+            controller: "EITHER",
             count: { up_to: 1 },
             filter: { cost_max: 4 },
           },

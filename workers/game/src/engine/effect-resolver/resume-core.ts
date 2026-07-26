@@ -40,6 +40,7 @@ import {
   handleArrangeSearchDeck,
   handleArrangeSearchTrashTheRest,
   handleArrangeSearchAndPlay,
+  handleArrangeLifeScry,
   handleArrangeReorderLife,
   handleArrangeReturnToDeck,
 } from "./resume/deck.js";
@@ -138,6 +139,16 @@ export function resumeEffectChain(
     events
   );
   if (lifeReorder) nextState = lifeReorder;
+
+  const lifeScry = handleArrangeLifeScry(
+    nextState,
+    action,
+    pausedAction,
+    controller,
+    validTargets,
+    events
+  );
+  if (lifeScry) nextState = lifeScry;
 
   const returnToDeck = handleArrangeReturnToDeck(
     nextState,

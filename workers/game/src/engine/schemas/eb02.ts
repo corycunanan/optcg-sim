@@ -915,7 +915,7 @@ export const EB02_024_SOGEKING: EffectSchema = {
           type: "RETURN_TO_HAND",
           target: {
             type: "CHARACTER",
-            controller: "ANY",
+            controller: "EITHER",
             count: { up_to: 1 },
             filter: { cost_max: 1 },
           },

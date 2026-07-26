@@ -385,23 +385,31 @@ describe("OPT-117 dual-target slot controllers", () => {
     );
   });
 
-  it.each(["EITHER", "ANY"] as const)(
-    "accepts %s slot controllers for target types with both-player resolution",
-    (slotController) => {
-      for (const targetType of [
-        "CHARACTER",
-        "LEADER_OR_CHARACTER",
-        "FIELD_CARD",
-      ] as const) {
-        expect(
-          validateEffectSchema(
-            buildSlotControllerSchema(targetType, slotController),
-            "TEST-117"
-          )
-        ).toEqual([]);
-      }
+  it("accepts EITHER slot controllers for target types with both-player resolution", () => {
+    for (const targetType of [
+      "CHARACTER",
+      "LEADER_OR_CHARACTER",
+      "FIELD_CARD",
+    ] as const) {
+      expect(
+        validateEffectSchema(
+          buildSlotControllerSchema(targetType, "EITHER"),
+          "TEST-117"
+        )
+      ).toEqual([]);
     }
-  );
+  });
+
+  it("rejects ANY slot controllers in targeting contexts", () => {
+    expect(
+      validateEffectSchema(
+        buildSlotControllerSchema("CHARACTER", "ANY"),
+        "TEST-117"
+      )
+    ).toContain(
+      "[TEST-117] effects[0].actions[0].dual_targets[0].controller: [C7] Target type 'CHARACTER' does not support dual-target slot controller 'ANY'; use SELF or OPPONENT or EITHER"
+    );
+  });
 
   it.each(["EITHER", "ANY"] as const)(
     "rejects %s slot controllers for target types that collapse both-player modes",

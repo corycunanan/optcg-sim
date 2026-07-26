@@ -1270,7 +1270,7 @@ export const EB04_028_ICE_TIME: EffectSchema = {
           type: "RETURN_TO_HAND",
           target: {
             type: "CHARACTER",
-            controller: "ANY",
+            controller: "EITHER",
             count: { up_to: 1 },
             filter: { cost_max: 5 },
           },

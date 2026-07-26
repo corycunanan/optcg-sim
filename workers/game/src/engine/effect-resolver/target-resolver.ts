@@ -515,18 +515,31 @@ export function computeAllValidTargets(
     }
     case "STAGE": {
       const ctrl = target.controller ?? "SELF";
-      const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
-      const stage = state.players[pi].stage;
-      if (!stage) return [];
-      if (target.filter && !matchesFilterForTarget(stage, target.filter, cardDb, state, _resultRefs)) return [];
-      return [stage.instanceId];
+      const playerIndexes: (0 | 1)[] = ctrl === "EITHER"
+        ? [0, 1]
+        : [ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0)];
+      let candidates = playerIndexes
+        .map((playerIndex) => state.players[playerIndex].stage)
+        .filter(isPresent);
+      if (target.filter) {
+        candidates = candidates.filter((stage) =>
+          matchesFilterForTarget(stage, target.filter!, cardDb, state, _resultRefs));
+      }
+      return candidates.map((stage) => stage.instanceId);
     }
     case "OPPONENT_LIFE": {
       const opp = controller === 0 ? 1 : 0;
       return state.players[opp].life.map((c) => c.instanceId);
     }
     case "LIFE_CARD": {
-      return state.players[controller].life.map((c) => c.instanceId);
+      const ctrl = target.controller ?? "SELF";
+      const playerIndexes: (0 | 1)[] = ctrl === "EITHER"
+        ? [0, 1]
+        : [ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0)];
+      // Authored LIFE_CARD targets are exclusively top-of-Life effects. Keep
+      // OPPONENT_LIFE as the distinct full-stack target type.
+      return playerIndexes.flatMap((playerIndex) =>
+        state.players[playerIndex].life.slice(0, 1).map((card) => card.instanceId));
     }
     case "PLAYER": {
       // Return player index as a string identifier
@@ -700,7 +713,23 @@ export function buildSelectTargetPrompt(
     : undefined;
 
   const pendingPrompt: PendingPromptState = {
-    options: { promptType: "SELECT_TARGET", cards, validTargets: allValidIds, effectDescription, countMin, countMax, ctaLabel: "Confirm", aggregateConstraint, uniquenessConstraint, namedDistribution, dualTargets: dualTargetsMetadata },
+    options: {
+      promptType: "SELECT_TARGET",
+      cards,
+      validTargets: allValidIds,
+      effectDescription,
+      countMin,
+      countMax,
+      ctaLabel: "Confirm",
+      aggregateConstraint,
+      uniquenessConstraint,
+      namedDistribution,
+      dualTargets: dualTargetsMetadata,
+      // Choosing which Life stack/card to inspect must not reveal every
+      // face-down candidate. The selected identity is disclosed later by the
+      // private LIFE_SCRIED event and the one-card arrange prompt.
+      blindSelection: target?.type === "LIFE_CARD" ? true : undefined,
+    },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
   };

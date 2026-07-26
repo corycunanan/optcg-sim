@@ -140,15 +140,22 @@ const SELF_OR_OPPONENT_CONTROLLERS: ReadonlySet<Controller> = new Set([
   "SELF",
   "OPPONENT",
 ]);
+const TARGETABLE_CONTROLLERS: ReadonlySet<Controller> = new Set([
+  "SELF",
+  "OPPONENT",
+  "EITHER",
+]);
+const SELF_CONTROLLER: ReadonlySet<Controller> = new Set(["SELF"]);
+const OPPONENT_CONTROLLER: ReadonlySet<Controller> = new Set(["OPPONENT"]);
 const NO_SLOT_CONTROLLERS: ReadonlySet<Controller> = new Set();
 const DUAL_TARGET_SLOT_CONTROLLER_MODES = {
   SELF: NO_SLOT_CONTROLLERS,
   YOUR_LEADER: NO_SLOT_CONTROLLERS,
   OPPONENT_LEADER: NO_SLOT_CONTROLLERS,
-  CHARACTER: VALID_CONTROLLERS,
+  CHARACTER: TARGETABLE_CONTROLLERS,
   STAGE: SELF_OR_OPPONENT_CONTROLLERS,
-  LEADER_OR_CHARACTER: VALID_CONTROLLERS,
-  FIELD_CARD: VALID_CONTROLLERS,
+  LEADER_OR_CHARACTER: TARGETABLE_CONTROLLERS,
+  FIELD_CARD: TARGETABLE_CONTROLLERS,
   ALL_YOUR_CHARACTERS: NO_SLOT_CONTROLLERS,
   ALL_OPPONENT_CHARACTERS: NO_SLOT_CONTROLLERS,
   CHARACTER_CARD: SELF_OR_OPPONENT_CONTROLLERS,
@@ -167,6 +174,39 @@ const DUAL_TARGET_SLOT_CONTROLLER_MODES = {
   OPPONENT_LIFE: NO_SLOT_CONTROLLERS,
   TRIGGERING_CARD: NO_SLOT_CONTROLLERS,
   TRIGGERING_CARD_IN_TRASH: NO_SLOT_CONTROLLERS,
+} satisfies Record<TargetType, ReadonlySet<Controller>>;
+
+// Parent Target.controller support is deliberately exhaustive and fail-closed.
+// Runtime target resolution cannot silently reinterpret a newly-authored mode:
+// adding a TargetType is a compile error here, and an unknown lookup denies it.
+// Fixed-scope target types tolerate the redundant controller forms already
+// shipped in the authored corpus (for example SELF + SELF).
+const TARGET_CONTROLLER_MODES = {
+  SELF: SELF_CONTROLLER,
+  YOUR_LEADER: SELF_CONTROLLER,
+  OPPONENT_LEADER: OPPONENT_CONTROLLER,
+  CHARACTER: TARGETABLE_CONTROLLERS,
+  STAGE: TARGETABLE_CONTROLLERS,
+  LEADER_OR_CHARACTER: TARGETABLE_CONTROLLERS,
+  FIELD_CARD: TARGETABLE_CONTROLLERS,
+  ALL_YOUR_CHARACTERS: SELF_CONTROLLER,
+  ALL_OPPONENT_CHARACTERS: SELF_CONTROLLER,
+  CHARACTER_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  STAGE_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  EVENT_CARD: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_HAND: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_TRASH: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_ON_TOP_OF_DECK: SELF_OR_OPPONENT_CONTROLLERS,
+  CARD_IN_DECK: SELF_OR_OPPONENT_CONTROLLERS,
+  LIFE_CARD: TARGETABLE_CONTROLLERS,
+  DON_IN_COST_AREA: SELF_OR_OPPONENT_CONTROLLERS,
+  DON_ATTACHED: NO_SLOT_CONTROLLERS,
+  DON_IN_DON_DECK: NO_SLOT_CONTROLLERS,
+  PLAYER: SELF_OR_OPPONENT_CONTROLLERS,
+  SELECTED_CARDS: NO_SLOT_CONTROLLERS,
+  OPPONENT_LIFE: OPPONENT_CONTROLLER,
+  TRIGGERING_CARD: NO_SLOT_CONTROLLERS,
+  TRIGGERING_CARD_IN_TRASH: SELF_CONTROLLER,
 } satisfies Record<TargetType, ReadonlySet<Controller>>;
 
 /**
@@ -500,6 +540,21 @@ function validateTargetController(target: Action["target"], prefix: string): str
     target?.filter as TargetFilter | undefined,
     `${prefix}.target`,
   ));
+  const parentController = target?.controller;
+  if (parentController !== undefined && !VALID_CONTROLLERS.has(parentController)) {
+    errors.push(`${prefix}.target.controller: Invalid controller '${parentController}'`);
+  } else if (parentController !== undefined && target?.type) {
+    const supportedModes = TARGET_CONTROLLER_MODES[target.type]
+      ?? NO_SLOT_CONTROLLERS;
+    if (!supportedModes.has(parentController)) {
+      const guidance = supportedModes.size === 0
+        ? "this target type has fixed scope; remove the controller"
+        : `use ${[...supportedModes].join(" or ")}`;
+      errors.push(
+        `${prefix}.target.controller: [C8] Target type '${target.type}' does not support controller '${parentController}'; ${guidance}`,
+      );
+    }
+  }
   for (let i = 0; i < (target?.dual_targets?.length ?? 0); i++) {
     const slotController = target!.dual_targets![i].controller;
     if (slotController !== undefined && !VALID_CONTROLLERS.has(slotController)) {
@@ -512,7 +567,7 @@ function validateTargetController(target: Action["target"], prefix: string): str
       if (!supportedModes.has(slotController)) {
         const guidance = supportedModes.size === 0
           ? "this target type does not support a per-slot controller; remove the controller"
-          : "use SELF or OPPONENT";
+          : `use ${[...supportedModes].join(" or ")}`;
         errors.push(
           `${prefix}.dual_targets[${i}].controller: [C7] Target type '${target.type}' does not support dual-target slot controller '${slotController}'; ${guidance}`,
         );

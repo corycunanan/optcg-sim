@@ -10,7 +10,13 @@ import type {
   PendingEvent,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
+import {
+  autoSelectTargets,
+  buildSelectTargetPrompt,
+  computeAllValidTargets,
+  lifeCardToTargetCandidate,
+  needsPlayerTargetSelection,
+} from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
@@ -533,26 +539,111 @@ export function executeTrashFaceUpLife(
 export function executeLifeScry(
   state: GameState,
   action: ActionOf<"LIFE_SCRY">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
   const lookAt = params.look_at ?? 1;
-  const p = state.players[controller];
-  const count = Math.min(lookAt, p.life.length);
-  if (count === 0) return { state, events, succeeded: false };
 
-  const lifeCards = p.life.slice(0, count);
+  // Legacy target-less LIFE_SCRY remains scoped to the acting player's top
+  // Life cards. Authored Katakuri-family schemas use LIFE_CARD + EITHER and
+  // take the private select -> reveal -> place flow below.
+  if (!action.target) {
+    const lifeCards = state.players[controller].life.slice(0, lookAt);
+    if (lifeCards.length === 0) return { state, events, succeeded: false };
+    events.push({
+      type: "LIFE_SCRIED",
+      playerIndex: controller,
+      payload: {
+        cards: lifeCards.map((card) => ({
+          instanceId: card.instanceId,
+          cardId: card.cardId,
+        })),
+        count: lifeCards.length,
+      },
+    });
+    return { state, events, succeeded: true };
+  }
+
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(
+    state,
+    action.target,
+    controller,
+    cardDb,
+    sourceCardInstanceId,
+    resultRefs,
+  );
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(
+      state,
+      action,
+      allValidIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+    );
+  }
+
+  const selectedIds = preselectedTargets ?? autoSelectTargets(action.target, allValidIds);
+  // "Up to 1" permits declining the look while allowing chained actions to
+  // continue normally.
+  if (selectedIds.length === 0) return { state, events, succeeded: true };
+
+  const selectedId = selectedIds[0];
+  const owner = state.players[0].life.some((card) => card.instanceId === selectedId)
+    ? 0
+    : state.players[1].life.some((card) => card.instanceId === selectedId)
+      ? 1
+      : null;
+  if (owner === null) return { state, events, succeeded: false };
+  const selectedLifeCard = state.players[owner].life.find(
+    (card) => card.instanceId === selectedId,
+  );
+  if (!selectedLifeCard) return { state, events, succeeded: false };
+
   events.push({
     type: "LIFE_SCRIED",
     playerIndex: controller,
-    payload: { cards: lifeCards.map((l) => ({ instanceId: l.instanceId, cardId: l.cardId })), count },
+    payload: {
+      cards: [{
+        instanceId: selectedLifeCard.instanceId,
+        cardId: selectedLifeCard.cardId,
+      }],
+      count: 1,
+    },
   });
 
-  return { state, events, succeeded: true };
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const resumeCtx: import("../../../types.js").ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [],
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [selectedId],
+  };
+  const pendingPrompt: import("../../../types.js").PendingPromptState = {
+    options: {
+      promptType: "ARRANGE_TOP_CARDS",
+      cards: [lifeCardToTargetCandidate(selectedLifeCard, {
+        owner,
+        visibility: "ENGINE_INTERNAL",
+      })],
+      effectDescription: sourceData?.effectText ?? "Place the Life card at the top or bottom.",
+      canSendToBottom: true,
+      validTargets: [selectedId],
+    },
+    respondingPlayer: controller,
+    resumeContext: resumeCtx,
+  };
+
+  return { state, events, succeeded: false, pendingPrompt };
 }
 
 export function executeDrainLifeToThreshold(
