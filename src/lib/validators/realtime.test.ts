@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RealtimeServerEventSchema } from "./realtime";
 
 describe("RealtimeServerEventSchema spectator removal", () => {
-  it.each(["SPECTATING_DISABLED", "REMOVED_BY_HOST"] as const)(
+  it.each(["SPECTATING_DISABLED", "REMOVED_BY_HOST", "LOBBY_CLOSED"] as const)(
     "accepts the %s reason",
     (reason) => {
       expect(

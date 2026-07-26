@@ -7,7 +7,9 @@ const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
 const lobbySpectatorDeleteManyMock = vi.fn();
 const userFindUniqueMock = vi.fn();
+const userFindManyMock = vi.fn();
 const userUpdateManyMock = vi.fn();
+const queryRawMock = vi.fn();
 const inviteFindManyMock = vi.fn();
 const inviteUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
@@ -35,7 +37,9 @@ beforeEach(() => {
     lobbyGuestDeleteManyMock,
     lobbySpectatorDeleteManyMock,
     userFindUniqueMock,
+    userFindManyMock,
     userUpdateManyMock,
+    queryRawMock,
     inviteFindManyMock,
     inviteUpdateManyMock,
     transactionMock,
@@ -73,10 +77,13 @@ beforeEach(() => {
     },
   });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindManyMock.mockResolvedValue([]);
+  queryRawMock.mockResolvedValue([{ id: "locked" }]);
   inviteFindManyMock.mockResolvedValue([]);
   inviteUpdateManyMock.mockResolvedValue({ count: 1 });
   transactionMock.mockImplementation(async (operation) =>
     operation({
+      $queryRaw: queryRawMock,
       lobby: {
         findFirst: lobbyFindFirstMock,
         updateMany: lobbyUpdateManyMock,
@@ -88,6 +95,7 @@ beforeEach(() => {
       lobbySpectator: { deleteMany: lobbySpectatorDeleteManyMock },
       user: {
         findUnique: userFindUniqueMock,
+        findMany: userFindManyMock,
         updateMany: userUpdateManyMock,
       },
       lobbyInvite: {
@@ -207,6 +215,7 @@ describe("joinLobbyByCode", () => {
     transactionMock.mockImplementationOnce(async (operation) => {
       const draft = structuredClone(state);
       const tx = {
+        $queryRaw: async () => [{ id: "locked" }],
         lobby: {
           findFirst: async () => ({
             id: "player-lobby",
@@ -235,6 +244,7 @@ describe("joinLobbyByCode", () => {
           },
         },
         user: {
+          findMany: async () => [],
           findUnique: async () => ({
             activeLobbyId: draft.activeLobbyId,
             activeLobby: {

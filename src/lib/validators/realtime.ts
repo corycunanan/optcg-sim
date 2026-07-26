@@ -85,7 +85,7 @@ export const RealtimeServerEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("lobby:spectator_removed"),
     lobbyId: z.string(),
-    reason: z.enum(["SPECTATING_DISABLED", "REMOVED_BY_HOST"]),
+    reason: z.enum(["SPECTATING_DISABLED", "REMOVED_BY_HOST", "LOBBY_CLOSED"]),
   }),
   z.object({
     type: z.literal("lobby:guest_removed"),

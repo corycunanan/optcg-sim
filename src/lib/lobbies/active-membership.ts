@@ -74,3 +74,21 @@ export async function releaseActiveLobby(
     data: { activeLobbyId: null },
   });
 }
+
+/** Release every active-lobby pointer in deterministic user-id lock order. */
+export async function releaseActiveLobbyMembers(
+  tx: Prisma.TransactionClient,
+  lobbyId: string
+) {
+  const members = await tx.user.findMany({
+    where: { activeLobbyId: lobbyId },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+  const orderedMembers = [...members].sort((a, b) => a.id.localeCompare(b.id));
+
+  for (const { id: userId } of orderedMembers) {
+    await releaseActiveLobby(tx, userId, lobbyId);
+  }
+  return orderedMembers.map(({ id }) => id);
+}

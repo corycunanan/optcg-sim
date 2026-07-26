@@ -9,7 +9,9 @@ const lobbyUpdateManyMock = vi.fn();
 const lobbyGuestCreateMock = vi.fn();
 const lobbyGuestDeleteManyMock = vi.fn();
 const userFindUniqueMock = vi.fn();
+const userFindManyMock = vi.fn();
 const userUpdateManyMock = vi.fn();
+const queryRawMock = vi.fn();
 const inviteFindManyMock = vi.fn();
 const inviteUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
@@ -53,6 +55,7 @@ vi.mock("@/lib/db", () => ({
     },
     user: {
       findUnique: (...args: unknown[]) => userFindUniqueMock(...args),
+      findMany: (...args: unknown[]) => userFindManyMock(...args),
       updateMany: (...args: unknown[]) => userUpdateManyMock(...args),
     },
     lobbyInvite: {
@@ -101,7 +104,9 @@ beforeEach(() => {
     lobbyGuestCreateMock,
     lobbyGuestDeleteManyMock,
     userFindUniqueMock,
+    userFindManyMock,
     userUpdateManyMock,
+    queryRawMock,
     inviteFindManyMock,
     inviteUpdateManyMock,
     transactionMock,
@@ -123,6 +128,8 @@ beforeEach(() => {
     activeLobby: null,
   });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
+  userFindManyMock.mockResolvedValue([]);
+  queryRawMock.mockResolvedValue([{ id: "locked" }]);
   inviteFindManyMock.mockResolvedValue([]);
   inviteUpdateManyMock.mockResolvedValue({ count: 1 });
   buildLobbyRoomStateMock.mockResolvedValue({
@@ -134,12 +141,17 @@ beforeEach(() => {
   notifyUserMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(async (operation) =>
     operation({
+      $queryRaw: queryRawMock,
       lobby: { findFirst: lobbyFindFirstMock, updateMany: lobbyUpdateManyMock },
       lobbyGuest: {
         create: lobbyGuestCreateMock,
         deleteMany: lobbyGuestDeleteManyMock,
       },
-      user: { findUnique: userFindUniqueMock, updateMany: userUpdateManyMock },
+      user: {
+        findUnique: userFindUniqueMock,
+        findMany: userFindManyMock,
+        updateMany: userUpdateManyMock,
+      },
       lobbyInvite: {
         findMany: inviteFindManyMock,
         updateMany: inviteUpdateManyMock,
@@ -199,9 +211,10 @@ describe("POST /api/lobbies/join", () => {
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
     });
-    expect(userUpdateManyMock).toHaveBeenCalledWith({
+    expect(userFindManyMock).toHaveBeenCalledWith({
       where: { activeLobbyId: "personal-lobby" },
-      data: { activeLobbyId: null },
+      select: { id: true },
+      orderBy: { id: "asc" },
     });
   });
 
@@ -295,9 +308,10 @@ describe("POST /api/lobbies/join", () => {
     expect(lobbyGuestDeleteManyMock).toHaveBeenCalledWith({
       where: { lobbyId: "current-lobby" },
     });
-    expect(userUpdateManyMock).toHaveBeenCalledWith({
+    expect(userFindManyMock).toHaveBeenCalledWith({
       where: { activeLobbyId: "current-lobby" },
-      data: { activeLobbyId: null },
+      select: { id: true },
+      orderBy: { id: "asc" },
     });
     expect(inviteUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "pending-invite", status: "PENDING" },
@@ -611,6 +625,7 @@ describe("POST /api/lobbies/join", () => {
     transactionMock.mockImplementationOnce(async (operation) => {
       const draft = structuredClone(state);
       const tx = {
+        $queryRaw: async () => [{ id: "locked" }],
         lobby: {
           findFirst: async () => ({ ...targetLobby, id: "target-lobby" }),
           updateMany: async (args: {
@@ -633,6 +648,10 @@ describe("POST /api/lobbies/join", () => {
           create: async () => undefined,
         },
         user: {
+          findMany: async ({ where }: { where: { activeLobbyId: string } }) =>
+            Object.entries(draft.users)
+              .filter(([, value]) => value.activeLobbyId === where.activeLobbyId)
+              .map(([id]) => ({ id })),
           findUnique: async () => ({
             activeLobbyId: draft.users.joiner.activeLobbyId,
             activeLobby: {

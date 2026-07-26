@@ -24,7 +24,11 @@ import {
   notifySpectatorsRemoved,
 } from "@/lib/realtime/fanout-lobby";
 import { resolvePregameMode, type PregameMode } from "@shared/game-init";
-import { releaseActiveLobby } from "@/lib/lobbies/active-membership";
+import {
+  releaseActiveLobby,
+  releaseActiveLobbyMembers,
+} from "@/lib/lobbies/active-membership";
+import { lockLobbyMembership } from "@/lib/lobbies/membership-lock";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -291,14 +295,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       const spectators = await tx.lobbySpectator.findMany({
         where: { lobbyId: id },
         select: { userId: true },
+        orderBy: { userId: "asc" },
       });
-      removedSpectatorUserIds = spectators.map(({ userId }) => userId);
+      removedSpectatorUserIds = spectators
+        .map(({ userId }) => userId)
+        .sort((a, b) => a.localeCompare(b));
       await tx.lobbySpectator.deleteMany({ where: { lobbyId: id } });
-      await Promise.all(
-        removedSpectatorUserIds.map((spectatorUserId) =>
-          releaseActiveLobby(tx, spectatorUserId, id),
-        ),
-      );
+      for (const spectatorUserId of removedSpectatorUserIds) {
+        await releaseActiveLobby(tx, spectatorUserId, id);
+      }
     }
 
     if (switchingToSolitaire) {
@@ -409,8 +414,50 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // This conditional status transition is the concurrency lock shared
-      // with POST /start. Closing and starting cannot both win a READY room.
+      // Serialize close against spectator joins before capturing their IDs.
+      // The lock is shared with all writes to this lobby row, including start.
+      if (!(await lockLobbyMembership(tx, id))) {
+        return {
+          failure: "NOT_FOUND" as const,
+          removedSpectatorUserIds: [] as string[],
+        };
+      }
+
+      const lobby = await tx.lobby.findUnique({
+        where: { id },
+        select: {
+          hostUserId: true,
+          mode: true,
+          status: true,
+          spectators: {
+            select: { userId: true },
+            orderBy: { userId: "asc" },
+          },
+        },
+      });
+
+      if (!lobby) {
+        return {
+          failure: "NOT_FOUND" as const,
+          removedSpectatorUserIds: [] as string[],
+        };
+      }
+
+      let failure: CloseFailure | null = null;
+      if (lobby.status === "CLOSED") failure = "NOT_FOUND";
+      else if (lobby.hostUserId !== userId) failure = "FORBIDDEN";
+      else if (lobby.status === "IN_GAME") failure = "ALREADY_STARTED";
+      else if (lobby.mode !== "PVP") failure = "NOT_PVP";
+
+      if (failure) {
+        return { failure, removedSpectatorUserIds: [] as string[] };
+      }
+
+      // Capture the directed terminal-event audience before CLOSED clears
+      // active membership. The post-mutation room audience is not authoritative.
+      const removedSpectatorUserIds = lobby.spectators
+        .map(({ userId }) => userId)
+        .sort((a, b) => a.localeCompare(b));
       const closed = await tx.lobby.updateMany({
         where: {
           id,
@@ -422,29 +469,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       });
 
       if (closed.count === 1) {
-        await tx.user.updateMany({
-          where: { activeLobbyId: id },
-          data: { activeLobbyId: null },
-        });
-        return { failure: null };
+        await releaseActiveLobbyMembers(tx, id);
+        return { failure: null, removedSpectatorUserIds };
       }
-
-      const lobby = await tx.lobby.findUnique({
-        where: { id },
-        select: {
-          hostUserId: true,
-          mode: true,
-          status: true,
-        },
-      });
-
-      let failure: CloseFailure;
-      if (!lobby || lobby.status === "CLOSED") failure = "NOT_FOUND";
-      else if (lobby.hostUserId !== userId) failure = "FORBIDDEN";
-      else if (lobby.status === "IN_GAME") failure = "ALREADY_STARTED";
-      else failure = "NOT_PVP";
-
-      return { failure };
+      return {
+        failure: "NOT_FOUND" as const,
+        removedSpectatorUserIds: [] as string[],
+      };
     });
 
     if (result.failure) return closeFailureResponse(result.failure);
@@ -457,28 +488,32 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         // guest's terminal CLOSED event.
         console.error("[lobbies:close] invite cancellation failed", error);
       });
+      const spectatorEjectionFanout = result.removedSpectatorUserIds.length
+        ? notifySpectatorsRemoved({
+            lobbyId: id,
+            reason: "LOBBY_CLOSED",
+            removedSpectatorUserIds: result.removedSpectatorUserIds,
+          })
+        : Promise.resolve();
+      const guestTerminalFanout = buildLobbyRoomState(id).then((state) => {
+        if (!state) return;
 
-      const state = await buildLobbyRoomState(id);
-      if (!state) {
-        await cancelInvites;
-        return;
-      }
+        const guestUserId =
+          state.guest && state.guest.user.id !== state.hostUserId
+            ? state.guest.user.id
+            : null;
+        return guestUserId
+          ? notifyUser(guestUserId, {
+              type: "lobby:state_changed",
+              lobby: { ...state, status: "CLOSED" },
+            })
+          : undefined;
+      });
 
-      const guestUserId =
-        state.guest && state.guest.user.id !== state.hostUserId
-          ? state.guest.user.id
-          : null;
-      if (!guestUserId) {
-        await cancelInvites;
-        return;
-      }
-
-      await Promise.all([
+      await Promise.allSettled([
         cancelInvites,
-        notifyUser(guestUserId, {
-          type: "lobby:state_changed",
-          lobby: { ...state, status: "CLOSED" },
-        }),
+        spectatorEjectionFanout,
+        guestTerminalFanout,
       ]);
     });
 

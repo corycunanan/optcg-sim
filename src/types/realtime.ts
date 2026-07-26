@@ -34,7 +34,7 @@ export type RealtimeServerEvent =
   | {
       type: "lobby:spectator_removed";
       lobbyId: string;
-      reason: "SPECTATING_DISABLED" | "REMOVED_BY_HOST";
+      reason: "SPECTATING_DISABLED" | "REMOVED_BY_HOST" | "LOBBY_CLOSED";
     }
   | {
       type: "lobby:guest_removed";

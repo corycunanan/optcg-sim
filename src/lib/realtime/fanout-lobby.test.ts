@@ -330,7 +330,7 @@ describe("notifyLobby", () => {
     }
   );
 
-  it.each(["SPECTATING_DISABLED", "REMOVED_BY_HOST"] as const)(
+  it.each(["SPECTATING_DISABLED", "REMOVED_BY_HOST", "LOBBY_CLOSED"] as const)(
     "directs exactly one %s event to every removed spectator outside current-state fanout",
     async (reason) => {
       const fetchMock = vi
