@@ -113,6 +113,43 @@ describe("OPT-555 spectator transport", () => {
     );
   });
 
+  it("denies a restored spectator attachment when its tag is missing", () => {
+    const beforeState = new MockSocketState();
+    const beforeWake = transport(beforeState);
+    const beforeSocket = new MockWebSocket();
+    beforeWake.acceptSpectator(
+      "spectator-user",
+      beforeSocket as unknown as WebSocket
+    );
+    const attachment = JSON.parse(
+      JSON.stringify(beforeSocket.deserializeAttachment())
+    ) as unknown;
+
+    const restoredState = new MockSocketState();
+    const restoredSpectator = new MockWebSocket(attachment);
+    restoredState.acceptWebSocket(
+      restoredSpectator as unknown as WebSocket,
+      []
+    );
+    const afterWake = transport(restoredState);
+    const player = new MockWebSocket();
+    afterWake.accept(0, player as unknown as WebSocket);
+
+    expect(
+      afterWake.spectatorIdFor(restoredSpectator as unknown as WebSocket)
+    ).toBeNull();
+    expect(
+      isSpectatorSocketAttachment(restoredSpectator.deserializeAttachment())
+    ).toBe(true);
+    afterWake.broadcast({
+      type: "game:player_reconnected",
+      playerIndex: 0,
+    });
+
+    expect(player.sent).toHaveLength(1);
+    expect(restoredSpectator.sent).toEqual([]);
+  });
+
   it.each([
     null,
     "attachment",

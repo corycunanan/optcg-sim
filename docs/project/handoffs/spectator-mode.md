@@ -16,7 +16,7 @@ Tickets on the current worker/visibility critical path plus the urgent revocatio
 
 | Order | Ticket | Title | Estimate | Depends on | Status | PR | Notes |
 |-------|--------|-------|----------|------------|--------|----|-------|
-| 1 | OPT-555 | Transport: spectator socket class, attachment, and hibernation identity | — | OPT-554 | In Review | [#427](https://github.com/corycunanan/optcg-sim/pull/427) | Spectator admission is default-deny for delivery. |
+| 1 | OPT-555 | Transport: spectator socket class, attachment, and hibernation identity | — | OPT-554 | In Review | [#427](https://github.com/corycunanan/optcg-sim/pull/427) | Socket scaffolding only; spectator upgrades remain fail-closed. |
 | 2 | OPT-552 | Broadcast wiring for the spectator view + third-filtered-state cost | — | OPT-551, OPT-555 | In Progress | — | Immediate cross-track successor. |
 | 3 | OPT-557 | Broadcast allowlist: audit which ServerMessages reach spectator sockets | — | OPT-555 | Backlog | — | Resume Track B after OPT-552. |
 | 4 | OPT-556 | Receive-only enforcement + spectator connection and message budgets | — | OPT-557 | Backlog | — | |
@@ -36,9 +36,8 @@ Tickets on the current worker/visibility critical path plus the urgent revocatio
 ### OPT-555 → OPT-552
 **From:** session on 2026-07-25 · **Commit:** `60d9747` · **PR:** [#427](https://github.com/corycunanan/optcg-sim/pull/427)
 
-- **Primer:** Spectators now have tagged, hibernation-safe, newest-authoritative sockets, but all plain transport broadcasts deny them by default.
+- **Primer:** The spectator socket class is implemented and hibernation-safe, but GameSession still rejects every spectator upgrade with 401, so the class is not live yet.
 - **Read first:** `workers/game/src/session/transport.ts`, `workers/game/src/GameSession.ts`, `workers/game/src/__tests__/opt-555-spectator-transport.test.ts`.
-- **Gotchas / do NOT touch:** Keep plain `broadcast()` default-deny and preserve player delivery if spectator view building throws; OPT-557 owns the message allowlist and OPT-556 owns inbound enforcement/budgets.
+- **Gotchas / do NOT touch:** Do not admit spectator upgrades until OPT-556 rejects frames before the shared coordinator and adds connection/message budgets; keep plain `broadcast()` default-deny, and land OPT-552/557 before sending any spectator payload.
 - **Unresolved:** OPT-574 owns established-socket revocation and expiry rechecks; no comment or behavior should imply token TTL bounds an accepted socket.
-- **Why this matters for OPT-552:** Use `spectatorSocket`/spectator tags for lazy merged-view delivery, and add explicit spectator state delivery without routing player-filtered or action-bearing frames through the plain broadcast path.
-
+- **Why this matters for OPT-552:** The unreachable transport scaffold is ready for lazy merged-view wiring, but no payload is live and the 401 must remain until the OPT-556 admission preconditions are satisfied.

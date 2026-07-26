@@ -102,12 +102,6 @@ export class SessionTransport {
     return true;
   }
 
-  upgradeSpectator(userId: string): Response {
-    const { 0: client, 1: server } = new WebSocketPair();
-    this.acceptSpectator(userId, server);
-    return new Response(null, { status: 101, webSocket: client });
-  }
-
   playerIndexFor(ws: WebSocket): 0 | 1 | null {
     const tag = this.state
       .getTags(ws)
@@ -346,13 +340,17 @@ export class SessionTransport {
 
   private shouldSend(ws: WebSocket): boolean {
     if (
+      getSpectatorSocketAttachment(ws) !== null ||
       this.spectatorIdFor(ws) !== null ||
       this.state.getTags(ws).includes(SPECTATOR_CAPACITY_REJECTED_TAG)
     ) {
       return false;
     }
     const playerIndex = this.playerIndexFor(ws);
-    return playerIndex === null || this.isAuthoritative(ws, playerIndex);
+    if (playerIndex === null) return false;
+    const attachment = getPlayerSocketAttachment(ws);
+    if (!attachment || attachment.playerIndex !== playerIndex) return false;
+    return this.isAuthoritative(ws, playerIndex);
   }
 }
 
