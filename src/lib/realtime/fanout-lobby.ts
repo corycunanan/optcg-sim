@@ -15,7 +15,11 @@
  */
 
 import type { LobbyRoomState } from "@/lib/lobbies/state";
-import { buildLobbyRoomState } from "@/lib/lobbies/build-state";
+import {
+  projectLobbyRoomState,
+  readLobbyRoomState,
+  type LobbyRoomStateRead,
+} from "@/lib/lobbies/build-state";
 import type { RealtimeServerEvent } from "@/types/realtime";
 import { notifyUser, type NotifyUserDeps } from "./fan-out";
 
@@ -29,11 +33,8 @@ export interface NotifyLobbyOptions {
   actorUserId?: string;
   /** Test seam — production callers leave this undefined. */
   deps?: NotifyUserDeps;
-  /** Test seam for participant-scoped state serialization. */
-  stateBuilder?: (
-    lobbyId: string,
-    viewerUserId: string
-  ) => Promise<LobbyRoomState | null>;
+  /** Test seam for the single viewer-invariant database read. */
+  stateReader?: (lobbyId: string) => Promise<LobbyRoomStateRead | null>;
 }
 
 export async function notifyLobby(
@@ -47,17 +48,21 @@ export async function notifyLobby(
 
   if (targets.length === 0) return;
 
-  const stateBuilder = options.stateBuilder ?? buildLobbyRoomState;
+  const stateReader = options.stateReader ?? readLobbyRoomState;
+  const sharedRead = await stateReader(lobby.id);
+  if (!sharedRead) return;
+
   await Promise.all(
-    targets.map(async (userId) => {
-      const viewerState = await stateBuilder(lobby.id, userId);
-      if (!viewerState) return;
-      return notifyUser(
+    targets.map((userId) =>
+      notifyUser(
         userId,
-        { type: "lobby:state_changed", lobby: viewerState },
+        {
+          type: "lobby:state_changed",
+          lobby: projectLobbyRoomState(sharedRead, userId),
+        },
         options.deps
-      );
-    })
+      )
+    )
   );
 }
 

@@ -1,4 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import type { LobbyRoomState } from "./state";
+import type {
+  LobbyRoomStateRead,
+  projectLobbyRoomState,
+  readLobbyRoomState,
+} from "./build-state";
 
 const lobbyFindUniqueMock = vi.fn();
 const cardFindManyMock = vi.fn();
@@ -26,6 +32,18 @@ beforeEach(() => {
   deckFindManyMock.mockReset();
   cardFindManyMock.mockResolvedValue([]);
   deckFindManyMock.mockResolvedValue([]);
+});
+
+describe("shared lobby read boundary", () => {
+  it("cannot be confused with the wire type and requires an explicit viewer", () => {
+    expectTypeOf<LobbyRoomStateRead>().not.toMatchTypeOf<LobbyRoomState>();
+    expectTypeOf<Parameters<typeof projectLobbyRoomState>>().toEqualTypeOf<
+      [LobbyRoomStateRead, string | null]
+    >();
+    expectTypeOf<Parameters<typeof readLobbyRoomState>>().toEqualTypeOf<
+      [string]
+    >();
+  });
 });
 
 describe("buildLobbyRoomState participant deck contents", () => {
@@ -138,14 +156,14 @@ describe("buildLobbyRoomState participant deck contents", () => {
     }
   );
 
-  it("omits all deck contents for a non-participant viewer", async () => {
+  it("loads deck contents once but omits them for a non-participant viewer", async () => {
     lobbyFindUniqueMock.mockResolvedValue(lobbyWithDecks);
 
     const state = await buildLobbyRoomState("lobby-1", "stranger-1");
 
     expect(state?.hostDeck?.contents).toBeUndefined();
     expect(state?.guest?.deck?.contents).toBeUndefined();
-    expect(deckFindManyMock).not.toHaveBeenCalled();
+    expect(deckFindManyMock).toHaveBeenCalledTimes(1);
   });
 });
 
