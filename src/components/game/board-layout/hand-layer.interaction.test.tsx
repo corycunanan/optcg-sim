@@ -181,6 +181,31 @@ describe("HandLayer spectator interaction", () => {
     expect(useSortable).not.toHaveBeenCalled();
   });
 
+  it("keeps a seated opponent sleeve visible while its draw flight runs", () => {
+    const hiddenCard = makeHiddenCard("opponent-draw-in-flight", 1);
+
+    act(() => {
+      renderer = create(
+        <InteractionModeProvider value="full">
+          <HandLayer
+            cards={[hiddenCard]}
+            cardDb={{} as CardDb}
+            inFlightInstanceIds={new Set([hiddenCard.instanceId])}
+          />
+        </InteractionModeProvider>
+      );
+    });
+
+    expect(
+      renderer!.root.findByProps({
+        "data-testid": "card-opponent-draw-in-flight",
+      }),
+    ).toBeDefined();
+    expect(renderer!.root.findAllByProps({ className: "invisible" })).toHaveLength(
+      0,
+    );
+  });
+
   it("excludes a defensive hidden card from mixed-hand sorting", () => {
     const hiddenCard = makeHiddenCard("bottom-hand-hidden", 0);
 

@@ -237,6 +237,43 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
 
     expect(transition.cardId).toBe("hidden");
   });
+
+  it("uses the sole visible received card when a redacted draw omits its instance id", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { cardId: "hidden" },
+    } as unknown as GameEvent;
+    const hands: [CardInstance[], CardInstance[]] = [
+      [],
+      [handCard("p1-visible-draw", "OP02-002", 1)],
+    ];
+
+    const [transition] = eventToTransitions(ev, 0, registry, null, hands);
+
+    expect(transition.cardId).toBe("OP02-002");
+  });
+
+  it("degrades face-down when a revealed draw instance is absent from received state", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP02-003",
+        cardInstanceId: "event-only-instance",
+      },
+    } as unknown as GameEvent;
+    const hands: [CardInstance[], CardInstance[]] = [
+      [],
+      [handCard("received-hidden-instance", "hidden", 1)],
+    ];
+
+    const [transition] = eventToTransitions(ev, 0, registry, null, hands);
+
+    expect(transition.cardId).toBeNull();
+  });
 });
 
 describe("receivedHandsByPlayerIndex", () => {

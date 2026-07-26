@@ -400,15 +400,15 @@ function eventToTransition(
 
   if (to.endsWith("-hand") && receivedHands) {
     const receivedHand = receivedHands[playerIndex];
-    const exactCard = cardInstanceId
+    const receivedCard = cardInstanceId
       ? receivedHand.find((card) => card.instanceId === cardInstanceId)
-      : undefined;
-    const matchingCard = cardId
-      ? [...receivedHand]
-          .reverse()
-          .find((card) => card.cardId === cardId)
-      : undefined;
-    cardId = exactCard?.cardId ?? matchingCard?.cardId ?? cardId;
+      : receivedHand.length === 1
+        ? receivedHand[0]
+        : undefined;
+    // The destination projection is the sole art authority. If it cannot
+    // identify this transition unambiguously, render a face-down ghost rather
+    // than trusting an event payload whose redaction may differ.
+    cardId = receivedCard?.cardId ?? null;
   }
 
   const allowSpotlightCardIdFallback =

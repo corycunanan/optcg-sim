@@ -295,18 +295,14 @@ export const HandLayer = React.memo(function HandLayer({
     // sleeve without relying on viewer identity or board position.
     if (card.cardId === "hidden") {
       return (
-        <div
+        <Card
           key={card.instanceId}
+          data={{ card, cardDb }}
+          variant="hand"
+          faceDown
+          sleeveUrl={sleeveUrl}
           style={marginStyle}
-          className={cn(isInFlight && "invisible")}
-        >
-          <Card
-            data={{ card, cardDb }}
-            variant="hand"
-            faceDown
-            sleeveUrl={sleeveUrl}
-          />
-        </div>
+        />
       );
     }
 
