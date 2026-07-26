@@ -21,6 +21,11 @@ vi.mock("./game-board-loader", () => ({
 
 const GamePage = (await import("./page")).default;
 
+const playerIdentities = {
+  player1: { username: "luffy", name: "Monkey D. Luffy" },
+  player2: { username: "zoro", name: "Roronoa Zoro" },
+};
+
 const expectedAdmissionQuery = {
   where: {
     id: "game-1",
@@ -45,6 +50,8 @@ const expectedAdmissionQuery = {
     mode: true,
     player1Id: true,
     player2Id: true,
+    player1: { select: { username: true, name: true } },
+    player2: { select: { username: true, name: true } },
     lobby: { select: { hostUserId: true } },
   },
 };
@@ -72,6 +79,7 @@ describe("/game/[id] spectator admission and retention", () => {
       mode: "PVP",
       player1Id: "viewer-1",
       player2Id: "player-2",
+      ...playerIdentities,
       lobby: { hostUserId: "viewer-1" },
     });
 
@@ -90,6 +98,7 @@ describe("/game/[id] spectator admission and retention", () => {
       mode: "PVP",
       player1Id: "player-1",
       player2Id: "viewer-1",
+      ...playerIdentities,
       lobby: { hostUserId: "player-1" },
     });
 
@@ -109,6 +118,7 @@ describe("/game/[id] spectator admission and retention", () => {
         mode: "PVP",
         player1Id: "player-1",
         player2Id: "player-2",
+        ...playerIdentities,
         lobby: { hostUserId },
       });
 
@@ -122,6 +132,7 @@ describe("/game/[id] spectator admission and retention", () => {
         gameMode: "PVP",
         viewerRole: "spectator",
         bottomPlayerIndex: expectedBottomPlayerIndex,
+        playerDisplayNames: ["luffy", "zoro"],
       });
     }
   );
@@ -134,6 +145,7 @@ describe("/game/[id] spectator admission and retention", () => {
         status,
         player1Id: "player-1",
         player2Id: "player-2",
+        ...playerIdentities,
         lobby: { hostUserId: "player-1" },
       });
 
@@ -149,6 +161,24 @@ describe("/game/[id] spectator admission and retention", () => {
       expect(redirectMock).not.toHaveBeenCalled();
     }
   );
+
+  it("uses username, then name, then player-number fallbacks", async () => {
+    gameSessionFindFirstMock.mockResolvedValue({
+      mode: "PVP",
+      player1Id: "player-1",
+      player2Id: "player-2",
+      player1: { username: null, name: "Monkey D. Luffy" },
+      player2: { username: null, name: null },
+      lobby: { hostUserId: "player-1" },
+    });
+
+    const result = await renderGamePage();
+
+    expect(result.props.playerDisplayNames).toEqual([
+      "Monkey D. Luffy",
+      "Player 2",
+    ]);
+  });
 
   it.each([
     "no LobbySpectator row",

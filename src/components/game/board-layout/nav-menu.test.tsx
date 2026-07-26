@@ -8,7 +8,9 @@ vi.mock("@/components/ui", () => {
     <button {...props}>{children}</button>
   );
   return {
-    AlertDialog: Wrapper,
+    AlertDialog: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="concede-dialog-root">{children}</div>
+    ),
     AlertDialogAction: Button,
     AlertDialogCancel: Button,
     AlertDialogContent: Wrapper,
@@ -43,5 +45,24 @@ describe("NavMenu spectator-safe actions", () => {
       .map((button) => button.children.join(""));
     expect(buttonText).toContain("← Back to Lobbies");
     expect(buttonText).not.toContain("Concede");
+    expect(
+      renderer!.root.findAllByProps({
+        "data-testid": "concede-dialog-root",
+      })
+    ).toHaveLength(0);
+  });
+
+  it("mounts the concede dialog policy only when concession is available", () => {
+    act(() => {
+      renderer = create(
+        <NavMenu onLeave={vi.fn()} onConcede={vi.fn()} matchClosed={false} />
+      );
+    });
+
+    expect(
+      renderer!.root.findAllByProps({
+        "data-testid": "concede-dialog-root",
+      })
+    ).toHaveLength(1);
   });
 });

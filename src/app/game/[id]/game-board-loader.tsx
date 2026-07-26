@@ -17,6 +17,7 @@ export function GameBoardLoader({
   gameMode,
   viewerRole,
   bottomPlayerIndex,
+  playerDisplayNames,
 }: {
   gameId: string;
   workerUrl: string;
@@ -24,6 +25,7 @@ export function GameBoardLoader({
   gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
   viewerRole: "player" | "spectator";
   bottomPlayerIndex?: 0 | 1;
+  playerDisplayNames: readonly [string, string];
 }) {
   return (
     <LiveGameShell
@@ -33,6 +35,7 @@ export function GameBoardLoader({
       gameMode={gameMode}
       viewerRole={viewerRole}
       bottomPlayerIndex={bottomPlayerIndex}
+      playerDisplayNames={playerDisplayNames}
     />
   );
 }
